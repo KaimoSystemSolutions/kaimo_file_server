@@ -1,0 +1,14 @@
+services:
+  kaimo_file_server_core:
+    image: ${DOCKER_REGISTRY-}kaimofileservercore
+    container_name: kaimo_file_server_core
+    user: root
+    ports:
+      - 4445:445
+    volumes: 
+    #Both work
+      #- C:\Users\Marco\source\repos\Kaimo_File_Server_Core\mappings\data\storage:/data/storage 
+      - C:/Users/Marco/source/repos/Kaimo_File_Server_Core/mappings/data/storage:/data/storage
+    build:
+      context: Kaimo_File_Server_Core
+      dockerfile: Dockerfile
