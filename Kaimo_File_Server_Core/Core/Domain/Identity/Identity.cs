@@ -9,6 +9,8 @@ namespace Kaimo_File_Server_Core.Core.Domain.Identity
         public Guid Id { get; init; }
         public string Name { get; init; }
 
+        protected Identity() { }
+
         public Identity(Guid id, string name) 
         { 
             Id = id;

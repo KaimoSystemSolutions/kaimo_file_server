@@ -7,6 +7,7 @@ namespace Kaimo_File_Server_Core.Core.Domain
 {
     public class FileMetadata
     {
+        public Guid Id { get; set; }
         public string Path { get; init; }
         public string Name { get; init; }
 
@@ -19,5 +20,10 @@ namespace Kaimo_File_Server_Core.Core.Domain
         public string OwnerId { get; init; }
 
         public IReadOnlyList<AccessEntry> Acl { get; init; }
+
+        internal FileMetadata() { }
+
+
+
     }
 }

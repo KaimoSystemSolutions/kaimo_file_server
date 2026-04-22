@@ -108,23 +108,49 @@ namespace Kaimo_File_Server_Core.Smb
             data = null;
             var h = handle as FileHandle;
 
+            Console.WriteLine($"[ReadFile] offset={offset} maxCount={maxCount}");
+
             if (h == null || h.IsDirectory)
                 return NTStatus.STATUS_INVALID_HANDLE;
 
             try
             {
+                var user = _userContextAccessor.Get();
+                if (!_fileService.CanReadSync(h.Path, user))
+                    return NTStatus.STATUS_ACCESS_DENIED;
+
                 h.Stream.Position = offset;
                 byte[] buffer = new byte[maxCount];
                 int read = h.Stream.Read(buffer, 0, maxCount);
+
+                Console.WriteLine($"[ReadFile] read {read} bytes");
+
+                // Kein Byte gelesen
+                if (read == 0)
+                {
+                    // Wenn offset > 0, wurde schon was gelesen → EOF ist ok
+                    if (offset > 0)
+                    {
+                        Console.WriteLine($"[ReadFile] returning END_OF_FILE");
+                        return NTStatus.STATUS_END_OF_FILE;
+                    }
+
+                    // Wenn offset == 0, ist die Datei leer → SUCCESS mit 0 Bytes
+                    Console.WriteLine($"[ReadFile] empty file, returning SUCCESS with 0 bytes");
+                    data = new byte[0];
+                    return NTStatus.STATUS_SUCCESS;
+                }
 
                 if (read < maxCount)
                     Array.Resize(ref buffer, read);
 
                 data = buffer;
+                Console.WriteLine($"[ReadFile] returning SUCCESS with {data.Length} bytes");
                 return NTStatus.STATUS_SUCCESS;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"[ReadFile ERROR] {ex.Message}");
                 return NTStatus.STATUS_ACCESS_DENIED;
             }
         }
@@ -140,8 +166,11 @@ namespace Kaimo_File_Server_Core.Smb
             try
             {
                 var user = _userContextAccessor.Get();
-                var stream = new MemoryStream(data);
-                _fileService.WriteFile(h.Path, stream, user).GetAwaiter().GetResult();
+                if (!_fileService.CanWrite(h.Path, user).GetAwaiter().GetResult())
+                    return NTStatus.STATUS_ACCESS_DENIED;
+
+                h.Stream.Position = offset;
+                h.Stream.Write(data, 0, data.Length);
                 numberOfBytesWritten = data.Length;
                 return NTStatus.STATUS_SUCCESS;
             }
@@ -193,10 +222,10 @@ namespace Kaimo_File_Server_Core.Smb
 
         // ---------------- DIRECTORY ----------------
         public NTStatus QueryDirectory(
-        out List<QueryDirectoryFileInformation> result,
-        object handle,
-        string fileName,
-        FileInformationClass informationClass)
+    out List<QueryDirectoryFileInformation> result,
+    object handle,
+    string fileName,
+    FileInformationClass informationClass)
         {
             result = new List<QueryDirectoryFileInformation>();
 
@@ -204,48 +233,99 @@ namespace Kaimo_File_Server_Core.Smb
             if (h == null || !h.IsDirectory)
                 return NTStatus.STATUS_INVALID_HANDLE;
 
+            Console.WriteLine($"[QueryDirectory] path={h.Path} fileName={fileName}");
+
             try
             {
                 foreach (var dir in Directory.GetDirectories(h.Path))
                 {
                     var info = new DirectoryInfo(dir);
-
-                    result.Add(new FileDirectoryInformation
-                    {
-                        FileName = info.Name,
-                        CreationTime = info.CreationTimeUtc,
-                        LastAccessTime = info.LastAccessTimeUtc,
-                        LastWriteTime = info.LastWriteTimeUtc,
-                        ChangeTime = info.LastWriteTimeUtc,
-                        EndOfFile = 0,
-                        AllocationSize = 0,
-                        FileAttributes = FileAttributes.Directory
-                    });
+                    result.Add(CreateFileInfo(info.Name, info, true, informationClass));
                 }
 
                 foreach (var file in Directory.GetFiles(h.Path))
                 {
                     var info = new FileInfo(file);
-
-                    result.Add(new FileDirectoryInformation
-                    {
-                        FileName = info.Name,
-                        CreationTime = info.CreationTimeUtc,
-                        LastAccessTime = info.LastAccessTimeUtc,
-                        LastWriteTime = info.LastWriteTimeUtc,
-                        ChangeTime = info.LastWriteTimeUtc,
-                        EndOfFile = info.Length,
-                        AllocationSize = info.Length,
-                        FileAttributes = FileAttributes.Normal
-                    });
+                    result.Add(CreateFileInfo(info.Name, info, false, informationClass));
                 }
 
+                Console.WriteLine($"[QueryDirectory] found {result.Count} items");
                 return NTStatus.STATUS_SUCCESS;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"[QueryDirectory ERROR] {ex.Message}");
                 return NTStatus.STATUS_ACCESS_DENIED;
             }
+        }
+
+        private QueryDirectoryFileInformation CreateFileInfo(
+            string name,
+            FileSystemInfo info,
+            bool isDirectory,
+            FileInformationClass informationClass)
+        {
+            var attrs = isDirectory ? FileAttributes.Directory : FileAttributes.Normal;
+            long size = isDirectory ? 0 : ((FileInfo)info).Length;
+
+            return informationClass switch
+            {
+                FileInformationClass.FileDirectoryInformation => new FileDirectoryInformation
+                {
+                    FileName = name,
+                    CreationTime = info.CreationTimeUtc,
+                    LastAccessTime = info.LastAccessTimeUtc,
+                    LastWriteTime = info.LastWriteTimeUtc,
+                    ChangeTime = info.LastWriteTimeUtc,
+                    EndOfFile = size,
+                    AllocationSize = size,
+                    FileAttributes = attrs
+                },
+
+                FileInformationClass.FileFullDirectoryInformation => new FileFullDirectoryInformation
+                {
+                    FileName = name,
+                    CreationTime = info.CreationTimeUtc,
+                    LastAccessTime = info.LastAccessTimeUtc,
+                    LastWriteTime = info.LastWriteTimeUtc,
+                    ChangeTime = info.LastWriteTimeUtc,
+                    EndOfFile = size,
+                    AllocationSize = size,
+                    FileAttributes = attrs,
+                    EaSize = 0
+                },
+
+                FileInformationClass.FileBothDirectoryInformation => new FileBothDirectoryInformation
+                {
+                    FileName = name,
+                    ShortName = name.Length > 12 ? name.Substring(0, 12) : name,
+                    CreationTime = info.CreationTimeUtc,
+                    LastAccessTime = info.LastAccessTimeUtc,
+                    LastWriteTime = info.LastWriteTimeUtc,
+                    ChangeTime = info.LastWriteTimeUtc,
+                    EndOfFile = size,
+                    AllocationSize = size,
+                    FileAttributes = attrs,
+                    EaSize = 0
+                },
+
+                FileInformationClass.FileNamesInformation => new FileNamesInformation
+                {
+                    FileName = name
+                },
+
+                _ => new FileDirectoryInformation
+                {
+                    FileName = name,
+                    CreationTime = info.CreationTimeUtc,
+                    LastAccessTime = info.LastAccessTimeUtc,
+                    LastWriteTime = info.LastWriteTimeUtc,
+                    ChangeTime = info.LastWriteTimeUtc,
+                    EndOfFile = size,
+                    AllocationSize = size,
+                    FileAttributes = attrs
+                }
+            };
         }
 
         // ---------------- FILE INFO ----------------

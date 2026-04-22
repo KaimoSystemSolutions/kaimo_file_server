@@ -4,10 +4,12 @@ from io import BytesIO
 HOST = "127.0.0.1"
 PORT = 4445
 SHARE = "test"
+USERNAME = "marco.hanisch"
+PASSWORD = "1234"
 
 def connect():
     conn = SMBConnection(HOST, HOST, sess_port=PORT)
-    conn.login("guest", "")
+    conn.login(USERNAME, PASSWORD)
     return conn
 
 def list_shares(conn):
@@ -24,7 +26,14 @@ def list_files(conn):
 def read_file(conn):
     path = input("Dateipfad (z.B. \\test.txt): ").strip()
     file_obj = BytesIO()
-    conn.getFile(SHARE, path, file_obj.write)
+    
+    try:
+        conn.getFile(SHARE, path, file_obj.write)
+    except Exception as e:
+        # STATUS_END_OF_FILE ist normal beim Lesen, ignorieren
+        if "STATUS_END_OF_FILE" not in str(e):
+            raise
+    
     content = file_obj.getvalue()
     
     print("\n[+] Dateiinhalt:")
@@ -45,7 +54,7 @@ def menu():
     conn = None
     try:
         conn = connect()
-        print(f"[+] Verbunden mit {HOST}:{PORT} als guest")
+        print(f"[+] Verbunden mit {HOST}:{PORT} als {USERNAME}")
 
         while True:
             print("\n=== SMB Menü ===")

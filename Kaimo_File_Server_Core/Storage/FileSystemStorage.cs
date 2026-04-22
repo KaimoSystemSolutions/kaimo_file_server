@@ -4,10 +4,13 @@ using SMBLibrary;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using static Kaimo_File_Server_Core.Core.Security.FilePermissions;
+using static Kaimo_File_Server_Core.Core.Security.FilePermission;
 
 namespace Kaimo_File_Server_Core.Storage
 {
+    /// <summary>
+    /// Class which manages all direct file system operations (read/write/delete/metadata) for the file server.
+    /// </summary>
     internal class FileSystemStorage : IStorageEngine
     {
         private readonly string _rootPath;
@@ -21,6 +24,12 @@ namespace Kaimo_File_Server_Core.Storage
             _rootPath = rootPath;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        /// <exception cref="UnauthorizedAccessException"></exception>
         private string GetFullPath(string path)
         {
             var root = Path.GetFullPath(_rootPath)
