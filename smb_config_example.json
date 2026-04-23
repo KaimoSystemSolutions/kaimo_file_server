@@ -1,0 +1,15 @@
+{
+  "ip": "192.168.1.10",
+  "port": 445,
+  "username": "admin",
+  "password": "your_password_here",
+  "domain": "",
+  "test_share": "",
+  "test_all_shares": true,
+  "write_test": true,
+  "delete_test": true,
+  "benchmark": true,
+  "benchmark_size_kb": 1024,
+  "timeout": 30,
+  "verbose": false
+}

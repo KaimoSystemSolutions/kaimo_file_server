@@ -362,3 +362,4 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /mappings/data
+/.idea/.idea.Kaimo_File_Server_Core/.idea
