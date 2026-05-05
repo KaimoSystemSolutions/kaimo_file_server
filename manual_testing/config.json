@@ -1,8 +1,8 @@
 {
-  "ip": "10.10.10.10",
-  "port": 445,
+  "ip": "127.0.0.1",
+  "port": 4445,
   "username": "marco.hanisch",
-  "password": "your_password_here",
+  "password": "1234",
   "domain": "",
   "test_share": "",
   "test_all_shares": true,

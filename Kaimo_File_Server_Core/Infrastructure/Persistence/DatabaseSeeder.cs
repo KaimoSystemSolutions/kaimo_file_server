@@ -78,12 +78,13 @@ namespace Kaimo_File_Server_Core.Infrastructure.Persistence
             // Share-Zugriff (Whitelist)
             _db.ShareAccessEntries.AddRange(
                 new ShareAccessEntry("test", admin.Id),
-                new ShareAccessEntry("test", marco.Id),
+                //new ShareAccessEntry("test", marco.Id),
                 new ShareAccessEntry("test", devGroup.Id),
                 new ShareAccessEntry("projekte", admin.Id),
                 new ShareAccessEntry("projekte", marco.Id)
             );
 
+            
 
             await _db.SaveChangesAsync();
             Console.WriteLine($"[+] Testdaten erstellt:");
