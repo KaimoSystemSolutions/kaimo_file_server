@@ -65,6 +65,46 @@ except ImportError:
 
 
 # ═══════════════════════════════════════════════════════════════
+# Berechtigungs-Erkennung
+# ═══════════════════════════════════════════════════════════════
+
+# NT STATUS Codes die auf Berechtigungsprobleme hinweisen
+_ACCESS_DENIED_INDICATORS = (
+    "access_denied", "access is denied", "STATUS_ACCESS_DENIED",
+    "STATUS_LOGON_FAILURE", "STATUS_BAD_NETWORK_NAME",
+    "STATUS_NETWORK_NAME_DELETED", "STATUS_SHARING_VIOLATION",
+    "STATUS_PRIVILEGE_NOT_HELD", "STATUS_INVALID_HANDLE",
+    "permission", "zugriff verweigert", "nicht berechtigt",
+    "0xc0000022",  # NT STATUS_ACCESS_DENIED
+    "0xc000006d",  # NT STATUS_LOGON_FAILURE
+)
+
+
+def is_access_denied(exc: Exception) -> bool:
+    """Prüft ob eine Exception auf fehlende Berechtigungen hinweist."""
+    msg = str(exc).lower()
+    return any(ind.lower() in msg for ind in _ACCESS_DENIED_INDICATORS)
+
+
+def permission_hint(exc: Exception) -> str:
+    """Gibt einen benutzerfreundlichen Hinweis zur fehlenden Berechtigung."""
+    msg = str(exc).lower()
+    if "bad_network_name" in msg or "network_name_deleted" in msg:
+        return "Share existiert nicht oder ist nicht erreichbar"
+    if "logon_failure" in msg:
+        return "Anmeldung am Share fehlgeschlagen"
+    if "sharing_violation" in msg:
+        return "Datei ist durch anderen Prozess gesperrt"
+    if "privilege_not_held" in msg:
+        return "Höhere Berechtigung erforderlich (z.B. Admin)"
+    if "access_denied" in msg or "access is denied" in msg or "0xc0000022" in msg:
+        return "Zugriff verweigert — fehlende Berechtigung"
+    if isinstance(exc, PermissionError):
+        return "Zugriff verweigert (OS-Ebene)"
+    return f"Fehlgeschlagen: {type(exc).__name__}"
+
+
+# ═══════════════════════════════════════════════════════════════
 # Datenklassen
 # ═══════════════════════════════════════════════════════════════
 
@@ -72,7 +112,7 @@ except ImportError:
 class TestResult:
     name: str
     category: str
-    status: str = "PENDING"  # PASS, FAIL, WARN, SKIP
+    status: str = "PENDING"  # PASS, FAIL, WARN, SKIP, DENIED
     message: str = ""
     duration_ms: float = 0.0
     details: dict = field(default_factory=dict)
@@ -80,9 +120,33 @@ class TestResult:
     @property
     def icon(self):
         return {
-            "PASS": "✅", "FAIL": "❌", "WARN": "⚠️",
-            "SKIP": "⏭️", "PENDING": "⏳",
+            "PASS": "✅", "FAIL": "❌", "WARN": "⚠️ ",
+            "SKIP": "⏭️", "PENDING": "⏳", "DENIED": "🔒",
         }.get(self.status, "❓")
+
+
+@dataclass
+class SharePermissions:
+    """Erkannte Berechtigungen für einen einzelnen Share."""
+    name: str
+    accessible: bool = False      # Share überhaupt erreichbar
+    can_read: bool = False        # Lesen (listPath, retrieveFile)
+    can_write: bool = False       # Schreiben (storeFile)
+    can_delete: bool = False      # Löschen (deleteFiles)
+    can_create_dir: bool = False  # Ordner erstellen
+    can_rename: bool = False      # Umbenennen
+    error_message: str = ""       # Fehler beim Zugriff
+
+    def summary_line(self) -> str:
+        if not self.accessible:
+            return f"🔒 {self.name}: KEIN ZUGRIFF — {self.error_message}"
+        flags = []
+        flags.append("✅ Read" if self.can_read else "🔒 Read")
+        flags.append("✅ Write" if self.can_write else "🔒 Write")
+        flags.append("✅ Delete" if self.can_delete else "🔒 Delete")
+        flags.append("✅ MkDir" if self.can_create_dir else "🔒 MkDir")
+        flags.append("✅ Rename" if self.can_rename else "🔒 Rename")
+        return f"  {self.name}: {' | '.join(flags)}"
 
 
 @dataclass
@@ -118,6 +182,7 @@ class SMBTester:
         self.results: list[TestResult] = []
         self.conn: Optional[SMBConnection] = None
         self.discovered_shares: list[str] = []
+        self.share_permissions: dict[str, SharePermissions] = {}
         self._prefix = f"_smbtest_{uuid.uuid4().hex[:8]}"
 
         # Client-Name generieren falls nicht gesetzt
@@ -139,15 +204,28 @@ class SMBTester:
         try:
             func(result, *args, **kwargs)
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"SMB-Fehler: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = f"🔒 {permission_hint(e)}"
+            else:
+                result.status = "FAIL"
+                result.message = f"SMB-Fehler: {e}"
             self._log(f"{name}: {e}", "ERROR")
         except PermissionError as e:
+            result.status = "DENIED"
+            result.message = f"🔒 {permission_hint(e)}"
+        except ConnectionError as e:
             result.status = "FAIL"
-            result.message = f"Zugriff verweigert: {e}"
+            result.message = f"Verbindungsfehler: {e}"
+            self._log(f"{name}: Verbindung verloren: {e}", "ERROR")
         except Exception as e:
-            result.status = "FAIL"
-            result.message = f"{type(e).__name__}: {e}"
+            # Auch hier auf Access-Denied prüfen
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = f"🔒 {permission_hint(e)}"
+            else:
+                result.status = "FAIL"
+                result.message = f"{type(e).__name__}: {e}"
             if self.config.verbose:
                 traceback.print_exc()
         finally:
@@ -156,6 +234,26 @@ class SMBTester:
             suffix = f" — {result.message}" if result.message else ""
             print(f"  {result.icon}  {name}: {result.status} "
                   f"({result.duration_ms:.0f}ms){suffix}")
+        return result
+
+    def _skip_test(self, name: str, category: str, reason: str) -> TestResult:
+        """Erstellt einen übersprungenen Test mit Begründung (ohne Ausführung)."""
+        result = TestResult(
+            name=name, category=category,
+            status="SKIP", message=reason, duration_ms=0,
+        )
+        self.results.append(result)
+        print(f"  {result.icon}  {name}: {result.status} — {reason}")
+        return result
+
+    def _denied_test(self, name: str, category: str, reason: str) -> TestResult:
+        """Erstellt einen DENIED-Test (Berechtigung fehlt)."""
+        result = TestResult(
+            name=name, category=category,
+            status="DENIED", message=f"🔒 {reason}", duration_ms=0,
+        )
+        self.results.append(result)
+        print(f"  {result.icon}  {name}: {result.status} — 🔒 {reason}")
         return result
 
     def _new_connection(self, username=None, password=None) -> SMBConnection:
@@ -194,6 +292,92 @@ class SMBTester:
             except Exception:
                 self.conn = None
                 return False
+
+    # ─── Berechtigungsprüfung pro Share ───────────────────────
+
+    def probe_share_permissions(self, share: str) -> SharePermissions:
+        """
+        Testet systematisch welche Rechte auf einem Share vorhanden sind.
+        Gibt ein SharePermissions-Objekt zurück.
+        Wird VOR den eigentlichen Tests aufgerufen.
+        """
+        perms = SharePermissions(name=share)
+
+        if not self.conn:
+            perms.error_message = "Keine aktive Verbindung"
+            return perms
+
+        # 1) Share erreichbar? (listPath auf Root)
+        try:
+            self.conn.listPath(share, "/")
+            perms.accessible = True
+            perms.can_read = True
+        except Exception as e:
+            perms.accessible = False
+            perms.error_message = permission_hint(e)
+            self.share_permissions[share] = perms
+            return perms
+
+        # 2) Schreibrecht? (kleine Testdatei erstellen)
+        test_file = f"{self._prefix}_permcheck.tmp"
+        try:
+            self.conn.storeFile(
+                share, f"/{test_file}",
+                io.BytesIO(b"permission_check"),
+            )
+            perms.can_write = True
+        except Exception:
+            perms.can_write = False
+
+        # 3) Löschrecht? (nur wenn Schreiben ging)
+        if perms.can_write:
+            try:
+                self.conn.deleteFiles(share, f"/{test_file}")
+                perms.can_delete = True
+            except Exception:
+                perms.can_delete = False
+                # Datei bleibt liegen — wird am Ende aufgeräumt
+
+        # 4) Ordner-Erstellung?
+        test_dir = f"{self._prefix}_permcheck_dir"
+        try:
+            self.conn.createDirectory(share, test_dir)
+            perms.can_create_dir = True
+            try:
+                self.conn.deleteDirectory(share, test_dir)
+            except Exception:
+                pass
+        except Exception:
+            perms.can_create_dir = False
+
+        # 5) Umbenennen? (nur wenn Schreiben ging)
+        if perms.can_write:
+            old = f"{self._prefix}_permren_a.tmp"
+            new = f"{self._prefix}_permren_b.tmp"
+            try:
+                self.conn.storeFile(
+                    share, f"/{old}", io.BytesIO(b"rename_check"),
+                )
+                try:
+                    self.conn.rename(share, f"/{old}", f"/{new}")
+                    perms.can_rename = True
+                    self._safe_delete(share, new)
+                except AttributeError:
+                    # pysmb-Version ohne rename()
+                    perms.can_rename = False
+                except Exception:
+                    perms.can_rename = False
+                    self._safe_delete(share, old)
+            except Exception:
+                perms.can_rename = False
+
+        # Aufräumen der Permcheck-Dateien
+        for fn in (test_file, f"{self._prefix}_permren_a.tmp",
+                   f"{self._prefix}_permren_b.tmp"):
+            self._safe_delete(share, fn)
+
+        self.share_permissions[share] = perms
+        return perms
 
     # ─── 1. Netzwerk-Tests ────────────────────────────────────
 
@@ -326,7 +510,6 @@ class SMBTester:
                 timeout=self.config.timeout,
             )
             if success:
-                # Prüfe ob wirklich authentifiziert oder nur Gast-Fallback
                 try:
                     shares = bad_conn.listShares()
                     result.status = "WARN"
@@ -601,8 +784,12 @@ class SMBTester:
                 result.message = "Geschrieben, aber Inhalt weicht ab"
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Schreibzugriff verweigert: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = f"🔒 Schreibzugriff verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Schreibzugriff verweigert: {e}"
         finally:
             self._safe_delete(share, filename)
 
@@ -618,7 +805,6 @@ class SMBTester:
             buf = io.BytesIO(b"")
             self.conn.storeFile(share, f"/{filename}", buf)
 
-            # Prüfe ob Datei existiert und 0 Bytes hat
             entries = self.conn.listPath(share, "/")
             found = [e for e in entries if e.filename == filename]
 
@@ -633,8 +819,12 @@ class SMBTester:
                 result.message = "Datei nicht im Listing gefunden"
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"0-Byte-Datei schreiben fehlgeschlagen: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Schreibzugriff verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"0-Byte-Datei schreiben fehlgeschlagen: {e}"
         finally:
             self._safe_delete(share, filename)
 
@@ -666,8 +856,12 @@ class SMBTester:
                 )
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Große Datei fehlgeschlagen: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Schreibzugriff verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Große Datei fehlgeschlagen: {e}"
         finally:
             self._safe_delete(share, filename)
 
@@ -695,8 +889,12 @@ class SMBTester:
                 result.message = "Ordner erstellt, aber nicht im Listing"
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Ordnererstellung verweigert: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Ordnererstellung verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Ordnererstellung verweigert: {e}"
         finally:
             try:
                 self.conn.deleteDirectory(share, dirname)
@@ -724,8 +922,12 @@ class SMBTester:
                 result.status = "PASS"
                 result.message = f"Doppeltes Erstellen abgelehnt: {type(e).__name__}"
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Erster Ordner konnte nicht erstellt werden: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Ordnererstellung verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Erster Ordner konnte nicht erstellt werden: {e}"
         finally:
             try:
                 self.conn.deleteDirectory(share, dirname)
@@ -763,8 +965,12 @@ class SMBTester:
                 result.message = "Struktur erstellt, aber Leseinhalt abweichend"
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Verschachtelte Ordner: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Verschachtelte Ordner: Zugriff verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Verschachtelte Ordner: {e}"
         finally:
             try:
                 self.conn.deleteFiles(share, f"{base}/ebene1/ebene2/tief.txt")
@@ -802,8 +1008,12 @@ class SMBTester:
                 result.message = f"Inhalt nach Überschreiben: '{content}'"
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = str(e)
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Überschreiben verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = str(e)
         finally:
             self._safe_delete(share, filename)
 
@@ -816,12 +1026,10 @@ class SMBTester:
 
         filename = f"{self._prefix}_shrink.txt"
         try:
-            # Große Version schreiben
             self.conn.storeFile(
                 share, f"/{filename}",
                 io.BytesIO(b"A" * 10000),
             )
-            # Kleine Version drüberschreiben
             self.conn.storeFile(
                 share, f"/{filename}",
                 io.BytesIO(b"klein"),
@@ -841,8 +1049,12 @@ class SMBTester:
                     f"alter Inhalt nicht abgeschnitten?"
                 )
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = str(e)
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Schreibzugriff verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = str(e)
         finally:
             self._safe_delete(share, filename)
 
@@ -873,8 +1085,12 @@ class SMBTester:
                 result.message = "Löschbefehl OK, Datei aber noch sichtbar"
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Löschen verweigert: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Löschzugriff verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Löschen verweigert: {e}"
             self._safe_delete(share, filename)
 
     def test_delete_nonexistent_file(self, result: TestResult, share: str):
@@ -918,8 +1134,12 @@ class SMBTester:
                 result.status = "WARN"
                 result.message = "Löschbefehl OK, Ordner aber noch sichtbar"
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Ordner löschen fehlgeschlagen: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Ordner löschen verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Ordner löschen fehlgeschlagen: {e}"
 
     def test_delete_nonempty_directory(self, result: TestResult, share: str):
         """Nicht-leeren Ordner löschen (soll fehlschlagen)."""
@@ -949,8 +1169,12 @@ class SMBTester:
                 result.message = f"Korrekt abgelehnt: {type(e).__name__}"
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Setup fehlgeschlagen: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Ordner/Datei erstellen verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Setup fehlgeschlagen: {e}"
         finally:
             try:
                 self.conn.deleteFiles(share, filename)
@@ -1007,7 +1231,6 @@ class SMBTester:
             for f in files:
                 self.conn.storeFile(share, f, io.BytesIO(b"x"))
 
-            # Jetzt rekursiv aufräumen (Blätter zuerst)
             errors = []
             for f in reversed(files):
                 try:
@@ -1021,7 +1244,6 @@ class SMBTester:
                 except Exception as e:
                     errors.append(f"Ordner {p}: {e}")
 
-            # Prüfe ob Basis-Ordner weg ist
             entries = self.conn.listPath(share, "/")
             still_there = any(e.filename == base for e in entries)
 
@@ -1041,9 +1263,12 @@ class SMBTester:
                 result.details["errors"] = errors
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Setup fehlgeschlagen: {e}"
-            # Cleanup Versuch
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Zugriff für rekursives Erstellen/Löschen verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Setup fehlgeschlagen: {e}"
             for f in reversed(files):
                 try:
                     self.conn.deleteFiles(share, f)
@@ -1069,7 +1294,6 @@ class SMBTester:
             for fn in filenames:
                 self.conn.storeFile(share, f"/{fn}", io.BytesIO(b"multi"))
 
-            # Wildcard-Löschung
             try:
                 self.conn.deleteFiles(share, f"/{base}_*.txt")
                 entries = self.conn.listPath(share, "/")
@@ -1088,13 +1312,16 @@ class SMBTester:
             except OperationFailure:
                 result.status = "WARN"
                 result.message = "Wildcard-Löschung nicht unterstützt — Einzellöschung"
-                # Fallback: einzeln löschen
                 for fn in filenames:
                     self._safe_delete(share, fn)
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Dateien erstellen fehlgeschlagen: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Schreib-/Löschzugriff verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Dateien erstellen fehlgeschlagen: {e}"
         finally:
             for fn in filenames:
                 self._safe_delete(share, fn)
@@ -1116,12 +1343,10 @@ class SMBTester:
             self.conn.storeFile(share, f"/{old_name}", io.BytesIO(content))
             self.conn.rename(share, f"/{old_name}", f"/{new_name}")
 
-            # Alten Namen prüfen
             entries = self.conn.listPath(share, "/")
             old_exists = any(e.filename == old_name for e in entries)
             new_exists = any(e.filename == new_name for e in entries)
 
-            # Inhalt verifizieren
             buf = io.BytesIO()
             self.conn.retrieveFile(share, f"/{new_name}", buf)
 
@@ -1136,8 +1361,12 @@ class SMBTester:
                 result.message = "Neue Datei nicht gefunden nach Umbenennung"
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Umbenennung fehlgeschlagen: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Umbenennung verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Umbenennung fehlgeschlagen: {e}"
         except AttributeError:
             result.status = "SKIP"
             result.message = "rename() nicht in dieser pysmb-Version verfügbar"
@@ -1173,8 +1402,12 @@ class SMBTester:
                 result.message = "Verschoben, aber Inhalt weicht ab"
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Verschieben fehlgeschlagen: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Verschieben verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Verschieben fehlgeschlagen: {e}"
         except AttributeError:
             result.status = "SKIP"
             result.message = "rename() nicht verfügbar"
@@ -1213,7 +1446,6 @@ class SMBTester:
             new_exists = any(e.filename == new_dir for e in entries)
 
             if not old_exists and new_exists:
-                # Prüfe ob Inhalt mitgewandert ist
                 buf = io.BytesIO()
                 self.conn.retrieveFile(share, f"/{new_dir}/inhalt.txt", buf)
                 if buf.getvalue() == b"ordnertest":
@@ -1230,8 +1462,12 @@ class SMBTester:
                 )
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Ordner umbenennen fehlgeschlagen: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Ordner umbenennen verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Ordner umbenennen fehlgeschlagen: {e}"
         except AttributeError:
             result.status = "SKIP"
             result.message = "rename() nicht verfügbar"
@@ -1263,7 +1499,6 @@ class SMBTester:
             try:
                 self.conn.rename(share, f"/{file_a}", f"/{file_b}")
 
-                # Prüfe was passiert ist
                 buf = io.BytesIO()
                 self.conn.retrieveFile(share, f"/{file_b}", buf)
                 content = buf.getvalue()
@@ -1285,8 +1520,12 @@ class SMBTester:
                 result.message = f"Korrekt abgelehnt: {type(e).__name__}"
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Setup fehlgeschlagen: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Schreibzugriff verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Setup fehlgeschlagen: {e}"
         except AttributeError:
             result.status = "SKIP"
             result.message = "rename() nicht verfügbar"
@@ -1331,8 +1570,13 @@ class SMBTester:
             result.message = f"{len(passed)} OK, {len(failed)} fehlgeschlagen"
             result.details["failed"] = failed
         else:
-            result.status = "FAIL"
-            result.message = "Alle Sonderzeichen-Tests fehlgeschlagen"
+            # Prüfe ob es ein generelles Zugriffsproblem ist
+            if any(is_access_denied(Exception(f)) for f in failed):
+                result.status = "DENIED"
+                result.message = "🔒 Schreibzugriff für Sonderzeichen-Test verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = "Alle Sonderzeichen-Tests fehlgeschlagen"
             result.details["failed"] = failed
 
     def test_unicode_filenames(self, result: TestResult, share: str):
@@ -1358,7 +1602,6 @@ class SMBTester:
                 content = f"Unicode: {label}".encode("utf-8")
                 self.conn.storeFile(share, f"/{name}", io.BytesIO(content))
 
-                # Zurücklesen zur Verifikation
                 buf = io.BytesIO()
                 self.conn.retrieveFile(share, f"/{name}", buf)
                 if buf.getvalue() == content:
@@ -1389,10 +1632,8 @@ class SMBTester:
             result.message = "Schreibtest deaktiviert"
             return
 
-        # Typisches SMB-Limit ist 255 Zeichen
         max_len = self.config.max_filename_length
-        # Prefix abziehen und .txt
-        available = max_len - len(self._prefix) - 5  # _prefix + _ + .txt
+        available = max_len - len(self._prefix) - 5
         if available < 10:
             available = 50
 
@@ -1408,8 +1649,12 @@ class SMBTester:
             result.message = f"Dateiname mit {len(filename)} Zeichen akzeptiert"
             self._safe_delete(share, filename)
         except OperationFailure as e:
-            result.status = "WARN"
-            result.message = f"Langer Dateiname ({len(filename)} Z.) abgelehnt: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Schreibzugriff verweigert"
+            else:
+                result.status = "WARN"
+                result.message = f"Langer Dateiname ({len(filename)} Z.) abgelehnt: {e}"
         except Exception as e:
             result.status = "WARN"
             result.message = f"Langer Dateiname ({len(filename)} Z.): {type(e).__name__}"
@@ -1422,7 +1667,7 @@ class SMBTester:
             return
 
         base = self._prefix + "_longpath"
-        segment = "abcdefghijklmnopqr"  # 18 Zeichen pro Ebene
+        segment = "abcdefghijklmnopqr"
         depth = 8
         paths = [base]
         current = base
@@ -1454,10 +1699,14 @@ class SMBTester:
                 result.message = f"Pfad erstellt, aber Inhalt abweichend"
 
         except OperationFailure as e:
-            result.status = "WARN"
-            result.message = (
-                f"Langer Pfad nach {len(created)} Ebenen abgelehnt: {e}"
-            )
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Zugriff für tiefen Pfad verweigert"
+            else:
+                result.status = "WARN"
+                result.message = (
+                    f"Langer Pfad nach {len(created)} Ebenen abgelehnt: {e}"
+                )
         except Exception as e:
             result.status = "WARN"
             result.message = f"Langer Pfad: {type(e).__name__}: {e}"
@@ -1533,8 +1782,12 @@ class SMBTester:
                 result.message = "Dot-Datei erstellt, aber nicht im Listing"
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Dot-Datei fehlgeschlagen: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Schreibzugriff verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Dot-Datei fehlgeschlagen: {e}"
         finally:
             self._safe_delete(share, filename)
 
@@ -1594,8 +1847,12 @@ class SMBTester:
                 result.message = "; ".join(issues)
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = str(e)
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Schreibzugriff verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = str(e)
         finally:
             self._safe_delete(share, filename)
 
@@ -1609,11 +1866,9 @@ class SMBTester:
             return
 
         try:
-            # Trennen
             self.conn.close()
             self._log("Verbindung getrennt", "INFO")
 
-            # Neu verbinden
             self.conn = self._new_connection()
             success = self.conn.connect(
                 self.config.ip,
@@ -1627,7 +1882,6 @@ class SMBTester:
                 self.conn = None
                 return
 
-            # Nach Reconnect: Lesezugriff prüfen
             entries = self.conn.listPath(share, "/")
             count = len([e for e in entries if e.filename not in (".", "..")])
 
@@ -1637,7 +1891,6 @@ class SMBTester:
         except Exception as e:
             result.status = "FAIL"
             result.message = f"Reconnect fehlgeschlagen: {e}"
-            # Versuch Verbindung wiederherzustellen
             try:
                 self.conn = self._new_connection()
                 self.conn.connect(
@@ -1662,7 +1915,6 @@ class SMBTester:
                 result.message = "Zweite Verbindung abgelehnt"
                 return
 
-            # Beide Verbindungen lesen gleichzeitig
             entries1 = self.conn.listPath(share, "/")
             entries2 = conn2.listPath(share, "/")
 
@@ -1703,21 +1955,17 @@ class SMBTester:
         conn2 = None
 
         try:
-            # Zweite Session öffnen
             conn2 = self._new_connection()
             conn2.connect(
                 self.config.ip, self.config.port,
                 timeout=self.config.timeout,
             )
 
-            # Datei über Session 2 schreiben
             conn2.storeFile(share, f"/{filename}", io.BytesIO(b"session2"))
 
-            # Session 2 trennen
             conn2.close()
             conn2 = None
 
-            # Session 1 liest die Datei
             buf = io.BytesIO()
             self.conn.retrieveFile(share, f"/{filename}", buf)
 
@@ -1729,8 +1977,12 @@ class SMBTester:
                 result.message = "Datei lesbar, aber Inhalt abweichend"
 
         except Exception as e:
-            result.status = "FAIL"
-            result.message = f"Test fehlgeschlagen: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Schreibzugriff verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Test fehlgeschlagen: {e}"
         finally:
             if conn2:
                 try:
@@ -1767,8 +2019,12 @@ class SMBTester:
                 result.message = "Inkonsistente Leseergebnisse"
 
         except Exception as e:
-            result.status = "FAIL"
-            result.message = str(e)
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Zugriff verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = str(e)
         finally:
             self._safe_delete(share, filename)
 
@@ -1807,8 +2063,12 @@ class SMBTester:
                 result.message = "Paralleles Schreiben: Inhalt abweichend"
 
         except Exception as e:
-            result.status = "FAIL"
-            result.message = f"Paralleles Schreiben fehlgeschlagen: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Schreibzugriff verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Paralleles Schreiben fehlgeschlagen: {e}"
         finally:
             if conn2:
                 try:
@@ -1845,12 +2105,18 @@ class SMBTester:
                         self._walk(share, subpath,
                                    tree[e.filename + "/"],
                                    depth + 1, max_depth, total)
-                    except Exception:
-                        tree[e.filename + "/"] = {"_error": "Zugriff verweigert"}
+                    except Exception as ex:
+                        if is_access_denied(ex):
+                            tree[e.filename + "/"] = {"_error": "🔒 Zugriff verweigert"}
+                        else:
+                            tree[e.filename + "/"] = {"_error": f"Fehler: {ex}"}
                 else:
                     tree[e.filename] = f"{e.file_size} B"
-        except Exception:
-            tree["_error"] = "Zugriff verweigert"
+        except Exception as ex:
+            if is_access_denied(ex):
+                tree["_error"] = "🔒 Zugriff verweigert"
+            else:
+                tree["_error"] = f"Fehler: {ex}"
 
     def _trim(self, tree, max_items):
         out = {}
@@ -1907,8 +2173,12 @@ class SMBTester:
             }
 
         except OperationFailure as e:
-            result.status = "SKIP"
-            result.message = f"Kein Schreibzugriff für Benchmark: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Kein Schreibzugriff für Benchmark"
+            else:
+                result.status = "SKIP"
+                result.message = f"Kein Schreibzugriff für Benchmark: {e}"
         finally:
             self._safe_delete(share, filename)
 
@@ -1936,11 +2206,9 @@ class SMBTester:
                 files_created.append(fname)
             create_time = time.perf_counter() - t0
 
-            # Listing prüfen
             entries = self.conn.listPath(share, f"/{dirname}")
             real = [e for e in entries if e.filename not in (".", "..")]
 
-            # Aufräumen
             t0 = time.perf_counter()
             for fname in files_created:
                 self.conn.deleteFiles(share, fname)
@@ -1962,8 +2230,12 @@ class SMBTester:
             }
 
         except OperationFailure as e:
-            result.status = "FAIL"
-            result.message = f"Viele Dateien fehlgeschlagen: {e}"
+            if is_access_denied(e):
+                result.status = "DENIED"
+                result.message = "🔒 Schreibzugriff für Massentest verweigert"
+            else:
+                result.status = "FAIL"
+                result.message = f"Viele Dateien fehlgeschlagen: {e}"
         finally:
             for fname in files_created:
                 try:
@@ -2046,7 +2318,7 @@ class SMBTester:
         self._run_test("NetBIOS Port 139", "Netzwerk",
                        self.test_port_139)
         if net.status != "PASS":
-            print("\n  Server nicht erreichbar. Abbruch.")
+            print("\n  ❌ Server nicht erreichbar. Abbruch.")
             return self._summary()
 
         # Phase 2: Auth
@@ -2061,7 +2333,7 @@ class SMBTester:
                        self.test_empty_password)
 
         if auth.status != "PASS":
-            print("\n  Authentifizierung fehlgeschlagen. Abbruch.")
+            print("\n  ❌ Authentifizierung fehlgeschlagen. Abbruch.")
             return self._summary()
 
         # Phase 3: Shares
@@ -2081,116 +2353,264 @@ class SMBTester:
             ]
 
         if not shares:
-            print("\n  Keine testbaren Disk-Shares gefunden.")
+            print("\n  ⚠️  Keine testbaren Disk-Shares gefunden.")
             if self.discovered_shares:
                 print(f"  Vorhandene Shares: {', '.join(self.discovered_shares)}")
                 print(f"  Nutze --share NAME um einen direkt zu testen.")
             return self._summary()
 
-        # Phase 4–9: Pro-Share Tests
+        # ── Pro-Share: Berechtigungsprüfung + Tests ───────────
         for share in shares:
-            # ── Read-Tests
-            print(f"\n── Phase 4: Lesen auf '{share}' ──────────────")
-            self._run_test(f"[{share}] Lesezugriff", "Read",
-                           self.test_read_access, share)
-            self._run_test(f"[{share}] Detail-Listing", "Read",
-                           self.test_directory_listing_details, share)
-            self._run_test(f"[{share}] Datei lesen", "Read",
-                           self.test_file_read_content, share)
-            self._run_test(f"[{share}] Nicht-exist. Datei lesen", "Read",
-                           self.test_read_nonexistent_file, share)
-            self._run_test(f"[{share}] Nicht-exist. Ordner lesen", "Read",
-                           self.test_read_nonexistent_directory, share)
-            self._run_test(f"[{share}] Verzeichnis-Scan", "Read",
-                           self.test_deep_traversal, share)
 
-            # ── Write-Tests
-            print(f"\n── Phase 5: Schreiben auf '{share}' ─────────")
-            self._run_test(f"[{share}] Datei schreiben", "Write",
-                           self.test_write_file, share)
-            self._run_test(f"[{share}] 0-Byte-Datei", "Write",
-                           self.test_write_zero_byte_file, share)
-            self._run_test(f"[{share}] Grosse Datei (5 MB)", "Write",
-                           self.test_write_large_content, share)
-            self._run_test(f"[{share}] Ordner erstellen", "Write",
-                           self.test_create_directory, share)
-            self._run_test(f"[{share}] Doppelter Ordner", "Write",
-                           self.test_create_duplicate_directory, share)
-            self._run_test(f"[{share}] Verschachtelte Ordner", "Write",
-                           self.test_nested_directories, share)
-            self._run_test(f"[{share}] Datei ueberschreiben", "Write",
-                           self.test_overwrite_file, share)
-            self._run_test(f"[{share}] Ueberschreiben (kleiner)", "Write",
-                           self.test_overwrite_with_smaller, share)
+            # ═══ Berechtigungsprüfung ═══
+            print(f"\n{'═' * w}")
+            print(f"  SHARE: {share}")
+            print(f"{'═' * w}")
+            print(f"\n── Berechtigungsprüfung für '{share}' ──────")
 
-            # ── Lösch-Tests
-            print(f"\n── Phase 6: Löschen auf '{share}' ──────────")
-            self._run_test(f"[{share}] Datei loeschen", "Delete",
-                           self.test_delete_file, share)
-            self._run_test(f"[{share}] Nicht-exist. Datei loeschen", "Delete",
-                           self.test_delete_nonexistent_file, share)
-            self._run_test(f"[{share}] Leeren Ordner loeschen", "Delete",
-                           self.test_delete_empty_directory, share)
-            self._run_test(f"[{share}] Nicht-leeren Ordner loeschen", "Delete",
-                           self.test_delete_nonempty_directory, share)
-            self._run_test(f"[{share}] Nicht-exist. Ordner loeschen", "Delete",
-                           self.test_delete_nonexistent_directory, share)
-            self._run_test(f"[{share}] Rekursives Loeschen", "Delete",
-                           self.test_recursive_delete, share)
-            self._run_test(f"[{share}] Wildcard-Loeschen", "Delete",
-                           self.test_delete_multiple_files_pattern, share)
+            # Sicherstellen dass Verbindung steht
+            if not self._ensure_connection():
+                print(f"  ❌ Verbindung verloren, überspringe Share '{share}'")
+                self._skip_test(
+                    f"[{share}] Alle Tests", "Permissions",
+                    "Verbindung verloren",
+                )
+                continue
 
-            # ── Umbenennen / Verschieben
-            print(f"\n── Phase 7: Umbenennen auf '{share}' ───────")
-            self._run_test(f"[{share}] Datei umbenennen", "Rename",
-                           self.test_rename_file, share)
-            self._run_test(f"[{share}] Datei verschieben", "Rename",
-                           self.test_move_file_to_subdirectory, share)
-            self._run_test(f"[{share}] Ordner umbenennen", "Rename",
-                           self.test_rename_directory, share)
-            self._run_test(f"[{share}] Rename auf existierend", "Rename",
-                           self.test_rename_to_existing, share)
+            perms = self.probe_share_permissions(share)
+            print(f"\n  {perms.summary_line()}")
+            print()
 
-            # ── Sonderzeichen & Edge-Cases
-            print(f"\n── Phase 8: Edge-Cases auf '{share}' ───────")
-            self._run_test(f"[{share}] Sonderzeichen", "EdgeCase",
-                           self.test_special_characters, share)
-            self._run_test(f"[{share}] Unicode-Dateinamen", "EdgeCase",
-                           self.test_unicode_filenames, share)
-            self._run_test(f"[{share}] Langer Dateiname", "EdgeCase",
-                           self.test_long_filename, share)
-            self._run_test(f"[{share}] Langer Pfad", "EdgeCase",
-                           self.test_long_path, share)
-            self._run_test(f"[{share}] Reservierte Namen", "EdgeCase",
-                           self.test_reserved_names, share)
-            self._run_test(f"[{share}] Dot-Dateien", "EdgeCase",
-                           self.test_dot_files, share)
-            self._run_test(f"[{share}] Timestamps", "EdgeCase",
-                           self.test_timestamps, share)
+            # Share nicht erreichbar → alle Tests überspringen
+            if not perms.accessible:
+                print(f"  🔒 Share '{share}' nicht erreichbar: "
+                      f"{perms.error_message}")
+                print(f"     Alle Tests für diesen Share werden übersprungen.\n")
+                self._denied_test(
+                    f"[{share}] Share-Zugriff", "Permissions",
+                    perms.error_message,
+                )
+                continue
 
-            # ── Concurrent / Sessions
-            print(f"\n── Phase 9: Sessions auf '{share}' ─────────")
-            self._run_test(f"[{share}] Mehrfach-Lesen", "Session",
-                           self.test_concurrent_read, share)
-            self._run_test(f"[{share}] Paralleles Schreiben", "Session",
-                           self.test_concurrent_write_different_files, share)
-            self._run_test(f"[{share}] Multi-Session", "Session",
-                           self.test_multi_session, share)
-            self._run_test(f"[{share}] Schreiben nach Disconnect", "Session",
-                           self.test_write_after_disconnect, share)
-            self._run_test(f"[{share}] Reconnect", "Session",
-                           self.test_reconnect, share)
+            # ── Read-Tests (nur wenn Leserecht) ───────────────
+            if perms.can_read:
+                print(f"\n── Phase 4: Lesen auf '{share}' ──────────────")
+                self._run_test(f"[{share}] Lesezugriff", "Read",
+                               self.test_read_access, share)
+                self._run_test(f"[{share}] Detail-Listing", "Read",
+                               self.test_directory_listing_details, share)
+                self._run_test(f"[{share}] Datei lesen", "Read",
+                               self.test_file_read_content, share)
+                self._run_test(f"[{share}] Nicht-exist. Datei lesen", "Read",
+                               self.test_read_nonexistent_file, share)
+                self._run_test(f"[{share}] Nicht-exist. Ordner lesen", "Read",
+                               self.test_read_nonexistent_directory, share)
+                self._run_test(f"[{share}] Verzeichnis-Scan", "Read",
+                               self.test_deep_traversal, share)
+            else:
+                print(f"\n── Phase 4: Lesen auf '{share}' ──────────────")
+                self._denied_test(
+                    f"[{share}] Alle Lese-Tests", "Read",
+                    "Kein Lesezugriff auf diesen Share",
+                )
 
-            # ── Benchmark
-            print(f"\n── Phase 10: Benchmark auf '{share}' ───────")
-            self._run_test(f"[{share}] Transfer-Benchmark", "Bench",
-                           self.test_benchmark, share)
-            self._run_test(f"[{share}] Viele kleine Dateien", "Bench",
-                           self.test_many_small_files, share)
+            # ── Write-Tests (nur wenn Schreibrecht) ───────────
+            if perms.can_write and self.config.write_test:
+                print(f"\n── Phase 5: Schreiben auf '{share}' ─────────")
+                self._run_test(f"[{share}] Datei schreiben", "Write",
+                               self.test_write_file, share)
+                self._run_test(f"[{share}] 0-Byte-Datei", "Write",
+                               self.test_write_zero_byte_file, share)
+                self._run_test(f"[{share}] Grosse Datei (5 MB)", "Write",
+                               self.test_write_large_content, share)
+                self._run_test(f"[{share}] Ordner erstellen", "Write",
+                               self.test_create_directory, share)
+                self._run_test(f"[{share}] Doppelter Ordner", "Write",
+                               self.test_create_duplicate_directory, share)
+                self._run_test(f"[{share}] Verschachtelte Ordner", "Write",
+                               self.test_nested_directories, share)
+                self._run_test(f"[{share}] Datei ueberschreiben", "Write",
+                               self.test_overwrite_file, share)
+                self._run_test(f"[{share}] Ueberschreiben (kleiner)", "Write",
+                               self.test_overwrite_with_smaller, share)
+            elif not self.config.write_test:
+                print(f"\n── Phase 5: Schreiben auf '{share}' ─────────")
+                self._skip_test(
+                    f"[{share}] Alle Schreib-Tests", "Write",
+                    "Schreibtests deaktiviert (--no-write)",
+                )
+            else:
+                print(f"\n── Phase 5: Schreiben auf '{share}' ─────────")
+                self._denied_test(
+                    f"[{share}] Alle Schreib-Tests", "Write",
+                    "Kein Schreibzugriff auf diesen Share",
+                )
 
-            # ── Aufräumen
-            print(f"\n  Räume Testartefakte auf '{share}' auf...")
-            self._cleanup_all(share)
+            # ── Lösch-Tests (nur wenn Löschrecht) ─────────────
+            if perms.can_write and perms.can_delete and self.config.delete_test:
+                print(f"\n── Phase 6: Löschen auf '{share}' ──────────")
+                self._run_test(f"[{share}] Datei loeschen", "Delete",
+                               self.test_delete_file, share)
+                self._run_test(f"[{share}] Nicht-exist. Datei loeschen", "Delete",
+                               self.test_delete_nonexistent_file, share)
+                self._run_test(f"[{share}] Leeren Ordner loeschen", "Delete",
+                               self.test_delete_empty_directory, share)
+                self._run_test(f"[{share}] Nicht-leeren Ordner loeschen", "Delete",
+                               self.test_delete_nonempty_directory, share)
+                self._run_test(f"[{share}] Nicht-exist. Ordner loeschen", "Delete",
+                               self.test_delete_nonexistent_directory, share)
+                self._run_test(f"[{share}] Rekursives Loeschen", "Delete",
+                               self.test_recursive_delete, share)
+                self._run_test(f"[{share}] Wildcard-Loeschen", "Delete",
+                               self.test_delete_multiple_files_pattern, share)
+            elif not self.config.delete_test:
+                print(f"\n── Phase 6: Löschen auf '{share}' ──────────")
+                self._skip_test(
+                    f"[{share}] Alle Lösch-Tests", "Delete",
+                    "Löschtests deaktiviert (--no-write)",
+                )
+            elif not perms.can_write:
+                print(f"\n── Phase 6: Löschen auf '{share}' ──────────")
+                self._denied_test(
+                    f"[{share}] Alle Lösch-Tests", "Delete",
+                    "Kein Schreibzugriff — Lösch-Tests nicht möglich",
+                )
+            else:
+                print(f"\n── Phase 6: Löschen auf '{share}' ──────────")
+                self._denied_test(
+                    f"[{share}] Alle Lösch-Tests", "Delete",
+                    "Kein Löschrecht auf diesen Share",
+                )
+
+            # ── Umbenennen / Verschieben (nur wenn Rename-Recht) ──
+            if perms.can_write and perms.can_rename and self.config.write_test:
+                print(f"\n── Phase 7: Umbenennen auf '{share}' ───────")
+                self._run_test(f"[{share}] Datei umbenennen", "Rename",
+                               self.test_rename_file, share)
+                self._run_test(f"[{share}] Datei verschieben", "Rename",
+                               self.test_move_file_to_subdirectory, share)
+                self._run_test(f"[{share}] Ordner umbenennen", "Rename",
+                               self.test_rename_directory, share)
+                self._run_test(f"[{share}] Rename auf existierend", "Rename",
+                               self.test_rename_to_existing, share)
+            elif not self.config.write_test:
+                print(f"\n── Phase 7: Umbenennen auf '{share}' ───────")
+                self._skip_test(
+                    f"[{share}] Alle Rename-Tests", "Rename",
+                    "Schreibtests deaktiviert (--no-write)",
+                )
+            elif not perms.can_write:
+                print(f"\n── Phase 7: Umbenennen auf '{share}' ───────")
+                self._denied_test(
+                    f"[{share}] Alle Rename-Tests", "Rename",
+                    "Kein Schreibzugriff — Rename nicht möglich",
+                )
+            else:
+                print(f"\n── Phase 7: Umbenennen auf '{share}' ───────")
+                self._denied_test(
+                    f"[{share}] Alle Rename-Tests", "Rename",
+                    "Kein Umbennennungsrecht auf diesen Share",
+                )
+
+            # ── Sonderzeichen & Edge-Cases (braucht Write) ────
+            if perms.can_write and self.config.write_test:
+                print(f"\n── Phase 8: Edge-Cases auf '{share}' ───────")
+                self._run_test(f"[{share}] Sonderzeichen", "EdgeCase",
+                               self.test_special_characters, share)
+                self._run_test(f"[{share}] Unicode-Dateinamen", "EdgeCase",
+                               self.test_unicode_filenames, share)
+                self._run_test(f"[{share}] Langer Dateiname", "EdgeCase",
+                               self.test_long_filename, share)
+                self._run_test(f"[{share}] Langer Pfad", "EdgeCase",
+                               self.test_long_path, share)
+                self._run_test(f"[{share}] Reservierte Namen", "EdgeCase",
+                               self.test_reserved_names, share)
+                self._run_test(f"[{share}] Dot-Dateien", "EdgeCase",
+                               self.test_dot_files, share)
+                self._run_test(f"[{share}] Timestamps", "EdgeCase",
+                               self.test_timestamps, share)
+            elif not self.config.write_test:
+                print(f"\n── Phase 8: Edge-Cases auf '{share}' ───────")
+                self._skip_test(
+                    f"[{share}] Alle Edge-Case-Tests", "EdgeCase",
+                    "Schreibtests deaktiviert (--no-write)",
+                )
+            else:
+                print(f"\n── Phase 8: Edge-Cases auf '{share}' ───────")
+                self._denied_test(
+                    f"[{share}] Alle Edge-Case-Tests", "EdgeCase",
+                    "Kein Schreibzugriff — Edge-Case-Tests benötigen Schreibrecht",
+                )
+
+            # ── Concurrent / Sessions (Read reicht für manche) ──
+            if perms.can_read:
+                print(f"\n── Phase 9: Sessions auf '{share}' ─────────")
+                if perms.can_write and self.config.write_test:
+                    self._run_test(f"[{share}] Mehrfach-Lesen", "Session",
+                                   self.test_concurrent_read, share)
+                    self._run_test(f"[{share}] Paralleles Schreiben", "Session",
+                                   self.test_concurrent_write_different_files, share)
+                else:
+                    self._skip_test(
+                        f"[{share}] Mehrfach-Lesen", "Session",
+                        "Benötigt Schreibrecht (Testdatei erstellen)",
+                    )
+                    self._skip_test(
+                        f"[{share}] Paralleles Schreiben", "Session",
+                        "Kein Schreibzugriff",
+                    )
+
+                self._run_test(f"[{share}] Multi-Session", "Session",
+                               self.test_multi_session, share)
+
+                if perms.can_write and self.config.write_test:
+                    self._run_test(f"[{share}] Schreiben nach Disconnect", "Session",
+                                   self.test_write_after_disconnect, share)
+                else:
+                    self._skip_test(
+                        f"[{share}] Schreiben nach Disconnect", "Session",
+                        "Kein Schreibzugriff",
+                    )
+
+                self._run_test(f"[{share}] Reconnect", "Session",
+                               self.test_reconnect, share)
+            else:
+                print(f"\n── Phase 9: Sessions auf '{share}' ─────────")
+                self._denied_test(
+                    f"[{share}] Alle Session-Tests", "Session",
+                    "Kein Lesezugriff auf diesen Share",
+                )
+
+            # ── Benchmark (braucht Write) ─────────────────────
+            if perms.can_write and self.config.write_test and self.config.benchmark:
+                print(f"\n── Phase 10: Benchmark auf '{share}' ───────")
+                self._run_test(f"[{share}] Transfer-Benchmark", "Bench",
+                               self.test_benchmark, share)
+                self._run_test(f"[{share}] Viele kleine Dateien", "Bench",
+                               self.test_many_small_files, share)
+            elif not self.config.benchmark:
+                print(f"\n── Phase 10: Benchmark auf '{share}' ───────")
+                self._skip_test(
+                    f"[{share}] Alle Benchmark-Tests", "Bench",
+                    "Benchmark deaktiviert (--no-bench)",
+                )
+            elif not perms.can_write:
+                print(f"\n── Phase 10: Benchmark auf '{share}' ───────")
+                self._denied_test(
+                    f"[{share}] Alle Benchmark-Tests", "Bench",
+                    "Kein Schreibzugriff — Benchmark nicht möglich",
+                )
+            else:
+                print(f"\n── Phase 10: Benchmark auf '{share}' ───────")
+                self._skip_test(
+                    f"[{share}] Alle Benchmark-Tests", "Bench",
+                    "Schreibtests deaktiviert (--no-write)",
+                )
+
+            # ── Aufräumen ─────────────────────────────────────
+            if perms.accessible:
+                print(f"\n  Räume Testartefakte auf '{share}' auf...")
+                self._cleanup_all(share)
 
         # Verbindung schliessen
         if self.conn:
@@ -2204,7 +2624,7 @@ class SMBTester:
     # ─── Zusammenfassung ──────────────────────────────────────
 
     def _summary(self) -> dict:
-        counts = {"PASS": 0, "FAIL": 0, "WARN": 0, "SKIP": 0}
+        counts = {"PASS": 0, "FAIL": 0, "WARN": 0, "SKIP": 0, "DENIED": 0}
         for r in self.results:
             counts[r.status] = counts.get(r.status, 0) + 1
 
@@ -2213,7 +2633,9 @@ class SMBTester:
         for r in self.results:
             cat = r.category
             if cat not in categories:
-                categories[cat] = {"PASS": 0, "FAIL": 0, "WARN": 0, "SKIP": 0}
+                categories[cat] = {
+                    "PASS": 0, "FAIL": 0, "WARN": 0, "SKIP": 0, "DENIED": 0,
+                }
             categories[cat][r.status] = categories[cat].get(r.status, 0) + 1
 
         w = 62
@@ -2221,26 +2643,48 @@ class SMBTester:
         print("=" * w)
         print("  ERGEBNIS")
         print("=" * w)
-        print(f"  Gesamt:      {len(self.results)} Tests")
-        print(f"  ✅ Bestanden:   {counts['PASS']}")
-        print(f"  ❌ Fehler:      {counts['FAIL']}")
-        print(f"  ⚠️  Warnungen:   {counts['WARN']}")
-        print(f"  ⏭️  Übersprungen: {counts['SKIP']}")
+        print(f"  Gesamt:        {len(self.results)} Tests")
+        print(f"  ✅ Bestanden:    {counts['PASS']}")
+        print(f"  ❌ Fehler:       {counts['FAIL']}")
+        print(f"  ⚠️ Warnungen:    {counts['WARN']}")
+        print(f"  🔒 Verweigert:   {counts['DENIED']}")
+        print(f"  ⏭️ Übersprungen: {counts['SKIP']}")
         print("-" * w)
+
+        # Berechtigungs-Übersicht
+        if self.share_permissions:
+            print()
+            print("  BERECHTIGUNGEN PRO SHARE:")
+            print("  " + "─" * (w - 2))
+            for share_name, perms in self.share_permissions.items():
+                print(f"  {perms.summary_line()}")
+            print("  " + "─" * (w - 2))
+            print()
 
         # Pro-Kategorie Zusammenfassung
         print("  Ergebnisse nach Kategorie:")
         for cat, cnts in categories.items():
             total = sum(cnts.values())
-            print(f"    {cat:<12} {total:>3} Tests | "
-                  f"✅{cnts['PASS']} ❌{cnts['FAIL']} "
-                  f"⚠️{cnts['WARN']} ⏭️{cnts['SKIP']}")
+            parts = []
+            if cnts.get("PASS", 0):
+                parts.append(f"✅ {cnts['PASS']}")
+            if cnts.get("FAIL", 0):
+                parts.append(f"❌ {cnts['FAIL']}")
+            if cnts.get("WARN", 0):
+                parts.append(f"⚠️ {cnts['WARN']}")
+            if cnts.get("DENIED", 0):
+                parts.append(f"🔒 {cnts['DENIED']}")
+            if cnts.get("SKIP", 0):
+                parts.append(f"⏭️ {cnts['SKIP']}")
+            print(f"    {cat:<12} {total:>3} Tests | {' '.join(parts)}")
         print("-" * w)
 
-        if counts["FAIL"] == 0 and counts["WARN"] == 0:
+        if counts["FAIL"] == 0 and counts["WARN"] == 0 and counts["DENIED"] == 0:
             print("  ✅ Alle Tests bestanden!")
-        elif counts["FAIL"] == 0:
+        elif counts["FAIL"] == 0 and counts["DENIED"] == 0:
             print("  ⚠️  Keine Fehler, aber Warnungen beachten.")
+        elif counts["FAIL"] == 0:
+            print("  🔒 Keine technischen Fehler, aber fehlende Berechtigungen.")
         else:
             print("  ❌ Fehler gefunden — Details oben prüfen.")
 
@@ -2250,6 +2694,13 @@ class SMBTester:
             print("  Fehlgeschlagene Tests:")
             for r in failed:
                 print(f"    ❌ {r.name}: {r.message}")
+
+        denied = [r for r in self.results if r.status == "DENIED"]
+        if denied:
+            print()
+            print("  Fehlende Berechtigungen:")
+            for r in denied:
+                print(f"    🔒 {r.name}: {r.message}")
 
         warned = [r for r in self.results if r.status == "WARN"]
         if warned:
@@ -2269,6 +2720,9 @@ class SMBTester:
             "categories": categories,
             "results": [asdict(r) for r in self.results],
             "discovered_shares": self.discovered_shares,
+            "share_permissions": {
+                k: asdict(v) for k, v in self.share_permissions.items()
+            },
         }
 
 

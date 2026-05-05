@@ -75,6 +75,20 @@ namespace Kaimo_File_Server_Core.Infrastructure.Persistence
 
             _db.Users.AddRange(admin, marco, guest);
 
+            // User -> Gruppen
+            _db.UserGroups.AddRange(
+                //new UserGroup(marco.Id, devGroup.Id),
+                new UserGroup(admin.Id, adminGroup.Id),
+                new UserGroup(guest.Id, guestGroup.Id)
+            );
+
+            // User -> Rollen
+            _db.UserRoles.AddRange(
+                new UserRole(admin.Id, adminRole.Id),
+                new UserRole(marco.Id, userRole.Id),
+                new UserRole(guest.Id, userRole.Id)
+            );
+
             // Share-Zugriff (Whitelist)
             _db.ShareAccessEntries.AddRange(
                 new ShareAccessEntry("test", admin.Id),
@@ -83,8 +97,6 @@ namespace Kaimo_File_Server_Core.Infrastructure.Persistence
                 new ShareAccessEntry("projekte", admin.Id),
                 new ShareAccessEntry("projekte", marco.Id)
             );
-
-            
 
             await _db.SaveChangesAsync();
             Console.WriteLine($"[+] Testdaten erstellt:");

@@ -1,6 +1,7 @@
 ﻿using Kaimo_File_Server_Core.Core.Domain;
 using Kaimo_File_Server_Core.Core.Domain.Identity;
 using Kaimo_File_Server_Core.Core.Repositories;
+using Kaimo_File_Server_Core.Core.Repositories.Kaimo_File_Server_Core.Core.Repositories;
 using Kaimo_File_Server_Core.Core.Services;
 using Kaimo_File_Server_Core.Infrastructure.Repositories;
 using Kaimo_File_Server_Core.Smb.Security;
@@ -88,6 +89,7 @@ namespace Kaimo_File_Server_Core.Smb
                 using var scope = _serviceProvider.CreateScope();
                 var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
                 var shareAccessRepo = scope.ServiceProvider.GetRequiredService<IShareAccessRepository>();
+                var contextFactory = scope.ServiceProvider.GetRequiredService<IUserContextFactory>();
 
                 var user = userRepo.GetByUsernameAsync(args.UserName).GetAwaiter().GetResult();
                 if (user == null)
@@ -97,15 +99,27 @@ namespace Kaimo_File_Server_Core.Smb
                     return;
                 }
 
-                // UserContext setzen, damit FileService spaeter weiss wer zugreift
-                _userContextAccessor.Set(new UserContext(
-                    user,
-                    new HashSet<Group>(),
-                    new HashSet<Role>(),
-                    new HashSet<string>()
-                ));
+                // UserContext MIT Gruppen und Rollen laden
+                var userContext = contextFactory.CreateAsync(user).GetAwaiter().GetResult();
+                _userContextAccessor.Set(userContext);
 
-                args.Allow = shareAccessRepo.HasAccessAsync(shareName, user.Id).GetAwaiter().GetResult();
+                // Share-Zugriff prüfen — auch gegen Gruppen-IDs
+                bool hasAccess = shareAccessRepo.HasAccessAsync(shareName, user.Id).GetAwaiter().GetResult();
+
+                if (!hasAccess)
+                {
+                    // Auch Gruppen-IDs gegen Share-Access prüfen
+                    foreach (var group in userContext.Groups)
+                    {
+                        if (shareAccessRepo.HasAccessAsync(shareName, group.Id).GetAwaiter().GetResult())
+                        {
+                            hasAccess = true;
+                            break;
+                        }
+                    }
+                }
+
+                args.Allow = hasAccess;
                 Console.WriteLine($"[ShareAccess] {args.UserName} -> {shareName}: {(args.Allow ? "allowed" : "denied")}");
             }
             catch (Exception ex)
