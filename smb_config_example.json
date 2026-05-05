@@ -1,7 +1,7 @@
 {
-  "ip": "192.168.1.10",
+  "ip": "10.10.10.10",
   "port": 445,
-  "username": "admin",
+  "username": "marco.hanisch",
   "password": "your_password_here",
   "domain": "",
   "test_share": "",

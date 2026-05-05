@@ -1,9 +1,6 @@
 ﻿using Kaimo_File_Server_Core.Core.Repositories;
 using SMBLibrary;
 using SMBLibrary.Server;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Kaimo_File_Server_Core.Smb
 {
@@ -26,30 +23,35 @@ namespace Kaimo_File_Server_Core.Smb
             var userName = context.UserName;
             Console.WriteLine($"[ShareAccess] User '{userName}' will auf Share '{Name}' zugreifen");
 
-            using var scope = _serviceProvider.CreateScope();
-            var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-            var shareRepo = scope.ServiceProvider.GetRequiredService<IShareAccessRepository>();
-
-            // User aus DB holen
-            var user = userRepo.GetByUsernameAsync(userName).GetAwaiter().GetResult();
-            if (user == null)
+            try
             {
-                Console.WriteLine($"[-] User '{userName}' nicht gefunden");
+                using var scope = _serviceProvider.CreateScope();
+                var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+                var shareRepo = scope.ServiceProvider.GetRequiredService<IShareAccessRepository>();
+
+                var user = userRepo.GetByUsernameAsync(userName).GetAwaiter().GetResult();
+                if (user == null)
+                {
+                    Console.WriteLine($"[-] User '{userName}' nicht gefunden");
+                    return false;
+                }
+
+                if (shareRepo.HasAccessAsync(Name, user.Id).GetAwaiter().GetResult())
+                {
+                    Console.WriteLine($"[+] User '{userName}' hat direkten Zugriff auf '{Name}'");
+                    return true;
+                }
+
+                // TODO: Gruppen-Berechtigung pruefen
+
+                Console.WriteLine($"[-] User '{userName}' hat keinen Zugriff auf '{Name}'");
                 return false;
             }
-
-            // Direkte User-Berechtigung prüfen
-            if (shareRepo.HasAccessAsync(Name, user.Id).GetAwaiter().GetResult())
+            catch (Exception ex)
             {
-                Console.WriteLine($"[+] User '{userName}' hat direkten Zugriff auf '{Name}'");
-                return true;
+                Console.WriteLine($"[ShareAccess ERROR] {userName} -> {Name}: {ex.Message}");
+                return false;
             }
-
-            // TODO: Gruppen-Berechtigung prüfen
-            // Hier später User-Gruppen laden und prüfen
-
-            Console.WriteLine($"[-] User '{userName}' hat keinen Zugriff auf '{Name}'");
-            return false;
         }
     }
 }

@@ -1,25 +1,23 @@
-﻿using Kaimo_File_Server_Core.Core.Repositories;
+﻿using Kaimo_File_Server_Core.Core.Domain;
+using Kaimo_File_Server_Core.Core.Domain.Identity;
+using Kaimo_File_Server_Core.Core.Repositories;
 using Kaimo_File_Server_Core.Core.Services;
 using Kaimo_File_Server_Core.Infrastructure.Repositories;
 using Kaimo_File_Server_Core.Smb.Security;
 using SMBLibrary;
 using SMBLibrary.Authentication.GSSAPI;
 using SMBLibrary.Authentication.NTLM;
-using SMBLibrary.Client;
 using SMBLibrary.Server;
-using System;
-using System.Collections.Generic;
 using System.Net;
-using System.Text;
 
 namespace Kaimo_File_Server_Core.Smb
 {
-    public class SmbServer
+    public class SmbServer : IDisposable
     {
         private readonly FileService _fileService;
         private readonly IServiceProvider _serviceProvider;
         private readonly UserContextAccessor _userContextAccessor;
-        private SMBServer _server;
+        private SMBServer? _server;
 
         public SmbServer(IServiceProvider serviceProvider, FileService fileService, UserContextAccessor userContextAccessor)
         {
@@ -30,7 +28,7 @@ namespace Kaimo_File_Server_Core.Smb
 
         public Task StartAsync(CancellationToken token)
         {
-            SMBShareCollection shareCollection = new SMBShareCollection();
+            var shareCollection = new SMBShareCollection();
 
             // Shares aus DB laden
             using (var scope = _serviceProvider.CreateScope())
@@ -40,13 +38,11 @@ namespace Kaimo_File_Server_Core.Smb
 
                 foreach (var shareDef in shares)
                 {
-                    // Verzeichnis erstellen falls nicht vorhanden
                     Directory.CreateDirectory(shareDef.Path);
 
                     var fileSystem = new SmbFileSystem(shareDef.Path, _fileService, _userContextAccessor);
                     var share = new FileSystemShare(shareDef.Name, fileSystem);
 
-                    // ACL-Prüfung pro Share
                     share.AccessRequested += (sender, args) =>
                     {
                         var shareName = ((FileSystemShare)sender).Name;
@@ -54,7 +50,7 @@ namespace Kaimo_File_Server_Core.Smb
                     };
 
                     shareCollection.Add(share);
-                    Console.WriteLine($"[+] Share '{shareDef.Name}' → {shareDef.Path}");
+                    Console.WriteLine($"[+] Share '{shareDef.Name}' -> {shareDef.Path}");
                 }
             }
 
@@ -69,30 +65,59 @@ namespace Kaimo_File_Server_Core.Smb
                 }
             );
 
-            GSSProvider gssProvider = new GSSProvider(authProvider);
+            var gssProvider = new GSSProvider(authProvider);
 
             _server = new SMBServer(shareCollection, gssProvider);
             _server.Start(IPAddress.Any, SMBTransportType.DirectTCPTransport);
             Console.WriteLine($"[+] SMB server started mit {shareCollection.Count} Shares");
+
+            token.Register(() =>
+            {
+                Console.WriteLine("[*] SMB server stopping...");
+                _server.Stop();
+                Console.WriteLine("[*] SMB server stopped.");
+            });
 
             return Task.CompletedTask;
         }
 
         private void OnAccessRequested(string shareName, AccessRequestArgs args)
         {
-            using var scope = _serviceProvider.CreateScope();
-            var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-            var shareAccessRepo = scope.ServiceProvider.GetRequiredService<IShareAccessRepository>();
-
-            var user = userRepo.GetByUsernameAsync(args.UserName).GetAwaiter().GetResult();
-            if (user == null)
+            try
             {
-                args.Allow = false;
-                return;
-            }
+                using var scope = _serviceProvider.CreateScope();
+                var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+                var shareAccessRepo = scope.ServiceProvider.GetRequiredService<IShareAccessRepository>();
 
-            args.Allow = shareAccessRepo.HasAccessAsync(shareName, user.Id).GetAwaiter().GetResult();
-            Console.WriteLine($"[ShareAccess] {args.UserName} → {shareName}: {(args.Allow ? "✓" : "✗")}");
+                var user = userRepo.GetByUsernameAsync(args.UserName).GetAwaiter().GetResult();
+                if (user == null)
+                {
+                    args.Allow = false;
+                    Console.WriteLine($"[ShareAccess] {args.UserName} -> {shareName}: user not found");
+                    return;
+                }
+
+                // UserContext setzen, damit FileService spaeter weiss wer zugreift
+                _userContextAccessor.Set(new UserContext(
+                    user,
+                    new HashSet<Group>(),
+                    new HashSet<Role>(),
+                    new HashSet<string>()
+                ));
+
+                args.Allow = shareAccessRepo.HasAccessAsync(shareName, user.Id).GetAwaiter().GetResult();
+                Console.WriteLine($"[ShareAccess] {args.UserName} -> {shareName}: {(args.Allow ? "allowed" : "denied")}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ShareAccess ERROR] {args.UserName} -> {shareName}: {ex.Message}");
+                args.Allow = false;
+            }
+        }
+
+        public void Dispose()
+        {
+            _server?.Stop();
         }
     }
 }
