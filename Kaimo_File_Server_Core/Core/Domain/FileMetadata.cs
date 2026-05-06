@@ -21,7 +21,7 @@ namespace Kaimo_File_Server_Core.Core.Domain
 
         public IReadOnlyList<AccessEntry> Acl { get; init; }
 
-        internal FileMetadata() { }
+        public FileMetadata() { }
 
 
 

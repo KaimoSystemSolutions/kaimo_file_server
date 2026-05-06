@@ -6,11 +6,8 @@ using System.Text;
 
 namespace Kaimo_File_Server_Core.Core.Repositories
 {
-    namespace Kaimo_File_Server_Core.Core.Repositories
+    public interface IUserContextFactory
     {
-        public interface IUserContextFactory
-        {
-            Task<UserContext> CreateAsync(User user);
-        }
+        Task<UserContext> CreateAsync(User user);
     }
 }
