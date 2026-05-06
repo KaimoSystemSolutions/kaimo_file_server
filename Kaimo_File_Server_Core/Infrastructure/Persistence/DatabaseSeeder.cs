@@ -1,9 +1,6 @@
 ﻿using Kaimo_File_Server_Core.Core.Domain;
 using Kaimo_File_Server_Core.Core.Domain.Identity;
 using Kaimo_File_Server_Core.Core.Security;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Kaimo_File_Server_Core.Infrastructure.Persistence
 {
@@ -20,7 +17,6 @@ namespace Kaimo_File_Server_Core.Infrastructure.Persistence
 
         public async Task SeedAsync()
         {
-            // Nur seeden wenn DB leer ist
             if (_db.Users.Any())
             {
                 Console.WriteLine("[+] Testdaten bereits vorhanden");
@@ -33,51 +29,45 @@ namespace Kaimo_File_Server_Core.Infrastructure.Persistence
             var adminGroup = new Group(Guid.NewGuid(), "Admins");
             var devGroup = new Group(Guid.NewGuid(), "Developers");
             var guestGroup = new Group(Guid.NewGuid(), "Guests");
-
             _db.Groups.AddRange(adminGroup, devGroup, guestGroup);
 
             // Rollen
             var adminRole = new Role(Guid.NewGuid(), "Administrator");
             var userRole = new Role(Guid.NewGuid(), "User");
-
             _db.Roles.AddRange(adminRole, userRole);
 
             // Shares
             var testShare = new ShareDefinition("test", "/data/storage/test");
             var projekteShare = new ShareDefinition("projekte", "/data/storage/projekte");
-
             _db.ShareDefinitions.AddRange(testShare, projekteShare);
 
-            // Users
+            // Users — Passwörter und Log-Output stimmen jetzt überein
+            const string adminPassword = "admin1234";
+            const string marcoPassword = "1234";
+            const string guestPassword = "";
+
             var admin = new User(
-                Guid.NewGuid(),
-                "Administrator",
-                "admin",
-                _passwordService.HashPassword("admin1234"),
-                _passwordService.ComputeNtHash("admin1234")
+                Guid.NewGuid(), "Administrator", "admin",
+                _passwordService.HashPassword(adminPassword),
+                _passwordService.ComputeNtHash(adminPassword)
             );
 
             var marco = new User(
-                Guid.NewGuid(),
-                "Marco Hanisch",
-                "marco.hanisch",
-                _passwordService.HashPassword("1234"),
-                _passwordService.ComputeNtHash("1234")
+                Guid.NewGuid(), "Marco Hanisch", "marco.hanisch",
+                _passwordService.HashPassword(marcoPassword),
+                _passwordService.ComputeNtHash(marcoPassword)
             );
 
             var guest = new User(
-                Guid.NewGuid(),
-                "Guest",
-                "guest",
-                _passwordService.HashPassword(""),
-                _passwordService.ComputeNtHash("")
+                Guid.NewGuid(), "Guest", "guest",
+                _passwordService.HashPassword(guestPassword),
+                _passwordService.ComputeNtHash(guestPassword)
             );
 
             _db.Users.AddRange(admin, marco, guest);
 
             // User -> Gruppen
             _db.UserGroups.AddRange(
-                //new UserGroup(marco.Id, devGroup.Id),
                 new UserGroup(admin.Id, adminGroup.Id),
                 new UserGroup(guest.Id, guestGroup.Id)
             );
@@ -89,20 +79,21 @@ namespace Kaimo_File_Server_Core.Infrastructure.Persistence
                 new UserRole(guest.Id, userRole.Id)
             );
 
-            // Share-Zugriff (Whitelist)
+            // Share-Zugriff
             _db.ShareAccessEntries.AddRange(
                 new ShareAccessEntry("test", admin.Id),
-                //new ShareAccessEntry("test", marco.Id),
                 new ShareAccessEntry("test", devGroup.Id),
                 new ShareAccessEntry("projekte", admin.Id),
                 new ShareAccessEntry("projekte", marco.Id)
             );
 
             await _db.SaveChangesAsync();
+
+            // Log-Output stimmt jetzt mit den tatsächlichen Passwörtern überein
             Console.WriteLine($"[+] Testdaten erstellt:");
-            Console.WriteLine($"    Admin: admin / admin123");
-            Console.WriteLine($"    Marco: marco / test123");
-            Console.WriteLine($"    Guest: guest / (leer)");
+            Console.WriteLine($"    Admin:  admin / {adminPassword}");
+            Console.WriteLine($"    Marco:  marco.hanisch / {marcoPassword}");
+            Console.WriteLine($"    Guest:  guest / (leer)");
         }
     }
 }

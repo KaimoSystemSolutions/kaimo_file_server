@@ -1,7 +1,6 @@
 ﻿using Kaimo_File_Server_Core.Core.Domain;
 using Kaimo_File_Server_Core.Core.Domain.Identity;
 using Kaimo_File_Server_Core.Core.Repositories;
-using Kaimo_File_Server_Core.Core.Repositories.Kaimo_File_Server_Core.Core.Repositories;
 using Kaimo_File_Server_Core.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using System;

@@ -38,64 +38,64 @@ public class FileServiceTests
             Acl = []
         };
 
-    // ========== CanRead ==========
+    // ========== CanReadAsync ==========
 
     [Fact]
-    public async Task CanRead_WithAccess_ReturnsTrue()
+    public async Task CanReadAsync_WithAccess_ReturnsTrue()
     {
         var ctx = CreateContext();
         var meta = CreateMeta();
         _storageMock.Setup(s => s.GetMetadataAsync(It.IsAny<string>())).ReturnsAsync(meta);
         _aclMock.Setup(a => a.HasAccess(ctx, meta, FilePermission.ListReadData)).Returns(true);
 
-        var result = await _sut.CanRead("/test.txt", ctx);
+        var result = await _sut.CanReadAsync("/test.txt", ctx);
         Assert.True(result);
     }
 
     [Fact]
-    public async Task CanRead_WithoutAccess_ReturnsFalse()
+    public async Task CanReadAsync_WithoutAccess_ReturnsFalse()
     {
         var ctx = CreateContext();
         var meta = CreateMeta();
         _storageMock.Setup(s => s.GetMetadataAsync(It.IsAny<string>())).ReturnsAsync(meta);
         _aclMock.Setup(a => a.HasAccess(ctx, meta, FilePermission.ListReadData)).Returns(false);
 
-        var result = await _sut.CanRead("/test.txt", ctx);
+        var result = await _sut.CanReadAsync("/test.txt", ctx);
         Assert.False(result);
     }
 
-    // ========== CanWrite ==========
+    // ========== CanWriteAsync ==========
 
     [Fact]
-    public async Task CanWrite_WithAccess_ReturnsTrue()
+    public async Task CanWriteAsync_WithAccess_ReturnsTrue()
     {
         var ctx = CreateContext();
         var meta = CreateMeta();
         _storageMock.Setup(s => s.GetMetadataAsync(It.IsAny<string>())).ReturnsAsync(meta);
         _aclMock.Setup(a => a.HasAccess(ctx, meta, FilePermission.CreateWriteData)).Returns(true);
 
-        var result = await _sut.CanWrite("/test.txt", ctx);
+        var result = await _sut.CanWriteAsync("/test.txt", ctx);
         Assert.True(result);
     }
 
-    // ========== CanDelete ==========
+    // ========== CanDeleteAsync ==========
 
     [Fact]
-    public async Task CanDelete_WithAccess_ReturnsTrue()
+    public async Task CanDeleteAsync_WithAccess_ReturnsTrue()
     {
         var ctx = CreateContext();
         var meta = CreateMeta();
         _storageMock.Setup(s => s.GetMetadataAsync(It.IsAny<string>())).ReturnsAsync(meta);
         _aclMock.Setup(a => a.HasAccess(ctx, meta, FilePermission.Delete)).Returns(true);
 
-        var result = await _sut.CanDelete("/test.txt", ctx);
+        var result = await _sut.CanDeleteAsync("/test.txt", ctx);
         Assert.True(result);
     }
 
-    // ========== ReadFile ==========
+    // ========== ReadFileAsync ==========
 
     [Fact]
-    public async Task ReadFile_WithAccess_ReturnsStream()
+    public async Task ReadFileAsync_WithAccess_ReturnsStream()
     {
         var ctx = CreateContext();
         var meta = CreateMeta();
@@ -105,13 +105,13 @@ public class FileServiceTests
         _aclMock.Setup(a => a.HasAccess(ctx, meta, FilePermission.ListReadData)).Returns(true);
         _storageMock.Setup(s => s.ReadAsync(It.IsAny<string>())).ReturnsAsync(expectedStream);
 
-        var result = await _sut.ReadFile("/test.txt", ctx);
+        var result = await _sut.ReadFileAsync("/test.txt", ctx);
 
         Assert.Same(expectedStream, result);
     }
 
     [Fact]
-    public async Task ReadFile_WithoutAccess_ThrowsUnauthorized()
+    public async Task ReadFileAsync_WithoutAccess_ThrowsUnauthorized()
     {
         var ctx = CreateContext();
         var meta = CreateMeta();
@@ -119,13 +119,13 @@ public class FileServiceTests
         _aclMock.Setup(a => a.HasAccess(ctx, meta, FilePermission.ListReadData)).Returns(false);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => _sut.ReadFile("/test.txt", ctx));
+            () => _sut.ReadFileAsync("/test.txt", ctx));
     }
 
-    // ========== WriteFile ==========
+    // ========== WriteFileAsync ==========
 
     [Fact]
-    public async Task WriteFile_WithAccess_CallsStorageWrite()
+    public async Task WriteFileAsync_WithAccess_CallsStorageWrite()
     {
         var ctx = CreateContext();
         var meta = CreateMeta();
@@ -134,13 +134,13 @@ public class FileServiceTests
         _storageMock.Setup(s => s.GetMetadataAsync(It.IsAny<string>())).ReturnsAsync(meta);
         _aclMock.Setup(a => a.HasAccess(ctx, meta, FilePermission.CreateWriteData)).Returns(true);
 
-        await _sut.WriteFile("/test.txt", data, ctx);
+        await _sut.WriteFileAsync("/test.txt", data, ctx);
 
         _storageMock.Verify(s => s.WriteAsync("/test.txt", data), Times.Once);
     }
 
     [Fact]
-    public async Task WriteFile_WithoutAccess_ThrowsUnauthorized()
+    public async Task WriteFileAsync_WithoutAccess_ThrowsUnauthorized()
     {
         var ctx = CreateContext();
         var meta = CreateMeta();
@@ -148,13 +148,13 @@ public class FileServiceTests
         _aclMock.Setup(a => a.HasAccess(ctx, meta, FilePermission.CreateWriteData)).Returns(false);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => _sut.WriteFile("/test.txt", Stream.Null, ctx));
+            () => _sut.WriteFileAsync("/test.txt", Stream.Null, ctx));
     }
 
-    // ========== DeleteFile ==========
+    // ========== DeleteFileAsync ==========
 
     [Fact]
-    public async Task DeleteFile_WithAccess_CallsStorageDelete()
+    public async Task DeleteFileAsync_WithAccess_CallsStorageDelete()
     {
         var ctx = CreateContext();
         var meta = CreateMeta();
@@ -162,13 +162,13 @@ public class FileServiceTests
         _storageMock.Setup(s => s.GetMetadataAsync(It.IsAny<string>())).ReturnsAsync(meta);
         _aclMock.Setup(a => a.HasAccess(ctx, meta, FilePermission.Delete)).Returns(true);
 
-        await _sut.DeleteFile("/test.txt", ctx);
+        await _sut.DeleteFileAsync("/test.txt", ctx);
 
         _storageMock.Verify(s => s.DeleteAsync("/test.txt"), Times.Once);
     }
 
     [Fact]
-    public async Task DeleteFile_WithoutAccess_ThrowsUnauthorized()
+    public async Task DeleteFileAsync_WithoutAccess_ThrowsUnauthorized()
     {
         var ctx = CreateContext();
         var meta = CreateMeta();
@@ -176,26 +176,26 @@ public class FileServiceTests
         _aclMock.Setup(a => a.HasAccess(ctx, meta, FilePermission.Delete)).Returns(false);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => _sut.DeleteFile("/test.txt", ctx));
+            () => _sut.DeleteFileAsync("/test.txt", ctx));
     }
 
-    // ========== GetMetadata ==========
+    // ========== GetMetadataAsync ==========
 
     [Fact]
-    public async Task GetMetadata_WithAccess_ReturnsMeta()
+    public async Task GetMetadataAsync_WithAccess_ReturnsMeta()
     {
         var ctx = CreateContext();
         var meta = CreateMeta();
         _storageMock.Setup(s => s.GetMetadataAsync(It.IsAny<string>())).ReturnsAsync(meta);
         _aclMock.Setup(a => a.HasAccess(ctx, meta, FilePermission.ListReadData)).Returns(true);
 
-        var result = await _sut.GetMetadata("/test.txt", ctx);
+        var result = await _sut.GetMetadataAsync("/test.txt", ctx);
 
         Assert.Same(meta, result);
     }
 
     [Fact]
-    public async Task GetMetadata_WithoutAccess_ThrowsUnauthorized()
+    public async Task GetMetadataAsync_WithoutAccess_ThrowsUnauthorized()
     {
         var ctx = CreateContext();
         var meta = CreateMeta();
@@ -203,26 +203,26 @@ public class FileServiceTests
         _aclMock.Setup(a => a.HasAccess(ctx, meta, FilePermission.ListReadData)).Returns(false);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => _sut.GetMetadata("/test.txt", ctx));
+            () => _sut.GetMetadataAsync("/test.txt", ctx));
     }
 
-    // ========== CreateFile ==========
+    // ========== CreateFileAsync ==========
 
     [Fact]
-    public async Task CreateFile_WithAccess_WritesEmptyStream()
+    public async Task CreateFileAsync_WithAccess_WritesEmptyStream()
     {
         var ctx = CreateContext();
         var meta = CreateMeta();
         _storageMock.Setup(s => s.GetMetadataAsync(It.IsAny<string>())).ReturnsAsync(meta);
         _aclMock.Setup(a => a.HasAccess(ctx, meta, FilePermission.CreateWriteData)).Returns(true);
 
-        await _sut.CreateFile("/test.txt", ctx);
+        await _sut.CreateFileAsync("/test.txt", ctx);
 
         _storageMock.Verify(s => s.WriteAsync("/test.txt", Stream.Null), Times.Once);
     }
 
     [Fact]
-    public async Task CreateFile_WithoutAccess_ThrowsUnauthorized()
+    public async Task CreateFileAsync_WithoutAccess_ThrowsUnauthorized()
     {
         var ctx = CreateContext();
         var meta = CreateMeta();
@@ -230,6 +230,6 @@ public class FileServiceTests
         _aclMock.Setup(a => a.HasAccess(ctx, meta, FilePermission.CreateWriteData)).Returns(false);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => _sut.CreateFile("/test.txt", ctx));
+            () => _sut.CreateFileAsync("/test.txt", ctx));
     }
 }

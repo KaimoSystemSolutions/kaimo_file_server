@@ -34,14 +34,15 @@ public class AclServiceTests
             Acl = acl ?? []
         };
 
-    // ========== HasAccess – Grundverhalten ==========
+    // ========== HasAccess — Grundverhalten ==========
 
     [Fact]
-    public void HasAccess_NullUserContext_ReturnsTrue()
+    public void HasAccess_NullUserContext_ReturnsFalse()
     {
+        // Nach dem Refactoring: kein UserContext = kein Zugriff (deny by default)
         var file = CreateFile();
         var result = _sut.HasAccess(null!, file, FilePermission.ListReadData);
-        Assert.True(result);
+        Assert.False(result);
     }
 
     [Fact]
@@ -57,8 +58,6 @@ public class AclServiceTests
     public void HasAccess_NullAcl_ReturnsTrue()
     {
         var ctx = CreateContext();
-        var file = CreateFile(acl: null);
-        // FileMetadata mit null ACL
         var fileWithNullAcl = new FileMetadata
         {
             Id = Guid.NewGuid(),
@@ -74,7 +73,7 @@ public class AclServiceTests
         Assert.True(result);
     }
 
-    // ========== HasAccess – Allow ==========
+    // ========== HasAccess — Allow ==========
 
     [Fact]
     public void HasAccess_ExplicitAllow_ForUser_ReturnsTrue()
@@ -139,12 +138,11 @@ public class AclServiceTests
             FilePermission.CreateWriteData, AclInheritance.ThisOnly);
         var file = CreateFile(acl: [entry]);
 
-        // User hat Write-Allow, fragt aber Read an
         var result = _sut.HasAccess(ctx, file, FilePermission.ListReadData);
         Assert.False(result);
     }
 
-    // ========== HasAccess – Deny hat Vorrang ==========
+    // ========== HasAccess — Deny hat Vorrang ==========
 
     [Fact]
     public void HasAccess_DenyOverridesAllow_ReturnsFalse()
@@ -178,7 +176,7 @@ public class AclServiceTests
         Assert.False(result);
     }
 
-    // ========== HasAccess – Combined Permissions ==========
+    // ========== HasAccess — Combined Permissions ==========
 
     [Fact]
     public void HasAccess_CombinedPermissions_PartialMatch()
@@ -210,7 +208,7 @@ public class AclServiceTests
         Assert.True(_sut.HasAccess(ctx, file, FilePermission.TakeOwnership));
     }
 
-    // ========== GetEffectiveAcl – Vererbung ==========
+    // ========== GetEffectiveAcl — Vererbung ==========
 
     [Fact]
     public void GetEffectiveAcl_AllDescendants_AppliesToBoth()
@@ -291,9 +289,7 @@ public class AclServiceTests
         var forDir = _sut.GetEffectiveAcl(entries, isDirectory: true);
         var forFile = _sut.GetEffectiveAcl(entries, isDirectory: false);
 
-        // Dir: SubFolders + AllDescendants = 2
         Assert.Equal(2, forDir.Count);
-        // File: SubFiles + AllDescendants = 2
         Assert.Equal(2, forFile.Count);
     }
 }

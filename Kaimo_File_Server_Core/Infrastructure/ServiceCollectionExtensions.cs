@@ -3,9 +3,6 @@ using Kaimo_File_Server_Core.Core.Security;
 using Kaimo_File_Server_Core.Infrastructure.Persistence;
 using Kaimo_File_Server_Core.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Kaimo_File_Server_Core.Infrastructure
 {
@@ -19,12 +16,14 @@ namespace Kaimo_File_Server_Core.Infrastructure
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseNpgsql(connectionString));
 
-            services.AddScoped<IUserRepository, UserRepository>();
-            services.AddSingleton<IPasswordService, PasswordService>();
-            services.AddScoped<DatabaseSeeder>();
+            // Repositories — jedes nur einmal
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<IShareAccessRepository, ShareAccessRepository>();
             services.AddScoped<IShareRepository, ShareRepository>();
+
+            // Infrastruktur-Services
+            services.AddSingleton<IPasswordService, PasswordService>();
+            services.AddScoped<DatabaseSeeder>();
 
             return services;
         }
@@ -41,7 +40,6 @@ namespace Kaimo_File_Server_Core.Infrastructure
                     await db.Database.EnsureCreatedAsync();
                     Console.WriteLine("[+] Datenbank bereit");
 
-                    // Testdaten seeden
                     var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
                     await seeder.SeedAsync();
 

@@ -1,5 +1,4 @@
-using Kaimo_File_Server_Core;
-using Kaimo_File_Server_Core.Core.Repositories.Kaimo_File_Server_Core.Core.Repositories;
+using Kaimo_File_Server_Core.Core.Repositories;
 using Kaimo_File_Server_Core.Core.Security;
 using Kaimo_File_Server_Core.Core.Services;
 using Kaimo_File_Server_Core.Core.Storage;
@@ -10,26 +9,26 @@ using Kaimo_File_Server_Core.Storage;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-// Infrastructure (DB + DBRepos)
+// ── Infrastructure (DB + Repositories) ──
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// ── Core Services ──
+var storagePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
+
+builder.Services.AddSingleton<IStorageEngine>(sp => new FileSystemStorage(storagePath, sp));
+builder.Services.AddSingleton<IAclService, AclService>();
 builder.Services.AddScoped<IUserContextFactory, UserContextFactory>();
 
-// Core 
-var storage = new FileSystemStorage("/data/storage");
-var aclService = new AclService();
-var fileService = new FileService(storage, aclService);
-var userContextAccessor = new UserContextAccessor();
+// Interface-Registrierung: alle Konsumenten hängen an IFileService
+builder.Services.AddSingleton<IFileService, FileService>();
 
-
-
-//builder.Services.AddHostedService<Worker>();
-builder.Services.AddSingleton<IStorageEngine>(new FileSystemStorage(@"/data/files"));
+// ── SMB Transport ──
+builder.Services.AddSingleton<SmbServer>();
 
 var host = builder.Build();
 await host.InitializeDatabaseAsync();
 
-// Smb
-var smbServer = new SmbServer(host.Services, fileService, userContextAccessor);
-smbServer.StartAsync(CancellationToken.None).Wait();
+var smbServer = host.Services.GetRequiredService<SmbServer>();
+await smbServer.StartAsync(CancellationToken.None);
 
 host.Run();

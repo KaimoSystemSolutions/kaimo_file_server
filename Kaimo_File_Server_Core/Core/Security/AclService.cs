@@ -1,8 +1,4 @@
 ﻿using Kaimo_File_Server_Core.Core.Domain;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using static Kaimo_File_Server_Core.Core.Security.FilePermission;
 
 namespace Kaimo_File_Server_Core.Core.Security
 {
@@ -10,12 +6,20 @@ namespace Kaimo_File_Server_Core.Core.Security
     {
         public bool HasAccess(UserContext userContext, FileMetadata file, FilePermission permission)
         {
-            if (userContext == null || file.Acl == null || file.Acl.Count == 0)
+            // ── DENY BY DEFAULT wenn kein User-Context vorhanden ──
+            // Das ist die sicherste Variante: ohne authentifizierten User kein Zugriff.
+            if (userContext == null)
+                return false;
+
+            // Wenn keine ACLs definiert sind, erlauben wir Zugriff (offenes System).
+            // TODO: Sobald ACLs aus der DB geladen werden, diesen Fallback überdenken.
+            //       Mögliche Strategie: Default-ACL pro Share definieren.
+            if (file.Acl == null || file.Acl.Count == 0)
                 return true;
 
             var userPrincipalIds = GetPrincipalIds(userContext);
 
-            // Deny hat IMMER Vorrang
+            // Deny hat IMMER Vorrang (Windows-NTFS-Semantik)
             foreach (var entry in file.Acl)
             {
                 if (entry.EntryType != AclEntryType.Deny)
@@ -25,7 +29,7 @@ namespace Kaimo_File_Server_Core.Core.Security
                     continue;
 
                 if ((entry.Permissions & permission) != 0)
-                    return false; // explizit verweigert
+                    return false;
             }
 
             // Dann Allow prüfen
@@ -38,10 +42,10 @@ namespace Kaimo_File_Server_Core.Core.Security
                     continue;
 
                 if ((entry.Permissions & permission) != 0)
-                    return true; // explizit erlaubt
+                    return true;
             }
 
-            // Kein Match = kein Zugriff (Whitelist)
+            // Kein Match = kein Zugriff (Whitelist-Prinzip)
             return false;
         }
 

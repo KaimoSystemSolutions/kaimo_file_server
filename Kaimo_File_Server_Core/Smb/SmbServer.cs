@@ -1,9 +1,7 @@
 ﻿using Kaimo_File_Server_Core.Core.Domain;
 using Kaimo_File_Server_Core.Core.Domain.Identity;
 using Kaimo_File_Server_Core.Core.Repositories;
-using Kaimo_File_Server_Core.Core.Repositories.Kaimo_File_Server_Core.Core.Repositories;
 using Kaimo_File_Server_Core.Core.Services;
-using Kaimo_File_Server_Core.Infrastructure.Repositories;
 using Kaimo_File_Server_Core.Smb.Security;
 using SMBLibrary;
 using SMBLibrary.Authentication.GSSAPI;
@@ -15,23 +13,26 @@ namespace Kaimo_File_Server_Core.Smb
 {
     public class SmbServer : IDisposable
     {
-        private readonly FileService _fileService;
         private readonly IServiceProvider _serviceProvider;
-        private readonly UserContextAccessor _userContextAccessor;
+        private readonly IFileService _fileService;
         private SMBServer? _server;
 
-        public SmbServer(IServiceProvider serviceProvider, FileService fileService, UserContextAccessor userContextAccessor)
+        /// <summary>
+        /// Mapping: ShareName -> SmbFileSystem-Instanz.
+        /// Wird beim Start befüllt und danach nur gelesen.
+        /// </summary>
+        private readonly Dictionary<string, SmbFileSystem> _fileSystems = new(StringComparer.OrdinalIgnoreCase);
+
+        public SmbServer(IServiceProvider serviceProvider, IFileService fileService)
         {
             _serviceProvider = serviceProvider;
             _fileService = fileService;
-            _userContextAccessor = userContextAccessor;
         }
 
         public Task StartAsync(CancellationToken token)
         {
             var shareCollection = new SMBShareCollection();
 
-            // Shares aus DB laden
             using (var scope = _serviceProvider.CreateScope())
             {
                 var shareRepo = scope.ServiceProvider.GetRequiredService<IShareRepository>();
@@ -41,7 +42,10 @@ namespace Kaimo_File_Server_Core.Smb
                 {
                     Directory.CreateDirectory(shareDef.Path);
 
-                    var fileSystem = new SmbFileSystem(shareDef.Path, _fileService, _userContextAccessor);
+                    // SmbFileSystem bekommt nur noch FileService — kein UserContextAccessor mehr
+                    var fileSystem = new SmbFileSystem(shareDef.Path, _fileService);
+                    _fileSystems[shareDef.Name] = fileSystem;
+
                     var share = new FileSystemShare(shareDef.Name, fileSystem);
 
                     share.AccessRequested += (sender, args) =>
@@ -99,16 +103,21 @@ namespace Kaimo_File_Server_Core.Smb
                     return;
                 }
 
-                // UserContext MIT Gruppen und Rollen laden
                 var userContext = contextFactory.CreateAsync(user).GetAwaiter().GetResult();
-                _userContextAccessor.Set(userContext);
 
-                // Share-Zugriff prüfen — auch gegen Gruppen-IDs
+                // ── Kernänderung: UserContext direkt ins FileSystem setzen ──
+                // Statt über AsyncLocal wird der Context auf der SmbFileSystem-Instanz gesetzt.
+                // Das ist sicherer, weil es an die konkrete Share-Verbindung gebunden ist.
+                if (_fileSystems.TryGetValue(shareName, out var fileSystem))
+                {
+                    fileSystem.CurrentUser = userContext;
+                }
+
+                // Share-Zugriff prüfen — User-ID + Gruppen-IDs
                 bool hasAccess = shareAccessRepo.HasAccessAsync(shareName, user.Id).GetAwaiter().GetResult();
 
                 if (!hasAccess)
                 {
-                    // Auch Gruppen-IDs gegen Share-Access prüfen
                     foreach (var group in userContext.Groups)
                     {
                         if (shareAccessRepo.HasAccessAsync(shareName, group.Id).GetAwaiter().GetResult())
@@ -120,7 +129,7 @@ namespace Kaimo_File_Server_Core.Smb
                 }
 
                 args.Allow = hasAccess;
-                Console.WriteLine($"[ShareAccess] {args.UserName} -> {shareName}: {(args.Allow ? "allowed" : "denied")}");
+                Console.WriteLine($"[ShareAccess] {args.UserName} -> {shareName}: {(hasAccess ? "allowed" : "denied")}");
             }
             catch (Exception ex)
             {
