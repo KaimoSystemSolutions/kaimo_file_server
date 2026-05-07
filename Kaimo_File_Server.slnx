@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="docker-compose.dcproj">
+    <Build />
+  </Project>
+  <Project Path="src/Kaimo_File_Server.Core/Kaimo_File_Server.Core.csproj" />
+  <Project Path="src/Kaimo_File_Server.Host/Kaimo_File_Server.Host.csproj" />
+  <Project Path="src/Kaimo_File_Server.Infrastructure/Kaimo_File_Server.Infrastructure.csproj" />
+  <Project Path="src/Kaimo_File_Server.Smb/Kaimo_File_Server.Smb.csproj" />
+  <Project Path="tests/Kaimo_File_Server.Tests/Kaimo_File_Server.Tests.csproj" />
+</Solution>

@@ -1,36 +1,37 @@
 services:
-  kaimo_file_server_core:
-    image: ${DOCKER_REGISTRY-}kaimofileservercore
-    container_name: kaimo_file_server_core
+  kaimo_file_server.host:
+    image: ${DOCKER_REGISTRY-}kaimofileserver
+    container_name: kaimo_file_server
     user: root
     ports:
       - 4445:445
     volumes: 
     #Both work
       #- C:\Users\Marco\source\repos\Kaimo_File_Server_Core\mappings\data\storage:/data/storage 
-      - C:/Users/Marco/source/repos/Kaimo_File_Server_Core/mappings/data/storage:/data/storage
+      #- C:/Users/Marco/source/repos/Kaimo_File_Server_Core/mappings/data/storage:/data/storage
+      - ./tests/data/storage:/data/storage
     depends_on:
       postgres:
         condition: service_healthy
     build:
-      context: Kaimo_File_Server_Core
-      dockerfile: Dockerfile
-
+      context: .
+      dockerfile: src/Kaimo_File_Server.Host/Dockerfile
 
   postgres:
-    container_name: kaimo_file_server_core_db
+    container_name: kaimo_file_server_db
     image: postgres:17-alpine
     environment:
       TZ: Europe/Berlin
-      POSTGRES_DB: kaimo_file_server_core
+      POSTGRES_DB: kaimo_file_server
       POSTGRES_USER: kaimo_test_user
       POSTGRES_PASSWORD: change_me
     volumes:
-      - C:/Users/Marco/source/repos/Kaimo_File_Server_Core/mappings/data/postgres:/var/lib/postgresql/data
+      #- C:/Users/Marco/source/repos/Kaimo_File_Server_Core/mappings/data/postgres:/var/lib/postgresql/data
+      - ./tests/data/postgres:/var/lib/postgresql/data
     ports:
       - "5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kaimo_test_user -d kaimo_file_server_core"]
+      test: ["CMD-SHELL", "pg_isready -U kaimo_test_user -d kaimo_file_server"]
       interval: 2s
       timeout: 5s
       retries: 10
@@ -40,3 +41,5 @@ services:
     restart: always
     ports:
       - 8080:8080
+  
+

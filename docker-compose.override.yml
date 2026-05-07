@@ -1,5 +1,5 @@
 services:
-  kaimo_file_server_core:
+  kaimo_file_server.host:
     environment:
       - DOTNET_ENVIRONMENT=Development
     volumes:

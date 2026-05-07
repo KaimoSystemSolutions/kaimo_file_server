@@ -1,7 +1,0 @@
-<Solution>
-  <Project Path="docker-compose.dcproj">
-    <Build />
-  </Project>
-  <Project Path="Kaimo_File_Server_Core.Tests/Kaimo_File_Server_Core.Tests.csproj" />
-  <Project Path="Kaimo_File_Server_Core/Kaimo_File_Server_Core.csproj" />
-</Solution>

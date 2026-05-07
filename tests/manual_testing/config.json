@@ -1,0 +1,15 @@
+{
+  "ip": "127.0.0.1",
+  "port": 4445,
+  "username": "marco.hanisch",
+  "password": "1234",
+  "domain": "",
+  "test_share": "",
+  "test_all_shares": true,
+  "write_test": true,
+  "delete_test": true,
+  "benchmark": true,
+  "benchmark_size_kb": 8192,
+  "timeout": 30,
+  "verbose": false
+}
