@@ -18,8 +18,6 @@ namespace Kaimo_File_Server.Smb
         private readonly IFileService _fileService;
         private SMBServer? _server;
 
-        private readonly Dictionary<string, SmbFileSystem> _fileSystems = new(StringComparer.OrdinalIgnoreCase);
-
         public SmbServer(IServiceProvider serviceProvider, IFileService fileService)
         {
             _serviceProvider = serviceProvider;
@@ -30,7 +28,6 @@ namespace Kaimo_File_Server.Smb
         {
             var shareCollection = new SMBShareCollection();
 
-            // Shares laden — einmalig beim Start über IShareRepository
             using (var scope = _serviceProvider.CreateScope())
             {
                 var shareRepo = scope.ServiceProvider.GetRequiredService<IShareRepository>();
@@ -41,7 +38,6 @@ namespace Kaimo_File_Server.Smb
                     Directory.CreateDirectory(shareDef.Path);
 
                     var fileSystem = new SmbFileSystem(shareDef.Path, _fileService);
-                    _fileSystems[shareDef.Name] = fileSystem;
 
                     var share = new FileSystemShare(shareDef.Name, fileSystem);
                     share.AccessRequested += (sender, args) =>
@@ -55,12 +51,12 @@ namespace Kaimo_File_Server.Smb
                 }
             }
 
-            // Auth-Provider nutzt IAuthenticationLookup statt direkt IUserRepository
             NTLMAuthenticationProviderBase authProvider = new NtHashAuthenticationProvider(
                 username =>
                 {
                     using var scope = _serviceProvider.CreateScope();
-                    var authLookup = scope.ServiceProvider.GetRequiredService<IAuthenticationLookup>();
+                    var authLookup = scope.ServiceProvider
+                        .GetRequiredService<IAuthenticationLookup>();
                     return authLookup.GetNtHashAsync(username).GetAwaiter().GetResult();
                 }
             );
@@ -86,28 +82,36 @@ namespace Kaimo_File_Server.Smb
             try
             {
                 using var scope = _serviceProvider.CreateScope();
-                var authLookup = scope.ServiceProvider.GetRequiredService<IAuthenticationLookup>();
+                var authLookup = scope.ServiceProvider
+                    .GetRequiredService<IAuthenticationLookup>();
 
-                var userContext = authLookup.ResolveUserContextAsync(args.UserName).GetAwaiter().GetResult();
+                var userContext = authLookup.ResolveUserContextAsync(args.UserName)
+                    .GetAwaiter().GetResult();
                 if (userContext == null)
                 {
                     args.Allow = false;
-                    Console.WriteLine($"[ShareAccess] {args.UserName} -> {shareName}: user not found");
+                    Console.WriteLine(
+                        $"[ShareAccess] {args.UserName} -> {shareName}: user not found");
                     return;
                 }
 
-                if (_fileSystems.TryGetValue(shareName, out var fileSystem))
-                    fileSystem.CurrentUser = userContext;
+                // ── Thread-safe user injection ──
+                // Instead of setting a mutable property on SmbFileSystem (race condition!),
+                // we inject the user into the current execution flow via AsyncLocal.
+                // Every subsequent filesystem call on this flow sees this user.
+                SmbFileSystem.SetSessionUser(userContext);
 
-                // Share-Zugriff prüfen — User-ID + Gruppen-IDs
-                bool hasAccess = authLookup.HasShareAccessAsync(shareName, userContext.User.Id)
+                // Check share access: user ID + group IDs
+                bool hasAccess = authLookup
+                    .HasShareAccessAsync(shareName, userContext.User.Id)
                     .GetAwaiter().GetResult();
 
                 if (!hasAccess)
                 {
                     foreach (var group in userContext.Groups)
                     {
-                        if (authLookup.HasShareAccessAsync(shareName, group.Id).GetAwaiter().GetResult())
+                        if (authLookup.HasShareAccessAsync(shareName, group.Id)
+                                .GetAwaiter().GetResult())
                         {
                             hasAccess = true;
                             break;
@@ -116,11 +120,14 @@ namespace Kaimo_File_Server.Smb
                 }
 
                 args.Allow = hasAccess;
-                Console.WriteLine($"[ShareAccess] {args.UserName} -> {shareName}: {(hasAccess ? "allowed" : "denied")}");
+                Console.WriteLine(
+                    $"[ShareAccess] {args.UserName} -> {shareName}: " +
+                    $"{(hasAccess ? "allowed" : "denied")}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ShareAccess ERROR] {args.UserName} -> {shareName}: {ex.Message}");
+                Console.WriteLine(
+                    $"[ShareAccess ERROR] {args.UserName} -> {shareName}: {ex.Message}");
                 args.Allow = false;
             }
         }
