@@ -89,7 +89,7 @@ public class SmbFileSystemTests : IDisposable
             SmbFileSystem.SetSessionUser(_testUser);
             barrier.SignalAndWait(); // sync: both threads have set their user
             barrier.SignalAndWait(); // sync: wait for thread2 to set its user too
-            // Now read back — should still be _testUser, not _secondUser
+            // Now read back should still be _testUser, not _secondUser
             // We verify by creating a file and checking the handle captures the right user
             CreateTestFile("race_t1.txt");
             _sut.CreateFile(out var h, out _, "race_t1.txt",
@@ -125,7 +125,7 @@ public class SmbFileSystemTests : IDisposable
     [Fact]
     public void ConcurrentSessions_PermissionChecksUseCorrectUser()
     {
-        // Two sessions with different users — verify FileService receives the correct
+        // Two sessions with different users verify FileService receives the correct
         // UserContext for each session's operations.
         var userAId = _testUser.User.Id;
         var userBId = _secondUser.User.Id;
@@ -176,10 +176,10 @@ public class SmbFileSystemTests : IDisposable
         // Clear the AsyncLocal by running on a fresh thread with no user set
         var ex = Task.Run(() =>
         {
-            // Fresh thread — no SetSessionUser called
+            // Fresh thread no SetSessionUser called
             // AsyncLocal is null here
             SmbFileSystem.SetSessionUser(null!);
-            // Actually we need to simulate "no user set" — set to null explicitly
+            // Actually we need to simulate "no user set" set to null explicitly
             // then attempt CreateFile
             return Record.Exception(() =>
             {
@@ -936,7 +936,7 @@ public class SmbFileSystemTests : IDisposable
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  SET FILE INFORMATION — EXTENDED TESTS
+    //  SET FILE INFORMATION EXTENDED TESTS
     // ═══════════════════════════════════════════════════════════
 
     [Fact]
@@ -987,7 +987,7 @@ public class SmbFileSystemTests : IDisposable
         _sut.SetFileInformation(h, alloc);
         _sut.CloseFile(h);
 
-        // File should NOT grow — AllocationInformation only truncates
+        // File should NOT grow AllocationInformation only truncates
         Assert.Equal(100, new FileInfo(Path.Combine(_testRoot, "small.txt")).Length);
     }
 
@@ -1042,7 +1042,7 @@ public class SmbFileSystemTests : IDisposable
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  GET FILE INFORMATION — EXTENDED INFO CLASSES
+    //  GET FILE INFORMATION EXTENDED INFO CLASSES
     // ═══════════════════════════════════════════════════════════
 
     [Fact]
@@ -1188,14 +1188,14 @@ public class SmbFileSystemTests : IDisposable
         File.Delete(Path.Combine(_testRoot, "vanish.txt"));
 
         // Re-create a handle-like object won't work, so just verify the method
-        // handles a fabricated stale handle — pass null
+        // handles a fabricated stale handle pass null
         var s = _sut.GetFileInformation(out _, null!,
             FileInformationClass.FileBasicInformation);
         Assert.Equal(NTStatus.STATUS_INVALID_HANDLE, s);
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  FILESYSTEM INFO — EXTENDED CLASSES
+    //  FILESYSTEM INFO EXTENDED CLASSES
     // ═══════════════════════════════════════════════════════════
 
     [Fact]
@@ -1320,7 +1320,7 @@ public class SmbFileSystemTests : IDisposable
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  WRITE TESTS — EXTENDED
+    //  WRITE TESTS EXTENDED
     // ═══════════════════════════════════════════════════════════
 
     [Fact]
@@ -1359,7 +1359,7 @@ public class SmbFileSystemTests : IDisposable
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  QUERY DIRECTORY — EXTENDED INFO CLASSES
+    //  QUERY DIRECTORY EXTENDED INFO CLASSES
     // ═══════════════════════════════════════════════════════════
 
     [Fact]
@@ -1429,7 +1429,7 @@ public class SmbFileSystemTests : IDisposable
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  PATH TRAVERSAL — ADDITIONAL VECTORS
+    //  PATH TRAVERSAL ADDITIONAL VECTORS
     // ═══════════════════════════════════════════════════════════
 
     [Theory]
@@ -1490,7 +1490,7 @@ public class SmbFileSystemTests : IDisposable
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  HANDLE LIFECYCLE — DOUBLE CLOSE, USE AFTER CLOSE
+    //  HANDLE LIFECYCLE DOUBLE CLOSE, USE AFTER CLOSE
     // ═══════════════════════════════════════════════════════════
 
     [Fact]
@@ -1504,7 +1504,7 @@ public class SmbFileSystemTests : IDisposable
 
         _sut.CloseFile(h);
 
-        // After close, stream is disposed — read should return FILE_CLOSED
+        // After close, stream is disposed read should return FILE_CLOSED
         var s = _sut.ReadFile(out _, h, 0, 10);
         Assert.Equal(NTStatus.STATUS_FILE_CLOSED, s);
     }
@@ -1525,7 +1525,7 @@ public class SmbFileSystemTests : IDisposable
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  EDGE CASES — EMPTY FILES, LARGE READS, ROOT DIR
+    //  EDGE CASES EMPTY FILES, LARGE READS, ROOT DIR
     // ═══════════════════════════════════════════════════════════
 
     [Fact]

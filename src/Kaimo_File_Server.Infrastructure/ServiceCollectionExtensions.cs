@@ -33,8 +33,11 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IUserContextFactory, UserContextFactory>();
             services.AddScoped<DatabaseSeeder>();
 
-            // AuthenticationLookup — das Interface aus Core, die Implementierung aus Infrastructure
+            // AuthenticationLookup das Interface aus Core, die Implementierung aus Infrastructure
             services.AddScoped<IAuthenticationLookup, AuthenticationLookup>();
+
+            // FileVersionRepositor
+            services.AddScoped<IFileVersionRepository, FileVersionRepository>();
 
             return services;
         }
@@ -48,6 +51,17 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddSingleton<IStorageEngine>(sp => new FileSystemStorage(storagePath, sp));
             services.AddSingleton<IAclService, AclService>();
             services.AddSingleton<IFileService, FileService>();
+
+            var versionStoragePath = Path.Combine(storagePath, ".versions");
+
+            // Use Scoped, not Singleton each version operation needs its own DbContext
+            services.AddScoped<IFileVersionService>(sp =>
+                new FileVersionService(
+                    sp.GetRequiredService<IFileVersionRepository>(),
+                    versionStoragePath,
+                    defaultMaxVersions: 64,
+                    defaultMaxAge: TimeSpan.FromDays(90)));
+
             return services;
         }
 

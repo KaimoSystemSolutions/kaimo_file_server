@@ -5,7 +5,7 @@ namespace Kaimo_File_Server.Core.Security
     /// <summary>
     /// Represents the security context for a single operation/request.
     /// Each transport adapter creates this per-request and passes it explicitly
-    /// through the call chain — no ambient state, no AsyncLocal.
+    /// through the call chain no ambient state, no AsyncLocal.
     /// 
     /// For SMB: created in OnAccessRequested, stored per-session in the FileHandle
     /// For HTTP: created from the authenticated ClaimsPrincipal per request

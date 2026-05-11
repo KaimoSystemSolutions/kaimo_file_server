@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Services;
+using Microsoft.Extensions.DependencyInjection;
 using SMBLibrary;
 using SMBLibrary.Server;
 using FileAttributes = SMBLibrary.FileAttributes;
@@ -10,11 +11,15 @@ namespace Kaimo_File_Server.Smb
     {
         private readonly string _root;
         private readonly IFileService _fileService;
+        private readonly IFileVersionService? _versionService;
+        private readonly IServiceProvider? _serviceProvider;
 
-        public SmbFileSystem(string rootPath, IFileService fileService)
+        public SmbFileSystem(string rootPath, IFileService fileService,
+            IServiceProvider? serviceProvider = null)
         {
             _root = rootPath;
             _fileService = fileService;
+            _serviceProvider = serviceProvider;
             Directory.CreateDirectory(_root);
         }
 
@@ -58,8 +63,9 @@ namespace Kaimo_File_Server.Smb
                 .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
             var full = Path.GetFullPath(fullPath);
             if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-                return fullPath; // fallback
-            return full.Substring(root.Length);
+                return fullPath;
+            return full.Substring(root.Length)
+                .Replace('\\', '/');  // ★ Immer forward slashes für Konsistenz
         }
 
         private sealed class FileHandle
@@ -68,13 +74,14 @@ namespace Kaimo_File_Server.Smb
             public string Path = string.Empty;
             public bool IsDirectory;
             public bool DeleteOnClose;
+            public UserContext User { get; init; } = null!;
 
             /// <summary>
-            /// Captured at handle creation time — immutable per-handle.
-            /// This is the fix for the CurrentUser race condition:
-            /// each handle knows which user opened it.
+            /// Set to true on the first WriteFile call.
+            /// Used by CloseFile to decide whether versioning is needed.
+            /// If false, the file was only read → no new version.
             /// </summary>
-            public UserContext User { get; init; } = null!;
+            public bool WasDirty { get; set; }
         }
 
         private UserContext RequireSessionUser()
@@ -92,12 +99,24 @@ namespace Kaimo_File_Server.Smb
             CreateDisposition createDisposition, CreateOptions createOptions,
             SecurityContext securityContext)
         {
+            Console.WriteLine($"[CreateFile] path='{path}' disposition={createDisposition} options={createOptions}");
+
             handle = null!;
             fileStatus = FileStatus.FILE_DOES_NOT_EXIST;
 
             try
             {
                 var user = RequireSessionUser();
+
+                // ── Snapshot path? Route to version store (readonly) ──
+                if (SmbSnapshotHandler.IsSnapshotPath(path) && _versionService != null)
+                {
+                    Console.WriteLine($"[SNAPSHOT DEBUG] Incoming path: '{path}'");
+                    var debugInfo = SmbSnapshotHandler.ParseSnapshotPath(path);
+                    Console.WriteLine($"[SNAPSHOT DEBUG] Parsed: ts={debugInfo?.SnapshotTimestamp:O}, real='{debugInfo?.RealPath}'");
+                    return OpenSnapshotFile(out handle, out fileStatus, path, user);
+                }
+
                 string fullPath = GetFullPath(path);
                 string relativePath = GetRelativePath(fullPath);
                 bool isDirectory = (createOptions & CreateOptions.FILE_DIRECTORY_FILE) != 0;
@@ -110,7 +129,7 @@ namespace Kaimo_File_Server.Smb
                 return CreateRegularFile(out handle, out fileStatus, fullPath, relativePath,
                     createDisposition, createOptions, desiredAccess, shareAccess, user);
             }
-            catch (InvalidOperationException) { throw; } // no user — let it bubble
+            catch (InvalidOperationException) { throw; } // no user let it bubble
             catch (UnauthorizedAccessException) { return NTStatus.STATUS_ACCESS_DENIED; }
             catch (IOException ex) when (ex.HResult == unchecked((int)0x80070020))
             { return NTStatus.STATUS_SHARING_VIOLATION; }
@@ -198,7 +217,7 @@ namespace Kaimo_File_Server.Smb
 
             // ── Single permission check ──
             // Write-creating operations check CanWrite; read-only opens check CanRead.
-            // This is the ONLY permission gate — FileService is not called again during
+            // This is the ONLY permission gate FileService is not called again during
             // ReadFile/WriteFile to avoid double-checking.
             bool needsWrite = createDisposition != CreateDisposition.FILE_OPEN;
             if (needsWrite)
@@ -289,12 +308,30 @@ namespace Kaimo_File_Server.Smb
         }
 
         // ===================== READ / WRITE =====================
-        // No additional permission checks here — permissions were validated
+        // No additional permission checks here permissions were validated
         // when the handle was created in CreateFile. The handle's User is
         // captured immutably, so there's no TOCTOU issue within a session.
         public NTStatus ReadFile(out byte[] data, object handle, long offset, int maxCount)
         {
             data = null!;
+
+            // ── Snapshot file: read from decompressed version blob ──
+            if (handle is SnapshotFileHandle sfh)
+            {
+                try
+                {
+                    sfh.Stream.Position = offset;
+                    byte[] buffer = new byte[maxCount];
+                    int read = sfh.Stream.Read(buffer, 0, maxCount);
+                    if (read == 0) { data = Array.Empty<byte>(); return NTStatus.STATUS_END_OF_FILE; }
+                    if (read < maxCount) Array.Resize(ref buffer, read);
+                    data = buffer;
+                    return NTStatus.STATUS_SUCCESS;
+                }
+                catch { return NTStatus.STATUS_DATA_ERROR; }
+            }
+
+            // ── Normal file read (existing code follows unchanged) ──
             var h = handle as FileHandle;
             if (h == null || h.IsDirectory) return NTStatus.STATUS_INVALID_HANDLE;
             if (h.Stream == null) return NTStatus.STATUS_FILE_CLOSED;
@@ -318,9 +355,14 @@ namespace Kaimo_File_Server.Smb
         }
 
         public NTStatus WriteFile(out int numberOfBytesWritten, object handle,
-            long offset, byte[] data)
+                long offset, byte[] data)
         {
             numberOfBytesWritten = 0;
+
+            // Snapshot files are readonly
+            if (handle is SnapshotFileHandle)
+                return NTStatus.STATUS_ACCESS_DENIED;
+
             var h = handle as FileHandle;
             if (h == null || h.IsDirectory) return NTStatus.STATUS_INVALID_HANDLE;
             if (h.Stream == null) return NTStatus.STATUS_FILE_CLOSED;
@@ -331,6 +373,9 @@ namespace Kaimo_File_Server.Smb
                 h.Stream.Write(data, 0, data.Length);
                 h.Stream.Flush();
                 numberOfBytesWritten = data.Length;
+
+                h.WasDirty = true;  // ← NEU: Track that this handle wrote data
+
                 return NTStatus.STATUS_SUCCESS;
             }
             catch (UnauthorizedAccessException) { return NTStatus.STATUS_ACCESS_DENIED; }
@@ -338,17 +383,83 @@ namespace Kaimo_File_Server.Smb
             catch (IOException) { return NTStatus.STATUS_DATA_ERROR; }
         }
 
+
         // ===================== CLOSE =====================
         public NTStatus CloseFile(object handle)
         {
+            // ── Snapshot handles: just close the stream ──
+            if (handle is SnapshotFileHandle sfh)
+            {
+                sfh.Stream?.Dispose();
+                return NTStatus.STATUS_SUCCESS;
+            }
+            if (handle is SnapshotDirectoryHandle)
+            {
+                return NTStatus.STATUS_SUCCESS;
+            }
+
             var h = handle as FileHandle;
             if (h == null) return NTStatus.STATUS_INVALID_HANDLE;
+
             try
             {
+                // ── Create version snapshot IF the file was actually written to ──
+                // Three conditions must all be true:
+                //   1. Versioning is enabled (_versionService != null)
+                //   2. It's a file, not a directory
+                //   3. WasDirty == true (at least one WriteFile call happened)
+                //
+                // This avoids:
+                //   - Hashing files that were only read (perf waste)
+                //   - Creating versions for directories
+                //   - Creating versions when versioning is disabled
+                //
+                // The hash comparison inside CreateVersionAsync is the second guard:
+                // if the content after all writes happens to be identical to the
+                // last version (e.g. user saved without changes), it returns null.
+
+                if (_serviceProvider != null && !h.IsDirectory && h.WasDirty && h.Stream != null && h.Stream.CanRead)
+                {
+                    try
+                    {
+                        using var scope = _serviceProvider.CreateScope();
+                        var versionService = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
+                        h.Stream.Flush(true);
+                        h.Stream.Position = 0;
+
+                        var relativePath = GetRelativePath(h.Path);
+                        var userId = h.User?.User?.Id.ToString();
+
+                        // CreateVersionAsync handles:
+                        //   - SHA-256 hashing
+                        //   - Hash comparison → skip if unchanged
+                        //   - Gzip compression
+                        //   - CAS blob storage (dedup)
+                        //   - DB record creation
+                        //   - Retention policy
+                        var version = Task.Run(() =>
+                            versionService.CreateVersionAsync(relativePath, h.Stream, userId))
+                            .GetAwaiter().GetResult();
+
+                        if (version != null)
+                            Console.WriteLine(
+                                $"[Versioning] Created v{version.VersionNumber} for '{relativePath}' " +
+                                $"at {version.SnapshotTimestampUtc:O} token={version.ToGmtToken()}");
+                        else
+                            Console.WriteLine($"[Versioning] Skipped for '{relativePath}' (unchanged or null)");
+                    }
+                    catch (Exception ex)
+                    {
+                        // Version creation failure must NEVER prevent file close.
+                        // Log and continue the file itself is fine.
+                        Console.WriteLine($"[Versioning] Failed for '{h.Path}': {ex.Message}");
+                    }
+                }
+
                 h.Stream?.Dispose();
+
                 if (h.DeleteOnClose)
                 {
-                    // Check delete permission using the handle's captured user
                     string relativePath = GetRelativePath(h.Path);
                     if (!CanDelete(relativePath, h.User))
                         return NTStatus.STATUS_ACCESS_DENIED;
@@ -358,6 +469,7 @@ namespace Kaimo_File_Server.Smb
                     else if (!h.IsDirectory && File.Exists(h.Path))
                         File.Delete(h.Path);
                 }
+
                 return NTStatus.STATUS_SUCCESS;
             }
             catch { return NTStatus.STATUS_ACCESS_DENIED; }
@@ -373,9 +485,47 @@ namespace Kaimo_File_Server.Smb
 
         // ===================== DIRECTORY LISTING =====================
         public NTStatus QueryDirectory(out List<QueryDirectoryFileInformation> result,
-            object handle, string fileName, FileInformationClass informationClass)
+    object handle, string fileName, FileInformationClass informationClass)
         {
             result = new List<QueryDirectoryFileInformation>();
+
+            // ★ Handle snapshot directory listing
+            if (handle is SnapshotDirectoryHandle sdh)
+            {
+                Console.WriteLine($"[QueryDirectory SNAPSHOT] path='{sdh.Path}', pattern='{fileName}', ts={sdh.SnapshotTimestamp:O}");
+
+                try
+                {
+                    var dirInfo = new DirectoryInfo(sdh.Path);
+                    if (!dirInfo.Exists) return NTStatus.STATUS_NO_SUCH_FILE;
+
+                    string pattern = string.IsNullOrEmpty(fileName) ? "*" : fileName;
+                    bool isWildcard = pattern == "*" || pattern == "*.*";
+
+                    if (isWildcard)
+                    {
+                        result.Add(CreateFileInfoFromDir(".", dirInfo, informationClass));
+                        result.Add(CreateFileInfoFromDir("..", dirInfo.Parent ?? dirInfo, informationClass));
+                    }
+
+                    foreach (var sub in dirInfo.GetDirectories())
+                        if (MatchesPattern(sub.Name, pattern))
+                            result.Add(CreateFileInfo(sub.Name, sub, true, informationClass));
+                    foreach (var file in dirInfo.GetFiles())
+                        if (MatchesPattern(file.Name, pattern))
+                            result.Add(CreateFileInfo(file.Name, file, false, informationClass));
+
+                    if (result.Count == 0) return NTStatus.STATUS_NO_SUCH_FILE;
+                    return NTStatus.STATUS_SUCCESS;
+                }
+                catch (UnauthorizedAccessException) { return NTStatus.STATUS_ACCESS_DENIED; }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[QueryDirectory SNAPSHOT ERROR] {ex.Message}");
+                    return NTStatus.STATUS_DATA_ERROR;
+                }
+            }
+
             var h = handle as FileHandle;
             if (h == null || !h.IsDirectory) return NTStatus.STATUS_INVALID_HANDLE;
 
@@ -424,8 +574,75 @@ namespace Kaimo_File_Server.Smb
 
         // ===================== FILE INFO =====================
         public NTStatus GetFileInformation(out FileInformation result, object handle,
-            FileInformationClass informationClass)
+    FileInformationClass informationClass)
         {
+            result = null!;
+
+            if (handle is SnapshotFileHandle sfh)
+            {
+                long size = sfh.Size;
+                long allocSize = RoundUpAllocation(size);
+                result = informationClass switch
+                {
+                    FileInformationClass.FileBasicInformation => new FileBasicInformation
+                    {
+                        CreationTime = sfh.SnapshotTimestamp,
+                        LastWriteTime = sfh.SnapshotTimestamp,
+                        LastAccessTime = sfh.SnapshotTimestamp,
+                        ChangeTime = sfh.SnapshotTimestamp,
+                        FileAttributes = FileAttributes.Normal | FileAttributes.ReadOnly
+                    },
+                    FileInformationClass.FileStandardInformation => new FileStandardInformation
+                    {
+                        AllocationSize = allocSize,
+                        EndOfFile = size,
+                        NumberOfLinks = 1,
+                        DeletePending = false,
+                        Directory = false
+                    },
+                    _ => new FileBasicInformation
+                    {
+                        CreationTime = sfh.SnapshotTimestamp,
+                        LastWriteTime = sfh.SnapshotTimestamp,
+                        LastAccessTime = sfh.SnapshotTimestamp,
+                        ChangeTime = sfh.SnapshotTimestamp,
+                        FileAttributes = FileAttributes.Normal | FileAttributes.ReadOnly
+                    }
+                };
+                return NTStatus.STATUS_SUCCESS;
+            }
+
+            if (handle is SnapshotDirectoryHandle sdh)
+            {
+                result = informationClass switch
+                {
+                    FileInformationClass.FileBasicInformation => new FileBasicInformation
+                    {
+                        CreationTime = sdh.SnapshotTimestamp,
+                        LastWriteTime = sdh.SnapshotTimestamp,
+                        LastAccessTime = sdh.SnapshotTimestamp,
+                        ChangeTime = sdh.SnapshotTimestamp,
+                        FileAttributes = FileAttributes.Directory | FileAttributes.ReadOnly
+                    },
+                    FileInformationClass.FileStandardInformation => new FileStandardInformation
+                    {
+                        AllocationSize = 0,
+                        EndOfFile = 0,
+                        NumberOfLinks = 1,
+                        DeletePending = false,
+                        Directory = true
+                    },
+                    _ => new FileBasicInformation
+                    {
+                        CreationTime = sdh.SnapshotTimestamp,
+                        LastWriteTime = sdh.SnapshotTimestamp,
+                        LastAccessTime = sdh.SnapshotTimestamp,
+                        ChangeTime = sdh.SnapshotTimestamp,
+                        FileAttributes = FileAttributes.Directory | FileAttributes.ReadOnly
+                    }
+                };
+                return NTStatus.STATUS_SUCCESS;
+            }
             result = null!;
             var h = handle as FileHandle;
             if (h == null) return NTStatus.STATUS_INVALID_HANDLE;
@@ -702,9 +919,74 @@ namespace Kaimo_File_Server.Smb
 
         // ===================== STUBS =====================
         public NTStatus Cancel(object ioRequest) => NTStatus.STATUS_SUCCESS;
+
         public NTStatus DeviceIOControl(object handle, uint ctlCode, byte[] input,
-            out byte[] output, int maxOutputLength)
-        { output = null!; return NTStatus.STATUS_NOT_SUPPORTED; }
+    out byte[] output, int maxOutputLength)
+        {
+            output = null!;
+
+            Console.WriteLine($"[IOCTL] ctlCode=0x{ctlCode:X8}");
+
+            if (ctlCode == SmbSnapshotHandler.FSCTL_SRV_ENUMERATE_SNAPSHOTS)
+            {
+                if (_serviceProvider == null)
+                    return NTStatus.STATUS_NOT_SUPPORTED;
+
+                try
+                {
+                    using var ioScope = _serviceProvider.CreateScope();
+                    var versionService = ioScope.ServiceProvider.GetRequiredService<IFileVersionService>();
+
+                    var timestamps = Task.Run(() =>
+                        versionService.GetSnapshotTimestampsAsync())
+                        .GetAwaiter().GetResult();
+
+                    Console.WriteLine($"[IOCTL] ENUMERATE_SNAPSHOTS: {timestamps.Count} snapshots, maxOutput={maxOutputLength}");
+
+                    if (maxOutputLength < 16)
+                    {
+                        // Not enough space even for the header
+                        output = new byte[0];
+                        return NTStatus.STATUS_BUFFER_TOO_SMALL;
+                    }
+
+                    // If client only asks for the header (16 bytes = 3x uint32 + padding),
+                    // return just the counts so it knows how much to allocate
+                    if (maxOutputLength < 32)
+                    {
+                        output = new byte[12];
+                        var fullResponse = SmbSnapshotHandler.BuildEnumerateSnapshotsResponse(timestamps);
+                        var snapshotArraySize = BitConverter.ToUInt32(fullResponse, 8);
+                        BitConverter.GetBytes((uint)timestamps.Count).CopyTo(output, 0);
+                        BitConverter.GetBytes((uint)0).CopyTo(output, 4);              // 0 returned
+                        BitConverter.GetBytes(snapshotArraySize).CopyTo(output, 8);    // but tell full size
+                        Console.WriteLine($"[IOCTL] Header-only response: {timestamps.Count} snapshots, array needs {snapshotArraySize} bytes");
+                        return NTStatus.STATUS_SUCCESS;
+                    }
+
+                    // Full response
+                    output = SmbSnapshotHandler.BuildEnumerateSnapshotsResponse(timestamps);
+
+                    // Truncate if needed
+                    if (output.Length > maxOutputLength)
+                    {
+                        Console.WriteLine($"[IOCTL] Truncating {output.Length} -> {maxOutputLength}");
+                        Array.Resize(ref output, maxOutputLength);
+                    }
+
+                    Console.WriteLine($"[IOCTL] Full response: {output.Length} bytes");
+                    return NTStatus.STATUS_SUCCESS;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[IOCTL] ERROR: {ex.Message}");
+                    return NTStatus.STATUS_NOT_SUPPORTED;
+                }
+            }
+
+            return NTStatus.STATUS_NOT_SUPPORTED;
+        }
+
         public NTStatus LockFile(object handle, long byteOffset, long length,
             bool exclusiveLock) => NTStatus.STATUS_SUCCESS;
         public NTStatus UnlockFile(object handle, long byteOffset, long length)
@@ -872,5 +1154,96 @@ namespace Kaimo_File_Server.Smb
             });
             return info;
         }
+
+
+        /// <summary>
+        /// Opens a file from the version store for read-only access.
+        /// Called when the path contains an @GMT- token (Windows "Previous Versions").
+        /// </summary>
+        private NTStatus OpenSnapshotFile(out object handle, out FileStatus fileStatus,
+    string path, UserContext user)
+        {
+            handle = null!;
+            fileStatus = FileStatus.FILE_DOES_NOT_EXIST;
+
+            var snapshotInfo = SmbSnapshotHandler.ParseSnapshotPath(path);
+            if (snapshotInfo == null)
+                return NTStatus.STATUS_OBJECT_NAME_NOT_FOUND;
+
+            try
+            {
+                // ★ FIX 1: Normalize AND actually use the normalized path
+                var realPath = snapshotInfo.RealPath.Replace('\\', '/');
+
+                if (string.IsNullOrEmpty(realPath))
+                {
+                    handle = new SnapshotDirectoryHandle
+                    {
+                        Path = _root,
+                        SnapshotTimestamp = snapshotInfo.SnapshotTimestamp,
+                        User = user
+                    };
+                    fileStatus = FileStatus.FILE_OPENED;
+                    return NTStatus.STATUS_SUCCESS;
+                }
+
+                if (!CanRead(realPath, user))
+                    return NTStatus.STATUS_ACCESS_DENIED;
+
+                // ★ FIX 2: Resolve versionService per scope instead of _versionService
+                using var snapshotScope = _serviceProvider!.CreateScope();
+                var versionService = snapshotScope.ServiceProvider
+                    .GetRequiredService<IFileVersionService>();
+
+                Console.WriteLine($"[OpenSnapshotFile] Looking up '{realPath}' at {snapshotInfo.SnapshotTimestamp:O}");
+
+                var stream = Task.Run(() =>
+                    versionService.ReadVersionAsync(realPath, snapshotInfo.SnapshotTimestamp))
+                    .GetAwaiter().GetResult();
+
+                handle = new SnapshotFileHandle
+                {
+                    Stream = stream,
+                    Path = realPath,
+                    SnapshotTimestamp = snapshotInfo.SnapshotTimestamp,
+                    User = user,
+                    Size = stream.Length
+                };
+
+                fileStatus = FileStatus.FILE_OPENED;
+                return NTStatus.STATUS_SUCCESS;
+            }
+            catch (FileNotFoundException)
+            {
+                return NTStatus.STATUS_OBJECT_NAME_NOT_FOUND;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[OpenSnapshotFile ERROR] {path}: {ex.Message}");
+                return NTStatus.STATUS_OBJECT_NAME_NOT_FOUND;
+            }
+        }
+
+        // ── Snapshot handle types (readonly, separate from FileHandle) ──
+
+        private sealed class SnapshotFileHandle
+        {
+            public Stream Stream { get; init; } = null!;
+            public string Path { get; init; } = "";
+            public DateTime SnapshotTimestamp { get; init; }
+            public UserContext User { get; init; } = null!;
+            public long Size { get; init; }
+        }
+
+        private sealed class SnapshotDirectoryHandle
+        {
+            public string Path { get; init; } = "";
+            public DateTime SnapshotTimestamp { get; init; }
+            public UserContext User { get; init; } = null!;
+        }
+
+
     }
+
+
 }

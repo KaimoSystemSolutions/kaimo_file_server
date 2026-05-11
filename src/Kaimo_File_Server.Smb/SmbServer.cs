@@ -37,7 +37,9 @@ namespace Kaimo_File_Server.Smb
                 {
                     Directory.CreateDirectory(shareDef.Path);
 
-                    var fileSystem = new SmbFileSystem(shareDef.Path, _fileService);
+                    using var versionScope = _serviceProvider.CreateScope();
+                    var versionService = versionScope.ServiceProvider.GetService<IFileVersionService>();
+                    var fileSystem = new SmbFileSystem(shareDef.Path, _fileService, _serviceProvider);
 
                     var share = new FileSystemShare(shareDef.Name, fileSystem);
                     share.AccessRequested += (sender, args) =>
@@ -90,8 +92,8 @@ namespace Kaimo_File_Server.Smb
                 if (userContext == null)
                 {
                     args.Allow = false;
-                    Console.WriteLine(
-                        $"[ShareAccess] {args.UserName} -> {shareName}: user not found");
+                    //Console.WriteLine(
+                    //    $"[ShareAccess] {args.UserName} -> {shareName}: user not found");
                     return;
                 }
 
@@ -120,9 +122,9 @@ namespace Kaimo_File_Server.Smb
                 }
 
                 args.Allow = hasAccess;
-                Console.WriteLine(
-                    $"[ShareAccess] {args.UserName} -> {shareName}: " +
-                    $"{(hasAccess ? "allowed" : "denied")}");
+                //Console.WriteLine(
+                //    $"[ShareAccess] {args.UserName} -> {shareName}: " +
+                //    $"{(hasAccess ? "allowed" : "denied")}");
             }
             catch (Exception ex)
             {

@@ -8,7 +8,7 @@ namespace Kaimo_File_Server.Core.Services
     /// Business logic layer for all file operations and permission checks.
     /// 
     /// This is the single entry point for every transport (SMB, HTTP, NFS).
-    /// All methods are async and require an explicit UserContext — no ambient state.
+    /// All methods are async and require an explicit UserContext no ambient state.
     /// </summary>
     public class FileService : IFileService
     {

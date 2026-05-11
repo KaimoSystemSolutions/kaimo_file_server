@@ -18,6 +18,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<AccessEntry> AccessEntries { get; set; }
         public DbSet<ShareAccessEntry> ShareAccessEntries { get; set; }
         public DbSet<ShareDefinition> ShareDefinitions { get; set; }
+        public DbSet<FileVersion> FileVersions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -89,6 +90,40 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
                 entity.HasIndex(e => e.Name).IsUnique();
                 entity.Property(e => e.Path).IsRequired();
+            });
+
+            modelBuilder.Entity<FileVersion>(entity =>
+            {
+                entity.ToTable("file_versions");
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.FilePath)
+                    .IsRequired()
+                    .HasMaxLength(1000);
+
+                entity.Property(e => e.SnapshotTimestampUtc)
+                    .IsRequired();
+
+                entity.Property(e => e.StoragePath)
+                    .IsRequired()
+                    .HasMaxLength(500);
+
+                entity.Property(e => e.ContentHash)
+                    .IsRequired()
+                    .HasMaxLength(64); // SHA-256 hex = 64 chars
+
+                entity.Property(e => e.CreatedBy)
+                    .HasMaxLength(200);
+
+                // Unique: one file can't have two versions at the exact same second
+                entity.HasIndex(e => new { e.FilePath, e.SnapshotTimestampUtc })
+                    .IsUnique();
+
+                // Fast lookup for "all snapshots" query
+                entity.HasIndex(e => e.SnapshotTimestampUtc);
+
+                // Fast lookup for "latest version hash" dedup check
+                entity.HasIndex(e => new { e.FilePath, e.ContentHash });
             });
         }
     }
