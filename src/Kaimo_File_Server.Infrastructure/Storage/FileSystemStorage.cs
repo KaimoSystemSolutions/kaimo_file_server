@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Kaimo_File_Server.Infrastructure.Storage
 {
-    internal class FileSystemStorage : IStorageEngine
+    public class FileSystemStorage : IStorageEngine
     {
         private readonly string _rootPath;
         private readonly IServiceProvider? _serviceProvider;
@@ -92,6 +92,57 @@ namespace Kaimo_File_Server.Infrastructure.Storage
                 ModifiedAt = info.Exists ? info.LastWriteTimeUtc : DateTime.UtcNow,
                 Acl = acl
             };
+        }
+
+        public Task<List<FileMetadata>> ListAsync(string directoryPath)
+        {
+            // Leerer Pfad oder "/" = Root des Storage
+            var cleanPath = directoryPath.Trim('/');
+
+            var fullPath = string.IsNullOrEmpty(cleanPath)
+                ? _rootPath
+                : GetFullPath(cleanPath);
+
+            var entries = new List<FileMetadata>();
+
+            if (!Directory.Exists(fullPath))
+                return Task.FromResult(entries);
+
+            foreach (var dir in Directory.GetDirectories(fullPath))
+            {
+                var info = new DirectoryInfo(dir);
+                entries.Add(new FileMetadata
+                {
+                    Id = Guid.Empty,
+                    Path = string.IsNullOrEmpty(cleanPath)
+                        ? info.Name
+                        : $"{cleanPath}/{info.Name}",
+                    Name = info.Name,
+                    Size = 0,
+                    IsDirectory = true,
+                    CreatedAt = info.CreationTimeUtc,
+                    ModifiedAt = info.LastWriteTimeUtc
+                });
+            }
+
+            foreach (var file in Directory.GetFiles(fullPath))
+            {
+                var info = new FileInfo(file);
+                entries.Add(new FileMetadata
+                {
+                    Id = Guid.Empty,
+                    Path = string.IsNullOrEmpty(cleanPath)
+                        ? info.Name
+                        : $"{cleanPath}/{info.Name}",
+                    Name = info.Name,
+                    Size = info.Length,
+                    IsDirectory = false,
+                    CreatedAt = info.CreationTimeUtc,
+                    ModifiedAt = info.LastWriteTimeUtc
+                });
+            }
+
+            return Task.FromResult(entries);
         }
     }
 }

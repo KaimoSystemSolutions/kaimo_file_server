@@ -17,6 +17,20 @@ services:
       context: .
       dockerfile: src/Kaimo_File_Server.Host/Dockerfile
 
+  kaimo_web:
+    image: ${DOCKER_REGISTRY-}kaimofileserverweb
+    container_name: kaimo_file_server_web
+    ports:
+      - 8081:8080
+    volumes:
+      - ./tests/data/storage:/data/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+    build:
+      context: .
+      dockerfile: src/Kaimo_File_Server.Web/Dockerfile
+
   postgres:
     container_name: kaimo_file_server_db
     image: postgres:17-alpine

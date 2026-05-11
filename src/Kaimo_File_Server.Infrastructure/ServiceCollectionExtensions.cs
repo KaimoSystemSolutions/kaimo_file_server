@@ -18,7 +18,7 @@ namespace Kaimo_File_Server.Infrastructure
         public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
         {
             var connectionString = configuration.GetConnectionString("Default")
-                ?? "Host=postgres;Database=kaimo_file_server_core;Username=kaimo_test_user;Password=change_me";
+                ?? "Host=kaimo_file_server_db;Database=kaimo_file_server;Username=kaimo_test_user;Password=change_me";
 
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseNpgsql(connectionString));

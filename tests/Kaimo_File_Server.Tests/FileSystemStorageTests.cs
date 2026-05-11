@@ -353,4 +353,9 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
             throw; // unreachable, keeps compiler happy
         }
     }
+
+    public Task<List<FileMetadata>> ListAsync(string directoryPath)
+    {
+        throw new NotImplementedException();
+    }
 }

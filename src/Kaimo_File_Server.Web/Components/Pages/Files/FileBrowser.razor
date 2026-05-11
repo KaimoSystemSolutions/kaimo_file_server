@@ -1,0 +1,125 @@
+@page "/browse/{ShareName}/{*SubPath}"
+@page "/browse/{ShareName}"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject FileBrowserViewModel VM
+@inject NavigationManager Nav
+
+<PageTitle>@(VM.CurrentShare?.Name ?? "Dateien") – Kaimo Files</PageTitle>
+
+<div class="page-header">
+    <div class="breadcrumb-bar">
+        <a class="breadcrumb-link" href="/">Shares</a>
+        <span class="breadcrumb-sep">/</span>
+        <a class="breadcrumb-link" href="/browse/@ShareName">@ShareName</a>
+        @foreach (var (name, fullPath) in VM.Breadcrumbs)
+        {
+            <span class="breadcrumb-sep">/</span>
+            <a class="breadcrumb-link" href="/browse/@ShareName/@fullPath">@name</a>
+        }
+    </div>
+</div>
+
+@if (VM.IsLoading)
+{
+    <div class="loading-state">
+        <div class="spinner"></div>
+    </div>
+}
+else if (VM.ErrorMessage is not null)
+{
+    <div class="error-banner">@VM.ErrorMessage</div>
+}
+else
+{
+    <div class="file-list">
+        @if (VM.HasParent)
+        {
+            <div class="file-row file-row-dir" @onclick="NavigateUp">
+                <div class="file-cell file-name">
+                    <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                         stroke="var(--text-tertiary)" stroke-width="1.5">
+                        <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                    <span>..</span>
+                </div>
+                <div class="file-cell file-size"></div>
+                <div class="file-cell file-date"></div>
+            </div>
+        }
+
+        @foreach (var dir in VM.Directories)
+        {
+            <div class="file-row file-row-dir" @onclick="() => NavigateTo(dir)">
+                <div class="file-cell file-name">
+                    <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
+                         fill="var(--folder-fill)" stroke="var(--folder-stroke)" stroke-width="1.5">
+                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                    </svg>
+                    <span>@dir.Name</span>
+                </div>
+                <div class="file-cell file-size">–</div>
+                <div class="file-cell file-date">@dir.ModifiedAt.ToString("dd.MM.yyyy HH:mm")</div>
+            </div>
+        }
+
+        @foreach (var file in VM.Files)
+        {
+            <div class="file-row">
+                <div class="file-cell file-name">
+                    <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
+                         fill="none" stroke="var(--text-tertiary)" stroke-width="1.5">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                    </svg>
+                    <span>@file.Name</span>
+                </div>
+                <div class="file-cell file-size">@FormatSize(file.Size)</div>
+                <div class="file-cell file-date">@file.ModifiedAt.ToString("dd.MM.yyyy HH:mm")</div>
+            </div>
+        }
+
+        @if (!VM.Items.Any())
+        {
+            <div class="empty-state">
+                <p>Dieser Ordner ist leer.</p>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string ShareName { get; set; } = "";
+    [Parameter] public string? SubPath { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await VM.LoadShareAsync(ShareName, SubPath ?? "");
+    }
+
+    private void NavigateTo(FileMetadata dir)
+    {
+        // Pfad relativ zum Share berechnen
+        var relativePath = dir.Path;
+        if (VM.CurrentShare is not null && relativePath.StartsWith(VM.CurrentShare.Path))
+        {
+            relativePath = relativePath[VM.CurrentShare.Path.Length..].TrimStart('/');
+        }
+        Nav.NavigateTo($"/browse/{ShareName}/{relativePath}");
+    }
+
+    private void NavigateUp()
+    {
+        if (string.IsNullOrEmpty(VM.ParentPath))
+            Nav.NavigateTo($"/browse/{ShareName}");
+        else
+            Nav.NavigateTo($"/browse/{ShareName}/{VM.ParentPath}");
+    }
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+        < 1024 * 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
+        _ => $"{bytes / (1024.0 * 1024 * 1024):F2} GB"
+    };
+}

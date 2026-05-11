@@ -1,0 +1,75 @@
+@page "/login"
+@layout EmptyLayout
+@rendermode RenderMode.InteractiveServer
+@inject LoginViewModel VM
+@inject NavigationManager Nav
+
+<PageTitle>Kaimo Files – Anmelden</PageTitle>
+
+<div class="login-wrapper">
+    <div class="login-card">
+        <div class="login-logo">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                <rect width="48" height="48" rx="12" fill="var(--accent)" />
+                <path d="M14 20h20v2H14zM14 26h20v2H14zM14 32h14v2H14z"
+                      fill="var(--login-icon-color, #fff)" />
+            </svg>
+            <h1>Kaimo Files</h1>
+        </div>
+
+        @if (VM.ErrorMessage is not null)
+        {
+            <div class="login-error">@VM.ErrorMessage</div>
+        }
+
+        <div class="login-form">
+            <div class="form-group">
+                <label for="username">Benutzername</label>
+                <input id="username" type="text" @bind="VM.Username"
+                       @bind:event="oninput"
+                       @onkeydown="HandleKeyDown"
+                       placeholder="Benutzername"
+                       autocomplete="username"
+                       disabled="@VM.IsLoading" />
+            </div>
+
+            <div class="form-group">
+                <label for="password">Passwort</label>
+                <input id="password" type="password" @bind="VM.Password"
+                       @bind:event="oninput"
+                       @onkeydown="HandleKeyDown"
+                       placeholder="Passwort"
+                       autocomplete="current-password"
+                       disabled="@VM.IsLoading" />
+            </div>
+
+            <button class="btn-login" @onclick="DoLogin" disabled="@VM.IsLoading">
+                @if (VM.IsLoading)
+                {
+                    <span class="spinner-sm"></span>
+                    <span>Anmelden...</span>
+                }
+                else
+                {
+                    <span>Anmelden</span>
+                }
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private async Task DoLogin()
+    {
+        if (await VM.LoginAsync())
+        {
+            Nav.NavigateTo("/", forceLoad: false);
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await DoLogin();
+    }
+}
