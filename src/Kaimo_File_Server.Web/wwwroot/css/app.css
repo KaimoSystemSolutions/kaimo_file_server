@@ -567,3 +567,19 @@ body {
         transform: rotate(360deg);
     }
 }
+
+/* ── User List Header ── */
+
+.user-row-header {
+    background: var(--bg-tertiary);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: default;
+}
+
+    .user-row-header:hover {
+        background: var(--bg-tertiary);
+    }

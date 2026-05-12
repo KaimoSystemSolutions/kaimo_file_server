@@ -7,17 +7,20 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 public class LoginViewModel
 {
     private readonly IUserRepository _userRepo;
+    private readonly IUserContextFactory _userContextFactory;
     private readonly IPasswordService _passwordService;
     private readonly JwtTokenService _jwtService;
     private readonly JwtAuthenticationStateProvider _authState;
 
     public LoginViewModel(
         IUserRepository userRepo,
+        IUserContextFactory userContextFactory,
         IPasswordService passwordService,
         JwtTokenService jwtService,
         JwtAuthenticationStateProvider authState)
     {
         _userRepo = userRepo;
+        _userContextFactory = userContextFactory;
         _passwordService = passwordService;
         _jwtService = jwtService;
         _authState = authState;
@@ -37,7 +40,6 @@ public class LoginViewModel
     {
         try
         {
-
             IsLoading = true;
             ErrorMessage = null;
 
@@ -60,8 +62,12 @@ public class LoginViewModel
                 return false;
             }
 
-            Console.WriteLine($"[LOGIN] Password OK für {user.Username}, generiere Token...");
-            var token = _jwtService.GenerateToken(user.Id, user.Username, user.Name);
+            Console.WriteLine($"[LOGIN] Password OK für {user.Username}, lade Rollen...");
+            var userContext = await _userContextFactory.CreateAsync(user);
+            var roleNames = userContext.Roles.Select(r => r.Name);
+
+            Console.WriteLine($"[LOGIN] Rollen: {string.Join(", ", roleNames)}, generiere Token...");
+            var token = _jwtService.GenerateToken(user.Id, user.Username, user.Name, roleNames);
             Console.WriteLine($"[LOGIN] Token generiert, speichere...");
             await _authState.LoginAsync(token);
             Console.WriteLine($"[LOGIN] Token gespeichert, redirect...");

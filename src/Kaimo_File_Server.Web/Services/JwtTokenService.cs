@@ -20,18 +20,21 @@ public class JwtTokenService
         Console.WriteLine($"[JWT] Initialisiert: Issuer={_issuer}, Secret-Länge={_secret.Length}, Expiration={_expirationHours}h");
     }
 
-    public string GenerateToken(Guid userId, string username, string displayName)
+    public string GenerateToken(Guid userId, string username, string displayName, IEnumerable<string> roles)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
-            new Claim(ClaimTypes.Name, username),
-            new Claim("display_name", displayName),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-        };
+        var claims = new List<Claim>
+    {
+        new(ClaimTypes.NameIdentifier, userId.ToString()),
+        new(ClaimTypes.Name, username),
+        new("display_name", displayName),
+        new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+    };
+
+        foreach (var role in roles)
+            claims.Add(new Claim(ClaimTypes.Role, role));
 
         var token = new JwtSecurityToken(
             issuer: _issuer,
@@ -42,7 +45,7 @@ public class JwtTokenService
         );
 
         var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
-        Console.WriteLine($"[JWT] Token generiert: expires={token.ValidTo:u}, length={tokenString.Length}");
+        Console.WriteLine($"[JWT] Token generiert: expires={token.ValidTo:u}, length={tokenString.Length}, roles={string.Join(",", roles)}");
         return tokenString;
     }
 

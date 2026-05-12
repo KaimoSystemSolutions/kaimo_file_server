@@ -38,6 +38,7 @@ builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<LoginViewModel>();
 builder.Services.AddScoped<ShareListViewModel>();
 builder.Services.AddScoped<FileBrowserViewModel>();
+builder.Services.AddScoped<UserListViewModel>();
 
 // ── DataProtection ──
 builder.Services.AddDataProtection()

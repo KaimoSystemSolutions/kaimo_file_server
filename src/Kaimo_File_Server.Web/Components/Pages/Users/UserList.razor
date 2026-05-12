@@ -1,0 +1,71 @@
+﻿@page "/users"
+@inject UserListViewModel VM
+@inject NavigationManager Nav
+
+<PageTitle>Kaimo Files – Benutzer</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>Benutzer</h1>
+        <p class="subtitle">@VM.Users.Count Benutzer</p>
+    </div>
+</div>
+
+@if (VM.IsLoading)
+{
+    <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Lade Benutzer...</p>
+    </div>
+}
+else if (VM.ErrorMessage is not null)
+{
+    <div class="error-banner">@VM.ErrorMessage</div>
+}
+else if (!VM.Users.Any())
+{
+    <div class="empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5">
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+        </svg>
+        <p>Keine Benutzer vorhanden.</p>
+    </div>
+}
+else
+{
+    <div class="file-list">
+        <div class="file-row user-row-header">
+            <div class="file-cell file-name">Name</div>
+            <div class="file-cell file-size">Benutzername</div>
+        </div>
+        @foreach (var user in VM.Users)
+        {
+            <div class="file-row">
+                <div class="file-cell file-name">
+                    <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
+                         fill="none" stroke="var(--accent)" stroke-width="1.5">
+                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    <span>@user.Name</span>
+                </div>
+                <div class="file-cell file-size" style="color: var(--text-secondary); font-size: 13px;">
+                    @user.Username
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await VM.LoadAsync();
+            StateHasChanged();
+        }
+    }
+}

@@ -15,12 +15,6 @@
 		<ProjectReference Include="..\Kaimo_File_Server.Infrastructure\Kaimo_File_Server.Infrastructure.csproj" />
 	</ItemGroup>
 
-	
-	<ItemGroup>
-	  <Folder Include="Components\Pages\" />
-	  <Folder Include="Components\ViewModels\" />
-	</ItemGroup>
-
 	<ItemGroup>
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>

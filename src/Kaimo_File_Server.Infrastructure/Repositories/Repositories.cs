@@ -51,5 +51,17 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             => await _db.ShareAccessEntries.AnyAsync(e => e.ShareName == shareName && e.PrincipalId == principalId);
         public async Task<List<ShareAccessEntry>> GetByShareAsync(string shareName)
             => await _db.ShareAccessEntries.Where(e => e.ShareName == shareName).ToListAsync();
+
+        public async Task GrantAccessAsync(string shareName, Guid principalId)
+        {
+            var exists = await _db.ShareAccessEntries
+                .AnyAsync(e => e.ShareName == shareName && e.PrincipalId == principalId);
+
+            if (!exists)
+            {
+                _db.ShareAccessEntries.Add(new ShareAccessEntry(shareName, principalId));
+                await _db.SaveChangesAsync();
+            }
+        }
     }
 }

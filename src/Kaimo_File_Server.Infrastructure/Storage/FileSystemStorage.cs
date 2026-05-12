@@ -144,5 +144,12 @@ namespace Kaimo_File_Server.Infrastructure.Storage
 
             return Task.FromResult(entries);
         }
+
+        public Task CreateDirectoryAsync(string path)
+        {
+            var fullPath = GetFullPath(path.Trim('/'));
+            Directory.CreateDirectory(fullPath);
+            return Task.CompletedTask;
+        }
     }
 }

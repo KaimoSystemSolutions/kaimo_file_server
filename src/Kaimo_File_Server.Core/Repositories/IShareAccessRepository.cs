@@ -9,5 +9,6 @@ namespace Kaimo_File_Server.Core.Repositories
     {
         Task<bool> HasAccessAsync(string shareName, Guid principalId);
         Task<List<ShareAccessEntry>> GetByShareAsync(string shareName);
+        Task GrantAccessAsync(string shareName, Guid principalId);
     }
 }

@@ -12,5 +12,6 @@ namespace Kaimo_File_Server.Core.Storage
         Task DeleteAsync(string path);
         Task<FileMetadata> GetMetadataAsync(string path);
         Task<List<FileMetadata>> ListAsync(string directoryPath);
+        Task CreateDirectoryAsync(string path);
     }
 }

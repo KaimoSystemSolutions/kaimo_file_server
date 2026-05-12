@@ -66,7 +66,6 @@ public class FileBrowserViewModel
         {
             IsLoading = true;
             ErrorMessage = null;
-            CurrentPath = subPath.Trim('/');
 
             CurrentShare = await _shareRepo.GetByNameAsync(shareName);
             if (CurrentShare is null)
@@ -76,14 +75,29 @@ public class FileBrowserViewModel
                 return;
             }
 
-            // Build the storage path: Share.Path is relative to storage root
-            // e.g. Share.Path = "documents" or "share1"
-            // If Share.Path is absolute (starts with /), strip the storage root prefix
-            var sharePath = CurrentShare.Path.TrimStart('/').TrimEnd('/');
+            var sharePath = CurrentShare.Name.Trim('/');
+
+            // subPath bereinigen und Share-Prefix entfernen,
+            // falls das UI ihn mitschickt (z.B. "projekte/hallo" statt "hallo")
+            var cleanSub = (subPath ?? "").Trim('/');
+            if (cleanSub.Equals(sharePath, StringComparison.OrdinalIgnoreCase))
+                cleanSub = "";
+            else if (cleanSub.StartsWith(sharePath + "/", StringComparison.OrdinalIgnoreCase))
+                cleanSub = cleanSub[(sharePath.Length + 1)..];
+
+            CurrentPath = cleanSub;
 
             var storagePath = string.IsNullOrEmpty(CurrentPath)
                 ? sharePath
                 : $"{sharePath}/{CurrentPath}";
+
+            // Path-Traversal verhindern (z.B. "../../etc")
+            if (storagePath.Contains(".."))
+            {
+                ErrorMessage = "Ungültiger Pfad.";
+                Items = [];
+                return;
+            }
 
             Console.WriteLine($"[FileBrowser] Loading path: '{storagePath}' (share={shareName}, sub={CurrentPath})");
 
