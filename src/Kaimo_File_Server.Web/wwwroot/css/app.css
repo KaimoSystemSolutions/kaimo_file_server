@@ -583,3 +583,242 @@ body {
     .user-row-header:hover {
         background: var(--bg-tertiary);
     }
+
+/* ── Admin Tabs ── */
+
+.admin-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-primary);
+    padding-bottom: 0;
+}
+
+.admin-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.15s ease;
+}
+
+    .admin-tab:hover {
+        color: var(--text-primary);
+    }
+
+    .admin-tab.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+    }
+
+/* ── Admin Content (Liste + Detail nebeneinander) ── */
+
+.admin-content {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.admin-list {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ── Admin Rows ── */
+
+.admin-row-header {
+    background: var(--bg-tertiary);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: default;
+}
+
+    .admin-row-header:hover {
+        background: var(--bg-tertiary);
+    }
+
+.admin-row-selectable {
+    cursor: pointer;
+}
+
+    .admin-row-selectable:hover {
+        background: var(--bg-hover);
+    }
+
+.admin-row-selected {
+    background: var(--accent-bg);
+    border-left: 3px solid var(--accent);
+}
+
+    .admin-row-selected:hover {
+        background: var(--accent-bg);
+    }
+
+/* ── Detail Panel ── */
+
+.admin-detail {
+    width: 320px;
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 24px;
+    position: sticky;
+    top: 28px;
+}
+
+.detail-header {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+    .detail-header h3 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 2px;
+    }
+
+.detail-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.detail-section {
+    margin-bottom: 16px;
+}
+
+.detail-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+}
+
+.detail-value {
+    font-size: 13px;
+    color: var(--text-secondary);
+    word-break: break-all;
+}
+
+.detail-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.btn-secondary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+    .btn-secondary:hover:not(:disabled) {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    .btn-secondary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+.btn-primary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+    .btn-primary:hover:not(:disabled) {
+        background: var(--accent-hover);
+    }
+
+    .btn-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+/* ── Danger Button ── */
+
+.btn-danger-outline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    background: transparent;
+    border: 1px solid var(--danger);
+    border-radius: 8px;
+    color: var(--danger);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+    .btn-danger-outline:hover:not(:disabled) {
+        background: rgba(240, 72, 72, 0.1);
+    }
+
+    .btn-danger-outline:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+/* ── Detail Info Hint ── */
+
+.detail-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    line-height: 1.5;
+    margin-top: 12px;
+}
+
+    .detail-info svg {
+        flex-shrink: 0;
+        margin-top: 1px;
+    }

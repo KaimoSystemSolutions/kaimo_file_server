@@ -2,58 +2,229 @@
 @inject UserListViewModel VM
 @inject NavigationManager Nav
 
-<PageTitle>Kaimo Files – Benutzer</PageTitle>
+<PageTitle>Kaimo Files – Verwaltung</PageTitle>
 
 <div class="page-header">
     <div>
-        <h1>Benutzer</h1>
-        <p class="subtitle">@VM.Users.Count Benutzer</p>
+        <h1>Verwaltung</h1>
+        <p class="subtitle">@VM.TabSubtitle</p>
     </div>
+</div>
+
+<div class="admin-tabs">
+    <button class="admin-tab @(VM.ActiveTab == AdminTab.Users ? "active" : "")"
+            @onclick="() => SwitchTab(AdminTab.Users)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+        </svg>
+        Benutzer
+    </button>
+    <button class="admin-tab @(VM.ActiveTab == AdminTab.Groups ? "active" : "")"
+            @onclick="() => SwitchTab(AdminTab.Groups)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+        </svg>
+        Gruppen
+    </button>
+    <button class="admin-tab @(VM.ActiveTab == AdminTab.Roles ? "active" : "")"
+            @onclick="() => SwitchTab(AdminTab.Roles)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+        Rollen
+    </button>
 </div>
 
 @if (VM.IsLoading)
 {
     <div class="loading-state">
         <div class="spinner"></div>
-        <p>Lade Benutzer...</p>
+        <p>Lade...</p>
     </div>
 }
 else if (VM.ErrorMessage is not null)
 {
     <div class="error-banner">@VM.ErrorMessage</div>
 }
-else if (!VM.Users.Any())
-{
-    <div class="empty-state">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5">
-            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
-        </svg>
-        <p>Keine Benutzer vorhanden.</p>
-    </div>
-}
 else
 {
-    <div class="file-list">
-        <div class="file-row user-row-header">
-            <div class="file-cell file-name">Name</div>
-            <div class="file-cell file-size">Benutzername</div>
+    <div class="admin-content">
+        <div class="admin-list">
+            @switch (VM.ActiveTab)
+            {
+                case AdminTab.Users:
+                    @if (!VM.Users.Any())
+                    {
+                        <div class="empty-state">
+                            <p>Keine Benutzer vorhanden.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="file-list">
+                            <div class="file-row admin-row-header">
+                                <div class="file-cell file-name">Name</div>
+                                <div class="file-cell file-size">Benutzername</div>
+                            </div>
+                            @foreach (var user in VM.Users)
+                            {
+                                var isSelected = VM.SelectedUser?.Id == user.Id;
+                                <div class="file-row admin-row-selectable @(isSelected ? "admin-row-selected" : "")"
+                                     @onclick="() => SelectUser(user)">
+                                    <div class="file-cell file-name">
+                                        <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
+                                             fill="none" stroke="@(isSelected ? "var(--accent)" : "var(--text-tertiary)")" stroke-width="1.5">
+                                            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                                            <circle cx="12" cy="7" r="4" />
+                                        </svg>
+                                        <span>@user.Name</span>
+                                    </div>
+                                    <div class="file-cell file-size" style="color: var(--text-secondary); font-size: 13px;">
+                                        @user.Username
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    break;
+
+                case AdminTab.Groups:
+                    @if (!VM.Groups.Any())
+                    {
+                        <div class="empty-state">
+                            <p>Keine Gruppen vorhanden.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="file-list">
+                            <div class="file-row admin-row-header">
+                                <div class="file-cell file-name">Gruppenname</div>
+                                <div class="file-cell file-size">ID</div>
+                            </div>
+                            @foreach (var group in VM.Groups)
+                            {
+                                var isSelected = VM.SelectedGroup?.Id == group.Id;
+                                <div class="file-row admin-row-selectable @(isSelected ? "admin-row-selected" : "")"
+                                     @onclick="() => SelectGroup(group)">
+                                    <div class="file-cell file-name">
+                                        <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
+                                             fill="none" stroke="@(isSelected ? "var(--accent)" : "var(--text-tertiary)")" stroke-width="1.5">
+                                            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                                            <circle cx="9" cy="7" r="4" />
+                                            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+                                        </svg>
+                                        <span>@group.Name</span>
+                                    </div>
+                                    <div class="file-cell file-size" style="color: var(--text-tertiary); font-size: 12px;">
+                                        @group.Id.ToString()[..8]…
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    break;
+
+                case AdminTab.Roles:
+                    @if (!VM.Roles.Any())
+                    {
+                        <div class="empty-state">
+                            <p>Keine Rollen vorhanden.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="file-list">
+                            <div class="file-row admin-row-header">
+                                <div class="file-cell file-name">Rollenname</div>
+                                <div class="file-cell file-size">ID</div>
+                            </div>
+                            @foreach (var role in VM.Roles)
+                            {
+                                var isSelected = VM.SelectedRole?.Id == role.Id;
+                                <div class="file-row admin-row-selectable @(isSelected ? "admin-row-selected" : "")"
+                                     @onclick="() => SelectRole(role)">
+                                    <div class="file-cell file-name">
+                                        <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
+                                             fill="none" stroke="@(isSelected ? "var(--accent)" : "var(--text-tertiary)")" stroke-width="1.5">
+                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                        </svg>
+                                        <span>@role.Name</span>
+                                    </div>
+                                    <div class="file-cell file-size" style="color: var(--text-tertiary); font-size: 12px;">
+                                        @role.Id.ToString()[..8]…
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    break;
+            }
         </div>
-        @foreach (var user in VM.Users)
+
+        @* Detail-Panel *@
+        @if (VM.SelectedUser is not null || VM.SelectedGroup is not null || VM.SelectedRole is not null)
         {
-            <div class="file-row">
-                <div class="file-cell file-name">
-                    <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
-                         fill="none" stroke="var(--accent)" stroke-width="1.5">
-                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                    </svg>
-                    <span>@user.Name</span>
-                </div>
-                <div class="file-cell file-size" style="color: var(--text-secondary); font-size: 13px;">
-                    @user.Username
-                </div>
+            <div class="admin-detail">
+                @if (VM.SelectedUser is not null)
+                {
+                    <div class="detail-header">
+                        <h3>@VM.SelectedUser.Name</h3>
+                        <span class="detail-subtitle">@VM.SelectedUser.Username</span>
+                    </div>
+                    <div class="detail-section">
+                        <span class="detail-label">ID</span>
+                        <span class="detail-value">@VM.SelectedUser.Id</span>
+                    </div>
+                    @if (VM.CanManageUsers)
+                    {
+                        <div class="detail-actions">
+                            <button class="btn-secondary" disabled>Rollen zuweisen</button>
+                            <button class="btn-secondary" disabled>Gruppen zuweisen</button>
+                            <button class="btn-danger-outline" disabled>Benutzer löschen</button>
+                        </div>
+                    }
+                }
+                else if (VM.SelectedGroup is not null)
+                {
+                    <div class="detail-header">
+                        <h3>@VM.SelectedGroup.Name</h3>
+                        <span class="detail-subtitle">Gruppe</span>
+                    </div>
+                    <div class="detail-section">
+                        <span class="detail-label">ID</span>
+                        <span class="detail-value">@VM.SelectedGroup.Id</span>
+                    </div>
+                    @if (VM.CanManageUsers)
+                    {
+                        <div class="detail-actions">
+                            <button class="btn-secondary" disabled>Mitglieder verwalten</button>
+                            <button class="btn-danger-outline" disabled>Gruppe löschen</button>
+                        </div>
+                    }
+                }
+                else if (VM.SelectedRole is not null)
+                {
+                    <div class="detail-header">
+                        <h3>@VM.SelectedRole.Name</h3>
+                        <span class="detail-subtitle">Systemrolle</span>
+                    </div>
+                    <div class="detail-section">
+                        <span class="detail-label">ID</span>
+                        <span class="detail-value">@VM.SelectedRole.Id</span>
+                    </div>
+                    <div class="detail-info">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="16" x2="12" y2="12" />
+                            <line x1="12" y1="8" x2="12.01" y2="8" />
+                        </svg>
+                        <span>Rollen werden vom System verwaltet und können Benutzern oder Gruppen zugewiesen werden.</span>
+                    </div>
+                }
             </div>
         }
     </div>
@@ -67,5 +238,29 @@ else
             await VM.LoadAsync();
             StateHasChanged();
         }
+    }
+
+    private async Task SwitchTab(AdminTab tab)
+    {
+        await VM.SwitchTabAsync(tab);
+        StateHasChanged();
+    }
+
+    private void SelectUser(User user)
+    {
+        VM.SelectUser(user);
+        StateHasChanged();
+    }
+
+    private void SelectGroup(Group group)
+    {
+        VM.SelectGroup(group);
+        StateHasChanged();
+    }
+
+    private void SelectRole(Role role)
+    {
+        VM.SelectRole(role);
+        StateHasChanged();
     }
 }

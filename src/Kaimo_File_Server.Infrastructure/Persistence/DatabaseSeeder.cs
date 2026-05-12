@@ -33,6 +33,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
             var adminRole = new Role(Guid.NewGuid(), "Administrator");
             var userRole = new Role(Guid.NewGuid(), "User");
             var shareCreatorRole = new Role(Guid.NewGuid(), "ShareCreator");
+            var userManagerRole = new Role(Guid.NewGuid(), "UserManager");
             _db.Roles.AddRange(adminRole, userRole);
 
             var testShare = new ShareDefinition("test", "/data/storage/test");
@@ -64,6 +65,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
             _db.UserRoles.AddRange(
                 new UserRole(admin.Id, adminRole.Id),
                 new UserRole(admin.Id, shareCreatorRole.Id),
+                new UserRole(admin.Id, userManagerRole.Id),
                 new UserRole(marco.Id, userRole.Id),
                 new UserRole(guest.Id, userRole.Id));
 
