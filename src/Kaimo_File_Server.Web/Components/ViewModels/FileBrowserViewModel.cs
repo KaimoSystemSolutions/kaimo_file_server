@@ -43,9 +43,6 @@ public class FileBrowserViewModel
         }
     }
 
-    /// <summary>
-    /// Breadcrumb-Segmente: "docs/reports/2026" → ["docs", "docs/reports", "docs/reports/2026"]
-    /// </summary>
     public List<(string Name, string FullPath)> Breadcrumbs
     {
         get
@@ -79,17 +76,25 @@ public class FileBrowserViewModel
                 return;
             }
 
-            // Share.Path + SubPath = voller Pfad im Storage
-            var storagePath = string.IsNullOrEmpty(CurrentPath)
-                ? CurrentShare.Path
-                : $"{CurrentShare.Path.TrimEnd('/')}/{CurrentPath}";
+            // Build the storage path: Share.Path is relative to storage root
+            // e.g. Share.Path = "documents" or "share1"
+            // If Share.Path is absolute (starts with /), strip the storage root prefix
+            var sharePath = CurrentShare.Path.TrimStart('/').TrimEnd('/');
 
-            // ListAsync nutzt den relativen Pfad ab Storage-Root
+            var storagePath = string.IsNullOrEmpty(CurrentPath)
+                ? sharePath
+                : $"{sharePath}/{CurrentPath}";
+
+            Console.WriteLine($"[FileBrowser] Loading path: '{storagePath}' (share={shareName}, sub={CurrentPath})");
+
             Items = await _storage.ListAsync(storagePath);
+
+            Console.WriteLine($"[FileBrowser] Found {Items.Count} items ({Directories.Count()} dirs, {Files.Count()} files)");
         }
         catch (Exception ex)
         {
             ErrorMessage = $"Fehler: {ex.Message}";
+            Console.WriteLine($"[FileBrowser] Error: {ex}");
             Items = [];
         }
         finally

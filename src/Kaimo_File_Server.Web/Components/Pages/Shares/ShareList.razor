@@ -1,5 +1,4 @@
 @page "/"
-@attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @inject ShareListViewModel VM
 @inject LoginViewModel LoginVM
 @inject NavigationManager Nav
@@ -13,7 +12,7 @@
     </div>
     <button class="btn-icon" title="Abmelden" @onclick="Logout">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
         </svg>
     </button>
 </div>
@@ -33,7 +32,7 @@ else if (!VM.Shares.Any())
 {
     <div class="empty-state">
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5">
-            <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+            <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
         <p>Keine Shares verfügbar.</p>
     </div>
@@ -46,7 +45,7 @@ else
             <div class="share-card" @onclick="() => OpenShare(share.Name)">
                 <div class="share-icon">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
-                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                     </svg>
                 </div>
                 <div class="share-info">
@@ -73,6 +72,6 @@ else
     private async Task Logout()
     {
         await LoginVM.LogoutAsync();
-        Nav.NavigateTo("/login", forceLoad: true);
+        Nav.NavigateTo("/login", forceLoad: false);
     }
 }

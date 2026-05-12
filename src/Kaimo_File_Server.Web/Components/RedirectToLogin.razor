@@ -1,8 +1,22 @@
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
 
 @code {
-    protected override void OnInitialized()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        Nav.NavigateTo("/login", forceLoad: true);
+        if (!firstRender) return;
+
+        var state = await AuthState.GetAuthenticationStateAsync();
+
+        if (state.User.Identity is null || !state.User.Identity.IsAuthenticated)
+        {
+            Console.WriteLine("[REDIRECT] Nicht authentifiziert → /login");
+            Nav.NavigateTo("/login", forceLoad: false);
+        }
+        else
+        {
+            Console.WriteLine($"[REDIRECT] Authentifiziert als {state.User.Identity.Name}, bleibe auf Seite");
+            Nav.NavigateTo("/", forceLoad: false);
+        }
     }
 }

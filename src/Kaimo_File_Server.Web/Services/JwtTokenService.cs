@@ -5,11 +5,6 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace Kaimo_File_Server.Web.Services;
 
-/// <summary>
-/// Erzeugt und validiert JWT-Tokens für die Web-Authentifizierung.
-/// Der Token wird clientseitig in Blazor's ProtectedLocalStorage gehalten
-/// und bei jedem Circuit-Start validiert.
-/// </summary>
 public class JwtTokenService
 {
     private readonly string _secret;
@@ -21,6 +16,8 @@ public class JwtTokenService
         _secret = config["Jwt:Secret"] ?? throw new InvalidOperationException("Jwt:Secret not configured");
         _issuer = config["Jwt:Issuer"] ?? "KaimoFileServer";
         _expirationHours = config.GetValue<int>("Jwt:ExpirationHours", 24);
+
+        Console.WriteLine($"[JWT] Initialisiert: Issuer={_issuer}, Secret-Länge={_secret.Length}, Expiration={_expirationHours}h");
     }
 
     public string GenerateToken(Guid userId, string username, string displayName)
@@ -44,7 +41,9 @@ public class JwtTokenService
             signingCredentials: credentials
         );
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+        Console.WriteLine($"[JWT] Token generiert: expires={token.ValidTo:u}, length={tokenString.Length}");
+        return tokenString;
     }
 
     public ClaimsPrincipal? ValidateToken(string token)
@@ -53,6 +52,18 @@ public class JwtTokenService
         {
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
             var handler = new JwtSecurityTokenHandler();
+
+            // Erst mal den Token lesen ohne Validierung, um zu sehen was drin ist
+            if (handler.CanReadToken(token))
+            {
+                var jwt = handler.ReadJwtToken(token);
+                Console.WriteLine($"[JWT] Token lesen: Issuer={jwt.Issuer}, Audience={jwt.Audiences.FirstOrDefault()}, Expires={jwt.ValidTo:u}, Now={DateTime.UtcNow:u}");
+            }
+            else
+            {
+                Console.WriteLine($"[JWT] Token kann nicht gelesen werden! Erste 50 Zeichen: {token[..Math.Min(50, token.Length)]}");
+                return null;
+            }
 
             var principal = handler.ValidateToken(token, new TokenValidationParameters
             {
@@ -65,10 +76,12 @@ public class JwtTokenService
                 ClockSkew = TimeSpan.FromMinutes(2)
             }, out _);
 
+            Console.WriteLine($"[JWT] Validierung OK: {principal.Identity?.Name}");
             return principal;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[JWT] Validierung FEHLGESCHLAGEN: {ex.GetType().Name}: {ex.Message}");
             return null;
         }
     }

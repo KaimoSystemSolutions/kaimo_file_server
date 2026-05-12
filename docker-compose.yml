@@ -6,18 +6,15 @@ services:
     ports:
       - 4445:445
     volumes: 
-    #Both work
-      #- C:\Users\Marco\source\repos\Kaimo_File_Server_Core\mappings\data\storage:/data/storage 
-      #- C:/Users/Marco/source/repos/Kaimo_File_Server_Core/mappings/data/storage:/data/storage
       - ./tests/data/storage:/data/storage
     depends_on:
-      postgres:
+      kaimo_file_server_db:
         condition: service_healthy
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.Host/Dockerfile
 
-  kaimo_web:
+  kaimo_file_server.web:
     image: ${DOCKER_REGISTRY-}kaimofileserverweb
     container_name: kaimo_file_server_web
     ports:
@@ -25,13 +22,15 @@ services:
     volumes:
       - ./tests/data/storage:/data/storage
     depends_on:
-      postgres:
+      kaimo_file_server_db:
         condition: service_healthy
+      kaimo_file_server.host:
+        condition: service_started
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.Web/Dockerfile
 
-  postgres:
+  kaimo_file_server_db:
     container_name: kaimo_file_server_db
     image: postgres:17-alpine
     environment:
@@ -40,7 +39,6 @@ services:
       POSTGRES_USER: kaimo_test_user
       POSTGRES_PASSWORD: change_me
     volumes:
-      #- C:/Users/Marco/source/repos/Kaimo_File_Server_Core/mappings/data/postgres:/var/lib/postgresql/data
       - ./tests/data/postgres:/var/lib/postgresql/data
     ports:
       - "5432"

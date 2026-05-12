@@ -6,7 +6,7 @@ services:
       - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
       - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
 
-  kaimo_web:
+  kaimo_file_server.web:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
     volumes:

@@ -9,7 +9,6 @@ using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,15 +18,6 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorizationCore();
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultScheme = "BlazorServer";
-    options.DefaultChallengeScheme = "BlazorServer";
-})
-.AddCookie("BlazorServer", options =>
-{
-    options.LoginPath = "/login";
-});
 
 // ── JWT ──
 builder.Services.AddSingleton<JwtTokenService>();
@@ -67,15 +57,11 @@ else
     app.MapStaticAssets();
 }
 
-app.UseAuthentication();
-app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 await app.InitializeDatabaseAsync();
-
-
 
 app.Run();
