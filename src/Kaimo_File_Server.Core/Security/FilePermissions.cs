@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Kaimo_File_Server.Core.Security
-{
+namespace Kaimo_File_Server.Core.Security;
+
 
 /// <summary>
         /// Bitwise combinable file permissions.
@@ -21,7 +21,7 @@ namespace Kaimo_File_Server.Core.Security
         /// </summary>
 [Flags]
 public enum FilePermission : long
-    {
+{
         None = 0,
 
         // Administration
@@ -48,6 +48,6 @@ public enum FilePermission : long
         WriteAll = CreateWriteData | CreateAppendData | WriteAttributes | WriteExtAttributes | DeleteSubItems | Delete,
         AdminAll = ChangePermissions | TakeOwnership,
         FullControl = ReadAll | WriteAll | AdminAll
-    }
 }
+
 

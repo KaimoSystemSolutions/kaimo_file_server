@@ -22,6 +22,46 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             var user = await _db.Users.FindAsync(id);
             if (user != null) { _db.Users.Remove(user); await _db.SaveChangesAsync(); }
         }
+        public async Task<List<Group>> GetGroupsForUserAsync(Guid userId)
+        {
+            return await _db.UserGroups
+                .Where(ug => ug.UserId == userId)
+                .Join(_db.Groups, ug => ug.GroupId, g => g.Id, (_, g) => g)
+                .OrderBy(g => g.Name)
+                .ToListAsync();
+        }
+
+        public async Task<List<Role>> GetRolesForUserAsync(Guid userId)
+        {
+            return await _db.UserRoles
+                .Where(ur => ur.UserId == userId)
+                .Join(_db.Roles, ur => ur.RoleId, r => r.Id, (_, r) => r)
+                .OrderBy(r => r.Name)
+                .ToListAsync();
+        }
+
+        public async Task SetGroupsForUserAsync(Guid userId, List<Guid> groupIds)
+        {
+            var existing = _db.UserGroups.Where(ug => ug.UserId == userId);
+            _db.UserGroups.RemoveRange(existing);
+            _db.UserGroups.AddRange(groupIds.Select(gId => new UserGroup(userId, gId)));
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task SetRolesForUserAsync(Guid userId, List<Guid> roleIds)
+        {
+            var existing = _db.UserRoles.Where(ur => ur.UserId == userId);
+            _db.UserRoles.RemoveRange(existing);
+            _db.UserRoles.AddRange(roleIds.Select(rId => new UserRole(userId, rId)));
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task UpdateNameAsync(Guid userId, string newName)
+        {
+            await _db.Users
+                .Where(u => u.Id == userId)
+                .ExecuteUpdateAsync(u => u.SetProperty(x => x.Name, newName));
+        }
     }
 
     public class GroupRepository : IGroupRepository
@@ -30,13 +70,37 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         public GroupRepository(ApplicationDbContext db) { _db = db; }
 
         public async Task<Group?> GetByIdAsync(Guid id) => await _db.Groups.FindAsync(id);
+        
         public async Task<IEnumerable<Group>> GetAllAsync() => await _db.Groups.ToListAsync();
+        
         public async Task<Group> CreateAsync(Group group)
-        { _db.Groups.Add(group); await _db.SaveChangesAsync(); return group; }
+        { 
+            _db.Groups.Add(group); 
+            await _db.SaveChangesAsync(); 
+            return group; 
+        }
+        
         public async Task DeleteAsync(Guid id)
         {
             var group = await _db.Groups.FindAsync(id);
             if (group != null) { _db.Groups.Remove(group); await _db.SaveChangesAsync(); }
+        }
+
+        public async Task<List<User>> GetMembersAsync(Guid groupId)
+        {
+            return await _db.UserGroups
+                .Where(ug => ug.GroupId == groupId)
+                .Join(_db.Users, ug => ug.UserId, u => u.Id, (_, u) => u)
+                .OrderBy(u => u.Name)
+                .ToListAsync();
+        }
+
+        public async Task SetMembersAsync(Guid groupId, List<Guid> userIds)
+        {
+            var existing = _db.UserGroups.Where(ug => ug.GroupId == groupId);
+            _db.UserGroups.RemoveRange(existing);
+            _db.UserGroups.AddRange(userIds.Select(uId => new UserGroup(uId, groupId)));
+            await _db.SaveChangesAsync();
         }
     }
 

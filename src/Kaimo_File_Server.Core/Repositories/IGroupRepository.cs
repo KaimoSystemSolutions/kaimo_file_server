@@ -11,5 +11,7 @@ namespace Kaimo_File_Server.Core.Repositories
         Task<IEnumerable<Group>> GetAllAsync();
         Task<Group> CreateAsync(Group group);
         Task DeleteAsync(Guid id);
+        Task<List<User>> GetMembersAsync(Guid groupId);
+        Task SetMembersAsync(Guid groupId, List<Guid> userIds);
     }
 }

@@ -10,5 +10,10 @@ namespace Kaimo_File_Server.Core.Repositories
         Task<User> CreateAsync(User user);
         Task UpdateAsync(User user);
         Task DeleteAsync(Guid id);
+        Task<List<Group>> GetGroupsForUserAsync(Guid userId);
+        Task<List<Role>> GetRolesForUserAsync(Guid userId);
+        Task SetGroupsForUserAsync(Guid userId, List<Guid> groupIds);
+        Task SetRolesForUserAsync(Guid userId, List<Guid> roleIds);
+        Task UpdateNameAsync(Guid userId, string newName);
     }
 }
