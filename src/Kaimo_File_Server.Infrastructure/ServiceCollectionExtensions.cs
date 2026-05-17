@@ -38,7 +38,7 @@ namespace Kaimo_File_Server.Infrastructure
             // AuthenticationLookup das Interface aus Core, die Implementierung aus Infrastructure
             services.AddScoped<IAuthenticationLookup, AuthenticationLookup>();
 
-            // FileVersionRepositor
+            // FileVersionRepository
             services.AddScoped<IFileVersionRepository, FileVersionRepository>();
 
             return services;
@@ -47,6 +47,8 @@ namespace Kaimo_File_Server.Infrastructure
         /// <summary>
         /// Registers Core services (FileService, AclService, StorageEngine).
         /// Called from the Host project after AddInfrastructure.
+        /// Hinweis: Wird aktuell nicht von Program.cs aufgerufen – die Services
+        /// werden dort direkt registriert. Diese Methode bleibt als Alternative.
         /// </summary>
         public static IServiceCollection AddCoreServices(this IServiceCollection services, string storagePath)
         {
@@ -56,13 +58,15 @@ namespace Kaimo_File_Server.Infrastructure
 
             var versionStoragePath = Path.Combine(storagePath, ".versions");
 
-            // Use Scoped, not Singleton each version operation needs its own DbContext
             services.AddScoped<IFileVersionService>(sp =>
                 new FileVersionService(
                     sp.GetRequiredService<IFileVersionRepository>(),
                     versionStoragePath,
                     defaultMaxVersions: 64,
                     defaultMaxAge: TimeSpan.FromDays(90)));
+
+            // ShareLockManager – Singleton, ein Lock pro Share-Name (In-Memory, Single-Instance)
+            services.AddSingleton<ShareLockManager>();
 
             return services;
         }

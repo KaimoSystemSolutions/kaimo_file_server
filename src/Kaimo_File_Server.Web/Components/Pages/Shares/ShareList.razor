@@ -12,7 +12,7 @@
     <div style="display: flex; gap: 0.5rem;">
         @if (VM.CanCreateShare)
         {
-            <button class="btn-icon" title="Share erstellen" @onclick="() => { VM.IsCreating = !VM.IsCreating; }">
+            <button class="btn-icon" title="Share erstellen" @onclick="ToggleCreate">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
@@ -22,28 +22,41 @@
     </div>
 </div>
 
+@* ── Create Form ── *@
+
 @if (VM.IsCreating && VM.CanCreateShare)
 {
-    <div class="create-share-form">
-        <input type="text"
-               placeholder="Name des neuen Shares"
-               @bind="VM.NewShareName"
-               @bind:event="oninput"
-               @onkeydown="HandleCreateKeyDown" />
-        <button class="btn-primary" @onclick="CreateShare">Erstellen</button>
-        <button class="btn-secondary" @onclick="() => { VM.IsCreating = false; }">Abbrechen</button>
+    <div class="create-form-card">
+        <h3>Neuen Share erstellen</h3>
+        <div class="create-form-fields">
+            <div class="form-group">
+                <label>Name</label>
+                <input class="edit-input"
+                       type="text"
+                       placeholder="z.B. projekte, backup, medien"
+                       @bind="VM.NewShareName"
+                       @bind:event="oninput"
+                       @onkeydown="HandleCreateKeyDown" />
+            </div>
+        </div>
         @if (VM.CreateErrorMessage is not null)
         {
-            <div class="error-banner">@VM.CreateErrorMessage</div>
+            <div class="error-banner" style="margin-top: 12px; margin-bottom: 0;">@VM.CreateErrorMessage</div>
         }
+        <div class="create-form-actions">
+            <button class="btn-primary" @onclick="CreateShare">Erstellen</button>
+            <button class="btn-secondary" @onclick="() => { VM.IsCreating = false; }">Abbrechen</button>
+        </div>
     </div>
 }
+
+@* ── Content ── *@
 
 @if (VM.IsLoading)
 {
     <div class="loading-state">
         <div class="spinner"></div>
-        <p>Lade Shares...</p>
+        <p>Lade Shares…</p>
     </div>
 }
 else if (VM.ErrorMessage is not null)
@@ -61,18 +74,229 @@ else if (!VM.Shares.Any())
 }
 else
 {
-    <div class="share-grid">
-        @foreach (var share in VM.Shares)
+    <div class="admin-content">
+        @* ── Share List ── *@
+        <div class="admin-list">
+            <div class="share-grid">
+                @foreach (var share in VM.Shares)
+                {
+                    var isSelected = VM.SelectedShare?.Id == share.Id;
+                    var isDisabled = !share.IsEnabled;
+
+                    <div class="share-card @(isSelected ? "share-card--selected" : "") @(isDisabled ? "share-card--disabled" : "")"
+                         @onclick="() => HandleCardClick(share)">
+                        <div class="share-icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+                                 stroke="@(isDisabled ? "var(--text-tertiary)" : "var(--folder-stroke)")" stroke-width="1.5">
+                                <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                                      fill="@(isDisabled ? "transparent" : "var(--folder-fill)")" />
+                            </svg>
+                        </div>
+                        <div class="share-info">
+                            <span class="share-name">@share.Name</span>
+                            <span class="share-path">@share.Path</span>
+                            @if (isDisabled)
+                            {
+                                <span class="share-badge share-badge--disabled">Deaktiviert</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* ── Detail Panel ── *@
+        @if (VM.SelectedShare is not null && VM.IsAdmin)
         {
-            <div class="share-card" @onclick="() => OpenShare(share.Name)">
-                <div class="share-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
-                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                    </svg>
+            <div class="admin-detail">
+                <div class="detail-header">
+                    <h3>@VM.SelectedShare.Name</h3>
+                    <span class="detail-subtitle">Share-Einstellungen</span>
                 </div>
-                <div class="share-info">
-                    <span class="share-name">@share.Name</span>
-                    <span class="share-path">@share.Path</span>
+
+                @if (VM.EditSuccessMessage is not null)
+                {
+                    <div class="success-banner">@VM.EditSuccessMessage</div>
+                }
+                @if (VM.EditErrorMessage is not null)
+                {
+                    <div class="error-banner">@VM.EditErrorMessage</div>
+                }
+
+                @* ── Rename ── *@
+                <div class="detail-section">
+                    <span class="detail-label">Name</span>
+                    <div class="detail-rename-row">
+                        <input class="edit-input"
+                               type="text"
+                               @bind="VM.EditShareName"
+                               @bind:event="oninput"
+                               disabled="@VM.IsRenaming" />
+                        <button class="btn-primary"
+                                @onclick="RenameShare"
+                                disabled="@(VM.EditShareName.Trim() == VM.SelectedShare.Name || VM.IsRenaming)">
+                            @(VM.IsRenaming ? "…" : "Umbenennen")
+                        </button>
+                    </div>
+                </div>
+
+                @* ── Path ── *@
+                <div class="detail-section">
+                    <span class="detail-label">Pfad</span>
+                    <span class="detail-value">@VM.SelectedShare.Path</span>
+                </div>
+
+                @* ── Status ── *@
+                <div class="detail-section">
+                    <span class="detail-label">Status</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="detail-value">
+                            @(VM.SelectedShare.IsEnabled ? "Aktiv" : "Deaktiviert")
+                        </span>
+                        <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" @onclick="ToggleEnabled">
+                            @(VM.SelectedShare.IsEnabled ? "Deaktivieren" : "Aktivieren")
+                        </button>
+                    </div>
+                </div>
+
+                @* ── Access ── *@
+                <div class="detail-section">
+                    <span class="detail-label">Zugriffsrechte</span>
+                    @if (!VM.ShowAccessPanel)
+                    {
+                        <button class="btn-secondary" style="margin-top: 4px;" @onclick="LoadAccess">
+                            Berechtigungen anzeigen
+                        </button>
+                    }
+                    else
+                    {
+                        @if (VM.AccessErrorMessage is not null)
+                        {
+                            <div class="error-banner" style="margin-top: 8px;">@VM.AccessErrorMessage</div>
+                        }
+
+                        @* Aktuelle Einträge *@
+                        <div class="access-section">
+                            @if (VM.AccessEntries.Any())
+                            {
+                                @foreach (var entry in VM.AccessEntries)
+                                {
+                                    <div class="access-row">
+                                        <div class="access-row-info">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                 stroke="var(--text-tertiary)" stroke-width="2">
+                                                @if (VM.GetPrincipalType(entry.PrincipalId) == "group")
+                                                {
+                                                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                                                    <circle cx="9" cy="7" r="4" />
+                                                    <path d="M23 21v-2a4 4 0 00-3-3.87" />
+                                                    <path d="M16 3.13a4 4 0 010 7.75" />
+                                                }
+                                                else
+                                                {
+                                                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                                                    <circle cx="12" cy="7" r="4" />
+                                                }
+                                            </svg>
+                                            <span>@VM.GetPrincipalDisplayName(entry.PrincipalId)</span>
+                                        </div>
+                                        <button class="btn-icon btn-icon--small btn-icon--danger"
+                                                title="Entfernen"
+                                                @onclick="() => RevokeAccess(entry.PrincipalId)">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor" stroke-width="2">
+                                                <line x1="18" y1="6" x2="6" y2="18" />
+                                                <line x1="6" y1="6" x2="18" y2="18" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <p class="empty-hint">Keine Berechtigungen vergeben</p>
+                            }
+                        </div>
+
+                        @* Hinzufügen *@
+                        
+                        var availableUsers = VM.AllUsers.Where(u => !VM.HasAccess(u.Id)).ToList();
+                        var availableGroups = VM.AllGroups.Where(g => !VM.HasAccess(g.Id)).ToList();
+                        
+
+                        @if (availableUsers.Any() || availableGroups.Any())
+                        {
+                            <span class="detail-label" style="margin-top: 12px;">Hinzufügen</span>
+                            <div class="access-section access-section--add">
+                                @foreach (var user in availableUsers)
+                                {
+                                    <div class="access-row access-row--add">
+                                        <div class="access-row-info">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                 stroke="var(--text-tertiary)" stroke-width="2">
+                                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                                                <circle cx="12" cy="7" r="4" />
+                                            </svg>
+                                            <span>@(user.Name ?? user.Username)</span>
+                                        </div>
+                                        <button class="btn-icon btn-icon--small btn-icon--accent"
+                                                title="Hinzufügen"
+                                                @onclick="() => GrantAccess(user.Id)">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="5" x2="12" y2="19" />
+                                                <line x1="5" y1="12" x2="19" y2="12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                }
+                                @foreach (var group in availableGroups)
+                                {
+                                    <div class="access-row access-row--add">
+                                        <div class="access-row-info">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                 stroke="var(--text-tertiary)" stroke-width="2">
+                                                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                                                <circle cx="9" cy="7" r="4" />
+                                                <path d="M23 21v-2a4 4 0 00-3-3.87" />
+                                                <path d="M16 3.13a4 4 0 010 7.75" />
+                                            </svg>
+                                            <span>@group.Name</span>
+                                        </div>
+                                        <button class="btn-icon btn-icon--small btn-icon--accent"
+                                                title="Hinzufügen"
+                                                @onclick="() => GrantAccess(group.Id)">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="5" x2="12" y2="19" />
+                                                <line x1="5" y1="12" x2="19" y2="12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+
+                @* ── Delete ── *@
+                <div class="detail-actions">
+                    @if (!VM.ShowDeleteConfirm)
+                    {
+                        <button class="btn-danger-outline" @onclick="() => VM.ShowDeleteConfirm = true">
+                            Share löschen
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="confirm-delete">
+                            <p>Share „@VM.SelectedShare.Name" wirklich löschen? Dateien bleiben erhalten.</p>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn-danger-outline" @onclick="DeleteShare">Endgültig löschen</button>
+                                <button class="btn-secondary" @onclick="() => VM.ShowDeleteConfirm = false">Abbrechen</button>
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
         }
@@ -89,6 +313,26 @@ else
         }
     }
 
+    private void HandleCardClick(ShareDefinition share)
+    {
+        if (VM.IsAdmin)
+        {
+            VM.SelectShare(share);
+            StateHasChanged();
+        }
+        else
+        {
+            Nav.NavigateTo($"/files/{share.Name}");
+        }
+    }
+
+    private void ToggleCreate()
+    {
+        VM.DeselectShare();
+        VM.IsCreating = !VM.IsCreating;
+        StateHasChanged();
+    }
+
     private void OpenShare(string name) => Nav.NavigateTo($"/files/{name}");
 
     private async Task CreateShare()
@@ -100,7 +344,42 @@ else
 
     private async Task HandleCreateKeyDown(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter")
-            await CreateShare();
+        if (e.Key == "Enter") await CreateShare();
+    }
+
+    private async Task RenameShare()
+    {
+        await VM.RenameShareAsync();
+        StateHasChanged();
+    }
+
+    private async Task ToggleEnabled()
+    {
+        await VM.ToggleShareEnabledAsync();
+        StateHasChanged();
+    }
+
+    private async Task DeleteShare()
+    {
+        await VM.DeleteShareAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadAccess()
+    {
+        await VM.LoadAccessAsync();
+        StateHasChanged();
+    }
+
+    private async Task GrantAccess(Guid principalId)
+    {
+        await VM.GrantAccessAsync(principalId);
+        StateHasChanged();
+    }
+
+    private async Task RevokeAccess(Guid principalId)
+    {
+        await VM.RevokeAccessAsync(principalId);
+        StateHasChanged();
     }
 }

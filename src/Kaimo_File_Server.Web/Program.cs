@@ -34,15 +34,29 @@ builder.Services.AddSingleton<IStorageEngine>(sp => new FileSystemStorage(storag
 builder.Services.AddSingleton<IAclService, AclService>();
 builder.Services.AddScoped<IFileService, FileService>();
 
+// ── Share Lock Manager (Singleton – ein Lock pro Share, In-Memory) ──
+builder.Services.AddSingleton<ShareLockManager>();
+
 // ── Services ──
 builder.Services.AddScoped<ThemeService>();
 
 // ── ViewModels ──
 builder.Services.AddScoped<LoginViewModel>();
-builder.Services.AddScoped<ShareListViewModel>();
 builder.Services.AddScoped<ShareBrowserViewModel>();
 builder.Services.AddScoped<FileBrowserViewModel>();
 builder.Services.AddScoped<UserListViewModel>();
+
+builder.Services.AddScoped<ShareListViewModel>(sp =>
+    new ShareListViewModel(
+        sp.GetRequiredService<IShareRepository>(),
+        sp.GetRequiredService<IShareAccessRepository>(),
+        sp.GetRequiredService<IUserRepository>(),
+        sp.GetRequiredService<IGroupRepository>(),
+        sp.GetRequiredService<IStorageEngine>(),
+        sp.GetRequiredService<ShareLockManager>(),
+        sp.GetRequiredService<AuthenticationStateProvider>(),
+        sp.GetRequiredService<ILogger<ShareListViewModel>>(),
+        storagePath));
 
 // ── DataProtection ──
 builder.Services.AddDataProtection()

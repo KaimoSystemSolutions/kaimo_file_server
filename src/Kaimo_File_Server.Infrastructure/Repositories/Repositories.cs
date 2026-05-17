@@ -135,14 +135,37 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
 
         public async Task<List<ShareDefinition>> GetAllEnabledAsync()
             => await _db.ShareDefinitions.Where(s => s.IsEnabled).ToListAsync();
+
+        public async Task<List<ShareDefinition>> GetAllAsync()
+            => await _db.ShareDefinitions.ToListAsync();
+
         public async Task<ShareDefinition?> GetByNameAsync(string name)
             => await _db.ShareDefinitions.FirstOrDefaultAsync(s => s.Name == name);
+
+        public async Task<ShareDefinition?> GetByIdAsync(Guid id)
+            => await _db.ShareDefinitions.FindAsync(id);
+
         public async Task<ShareDefinition> CreateAsync(ShareDefinition share)
-        { _db.ShareDefinitions.Add(share); await _db.SaveChangesAsync(); return share; }
+        {
+            _db.ShareDefinitions.Add(share);
+            await _db.SaveChangesAsync();
+            return share;
+        }
+
+        public async Task UpdateAsync(ShareDefinition share)
+        {
+            _db.ShareDefinitions.Update(share);
+            await _db.SaveChangesAsync();
+        }
+
         public async Task DeleteAsync(Guid id)
         {
             var share = await _db.ShareDefinitions.FindAsync(id);
-            if (share != null) { _db.ShareDefinitions.Remove(share); await _db.SaveChangesAsync(); }
+            if (share != null)
+            {
+                _db.ShareDefinitions.Remove(share);
+                await _db.SaveChangesAsync();
+            }
         }
     }
 
@@ -153,6 +176,7 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
 
         public async Task<bool> HasAccessAsync(string shareName, Guid principalId)
             => await _db.ShareAccessEntries.AnyAsync(e => e.ShareName == shareName && e.PrincipalId == principalId);
+
         public async Task<List<ShareAccessEntry>> GetByShareAsync(string shareName)
             => await _db.ShareAccessEntries.Where(e => e.ShareName == shareName).ToListAsync();
 
@@ -166,6 +190,25 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
                 _db.ShareAccessEntries.Add(new ShareAccessEntry(shareName, principalId));
                 await _db.SaveChangesAsync();
             }
+        }
+
+        public async Task RevokeAccessAsync(string shareName, Guid principalId)
+        {
+            var entry = await _db.ShareAccessEntries
+                .FirstOrDefaultAsync(e => e.ShareName == shareName && e.PrincipalId == principalId);
+
+            if (entry != null)
+            {
+                _db.ShareAccessEntries.Remove(entry);
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        public async Task UpdateShareNameAsync(string oldName, string newName)
+        {
+            await _db.ShareAccessEntries
+                .Where(e => e.ShareName == oldName)
+                .ExecuteUpdateAsync(e => e.SetProperty(x => x.ShareName, newName));
         }
     }
 }

@@ -1,0 +1,29 @@
+﻿using System.Collections.Concurrent;
+
+namespace Kaimo_File_Server.Core.Services
+{
+    /// <summary>
+    /// In-Memory Lock pro Share-Name.
+    /// Verhindert parallele Dateioperationen während Umbenennungen oder Löschungen.
+    /// Für Single-Instance-Deployments.
+    /// </summary>
+    public class ShareLockManager
+    {
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
+
+        public SemaphoreSlim GetLock(string shareName)
+            => _locks.GetOrAdd(shareName, _ => new SemaphoreSlim(1, 1));
+
+        public void RemoveLock(string shareName)
+        {
+            if (_locks.TryRemove(shareName, out var sem))
+                sem.Dispose();
+        }
+
+        public void RenameLock(string oldName, string newName)
+        {
+            if (_locks.TryRemove(oldName, out var sem))
+                _locks.TryAdd(newName, sem);
+        }
+    }
+}
