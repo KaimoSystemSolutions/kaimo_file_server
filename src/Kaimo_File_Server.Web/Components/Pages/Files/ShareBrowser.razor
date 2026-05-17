@@ -1,22 +1,23 @@
-@page "/"
-@inject ShareListViewModel VM
+@page "/files"
+@inject ShareBrowserViewModel VM
 @inject NavigationManager Nav
 
-<PageTitle>Kaimo Files – Shares</PageTitle>
+<PageTitle>Kaimo Files – Browse</PageTitle>
 
 <div class="page-header">
     <div>
-        <h1>Shares</h1>
-        <p class="subtitle">Willkommen, @VM.CurrentUserName</p>
+        <h1>Browse - Shares</h1>
     </div>
     <div style="display: flex; gap: 0.5rem;">
         @if (VM.CanCreateShare)
         {
             <button class="btn-icon" title="Share erstellen" @onclick="() => { VM.IsCreating = !VM.IsCreating; }">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
+                <NavLink class="nav-item" href="/" Match="NavLinkMatch.All">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                    Shares Verwalten
+                </NavLink>
             </button>
         }
     </div>
@@ -61,19 +62,19 @@ else if (!VM.Shares.Any())
 }
 else
 {
-    <div class="share-grid">
+    <div class="file-list">
         @foreach (var share in VM.Shares)
         {
-            <div class="share-card" @onclick="() => OpenShare(share.Name)">
-                <div class="share-icon">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5">
+            <div class="file-row file-row-dir" @onclick="() => OpenShare(share.Name)">
+                <div class="file-cell file-name">
+                    <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
+                         fill="var(--folder-fill)" stroke="var(--folder-stroke)" stroke-width="1.5">
                         <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                     </svg>
+                    <span>@share.Name</span>
                 </div>
-                <div class="share-info">
-                    <span class="share-name">@share.Name</span>
-                    <span class="share-path">@share.Path</span>
-                </div>
+                <div class="file-cell file-size">@share.Path</div>
+                <div class="file-cell file-date"></div>
             </div>
         }
     </div>

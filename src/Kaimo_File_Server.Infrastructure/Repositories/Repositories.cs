@@ -62,6 +62,14 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
                 .Where(u => u.Id == userId)
                 .ExecuteUpdateAsync(u => u.SetProperty(x => x.Name, newName));
         }
+        public async Task UpdatePasswordAsync(Guid userId, string passwordHash, string ntHash)
+        {
+            await _db.Users
+                .Where(u => u.Id == userId)
+                .ExecuteUpdateAsync(u => u
+                    .SetProperty(x => x.PasswordHash, passwordHash)
+                    .SetProperty(x => x.NtHash, ntHash));
+        }
     }
 
     public class GroupRepository : IGroupRepository

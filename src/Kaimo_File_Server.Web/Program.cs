@@ -34,9 +34,13 @@ builder.Services.AddSingleton<IStorageEngine>(sp => new FileSystemStorage(storag
 builder.Services.AddSingleton<IAclService, AclService>();
 builder.Services.AddScoped<IFileService, FileService>();
 
+// ── Services ──
+builder.Services.AddScoped<ThemeService>();
+
 // ── ViewModels ──
 builder.Services.AddScoped<LoginViewModel>();
 builder.Services.AddScoped<ShareListViewModel>();
+builder.Services.AddScoped<ShareBrowserViewModel>();
 builder.Services.AddScoped<FileBrowserViewModel>();
 builder.Services.AddScoped<UserListViewModel>();
 

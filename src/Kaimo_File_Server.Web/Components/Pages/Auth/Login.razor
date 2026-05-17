@@ -1,67 +1,59 @@
 @page "/login"
 @layout EmptyLayout
-@rendermode RenderMode.InteractiveServer
 @inject LoginViewModel VM
 @inject NavigationManager Nav
 
 <PageTitle>Kaimo Files – Anmelden</PageTitle>
 
-<div class="login-wrapper">
+<div class="login-page">
     <div class="login-card">
-        <div class="login-logo">
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                <rect width="48" height="48" rx="12" fill="var(--accent)" />
-                <path d="M14 20h20v2H14zM14 26h20v2H14zM14 32h14v2H14z"
-                      fill="var(--login-icon-color, #fff)" />
+        <div class="sidebar-brand" style="justify-content: center; margin-bottom: 8px;">
+            <svg width="36" height="36" viewBox="0 0 48 48" fill="none">
+                <rect width="48" height="48" rx="10" fill="var(--accent)" />
+                <path d="M14 20h20v2H14zM14 26h20v2H14zM14 32h14v2H14z" fill="#fff" />
             </svg>
-            <h1>Kaimo Files</h1>
         </div>
+        <h2 style="text-align: center;">Kaimo Files</h2>
+        <p class="subtitle" style="text-align: center;">Melde dich an, um fortzufahren</p>
 
         @if (VM.ErrorMessage is not null)
         {
-            <div class="login-error">@VM.ErrorMessage</div>
+            <div class="error-banner">@VM.ErrorMessage</div>
         }
 
         <div class="login-form">
             <div class="form-group">
-                <label for="username">Benutzername</label>
-                <input id="username" type="text" @bind="VM.Username"
+                <label>Benutzername</label>
+                <input type="text"
+                       placeholder="Benutzername eingeben"
+                       @bind="VM.Username"
                        @bind:event="oninput"
                        @onkeydown="HandleKeyDown"
-                       placeholder="Benutzername"
-                       autocomplete="username"
                        disabled="@VM.IsLoading" />
             </div>
 
             <div class="form-group">
-                <label for="password">Passwort</label>
-                <input id="password" type="password" @bind="VM.Password"
+                <label>Passwort</label>
+                <input type="password"
+                       placeholder="Passwort eingeben"
+                       @bind="VM.Password"
                        @bind:event="oninput"
                        @onkeydown="HandleKeyDown"
-                       placeholder="Passwort"
-                       autocomplete="current-password"
                        disabled="@VM.IsLoading" />
             </div>
 
-            <button class="btn-login" @onclick="DoLogin" disabled="@VM.IsLoading">
-                @if (VM.IsLoading)
-                {
-                    <span class="spinner-sm"></span>
-                    <span>Anmelden...</span>
-                }
-                else
-                {
-                    <span>Anmelden</span>
-                }
+            <button class="btn-primary" @onclick="HandleLogin" disabled="@VM.IsLoading">
+                @(VM.IsLoading ? "Wird angemeldet…" : "Anmelden")
             </button>
         </div>
     </div>
 </div>
 
 @code {
-    private async Task DoLogin()
+    private async Task HandleLogin()
     {
-        if (await VM.LoginAsync())
+        var success = await VM.LoginAsync();
+        if (success)
         {
             Nav.NavigateTo("/", forceLoad: false);
         }
@@ -70,6 +62,6 @@
     private async Task HandleKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
-            await DoLogin();
+            await HandleLogin();
     }
 }

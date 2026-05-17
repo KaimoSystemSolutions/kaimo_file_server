@@ -27,6 +27,26 @@ else
             <h1>Verwaltung</h1>
             <p class="subtitle">@VM.TabSubtitle</p>
         </div>
+        <div style="display: flex; gap: 0.5rem;">
+            @if (VM.ActiveTab == AdminTab.Users)
+            {
+                <button class="btn-icon" title="Benutzer erstellen" @onclick="() => VM.StartCreateUser()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                </button>
+            }
+            else if (VM.ActiveTab == AdminTab.Groups)
+            {
+                <button class="btn-icon" title="Gruppe erstellen" @onclick="() => VM.StartCreateGroup()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                </button>
+            }
+        </div>
     </div>
 
     <div class="admin-tabs">
@@ -56,7 +76,68 @@ else
         </button>
     </div>
 
-    @if (VM.ErrorMessage is not null && !VM.IsEditing)
+    @* ── Create User Form ── *@
+    @if (VM.IsCreatingUser)
+    {
+        <div class="create-form-card">
+            <h3>Neuen Benutzer erstellen</h3>
+            <div class="create-form-fields">
+                <div class="form-group">
+                    <label>Anzeigename</label>
+                    <input type="text" class="edit-input" placeholder="z.B. Max Mustermann"
+                           @bind="VM.CreateUserName" @bind:event="oninput" />
+                </div>
+                <div class="form-group">
+                    <label>Benutzername</label>
+                    <input type="text" class="edit-input" placeholder="z.B. mmustermann"
+                           @bind="VM.CreateUserUsername" @bind:event="oninput" />
+                </div>
+                <div class="form-group">
+                    <label>Passwort</label>
+                    <input type="password" class="edit-input" placeholder="Mindestens 6 Zeichen"
+                           @bind="VM.CreateUserPassword" @bind:event="oninput" />
+                </div>
+            </div>
+            @if (VM.ErrorMessage is not null)
+            {
+                <div class="error-banner" style="margin-top: 12px;">@VM.ErrorMessage</div>
+            }
+            <div class="create-form-actions">
+                <button class="btn-primary" @onclick="CreateUser" disabled="@VM.IsSaving">
+                    @(VM.IsSaving ? "Erstellt…" : "Erstellen")
+                </button>
+                <button class="btn-secondary" @onclick="() => VM.CancelCreate()">Abbrechen</button>
+            </div>
+        </div>
+    }
+
+    @* ── Create Group Form ── *@
+    @if (VM.IsCreatingGroup)
+    {
+        <div class="create-form-card">
+            <h3>Neue Gruppe erstellen</h3>
+            <div class="create-form-fields">
+                <div class="form-group">
+                    <label>Gruppenname</label>
+                    <input type="text" class="edit-input" placeholder="z.B. Entwickler"
+                           @bind="VM.CreateGroupName" @bind:event="oninput"
+                           @onkeydown="HandleCreateGroupKeyDown" />
+                </div>
+            </div>
+            @if (VM.ErrorMessage is not null)
+            {
+                <div class="error-banner" style="margin-top: 12px;">@VM.ErrorMessage</div>
+            }
+            <div class="create-form-actions">
+                <button class="btn-primary" @onclick="CreateGroup" disabled="@VM.IsSaving">
+                    @(VM.IsSaving ? "Erstellt…" : "Erstellen")
+                </button>
+                <button class="btn-secondary" @onclick="() => VM.CancelCreate()">Abbrechen</button>
+            </div>
+        </div>
+    }
+
+    @if (VM.ErrorMessage is not null && !VM.IsEditing && !VM.IsCreatingUser && !VM.IsCreatingGroup)
     {
         <div class="error-banner">@VM.ErrorMessage</div>
     }
@@ -176,7 +257,7 @@ else
                         }
                         break;
                 }
-            </div> @* Ende admin-list *@
+            </div>
 
             @* ════════════════════ DETAIL-PANEL (rechts) ════════════════════ *@
             @if (VM.SelectedUser is not null || VM.SelectedGroup is not null || VM.SelectedRole is not null)
@@ -202,6 +283,21 @@ else
                                 <span class="detail-label">Name</span>
                                 <input type="text" class="edit-input" @bind="VM.EditUserName" />
                             </div>
+
+                            <div class="detail-section">
+                                <span class="detail-label">Neues Passwort (optional)</span>
+                                <input type="password" class="edit-input" placeholder="Leer lassen = unverändert"
+                                       @bind="VM.NewPassword" @bind:event="oninput" />
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(VM.NewPassword))
+                            {
+                                <div class="detail-section">
+                                    <span class="detail-label">Passwort bestätigen</span>
+                                    <input type="password" class="edit-input" placeholder="Passwort wiederholen"
+                                           @bind="VM.ConfirmPassword" @bind:event="oninput" />
+                                </div>
+                            }
 
                             <div class="detail-section">
                                 <span class="detail-label">Gruppen</span>
@@ -299,7 +395,27 @@ else
                             </div>
                             <div class="detail-actions">
                                 <button class="btn-secondary" @onclick="EditUser">Bearbeiten</button>
-                                <button class="btn-danger-outline" disabled>Benutzer löschen</button>
+
+                                @if (VM.IsConfirmingDelete)
+                                {
+                                    <div class="confirm-delete">
+                                        <p>Benutzer wirklich löschen?</p>
+                                        <div style="display: flex; gap: 8px;">
+                                            <button class="btn-danger-outline" @onclick="ConfirmDeleteUser" disabled="@VM.IsSaving">
+                                                @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
+                                            </button>
+                                            <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">
+                                                Abbrechen
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <button class="btn-danger-outline" @onclick="() => VM.RequestDeleteUser()">
+                                        Benutzer löschen
+                                    </button>
+                                }
                             </div>
                         }
                     }
@@ -372,7 +488,27 @@ else
                             </div>
                             <div class="detail-actions">
                                 <button class="btn-secondary" @onclick="EditGroup">Mitglieder verwalten</button>
-                                <button class="btn-danger-outline" disabled>Gruppe löschen</button>
+
+                                @if (VM.IsConfirmingDelete)
+                                {
+                                    <div class="confirm-delete">
+                                        <p>Gruppe wirklich löschen?</p>
+                                        <div style="display: flex; gap: 8px;">
+                                            <button class="btn-danger-outline" @onclick="ConfirmDeleteGroup" disabled="@VM.IsSaving">
+                                                @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
+                                            </button>
+                                            <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">
+                                                Abbrechen
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <button class="btn-danger-outline" @onclick="() => VM.RequestDeleteGroup()">
+                                        Gruppe löschen
+                                    </button>
+                                }
                             </div>
                         }
                     }
@@ -398,10 +534,10 @@ else
                         </div>
                     }
 
-                </div> @* Ende admin-detail *@
+                </div>
             }
 
-        </div> @* Ende admin-content *@
+        </div>
     }
 }
 
@@ -436,7 +572,19 @@ else
     private async Task SaveUser() { CloseDropdowns(); await VM.SaveUserAsync(); StateHasChanged(); }
     private async Task SaveGroup() { CloseDropdowns(); await VM.SaveGroupAsync(); StateHasChanged(); }
 
+    private async Task CreateUser() { await VM.CreateUserAsync(); StateHasChanged(); }
+    private async Task CreateGroup() { await VM.CreateGroupAsync(); StateHasChanged(); }
+
+    private async Task ConfirmDeleteUser() { await VM.ConfirmDeleteUserAsync(); StateHasChanged(); }
+    private async Task ConfirmDeleteGroup() { await VM.ConfirmDeleteGroupAsync(); StateHasChanged(); }
+
     private void CancelEdit() { CloseDropdowns(); VM.CancelEdit(); StateHasChanged(); }
 
     private void CloseDropdowns() { groupsOpen = false; rolesOpen = false; membersOpen = false; }
+
+    private async Task HandleCreateGroupKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await CreateGroup();
+    }
 }

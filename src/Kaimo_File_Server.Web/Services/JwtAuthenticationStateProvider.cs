@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace Kaimo_File_Server.Web.Services;
@@ -7,17 +8,12 @@ namespace Kaimo_File_Server.Web.Services;
 /// <summary>
 /// Blazor AuthenticationStateProvider der den JWT-Token direkt aus
 /// localStorage (via IJSRuntime) liest und validiert.
-///
-/// Warum nicht ProtectedLocalStorage?
-/// - ProtectedLocalStorage verschlüsselt mit DataProtection-Keys
-/// - Bei Container-Restart oder Key-Rotation kann der Token nicht
-///   mehr entschlüsselt werden → User wird ausgeloggt
-/// - Der JWT ist selbst signiert/validiert, braucht keine Extra-Verschlüsselung
 /// </summary>
 public class JwtAuthenticationStateProvider : AuthenticationStateProvider
 {
     private readonly IJSRuntime _js;
     private readonly JwtTokenService _jwtService;
+    private readonly ILogger<JwtAuthenticationStateProvider> _logger;
 
     private static readonly AuthenticationState _anonymous =
         new(new ClaimsPrincipal(new ClaimsIdentity()));
@@ -26,10 +22,12 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
 
     public JwtAuthenticationStateProvider(
         IJSRuntime js,
-        JwtTokenService jwtService)
+        JwtTokenService jwtService,
+        ILogger<JwtAuthenticationStateProvider> logger)
     {
         _js = js;
         _jwtService = jwtService;
+        _logger = logger;
     }
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
@@ -43,46 +41,43 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
 
             if (string.IsNullOrEmpty(token))
             {
-                Console.WriteLine("[AUTH] Kein Token im localStorage gefunden");
+                _logger.LogDebug("Kein Token im localStorage gefunden");
                 return _anonymous;
             }
 
-            Console.WriteLine("[AUTH] Token gefunden, validiere...");
             var principal = _jwtService.ValidateToken(token);
 
             if (principal is null)
             {
-                Console.WriteLine("[AUTH] Token ungültig oder abgelaufen");
+                _logger.LogInformation("Token ungültig oder abgelaufen, wird entfernt");
                 try { await _js.InvokeVoidAsync("localStorage.removeItem", "auth_token"); } catch { }
                 return _anonymous;
             }
 
-            Console.WriteLine($"[AUTH] Token valid für: {principal.Identity?.Name}");
+            _logger.LogDebug("Token gültig für: {Username}", principal.Identity?.Name);
             _cachedPrincipal = principal;
             return new AuthenticationState(principal);
         }
-        catch (InvalidOperationException ex)
+        catch (InvalidOperationException)
         {
-            // Sollte mit prerender: false nicht passieren
-            Console.WriteLine($"[AUTH] JS Interop nicht verfügbar: {ex.Message}");
+            // JS Interop nicht verfügbar (sollte mit prerender: false nicht passieren)
             return _anonymous;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[AUTH] Unerwarteter Fehler: {ex.Message}");
+            _logger.LogError(ex, "Unerwarteter Fehler beim Laden des Auth-State");
             return _anonymous;
         }
     }
 
     public async Task LoginAsync(string token)
     {
-        Console.WriteLine("[AUTH] Speichere Token in localStorage...");
         await _js.InvokeVoidAsync("localStorage.setItem", "auth_token", token);
 
         var principal = _jwtService.ValidateToken(token);
         if (principal is not null)
         {
-            Console.WriteLine($"[AUTH] Login erfolgreich für: {principal.Identity?.Name}");
+            _logger.LogInformation("Login erfolgreich für: {Username}", principal.Identity?.Name);
             _cachedPrincipal = principal;
             NotifyAuthenticationStateChanged(
                 Task.FromResult(new AuthenticationState(principal)));
@@ -96,7 +91,7 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
 
     public async Task LogoutAsync()
     {
-        Console.WriteLine("[AUTH] Logout, lösche Token...");
+        _logger.LogInformation("Logout durchgeführt");
         try { await _js.InvokeVoidAsync("localStorage.removeItem", "auth_token"); } catch { }
         _cachedPrincipal = null;
         NotifyAuthenticationStateChanged(Task.FromResult(_anonymous));

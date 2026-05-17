@@ -8,20 +8,20 @@ using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
-public partial class ShareListViewModel
+public partial class ShareBrowserViewModel
 {
     private readonly IShareRepository _shareRepo;
     private readonly IShareAccessRepository _accessRepo;
     private readonly IStorageEngine _storage;
     private readonly AuthenticationStateProvider _authState;
-    private readonly ILogger<ShareListViewModel> _logger;
+    private readonly ILogger<ShareBrowserViewModel> _logger;
 
-    public ShareListViewModel(
+    public ShareBrowserViewModel(
         IShareRepository shareRepo,
         IShareAccessRepository accessRepo,
         IStorageEngine storage,
         AuthenticationStateProvider authState,
-        ILogger<ShareListViewModel> logger)
+        ILogger<ShareBrowserViewModel> logger)
     {
         _shareRepo = shareRepo;
         _accessRepo = accessRepo;

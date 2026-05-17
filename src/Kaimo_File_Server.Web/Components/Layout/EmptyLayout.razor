@@ -1,27 +1,17 @@
 @inherits LayoutComponentBase
-@inject IJSRuntime JS
+@inject ThemeService Theme
 
-<div data-theme="@_theme">
+<div data-theme="@Theme.Current">
     @Body
 </div>
 
 @code {
-    private string _theme = "dark";
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            try
-            {
-                var saved = await JS.InvokeAsync<string?>("localStorage.getItem", "kaimo_theme");
-                if (saved is "dark" or "light")
-                {
-                    _theme = saved;
-                    StateHasChanged();
-                }
-            }
-            catch { }
+            await Theme.InitializeAsync();
+            StateHasChanged();
         }
     }
 }

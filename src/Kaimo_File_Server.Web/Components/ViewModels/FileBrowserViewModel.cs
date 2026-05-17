@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Storage;
+using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -8,11 +9,16 @@ public class FileBrowserViewModel
 {
     private readonly IStorageEngine _storage;
     private readonly IShareRepository _shareRepo;
+    private readonly ILogger<FileBrowserViewModel> _logger;
 
-    public FileBrowserViewModel(IStorageEngine storage, IShareRepository shareRepo)
+    public FileBrowserViewModel(
+        IStorageEngine storage,
+        IShareRepository shareRepo,
+        ILogger<FileBrowserViewModel> logger)
     {
         _storage = storage;
         _shareRepo = shareRepo;
+        _logger = logger;
     }
 
     // ── State ──
@@ -75,10 +81,11 @@ public class FileBrowserViewModel
                 return;
             }
 
-            var sharePath = CurrentShare.Name.Trim('/');
+            // FIX: CurrentShare.Path statt CurrentShare.Name verwenden
+            var sharePath = CurrentShare.Path.Trim('/');
 
             // subPath bereinigen und Share-Prefix entfernen,
-            // falls das UI ihn mitschickt (z.B. "projekte/hallo" statt "hallo")
+            // falls das UI ihn mitschickt
             var cleanSub = (subPath ?? "").Trim('/');
             if (cleanSub.Equals(sharePath, StringComparison.OrdinalIgnoreCase))
                 cleanSub = "";
@@ -91,24 +98,26 @@ public class FileBrowserViewModel
                 ? sharePath
                 : $"{sharePath}/{CurrentPath}";
 
-            // Path-Traversal verhindern (z.B. "../../etc")
-            if (storagePath.Contains(".."))
+            // Path-Traversal und gefährliche Zeichen verhindern
+            if (storagePath.Contains("..") || storagePath.Contains('\0'))
             {
                 ErrorMessage = "Ungültiger Pfad.";
                 Items = [];
                 return;
             }
 
-            Console.WriteLine($"[FileBrowser] Loading path: '{storagePath}' (share={shareName}, sub={CurrentPath})");
+            _logger.LogDebug("Loading path: '{StoragePath}' (share={ShareName}, sub={SubPath})",
+                storagePath, shareName, CurrentPath);
 
             Items = await _storage.ListAsync(storagePath);
 
-            Console.WriteLine($"[FileBrowser] Found {Items.Count} items ({Directories.Count()} dirs, {Files.Count()} files)");
+            _logger.LogDebug("Found {Total} items ({Dirs} dirs, {Files} files)",
+                Items.Count, Directories.Count(), Files.Count());
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Fehler: {ex.Message}";
-            Console.WriteLine($"[FileBrowser] Error: {ex}");
+            ErrorMessage = "Fehler beim Laden der Dateien.";
+            _logger.LogError(ex, "Error loading share {ShareName} path {SubPath}", shareName, subPath);
             Items = [];
         }
         finally

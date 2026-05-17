@@ -1,6 +1,8 @@
 ﻿using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -11,18 +13,24 @@ public class UserListViewModel
     private readonly IUserRepository _userRepo;
     private readonly IGroupRepository _groupRepo;
     private readonly IRoleRepository _roleRepo;
+    private readonly IPasswordService _passwordService;
     private readonly AuthenticationStateProvider _authState;
+    private readonly ILogger<UserListViewModel> _logger;
 
     public UserListViewModel(
         IUserRepository userRepo,
         IGroupRepository groupRepo,
         IRoleRepository roleRepo,
-        AuthenticationStateProvider authState)
+        IPasswordService passwordService,
+        AuthenticationStateProvider authState,
+        ILogger<UserListViewModel> logger)
     {
         _userRepo = userRepo;
         _groupRepo = groupRepo;
         _roleRepo = roleRepo;
+        _passwordService = passwordService;
         _authState = authState;
+        _logger = logger;
     }
 
     // ── State ──
@@ -50,8 +58,25 @@ public class UserListViewModel
     public List<CheckboxItem<Group>> EditUserGroups { get; private set; } = [];
     public List<CheckboxItem<Role>> EditUserRoles { get; private set; } = [];
 
+    // Password-Change
+    public string NewPassword { get; set; } = "";
+    public string ConfirmPassword { get; set; } = "";
+
     // Group-Edit
     public List<CheckboxItem<User>> EditGroupMembers { get; private set; } = [];
+
+    // ── Create User ──
+    public bool IsCreatingUser { get; set; }
+    public string CreateUserName { get; set; } = "";
+    public string CreateUserUsername { get; set; } = "";
+    public string CreateUserPassword { get; set; } = "";
+
+    // ── Create Group ──
+    public bool IsCreatingGroup { get; set; }
+    public string CreateGroupName { get; set; } = "";
+
+    // ── Delete Confirmation ──
+    public bool IsConfirmingDelete { get; set; }
 
     // ── Computed ──
     public string TabSubtitle => ActiveTab switch
@@ -79,7 +104,11 @@ public class UserListViewModel
 
             await LoadTabDataAsync();
         }
-        catch (Exception ex) { ErrorMessage = $"Fehler beim Laden: {ex.Message}"; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Laden der Benutzerverwaltung");
+            ErrorMessage = "Fehler beim Laden.";
+        }
         finally { IsLoading = false; }
     }
 
@@ -87,6 +116,7 @@ public class UserListViewModel
     {
         ActiveTab = tab;
         CancelEdit();
+        CancelCreate();
         SelectedUser = null;
         SelectedGroup = null;
         SelectedRole = null;
@@ -98,13 +128,18 @@ public class UserListViewModel
             IsLoading = true;
             await LoadTabDataAsync();
         }
-        catch (Exception ex) { ErrorMessage = $"Fehler beim Laden: {ex.Message}"; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Tab-Wechsel zu {Tab}", tab);
+            ErrorMessage = "Fehler beim Laden.";
+        }
         finally { IsLoading = false; }
     }
 
     public void SelectUser(User user)
     {
         CancelEdit();
+        CancelCreate();
         SelectedUser = SelectedUser?.Id == user.Id ? null : user;
         SelectedGroup = null;
         SelectedRole = null;
@@ -114,6 +149,7 @@ public class UserListViewModel
     public void SelectGroup(Group group)
     {
         CancelEdit();
+        CancelCreate();
         SelectedGroup = SelectedGroup?.Id == group.Id ? null : group;
         SelectedUser = null;
         SelectedRole = null;
@@ -123,6 +159,7 @@ public class UserListViewModel
     public void SelectRole(Role role)
     {
         CancelEdit();
+        CancelCreate();
         SelectedRole = SelectedRole?.Id == role.Id ? null : role;
         SelectedUser = null;
         SelectedGroup = null;
@@ -137,16 +174,16 @@ public class UserListViewModel
         IsEditing = true;
         ErrorMessage = null;
         SuccessMessage = null;
+        NewPassword = "";
+        ConfirmPassword = "";
 
         EditUserName = SelectedUser.Name;
 
-        // Alle Gruppen laden + aktuelle Zuweisungen markieren
         var allGroups = (await _groupRepo.GetAllAsync()).OrderBy(g => g.Name).ToList();
         var userGroups = await _userRepo.GetGroupsForUserAsync(SelectedUser.Id);
         var userGroupIds = userGroups.Select(g => g.Id).ToHashSet();
         EditUserGroups = allGroups.Select(g => new CheckboxItem<Group>(g, userGroupIds.Contains(g.Id))).ToList();
 
-        // Alle Rollen laden + aktuelle Zuweisungen markieren
         var allRoles = (await _roleRepo.GetAllAsync()).OrderBy(r => r.Name).ToList();
         var userRoles = await _userRepo.GetRolesForUserAsync(SelectedUser.Id);
         var userRoleIds = userRoles.Select(r => r.Id).ToHashSet();
@@ -168,6 +205,25 @@ public class UserListViewModel
                 await _userRepo.UpdateNameAsync(SelectedUser.Id, EditUserName.Trim());
             }
 
+            // Passwort ändern (wenn ausgefüllt)
+            if (!string.IsNullOrWhiteSpace(NewPassword))
+            {
+                if (NewPassword.Length < 6)
+                {
+                    ErrorMessage = "Passwort muss mindestens 6 Zeichen lang sein.";
+                    return;
+                }
+                if (NewPassword != ConfirmPassword)
+                {
+                    ErrorMessage = "Passwörter stimmen nicht überein.";
+                    return;
+                }
+                var hash = _passwordService.HashPassword(NewPassword);
+                var ntHash = _passwordService.ComputeNtHash(NewPassword);
+                await _userRepo.UpdatePasswordAsync(SelectedUser.Id, hash, ntHash);
+                _logger.LogInformation("Passwort geändert für Benutzer {UserId}", SelectedUser.Id);
+            }
+
             // Gruppen aktualisieren
             var selectedGroupIds = EditUserGroups.Where(g => g.IsChecked).Select(g => g.Item.Id).ToList();
             await _userRepo.SetGroupsForUserAsync(SelectedUser.Id, selectedGroupIds);
@@ -176,15 +232,19 @@ public class UserListViewModel
             var selectedRoleIds = EditUserRoles.Where(r => r.IsChecked).Select(r => r.Item.Id).ToList();
             await _userRepo.SetRolesForUserAsync(SelectedUser.Id, selectedRoleIds);
 
-            // Listen neu laden
             await LoadTabDataAsync();
 
-            // Aktualisierten User aus der Liste holen
             SelectedUser = Users.FirstOrDefault(u => u.Id == SelectedUser.Id);
             IsEditing = false;
+            NewPassword = "";
+            ConfirmPassword = "";
             SuccessMessage = "Änderungen gespeichert.";
         }
-        catch (Exception ex) { ErrorMessage = $"Fehler beim Speichern: {ex.Message}"; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Speichern von Benutzer {UserId}", SelectedUser.Id);
+            ErrorMessage = "Fehler beim Speichern.";
+        }
         finally { IsSaving = false; }
     }
 
@@ -218,7 +278,197 @@ public class UserListViewModel
             IsEditing = false;
             SuccessMessage = "Mitglieder gespeichert.";
         }
-        catch (Exception ex) { ErrorMessage = $"Fehler beim Speichern: {ex.Message}"; }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Speichern der Gruppe {GroupId}", SelectedGroup.Id);
+            ErrorMessage = "Fehler beim Speichern.";
+        }
+        finally { IsSaving = false; }
+    }
+
+    // ── Create User ──
+
+    public void StartCreateUser()
+    {
+        CancelEdit();
+        SelectedUser = null;
+        SelectedGroup = null;
+        SelectedRole = null;
+        IsCreatingUser = true;
+        IsCreatingGroup = false;
+        CreateUserName = "";
+        CreateUserUsername = "";
+        CreateUserPassword = "";
+        ErrorMessage = null;
+        SuccessMessage = null;
+    }
+
+    public async Task CreateUserAsync()
+    {
+        ErrorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(CreateUserUsername))
+        {
+            ErrorMessage = "Benutzername erforderlich.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(CreateUserName))
+        {
+            ErrorMessage = "Name erforderlich.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(CreateUserPassword) || CreateUserPassword.Length < 6)
+        {
+            ErrorMessage = "Passwort muss mindestens 6 Zeichen lang sein.";
+            return;
+        }
+
+        try
+        {
+            IsSaving = true;
+
+            var existing = await _userRepo.GetByUsernameAsync(CreateUserUsername.Trim());
+            if (existing is not null)
+            {
+                ErrorMessage = "Benutzername bereits vergeben.";
+                return;
+            }
+
+            var hash = _passwordService.HashPassword(CreateUserPassword);
+            var ntHash = _passwordService.ComputeNtHash(CreateUserPassword);
+            var user = new User(
+                Guid.NewGuid(),
+                CreateUserName.Trim(),
+                CreateUserUsername.Trim(),
+                hash,
+                ntHash
+            );
+
+            await _userRepo.CreateAsync(user);
+            _logger.LogInformation("Benutzer '{Username}' erstellt", user.Username);
+
+            IsCreatingUser = false;
+            CreateUserName = "";
+            CreateUserUsername = "";
+            CreateUserPassword = "";
+            await LoadTabDataAsync();
+            SuccessMessage = "Benutzer erstellt.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Erstellen des Benutzers");
+            ErrorMessage = "Fehler beim Erstellen.";
+        }
+        finally { IsSaving = false; }
+    }
+
+    // ── Create Group ──
+
+    public void StartCreateGroup()
+    {
+        CancelEdit();
+        SelectedUser = null;
+        SelectedGroup = null;
+        SelectedRole = null;
+        IsCreatingGroup = true;
+        IsCreatingUser = false;
+        CreateGroupName = "";
+        ErrorMessage = null;
+        SuccessMessage = null;
+    }
+
+    public async Task CreateGroupAsync()
+    {
+        ErrorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(CreateGroupName))
+        {
+            ErrorMessage = "Gruppenname erforderlich.";
+            return;
+        }
+
+        try
+        {
+            IsSaving = true;
+
+            var group = new Group(Guid.NewGuid(), CreateGroupName.Trim());
+            await _groupRepo.CreateAsync(group);
+            _logger.LogInformation("Gruppe '{GroupName}' erstellt", group.Name);
+
+            IsCreatingGroup = false;
+            CreateGroupName = "";
+            await LoadTabDataAsync();
+            SuccessMessage = "Gruppe erstellt.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Erstellen der Gruppe");
+            ErrorMessage = "Fehler beim Erstellen.";
+        }
+        finally { IsSaving = false; }
+    }
+
+    // ── Delete User ──
+
+    public void RequestDeleteUser()
+    {
+        IsConfirmingDelete = true;
+        ErrorMessage = null;
+    }
+
+    public async Task ConfirmDeleteUserAsync()
+    {
+        if (SelectedUser is null) return;
+
+        try
+        {
+            IsSaving = true;
+            await _userRepo.DeleteAsync(SelectedUser.Id);
+            _logger.LogInformation("Benutzer '{Username}' gelöscht", SelectedUser.Username);
+
+            SelectedUser = null;
+            IsConfirmingDelete = false;
+            await LoadTabDataAsync();
+            SuccessMessage = "Benutzer gelöscht.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Löschen des Benutzers");
+            ErrorMessage = "Fehler beim Löschen.";
+        }
+        finally { IsSaving = false; }
+    }
+
+    // ── Delete Group ──
+
+    public void RequestDeleteGroup()
+    {
+        IsConfirmingDelete = true;
+        ErrorMessage = null;
+    }
+
+    public async Task ConfirmDeleteGroupAsync()
+    {
+        if (SelectedGroup is null) return;
+
+        try
+        {
+            IsSaving = true;
+            await _groupRepo.DeleteAsync(SelectedGroup.Id);
+            _logger.LogInformation("Gruppe '{GroupName}' gelöscht", SelectedGroup.Name);
+
+            SelectedGroup = null;
+            IsConfirmingDelete = false;
+            await LoadTabDataAsync();
+            SuccessMessage = "Gruppe gelöscht.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Löschen der Gruppe");
+            ErrorMessage = "Fehler beim Löschen.";
+        }
         finally { IsSaving = false; }
     }
 
@@ -228,6 +478,21 @@ public class UserListViewModel
     {
         IsEditing = false;
         IsSaving = false;
+        IsConfirmingDelete = false;
+        NewPassword = "";
+        ConfirmPassword = "";
+        ErrorMessage = null;
+    }
+
+    public void CancelCreate()
+    {
+        IsCreatingUser = false;
+        IsCreatingGroup = false;
+        IsConfirmingDelete = false;
+        CreateUserName = "";
+        CreateUserUsername = "";
+        CreateUserPassword = "";
+        CreateGroupName = "";
         ErrorMessage = null;
     }
 

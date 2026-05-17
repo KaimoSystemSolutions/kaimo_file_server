@@ -10,13 +10,11 @@
 
         if (state.User.Identity is null || !state.User.Identity.IsAuthenticated)
         {
-            Console.WriteLine("[REDIRECT] Nicht authentifiziert → /login");
             Nav.NavigateTo("/login", forceLoad: false);
         }
-        else
-        {
-            Console.WriteLine($"[REDIRECT] Authentifiziert als {state.User.Identity.Name}, bleibe auf Seite");
-            Nav.NavigateTo("/", forceLoad: false);
-        }
+        // Authentifiziert aber nicht autorisiert → NICHT nach "/" redirecten,
+        // das würde eine Endlosschleife verursachen.
+        // Der User bleibt auf der Seite und sieht die "Keine Berechtigung"-Meldung
+        // der jeweiligen Seite (z.B. UserList zeigt das bereits).
     }
 }

@@ -1,5 +1,5 @@
-@page "/browse/{ShareName}/{*SubPath}"
-@page "/browse/{ShareName}"
+@page "/files/{ShareName}/{*SubPath}"
+@page "/files/{ShareName}"
 @inject FileBrowserViewModel VM
 @inject NavigationManager Nav
 
@@ -7,13 +7,13 @@
 
 <div class="page-header">
     <div class="breadcrumb-bar">
-        <a class="breadcrumb-link" href="/">Shares</a>
+        <a class="breadcrumb-link" href="/files">Shares</a>
         <span class="breadcrumb-sep">/</span>
-        <a class="breadcrumb-link" href="/browse/@ShareName">@ShareName</a>
+        <a class="breadcrumb-link" href="/files/@ShareName">@ShareName</a>
         @foreach (var (name, fullPath) in VM.Breadcrumbs)
         {
             <span class="breadcrumb-sep">/</span>
-            <a class="breadcrumb-link" href="/browse/@ShareName/@fullPath">@name</a>
+            <a class="breadcrumb-link" href="/files/@ShareName/@fullPath">@name</a>
         }
     </div>
 </div>
@@ -72,7 +72,7 @@ else
                     </svg>
                     <span>@file.Name</span>
                 </div>
-                <div class="file-cell file-size">@FormatSize(file.Size)</div>
+                <div class="file-cell file-size">@FormatHelper.FormatFileSize(file.Size)</div>
                 <div class="file-cell file-date">@file.ModifiedAt.ToString("dd.MM.yyyy HH:mm")</div>
             </div>
         }
@@ -102,22 +102,14 @@ else
         {
             relativePath = relativePath[VM.CurrentShare.Path.Length..].TrimStart('/');
         }
-        Nav.NavigateTo($"/browse/{ShareName}/{relativePath}");
+        Nav.NavigateTo($"/files/{ShareName}/{relativePath}");
     }
 
     private void NavigateUp()
     {
         if (string.IsNullOrEmpty(VM.ParentPath))
-            Nav.NavigateTo($"/browse/{ShareName}");
+            Nav.NavigateTo($"/files/{ShareName}");
         else
-            Nav.NavigateTo($"/browse/{ShareName}/{VM.ParentPath}");
+            Nav.NavigateTo($"/files/{ShareName}/{VM.ParentPath}");
     }
-
-    private static string FormatSize(long bytes) => bytes switch
-    {
-        < 1024 => $"{bytes} B",
-        < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
-        < 1024 * 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
-        _ => $"{bytes / (1024.0 * 1024 * 1024):F2} GB"
-    };
 }

@@ -290,6 +290,82 @@ public class FileSystemStorageTests : IDisposable
             Assert.True(File.Exists(Path.Combine(_testRoot, $"concurrent_{i}.txt")));
         }
     }
+
+    // ── CreateDirectoryAsync ──
+
+    [Fact]
+    public async Task CreateDirectoryAsync_CreatesDirectory()
+    {
+        await _sut.CreateDirectoryAsync("newdir");
+
+        var fullPath = Path.Combine(_testRoot, "newdir");
+        Assert.True(Directory.Exists(fullPath));
+    }
+
+    [Fact]
+    public async Task CreateDirectoryAsync_CreatesNestedDirectories()
+    {
+        await _sut.CreateDirectoryAsync("parent/child/grandchild");
+
+        Assert.True(Directory.Exists(
+            Path.Combine(_testRoot, "parent", "child", "grandchild")));
+    }
+
+    [Fact]
+    public async Task CreateDirectoryAsync_AlreadyExists_DoesNotThrow()
+    {
+        Directory.CreateDirectory(Path.Combine(_testRoot, "existing"));
+
+        // Should be idempotent
+        await _sut.CreateDirectoryAsync("existing");
+        Assert.True(Directory.Exists(Path.Combine(_testRoot, "existing")));
+    }
+
+    [Fact]
+    public async Task CreateDirectoryAsync_PathTraversal_ThrowsUnauthorized()
+    {
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => _sut.CreateDirectoryAsync("../../etc/evil"));
+    }
+
+    [Theory]
+    [InlineData("..")]
+    [InlineData("../")]
+    [InlineData("sub/../../..")]
+    [InlineData("./../../etc")]
+    public async Task CreateDirectoryAsync_PathTraversal_Variants_ThrowsUnauthorized(string path)
+    {
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => _sut.CreateDirectoryAsync(path));
+    }
+
+    [Fact]
+    public async Task CreateDirectoryAsync_ThenWriteFile_Works()
+    {
+        await _sut.CreateDirectoryAsync("prepared");
+        await _sut.WriteAsync("prepared/file.txt", new MemoryStream([1, 2, 3]));
+
+        Assert.True(File.Exists(Path.Combine(_testRoot, "prepared", "file.txt")));
+    }
+
+    [Fact]
+    public async Task CreateDirectoryAsync_ThenGetMetadata_ReturnsIsDirectory()
+    {
+        await _sut.CreateDirectoryAsync("metacheck");
+
+        var meta = await _sut.GetMetadataAsync("metacheck");
+        Assert.True(meta.IsDirectory);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_RemovesCreatedDirectory()
+    {
+        await _sut.CreateDirectoryAsync("removeme");
+        await _sut.WriteAsync("removeme/child.txt", new MemoryStream([1]));
+
+        await _sut.DeleteAsync("removeme");
+        Assert.False(Directory.Exists(Path.Combine(_testRoot, "removeme")));
+    }
 }
 
 /// <summary>
@@ -327,6 +403,12 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
     public Task<FileMetadata> GetMetadataAsync(string path)
         => Invoke<FileMetadata>("GetMetadataAsync", path);
 
+    public Task CreateDirectoryAsync(string path)
+        => Invoke("CreateDirectoryAsync", path);
+
+    public Task<List<FileMetadata>> ListAsync(string directoryPath)
+        => Invoke<List<FileMetadata>>("ListAsync", directoryPath);
+
     // ── Helpers that unwrap TargetInvocationException from reflection ──
 
     private async Task Invoke(string method, params object[] args)
@@ -352,10 +434,5 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
             System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
             throw; // unreachable, keeps compiler happy
         }
-    }
-
-    public Task<List<FileMetadata>> ListAsync(string directoryPath)
-    {
-        throw new NotImplementedException();
     }
 }

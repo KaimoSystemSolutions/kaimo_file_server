@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Web.Services;
+using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -11,19 +12,22 @@ public class LoginViewModel
     private readonly IPasswordService _passwordService;
     private readonly JwtTokenService _jwtService;
     private readonly JwtAuthenticationStateProvider _authState;
+    private readonly ILogger<LoginViewModel> _logger;
 
     public LoginViewModel(
         IUserRepository userRepo,
         IUserContextFactory userContextFactory,
         IPasswordService passwordService,
         JwtTokenService jwtService,
-        JwtAuthenticationStateProvider authState)
+        JwtAuthenticationStateProvider authState,
+        ILogger<LoginViewModel> logger)
     {
         _userRepo = userRepo;
         _userContextFactory = userContextFactory;
         _passwordService = passwordService;
         _jwtService = jwtService;
         _authState = authState;
+        _logger = logger;
     }
 
     // ── State ──
@@ -62,21 +66,23 @@ public class LoginViewModel
                 return false;
             }
 
-            Console.WriteLine($"[LOGIN] Password OK für {user.Username}, lade Rollen...");
+            _logger.LogInformation("Login erfolgreich für Benutzer {Username}", user.Username);
+
             var userContext = await _userContextFactory.CreateAsync(user);
             var roleNames = userContext.Roles.Select(r => r.Name);
 
-            Console.WriteLine($"[LOGIN] Rollen: {string.Join(", ", roleNames)}, generiere Token...");
             var token = _jwtService.GenerateToken(user.Id, user.Username, user.Name, roleNames);
-            Console.WriteLine($"[LOGIN] Token generiert, speichere...");
             await _authState.LoginAsync(token);
-            Console.WriteLine($"[LOGIN] Token gespeichert, redirect...");
+
+            // Passwort sofort aus dem Speicher entfernen
+            Password = "";
             IsAuthenticated = true;
             return true;
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Anmeldung fehlgeschlagen: {ex.Message}";
+            _logger.LogError(ex, "Login fehlgeschlagen für Benutzer {Username}", Username);
+            ErrorMessage = "Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.";
             return false;
         }
         finally
