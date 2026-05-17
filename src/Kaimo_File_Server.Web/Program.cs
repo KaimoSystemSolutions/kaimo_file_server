@@ -9,6 +9,7 @@ using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +38,10 @@ builder.Services.AddScoped<IFileService, FileService>();
 // ── Share Lock Manager (Singleton – ein Lock pro Share, In-Memory) ──
 builder.Services.AddSingleton<ShareLockManager>();
 
+// ── Additional Repositories ──
+builder.Services.AddScoped<IAclRepository, Kaimo_File_Server.Infrastructure.Repositories.AclRepository>();
+builder.Services.AddScoped<IFileMetadataRepository, Kaimo_File_Server.Infrastructure.Repositories.FileMetadataRepository>();
+
 // ── Services ──
 builder.Services.AddScoped<ThemeService>();
 
@@ -45,6 +50,7 @@ builder.Services.AddScoped<LoginViewModel>();
 builder.Services.AddScoped<ShareBrowserViewModel>();
 builder.Services.AddScoped<FileBrowserViewModel>();
 builder.Services.AddScoped<UserListViewModel>();
+builder.Services.AddScoped<AclEditorViewModel>();
 
 builder.Services.AddScoped<ShareListViewModel>(sp =>
     new ShareListViewModel(

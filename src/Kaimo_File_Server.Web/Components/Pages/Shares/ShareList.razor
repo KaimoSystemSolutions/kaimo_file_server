@@ -159,13 +159,16 @@ else
                     </div>
                 </div>
 
-                @* ── Access ── *@
+                @* ── Share-Sichtbarkeit (ShareAccessEntries) ── *@
                 <div class="detail-section">
-                    <span class="detail-label">Zugriffsrechte</span>
+                    <span class="detail-label">Share-Sichtbarkeit</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 8px;">
+                        Welche Benutzer und Gruppen diesen Share in der Übersicht sehen.
+                    </p>
                     @if (!VM.ShowAccessPanel)
                     {
                         <button class="btn-secondary" style="margin-top: 4px;" @onclick="LoadAccess">
-                            Berechtigungen anzeigen
+                            Sichtbarkeit verwalten
                         </button>
                     }
                     else
@@ -175,7 +178,6 @@ else
                             <div class="error-banner" style="margin-top: 8px;">@VM.AccessErrorMessage</div>
                         }
 
-                        @* Aktuelle Einträge *@
                         <div class="access-section">
                             @if (VM.AccessEntries.Any())
                             {
@@ -183,21 +185,22 @@ else
                                 {
                                     <div class="access-row">
                                         <div class="access-row-info">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                 stroke="var(--text-tertiary)" stroke-width="2">
-                                                @if (VM.GetPrincipalType(entry.PrincipalId) == "group")
-                                                {
+                                            @if (VM.GetPrincipalType(entry.PrincipalId) == "group")
+                                            {
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2">
                                                     <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
                                                     <circle cx="9" cy="7" r="4" />
                                                     <path d="M23 21v-2a4 4 0 00-3-3.87" />
                                                     <path d="M16 3.13a4 4 0 010 7.75" />
-                                                }
-                                                else
-                                                {
+                                                </svg>
+                                            }
+                                            else
+                                            {
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2">
                                                     <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
                                                     <circle cx="12" cy="7" r="4" />
-                                                }
-                                            </svg>
+                                                </svg>
+                                            }
                                             <span>@VM.GetPrincipalDisplayName(entry.PrincipalId)</span>
                                         </div>
                                         <button class="btn-icon btn-icon--small btn-icon--danger"
@@ -214,38 +217,30 @@ else
                             }
                             else
                             {
-                                <p class="empty-hint">Keine Berechtigungen vergeben</p>
+                                <p class="empty-hint">Keine Sichtbarkeitsregeln – Share ist für alle sichtbar.</p>
                             }
                         </div>
 
-                        @* Hinzufügen *@
-                        
                         var availableUsers = VM.AllUsers.Where(u => !VM.HasAccess(u.Id)).ToList();
                         var availableGroups = VM.AllGroups.Where(g => !VM.HasAccess(g.Id)).ToList();
-                        
 
-                        @if (availableUsers.Any() || availableGroups.Any())
+                        if (availableUsers.Any() || availableGroups.Any())
                         {
-                            <span class="detail-label" style="margin-top: 12px;">Hinzufügen</span>
+                            <span class="detail-label" style="margin-top: 10px;">Hinzufügen</span>
                             <div class="access-section access-section--add">
                                 @foreach (var user in availableUsers)
                                 {
                                     <div class="access-row access-row--add">
                                         <div class="access-row-info">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                 stroke="var(--text-tertiary)" stroke-width="2">
-                                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                                                <circle cx="12" cy="7" r="4" />
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2">
+                                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
                                             </svg>
                                             <span>@(user.Name ?? user.Username)</span>
                                         </div>
-                                        <button class="btn-icon btn-icon--small btn-icon--accent"
-                                                title="Hinzufügen"
+                                        <button class="btn-icon btn-icon--small btn-icon--accent" title="Hinzufügen"
                                                 @onclick="() => GrantAccess(user.Id)">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                 stroke="currentColor" stroke-width="2">
-                                                <line x1="12" y1="5" x2="12" y2="19" />
-                                                <line x1="5" y1="12" x2="19" y2="12" />
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                                             </svg>
                                         </button>
                                     </div>
@@ -254,28 +249,40 @@ else
                                 {
                                     <div class="access-row access-row--add">
                                         <div class="access-row-info">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                 stroke="var(--text-tertiary)" stroke-width="2">
-                                                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                                                <circle cx="9" cy="7" r="4" />
-                                                <path d="M23 21v-2a4 4 0 00-3-3.87" />
-                                                <path d="M16 3.13a4 4 0 010 7.75" />
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2">
+                                                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
+                                                <path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
                                             </svg>
                                             <span>@group.Name</span>
                                         </div>
-                                        <button class="btn-icon btn-icon--small btn-icon--accent"
-                                                title="Hinzufügen"
+                                        <button class="btn-icon btn-icon--small btn-icon--accent" title="Hinzufügen"
                                                 @onclick="() => GrantAccess(group.Id)">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                 stroke="currentColor" stroke-width="2">
-                                                <line x1="12" y1="5" x2="12" y2="19" />
-                                                <line x1="5" y1="12" x2="19" y2="12" />
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
                                             </svg>
                                         </button>
                                     </div>
                                 }
                             </div>
                         }
+                    }
+                </div>
+
+                @* ── ACL / Dateiberechtigungen ── *@
+                <div class="detail-section">
+                    <span class="detail-label">Dateiberechtigungen (ACL)</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 8px;">
+                        NTFS-ähnliche Berechtigungen für Dateien und Ordner innerhalb dieses Shares.
+                    </p>
+                    @if (!ShowAclEditor)
+                    {
+                        <button class="btn-secondary" style="margin-top: 4px;" @onclick="() => { ShowAclEditor = true; }">
+                            ACL bearbeiten
+                        </button>
+                    }
+                    else
+                    {
+                        <AclEditor Path="@VM.SelectedShare.Name" IsDirectory="true" />
                     }
                 </div>
 
@@ -304,6 +311,8 @@ else
 }
 
 @code {
+    private bool ShowAclEditor;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -317,6 +326,7 @@ else
     {
         if (VM.IsAdmin)
         {
+            ShowAclEditor = false;
             VM.SelectShare(share);
             StateHasChanged();
         }
@@ -329,6 +339,7 @@ else
     private void ToggleCreate()
     {
         VM.DeselectShare();
+        ShowAclEditor = false;
         VM.IsCreating = !VM.IsCreating;
         StateHasChanged();
     }

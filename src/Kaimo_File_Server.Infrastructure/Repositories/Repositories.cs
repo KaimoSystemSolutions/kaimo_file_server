@@ -174,8 +174,26 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         private readonly ApplicationDbContext _db;
         public ShareAccessRepository(ApplicationDbContext db) { _db = db; }
 
+        /// <summary>
+        /// Checks if the user or any of their groups has access to the share. This is used for authorization checks when accessing shares.
+        /// </summary>
+        /// <param name="shareName">The name of the share.</param>
+        /// <param name="principalId">The ID of the user</param>
+        /// <returns>True if the user or any of their groups has access to the share; otherwise, false.</returns>
         public async Task<bool> HasAccessAsync(string shareName, Guid principalId)
-            => await _db.ShareAccessEntries.AnyAsync(e => e.ShareName == shareName && e.PrincipalId == principalId);
+        {   
+            List<Guid> groupsOfUser = await _db.UserGroups
+                .Where(userGroup => userGroup.UserId == principalId)
+                .Select(userGroup => userGroup.GroupId)
+                .ToListAsync();
+
+
+            return await _db.ShareAccessEntries.AnyAsync((ShareAccessEntry entry) =>
+                entry.ShareName == shareName &&
+                (entry.PrincipalId == principalId ||
+                 groupsOfUser.Contains(entry.PrincipalId))
+                );
+        }
 
         public async Task<List<ShareAccessEntry>> GetByShareAsync(string shareName)
             => await _db.ShareAccessEntries.Where(e => e.ShareName == shareName).ToListAsync();

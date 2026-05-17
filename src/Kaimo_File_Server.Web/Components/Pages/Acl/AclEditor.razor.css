@@ -1,0 +1,252 @@
+﻿/* ── ACL Entry List ── */
+
+.acl-editor {
+    margin-top: 8px;
+}
+
+.acl-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.acl-entry {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    background: var(--bg-tertiary);
+    transition: background 0.1s;
+}
+
+    .acl-entry:hover {
+        background: var(--bg-hover);
+    }
+
+.acl-entry--allow {
+    border-left: 3px solid var(--success);
+}
+
+.acl-entry--deny {
+    border-left: 3px solid var(--danger);
+}
+
+.acl-entry--editing {
+    border-color: var(--accent);
+    background: var(--accent-subtle);
+}
+
+.acl-entry-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.acl-entry-principal {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 1;
+}
+
+.acl-entry-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.acl-entry-type-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.badge--allow {
+    background: var(--success-subtle);
+    color: var(--success);
+}
+
+.badge--deny {
+    background: var(--danger-subtle);
+    color: var(--danger);
+}
+
+.acl-entry-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.acl-entry-details {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    font-size: 12px;
+}
+
+.acl-detail-label {
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+}
+
+.acl-detail-value {
+    color: var(--text-secondary);
+}
+
+.acl-icon {
+    flex-shrink: 0;
+}
+
+/* ── Add Form ── */
+
+.acl-add-form {
+    margin-top: 12px;
+    padding: 14px;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+    .acl-add-form h4 {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent);
+        margin: 0 0 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+/* ── Form Layout ── */
+
+.acl-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.acl-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.acl-form-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+/* ── Type Tabs (User/Group/Role, Allow/Deny) ── */
+
+.acl-type-tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    padding: 2px;
+}
+
+.acl-type-tab {
+    flex: 1;
+    padding: 5px 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+}
+
+    .acl-type-tab:hover {
+        color: var(--text-primary);
+        background: var(--bg-hover);
+    }
+
+    .acl-type-tab.active {
+        background: var(--bg-secondary);
+        color: var(--accent);
+        box-shadow: var(--shadow);
+    }
+
+.acl-tab--allow.active {
+    color: var(--success);
+}
+
+.acl-tab--deny.active {
+    color: var(--danger);
+}
+
+/* ── Permission Shortcuts ── */
+
+.acl-shortcut-row {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.acl-shortcut {
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+    .acl-shortcut:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+
+.acl-shortcut--active {
+    background: var(--accent-subtle);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* ── Permission Grid ── */
+
+.acl-perm-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 12px;
+}
+
+.acl-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.1s;
+}
+
+    .acl-checkbox:hover {
+        color: var(--text-primary);
+    }
+
+    .acl-checkbox input[type="checkbox"] {
+        accent-color: var(--accent);
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        cursor: pointer;
+    }
