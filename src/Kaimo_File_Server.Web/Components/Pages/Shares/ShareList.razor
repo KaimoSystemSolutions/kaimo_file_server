@@ -1,4 +1,5 @@
 @page "/"
+@using Kaimo_File_Server.Web.Components.Pages.Acl
 @inject ShareListViewModel VM
 @inject NavigationManager Nav
 
@@ -276,13 +277,14 @@ else
                     </p>
                     @if (!ShowAclEditor)
                     {
-                        <button class="btn-secondary" style="margin-top: 4px;" @onclick="() => { ShowAclEditor = true; }">
+                        <button class="btn-secondary" style="margin-top: 4px;" @onclick="OpenAclEditor">
                             ACL bearbeiten
                         </button>
                     }
                     else
                     {
-                        <AclEditor Path="@VM.SelectedShare.Name" IsDirectory="true" />
+                        <button class="btn-secondary btn-secondary--active" ...>ACL ausblenden</button>
+                        <AclEditor @key="@_aclEditorKey" Path="@VM.SelectedShare.Path" IsDirectory="true" />
                     }
                 </div>
 
@@ -312,6 +314,7 @@ else
 
 @code {
     private bool ShowAclEditor;
+    private string _aclEditorKey = "";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -341,6 +344,21 @@ else
         VM.DeselectShare();
         ShowAclEditor = false;
         VM.IsCreating = !VM.IsCreating;
+        StateHasChanged();
+    }
+
+    // FIX: Separate Methode statt inline-Lambda, mit Key-Update für Re-Mount
+    private void OpenAclEditor()
+    {
+        ShowAclEditor = true;
+        // Eindeutiger Key erzwingt, dass Blazor eine neue AclEditor-Instanz erstellt
+        _aclEditorKey = $"{VM.SelectedShare?.Name}_{DateTime.UtcNow.Ticks}";
+        StateHasChanged();
+    }
+
+    private void CloseAclEditor()
+    {
+        ShowAclEditor = false;
         StateHasChanged();
     }
 

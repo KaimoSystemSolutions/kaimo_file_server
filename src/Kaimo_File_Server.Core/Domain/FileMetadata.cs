@@ -17,7 +17,7 @@ namespace Kaimo_File_Server.Core.Domain
         public DateTime CreatedAt { get; init; }
         public DateTime ModifiedAt { get; init; }
 
-        public string OwnerId { get; init; }
+        public Guid OwnerId { get; init; }
 
         public IReadOnlyList<AccessEntry> Acl { get; init; }
 

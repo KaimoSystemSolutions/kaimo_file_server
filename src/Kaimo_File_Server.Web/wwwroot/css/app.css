@@ -1079,3 +1079,31 @@ html, body, #app {
         font-size: 18px;
     }
 }
+
+.acl-panel {
+    background: var(--surface-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.acl-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.file-row-acl-expand {
+    padding: 12px 16px 16px 44px;
+    background: var(--surface-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.file-cell.file-actions {
+    width: 40px;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+}

@@ -2,6 +2,7 @@
 @page "/files/{ShareName}"
 @inject FileBrowserViewModel VM
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>@(VM.CurrentShare?.Name ?? "Dateien") – Kaimo Files</PageTitle>
 
@@ -16,6 +17,18 @@
             <a class="breadcrumb-link" href="/files/@ShareName/@fullPath">@name</a>
         }
     </div>
+    @if (_isAdmin)
+    {
+        <div style="display: flex; gap: 0.5rem;">
+            <button class="btn-icon" title="Berechtigungen verwalten"
+                    @onclick="ToggleAclPanel">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                     stroke="@(_showAclPanel ? "var(--accent)" : "currentColor")" stroke-width="1.5">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+            </button>
+        </div>
+    }
 </div>
 
 @if (VM.IsLoading)
@@ -30,6 +43,24 @@ else if (VM.ErrorMessage is not null)
 }
 else
 {
+    @* ── ACL Panel (Slide-Down) ── *@
+    @if (_showAclPanel && _isAdmin)
+    {
+        <div class="acl-panel">
+            <div class="acl-panel-header">
+                <h3>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="1.5" style="vertical-align: -2px; margin-right: 6px;">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                    Berechtigungen
+                </h3>
+                <span class="detail-subtitle">@_aclPath</span>
+            </div>
+            <AclEditor Path="@_aclPath" IsDirectory="true" />
+        </div>
+    }
+
     <div class="file-list">
         @if (VM.HasParent)
         {
@@ -43,13 +74,14 @@ else
                 </div>
                 <div class="file-cell file-size"></div>
                 <div class="file-cell file-date"></div>
+                <div class="file-cell file-actions"></div>
             </div>
         }
 
         @foreach (var dir in VM.Directories)
         {
-            <div class="file-row file-row-dir" @onclick="() => NavigateTo(dir)">
-                <div class="file-cell file-name">
+            <div class="file-row file-row-dir">
+                <div class="file-cell file-name" @onclick="() => NavigateTo(dir)">
                     <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
                          fill="var(--folder-fill)" stroke="var(--folder-stroke)" stroke-width="1.5">
                         <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -58,7 +90,39 @@ else
                 </div>
                 <div class="file-cell file-size">–</div>
                 <div class="file-cell file-date">@dir.ModifiedAt.ToString("dd.MM.yyyy HH:mm")</div>
+                @if (_isAdmin)
+                {
+                    <div class="file-cell file-actions">
+                        <button class="btn-icon btn-icon--small" title="ACL für @dir.Name"
+                                @onclick="() => OpenFolderAcl(dir)" @onclick:stopPropagation="true">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                 stroke="@(_aclFolderPath == GetDirAclPath(dir) && _showFolderAcl ? "var(--accent)" : "var(--text-tertiary)")"
+                                 stroke-width="1.5">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            </svg>
+                        </button>
+                    </div>
+                }
             </div>
+
+            @* Inline ACL editor for this specific folder *@
+            @if (_showFolderAcl && _aclFolderPath == GetDirAclPath(dir))
+            {
+                <div class="file-row-acl-expand">
+                    <div class="acl-panel-header" style="padding: 0 0 8px 0;">
+                        <span class="detail-subtitle">Berechtigungen für „@dir.Name"</span>
+                        <button class="btn-icon btn-icon--small" title="Schließen"
+                                @onclick="CloseFolderAcl">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </button>
+                    </div>
+                    <AclEditor Path="@_aclFolderPath" IsDirectory="true" />
+                </div>
+            }
         }
 
         @foreach (var file in VM.Files)
@@ -74,7 +138,39 @@ else
                 </div>
                 <div class="file-cell file-size">@FormatHelper.FormatFileSize(file.Size)</div>
                 <div class="file-cell file-date">@file.ModifiedAt.ToString("dd.MM.yyyy HH:mm")</div>
+                @if (_isAdmin)
+                {
+                    <div class="file-cell file-actions">
+                        <button class="btn-icon btn-icon--small" title="ACL für @file.Name"
+                                @onclick="() => OpenFileAcl(file)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                 stroke="@(_aclFolderPath == GetFileAclPath(file) && _showFolderAcl ? "var(--accent)" : "var(--text-tertiary)")"
+                                 stroke-width="1.5">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            </svg>
+                        </button>
+                    </div>
+                }
             </div>
+
+            @* Inline ACL editor for this specific file *@
+            @if (_showFolderAcl && _aclFolderPath == GetFileAclPath(file))
+            {
+                <div class="file-row-acl-expand">
+                    <div class="acl-panel-header" style="padding: 0 0 8px 0;">
+                        <span class="detail-subtitle">Berechtigungen für „@file.Name"</span>
+                        <button class="btn-icon btn-icon--small" title="Schließen"
+                                @onclick="CloseFolderAcl">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </button>
+                    </div>
+                    <AclEditor Path="@_aclFolderPath" IsDirectory="false" />
+                </div>
+            }
         }
 
         @if (!VM.Items.Any())
@@ -90,9 +186,103 @@ else
     [Parameter] public string ShareName { get; set; } = "";
     [Parameter] public string? SubPath { get; set; }
 
+    private bool _isAdmin;
+    private bool _showAclPanel;
+    private string _aclPath = "";
+
+    // Folder/File-level ACL
+    private bool _showFolderAcl;
+    private string _aclFolderPath = "";
+
     protected override async Task OnParametersSetAsync()
     {
+        // Beim Navigieren ACL-Panels schließen
+        _showFolderAcl = false;
+        _aclFolderPath = "";
+
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
+        UpdateAclPath();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var state = await AuthStateProvider.GetAuthenticationStateAsync();
+            _isAdmin = state.User.IsInRole("Administrator")
+                    || state.User.IsInRole("ShareCreator");
+            StateHasChanged();
+        }
+    }
+
+    private void UpdateAclPath()
+    {
+        // Baue den vollständigen Pfad für den aktuellen Ordner
+        if (string.IsNullOrEmpty(VM.CurrentPath))
+            _aclPath = ShareName;
+        else
+            _aclPath = $"{ShareName}/{VM.CurrentPath}";
+    }
+
+    private void ToggleAclPanel()
+    {
+        _showAclPanel = !_showAclPanel;
+        _showFolderAcl = false; // Folder-ACL schließen wenn Panel getoggelt wird
+    }
+
+    private string GetDirAclPath(FileMetadata dir)
+    {
+        var relativePath = dir.Path;
+        if (VM.CurrentShare is not null && relativePath.StartsWith(VM.CurrentShare.Path))
+            relativePath = relativePath[VM.CurrentShare.Path.Length..].TrimStart('/');
+
+        return string.IsNullOrEmpty(relativePath) ? ShareName : $"{ShareName}/{relativePath}";
+    }
+
+    private string GetFileAclPath(FileMetadata file)
+    {
+        var relativePath = file.Path;
+        if (VM.CurrentShare is not null && relativePath.StartsWith(VM.CurrentShare.Path))
+            relativePath = relativePath[VM.CurrentShare.Path.Length..].TrimStart('/');
+
+        return string.IsNullOrEmpty(relativePath) ? ShareName : $"{ShareName}/{relativePath}";
+    }
+
+    private void OpenFolderAcl(FileMetadata dir)
+    {
+        var path = GetDirAclPath(dir);
+        if (_showFolderAcl && _aclFolderPath == path)
+        {
+            // Toggle: schließen wenn gleicher Ordner
+            _showFolderAcl = false;
+            _aclFolderPath = "";
+        }
+        else
+        {
+            _showFolderAcl = true;
+            _aclFolderPath = path;
+        }
+    }
+
+    private void OpenFileAcl(FileMetadata file)
+    {
+        var path = GetFileAclPath(file);
+        if (_showFolderAcl && _aclFolderPath == path)
+        {
+            _showFolderAcl = false;
+            _aclFolderPath = "";
+        }
+        else
+        {
+            _showFolderAcl = true;
+            _aclFolderPath = path;
+        }
+    }
+
+    private void CloseFolderAcl()
+    {
+        _showFolderAcl = false;
+        _aclFolderPath = "";
     }
 
     private void NavigateTo(FileMetadata dir)

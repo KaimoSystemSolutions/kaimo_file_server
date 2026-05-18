@@ -59,11 +59,13 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.ToTable("file_metadata");
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Path).IsRequired();
+                entity.Property(e => e.OwnerId).IsRequired();
                 entity.HasIndex(e => e.Path).IsUnique();
                 entity.HasMany(e => e.Acl)
                       .WithOne()
                       .HasForeignKey(e => e.FileMetadataId)
                       .OnDelete(DeleteBehavior.Cascade);
+                
             });
 
             modelBuilder.Entity<AccessEntry>(entity =>

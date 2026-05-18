@@ -26,6 +26,7 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
 
             var meta = new FileMetadata
             {
+                OwnerId = _db.Users.Where(e => e.Username == "admin").Select(e => e.Id).First(),
                 Id = Guid.NewGuid(),
                 Path = path,
                 Name = fileName,

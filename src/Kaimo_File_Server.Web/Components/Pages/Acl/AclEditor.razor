@@ -4,15 +4,23 @@
 
 <div class="acl-editor">
 
-    @if (IsLoading)
+    @* DEBUG: zeigt was wirklich passiert – nach Fix entfernen *@
+    <p style="font-size: 11px; color: var(--text-tertiary); font-family: monospace; margin: 4px 0; padding: 4px 8px; background: var(--bg-tertiary); border-radius: 4px;">
+        DEBUG: path="@Path" | loading=@_isLoading | loaded=@_loaded | vmLoaded=@VM.IsLoaded | error=@(_errorMessage ?? VM.ErrorMessage ?? "none")
+    </p>
+
+    @if (_isLoading)
     {
         <div class="loading-state" style="padding: 24px 0;">
             <div class="spinner"></div>
             <p>Lade Berechtigungen…</p>
         </div>
     }
-
-    @if (VM.ErrorMessage is not null)
+    else if (_errorMessage is not null)
+    {
+        <div class="error-banner">@_errorMessage</div>
+    }
+    else if (VM.ErrorMessage is not null)
     {
         <div class="error-banner">@VM.ErrorMessage</div>
     }
@@ -22,9 +30,8 @@
         <div class="success-banner">@VM.SuccessMessage</div>
     }
 
-    @if (VM.IsLoaded)
+    @if (_loaded)
     {
-        @* ── Existing Entries ── *@
         @if (VM.Entries.Any())
         {
             <div class="acl-list">
@@ -39,10 +46,8 @@
                                 @if (principalType == "group")
                                 {
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" class="acl-icon">
-                                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                                        <circle cx="9" cy="7" r="4" />
-                                        <path d="M23 21v-2a4 4 0 00-3-3.87" />
-                                        <path d="M16 3.13a4 4 0 010 7.75" />
+                                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
+                                        <path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
                                     </svg>
                                 }
                                 else if (principalType == "role")
@@ -54,8 +59,7 @@
                                 else
                                 {
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" class="acl-icon">
-                                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                                        <circle cx="12" cy="7" r="4" />
+                                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
                                     </svg>
                                 }
                                 <span class="acl-entry-name">@VM.GetPrincipalDisplayName(entry.PrincipalId)</span>
@@ -66,18 +70,15 @@
                             <div class="acl-entry-actions">
                                 @if (!isEditing)
                                 {
-                                    <button class="btn-icon btn-icon--small" title="Bearbeiten"
-                                            @onclick="() => StartEdit(entry)">
+                                    <button class="btn-icon btn-icon--small" title="Bearbeiten" @onclick="() => StartEdit(entry)">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
                                             <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
                                         </svg>
                                     </button>
-                                    <button class="btn-icon btn-icon--small btn-icon--danger" title="Entfernen"
-                                            @onclick="() => DeleteEntry(entry.Id)">
+                                    <button class="btn-icon btn-icon--small btn-icon--danger" title="Entfernen" @onclick="() => DeleteEntry(entry.Id)">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <line x1="18" y1="6" x2="6" y2="18" />
-                                            <line x1="6" y1="6" x2="18" y2="18" />
+                                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                                         </svg>
                                     </button>
                                 }
@@ -90,39 +91,19 @@
                                 <div class="acl-form-row">
                                     <span class="detail-label">Aktion</span>
                                     <div class="acl-type-tabs">
-                                        <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Allow ? "active acl-tab--allow" : "")"
-                                                @onclick="() => SetEntryType(AclEntryType.Allow)">
-                                            Allow
-                                        </button>
-                                        <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Deny ? "active acl-tab--deny" : "")"
-                                                @onclick="() => SetEntryType(AclEntryType.Deny)">
-                                            Deny
-                                        </button>
+                                        <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Allow ? "active acl-tab--allow" : "")" @onclick="() => SetEntryType(AclEntryType.Allow)">Allow</button>
+                                        <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Deny ? "active acl-tab--deny" : "")" @onclick="() => SetEntryType(AclEntryType.Deny)">Deny</button>
                                     </div>
                                 </div>
-
                                 <div class="acl-form-row">
                                     <span class="detail-label">Schnellauswahl</span>
                                     <div class="acl-shortcut-row">
-                                        <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.ReadAll) ? "acl-shortcut--active" : "")"
-                                                @onclick="() => ToggleShortcut(FilePermission.ReadAll)">
-                                            Lesen
-                                        </button>
-                                        <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.WriteAll) ? "acl-shortcut--active" : "")"
-                                                @onclick="() => ToggleShortcut(FilePermission.WriteAll)">
-                                            Schreiben
-                                        </button>
-                                        <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.AdminAll) ? "acl-shortcut--active" : "")"
-                                                @onclick="() => ToggleShortcut(FilePermission.AdminAll)">
-                                            Admin
-                                        </button>
-                                        <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.FullControl) ? "acl-shortcut--active" : "")"
-                                                @onclick="() => ToggleShortcut(FilePermission.FullControl)">
-                                            Vollzugriff
-                                        </button>
+                                        <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.ReadAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.ReadAll)">Lesen</button>
+                                        <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.WriteAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.WriteAll)">Schreiben</button>
+                                        <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.AdminAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.AdminAll)">Admin</button>
+                                        <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.FullControl) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.FullControl)">Vollzugriff</button>
                                     </div>
                                 </div>
-
                                 <div class="acl-form-row">
                                     <span class="detail-label">Einzelberechtigungen</span>
                                     <div class="acl-perm-grid">
@@ -141,7 +122,6 @@
                                         <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.TakeOwnership)" @onchange="() => TogglePerm(FilePermission.TakeOwnership)" /><span>Besitz übernehmen</span></label>
                                     </div>
                                 </div>
-
                                 <div class="acl-form-row">
                                     <span class="detail-label">Vererbung</span>
                                     <div class="acl-perm-grid">
@@ -151,7 +131,6 @@
                                         <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.AllDescendants) != 0)" @onchange="() => ToggleInheritance(AclInheritance.AllDescendants)" /><span>Alle Nachfahren (rekursiv)</span></label>
                                     </div>
                                 </div>
-
                                 <div class="acl-form-actions">
                                     <button class="btn-primary" @onclick="SaveEdit">Speichern</button>
                                     <button class="btn-secondary" @onclick="CancelEdit">Abbrechen</button>
@@ -187,87 +166,45 @@
                     <div class="acl-form-row">
                         <span class="detail-label">Typ</span>
                         <div class="acl-type-tabs">
-                            <button class="acl-type-tab @(VM.NewPrincipalType == "user" ? "active" : "")"
-                                    @onclick='() => SetPrincipalType("user")'>
-                                Benutzer
-                            </button>
-                            <button class="acl-type-tab @(VM.NewPrincipalType == "group" ? "active" : "")"
-                                    @onclick='() => SetPrincipalType("group")'>
-                                Gruppe
-                            </button>
-                            <button class="acl-type-tab @(VM.NewPrincipalType == "role" ? "active" : "")"
-                                    @onclick='() => SetPrincipalType("role")'>
-                                Rolle
-                            </button>
+                            <button class="acl-type-tab @(VM.NewPrincipalType == "user" ? "active" : "")" @onclick='() => SetPrincipalType("user")'>Benutzer</button>
+                            <button class="acl-type-tab @(VM.NewPrincipalType == "group" ? "active" : "")" @onclick='() => SetPrincipalType("group")'>Gruppe</button>
+                            <button class="acl-type-tab @(VM.NewPrincipalType == "role" ? "active" : "")" @onclick='() => SetPrincipalType("role")'>Rolle</button>
                         </div>
                     </div>
-
                     <div class="acl-form-row">
-                        <span class="detail-label">
-                            @(VM.NewPrincipalType == "user" ? "Benutzer" : VM.NewPrincipalType == "group" ? "Gruppe" : "Rolle")
-                        </span>
+                        <span class="detail-label">@(VM.NewPrincipalType == "user" ? "Benutzer" : VM.NewPrincipalType == "group" ? "Gruppe" : "Rolle")</span>
                         <select class="edit-input" @onchange="OnPrincipalSelected">
                             <option value="">— Auswählen —</option>
                             @if (VM.NewPrincipalType == "user")
                             {
-                                @foreach (var u in VM.AllUsers)
-                                {
-                                    <option value="@u.Id">@(u.Name ?? u.Username)</option>
-                                }
+                                @foreach (var u in VM.AllUsers) { <option value="@u.Id">@(u.Name ?? u.Username)</option> }
                             }
                             else if (VM.NewPrincipalType == "group")
                             {
-                                @foreach (var g in VM.AllGroups)
-                                {
-                                    <option value="@g.Id">@g.Name</option>
-                                }
+                                @foreach (var g in VM.AllGroups) { <option value="@g.Id">@g.Name</option> }
                             }
                             else
                             {
-                                @foreach (var r in VM.AllRoles)
-                                {
-                                    <option value="@r.Id">@r.Name</option>
-                                }
+                                @foreach (var r in VM.AllRoles) { <option value="@r.Id">@r.Name</option> }
                             }
                         </select>
                     </div>
-
                     <div class="acl-form-row">
                         <span class="detail-label">Aktion</span>
                         <div class="acl-type-tabs">
-                            <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Allow ? "active acl-tab--allow" : "")"
-                                    @onclick="() => SetEntryType(AclEntryType.Allow)">
-                                Allow
-                            </button>
-                            <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Deny ? "active acl-tab--deny" : "")"
-                                    @onclick="() => SetEntryType(AclEntryType.Deny)">
-                                Deny
-                            </button>
+                            <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Allow ? "active acl-tab--allow" : "")" @onclick="() => SetEntryType(AclEntryType.Allow)">Allow</button>
+                            <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Deny ? "active acl-tab--deny" : "")" @onclick="() => SetEntryType(AclEntryType.Deny)">Deny</button>
                         </div>
                     </div>
-
                     <div class="acl-form-row">
                         <span class="detail-label">Schnellauswahl</span>
                         <div class="acl-shortcut-row">
-                            <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.ReadAll) ? "acl-shortcut--active" : "")"
-                                    @onclick="() => ToggleShortcut(FilePermission.ReadAll)">
-                                Lesen
-                            </button>
-                            <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.WriteAll) ? "acl-shortcut--active" : "")"
-                                    @onclick="() => ToggleShortcut(FilePermission.WriteAll)">
-                                Schreiben
-                            </button>
-                            <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.AdminAll) ? "acl-shortcut--active" : "")"
-                                    @onclick="() => ToggleShortcut(FilePermission.AdminAll)">
-                                Admin
-                            </button>
-                            <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.FullControl) ? "acl-shortcut--active" : "")"
-                                    @onclick="() => ToggleShortcut(FilePermission.FullControl)">
-                                Vollzugriff
-                            </button>
+                            <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.ReadAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.ReadAll)">Lesen</button>
+                            <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.WriteAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.WriteAll)">Schreiben</button>
+                            <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.AdminAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.AdminAll)">Admin</button>
+                            <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.FullControl) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.FullControl)">Vollzugriff</button>
                         </div>
                     </div>
-
                     <div class="acl-form-row">
                         <span class="detail-label">Einzelberechtigungen</span>
                         <div class="acl-perm-grid">
@@ -286,7 +223,6 @@
                             <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.TakeOwnership)" @onchange="() => TogglePerm(FilePermission.TakeOwnership)" /><span>Besitz übernehmen</span></label>
                         </div>
                     </div>
-
                     <div class="acl-form-row">
                         <span class="detail-label">Vererbung</span>
                         <div class="acl-perm-grid">
@@ -296,7 +232,6 @@
                             <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.AllDescendants) != 0)" @onchange="() => ToggleInheritance(AclInheritance.AllDescendants)" /><span>Alle Nachfahren (rekursiv)</span></label>
                         </div>
                     </div>
-
                     <div class="acl-form-actions">
                         <button class="btn-primary" @onclick="AddEntry">Hinzufügen</button>
                         <button class="btn-secondary" @onclick="CancelAdd">Abbrechen</button>
@@ -318,44 +253,69 @@
     [Parameter] public bool IsDirectory { get; set; } = true;
     [Parameter] public EventCallback OnChanged { get; set; }
 
-    private bool IsLoading;
-    private string? _loadedPath;
+    private bool _isLoading;
+    private bool _loaded;
+    private string? _errorMessage;
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!string.IsNullOrEmpty(Path) && Path != _loadedPath)
+        if (firstRender && !string.IsNullOrEmpty(Path))
         {
-            _loadedPath = Path;
-            IsLoading = true;
-            StateHasChanged();
-
-            await VM.LoadAsync(Path, IsDirectory);
-
-            IsLoading = false;
+            await LoadDataAsync();
         }
     }
 
-    // ── Simple wrapper methods to avoid lambda issues ──
-
-    private void StartAdd()
+    protected override async Task OnParametersSetAsync()
     {
-        VM.StartAddEntry();
+        // Nur neu laden wenn sich der Pfad tatsächlich geändert hat UND wir bereits geladen hatten
+        if (_loaded && !string.IsNullOrEmpty(Path) && Path != VM.Path)
+        {
+            await LoadDataAsync();
+        }
     }
 
-    private void CancelAdd()
+    private async Task LoadDataAsync()
     {
-        VM.CancelAddEntry();
+        if (string.IsNullOrEmpty(Path))
+        {
+            _errorMessage = "Kein Pfad angegeben.";
+            StateHasChanged();
+            return;
+        }
+
+        _isLoading = true;
+        _loaded = false;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            await VM.LoadAsync(Path, IsDirectory);
+
+            if (VM.IsLoaded)
+            {
+                _loaded = true;
+            }
+            else
+            {
+                _errorMessage = VM.ErrorMessage ?? "Laden fehlgeschlagen (unbekannter Fehler).";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Exception: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
     }
 
-    private void StartEdit(AccessEntry entry)
-    {
-        VM.StartEditEntry(entry);
-    }
-
-    private void CancelEdit()
-    {
-        VM.CancelEditEntry();
-    }
+    private void StartAdd() => VM.StartAddEntry();
+    private void CancelAdd() => VM.CancelAddEntry();
+    private void StartEdit(AccessEntry entry) => VM.StartEditEntry(entry);
+    private void CancelEdit() => VM.CancelEditEntry();
 
     private async Task DeleteEntry(Guid entryId)
     {
@@ -381,25 +341,16 @@
         VM.NewPrincipalId = null;
     }
 
-    private void SetEntryType(AclEntryType type)
-    {
-        VM.NewEntryType = type;
-    }
+    private void SetEntryType(AclEntryType type) => VM.NewEntryType = type;
 
     private void TogglePerm(FilePermission flag)
-    {
-        VM.NewPermissions = VM.TogglePermission(VM.NewPermissions, flag);
-    }
+        => VM.NewPermissions = VM.TogglePermission(VM.NewPermissions, flag);
 
     private void ToggleShortcut(FilePermission shortcut)
-    {
-        VM.NewPermissions = VM.ApplyShortcut(VM.NewPermissions, shortcut);
-    }
+        => VM.NewPermissions = VM.ApplyShortcut(VM.NewPermissions, shortcut);
 
     private void ToggleInheritance(AclInheritance flag)
-    {
-        VM.NewInheritance ^= flag;
-    }
+        => VM.NewInheritance ^= flag;
 
     private void OnPrincipalSelected(ChangeEventArgs e)
     {
@@ -413,28 +364,13 @@
         if (p == FilePermission.ReadAll) return "Lesen";
         if (p == FilePermission.WriteAll) return "Schreiben";
         if (p == (FilePermission.ReadAll | FilePermission.WriteAll)) return "Lesen + Schreiben";
-
         var parts = new List<string>();
         if ((p & FilePermission.ReadAll) == FilePermission.ReadAll) parts.Add("Lesen");
-        else
-        {
-            if ((p & FilePermission.ListReadData) != 0) parts.Add("Lesen/Auflisten");
-            if ((p & FilePermission.ReadAttributes) != 0) parts.Add("Attribute lesen");
-            if ((p & FilePermission.TraverseExecute) != 0) parts.Add("Durchsuchen");
-        }
+        else { if ((p & FilePermission.ListReadData) != 0) parts.Add("Lesen/Auflisten"); if ((p & FilePermission.ReadAttributes) != 0) parts.Add("Attribute lesen"); if ((p & FilePermission.TraverseExecute) != 0) parts.Add("Durchsuchen"); }
         if ((p & FilePermission.WriteAll) == FilePermission.WriteAll) parts.Add("Schreiben");
-        else
-        {
-            if ((p & FilePermission.CreateWriteData) != 0) parts.Add("Erstellen/Schreiben");
-            if ((p & FilePermission.Delete) != 0) parts.Add("Löschen");
-            if ((p & FilePermission.DeleteSubItems) != 0) parts.Add("Unterelemente löschen");
-        }
+        else { if ((p & FilePermission.CreateWriteData) != 0) parts.Add("Erstellen/Schreiben"); if ((p & FilePermission.Delete) != 0) parts.Add("Löschen"); if ((p & FilePermission.DeleteSubItems) != 0) parts.Add("Unterelemente löschen"); }
         if ((p & FilePermission.AdminAll) == FilePermission.AdminAll) parts.Add("Administration");
-        else
-        {
-            if ((p & FilePermission.ChangePermissions) != 0) parts.Add("Rechte ändern");
-            if ((p & FilePermission.TakeOwnership) != 0) parts.Add("Besitz übernehmen");
-        }
+        else { if ((p & FilePermission.ChangePermissions) != 0) parts.Add("Rechte ändern"); if ((p & FilePermission.TakeOwnership) != 0) parts.Add("Besitz übernehmen"); }
         return parts.Count > 0 ? string.Join(", ", parts) : "Keine";
     }
 
@@ -443,7 +379,6 @@
         if (i == AclInheritance.Everything) return "Alles (rekursiv)";
         if (i == AclInheritance.ThisOnly) return "Nur dieser Ordner";
         if (i == AclInheritance.ThisAndDirect) return "Dieser Ordner + direkte Unterelemente";
-
         var parts = new List<string>();
         if ((i & AclInheritance.ThisFolder) != 0) parts.Add("Dieser Ordner");
         if ((i & AclInheritance.SubFolders) != 0) parts.Add("Unterordner");
