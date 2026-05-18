@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Microsoft.Extensions.Logging;
+using System.Security.Claims;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -70,8 +71,10 @@ public class AclEditorViewModel
 
         try
         {
+            var state = await _authState.GetAuthenticationStateAsync();
+            var userId = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             Path = path;
-            var meta = await _metaRepo.GetOrCreateAsync(path, isDirectory);
+            var meta = await _metaRepo.GetOrCreateAsync(path, isDirectory, userGuid);
             FileMetadataId = meta.Id;
 
             Entries = await _aclRepo.GetByFileMetadataIdAsync(meta.Id);

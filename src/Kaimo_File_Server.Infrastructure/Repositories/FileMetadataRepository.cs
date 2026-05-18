@@ -13,7 +13,7 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         public async Task<FileMetadata?> GetByPathAsync(string path)
             => await _db.FileMetadata.FirstOrDefaultAsync(m => m.Path == path);
 
-        public async Task<FileMetadata> GetOrCreateAsync(string path, bool isDirectory)
+        public async Task<FileMetadata> GetOrCreateAsync(string path, bool isDirectory, Guid user)
         {
             var existing = await _db.FileMetadata
                 .Include(m => m.Acl)
@@ -26,7 +26,7 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
 
             var meta = new FileMetadata
             {
-                OwnerId = _db.Users.Where(e => e.Username == "admin").Select(e => e.Id).First(),
+                OwnerId = user,
                 Id = Guid.NewGuid(),
                 Path = path,
                 Name = fileName,
