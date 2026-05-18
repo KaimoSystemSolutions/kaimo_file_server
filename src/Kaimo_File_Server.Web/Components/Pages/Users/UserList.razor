@@ -160,15 +160,15 @@ else
                         {
                             <div class="file-list">
                                 <div class="file-row admin-row-header">
-                                    <div class="file-cell file-name">Name</div>
-                                    <div class="file-cell file-size">Benutzername</div>
+                                    <div class="file-cell user-name">Name</div>
+                                    <div class="file-cell user-size">Benutzername</div>
                                 </div>
                                 @foreach (var user in VM.Users)
                                 {
                                     var isSelected = VM.SelectedUser?.Id == user.Id;
                                     <div class="file-row admin-row-selectable @(isSelected ? "admin-row-selected" : "")"
                                          @onclick="() => SelectUser(user)">
-                                        <div class="file-cell file-name">
+                                        <div class="file-cell user-name">
                                             <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
                                                  fill="none" stroke="@(isSelected ? "var(--accent)" : "var(--text-tertiary)")" stroke-width="1.5">
                                                 <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
@@ -176,7 +176,7 @@ else
                                             </svg>
                                             <span>@user.Name</span>
                                         </div>
-                                        <div class="file-cell file-size" style="color: var(--text-secondary); font-size: 13px;">
+                                        <div class="file-cell user-size" style="color: var(--text-secondary); font-size: 13px;">
                                             @user.Username
                                         </div>
                                     </div>
@@ -196,15 +196,15 @@ else
                         {
                             <div class="file-list">
                                 <div class="file-row admin-row-header">
-                                    <div class="file-cell file-name">Gruppenname</div>
-                                    <div class="file-cell file-size">ID</div>
+                                    <div class="file-cell user-name">Gruppenname</div>
+                                    <div class="file-cell user-size">ID</div>
                                 </div>
                                 @foreach (var group in VM.Groups)
                                 {
                                     var isSelected = VM.SelectedGroup?.Id == group.Id;
                                     <div class="file-row admin-row-selectable @(isSelected ? "admin-row-selected" : "")"
                                          @onclick="() => SelectGroup(group)">
-                                        <div class="file-cell file-name">
+                                        <div class="file-cell user-name">
                                             <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
                                                  fill="none" stroke="@(isSelected ? "var(--accent)" : "var(--text-tertiary)")" stroke-width="1.5">
                                                 <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
@@ -213,8 +213,8 @@ else
                                             </svg>
                                             <span>@group.Name</span>
                                         </div>
-                                        <div class="file-cell file-size" style="color: var(--text-tertiary); font-size: 12px;">
-                                            @group.Id.ToString()[..8]…
+                                        <div class="file-cell user-size" style="color: var(--text-tertiary); font-size: 12px;">
+                                            @group.Id.ToString()
                                         </div>
                                     </div>
                                 }
@@ -233,23 +233,23 @@ else
                         {
                             <div class="file-list">
                                 <div class="file-row admin-row-header">
-                                    <div class="file-cell file-name">Rollenname</div>
-                                    <div class="file-cell file-size">ID</div>
+                                    <div class="file-cell user-name">Rollenname</div>
+                                    <div class="file-cell user-size">ID</div>
                                 </div>
                                 @foreach (var role in VM.Roles)
                                 {
                                     var isSelected = VM.SelectedRole?.Id == role.Id;
                                     <div class="file-row admin-row-selectable @(isSelected ? "admin-row-selected" : "")"
                                          @onclick="() => SelectRole(role)">
-                                        <div class="file-cell file-name">
+                                        <div class="file-cell user-name">
                                             <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
                                                  fill="none" stroke="@(isSelected ? "var(--accent)" : "var(--text-tertiary)")" stroke-width="1.5">
                                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                                             </svg>
                                             <span>@role.Name</span>
                                         </div>
-                                        <div class="file-cell file-size" style="color: var(--text-tertiary); font-size: 12px;">
-                                            @role.Id.ToString()[..8]…
+                                        <div class="file-cell user-size" style="color: var(--text-tertiary); font-size: 12px;">
+                                            @role.Id.ToString()
                                         </div>
                                     </div>
                                 }
@@ -387,9 +387,27 @@ else
                         {
                             <div class="detail-header">
                                 <h3>@VM.SelectedUser.Name</h3>
-                                <span class="detail-subtitle">@VM.SelectedUser.Username</span>
+                                <br/>
                             </div>
                             <div class="detail-section">
+                                
+                                <span class="detail-label">Rollen</span>
+                                <span class="detail-value">
+                                    @{
+                                        
+                                        GetRoles(VM.SelectedUser);
+                                        //VM.UserRoles(user);
+                                        var roles = VM.UserRoles
+                                            .Select(r => r.Name)
+                                            .ToList();
+                                    }
+
+                                    @(roles.Count > 0
+                                        ? string.Join(", ", roles)
+                                        : "Keine Rollen")
+                                </span>
+                                <span class="detail-label">Username</span>
+                                <span class="detail-subtitle">@VM.SelectedUser.Username</span>
                                 <span class="detail-label">ID</span>
                                 <span class="detail-value">@VM.SelectedUser.Id</span>
                             </div>
@@ -561,6 +579,8 @@ else
         await VM.SwitchTabAsync(tab);
         StateHasChanged();
     }
+
+    private async Task GetRoles(User user) { await VM.GetUserRoles(user); }
 
     private void SelectUser(User user) { CloseDropdowns(); VM.SelectUser(user); StateHasChanged(); }
     private void SelectGroup(Group group) { CloseDropdowns(); VM.SelectGroup(group); StateHasChanged(); }

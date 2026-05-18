@@ -106,7 +106,7 @@ else
             </div>
         </div>
 
-        @* ── Detail Panel ── *@
+        @* ── Detail Panel mit Tabs ── *@
         @if (VM.SelectedShare is not null && VM.IsAdmin)
         {
             <div class="admin-detail">
@@ -115,206 +115,214 @@ else
                     <span class="detail-subtitle">Share-Einstellungen</span>
                 </div>
 
-                @if (VM.EditSuccessMessage is not null)
+                @* ── Tab-Navigation ── *@
+                <div class="detail-tabs">
+                    <button class="detail-tab @(_activeTab == DetailTab.Settings ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(DetailTab.Settings)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+                        </svg>
+                        Allgemein
+                    </button>
+                    <button class="detail-tab @(_activeTab == DetailTab.Access ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(DetailTab.Access)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
+                            <path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
+                        </svg>
+                        Sichtbarkeit
+                    </button>
+                    <button class="detail-tab @(_activeTab == DetailTab.Acl ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(DetailTab.Acl)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </svg>
+                        ACL
+                    </button>
+                </div>
+
+                @* ── Tab: Allgemein ── *@
+                @if (_activeTab == DetailTab.Settings)
                 {
-                    <div class="success-banner">@VM.EditSuccessMessage</div>
-                }
-                @if (VM.EditErrorMessage is not null)
-                {
-                    <div class="error-banner">@VM.EditErrorMessage</div>
-                }
-
-                @* ── Rename ── *@
-                <div class="detail-section">
-                    <span class="detail-label">Name</span>
-                    <div class="detail-rename-row">
-                        <input class="edit-input"
-                               type="text"
-                               @bind="VM.EditShareName"
-                               @bind:event="oninput"
-                               disabled="@VM.IsRenaming" />
-                        <button class="btn-primary"
-                                @onclick="RenameShare"
-                                disabled="@(VM.EditShareName.Trim() == VM.SelectedShare.Name || VM.IsRenaming)">
-                            @(VM.IsRenaming ? "…" : "Umbenennen")
-                        </button>
-                    </div>
-                </div>
-
-                @* ── Path ── *@
-                <div class="detail-section">
-                    <span class="detail-label">Pfad</span>
-                    <span class="detail-value">@VM.SelectedShare.Path</span>
-                </div>
-
-                @* ── Status ── *@
-                <div class="detail-section">
-                    <span class="detail-label">Status</span>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="detail-value">
-                            @(VM.SelectedShare.IsEnabled ? "Aktiv" : "Deaktiviert")
-                        </span>
-                        <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" @onclick="ToggleEnabled">
-                            @(VM.SelectedShare.IsEnabled ? "Deaktivieren" : "Aktivieren")
-                        </button>
-                    </div>
-                </div>
-
-                @* ── Share-Sichtbarkeit (ShareAccessEntries) ── *@
-                <div class="detail-section">
-                    <span class="detail-label">Share-Sichtbarkeit</span>
-                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 8px;">
-                        Welche Benutzer und Gruppen diesen Share in der Übersicht sehen.
-                    </p>
-                    @if (!VM.ShowAccessPanel)
+                    @if (VM.EditSuccessMessage is not null)
                     {
-                        <button class="btn-secondary" style="margin-top: 4px;" @onclick="LoadAccess">
-                            Sichtbarkeit verwalten
-                        </button>
+                        <div class="success-banner">@VM.EditSuccessMessage</div>
                     }
-                    else
+                    @if (VM.EditErrorMessage is not null)
                     {
-                        @if (VM.AccessErrorMessage is not null)
-                        {
-                            <div class="error-banner" style="margin-top: 8px;">@VM.AccessErrorMessage</div>
-                        }
+                        <div class="error-banner">@VM.EditErrorMessage</div>
+                    }
 
-                        <div class="access-section">
+                    <div class="detail-section">
+                        <span class="detail-label">Name</span>
+                        <div class="detail-rename-row">
+                            <input class="edit-input"
+                                   type="text"
+                                   @bind="VM.EditShareName"
+                                   @bind:event="oninput"
+                                   disabled="@VM.IsRenaming" />
+                            <button class="btn-primary"
+                                    @onclick="RenameShare"
+                                    disabled="@(VM.EditShareName.Trim() == VM.SelectedShare.Name || VM.IsRenaming)">
+                                @(VM.IsRenaming ? "…" : "Umbenennen")
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <span class="detail-label">Pfad</span>
+                        <span class="detail-value">@VM.SelectedShare.Path</span>
+                    </div>
+
+                    <div class="detail-section">
+                        <span class="detail-label">Status</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="detail-value">
+                                @(VM.SelectedShare.IsEnabled ? "Aktiv" : "Deaktiviert")
+                            </span>
+                            <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" @onclick="ToggleEnabled">
+                                @(VM.SelectedShare.IsEnabled ? "Deaktivieren" : "Aktivieren")
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="detail-actions">
+                        @if (!VM.ShowDeleteConfirm)
+                        {
+                            <button class="btn-danger-outline" @onclick="() => VM.ShowDeleteConfirm = true">
+                                Share löschen
+                            </button>
+                        }
+                        else
+                        {
+                            <div class="confirm-delete">
+                                <p>Share „@VM.SelectedShare.Name" wirklich löschen? Dateien bleiben erhalten.</p>
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="btn-danger-outline" @onclick="DeleteShare">Endgültig löschen</button>
+                                    <button class="btn-secondary" @onclick="() => VM.ShowDeleteConfirm = false">Abbrechen</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @* ── Tab: Sichtbarkeit ── *@
+                @if (_activeTab == DetailTab.Access)
+                {
+                    @if (VM.AccessErrorMessage is not null)
+                    {
+                        <div class="error-banner">@VM.AccessErrorMessage</div>
+                    }
+
+                    <div class="detail-section">
+                        <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
+                            Welche Benutzer und Gruppen diesen Share in der Übersicht sehen.
+                        </p>
+
+                        @if (!_accessLoaded)
+                        {
+                            <div class="loading-state" style="padding: 24px 0;">
+                                <div class="spinner"></div>
+                            </div>
+                        }
+                        else
+                        {
+                            
+                            var availableUsers = VM.AllUsers.Where(u => !VM.HasAccess(u.Id)).ToList();
+                            var availableGroups = VM.AllGroups.Where(g => !VM.HasAccess(g.Id)).ToList();
+                            
+
+                            @if (availableUsers.Any() || availableGroups.Any())
+                            {
+                                <div class="access-add-row">
+                                    <select class="edit-input access-select" @onchange="OnAccessPrincipalAdd">
+                                        <option value="">+ Benutzer oder Gruppe hinzufügen…</option>
+                                        @if (availableUsers.Any())
+                                        {
+                                            <optgroup label="Benutzer">
+                                                @foreach (var u in availableUsers)
+                                                {
+                                                    <option value="@u.Id">@(u.Name ?? u.Username)</option>
+                                                }
+                                            </optgroup>
+                                        }
+                                        @if (availableGroups.Any())
+                                        {
+                                            <optgroup label="Gruppen">
+                                                @foreach (var g in availableGroups)
+                                                {
+                                                    <option value="@g.Id">@g.Name</option>
+                                                }
+                                            </optgroup>
+                                        }
+                                    </select>
+                                </div>
+                            }
+
+                            @* ── Aktuelle Einträge als kompakte Chips ── *@
                             @if (VM.AccessEntries.Any())
                             {
-                                @foreach (var entry in VM.AccessEntries)
-                                {
-                                    <div class="access-row">
-                                        <div class="access-row-info">
-                                            @if (VM.GetPrincipalType(entry.PrincipalId) == "group")
-                                            {
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2">
-                                                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                                                    <circle cx="9" cy="7" r="4" />
-                                                    <path d="M23 21v-2a4 4 0 00-3-3.87" />
-                                                    <path d="M16 3.13a4 4 0 010 7.75" />
+                                <div class="access-chip-list">
+                                    @foreach (var entry in VM.AccessEntries)
+                                    {
+                                        var pType = VM.GetPrincipalType(entry.PrincipalId);
+                                        <div class="access-chip">
+                                            <div class="access-chip-icon">
+                                                @if (pType == "group")
+                                                {
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
+                                                        <path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
+                                                    </svg>
+                                                }
+                                                else
+                                                {
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
+                                                    </svg>
+                                                }
+                                            </div>
+                                            <span class="access-chip-name">@VM.GetPrincipalDisplayName(entry.PrincipalId)</span>
+                                            <button class="access-chip-remove" title="Entfernen"
+                                                    @onclick="() => RevokeAccess(entry.PrincipalId)">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                                                 </svg>
-                                            }
-                                            else
-                                            {
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2">
-                                                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                                                    <circle cx="12" cy="7" r="4" />
-                                                </svg>
-                                            }
-                                            <span>@VM.GetPrincipalDisplayName(entry.PrincipalId)</span>
+                                            </button>
                                         </div>
-                                        <button class="btn-icon btn-icon--small btn-icon--danger"
-                                                title="Entfernen"
-                                                @onclick="() => RevokeAccess(entry.PrincipalId)">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                 stroke="currentColor" stroke-width="2">
-                                                <line x1="18" y1="6" x2="6" y2="18" />
-                                                <line x1="6" y1="6" x2="18" y2="18" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                }
+                                    }
+                                </div>
                             }
                             else
                             {
                                 <p class="empty-hint">Keine Sichtbarkeitsregeln – Share ist für alle sichtbar.</p>
                             }
-                        </div>
-
-                        var availableUsers = VM.AllUsers.Where(u => !VM.HasAccess(u.Id)).ToList();
-                        var availableGroups = VM.AllGroups.Where(g => !VM.HasAccess(g.Id)).ToList();
-
-                        if (availableUsers.Any() || availableGroups.Any())
-                        {
-                            <span class="detail-label" style="margin-top: 10px;">Hinzufügen</span>
-                            <div class="access-section access-section--add">
-                                @foreach (var user in availableUsers)
-                                {
-                                    <div class="access-row access-row--add">
-                                        <div class="access-row-info">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2">
-                                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
-                                            </svg>
-                                            <span>@(user.Name ?? user.Username)</span>
-                                        </div>
-                                        <button class="btn-icon btn-icon--small btn-icon--accent" title="Hinzufügen"
-                                                @onclick="() => GrantAccess(user.Id)">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                }
-                                @foreach (var group in availableGroups)
-                                {
-                                    <div class="access-row access-row--add">
-                                        <div class="access-row-info">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2">
-                                                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
-                                                <path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
-                                            </svg>
-                                            <span>@group.Name</span>
-                                        </div>
-                                        <button class="btn-icon btn-icon--small btn-icon--accent" title="Hinzufügen"
-                                                @onclick="() => GrantAccess(group.Id)">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                }
-                            </div>
                         }
-                    }
-                </div>
+                    </div>
+                }
 
-                @* ── ACL / Dateiberechtigungen ── *@
-                <div class="detail-section">
-                    <span class="detail-label">Dateiberechtigungen (ACL)</span>
-                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 8px;">
-                        NTFS-ähnliche Berechtigungen für Dateien und Ordner innerhalb dieses Shares.
-                    </p>
-                    @if (!ShowAclEditor)
-                    {
-                        <button class="btn-secondary" style="margin-top: 4px;" @onclick="OpenAclEditor">
-                            ACL bearbeiten
-                        </button>
-                    }
-                    else
-                    {
-                        <button class="btn-secondary btn-secondary--active" ...>ACL ausblenden</button>
+                @* ── Tab: ACL ── *@
+                @if (_activeTab == DetailTab.Acl)
+                {
+                    <div class="detail-section">
+                        <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
+                            NTFS-ähnliche Berechtigungen für Dateien und Ordner innerhalb dieses Shares.
+                        </p>
                         <AclEditor @key="@_aclEditorKey" Path="@VM.SelectedShare.Path" IsDirectory="true" />
-                    }
-                </div>
-
-                @* ── Delete ── *@
-                <div class="detail-actions">
-                    @if (!VM.ShowDeleteConfirm)
-                    {
-                        <button class="btn-danger-outline" @onclick="() => VM.ShowDeleteConfirm = true">
-                            Share löschen
-                        </button>
-                    }
-                    else
-                    {
-                        <div class="confirm-delete">
-                            <p>Share „@VM.SelectedShare.Name" wirklich löschen? Dateien bleiben erhalten.</p>
-                            <div style="display: flex; gap: 8px;">
-                                <button class="btn-danger-outline" @onclick="DeleteShare">Endgültig löschen</button>
-                                <button class="btn-secondary" @onclick="() => VM.ShowDeleteConfirm = false">Abbrechen</button>
-                            </div>
-                        </div>
-                    }
-                </div>
+                    </div>
+                }
             </div>
         }
     </div>
 }
 
 @code {
-    private bool ShowAclEditor;
+    private enum DetailTab { Settings, Access, Acl }
+
+    private DetailTab _activeTab = DetailTab.Settings;
     private string _aclEditorKey = "";
+    private bool _accessLoaded;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -329,7 +337,8 @@ else
     {
         if (VM.IsAdmin)
         {
-            ShowAclEditor = false;
+            _activeTab = DetailTab.Settings;
+            _accessLoaded = false;
             VM.SelectShare(share);
             StateHasChanged();
         }
@@ -339,26 +348,30 @@ else
         }
     }
 
+    private async Task SwitchTab(DetailTab tab)
+    {
+        _activeTab = tab;
+
+        if (tab == DetailTab.Access && !_accessLoaded)
+        {
+            await VM.LoadAccessAsync();
+            _accessLoaded = true;
+        }
+
+        if (tab == DetailTab.Acl)
+        {
+            _aclEditorKey = $"{VM.SelectedShare?.Name}_{DateTime.UtcNow.Ticks}";
+        }
+
+        StateHasChanged();
+    }
+
     private void ToggleCreate()
     {
         VM.DeselectShare();
-        ShowAclEditor = false;
+        _activeTab = DetailTab.Settings;
+        _accessLoaded = false;
         VM.IsCreating = !VM.IsCreating;
-        StateHasChanged();
-    }
-
-    // FIX: Separate Methode statt inline-Lambda, mit Key-Update für Re-Mount
-    private void OpenAclEditor()
-    {
-        ShowAclEditor = true;
-        // Eindeutiger Key erzwingt, dass Blazor eine neue AclEditor-Instanz erstellt
-        _aclEditorKey = $"{VM.SelectedShare?.Name}_{DateTime.UtcNow.Ticks}";
-        StateHasChanged();
-    }
-
-    private void CloseAclEditor()
-    {
-        ShowAclEditor = false;
         StateHasChanged();
     }
 
@@ -391,13 +404,18 @@ else
     private async Task DeleteShare()
     {
         await VM.DeleteShareAsync();
+        _activeTab = DetailTab.Settings;
+        _accessLoaded = false;
         StateHasChanged();
     }
 
-    private async Task LoadAccess()
+    private async Task OnAccessPrincipalAdd(ChangeEventArgs e)
     {
-        await VM.LoadAccessAsync();
-        StateHasChanged();
+        var val = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(val) && Guid.TryParse(val, out var id))
+        {
+            await GrantAccess(id);
+        }
     }
 
     private async Task GrantAccess(Guid principalId)

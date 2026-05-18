@@ -4,11 +4,6 @@
 
 <div class="acl-editor">
 
-    @* DEBUG: zeigt was wirklich passiert – nach Fix entfernen *@
-    <p style="font-size: 11px; color: var(--text-tertiary); font-family: monospace; margin: 4px 0; padding: 4px 8px; background: var(--bg-tertiary); border-radius: 4px;">
-        DEBUG: path="@Path" | loading=@_isLoading | loaded=@_loaded | vmLoaded=@VM.IsLoaded | error=@(_errorMessage ?? VM.ErrorMessage ?? "none")
-    </p>
-
     @if (_isLoading)
     {
         <div class="loading-state" style="padding: 24px 0;">
@@ -46,8 +41,10 @@
                                 @if (principalType == "group")
                                 {
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" class="acl-icon">
-                                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
-                                        <path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
+                                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                                        <circle cx="9" cy="7" r="4" />
+                                        <path d="M23 21v-2a4 4 0 00-3-3.87" />
+                                        <path d="M16 3.13a4 4 0 010 7.75" />
                                     </svg>
                                 }
                                 else if (principalType == "role")
@@ -59,7 +56,8 @@
                                 else
                                 {
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" class="acl-icon">
-                                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
+                                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                                        <circle cx="12" cy="7" r="4" />
                                     </svg>
                                 }
                                 <span class="acl-entry-name">@VM.GetPrincipalDisplayName(entry.PrincipalId)</span>
@@ -78,7 +76,8 @@
                                     </button>
                                     <button class="btn-icon btn-icon--small btn-icon--danger" title="Entfernen" @onclick="() => DeleteEntry(entry.Id)">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                                            <line x1="18" y1="6" x2="6" y2="18" />
+                                            <line x1="6" y1="6" x2="18" y2="18" />
                                         </svg>
                                     </button>
                                 }
@@ -87,55 +86,7 @@
 
                         @if (isEditing)
                         {
-                            <div class="acl-form">
-                                <div class="acl-form-row">
-                                    <span class="detail-label">Aktion</span>
-                                    <div class="acl-type-tabs">
-                                        <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Allow ? "active acl-tab--allow" : "")" @onclick="() => SetEntryType(AclEntryType.Allow)">Allow</button>
-                                        <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Deny ? "active acl-tab--deny" : "")" @onclick="() => SetEntryType(AclEntryType.Deny)">Deny</button>
-                                    </div>
-                                </div>
-                                <div class="acl-form-row">
-                                    <span class="detail-label">Schnellauswahl</span>
-                                    <div class="acl-shortcut-row">
-                                        <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.ReadAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.ReadAll)">Lesen</button>
-                                        <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.WriteAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.WriteAll)">Schreiben</button>
-                                        <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.AdminAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.AdminAll)">Admin</button>
-                                        <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.FullControl) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.FullControl)">Vollzugriff</button>
-                                    </div>
-                                </div>
-                                <div class="acl-form-row">
-                                    <span class="detail-label">Einzelberechtigungen</span>
-                                    <div class="acl-perm-grid">
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.TraverseExecute)" @onchange="() => TogglePerm(FilePermission.TraverseExecute)" /><span>Durchsuchen/Ausführen</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ListReadData)" @onchange="() => TogglePerm(FilePermission.ListReadData)" /><span>Lesen/Auflisten</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadAttributes)" @onchange="() => TogglePerm(FilePermission.ReadAttributes)" /><span>Attribute lesen</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadExtAttributes)" @onchange="() => TogglePerm(FilePermission.ReadExtAttributes)" /><span>Erw. Attribute lesen</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadPermissions)" @onchange="() => TogglePerm(FilePermission.ReadPermissions)" /><span>Rechte lesen</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.CreateWriteData)" @onchange="() => TogglePerm(FilePermission.CreateWriteData)" /><span>Erstellen/Schreiben</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.CreateAppendData)" @onchange="() => TogglePerm(FilePermission.CreateAppendData)" /><span>Erstellen/Anhängen</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.WriteAttributes)" @onchange="() => TogglePerm(FilePermission.WriteAttributes)" /><span>Attribute schreiben</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.WriteExtAttributes)" @onchange="() => TogglePerm(FilePermission.WriteExtAttributes)" /><span>Erw. Attr. schreiben</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.DeleteSubItems)" @onchange="() => TogglePerm(FilePermission.DeleteSubItems)" /><span>Unterelem. löschen</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.Delete)" @onchange="() => TogglePerm(FilePermission.Delete)" /><span>Löschen</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ChangePermissions)" @onchange="() => TogglePerm(FilePermission.ChangePermissions)" /><span>Rechte ändern</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.TakeOwnership)" @onchange="() => TogglePerm(FilePermission.TakeOwnership)" /><span>Besitz übernehmen</span></label>
-                                    </div>
-                                </div>
-                                <div class="acl-form-row">
-                                    <span class="detail-label">Vererbung</span>
-                                    <div class="acl-perm-grid">
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.ThisFolder) != 0)" @onchange="() => ToggleInheritance(AclInheritance.ThisFolder)" /><span>Dieser Ordner</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.SubFolders) != 0)" @onchange="() => ToggleInheritance(AclInheritance.SubFolders)" /><span>Unterordner</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.SubFiles) != 0)" @onchange="() => ToggleInheritance(AclInheritance.SubFiles)" /><span>Dateien</span></label>
-                                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.AllDescendants) != 0)" @onchange="() => ToggleInheritance(AclInheritance.AllDescendants)" /><span>Alle Nachfahren (rekursiv)</span></label>
-                                    </div>
-                                </div>
-                                <div class="acl-form-actions">
-                                    <button class="btn-primary" @onclick="SaveEdit">Speichern</button>
-                                    <button class="btn-secondary" @onclick="CancelEdit">Abbrechen</button>
-                                </div>
-                            </div>
+                            @RenderPermissionForm(false)
                         }
                         else
                         {
@@ -177,65 +128,28 @@
                             <option value="">— Auswählen —</option>
                             @if (VM.NewPrincipalType == "user")
                             {
-                                @foreach (var u in VM.AllUsers) { <option value="@u.Id">@(u.Name ?? u.Username)</option> }
+                                @foreach (var u in VM.AllUsers)
+                                {
+                                    <option value="@u.Id">@(u.Name ?? u.Username)</option>
+                                }
                             }
                             else if (VM.NewPrincipalType == "group")
                             {
-                                @foreach (var g in VM.AllGroups) { <option value="@g.Id">@g.Name</option> }
+                                @foreach (var g in VM.AllGroups)
+                                {
+                                    <option value="@g.Id">@g.Name</option>
+                                }
                             }
                             else
                             {
-                                @foreach (var r in VM.AllRoles) { <option value="@r.Id">@r.Name</option> }
+                                @foreach (var r in VM.AllRoles)
+                                {
+                                    <option value="@r.Id">@r.Name</option>
+                                }
                             }
                         </select>
                     </div>
-                    <div class="acl-form-row">
-                        <span class="detail-label">Aktion</span>
-                        <div class="acl-type-tabs">
-                            <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Allow ? "active acl-tab--allow" : "")" @onclick="() => SetEntryType(AclEntryType.Allow)">Allow</button>
-                            <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Deny ? "active acl-tab--deny" : "")" @onclick="() => SetEntryType(AclEntryType.Deny)">Deny</button>
-                        </div>
-                    </div>
-                    <div class="acl-form-row">
-                        <span class="detail-label">Schnellauswahl</span>
-                        <div class="acl-shortcut-row">
-                            <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.ReadAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.ReadAll)">Lesen</button>
-                            <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.WriteAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.WriteAll)">Schreiben</button>
-                            <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.AdminAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.AdminAll)">Admin</button>
-                            <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.FullControl) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.FullControl)">Vollzugriff</button>
-                        </div>
-                    </div>
-                    <div class="acl-form-row">
-                        <span class="detail-label">Einzelberechtigungen</span>
-                        <div class="acl-perm-grid">
-                            <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.TraverseExecute)" @onchange="() => TogglePerm(FilePermission.TraverseExecute)" /><span>Durchsuchen/Ausführen</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ListReadData)" @onchange="() => TogglePerm(FilePermission.ListReadData)" /><span>Lesen/Auflisten</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadAttributes)" @onchange="() => TogglePerm(FilePermission.ReadAttributes)" /><span>Attribute lesen</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadExtAttributes)" @onchange="() => TogglePerm(FilePermission.ReadExtAttributes)" /><span>Erw. Attribute lesen</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadPermissions)" @onchange="() => TogglePerm(FilePermission.ReadPermissions)" /><span>Rechte lesen</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.CreateWriteData)" @onchange="() => TogglePerm(FilePermission.CreateWriteData)" /><span>Erstellen/Schreiben</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.CreateAppendData)" @onchange="() => TogglePerm(FilePermission.CreateAppendData)" /><span>Erstellen/Anhängen</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.WriteAttributes)" @onchange="() => TogglePerm(FilePermission.WriteAttributes)" /><span>Attribute schreiben</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.WriteExtAttributes)" @onchange="() => TogglePerm(FilePermission.WriteExtAttributes)" /><span>Erw. Attr. schreiben</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.DeleteSubItems)" @onchange="() => TogglePerm(FilePermission.DeleteSubItems)" /><span>Unterelem. löschen</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.Delete)" @onchange="() => TogglePerm(FilePermission.Delete)" /><span>Löschen</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ChangePermissions)" @onchange="() => TogglePerm(FilePermission.ChangePermissions)" /><span>Rechte ändern</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.TakeOwnership)" @onchange="() => TogglePerm(FilePermission.TakeOwnership)" /><span>Besitz übernehmen</span></label>
-                        </div>
-                    </div>
-                    <div class="acl-form-row">
-                        <span class="detail-label">Vererbung</span>
-                        <div class="acl-perm-grid">
-                            <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.ThisFolder) != 0)" @onchange="() => ToggleInheritance(AclInheritance.ThisFolder)" /><span>Dieser Ordner</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.SubFolders) != 0)" @onchange="() => ToggleInheritance(AclInheritance.SubFolders)" /><span>Unterordner</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.SubFiles) != 0)" @onchange="() => ToggleInheritance(AclInheritance.SubFiles)" /><span>Dateien</span></label>
-                            <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.AllDescendants) != 0)" @onchange="() => ToggleInheritance(AclInheritance.AllDescendants)" /><span>Alle Nachfahren (rekursiv)</span></label>
-                        </div>
-                    </div>
-                    <div class="acl-form-actions">
-                        <button class="btn-primary" @onclick="AddEntry">Hinzufügen</button>
-                        <button class="btn-secondary" @onclick="CancelAdd">Abbrechen</button>
-                    </div>
+                    @RenderPermissionForm(true)
                 </div>
             </div>
         }
@@ -248,6 +162,93 @@
     }
 </div>
 
+@* ── Shared Permission Form Fragment ── *@
+@{
+    RenderFragment RenderPermissionForm(bool isAdd) => __builder2 =>
+    {
+        <div class="acl-form" style="@(isAdd ? "" : "margin-top: 8px;")">
+            <div class="acl-form-row">
+                <span class="detail-label">Aktion</span>
+                <div class="acl-type-tabs">
+                    <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Allow ? "active acl-tab--allow" : "")" @onclick="() => SetEntryType(AclEntryType.Allow)">Allow</button>
+                    <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Deny ? "active acl-tab--deny" : "")" @onclick="() => SetEntryType(AclEntryType.Deny)">Deny</button>
+                </div>
+            </div>
+            <div class="acl-form-row">
+                <span class="detail-label">Schnellauswahl</span>
+                <div class="acl-shortcut-row">
+                    <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.ReadAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.ReadAll)">Lesen</button>
+                    <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.WriteAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.WriteAll)">Schreiben</button>
+                    <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.AdminAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.AdminAll)">Admin</button>
+                    <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.FullControl) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.FullControl)">Vollzugriff</button>
+                </div>
+            </div>
+
+            @* ── Collapsible Einzelberechtigungen ── *@
+            <div class="acl-form-row">
+                <button class="acl-collapse-toggle" @onclick="() => _showDetailPerms = !_showDetailPerms">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                         class="acl-collapse-chevron @(_showDetailPerms ? "acl-collapse-chevron--open" : "")">
+                        <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                    <span class="detail-label" style="margin-bottom: 0; cursor: pointer;">Einzelberechtigungen</span>
+                </button>
+                @if (_showDetailPerms)
+                {
+                    <div class="acl-perm-grid">
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.TraverseExecute)" @onchange="() => TogglePerm(FilePermission.TraverseExecute)" /><span>Durchsuchen/Ausführen</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ListReadData)" @onchange="() => TogglePerm(FilePermission.ListReadData)" /><span>Lesen/Auflisten</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadAttributes)" @onchange="() => TogglePerm(FilePermission.ReadAttributes)" /><span>Attribute lesen</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadExtAttributes)" @onchange="() => TogglePerm(FilePermission.ReadExtAttributes)" /><span>Erw. Attribute lesen</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadPermissions)" @onchange="() => TogglePerm(FilePermission.ReadPermissions)" /><span>Rechte lesen</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.CreateWriteData)" @onchange="() => TogglePerm(FilePermission.CreateWriteData)" /><span>Erstellen/Schreiben</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.CreateAppendData)" @onchange="() => TogglePerm(FilePermission.CreateAppendData)" /><span>Erstellen/Anhängen</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.WriteAttributes)" @onchange="() => TogglePerm(FilePermission.WriteAttributes)" /><span>Attribute schreiben</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.WriteExtAttributes)" @onchange="() => TogglePerm(FilePermission.WriteExtAttributes)" /><span>Erw. Attr. schreiben</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.DeleteSubItems)" @onchange="() => TogglePerm(FilePermission.DeleteSubItems)" /><span>Unterelem. löschen</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.Delete)" @onchange="() => TogglePerm(FilePermission.Delete)" /><span>Löschen</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ChangePermissions)" @onchange="() => TogglePerm(FilePermission.ChangePermissions)" /><span>Rechte ändern</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.TakeOwnership)" @onchange="() => TogglePerm(FilePermission.TakeOwnership)" /><span>Besitz übernehmen</span></label>
+                    </div>
+                }
+            </div>
+
+            @* ── Collapsible Vererbung ── *@
+            <div class="acl-form-row">
+                <button class="acl-collapse-toggle" @onclick="() => _showInheritance = !_showInheritance">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                         class="acl-collapse-chevron @(_showInheritance ? "acl-collapse-chevron--open" : "")">
+                        <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                    <span class="detail-label" style="margin-bottom: 0; cursor: pointer;">Vererbung</span>
+                </button>
+                @if (_showInheritance)
+                {
+                    <div class="acl-perm-grid">
+                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.ThisFolder) != 0)" @onchange="() => ToggleInheritance(AclInheritance.ThisFolder)" /><span>Dieser Ordner</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.SubFolders) != 0)" @onchange="() => ToggleInheritance(AclInheritance.SubFolders)" /><span>Unterordner</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.SubFiles) != 0)" @onchange="() => ToggleInheritance(AclInheritance.SubFiles)" /><span>Dateien</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.AllDescendants) != 0)" @onchange="() => ToggleInheritance(AclInheritance.AllDescendants)" /><span>Alle Nachfahren (rekursiv)</span></label>
+                    </div>
+                }
+            </div>
+
+            <div class="acl-form-actions">
+                @if (isAdd)
+                {
+                    <button class="btn-primary" @onclick="AddEntry">Hinzufügen</button>
+                    <button class="btn-secondary" @onclick="CancelAdd">Abbrechen</button>
+                }
+                else
+                {
+                    <button class="btn-primary" @onclick="SaveEdit">Speichern</button>
+                    <button class="btn-secondary" @onclick="CancelEdit">Abbrechen</button>
+                }
+            </div>
+        </div>
+    };
+}
+
 @code {
     [Parameter] public string Path { get; set; } = "";
     [Parameter] public bool IsDirectory { get; set; } = true;
@@ -256,6 +257,8 @@
     private bool _isLoading;
     private bool _loaded;
     private string? _errorMessage;
+    private bool _showDetailPerms;
+    private bool _showInheritance;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -267,7 +270,6 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        // Nur neu laden wenn sich der Pfad tatsächlich geändert hat UND wir bereits geladen hatten
         if (_loaded && !string.IsNullOrEmpty(Path) && Path != VM.Path)
         {
             await LoadDataAsync();
@@ -312,9 +314,22 @@
         }
     }
 
-    private void StartAdd() => VM.StartAddEntry();
+    private void StartAdd()
+    {
+        _showDetailPerms = false;
+        _showInheritance = false;
+        VM.StartAddEntry();
+    }
+
     private void CancelAdd() => VM.CancelAddEntry();
-    private void StartEdit(AccessEntry entry) => VM.StartEditEntry(entry);
+
+    private void StartEdit(AccessEntry entry)
+    {
+        _showDetailPerms = false;
+        _showInheritance = false;
+        VM.StartEditEntry(entry);
+    }
+
     private void CancelEdit() => VM.CancelEditEntry();
 
     private async Task DeleteEntry(Guid entryId)

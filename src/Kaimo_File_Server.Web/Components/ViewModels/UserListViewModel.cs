@@ -3,6 +3,8 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
+using System.Collections.Specialized;
+using System.ComponentModel;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -57,6 +59,10 @@ public class UserListViewModel
     public string EditUserName { get; set; } = "";
     public List<CheckboxItem<Group>> EditUserGroups { get; private set; } = [];
     public List<CheckboxItem<Role>> EditUserRoles { get; private set; } = [];
+
+    // -- User-Details --
+
+    public List<Role> UserRoles { get; private set; } = [];
 
     // Password-Change
     public string NewPassword { get; set; } = "";
@@ -166,7 +172,18 @@ public class UserListViewModel
         SuccessMessage = null;
     }
 
-    // ── Edit User ──
+    // -- Show Details --
+
+    public async Task GetUserRoles(User user)
+    {
+        var allRoles = (await _roleRepo.GetAllAsync()).OrderBy(r => r.Name).ToList();
+        var userRoles = await _userRepo.GetRolesForUserAsync(user.Id);
+        UserRoles = userRoles;
+        //var userRoleIds = userRoles.Select(r => r.Id).ToHashSet();
+        //EditUserRoles = allRoles.Select(r => new CheckboxItem<Role>(r, userRoleIds.Contains(r.Id))).ToList();
+    }
+
+    // -- Edit User --
 
     public async Task StartEditUserAsync()
     {

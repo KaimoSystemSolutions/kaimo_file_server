@@ -71,10 +71,10 @@ public class AclEditorViewModel
 
         try
         {
-            var state = await _authState.GetAuthenticationStateAsync();
-            var userId = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            //var state = await _authState.GetAuthenticationStateAsync();
+            //var userId = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             Path = path;
-            var meta = await _metaRepo.GetOrCreateAsync(path, isDirectory, userGuid);
+            var meta = await _metaRepo.GetOrCreateAsync(path, isDirectory, Guid.Empty);
             FileMetadataId = meta.Id;
 
             Entries = await _aclRepo.GetByFileMetadataIdAsync(meta.Id);

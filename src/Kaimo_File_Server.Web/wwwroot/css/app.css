@@ -527,6 +527,7 @@ html, body, #app {
     text-align: right;
     color: var(--text-secondary);
     flex-shrink: 0;
+    margin-right: 10px;
 }
 
 .file-date {
@@ -538,6 +539,28 @@ html, body, #app {
 
 .file-icon {
     flex-shrink: 0;
+}
+
+
+/* -- User List -- */
+
+.user-name {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.user-size {
+    width: 300px;
+    text-align: right;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+    margin-right: 10px;
 }
 
 /* ── Breadcrumbs ── */
@@ -1107,3 +1130,534 @@ html, body, #app {
     display: flex;
     justify-content: center;
 }
+
+::deep .admin-detail {
+    width: 460px;
+    min-width: 380px;
+}
+
+/* ── Panel Header ── */
+
+.detail-panel-header {
+    padding-bottom: 16px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+}
+
+.detail-panel-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.detail-share-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--accent-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.detail-panel-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.3;
+}
+
+.detail-panel-subtitle {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+}
+
+/* ── Detail Tabs ── */
+
+.detail-tabs {
+    display: flex;
+    gap: 0;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    margin: 16px 0;
+}
+
+.detail-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    position: relative;
+}
+
+    .detail-tab:hover {
+        color: var(--text-primary);
+        background: var(--bg-hover);
+    }
+
+.detail-tab--active {
+    background: var(--accent);
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+    .detail-tab--active:hover {
+        background: var(--accent);
+        color: white;
+    }
+
+    .detail-tab--active svg {
+        stroke: white;
+    }
+
+/* ── Tab Content Area ── */
+
+.detail-tab-content {
+    padding: 0;
+}
+
+/* ── Detail Card (grouped fields) ── */
+
+.detail-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px 0;
+    margin-bottom: 12px;
+}
+
+.detail-card-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 16px;
+}
+
+    .detail-card-row + .detail-card-row {
+        border-top: 1px solid var(--border);
+    }
+
+.detail-card-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-tertiary);
+}
+
+/* ── Detail Rename Row ── */
+
+.detail-rename-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+    .detail-rename-row .edit-input {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .detail-rename-row .btn-primary {
+        flex-shrink: 0;
+        padding: 8px 12px;
+        font-size: 12px;
+        margin-top: 15px;
+    }
+
+/* ── Monospace Detail Value ── */
+
+.detail-value--mono {
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    font-size: 12px;
+    background: var(--bg-secondary);
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    display: block;
+    word-break: break-all;
+    color: var(--text-secondary);
+}
+
+/* ── Status Indicator ── */
+
+.detail-status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-indicator--active {
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+}
+
+.status-indicator--inactive {
+    background: var(--text-tertiary);
+    opacity: 0.5;
+}
+
+.btn-secondary--sm {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+/* ── Hint & Info Text ── */
+
+.detail-hint {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin-bottom: 14px;
+    line-height: 1.5;
+    padding: 0 2px;
+}
+
+.detail-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    line-height: 1.5;
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 1px dashed var(--border);
+}
+
+/* ── Multi-Select Empty State ── */
+
+.multi-select-empty {
+    padding: 12px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+/* ── Disabled share card ── */
+
+.share-card--disabled {
+    opacity: 0.6;
+}
+
+.share-card--selected {
+    border-color: var(--accent);
+    background: var(--accent-selected, var(--accent-subtle));
+    box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
+.share-badge--disabled {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    background: var(--bg-tertiary);
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-top: 2px;
+    display: inline-block;
+}
+
+/* ── ACL Entry List ── */
+
+.acl-editor {
+    margin-top: 0;
+}
+
+.acl-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.acl-entry {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    background: var(--bg-tertiary);
+    transition: background 0.1s;
+}
+
+    .acl-entry:hover {
+        background: var(--bg-hover);
+    }
+
+.acl-entry--allow {
+    border-left: 3px solid var(--success);
+}
+
+.acl-entry--deny {
+    border-left: 3px solid var(--danger);
+}
+
+.acl-entry--editing {
+    border-color: var(--accent);
+    background: var(--accent-subtle);
+}
+
+.acl-entry-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.acl-entry-principal {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 1;
+}
+
+.acl-entry-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.acl-entry-type-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.badge--allow {
+    background: var(--success-subtle);
+    color: var(--success);
+}
+
+.badge--deny {
+    background: var(--danger-subtle);
+    color: var(--danger);
+}
+
+.acl-entry-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.acl-entry-details {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    font-size: 12px;
+}
+
+.acl-detail-label {
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+}
+
+.acl-detail-value {
+    color: var(--text-secondary);
+}
+
+.acl-icon {
+    flex-shrink: 0;
+}
+
+/* ── Add Form ── */
+
+.acl-add-form {
+    margin-top: 12px;
+    padding: 14px;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+    .acl-add-form h4 {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent);
+        margin: 0 0 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+/* ── Form Layout ── */
+
+.acl-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.acl-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.acl-form-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+/* ── Type Tabs (User/Group/Role, Allow/Deny) ── */
+
+.acl-type-tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    padding: 2px;
+}
+
+.acl-type-tab {
+    flex: 1;
+    padding: 5px 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+}
+
+    .acl-type-tab:hover {
+        color: var(--text-primary);
+        background: var(--bg-hover);
+    }
+
+    .acl-type-tab.active {
+        background: var(--bg-secondary);
+        color: var(--accent);
+        box-shadow: var(--shadow);
+    }
+
+.acl-tab--allow.active {
+    color: var(--success);
+}
+
+.acl-tab--deny.active {
+    color: var(--danger);
+}
+
+/* ── Permission Shortcuts ── */
+
+.acl-shortcut-row {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.acl-shortcut {
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+    .acl-shortcut:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+
+.acl-shortcut--active {
+    background: var(--accent-subtle);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* ── Collapsible Toggle ── */
+
+.acl-collapse-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    padding: 2px 0;
+    cursor: pointer;
+    color: var(--text-tertiary);
+    transition: color 0.15s;
+}
+
+    .acl-collapse-toggle:hover {
+        color: var(--text-primary);
+    }
+
+.acl-collapse-chevron {
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+
+.acl-collapse-chevron--open {
+    transform: rotate(90deg);
+}
+
+/* ── Permission Grid ── */
+
+.acl-perm-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 12px;
+    margin-top: 4px;
+}
+
+.acl-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.1s;
+}
+
+    .acl-checkbox:hover {
+        color: var(--text-primary);
+    }
+
+    .acl-checkbox input[type="checkbox"] {
+        accent-color: var(--accent);
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+        cursor: pointer;
+    }
