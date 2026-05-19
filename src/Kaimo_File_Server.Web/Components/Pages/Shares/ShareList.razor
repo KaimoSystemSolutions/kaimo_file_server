@@ -23,7 +23,7 @@
     </div>
 </div>
 
-@* ── Create Form ── *@
+@* -- Create Form -- *@
 
 @if (VM.IsCreating && VM.CanCreateShare)
 {
@@ -51,7 +51,7 @@
     </div>
 }
 
-@* ── Content ── *@
+@* -- Content -- *@
 
 @if (VM.IsLoading)
 {
@@ -76,7 +76,7 @@ else if (!VM.Shares.Any())
 else
 {
     <div class="admin-content">
-        @* ── Share List ── *@
+        @* -- Share List -- *@
         <div class="admin-list">
             <div class="share-grid">
                 @foreach (var share in VM.Shares)
@@ -106,7 +106,7 @@ else
             </div>
         </div>
 
-        @* ── Detail Panel mit Tabs ── *@
+        @* -- Detail Panel mit Tabs -- *@
         @if (VM.SelectedShare is not null && VM.IsAdmin)
         {
             <div class="admin-detail">
@@ -115,7 +115,7 @@ else
                     <span class="detail-subtitle">Share-Einstellungen</span>
                 </div>
 
-                @* ── Tab-Navigation ── *@
+                @* -- Tab-Navigation -- *@
                 <div class="detail-tabs">
                     <button class="detail-tab @(_activeTab == DetailTab.Settings ? "detail-tab--active" : "")"
                             @onclick="() => SwitchTab(DetailTab.Settings)">
@@ -142,7 +142,7 @@ else
                     </button>
                 </div>
 
-                @* ── Tab: Allgemein ── *@
+                @* -- Tab: Allgemein -- *@
                 @if (_activeTab == DetailTab.Settings)
                 {
                     @if (VM.EditSuccessMessage is not null)
@@ -207,7 +207,7 @@ else
                     </div>
                 }
 
-                @* ── Tab: Sichtbarkeit ── *@
+                @* -- Tab: Sichtbarkeit -- *@
                 @if (_activeTab == DetailTab.Access)
                 {
                     @if (VM.AccessErrorMessage is not null)
@@ -260,7 +260,7 @@ else
                                 </div>
                             }
 
-                            @* ── Aktuelle Einträge als kompakte Chips ── *@
+                            @* -- Aktuelle Einträge als kompakte Chips -- *@
                             @if (VM.AccessEntries.Any())
                             {
                                 <div class="access-chip-list">
@@ -302,14 +302,14 @@ else
                     </div>
                 }
 
-                @* ── Tab: ACL ── *@
+                @* -- Tab: ACL -- *@
                 @if (_activeTab == DetailTab.Acl)
                 {
                     <div class="detail-section">
                         <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
                             NTFS-ähnliche Berechtigungen für Dateien und Ordner innerhalb dieses Shares.
                         </p>
-                        <AclEditor @key="@_aclEditorKey" Path="@VM.SelectedShare.Path" IsDirectory="true" />
+                        <AclEditor @key="@_aclEditorKey" Path="" ShareId="@VM.SelectedShare.Id" IsDirectory="true" />
                     </div>
                 }
             </div>

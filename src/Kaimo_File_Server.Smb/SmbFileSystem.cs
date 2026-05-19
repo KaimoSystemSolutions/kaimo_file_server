@@ -10,20 +10,22 @@ namespace Kaimo_File_Server.Smb
     public class SmbFileSystem : INTFileStore
     {
         private readonly string _root;
+        private readonly string _shareName;
         private readonly IFileService _fileService;
         private readonly IFileVersionService? _versionService;
         private readonly IServiceProvider? _serviceProvider;
 
-        public SmbFileSystem(string rootPath, IFileService fileService,
+        public SmbFileSystem(string rootPath, string shareName, IFileService fileService,
             IServiceProvider? serviceProvider = null)
         {
             _root = rootPath;
+            _shareName = shareName;
             _fileService = fileService;
             _serviceProvider = serviceProvider;
             Directory.CreateDirectory(_root);
         }
 
-        // ── Thread-safe user injection ──
+        // -- Thread-safe user injection --
         // Instead of a mutable CurrentUser property (race condition!),
         // each session stores its UserContext in AsyncLocal, set by OnAccessRequested.
         // The FileHandle then captures the user at creation time.
@@ -41,7 +43,7 @@ namespace Kaimo_File_Server.Smb
 
         private string GetFullPath(string path)
         {
-            // ── Path traversal protection ──
+            // -- Path traversal protection --
             path = path.Replace('\\', Path.DirectorySeparatorChar)
                        .TrimStart(Path.DirectorySeparatorChar);
             var root = Path.GetFullPath(_root)
@@ -64,8 +66,11 @@ namespace Kaimo_File_Server.Smb
             var full = Path.GetFullPath(fullPath);
             if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
                 return fullPath;
-            return full.Substring(root.Length)
-                .Replace('\\', '/');  // ★ Immer forward slashes für Konsistenz
+            var relative = full.Substring(root.Length).Replace('\\', '/');
+            // ★ Share-Name voranstellen für konsistente DB-Pfade
+            return string.IsNullOrEmpty(relative)
+                ? _shareName
+                : $"{_shareName}/{relative}";
         }
 
         private sealed class FileHandle
@@ -108,7 +113,7 @@ namespace Kaimo_File_Server.Smb
             {
                 var user = RequireSessionUser();
 
-                // ── Snapshot path? Route to version store (readonly) ──
+                // -- Snapshot path? Route to version store (readonly) --
                 if (SmbSnapshotHandler.IsSnapshotPath(path) && _versionService != null)
                 {
                     Console.WriteLine($"[SNAPSHOT DEBUG] Incoming path: '{path}'");
@@ -215,7 +220,7 @@ namespace Kaimo_File_Server.Smb
                     break;
             }
 
-            // ── Single permission check ──
+            // -- Single permission check --
             // Write-creating operations check CanWrite; read-only opens check CanRead.
             // This is the ONLY permission gate FileService is not called again during
             // ReadFile/WriteFile to avoid double-checking.
@@ -267,7 +272,7 @@ namespace Kaimo_File_Server.Smb
             return NTStatus.STATUS_SUCCESS;
         }
 
-        // ── Permission helpers ──
+        // -- Permission helpers --
         // Wrap the async IFileService calls. SMBLibrary forces sync interfaces,
         // so we use Task.Run to avoid blocking the calling sync context.
         private bool CanRead(string relativePath, UserContext user)
@@ -315,7 +320,7 @@ namespace Kaimo_File_Server.Smb
         {
             data = null!;
 
-            // ── Snapshot file: read from decompressed version blob ──
+            // -- Snapshot file: read from decompressed version blob --
             if (handle is SnapshotFileHandle sfh)
             {
                 try
@@ -331,7 +336,7 @@ namespace Kaimo_File_Server.Smb
                 catch { return NTStatus.STATUS_DATA_ERROR; }
             }
 
-            // ── Normal file read (existing code follows unchanged) ──
+            // -- Normal file read (existing code follows unchanged) --
             var h = handle as FileHandle;
             if (h == null || h.IsDirectory) return NTStatus.STATUS_INVALID_HANDLE;
             if (h.Stream == null) return NTStatus.STATUS_FILE_CLOSED;
@@ -387,7 +392,7 @@ namespace Kaimo_File_Server.Smb
         // ===================== CLOSE =====================
         public NTStatus CloseFile(object handle)
         {
-            // ── Snapshot handles: just close the stream ──
+            // -- Snapshot handles: just close the stream --
             if (handle is SnapshotFileHandle sfh)
             {
                 sfh.Stream?.Dispose();
@@ -403,7 +408,7 @@ namespace Kaimo_File_Server.Smb
 
             try
             {
-                // ── Create version snapshot IF the file was actually written to ──
+                // -- Create version snapshot IF the file was actually written to --
                 // Three conditions must all be true:
                 //   1. Versioning is enabled (_versionService != null)
                 //   2. It's a file, not a directory
@@ -1224,7 +1229,7 @@ namespace Kaimo_File_Server.Smb
             }
         }
 
-        // ── Snapshot handle types (readonly, separate from FileHandle) ──
+        // -- Snapshot handle types (readonly, separate from FileHandle) --
 
         private sealed class SnapshotFileHandle
         {

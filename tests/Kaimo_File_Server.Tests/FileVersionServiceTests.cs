@@ -31,7 +31,7 @@ public class FileVersionServiceTests : IDisposable
         try { if (Directory.Exists(_testRoot)) Directory.Delete(_testRoot, true); } catch { }
     }
 
-    // ── Helper ──
+    // -- Helper --
 
     private static Stream ToStream(string content)
         => new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));

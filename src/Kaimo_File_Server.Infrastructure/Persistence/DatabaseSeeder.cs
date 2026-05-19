@@ -18,12 +18,12 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
 
         public async Task SeedAsync()
         {
-            // ── Einmalig: vorhandene Duplikate bereinigen ──
+            // -- Einmalig: vorhandene Duplikate bereinigen --
             await RemoveDuplicatesAsync();
 
             var changed = false;
 
-            // ── Rollen (by Name, da systemdefiniert) ──
+            // -- Rollen (by Name, da systemdefiniert) --
             var requiredRoles = new[] { "Administrator", "User", "ShareCreator", "UserManager" };
             var existingRoleNames = (await _db.Roles.Select(r => r.Name).ToListAsync())
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -37,7 +37,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 }
             }
 
-            // ── Gruppen ──
+            // -- Gruppen --
             var requiredGroups = new[] { "Admins", "Developers", "Guests" };
             var existingGroupNames = (await _db.Groups.Select(g => g.Name).ToListAsync())
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -55,7 +55,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
             if (changed)
                 await _db.SaveChangesAsync();
 
-            // ── Test-User (nur beim allerersten Start) ──
+            // -- Test-User (nur beim allerersten Start) --
             if (!_db.Users.Any())
             {
                 Console.WriteLine("[+] Erstelle Testbenutzer...");
@@ -134,7 +134,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         {
             var cleaned = false;
 
-            // ── Doppelte Rollen ──
+            // -- Doppelte Rollen --
             var allRoles = await _db.Roles.ToListAsync();
             var roleDupes = allRoles
                 .GroupBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
@@ -166,7 +166,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 cleaned = true;
             }
 
-            // ── Doppelte Gruppen ──
+            // -- Doppelte Gruppen --
             var allGroups = await _db.Groups.ToListAsync();
             var groupDupes = allGroups
                 .GroupBy(g => g.Name, StringComparer.OrdinalIgnoreCase)

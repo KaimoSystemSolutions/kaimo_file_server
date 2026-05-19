@@ -44,19 +44,19 @@ public partial class ShareListViewModel
         _storagePath = storagePath.TrimEnd('/');
     }
 
-    // ── State ──
+    // -- State --
 
     public List<ShareDefinition> Shares { get; private set; } = [];
     public bool IsLoading { get; private set; }
     public string? ErrorMessage { get; private set; }
 
-    // ── Create ──
+    // -- Create --
 
     public bool IsCreating { get; set; }
     public string NewShareName { get; set; } = "";
     public string? CreateErrorMessage { get; private set; }
 
-    // ── Edit ──
+    // -- Edit --
 
     public ShareDefinition? SelectedShare { get; private set; }
     public string EditShareName { get; set; } = "";
@@ -65,7 +65,7 @@ public partial class ShareListViewModel
     public bool ShowDeleteConfirm { get; set; }
     public bool IsRenaming { get; private set; }
 
-    // ── Access ──
+    // -- Access --
 
     public bool ShowAccessPanel { get; set; }
     public List<ShareAccessEntry> AccessEntries { get; private set; } = [];
@@ -73,7 +73,7 @@ public partial class ShareListViewModel
     public List<Core.Domain.Identity.Group> AllGroups { get; private set; } = [];
     public string? AccessErrorMessage { get; private set; }
 
-    // ── Computed ──
+    // -- Computed --
 
     public string CurrentUserName { get; private set; } = "";
     public bool IsAdmin { get; private set; }
@@ -82,7 +82,7 @@ public partial class ShareListViewModel
     [GeneratedRegex(@"^[a-zA-Z0-9\-_.]+$")]
     private static partial Regex SafeShareNameRegex();
 
-    // ── Load ──
+    // -- Load --
 
     public async Task LoadAsync()
     {
@@ -142,7 +142,7 @@ public partial class ShareListViewModel
         }
     }
 
-    // ── Validation ──
+    // -- Validation --
 
     private bool ValidateShareName(string name, out string? error)
     {
@@ -165,7 +165,7 @@ public partial class ShareListViewModel
 
     private string BuildSharePath(string name) => $"{_storagePath}/{name}";
 
-    // ── Create ──
+    // -- Create --
 
     public async Task<bool> CreateShareAsync()
     {
@@ -205,7 +205,7 @@ public partial class ShareListViewModel
         }
     }
 
-    // ── Select / Deselect ──
+    // -- Select / Deselect --
 
     public void SelectShare(ShareDefinition share)
     {
@@ -234,7 +234,7 @@ public partial class ShareListViewModel
         ShowAccessPanel = false;
     }
 
-    // ── Rename (mit Lock) ──
+    // -- Rename (mit Lock) --
 
     public async Task<bool> RenameShareAsync()
     {
@@ -317,7 +317,7 @@ public partial class ShareListViewModel
         }
     }
 
-    // ── Toggle Enabled ──
+    // -- Toggle Enabled --
 
     public async Task<bool> ToggleShareEnabledAsync()
     {
@@ -352,7 +352,7 @@ public partial class ShareListViewModel
         }
     }
 
-    // ── Delete ──
+    // -- Delete --
 
     public async Task<bool> DeleteShareAsync()
     {
@@ -380,7 +380,7 @@ public partial class ShareListViewModel
         }
     }
 
-    // ── Access Management ──
+    // -- Access Management --
 
     public async Task LoadAccessAsync()
     {

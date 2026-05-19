@@ -15,6 +15,7 @@ public class AclEditorViewModel
     private readonly IGroupRepository _groupRepo;
     private readonly IRoleRepository _roleRepo;
     private readonly ILogger<AclEditorViewModel> _logger;
+    public Guid ShareId { get; private set; }
 
     public AclEditorViewModel(
         IAclRepository aclRepo,
@@ -32,7 +33,7 @@ public class AclEditorViewModel
         _logger = logger;
     }
 
-    // ── State ──
+    // -- State --
 
     public Guid FileMetadataId { get; private set; }
     public string Path { get; private set; } = "";
@@ -45,7 +46,7 @@ public class AclEditorViewModel
     public List<Group> AllGroups { get; private set; } = [];
     public List<Role> AllRoles { get; private set; } = [];
 
-    // ── New Entry State ──
+    // -- New Entry State --
 
     public bool IsAddingEntry { get; set; }
     public string NewPrincipalType { get; set; } = "user";  // "user", "group", "role"
@@ -54,16 +55,16 @@ public class AclEditorViewModel
     public FilePermission NewPermissions { get; set; } = FilePermission.None;
     public AclInheritance NewInheritance { get; set; } = AclInheritance.Everything;
 
-    // ── Edit State ──
+    // -- Edit State --
 
     public Guid? EditingEntryId { get; set; }
 
-    // ── Load ──
+    // -- Load --
 
     /// <summary>
     /// Lädt oder erstellt die FileMetadata für den gegebenen Pfad und lädt die ACL-Einträge.
     /// </summary>
-    public async Task LoadAsync(string path, bool isDirectory = true)
+    public async Task LoadAsync(string path, Guid shareId, bool isDirectory = true)
     {
         IsLoaded = false;
         ErrorMessage = null;
@@ -71,27 +72,37 @@ public class AclEditorViewModel
 
         try
         {
-            //var state = await _authState.GetAuthenticationStateAsync();
-            //var userId = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             Path = path;
-            var meta = await _metaRepo.GetOrCreateAsync(path, isDirectory, Guid.Empty);
-            FileMetadataId = meta.Id;
+            ShareId = shareId;
 
+            Console.WriteLine($"[AclEditor DEBUG] LoadAsync path='{path}', shareId={shareId}, isDirectory={isDirectory}");
+
+            var meta = await _metaRepo.GetOrCreateAsync(path, isDirectory, Guid.Empty, shareId);
+
+            Console.WriteLine($"[AclEditor DEBUG] meta.Id={meta.Id}, meta.Path='{meta.Path}', meta.ShareId={meta.ShareId}");
+
+            FileMetadataId = meta.Id;
             Entries = await _aclRepo.GetByFileMetadataIdAsync(meta.Id);
+
+            Console.WriteLine($"[AclEditor DEBUG] Entries count={Entries.Count}");
+
             AllUsers = (await _userRepo.GetAllAsync()).ToList();
             AllGroups = (await _groupRepo.GetAllAsync()).ToList();
             AllRoles = (await _roleRepo.GetAllAsync()).ToList();
+
+            Console.WriteLine($"[AclEditor DEBUG] Users={AllUsers.Count}, Groups={AllGroups.Count}, Roles={AllRoles.Count}");
 
             IsLoaded = true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Laden der ACL für '{Path}'", path);
+            Console.WriteLine($"[AclEditor DEBUG] EXCEPTION: {ex}");
             ErrorMessage = "Fehler beim Laden der Berechtigungen.";
         }
     }
 
-    // ── Add ──
+    // -- Add --
 
     public void StartAddEntry()
     {
@@ -157,7 +168,7 @@ public class AclEditorViewModel
         }
     }
 
-    // ── Edit ──
+    // -- Edit --
 
     public void StartEditEntry(AccessEntry entry)
     {
@@ -218,7 +229,7 @@ public class AclEditorViewModel
         }
     }
 
-    // ── Delete ──
+    // -- Delete --
 
     public async Task<bool> DeleteEntryAsync(Guid entryId)
     {
@@ -240,7 +251,7 @@ public class AclEditorViewModel
         }
     }
 
-    // ── Helpers ──
+    // -- Helpers --
 
     public string GetPrincipalDisplayName(Guid principalId)
     {
@@ -272,7 +283,7 @@ public class AclEditorViewModel
         _ => "unknown"
     };
 
-    // ── Permission Helpers ──
+    // -- Permission Helpers --
 
     public bool HasPermission(FilePermission flags, FilePermission flag)
         => (flags & flag) != 0;

@@ -76,7 +76,7 @@ else
         </button>
     </div>
 
-    @* ── Create User Form ── *@
+    @* -- Create User Form -- *@
     @if (VM.IsCreatingUser)
     {
         <div class="create-form-card">
@@ -111,7 +111,7 @@ else
         </div>
     }
 
-    @* ── Create Group Form ── *@
+    @* -- Create Group Form -- *@
     @if (VM.IsCreatingGroup)
     {
         <div class="create-form-card">
@@ -269,7 +269,7 @@ else
                         <div class="success-banner">@VM.SuccessMessage</div>
                     }
 
-                    @* ── USER DETAIL ── *@
+                    @* -- USER DETAIL -- *@
                     @if (VM.SelectedUser is not null)
                     {
                         @if (VM.IsEditing)
@@ -393,21 +393,36 @@ else
                                 
                                 <span class="detail-label">Rollen</span>
                                 <span class="detail-value">
-                                    @{
-                                        
-                                        GetRoles(VM.SelectedUser);
-                                        //VM.UserRoles(user);
-                                        var roles = VM.UserRoles
-                                            .Select(r => r.Name)
-                                            .ToList();
+                                    @if (VM.UserRoles.Any())
+                                    {
+                                        @string.Join(", ", VM.UserRoles.Select(r => r.Name).Take(5))
+                                        @if (VM.UserRoles.Count > 5)
+                                        {
+                                            <span class="truncated-hint"> +@(VM.UserRoles.Count - 5) weitere</span>
+                                        }
                                     }
-
-                                    @(roles.Count > 0
-                                        ? string.Join(", ", roles)
-                                        : "Keine Rollen")
+                                    else
+                                    {
+                                        <text>Keine Rollen</text>
+                                    }
                                 </span>
-                                <span class="detail-label">Username</span>
-                                <span class="detail-subtitle">@VM.SelectedUser.Username</span>
+
+                                <span class="detail-label">Gruppen</span>
+                                <span class="detail-value">
+                                    @if (VM.UserGroups.Any())
+                                    {
+                                        @string.Join(", ", VM.UserGroups.Select(g => g.Name).Take(5))
+                                        @if (VM.UserGroups.Count > 5)
+                                        {
+                                            <span class="truncated-hint"> +@(VM.UserGroups.Count - 5) weitere</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <text>Keine Gruppen</text>
+                                    }
+                                </span>
+
                                 <span class="detail-label">ID</span>
                                 <span class="detail-value">@VM.SelectedUser.Id</span>
                             </div>
@@ -438,7 +453,7 @@ else
                         }
                     }
 
-                    @* ── GROUP DETAIL ── *@
+                    @* -- GROUP DETAIL -- *@
                     else if (VM.SelectedGroup is not null)
                     {
                         @if (VM.IsEditing)
@@ -501,6 +516,22 @@ else
                                 <span class="detail-subtitle">Gruppe</span>
                             </div>
                             <div class="detail-section">
+                                <span class="detail-label">Mitglieder</span>
+                                <span class="detail-value">
+                                    @if (VM.GroupMembers.Any())
+                                    {
+                                        @string.Join(", ", VM.GroupMembers.Select(u => u.Name).Take(5))
+                                        @if (VM.GroupMembers.Count > 5)
+                                        {
+                                            <span class="truncated-hint"> +@(VM.GroupMembers.Count - 5) weitere</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <text>Keine Mitglieder</text>
+                                    }
+                                </span>
+
                                 <span class="detail-label">ID</span>
                                 <span class="detail-value">@VM.SelectedGroup.Id</span>
                             </div>
@@ -531,7 +562,7 @@ else
                         }
                     }
 
-                    @* ── ROLE DETAIL ── *@
+                    @* -- ROLE DETAIL -- *@
                     else if (VM.SelectedRole is not null)
                     {
                         <div class="detail-header">
@@ -581,9 +612,8 @@ else
     }
 
     private async Task GetRoles(User user) { await VM.GetUserRoles(user); }
-
-    private void SelectUser(User user) { CloseDropdowns(); VM.SelectUser(user); StateHasChanged(); }
-    private void SelectGroup(Group group) { CloseDropdowns(); VM.SelectGroup(group); StateHasChanged(); }
+    private async Task SelectUser(User user) { CloseDropdowns(); await VM.SelectUserAsync(user); StateHasChanged(); }
+    private async Task SelectGroup(Group group) { CloseDropdowns(); await VM.SelectGroupAsync(group); StateHasChanged(); }
     private void SelectRole(Role role) { CloseDropdowns(); VM.SelectRole(role); StateHasChanged(); }
 
     private async Task EditUser() { CloseDropdowns(); await VM.StartEditUserAsync(); StateHasChanged(); }

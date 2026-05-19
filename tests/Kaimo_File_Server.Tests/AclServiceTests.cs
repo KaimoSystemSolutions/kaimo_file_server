@@ -23,7 +23,7 @@ public class AclServiceTests
         {
             Id = Guid.NewGuid(), Path = "/test/file.txt", Name = "file.txt",
             Size = 100, IsDirectory = false, CreatedAt = DateTime.UtcNow,
-            ModifiedAt = DateTime.UtcNow, OwnerId = Guid.NewGuid().ToString(), Acl = acl ?? []
+            ModifiedAt = DateTime.UtcNow, OwnerId = Guid.NewGuid(), Acl = acl ?? []
         };
 
     [Fact] public void HasAccess_NullUserContext_ReturnsFalse()

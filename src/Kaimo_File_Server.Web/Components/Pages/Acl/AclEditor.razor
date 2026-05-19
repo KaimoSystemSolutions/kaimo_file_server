@@ -108,7 +108,7 @@
             <p class="empty-hint">Keine Berechtigungen konfiguriert. Ohne ACL-Einträge haben alle Benutzer mit Share-Zugriff vollen Zugriff.</p>
         }
 
-        @* ── Add Entry ── *@
+        @* -- Add Entry -- *@
         @if (VM.IsAddingEntry)
         {
             <div class="acl-add-form">
@@ -162,7 +162,7 @@
     }
 </div>
 
-@* ── Shared Permission Form Fragment ── *@
+@* -- Shared Permission Form Fragment -- *@
 @{
     RenderFragment RenderPermissionForm(bool isAdd) => __builder2 =>
     {
@@ -184,7 +184,7 @@
                 </div>
             </div>
 
-            @* ── Collapsible Einzelberechtigungen ── *@
+            @* -- Collapsible Einzelberechtigungen -- *@
             <div class="acl-form-row">
                 <button class="acl-collapse-toggle" @onclick="() => _showDetailPerms = !_showDetailPerms">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -213,7 +213,7 @@
                 }
             </div>
 
-            @* ── Collapsible Vererbung ── *@
+            @* -- Collapsible Vererbung -- *@
             <div class="acl-form-row">
                 <button class="acl-collapse-toggle" @onclick="() => _showInheritance = !_showInheritance">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -251,6 +251,7 @@
 
 @code {
     [Parameter] public string Path { get; set; } = "";
+    [Parameter] public Guid ShareId { get; set; }
     [Parameter] public bool IsDirectory { get; set; } = true;
     [Parameter] public EventCallback OnChanged { get; set; }
 
@@ -285,6 +286,13 @@
             return;
         }
 
+        if (ShareId == Guid.Empty)
+        {
+            _errorMessage = "Keine Share-ID angegeben.";
+            StateHasChanged();
+            return;
+        }
+
         _isLoading = true;
         _loaded = false;
         _errorMessage = null;
@@ -292,7 +300,7 @@
 
         try
         {
-            await VM.LoadAsync(Path, IsDirectory);
+            await VM.LoadAsync(Path, ShareId, IsDirectory); 
 
             if (VM.IsLoaded)
             {

@@ -15,13 +15,13 @@ namespace Kaimo_File_Server.Smb
     public class SmbServer : IDisposable
     {
         private readonly IServiceProvider _serviceProvider;
-        private readonly IFileService _fileService;
+        private readonly IFileServiceFactory _fileServiceFactory;
         private SMBServer? _server;
 
-        public SmbServer(IServiceProvider serviceProvider, IFileService fileService)
+        public SmbServer(IServiceProvider serviceProvider, IFileServiceFactory fileServiceFactory)
         {
             _serviceProvider = serviceProvider;
-            _fileService = fileService;
+            _fileServiceFactory = fileServiceFactory;
         }
 
         public Task StartAsync(CancellationToken token)
@@ -36,10 +36,8 @@ namespace Kaimo_File_Server.Smb
                 foreach (var shareDef in shares)
                 {
                     Directory.CreateDirectory(shareDef.Path);
-
-                    using var versionScope = _serviceProvider.CreateScope();
-                    var versionService = versionScope.ServiceProvider.GetService<IFileVersionService>();
-                    var fileSystem = new SmbFileSystem(shareDef.Path, _fileService, _serviceProvider);
+                    var fileService = _fileServiceFactory.CreateForShare(shareDef.Id, shareDef.Path);
+                    var fileSystem = new SmbFileSystem(shareDef.Path, shareDef.Name, fileService, _serviceProvider);
 
                     var share = new FileSystemShare(shareDef.Name, fileSystem);
                     share.AccessRequested += (sender, args) =>
@@ -49,7 +47,7 @@ namespace Kaimo_File_Server.Smb
                     };
 
                     shareCollection.Add(share);
-                    Console.WriteLine($"[+] Share '{shareDef.Name}' -> {shareDef.Path}");
+                    Console.WriteLine($"[+] Share '{shareDef.Name}' ({shareDef.Id}) -> {shareDef.Path}");
                 }
             }
 
@@ -92,18 +90,11 @@ namespace Kaimo_File_Server.Smb
                 if (userContext == null)
                 {
                     args.Allow = false;
-                    //Console.WriteLine(
-                    //    $"[ShareAccess] {args.UserName} -> {shareName}: user not found");
                     return;
                 }
 
-                // ── Thread-safe user injection ──
-                // Instead of setting a mutable property on SmbFileSystem (race condition!),
-                // we inject the user into the current execution flow via AsyncLocal.
-                // Every subsequent filesystem call on this flow sees this user.
                 SmbFileSystem.SetSessionUser(userContext);
 
-                // Check share access: user ID + group IDs
                 bool hasAccess = authLookup
                     .HasShareAccessAsync(shareName, userContext.User.Id)
                     .GetAwaiter().GetResult();
@@ -122,9 +113,6 @@ namespace Kaimo_File_Server.Smb
                 }
 
                 args.Allow = hasAccess;
-                //Console.WriteLine(
-                //    $"[ShareAccess] {args.UserName} -> {shareName}: " +
-                //    $"{(hasAccess ? "allowed" : "denied")}");
             }
             catch (Exception ex)
             {

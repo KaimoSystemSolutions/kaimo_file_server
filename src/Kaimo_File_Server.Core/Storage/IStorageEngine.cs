@@ -13,5 +13,6 @@ namespace Kaimo_File_Server.Core.Storage
         Task<FileMetadata> GetMetadataAsync(string path);
         Task<List<FileMetadata>> ListAsync(string directoryPath);
         Task CreateDirectoryAsync(string path);
+        Task<bool> IsDirectoryAsync(string path);
     }
 }

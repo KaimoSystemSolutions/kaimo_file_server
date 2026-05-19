@@ -1,12 +1,16 @@
 ﻿using Kaimo_File_Server.Core.Security;
 
-namespace Kaimo_File_Server.Core.Repositories
+public interface IAclRepository
 {
-    public interface IAclRepository
-    {
-        Task<List<AccessEntry>> GetByFileMetadataIdAsync(Guid fileMetadataId);
-        Task<AccessEntry> AddAsync(AccessEntry entry);
-        Task UpdateAsync(AccessEntry entry);
-        Task DeleteAsync(Guid entryId);
-    }
+    Task<List<AccessEntry>> GetByFileMetadataIdAsync(Guid fileMetadataId);
+    Task<AccessEntry> AddAsync(AccessEntry entry);
+    Task UpdateAsync(AccessEntry entry);
+    Task DeleteAsync(Guid entryId);
+
+    /// <summary>
+    /// Lädt alle ACL-Einträge für die gegebenen Pfade innerhalb eines Shares.
+    /// Wird für die Vererbungsauflösung benötigt.
+    /// </summary>
+    Task<List<(string Path, bool IsDirectory, List<AccessEntry> Acl)>> GetAclsForPathsAsync(
+        Guid shareId, List<string> paths);
 }

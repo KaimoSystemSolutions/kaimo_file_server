@@ -27,7 +27,7 @@ public class FileSystemStorageTests : IDisposable
         try { if (Directory.Exists(_testRoot)) Directory.Delete(_testRoot, true); } catch { }
     }
 
-    // ── Read / Write / Delete ──
+    // -- Read / Write / Delete --
 
     [Fact]
     public async Task WriteAsync_CreatesFileWithContent()
@@ -94,7 +94,7 @@ public class FileSystemStorageTests : IDisposable
         await _sut.DeleteAsync("ghost.txt");
     }
 
-    // ── Metadata ──
+    // -- Metadata --
 
     [Fact]
     public async Task GetMetadataAsync_File_ReturnsCorrectInfo()
@@ -134,7 +134,7 @@ public class FileSystemStorageTests : IDisposable
         Assert.Empty(meta.Acl);
     }
 
-    // ── Path Traversal ──
+    // -- Path Traversal --
 
     [Fact]
     public async Task ReadAsync_PathTraversal_ThrowsUnauthorized()
@@ -164,7 +164,7 @@ public class FileSystemStorageTests : IDisposable
             () => _sut.GetMetadataAsync("../../../etc/shadow"));
     }
 
-    // ── Overwrite ──
+    // -- Overwrite --
 
     [Fact]
     public async Task WriteAsync_OverwritesExistingFile()
@@ -177,7 +177,7 @@ public class FileSystemStorageTests : IDisposable
         Assert.Equal([9, 8], content);
     }
 
-    // ── Large file handling ──
+    // -- Large file handling --
 
     [Fact]
     public async Task WriteAndRead_LargeFile_RoundTrips()
@@ -193,7 +193,7 @@ public class FileSystemStorageTests : IDisposable
         Assert.Equal(data, ms.ToArray());
     }
 
-    // ── Empty file ──
+    // -- Empty file --
 
     [Fact]
     public async Task WriteAsync_EmptyStream_CreatesEmptyFile()
@@ -214,7 +214,7 @@ public class FileSystemStorageTests : IDisposable
         Assert.False(meta.IsDirectory);
     }
 
-    // ── Deeply nested paths ──
+    // -- Deeply nested paths --
 
     [Fact]
     public async Task WriteAsync_DeeplyNestedPath_CreatesAllDirectories()
@@ -225,7 +225,7 @@ public class FileSystemStorageTests : IDisposable
         Assert.True(File.Exists(Path.Combine(_testRoot, path)));
     }
 
-    // ── Special characters in filenames ──
+    // -- Special characters in filenames --
 
     [Fact]
     public async Task WriteAndRead_SpecialCharsInName_RoundTrips()
@@ -239,7 +239,7 @@ public class FileSystemStorageTests : IDisposable
         Assert.Equal([1, 2, 3], ms.ToArray());
     }
 
-    // ── Delete idempotency ──
+    // -- Delete idempotency --
 
     [Fact]
     public async Task DeleteAsync_CalledTwice_DoesNotThrow()
@@ -249,7 +249,7 @@ public class FileSystemStorageTests : IDisposable
         await _sut.DeleteAsync("twice.txt"); // should not throw
     }
 
-    // ── Metadata for nested paths ──
+    // -- Metadata for nested paths --
 
     [Fact]
     public async Task GetMetadataAsync_NestedFile_ReturnsCorrectSize()
@@ -261,7 +261,7 @@ public class FileSystemStorageTests : IDisposable
         Assert.Equal(777, meta.Size);
     }
 
-    // ── Path traversal with encoded/tricky patterns ──
+    // -- Path traversal with encoded/tricky patterns --
 
     [Theory]
     [InlineData("..")]
@@ -274,7 +274,7 @@ public class FileSystemStorageTests : IDisposable
             () => _sut.WriteAsync(path, new MemoryStream([1])));
     }
 
-    // ── Concurrent writes to different files ──
+    // -- Concurrent writes to different files --
 
     [Fact]
     public async Task ConcurrentWrites_DifferentFiles_AllSucceed()
@@ -291,7 +291,7 @@ public class FileSystemStorageTests : IDisposable
         }
     }
 
-    // ── CreateDirectoryAsync ──
+    // -- CreateDirectoryAsync --
 
     [Fact]
     public async Task CreateDirectoryAsync_CreatesDirectory()
@@ -409,7 +409,7 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
     public Task<List<FileMetadata>> ListAsync(string directoryPath)
         => Invoke<List<FileMetadata>>("ListAsync", directoryPath);
 
-    // ── Helpers that unwrap TargetInvocationException from reflection ──
+    // -- Helpers that unwrap TargetInvocationException from reflection --
 
     private async Task Invoke(string method, params object[] args)
     {

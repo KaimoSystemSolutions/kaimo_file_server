@@ -32,19 +32,19 @@ public partial class ShareBrowserViewModel
         _logger = logger;
     }
 
-    // ── State ──
+    // -- State --
 
     public List<ShareDefinition> Shares { get; private set; } = [];
     public bool IsLoading { get; private set; }
     public string? ErrorMessage { get; private set; }
 
-    // ── Create Share State ──
+    // -- Create Share State --
 
     public bool IsCreating { get; set; }
     public string NewShareName { get; set; } = "";
     public string? CreateErrorMessage { get; private set; }
 
-    // ── Computed ──
+    // -- Computed --
     public string CurrentUserName { get; private set; } = "";
     public bool CanCreateShare { get; private set; }
 
@@ -52,7 +52,7 @@ public partial class ShareBrowserViewModel
     [GeneratedRegex(@"^[a-zA-Z0-9\-_.]+$")]
     private static partial Regex SafeShareNameRegex();
 
-    // ── Commands ──
+    // -- Commands --
 
     public async Task LoadAsync()
     {

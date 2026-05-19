@@ -46,15 +46,20 @@ namespace Kaimo_File_Server.Infrastructure
 
         /// <summary>
         /// Registers Core services (FileService, AclService, StorageEngine).
-        /// Called from the Host project after AddInfrastructure.
-        /// Hinweis: Wird aktuell nicht von Program.cs aufgerufen – die Services
-        /// werden dort direkt registriert. Diese Methode bleibt als Alternative.
+        /// Called from the Host project after AddInfrastructure..
         /// </summary>
         public static IServiceCollection AddCoreServices(this IServiceCollection services, string storagePath)
         {
-            services.AddSingleton<IStorageEngine>(sp => new FileSystemStorage(storagePath, sp));
-            services.AddSingleton<IAclService, AclService>();
-            services.AddSingleton<IFileService, FileService>();
+
+            services.AddScoped<IAclRepository, Kaimo_File_Server.Infrastructure.Repositories.AclRepository>();
+            services.AddScoped<IFileMetadataRepository, Kaimo_File_Server.Infrastructure.Repositories.FileMetadataRepository>();
+
+            // Factory für share-spezifische FileService-Instanzen (mit ACL)
+            services.AddSingleton<IFileServiceFactory, FileServiceFactory>();
+
+            // Root-StorageEngine für die Web-UI (Listing, Ordner erstellen — ohne ACL)
+            services.AddSingleton<IStorageEngine>(sp =>
+                new FileSystemStorage(storagePath, Guid.Empty, sp));
 
             var versionStoragePath = Path.Combine(storagePath, ".versions");
 
@@ -65,7 +70,6 @@ namespace Kaimo_File_Server.Infrastructure
                     defaultMaxVersions: 64,
                     defaultMaxAge: TimeSpan.FromDays(90)));
 
-            // ShareLockManager – Singleton, ein Lock pro Share-Name (In-Memory, Single-Instance)
             services.AddSingleton<ShareLockManager>();
 
             return services;
@@ -97,5 +101,8 @@ namespace Kaimo_File_Server.Infrastructure
 
             throw new Exception("Datenbank konnte nicht erreicht werden");
         }
+
+
     }
+
 }

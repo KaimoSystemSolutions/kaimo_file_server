@@ -9,5 +9,6 @@ namespace Kaimo_File_Server.Core.Repositories
     public interface IUserContextFactory
     {
         Task<UserContext> CreateAsync(User user);
+        Task<UserContext?> CreateByUsernameAsync(string username);
     }
 }

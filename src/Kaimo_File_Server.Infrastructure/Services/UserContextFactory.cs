@@ -25,5 +25,15 @@ namespace Kaimo_File_Server.Infrastructure.Services
 
             return new UserContext(user, groups, roles, new HashSet<string>());
         }
+
+        public async Task<UserContext?> CreateByUsernameAsync(string username)
+        {
+            var user = await _db.Users
+                .FirstOrDefaultAsync(u => u.Username == username);
+
+            if (user is null) return null;
+
+            return await CreateAsync(user);
+        }
     }
 }

@@ -1,29 +1,18 @@
 ﻿using Kaimo_File_Server.Core.Security;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Kaimo_File_Server.Core.Domain
 {
     public class FileMetadata
     {
         public Guid Id { get; set; }
-        public string Path { get; init; }
-        public string Name { get; init; }
-
-        public long Size { get; init; }
-        public bool IsDirectory { get; init; }
-
-        public DateTime CreatedAt { get; init; }
-        public DateTime ModifiedAt { get; init; }
-
-        public Guid OwnerId { get; init; }
-
-        public IReadOnlyList<AccessEntry> Acl { get; init; }
-
-        public FileMetadata() { }
-
-
-
+        public Guid ShareId { get; set; }
+        public string Path { get; set; } = "";
+        public string Name { get; set; } = "";
+        public long Size { get; set; }
+        public bool IsDirectory { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime ModifiedAt { get; set; }
+        public Guid OwnerId { get; set; }
+        public IReadOnlyList<AccessEntry> Acl { get; set; } = [];
     }
 }

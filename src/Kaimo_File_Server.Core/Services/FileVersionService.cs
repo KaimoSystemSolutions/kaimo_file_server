@@ -45,16 +45,16 @@ namespace Kaimo_File_Server.Core.Services
         public async Task<FileVersion?> CreateVersionAsync(
     string filePath, Stream content, string? userId = null)
         {
-            // ── 1. Hash the content ──
+            // -- 1. Hash the content --
             content.Position = 0;
             var hash = await ComputeHashAsync(content);
             content.Position = 0;
 
-            // ── 2. Skip if content unchanged since last version ──
+            // -- 2. Skip if content unchanged since last version --
             if (await _versionRepo.ExistsWithHashAsync(filePath, hash))
                 return null;
 
-            // ── 3. Store blob compressed (content-addressable) ──
+            // -- 3. Store blob compressed (content-addressable) --
             var blobRelativePath = HashToPath(hash);
             var blobFullPath = Path.Combine(_versionStorageRoot, blobRelativePath);
 
@@ -80,7 +80,7 @@ namespace Kaimo_File_Server.Core.Services
 
             content.Position = 0;
 
-            // ── 4. Create version record ──
+            // -- 4. Create version record --
             var versionNumber = await _versionRepo.GetMaxVersionNumberAsync(filePath) + 1;
             var now = DateTime.UtcNow;
 
@@ -112,7 +112,7 @@ namespace Kaimo_File_Server.Core.Services
                 $"({content.Length} → {compressedSize} bytes, " +
                 $"{(double)compressedSize / Math.Max(content.Length, 1):P0} ratio)");
 
-            // ── 5. Enforce retention ──
+            // -- 5. Enforce retention --
             await ApplyRetentionAsync(filePath, _defaultMaxVersions, _defaultMaxAge);
 
             return version;
@@ -181,7 +181,7 @@ namespace Kaimo_File_Server.Core.Services
             return deleted;
         }
 
-        // ── Helpers ──
+        // -- Helpers --
 
         private static async Task<string> ComputeHashAsync(Stream stream)
         {

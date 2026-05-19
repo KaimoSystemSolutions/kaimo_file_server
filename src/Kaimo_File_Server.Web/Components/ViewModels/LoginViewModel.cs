@@ -30,7 +30,7 @@ public class LoginViewModel
         _logger = logger;
     }
 
-    // ── State ──
+    // -- State --
 
     public string Username { get; set; } = "";
     public string Password { get; set; } = "";
@@ -38,7 +38,7 @@ public class LoginViewModel
     public string? ErrorMessage { get; private set; }
     public bool IsAuthenticated { get; private set; }
 
-    // ── Commands ──
+    // -- Commands --
 
     public async Task<bool> LoginAsync()
     {

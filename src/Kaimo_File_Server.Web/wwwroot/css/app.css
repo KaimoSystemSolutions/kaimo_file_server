@@ -3,7 +3,7 @@
    Dark/Light Theme, Synology-inspired File Server UI
    ══════════════════════════════════════════════════════════ */
 
-/* ── Theme Variables ── */
+/* -- Theme Variables -- */
 
 [data-theme="dark"] {
     --bg-primary: #0f1117;
@@ -59,7 +59,7 @@
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
-/* ── Reset & Base ── */
+/* -- Reset & Base -- */
 
 *, *::before, *::after {
     box-sizing: border-box;
@@ -77,7 +77,7 @@ html, body, #app {
     -webkit-font-smoothing: antialiased;
 }
 
-/* ── App Shell ── */
+/* -- App Shell -- */
 
 .app-shell {
     display: flex;
@@ -85,7 +85,7 @@ html, body, #app {
     overflow: hidden;
 }
 
-/* ── Sidebar ── */
+/* -- Sidebar -- */
 
 .sidebar {
     width: 240px;
@@ -144,7 +144,7 @@ html, body, #app {
         font-weight: 600;
     }
 
-/* ── Sidebar Footer ── */
+/* -- Sidebar Footer -- */
 
 .sidebar-footer {
     padding: 12px;
@@ -192,7 +192,7 @@ html, body, #app {
     justify-content: flex-end;
 }
 
-/* ── Theme Toggle & Icon Buttons ── */
+/* -- Theme Toggle & Icon Buttons -- */
 
 .theme-toggle {
     width: 34px;
@@ -233,7 +233,7 @@ html, body, #app {
         border-color: var(--accent);
     }
 
-/* ── Main Content ── */
+/* -- Main Content -- */
 
 .main {
     flex: 1;
@@ -242,7 +242,7 @@ html, body, #app {
     min-width: 0;
 }
 
-/* ── Page Header ── */
+/* -- Page Header -- */
 
 .page-header {
     display: flex;
@@ -264,7 +264,7 @@ html, body, #app {
     margin-top: 2px;
 }
 
-/* ── Buttons ── */
+/* -- Buttons -- */
 
 .btn-primary {
     padding: 8px 16px;
@@ -331,7 +331,7 @@ html, body, #app {
         cursor: not-allowed;
     }
 
-/* ── Banners ── */
+/* -- Banners -- */
 
 .error-banner {
     padding: 10px 14px;
@@ -355,7 +355,7 @@ html, body, #app {
     margin-bottom: 16px;
 }
 
-/* ── Loading & Empty State ── */
+/* -- Loading & Empty State -- */
 
 .loading-state {
     display: flex;
@@ -394,7 +394,7 @@ html, body, #app {
     font-size: 13px;
 }
 
-/* ── Share Grid ── */
+/* -- Share Grid -- */
 
 .share-grid {
     display: grid;
@@ -447,7 +447,7 @@ html, body, #app {
     white-space: nowrap;
 }
 
-/* ── Create Share Form ── */
+/* -- Create Share Form -- */
 
 .create-share-form {
     display: flex;
@@ -478,7 +478,7 @@ html, body, #app {
             border-color: var(--accent);
         }
 
-/* ── File List ── */
+/* -- File List -- */
 
 .file-list {
     border: 1px solid var(--border);
@@ -563,7 +563,7 @@ html, body, #app {
     margin-right: 10px;
 }
 
-/* ── Breadcrumbs ── */
+/* -- Breadcrumbs -- */
 
 .breadcrumb-bar {
     display: flex;
@@ -594,7 +594,7 @@ html, body, #app {
     margin: 0 2px;
 }
 
-/* ── Login Page ── */
+/* -- Login Page -- */
 
 .login-page {
     min-height: 100vh;
@@ -676,7 +676,7 @@ html, body, #app {
     margin-top: 4px;
 }
 
-/* ── Admin Tabs ── */
+/* -- Admin Tabs -- */
 
 .admin-tabs {
     display: flex;
@@ -716,7 +716,7 @@ html, body, #app {
         box-shadow: var(--shadow);
     }
 
-/* ── Admin Content (List + Detail) ── */
+/* -- Admin Content (List + Detail) -- */
 
 .admin-content {
     display: flex;
@@ -741,7 +741,7 @@ html, body, #app {
     top: 24px;
 }
 
-/* ── Admin List Rows ── */
+/* -- Admin List Rows -- */
 
 .admin-row-header {
     background: var(--bg-tertiary);
@@ -779,7 +779,7 @@ html, body, #app {
         background: var(--accent-selected) !important;
     }
 
-/* ── Detail Panel ── */
+/* -- Detail Panel -- */
 
 .detail-header {
     margin-bottom: 20px;
@@ -809,7 +809,7 @@ html, body, #app {
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--text-tertiary);
-    margin-bottom: 5px;
+    margin-top: 15px;
 }
 
 .detail-value {
@@ -844,7 +844,7 @@ html, body, #app {
         margin-top: 1px;
     }
 
-/* ── Multi-Select Dropdowns ── */
+/* -- Multi-Select Dropdowns -- */
 
 .multi-select {
     position: relative;
@@ -949,7 +949,7 @@ html, body, #app {
     text-align: center;
 }
 
-/* ── Create Form Card (User/Group Creation) ── */
+/* -- Create Form Card (User/Group Creation) -- */
 
 .create-form-card {
     background: var(--bg-secondary);
@@ -979,7 +979,7 @@ html, body, #app {
     margin-top: 16px;
 }
 
-/* ── Delete Confirmation ── */
+/* -- Delete Confirmation -- */
 
 .confirm-delete {
     padding: 12px 14px;
@@ -995,7 +995,7 @@ html, body, #app {
         margin-bottom: 10px;
     }
 
-/* ── Scrollbar ── */
+/* -- Scrollbar -- */
 
 ::-webkit-scrollbar {
     width: 6px;
@@ -1014,7 +1014,7 @@ html, body, #app {
         background: var(--text-tertiary);
     }
 
-/* ── Responsive ── */
+/* -- Responsive -- */
 
 @media (max-width: 768px) {
     .app-shell {
@@ -1136,7 +1136,7 @@ html, body, #app {
     min-width: 380px;
 }
 
-/* ── Panel Header ── */
+/* -- Panel Header -- */
 
 .detail-panel-header {
     padding-bottom: 16px;
@@ -1175,7 +1175,7 @@ html, body, #app {
     font-weight: 500;
 }
 
-/* ── Detail Tabs ── */
+/* -- Detail Tabs -- */
 
 .detail-tabs {
     display: flex;
@@ -1226,13 +1226,13 @@ html, body, #app {
         stroke: white;
     }
 
-/* ── Tab Content Area ── */
+/* -- Tab Content Area -- */
 
 .detail-tab-content {
     padding: 0;
 }
 
-/* ── Detail Card (grouped fields) ── */
+/* -- Detail Card (grouped fields) -- */
 
 .detail-card {
     background: var(--bg-tertiary);
@@ -1261,7 +1261,7 @@ html, body, #app {
     color: var(--text-tertiary);
 }
 
-/* ── Detail Rename Row ── */
+/* -- Detail Rename Row -- */
 
 .detail-rename-row {
     display: flex;
@@ -1281,7 +1281,7 @@ html, body, #app {
         margin-top: 15px;
     }
 
-/* ── Monospace Detail Value ── */
+/* -- Monospace Detail Value -- */
 
 .detail-value--mono {
     font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
@@ -1295,7 +1295,7 @@ html, body, #app {
     color: var(--text-secondary);
 }
 
-/* ── Status Indicator ── */
+/* -- Status Indicator -- */
 
 .detail-status-row {
     display: flex;
@@ -1325,7 +1325,7 @@ html, body, #app {
     font-size: 12px;
 }
 
-/* ── Hint & Info Text ── */
+/* -- Hint & Info Text -- */
 
 .detail-hint {
     font-size: 12px;
@@ -1349,7 +1349,7 @@ html, body, #app {
     border: 1px dashed var(--border);
 }
 
-/* ── Multi-Select Empty State ── */
+/* -- Multi-Select Empty State -- */
 
 .multi-select-empty {
     padding: 12px;
@@ -1358,7 +1358,7 @@ html, body, #app {
     color: var(--text-tertiary);
 }
 
-/* ── Disabled share card ── */
+/* -- Disabled share card -- */
 
 .share-card--disabled {
     opacity: 0.6;
@@ -1381,7 +1381,7 @@ html, body, #app {
     display: inline-block;
 }
 
-/* ── ACL Entry List ── */
+/* -- ACL Entry List -- */
 
 .acl-editor {
     margin-top: 0;
@@ -1488,7 +1488,7 @@ html, body, #app {
     flex-shrink: 0;
 }
 
-/* ── Add Form ── */
+/* -- Add Form -- */
 
 .acl-add-form {
     margin-top: 12px;
@@ -1508,7 +1508,7 @@ html, body, #app {
         letter-spacing: 0.04em;
     }
 
-/* ── Form Layout ── */
+/* -- Form Layout -- */
 
 .acl-form {
     display: flex;
@@ -1529,7 +1529,7 @@ html, body, #app {
     margin-top: 4px;
 }
 
-/* ── Type Tabs (User/Group/Role, Allow/Deny) ── */
+/* -- Type Tabs (User/Group/Role, Allow/Deny) -- */
 
 .acl-type-tabs {
     display: flex;
@@ -1572,7 +1572,7 @@ html, body, #app {
     color: var(--danger);
 }
 
-/* ── Permission Shortcuts ── */
+/* -- Permission Shortcuts -- */
 
 .acl-shortcut-row {
     display: flex;
@@ -1603,7 +1603,7 @@ html, body, #app {
     color: var(--accent);
 }
 
-/* ── Collapsible Toggle ── */
+/* -- Collapsible Toggle -- */
 
 .acl-collapse-toggle {
     display: flex;
@@ -1630,7 +1630,7 @@ html, body, #app {
     transform: rotate(90deg);
 }
 
-/* ── Permission Grid ── */
+/* -- Permission Grid -- */
 
 .acl-perm-grid {
     display: grid;

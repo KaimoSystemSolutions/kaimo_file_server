@@ -1,4 +1,5 @@
-﻿using Kaimo_File_Server.Core.Repositories;
+﻿using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -36,6 +37,19 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
                 _db.AccessEntries.Remove(entry);
                 await _db.SaveChangesAsync();
             }
+        }
+
+        public async Task<List<(string Path, bool IsDirectory, List<AccessEntry> Acl)>>
+            GetAclsForPathsAsync(Guid shareId, List<string> paths)
+        {
+            var metas = await _db.FileMetadata
+                .Where(m => m.ShareId == shareId && paths.Contains(m.Path))
+                .Include(m => m.Acl)
+                .ToListAsync();
+
+            return metas
+                .Select(m => (m.Path, m.IsDirectory, m.Acl?.ToList() ?? new List<AccessEntry>()))
+                .ToList();
         }
     }
 }

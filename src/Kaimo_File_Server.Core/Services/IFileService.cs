@@ -13,18 +13,19 @@ namespace Kaimo_File_Server.Core.Services
     /// </summary>
     public interface IFileService
     {
-        // ──────────── Permission Checks ────────────
+        // ------------ Permission Checks ------------
         Task<bool> CanReadAsync(string path, UserContext user);
         Task<bool> CanWriteAsync(string path, UserContext user);
         Task<bool> CanCreateAsync(string path, UserContext user);
         Task<bool> CanDeleteAsync(string path, UserContext user);
         Task<bool> CanListAsync(string path, UserContext user);
 
-        // ──────────── Full Operations ────────────
+        // ------------ Full Operations ------------
         Task<Stream> ReadFileAsync(string path, UserContext user);
         Task WriteFileAsync(string path, Stream data, UserContext user);
         Task CreateFileAsync(string path, UserContext user);
         Task DeleteFileAsync(string path, UserContext user);
         Task<FileMetadata> GetMetadataAsync(string path, UserContext user);
+        Task<List<FileMetadata>> ListAsync(string directoryPath, UserContext user);
     }
 }

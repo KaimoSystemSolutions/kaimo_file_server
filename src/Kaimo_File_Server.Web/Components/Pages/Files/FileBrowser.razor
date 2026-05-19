@@ -43,7 +43,7 @@ else if (VM.ErrorMessage is not null)
 }
 else
 {
-    @* ── ACL Panel (Slide-Down) ── *@
+    @* -- ACL Panel (Slide-Down) -- *@
     @if (_showAclPanel && _isAdmin)
     {
         <div class="acl-panel">
@@ -57,7 +57,7 @@ else
                 </h3>
                 <span class="detail-subtitle">@_aclPath</span>
             </div>
-            <AclEditor Path="@_aclPath" IsDirectory="true" />
+            <AclEditor Path="@_aclPath" ShareId="@VM.CurrentShare.Id" IsDirectory="true" />
         </div>
     }
 
@@ -120,7 +120,7 @@ else
                             </svg>
                         </button>
                     </div>
-                    <AclEditor Path="@_aclFolderPath" IsDirectory="true" />
+                    <AclEditor Path="@_aclFolderPath" ShareId="@VM.CurrentShare.Id" IsDirectory="true" />
                 </div>
             }
         }
@@ -168,7 +168,7 @@ else
                             </svg>
                         </button>
                     </div>
-                    <AclEditor Path="@_aclFolderPath" IsDirectory="false" />
+                    <AclEditor Path="@_aclFolderPath" ShareId="@VM.CurrentShare.Id" IsDirectory="false" />
                 </div>
             }
         }
@@ -217,11 +217,8 @@ else
 
     private void UpdateAclPath()
     {
-        // Baue den vollständigen Pfad für den aktuellen Ordner
-        if (string.IsNullOrEmpty(VM.CurrentPath))
-            _aclPath = ShareName;
-        else
-            _aclPath = $"{ShareName}/{VM.CurrentPath}";
+        // Nur der Pfad innerhalb des Shares, OHNE Share-Name
+        _aclPath = VM.CurrentPath ?? "";
     }
 
     private void ToggleAclPanel()
@@ -235,8 +232,7 @@ else
         var relativePath = dir.Path;
         if (VM.CurrentShare is not null && relativePath.StartsWith(VM.CurrentShare.Path))
             relativePath = relativePath[VM.CurrentShare.Path.Length..].TrimStart('/');
-
-        return string.IsNullOrEmpty(relativePath) ? ShareName : $"{ShareName}/{relativePath}";
+        return relativePath;
     }
 
     private string GetFileAclPath(FileMetadata file)
@@ -244,8 +240,7 @@ else
         var relativePath = file.Path;
         if (VM.CurrentShare is not null && relativePath.StartsWith(VM.CurrentShare.Path))
             relativePath = relativePath[VM.CurrentShare.Path.Length..].TrimStart('/');
-
-        return string.IsNullOrEmpty(relativePath) ? ShareName : $"{ShareName}/{relativePath}";
+        return relativePath;
     }
 
     private void OpenFolderAcl(FileMetadata dir)

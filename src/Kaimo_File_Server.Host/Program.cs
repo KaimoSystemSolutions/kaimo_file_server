@@ -3,14 +3,14 @@ using Kaimo_File_Server.Smb;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-// ── Infrastructure (DB + Repositories + AuthenticationLookup) ──
+// -- Infrastructure (DB + Repositories + AuthenticationLookup) --
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// ── Core Services (FileService, AclService, StorageEngine) ──
+// -- Core Services (FileService, AclService, StorageEngine) --
 var storagePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
 builder.Services.AddCoreServices(storagePath);
 
-// ── SMB Transport ──
+// -- SMB Transport --
 builder.Services.AddSmb();
 
 var host = builder.Build();

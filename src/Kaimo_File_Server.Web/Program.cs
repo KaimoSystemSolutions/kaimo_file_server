@@ -13,39 +13,35 @@ using Microsoft.AspNetCore.DataProtection.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Blazor ──
+// -- Blazor --
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorizationCore();
 
-// ── JWT ──
+// -- JWT --
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<JwtAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
     sp.GetRequiredService<JwtAuthenticationStateProvider>());
 
-// ── Infrastructure (DB + Repositories) ──
+// -- Infrastructure (DB + Repositories) --
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// ── Core Services ──
+// -- Core Services --
 var storagePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
-builder.Services.AddSingleton<IStorageEngine>(sp => new FileSystemStorage(storagePath, sp));
-builder.Services.AddSingleton<IAclService, AclService>();
-builder.Services.AddScoped<IFileService, FileService>();
+builder.Services.AddCoreServices(storagePath);
 
-// ── Share Lock Manager (Singleton – ein Lock pro Share, In-Memory) ──
+// -- Share Lock Manager (Singleton – ein Lock pro Share, In-Memory) --
 builder.Services.AddSingleton<ShareLockManager>();
 
-// ── Additional Repositories ──
-builder.Services.AddScoped<IAclRepository, Kaimo_File_Server.Infrastructure.Repositories.AclRepository>();
-builder.Services.AddScoped<IFileMetadataRepository, Kaimo_File_Server.Infrastructure.Repositories.FileMetadataRepository>();
+// -- Additional Repositories --
 
-// ── Services ──
+// -- Services --
 builder.Services.AddScoped<ThemeService>();
 
-// ── ViewModels ──
+// -- ViewModels --
 builder.Services.AddScoped<LoginViewModel>();
 builder.Services.AddScoped<ShareBrowserViewModel>();
 builder.Services.AddScoped<FileBrowserViewModel>();
@@ -64,7 +60,7 @@ builder.Services.AddScoped<ShareListViewModel>(sp =>
         sp.GetRequiredService<ILogger<ShareListViewModel>>(),
         storagePath));
 
-// ── DataProtection ──
+// -- DataProtection --
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo("/data/storage/.dp-keys"))
     .SetApplicationName("KaimoFiles");

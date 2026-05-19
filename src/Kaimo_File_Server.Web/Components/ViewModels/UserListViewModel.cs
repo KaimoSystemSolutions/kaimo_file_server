@@ -35,7 +35,7 @@ public class UserListViewModel
         _logger = logger;
     }
 
-    // ── State ──
+    // -- State --
     public List<User> Users { get; private set; } = [];
     public List<Group> Groups { get; private set; } = [];
     public List<Role> Roles { get; private set; } = [];
@@ -46,12 +46,12 @@ public class UserListViewModel
     public bool CanManageUsers { get; private set; }
     public AdminTab ActiveTab { get; private set; } = AdminTab.Users;
 
-    // ── Selection ──
+    // -- Selection --
     public User? SelectedUser { get; set; }
     public Group? SelectedGroup { get; set; }
     public Role? SelectedRole { get; set; }
 
-    // ── Edit-Modus ──
+    // -- Edit-Modus --
     public bool IsEditing { get; private set; }
     public bool IsSaving { get; private set; }
 
@@ -61,8 +61,12 @@ public class UserListViewModel
     public List<CheckboxItem<Role>> EditUserRoles { get; private set; } = [];
 
     // -- User-Details --
-
+    public List<Group> UserGroups {get; private set; } = [];
     public List<Role> UserRoles { get; private set; } = [];
+
+    // -- Group-Details --
+    public List<User> GroupMembers { get; private set; } = [];
+    public List<Role> GroupRoles { get; private set; } = [];
 
     // Password-Change
     public string NewPassword { get; set; } = "";
@@ -71,20 +75,20 @@ public class UserListViewModel
     // Group-Edit
     public List<CheckboxItem<User>> EditGroupMembers { get; private set; } = [];
 
-    // ── Create User ──
+    // -- Create User --
     public bool IsCreatingUser { get; set; }
     public string CreateUserName { get; set; } = "";
     public string CreateUserUsername { get; set; } = "";
     public string CreateUserPassword { get; set; } = "";
 
-    // ── Create Group ──
+    // -- Create Group --
     public bool IsCreatingGroup { get; set; }
     public string CreateGroupName { get; set; } = "";
 
-    // ── Delete Confirmation ──
+    // -- Delete Confirmation --
     public bool IsConfirmingDelete { get; set; }
 
-    // ── Computed ──
+    // -- Computed --
     public string TabSubtitle => ActiveTab switch
     {
         AdminTab.Users => $"{Users.Count} Benutzer",
@@ -93,7 +97,7 @@ public class UserListViewModel
         _ => ""
     };
 
-    // ── Commands ──
+    // -- Commands --
 
     public async Task LoadAsync()
     {
@@ -173,6 +177,46 @@ public class UserListViewModel
     }
 
     // -- Show Details --
+
+    public async Task SelectUserAsync(User user)
+    {
+        CancelEdit();
+        CancelCreate();
+        SelectedGroup = null;
+        SelectedRole = null;
+        SuccessMessage = null;
+
+        if (SelectedUser?.Id == user.Id)
+        {
+            SelectedUser = null;
+            UserRoles = [];
+            UserGroups = [];
+            return;
+        }
+
+        SelectedUser = user;
+        UserRoles = (await _userRepo.GetRolesForUserAsync(user.Id)).OrderBy(r => r.Name).ToList();
+        UserGroups = (await _userRepo.GetGroupsForUserAsync(user.Id)).OrderBy(g => g.Name).ToList();
+    }
+
+    public async Task SelectGroupAsync(Group group)
+    {
+        CancelEdit();
+        CancelCreate();
+        SelectedUser = null;
+        SelectedRole = null;
+        SuccessMessage = null;
+
+        if (SelectedGroup?.Id == group.Id)
+        {
+            SelectedGroup = null;
+            GroupMembers = [];
+            return;
+        }
+
+        SelectedGroup = group;
+        GroupMembers = (await _groupRepo.GetMembersAsync(group.Id)).OrderBy(u => u.Name).ToList();
+    }
 
     public async Task GetUserRoles(User user)
     {
@@ -265,7 +309,7 @@ public class UserListViewModel
         finally { IsSaving = false; }
     }
 
-    // ── Edit Group ──
+    // -- Edit Group --
 
     public async Task StartEditGroupAsync()
     {
@@ -303,7 +347,7 @@ public class UserListViewModel
         finally { IsSaving = false; }
     }
 
-    // ── Create User ──
+    // -- Create User --
 
     public void StartCreateUser()
     {
@@ -381,7 +425,7 @@ public class UserListViewModel
         finally { IsSaving = false; }
     }
 
-    // ── Create Group ──
+    // -- Create Group --
 
     public void StartCreateGroup()
     {
@@ -427,7 +471,7 @@ public class UserListViewModel
         finally { IsSaving = false; }
     }
 
-    // ── Delete User ──
+    // -- Delete User --
 
     public void RequestDeleteUser()
     {
@@ -458,7 +502,7 @@ public class UserListViewModel
         finally { IsSaving = false; }
     }
 
-    // ── Delete Group ──
+    // -- Delete Group --
 
     public void RequestDeleteGroup()
     {
@@ -489,7 +533,7 @@ public class UserListViewModel
         finally { IsSaving = false; }
     }
 
-    // ── Helpers ──
+    // -- Helpers --
 
     public void CancelEdit()
     {
@@ -533,7 +577,7 @@ public class UserListViewModel
     }
 }
 
-// ── Hilfsklasse für Checkbox-Listen ──
+// -- Hilfsklasse für Checkbox-Listen --
 public class CheckboxItem<T>
 {
     public T Item { get; }

@@ -10,18 +10,14 @@ namespace Kaimo_File_Server.Infrastructure.Storage
     public class FileSystemStorage : IStorageEngine
     {
         private readonly string _rootPath;
+        private readonly Guid _shareId;
         private readonly IServiceProvider? _serviceProvider;
 
-        public FileSystemStorage(string rootPath, IServiceProvider serviceProvider)
+        public FileSystemStorage(string rootPath, Guid shareId, IServiceProvider serviceProvider)
         {
             _rootPath = rootPath;
+            _shareId = shareId;
             _serviceProvider = serviceProvider;
-            Directory.CreateDirectory(_rootPath);
-        }
-
-        public FileSystemStorage(string rootPath)
-        {
-            _rootPath = rootPath;
             Directory.CreateDirectory(_rootPath);
         }
 
@@ -58,6 +54,13 @@ namespace Kaimo_File_Server.Infrastructure.Storage
             return Task.CompletedTask;
         }
 
+        public Task<bool> IsDirectoryAsync(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return Task.FromResult(true);
+            var fullPath = GetFullPath(path);
+            return Task.FromResult(Directory.Exists(fullPath));
+        }
+
         public async Task<FileMetadata> GetMetadataAsync(string path)
         {
             var fullPath = GetFullPath(path);
@@ -73,7 +76,7 @@ namespace Kaimo_File_Server.Infrastructure.Storage
                     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                     var dbMeta = await db.FileMetadata
                         .Include(m => m.Acl)
-                        .FirstOrDefaultAsync(m => m.Path == path);
+                        .FirstOrDefaultAsync(m => m.ShareId == _shareId && m.Path == path);
                     if (dbMeta?.Acl != null) acl = dbMeta.Acl;
                 }
                 catch (Exception ex)
@@ -84,6 +87,7 @@ namespace Kaimo_File_Server.Infrastructure.Storage
 
             return new FileMetadata
             {
+                ShareId = _shareId,
                 Path = path,
                 Name = info.Name,
                 Size = info.Exists ? info.Length : 0,
@@ -96,13 +100,8 @@ namespace Kaimo_File_Server.Infrastructure.Storage
 
         public Task<List<FileMetadata>> ListAsync(string directoryPath)
         {
-            // Leerer Pfad oder "/" = Root des Storage
             var cleanPath = directoryPath.Trim('/');
-
-            var fullPath = string.IsNullOrEmpty(cleanPath)
-                ? _rootPath
-                : GetFullPath(cleanPath);
-
+            var fullPath = string.IsNullOrEmpty(cleanPath) ? _rootPath : GetFullPath(cleanPath);
             var entries = new List<FileMetadata>();
 
             if (!Directory.Exists(fullPath))
@@ -110,35 +109,33 @@ namespace Kaimo_File_Server.Infrastructure.Storage
 
             foreach (var dir in Directory.GetDirectories(fullPath))
             {
-                var info = new DirectoryInfo(dir);
+                var dirInfo = new DirectoryInfo(dir);
                 entries.Add(new FileMetadata
                 {
                     Id = Guid.Empty,
-                    Path = string.IsNullOrEmpty(cleanPath)
-                        ? info.Name
-                        : $"{cleanPath}/{info.Name}",
-                    Name = info.Name,
+                    ShareId = _shareId,
+                    Path = string.IsNullOrEmpty(cleanPath) ? dirInfo.Name : $"{cleanPath}/{dirInfo.Name}",
+                    Name = dirInfo.Name,
                     Size = 0,
                     IsDirectory = true,
-                    CreatedAt = info.CreationTimeUtc,
-                    ModifiedAt = info.LastWriteTimeUtc
+                    CreatedAt = dirInfo.CreationTimeUtc,
+                    ModifiedAt = dirInfo.LastWriteTimeUtc
                 });
             }
 
             foreach (var file in Directory.GetFiles(fullPath))
             {
-                var info = new FileInfo(file);
+                var fileInfo = new FileInfo(file);
                 entries.Add(new FileMetadata
                 {
                     Id = Guid.Empty,
-                    Path = string.IsNullOrEmpty(cleanPath)
-                        ? info.Name
-                        : $"{cleanPath}/{info.Name}",
-                    Name = info.Name,
-                    Size = info.Length,
+                    ShareId = _shareId,
+                    Path = string.IsNullOrEmpty(cleanPath) ? fileInfo.Name : $"{cleanPath}/{fileInfo.Name}",
+                    Name = fileInfo.Name,
+                    Size = fileInfo.Length,
                     IsDirectory = false,
-                    CreatedAt = info.CreationTimeUtc,
-                    ModifiedAt = info.LastWriteTimeUtc
+                    CreatedAt = fileInfo.CreationTimeUtc,
+                    ModifiedAt = fileInfo.LastWriteTimeUtc
                 });
             }
 
