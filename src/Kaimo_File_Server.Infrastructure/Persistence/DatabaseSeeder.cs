@@ -79,15 +79,27 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
 
                 var admin = new User(Guid.NewGuid(), "Administrator", "admin",
                     _passwordService.HashPassword(adminPassword),
-                    _passwordService.ComputeNtHash(adminPassword));
+                    _passwordService.ComputeNtHash(adminPassword),
+                    description: "Built-in administrator account",
+                    email: "admin@kaimo.local",
+                    isEnabled: true,
+                    canChangePassword: true);
 
                 var marco = new User(Guid.NewGuid(), "Marco Hanisch", "marco.hanisch",
                     _passwordService.HashPassword(marcoPassword),
-                    _passwordService.ComputeNtHash(marcoPassword));
+                    _passwordService.ComputeNtHash(marcoPassword),
+                    description: "",
+                    email: "marco.hanisch@kaimo.local",
+                    isEnabled: true,
+                    canChangePassword: true);
 
                 var guest = new User(Guid.NewGuid(), "Guest", "guest",
                     _passwordService.HashPassword(guestPassword),
-                    _passwordService.ComputeNtHash(guestPassword));
+                    _passwordService.ComputeNtHash(guestPassword),
+                    description: "Built-in guest account",
+                    email: "",
+                    isEnabled: true,
+                    canChangePassword: false);
 
                 _db.Users.AddRange(admin, marco, guest);
 

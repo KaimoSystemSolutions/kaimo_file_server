@@ -93,9 +93,35 @@ else
                            @bind="VM.CreateUserUsername" @bind:event="oninput" />
                 </div>
                 <div class="form-group">
+                    <label>E-Mail</label>
+                    <input type="email" class="edit-input" placeholder="z.B. max@firma.de"
+                           @bind="VM.CreateUserEmail" @bind:event="oninput" />
+                </div>
+                <div class="form-group">
+                    <label>Beschreibung</label>
+                    <input type="text" class="edit-input" placeholder="Optional"
+                           @bind="VM.CreateUserDescription" @bind:event="oninput" />
+                </div>
+                <div class="form-group">
                     <label>Passwort</label>
                     <input type="password" class="edit-input" placeholder="Mindestens 6 Zeichen"
                            @bind="VM.CreateUserPassword" @bind:event="oninput" />
+                </div>
+                <div class="create-form-toggles">
+                    <div class="toggle-row">
+                        <span class="toggle-label-text">Konto aktiviert</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" @bind="VM.CreateUserIsEnabled" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label-text">Passwort ändern erlaubt</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" @bind="VM.CreateUserCanChangePassword" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
                 </div>
             </div>
             @if (VM.ErrorMessage is not null)
@@ -158,17 +184,18 @@ else
                         }
                         else
                         {
-                            <div class="file-list">
-                                <div class="file-row admin-row-header">
-                                    <div class="file-cell user-name">Name</div>
-                                    <div class="file-cell user-size">Benutzername</div>
+                            <div class="user-list-container">
+                                <div class="user-list-row user-list-header">
+                                    <div class="user-cell-name">Name</div>
+                                    <div class="user-cell-username">Benutzername</div>
+                                    <div class="user-cell-status">Status</div>
                                 </div>
                                 @foreach (var user in VM.Users)
                                 {
                                     var isSelected = VM.SelectedUser?.Id == user.Id;
-                                    <div class="file-row admin-row-selectable @(isSelected ? "admin-row-selected" : "")"
+                                    <div class="user-list-row user-list-selectable @(isSelected ? "user-list-selected" : "")"
                                          @onclick="() => SelectUser(user)">
-                                        <div class="file-cell user-name">
+                                        <div class="user-cell-name">
                                             <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
                                                  fill="none" stroke="@(isSelected ? "var(--accent)" : "var(--text-tertiary)")" stroke-width="1.5">
                                                 <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
@@ -176,8 +203,24 @@ else
                                             </svg>
                                             <span>@user.Name</span>
                                         </div>
-                                        <div class="file-cell user-size" style="color: var(--text-secondary); font-size: 13px;">
+                                        <div class="user-cell-username">
                                             @user.Username
+                                        </div>
+                                        <div class="user-cell-status">
+                                            @if (user.IsEnabled)
+                                            {
+                                                <span class="status-badge status-badge--active">
+                                                    <span class="status-dot status-dot--active"></span>
+                                                    Aktiv
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="status-badge status-badge--disabled">
+                                                    <span class="status-dot status-dot--disabled"></span>
+                                                    Deaktiviert
+                                                </span>
+                                            }
                                         </div>
                                     </div>
                                 }
@@ -279,99 +322,130 @@ else
                                 <span class="detail-subtitle">@VM.SelectedUser.Username</span>
                             </div>
 
-                            <div class="detail-section">
-                                <span class="detail-label">Name</span>
-                                <input type="text" class="edit-input" @bind="VM.EditUserName" />
-                            </div>
-
-                            <div class="detail-section">
-                                <span class="detail-label">Neues Passwort (optional)</span>
-                                <input type="password" class="edit-input" placeholder="Leer lassen = unverändert"
-                                       @bind="VM.NewPassword" @bind:event="oninput" />
-                            </div>
-
-                            @if (!string.IsNullOrEmpty(VM.NewPassword))
-                            {
-                                <div class="detail-section">
-                                    <span class="detail-label">Passwort bestätigen</span>
-                                    <input type="password" class="edit-input" placeholder="Passwort wiederholen"
-                                           @bind="VM.ConfirmPassword" @bind:event="oninput" />
+                            <div class="detail-field-grid">
+                                <div class="form-group">
+                                    <label>Name</label>
+                                    <input type="text" class="edit-input" @bind="VM.EditUserName" />
                                 </div>
-                            }
 
-                            <div class="detail-section">
-                                <span class="detail-label">Gruppen</span>
-                                <div class="multi-select @(groupsOpen ? "open" : "")">
-                                    <div class="multi-select-display" @onclick="() => groupsOpen = !groupsOpen">
-                                        <span class="multi-select-text">
-                                            @{
-                                                var selGroups = VM.EditUserGroups.Where(g => g.IsChecked).Select(g => g.Item.Name);
-                                            }
-                                            @(selGroups.Any() ? string.Join(", ", selGroups) : "Keine Gruppen")
-                                        </span>
-                                        <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
-                                             fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M6 9l6 6 6-6" />
-                                        </svg>
-                                    </div>
-                                    @if (groupsOpen)
-                                    {
-                                        <div class="multi-select-backdrop" @onclick="() => groupsOpen = false"></div>
-                                        <div class="multi-select-dropdown">
-                                            @foreach (var item in VM.EditUserGroups)
-                                            {
-                                                <label class="multi-select-option">
-                                                    <input type="checkbox" @bind="item.IsChecked" />
-                                                    <span>@item.Item.Name</span>
-                                                </label>
-                                            }
-                                            @if (!VM.EditUserGroups.Any())
-                                            {
-                                                <span class="empty-hint">Keine Gruppen vorhanden</span>
-                                            }
-                                        </div>
-                                    }
+                                <div class="form-group">
+                                    <label>E-Mail</label>
+                                    <input type="email" class="edit-input" placeholder="z.B. max@firma.de"
+                                           @bind="VM.EditUserEmail" @bind:event="oninput" />
                                 </div>
-                            </div>
 
-                            <div class="detail-section">
-                                <span class="detail-label">Rollen</span>
-                                <div class="multi-select @(rolesOpen ? "open" : "")">
-                                    <div class="multi-select-display" @onclick="() => rolesOpen = !rolesOpen">
-                                        <span class="multi-select-text">
-                                            @{
-                                                var selRoles = VM.EditUserRoles.Where(r => r.IsChecked).Select(r => r.Item.Name);
-                                            }
-                                            @(selRoles.Any() ? string.Join(", ", selRoles) : "Keine Rollen")
-                                        </span>
-                                        <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
-                                             fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M6 9l6 6 6-6" />
-                                        </svg>
+                                <div class="form-group">
+                                    <label>Beschreibung</label>
+                                    <input type="text" class="edit-input" placeholder="Optional"
+                                           @bind="VM.EditUserDescription" @bind:event="oninput" />
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Neues Passwort (optional)</label>
+                                    <input type="password" class="edit-input" placeholder="Leer lassen = unverändert"
+                                           @bind="VM.NewPassword" @bind:event="oninput" />
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(VM.NewPassword))
+                                {
+                                    <div class="form-group">
+                                        <label>Passwort bestätigen</label>
+                                        <input type="password" class="edit-input" placeholder="Passwort wiederholen"
+                                               @bind="VM.ConfirmPassword" @bind:event="oninput" />
                                     </div>
-                                    @if (rolesOpen)
-                                    {
-                                        <div class="multi-select-backdrop" @onclick="() => rolesOpen = false"></div>
-                                        <div class="multi-select-dropdown">
-                                            @foreach (var item in VM.EditUserRoles)
-                                            {
-                                                <label class="multi-select-option">
-                                                    <input type="checkbox" @bind="item.IsChecked" />
-                                                    <span>@item.Item.Name</span>
-                                                </label>
-                                            }
-                                            @if (!VM.EditUserRoles.Any())
-                                            {
-                                                <span class="empty-hint">Keine Rollen vorhanden</span>
-                                            }
+                                }
+
+                                <div class="create-form-toggles">
+                                    <div class="toggle-row">
+                                        <span class="toggle-label-text">Konto aktiviert</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" @bind="VM.EditUserIsEnabled" />
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="toggle-row">
+                                        <span class="toggle-label-text">Passwort ändern erlaubt</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" @bind="VM.EditUserCanChangePassword" />
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Gruppen</label>
+                                    <div class="multi-select @(groupsOpen ? "open" : "")">
+                                        <div class="multi-select-display" @onclick="() => groupsOpen = !groupsOpen">
+                                            <span class="multi-select-text">
+                                                @{
+                                                    var selGroups = VM.EditUserGroups.Where(g => g.IsChecked).Select(g => g.Item.Name);
+                                                }
+                                                @(selGroups.Any() ? string.Join(", ", selGroups) : "Keine Gruppen")
+                                            </span>
+                                            <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
+                                                 fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M6 9l6 6 6-6" />
+                                            </svg>
                                         </div>
-                                    }
+                                        @if (groupsOpen)
+                                        {
+                                            <div class="multi-select-backdrop" @onclick="() => groupsOpen = false"></div>
+                                            <div class="multi-select-dropdown">
+                                                @foreach (var item in VM.EditUserGroups)
+                                                {
+                                                    <label class="multi-select-option">
+                                                        <input type="checkbox" @bind="item.IsChecked" />
+                                                        <span>@item.Item.Name</span>
+                                                    </label>
+                                                }
+                                                @if (!VM.EditUserGroups.Any())
+                                                {
+                                                    <span class="empty-hint">Keine Gruppen vorhanden</span>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Rollen</label>
+                                    <div class="multi-select @(rolesOpen ? "open" : "")">
+                                        <div class="multi-select-display" @onclick="() => rolesOpen = !rolesOpen">
+                                            <span class="multi-select-text">
+                                                @{
+                                                    var selRoles = VM.EditUserRoles.Where(r => r.IsChecked).Select(r => r.Item.Name);
+                                                }
+                                                @(selRoles.Any() ? string.Join(", ", selRoles) : "Keine Rollen")
+                                            </span>
+                                            <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
+                                                 fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M6 9l6 6 6-6" />
+                                            </svg>
+                                        </div>
+                                        @if (rolesOpen)
+                                        {
+                                            <div class="multi-select-backdrop" @onclick="() => rolesOpen = false"></div>
+                                            <div class="multi-select-dropdown">
+                                                @foreach (var item in VM.EditUserRoles)
+                                                {
+                                                    <label class="multi-select-option">
+                                                        <input type="checkbox" @bind="item.IsChecked" />
+                                                        <span>@item.Item.Name</span>
+                                                    </label>
+                                                }
+                                                @if (!VM.EditUserRoles.Any())
+                                                {
+                                                    <span class="empty-hint">Keine Rollen vorhanden</span>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
                                 </div>
                             </div>
 
                             @if (VM.ErrorMessage is not null)
                             {
-                                <div class="error-banner" style="margin-bottom: 12px;">@VM.ErrorMessage</div>
+                                <div class="error-banner" style="margin: 12px 0;">@VM.ErrorMessage</div>
                             }
 
                             <div class="detail-actions">
@@ -385,47 +459,106 @@ else
                         }
                         else
                         {
+                            @* -- View Mode -- *@
                             <div class="detail-header">
                                 <h3>@VM.SelectedUser.Name</h3>
-                                <br/>
+                                <span class="detail-subtitle">@VM.SelectedUser.Username</span>
                             </div>
-                            <div class="detail-section">
-                                
-                                <span class="detail-label">Rollen</span>
-                                <span class="detail-value">
-                                    @if (VM.UserRoles.Any())
-                                    {
-                                        @string.Join(", ", VM.UserRoles.Select(r => r.Name).Take(5))
-                                        @if (VM.UserRoles.Count > 5)
+
+                            <div class="detail-field-grid">
+                                <div class="detail-field">
+                                    <span class="detail-field-label">Status</span>
+                                    <span>
+                                        @if (VM.SelectedUser.IsEnabled)
                                         {
-                                            <span class="truncated-hint"> +@(VM.UserRoles.Count - 5) weitere</span>
+                                            <span class="status-badge status-badge--active">
+                                                <span class="status-dot status-dot--active"></span>
+                                                Aktiv
+                                            </span>
                                         }
+                                        else
+                                        {
+                                            <span class="status-badge status-badge--disabled">
+                                                <span class="status-dot status-dot--disabled"></span>
+                                                Deaktiviert
+                                            </span>
+                                        }
+                                    </span>
+                                </div>
+
+                                <div class="detail-field">
+                                    <span class="detail-field-label">E-Mail</span>
+                                    @if (!string.IsNullOrWhiteSpace(VM.SelectedUser.Email))
+                                    {
+                                        <span class="detail-field-value">@VM.SelectedUser.Email</span>
                                     }
                                     else
                                     {
-                                        <text>Keine Rollen</text>
+                                        <span class="detail-field-value detail-field-value--empty">Nicht angegeben</span>
                                     }
-                                </span>
+                                </div>
 
-                                <span class="detail-label">Gruppen</span>
-                                <span class="detail-value">
-                                    @if (VM.UserGroups.Any())
+                                <div class="detail-field">
+                                    <span class="detail-field-label">Beschreibung</span>
+                                    @if (!string.IsNullOrWhiteSpace(VM.SelectedUser.Description))
                                     {
-                                        @string.Join(", ", VM.UserGroups.Select(g => g.Name).Take(5))
-                                        @if (VM.UserGroups.Count > 5)
-                                        {
-                                            <span class="truncated-hint"> +@(VM.UserGroups.Count - 5) weitere</span>
-                                        }
+                                        <span class="detail-field-value">@VM.SelectedUser.Description</span>
                                     }
                                     else
                                     {
-                                        <text>Keine Gruppen</text>
+                                        <span class="detail-field-value detail-field-value--empty">Keine Beschreibung</span>
                                     }
-                                </span>
+                                </div>
 
-                                <span class="detail-label">ID</span>
-                                <span class="detail-value">@VM.SelectedUser.Id</span>
+                                <div class="detail-field">
+                                    <span class="detail-field-label">Passwort ändern</span>
+                                    <span class="detail-field-value">
+                                        @(VM.SelectedUser.CanChangePassword ? "Erlaubt" : "Gesperrt")
+                                    </span>
+                                </div>
+
+                                <div class="detail-field">
+                                    <span class="detail-field-label">Rollen</span>
+                                    <span class="detail-field-value">
+                                        @if (VM.UserRoles.Any())
+                                        {
+                                            @string.Join(", ", VM.UserRoles.Select(r => r.Name).Take(5))
+                                            @if (VM.UserRoles.Count > 5)
+                                            {
+                                                <span class="truncated-hint"> +@(VM.UserRoles.Count - 5) weitere</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <text>Keine Rollen</text>
+                                        }
+                                    </span>
+                                </div>
+
+                                <div class="detail-field">
+                                    <span class="detail-field-label">Gruppen</span>
+                                    <span class="detail-field-value">
+                                        @if (VM.UserGroups.Any())
+                                        {
+                                            @string.Join(", ", VM.UserGroups.Select(g => g.Name).Take(5))
+                                            @if (VM.UserGroups.Count > 5)
+                                            {
+                                                <span class="truncated-hint"> +@(VM.UserGroups.Count - 5) weitere</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <text>Keine Gruppen</text>
+                                        }
+                                    </span>
+                                </div>
+
+                                <div class="detail-field">
+                                    <span class="detail-field-label">ID</span>
+                                    <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">@VM.SelectedUser.Id</span>
+                                </div>
                             </div>
+
                             <div class="detail-actions">
                                 <button class="btn-secondary" @onclick="EditUser">Bearbeiten</button>
 
@@ -611,7 +744,6 @@ else
         StateHasChanged();
     }
 
-    private async Task GetRoles(User user) { await VM.GetUserRoles(user); }
     private async Task SelectUser(User user) { CloseDropdowns(); await VM.SelectUserAsync(user); StateHasChanged(); }
     private async Task SelectGroup(Group group) { CloseDropdowns(); await VM.SelectGroupAsync(group); StateHasChanged(); }
     private void SelectRole(Role role) { CloseDropdowns(); VM.SelectRole(role); StateHasChanged(); }

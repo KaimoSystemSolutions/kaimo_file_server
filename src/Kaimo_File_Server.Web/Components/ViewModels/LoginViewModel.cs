@@ -66,6 +66,15 @@ public class LoginViewModel
                 return false;
             }
 
+            if (!user.IsEnabled)
+            {
+                _logger.LogWarning("Login abgelehnt – Konto deaktiviert: {Username}", user.Username);
+                ErrorMessage = "Dieses Konto ist deaktiviert.";
+                return false;
+            }
+
+            _logger.LogInformation("Login erfolgreich für Benutzer {Username}", user.Username);
+
             _logger.LogInformation("Login erfolgreich für Benutzer {Username}", user.Username);
 
             var userContext = await _userContextFactory.CreateAsync(user);

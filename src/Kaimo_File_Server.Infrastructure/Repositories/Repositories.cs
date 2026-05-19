@@ -71,6 +71,18 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
                     .SetProperty(x => x.PasswordHash, passwordHash)
                     .SetProperty(x => x.NtHash, ntHash));
         }
+        public async Task UpdateProfileAsync(Guid userId, string description, string email, bool isEnabled, bool canChangePassword)
+        {
+            var user = await _db.Users.FindAsync(userId)
+                ?? throw new KeyNotFoundException($"User {userId} not found");
+
+            user.Description = description;
+            user.Email = email;
+            user.IsEnabled = isEnabled;
+            user.CanChangePassword = canChangePassword;
+
+            await _db.SaveChangesAsync();
+        }
     }
 
     public class GroupRepository : IGroupRepository

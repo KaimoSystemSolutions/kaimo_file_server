@@ -16,5 +16,6 @@ namespace Kaimo_File_Server.Core.Repositories
         Task SetRolesForUserAsync(Guid userId, List<Guid> roleIds);
         Task UpdateNameAsync(Guid userId, string newName);
         Task UpdatePasswordAsync(Guid userId, string passwordHash, string ntHash);
+        Task UpdateProfileAsync(Guid userId, string description, string email, bool isEnabled, bool canChangePassword);
     }
 }

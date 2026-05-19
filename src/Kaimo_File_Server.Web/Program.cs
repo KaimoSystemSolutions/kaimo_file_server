@@ -84,6 +84,5 @@ app.UseAntiforgery();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-await app.InitializeDatabaseAsync();
 
 app.Run();

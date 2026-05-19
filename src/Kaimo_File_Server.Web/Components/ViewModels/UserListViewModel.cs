@@ -3,8 +3,6 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
-using System.Collections.Specialized;
-using System.ComponentModel;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -57,11 +55,15 @@ public class UserListViewModel
 
     // User-Edit
     public string EditUserName { get; set; } = "";
+    public string EditUserDescription { get; set; } = "";
+    public string EditUserEmail { get; set; } = "";
+    public bool EditUserIsEnabled { get; set; } = true;
+    public bool EditUserCanChangePassword { get; set; } = true;
     public List<CheckboxItem<Group>> EditUserGroups { get; private set; } = [];
     public List<CheckboxItem<Role>> EditUserRoles { get; private set; } = [];
 
     // -- User-Details --
-    public List<Group> UserGroups {get; private set; } = [];
+    public List<Group> UserGroups { get; private set; } = [];
     public List<Role> UserRoles { get; private set; } = [];
 
     // -- Group-Details --
@@ -80,6 +82,10 @@ public class UserListViewModel
     public string CreateUserName { get; set; } = "";
     public string CreateUserUsername { get; set; } = "";
     public string CreateUserPassword { get; set; } = "";
+    public string CreateUserDescription { get; set; } = "";
+    public string CreateUserEmail { get; set; } = "";
+    public bool CreateUserIsEnabled { get; set; } = true;
+    public bool CreateUserCanChangePassword { get; set; } = true;
 
     // -- Create Group --
     public bool IsCreatingGroup { get; set; }
@@ -223,8 +229,6 @@ public class UserListViewModel
         var allRoles = (await _roleRepo.GetAllAsync()).OrderBy(r => r.Name).ToList();
         var userRoles = await _userRepo.GetRolesForUserAsync(user.Id);
         UserRoles = userRoles;
-        //var userRoleIds = userRoles.Select(r => r.Id).ToHashSet();
-        //EditUserRoles = allRoles.Select(r => new CheckboxItem<Role>(r, userRoleIds.Contains(r.Id))).ToList();
     }
 
     // -- Edit User --
@@ -239,6 +243,10 @@ public class UserListViewModel
         ConfirmPassword = "";
 
         EditUserName = SelectedUser.Name;
+        EditUserDescription = SelectedUser.Description ?? "";
+        EditUserEmail = SelectedUser.Email ?? "";
+        EditUserIsEnabled = SelectedUser.IsEnabled;
+        EditUserCanChangePassword = SelectedUser.CanChangePassword;
 
         var allGroups = (await _groupRepo.GetAllAsync()).OrderBy(g => g.Name).ToList();
         var userGroups = await _userRepo.GetGroupsForUserAsync(SelectedUser.Id);
@@ -265,6 +273,15 @@ public class UserListViewModel
             {
                 await _userRepo.UpdateNameAsync(SelectedUser.Id, EditUserName.Trim());
             }
+
+
+            // Profil-Felder aktualisieren
+            await _userRepo.UpdateProfileAsync(
+                SelectedUser.Id,
+                EditUserDescription.Trim(),
+                EditUserEmail.Trim(),
+                EditUserIsEnabled,
+                EditUserCanChangePassword);
 
             // Passwort ändern (wenn ausgefüllt)
             if (!string.IsNullOrWhiteSpace(NewPassword))
@@ -296,6 +313,12 @@ public class UserListViewModel
             await LoadTabDataAsync();
 
             SelectedUser = Users.FirstOrDefault(u => u.Id == SelectedUser.Id);
+            if (SelectedUser is not null)
+            {
+                UserRoles = (await _userRepo.GetRolesForUserAsync(SelectedUser.Id)).OrderBy(r => r.Name).ToList();
+                UserGroups = (await _userRepo.GetGroupsForUserAsync(SelectedUser.Id)).OrderBy(g => g.Name).ToList();
+            }
+
             IsEditing = false;
             NewPassword = "";
             ConfirmPassword = "";
@@ -360,6 +383,10 @@ public class UserListViewModel
         CreateUserName = "";
         CreateUserUsername = "";
         CreateUserPassword = "";
+        CreateUserDescription = "";
+        CreateUserEmail = "";
+        CreateUserIsEnabled = true;
+        CreateUserCanChangePassword = true;
         ErrorMessage = null;
         SuccessMessage = null;
     }
@@ -404,7 +431,11 @@ public class UserListViewModel
                 CreateUserName.Trim(),
                 CreateUserUsername.Trim(),
                 hash,
-                ntHash
+                ntHash,
+                description: CreateUserDescription.Trim(),
+                email: CreateUserEmail.Trim(),
+                isEnabled: CreateUserIsEnabled,
+                canChangePassword: CreateUserCanChangePassword
             );
 
             await _userRepo.CreateAsync(user);
@@ -414,6 +445,10 @@ public class UserListViewModel
             CreateUserName = "";
             CreateUserUsername = "";
             CreateUserPassword = "";
+            CreateUserDescription = "";
+            CreateUserEmail = "";
+            CreateUserIsEnabled = true;
+            CreateUserCanChangePassword = true;
             await LoadTabDataAsync();
             SuccessMessage = "Benutzer erstellt.";
         }
@@ -553,6 +588,10 @@ public class UserListViewModel
         CreateUserName = "";
         CreateUserUsername = "";
         CreateUserPassword = "";
+        CreateUserDescription = "";
+        CreateUserEmail = "";
+        CreateUserIsEnabled = true;
+        CreateUserCanChangePassword = true;
         CreateGroupName = "";
         ErrorMessage = null;
     }

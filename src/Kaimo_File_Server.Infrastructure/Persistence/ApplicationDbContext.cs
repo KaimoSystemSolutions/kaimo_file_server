@@ -37,6 +37,10 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.Username).IsRequired().HasMaxLength(100);
                 entity.HasIndex(e => e.Username).IsUnique();
                 entity.Property(e => e.NtHash).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.Description).HasMaxLength(500);
+                entity.Property(e => e.Email).HasMaxLength(254);
+                entity.Property(e => e.IsEnabled).IsRequired().HasDefaultValue(true);
+                entity.Property(e => e.CanChangePassword).IsRequired().HasDefaultValue(true);
             });
 
             modelBuilder.Entity<Group>(entity => { entity.ToTable("groups"); });
