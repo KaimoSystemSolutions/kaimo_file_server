@@ -187,6 +187,10 @@ else
                         {
                             <span class="acl-badge acl-badge--small">@dirCount</span>
                         }
+                        else
+                        {
+                            <span class="acl-badge acl-badge--small" style="visibility: hidden;">0</span>
+                        }
                     }
                 </div>
             </div>
@@ -254,6 +258,10 @@ else
                         @if (fileCount > 0)
                         {
                             <span class="acl-badge acl-badge--small">@fileCount</span>
+                        }
+                        else
+                        {
+                            <span class="acl-badge acl-badge--small" style="visibility: hidden;">0</span>
                         }
                     }
                 </div>

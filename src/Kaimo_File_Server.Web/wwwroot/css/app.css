@@ -234,9 +234,19 @@ html, body, #app {
     }
 
 .btn-icon--small {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    transition: all 0.15s;
 }
+
+    .btn-icon--small:hover {
+        background: var(--bg-hover);
+        border-color: var(--border-light);
+        color: var(--text-primary);
+    }
 
 .btn-icon--danger:hover svg {
     stroke: var(--danger) !important;
@@ -623,11 +633,13 @@ html, body, #app {
 
 .file-cell.file-actions {
     width: auto;
-    min-width: 40px;
+    min-width: 100px;
     flex-shrink: 0;
     display: flex;
-    gap: 4px;
+    gap: 6px;
     justify-content: flex-end;
+    align-items: center;
+    margin-left: 16px;
 }
 
 .file-row-acl-expand {
@@ -688,44 +700,6 @@ html, body, #app {
     margin: 0 2px;
 }
 
-/* -- Login Page -- */
-
-.login-page {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-primary);
-    padding: 24px;
-}
-
-.login-card {
-    width: 100%;
-    max-width: 380px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 36px 32px;
-    box-shadow: var(--shadow-lg);
-}
-
-    .login-card h2 {
-        font-size: 20px;
-        font-weight: 700;
-        margin-bottom: 6px;
-        color: var(--text-primary);
-    }
-
-    .login-card .subtitle {
-        margin-bottom: 24px;
-    }
-
-.login-form {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
 .form-group {
     display: flex;
     flex-direction: column;
@@ -764,11 +738,7 @@ html, body, #app {
             color: var(--text-tertiary);
         }
 
-.login-form .btn-primary {
-    width: 100%;
-    padding: 10px;
-    margin-top: 4px;
-}
+
 
 /* -- Admin Tabs -- */
 
@@ -1901,21 +1871,21 @@ html, body, #app {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 6px;
-    border-radius: 10px;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 11px;
     background: var(--accent);
     color: #fff;
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: 0.8rem;
+    font-weight: 700;
     line-height: 1;
 }
 
 .acl-badge--small {
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
-    font-size: 0.65rem;
-    border-radius: 8px;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    font-size: 0.75rem;
+    border-radius: 11px;
 }
