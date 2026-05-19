@@ -13,6 +13,9 @@ using Microsoft.AspNetCore.DataProtection.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// -- Infrastructure (DB + Repositories) --
+builder.Services.AddInfrastructure(builder.Configuration);
+
 // -- Blazor --
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -26,8 +29,6 @@ builder.Services.AddScoped<JwtAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
     sp.GetRequiredService<JwtAuthenticationStateProvider>());
 
-// -- Infrastructure (DB + Repositories) --
-builder.Services.AddInfrastructure(builder.Configuration);
 
 // -- Core Services --
 var storagePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";

@@ -556,7 +556,16 @@ html, body, #app {
     border-radius: 8px;
     overflow: hidden;
     background: var(--bg-secondary);
+    display: flex;
+    flex-direction: column;
+    min-height: 80%;
 }
+
+    .file-list::after {
+        content: "";
+        flex: 1;
+        /*border-bottom: 1px solid var(--border);*/
+    }
 
 .file-row {
     display: flex;
@@ -566,9 +575,9 @@ html, body, #app {
     transition: background 0.1s;
 }
 
-    .file-row:last-child {
+    /*.file-row:last-child {
         border-bottom: none;
-    }
+    }*/
 
     .file-row:hover {
         background: var(--bg-hover);
@@ -1886,4 +1895,27 @@ html, body, #app {
     .page-header h1 {
         font-size: 18px;
     }
+}
+
+.acl-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.acl-badge--small {
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 0.65rem;
+    border-radius: 8px;
 }

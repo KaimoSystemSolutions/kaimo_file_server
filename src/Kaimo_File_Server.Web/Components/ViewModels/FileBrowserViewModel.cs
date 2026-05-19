@@ -1,7 +1,9 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 
@@ -18,6 +20,7 @@ public class FileBrowserViewModel
 {
     private readonly IFileServiceFactory _fileServiceFactory;
     private readonly IShareRepository _shareRepo;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<FileBrowserViewModel> _logger;
@@ -27,12 +30,14 @@ public class FileBrowserViewModel
     public FileBrowserViewModel(
         IFileServiceFactory fileServiceFactory,
         IShareRepository shareRepo,
+        IDbContextFactory<ApplicationDbContext> dbFactory,
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authState,
         ILogger<FileBrowserViewModel> logger)
     {
         _fileServiceFactory = fileServiceFactory;
         _shareRepo = shareRepo;
+        _dbFactory = dbFactory;
         _userContextFactory = userContextFactory;
         _authState = authState;
         _logger = logger;
@@ -40,6 +45,7 @@ public class FileBrowserViewModel
 
     // -- State --
 
+    public Dictionary<string, int> AclCounts { get; private set; } = new();
     public ShareDefinition? CurrentShare { get; private set; }
     public List<FileMetadata> Items { get; private set; } = [];
     public string CurrentPath { get; private set; } = "";
@@ -295,5 +301,36 @@ public class FileBrowserViewModel
         var username = state.User.Identity?.Name;
         if (string.IsNullOrEmpty(username)) return null;
         return await _userContextFactory.CreateByUsernameAsync(username);
+    }
+
+    /// <summary>Load ACL counts for current path + all visible items in one DB call.</summary>
+    public async Task LoadAclCountsAsync()
+    {
+        AclCounts.Clear();
+        if (CurrentShare is null) return;
+
+        var paths = new List<string> { CurrentPath ?? "" };
+
+        foreach (var item in Items)
+        {
+            var relativePath = item.Path;
+            if (relativePath.StartsWith(CurrentShare.Path))
+                relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
+            paths.Add(relativePath);
+        }
+
+        var distinctPaths = paths.Distinct().ToList();
+
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        AclCounts = await db.FileMetadata
+            .Where(fm => fm.ShareId == CurrentShare.Id && distinctPaths.Contains(fm.Path))
+            .Select(fm => new { fm.Path, Count = fm.Acl.Count })
+            .ToDictionaryAsync(x => x.Path, x => x.Count);
+    }
+
+    public int GetAclCount(string path)
+    {
+        return AclCounts.TryGetValue(path, out var count) ? count : 0;
     }
 }

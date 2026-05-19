@@ -13,4 +13,6 @@ public interface IAclRepository
     /// </summary>
     Task<List<(string Path, bool IsDirectory, List<AccessEntry> Acl)>> GetAclsForPathsAsync(
         Guid shareId, List<string> paths);
+
+    Task<Dictionary<string, int>> GetAclCountsByPathAsync(Guid shareId, IEnumerable<string> paths);
 }

@@ -64,4 +64,18 @@ public class AclRepository : IAclRepository
             .Select(m => (m.Path, m.IsDirectory, m.Acl?.ToList() ?? new List<AccessEntry>()))
             .ToList();
     }
+
+    public async Task<Dictionary<string, int>> GetAclCountsByPathAsync(Guid shareId, IEnumerable<string> paths)
+    {
+        var pathList = paths.ToList();
+
+        return await _db.FileMetadata
+            .Where(fm => fm.ShareId == shareId && pathList.Contains(fm.Path))
+            .Select(fm => new
+            {
+                fm.Path,
+                Count = fm.Acl.Count
+            })
+            .ToDictionaryAsync(x => x.Path, x => x.Count);
+    }
 }

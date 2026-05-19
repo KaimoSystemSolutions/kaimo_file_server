@@ -33,12 +33,17 @@
         @if (_isAdmin)
         {
             <button class="btn-icon" title="Berechtigungen verwalten"
-                    @onclick="ToggleAclPanel">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                     stroke="@(_showAclPanel ? "var(--accent)" : "currentColor")" stroke-width="1.5">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
+                @onclick="ToggleAclPanel">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="@(_showAclPanel ? "var(--accent)" : "currentColor")" stroke-width="1.5">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
             </button>
+        var rootCount = GetAclCount(_aclPath);
+        @if (rootCount > 0)
+        {
+            <span class="acl-badge">@rootCount</span>
+        }
         }
     </div>
 </div>
@@ -146,7 +151,8 @@ else
         {
             <div class="file-row file-row-dir"
                  @oncontextmenu="(e) => OnItemContextMenu(e, dir)"
-                 @oncontextmenu:preventDefault="true">
+                 @oncontextmenu:preventDefault="true"
+                 @oncontextmenu:stopPropagation="true">
                 <div class="file-cell file-name" @onclick="() => NavigateTo(dir)">
                     <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
                          fill="var(--folder-fill)" stroke="var(--folder-stroke)" stroke-width="1.5">
@@ -169,13 +175,18 @@ else
                     @if (_isAdmin)
                     {
                         <button class="btn-icon btn-icon--small" title="ACL für @dir.Name"
-                                @onclick="() => OpenFolderAcl(dir)" @onclick:stopPropagation="true">
+                            @onclick="() => OpenFolderAcl(dir)" @onclick:stopPropagation="true">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                 stroke="@(_aclFolderPath == GetDirAclPath(dir) && _showFolderAcl ? "var(--accent)" : "var(--text-tertiary)")"
-                                 stroke-width="1.5">
+                                stroke="@(_aclFolderPath == GetDirAclPath(dir) && _showFolderAcl ? "var(--accent)" : "var(--text-tertiary)")"
+                                stroke-width="1.5">
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                             </svg>
                         </button>
+                        var dirCount = GetAclCount(GetDirAclPath(dir));
+                        @if (dirCount > 0)
+                        {
+                            <span class="acl-badge acl-badge--small">@dirCount</span>
+                        }
                     }
                 </div>
             </div>
@@ -195,8 +206,8 @@ else
                             </svg>
                         </button>
                     </div>
-                    <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclPath}-{_showAclPanel}")"
-                               Path="@_aclPath"
+                    <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
+                               Path="@_aclFolderPath"
                                ShareId="@VM.CurrentShare.Id"
                                IsDirectory="true" />
                 </div>
@@ -232,13 +243,18 @@ else
                     @if (_isAdmin)
                     {
                         <button class="btn-icon btn-icon--small" title="ACL für @file.Name"
-                                @onclick="() => OpenFileAcl(file)">
+                                @onclick="() => OpenFileAcl(file)" @onclick:stopPropagation="true">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
                                  stroke="@(_aclFolderPath == GetFileAclPath(file) && _showFolderAcl ? "var(--accent)" : "var(--text-tertiary)")"
                                  stroke-width="1.5">
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                             </svg>
                         </button>
+                        var fileCount = GetAclCount(GetFileAclPath(file));
+                        @if (fileCount > 0)
+                        {
+                            <span class="acl-badge acl-badge--small">@fileCount</span>
+                        }
                     }
                 </div>
             </div>
@@ -258,10 +274,10 @@ else
                             </svg>
                         </button>
                     </div>
-                    <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclPath}-{_showAclPanel}")"
-                               Path="@_aclPath"
+                    <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
+                               Path="@_aclFolderPath"
                                ShareId="@VM.CurrentShare.Id"
-                               IsDirectory="true" />
+                               IsDirectory="false" />
                 </div>
             }
         }
@@ -368,6 +384,12 @@ else
     [Parameter] public string ShareName { get; set; } = "";
     [Parameter] public string? SubPath { get; set; }
 
+
+    // General ACL
+    private Dictionary<string, int> _aclCounts = new();
+
+
+    // Root ACL
     private bool _isAdmin;
     private bool _showAclPanel;
     private string _aclPath = "";
@@ -406,6 +428,7 @@ else
 
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
         UpdateAclPath();
+        await LoadAclCounts();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -599,7 +622,17 @@ else
         }
     }
 
-    // ========== ACL Helpers (unverändert) ==========
+    // ========== ACL Helpers ==========
+
+    private int GetAclCount(string path)
+    {
+        return VM.GetAclCount(path);
+    }
+
+    private async Task LoadAclCounts()
+    {
+        await VM.LoadAclCountsAsync();
+    }
 
     private string GetDirAclPath(FileMetadata dir)
     {

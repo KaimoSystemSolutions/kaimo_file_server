@@ -22,6 +22,8 @@ namespace Kaimo_File_Server.Infrastructure
 
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseNpgsql(connectionString));
+            services.AddDbContextFactory<ApplicationDbContext>(options =>
+                options.UseNpgsql(connectionString), ServiceLifetime.Scoped);
 
             // Repositories
             services.AddScoped<IUserRepository, UserRepository>();
