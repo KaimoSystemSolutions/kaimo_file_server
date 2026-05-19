@@ -24,6 +24,7 @@ namespace Kaimo_File_Server.Core.Services
         Task<Stream> ReadFileAsync(string path, UserContext user);
         Task WriteFileAsync(string path, Stream data, UserContext user);
         Task CreateFileAsync(string path, UserContext user);
+        Task CreateDirectoryAsync(string path, UserContext user);
         Task DeleteFileAsync(string path, UserContext user);
         Task<FileMetadata> GetMetadataAsync(string path, UserContext user);
         Task<List<FileMetadata>> ListAsync(string directoryPath, UserContext user);

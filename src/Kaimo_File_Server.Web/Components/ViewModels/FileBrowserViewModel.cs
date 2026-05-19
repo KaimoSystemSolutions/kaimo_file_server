@@ -7,6 +7,13 @@ using System.Security.Claims;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
+/// <summary>Simple result wrapper for UI operations.</summary>
+public record OperationResult(bool Success, string? Error = null)
+{
+    public static OperationResult Ok() => new(true);
+    public static OperationResult Fail(string error) => new(false, error);
+}
+
 public class FileBrowserViewModel
 {
     private readonly IFileServiceFactory _fileServiceFactory;
@@ -91,7 +98,6 @@ public class FileBrowserViewModel
                 return;
             }
 
-            // Pro Share einen eigenen FileService mit ACL-Prüfung
             _fileService = _fileServiceFactory.CreateForShare(CurrentShare.Id, CurrentShare.Path);
 
             var cleanSub = (subPath ?? "").Trim('/');
@@ -111,7 +117,6 @@ public class FileBrowserViewModel
                 return;
             }
 
-            // ★ Aktuellen User für ACL-gefiltertes Listing auflösen
             var userContext = await GetCurrentUserContextAsync();
             if (userContext is null)
             {
@@ -123,7 +128,6 @@ public class FileBrowserViewModel
             _logger.LogDebug("Loading path: '{CurrentPath}' (share={ShareName}, user={User})",
                 CurrentPath, shareName, userContext.User.Username);
 
-            // ★ ACL-gefiltertes Listing
             Items = await _fileService.ListAsync(CurrentPath, userContext);
 
             _logger.LogDebug("Found {Total} items ({Dirs} dirs, {Files} files)",
@@ -143,6 +147,145 @@ public class FileBrowserViewModel
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    /// <summary>Create a new sub-folder inside the current directory.</summary>
+    public async Task<OperationResult> CreateFolderAsync(string folderName)
+    {
+        if (_fileService is null || CurrentShare is null)
+            return OperationResult.Fail("Kein Share geladen.");
+
+        if (string.IsNullOrWhiteSpace(folderName))
+            return OperationResult.Fail("Bitte einen Ordnernamen eingeben.");
+
+        // Basic validation
+        var invalidChars = Path.GetInvalidFileNameChars();
+        if (folderName.Any(c => invalidChars.Contains(c)))
+            return OperationResult.Fail("Der Name enthält ungültige Zeichen.");
+
+        if (folderName.Contains(".."))
+            return OperationResult.Fail("Ungültiger Ordnername.");
+
+        try
+        {
+            var userContext = await GetCurrentUserContextAsync();
+            if (userContext is null)
+                return OperationResult.Fail("Nicht authentifiziert.");
+
+            var targetPath = string.IsNullOrEmpty(CurrentPath)
+                ? folderName
+                : $"{CurrentPath}/{folderName}/";
+
+            
+            await _fileService.CreateDirectoryAsync(targetPath, userContext);
+
+            _logger.LogInformation("Folder created: '{Path}' by {User}",
+                targetPath, userContext.User.Username);
+
+            return OperationResult.Ok();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return OperationResult.Fail("Zugriff verweigert.");
+        }
+        catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+        {
+            return OperationResult.Fail("Ein Ordner mit diesem Namen existiert bereits.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating folder '{FolderName}'", folderName);
+            return OperationResult.Fail("Fehler beim Erstellen des Ordners.");
+        }
+    }
+
+    /// <summary>Delete a file or directory (recursively).</summary>
+    public async Task<OperationResult> DeleteAsync(FileMetadata item)
+    {
+        if (_fileService is null || CurrentShare is null)
+            return OperationResult.Fail("Kein Share geladen.");
+
+        try
+        {
+            var userContext = await GetCurrentUserContextAsync();
+            if (userContext is null)
+                return OperationResult.Fail("Nicht authentifiziert.");
+
+            // Build relative path within the share
+            var relativePath = item.Path;
+            if (relativePath.StartsWith(CurrentShare.Path))
+                relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
+            
+            await _fileService.DeleteFileAsync(relativePath, userContext);
+
+            _logger.LogInformation("{Type} deleted: '{Path}' by {User}",
+                item.IsDirectory ? "Directory" : "File",
+                relativePath, userContext.User.Username);
+
+            return OperationResult.Ok();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return OperationResult.Fail("Zugriff verweigert.");
+        }
+        catch (FileNotFoundException)
+        {
+            return OperationResult.Fail("Datei oder Ordner nicht gefunden.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting '{Path}'", item.Path);
+            return OperationResult.Fail("Fehler beim Löschen.");
+        }
+    }
+
+    /// <summary>Rename a file or directory.</summary>
+    public async Task<OperationResult> RenameAsync(FileMetadata item, string newName)
+    {
+        if (_fileService is null || CurrentShare is null)
+            return OperationResult.Fail("Kein Share geladen.");
+
+        if (string.IsNullOrWhiteSpace(newName))
+            return OperationResult.Fail("Bitte einen neuen Namen eingeben.");
+
+        var invalidChars = Path.GetInvalidFileNameChars();
+        if (newName.Any(c => invalidChars.Contains(c)))
+            return OperationResult.Fail("Der Name enthält ungültige Zeichen.");
+
+        if (newName.Contains(".."))
+            return OperationResult.Fail("Ungültiger Name.");
+
+        try
+        {
+            var userContext = await GetCurrentUserContextAsync();
+            if (userContext is null)
+                return OperationResult.Fail("Nicht authentifiziert.");
+
+            var relativePath = item.Path;
+            if (relativePath.StartsWith(CurrentShare.Path))
+                relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
+
+            //await _fileService.RenameAsync(relativePath, newName, userContext);
+
+            _logger.LogInformation("{Type} renamed: '{OldPath}' -> '{NewName}' by {User}",
+                item.IsDirectory ? "Directory" : "File",
+                relativePath, newName, userContext.User.Username);
+
+            return OperationResult.Ok();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return OperationResult.Fail("Zugriff verweigert.");
+        }
+        catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+        {
+            return OperationResult.Fail("Ein Element mit diesem Namen existiert bereits.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error renaming '{Path}' to '{NewName}'", item.Path, newName);
+            return OperationResult.Fail("Fehler beim Umbenennen.");
         }
     }
 

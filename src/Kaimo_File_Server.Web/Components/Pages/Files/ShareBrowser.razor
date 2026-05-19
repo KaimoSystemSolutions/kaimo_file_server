@@ -9,7 +9,7 @@
         <h1>Browse - Shares</h1>
     </div>
     <div style="display: flex; gap: 0.5rem;">
-        @if (VM.CanCreateShare)
+        @if (VM.CanManageShares)
         {
             <button class="btn-icon" title="Share erstellen" @onclick="() => { VM.IsCreating = !VM.IsCreating; }">
                 <NavLink class="nav-item" href="/" Match="NavLinkMatch.All">
@@ -22,23 +22,6 @@
         }
     </div>
 </div>
-
-@if (VM.IsCreating && VM.CanCreateShare)
-{
-    <div class="create-share-form">
-        <input type="text"
-               placeholder="Name des neuen Shares"
-               @bind="VM.NewShareName"
-               @bind:event="oninput"
-               @onkeydown="HandleCreateKeyDown" />
-        <button class="btn-primary" @onclick="CreateShare">Erstellen</button>
-        <button class="btn-secondary" @onclick="() => { VM.IsCreating = false; }">Abbrechen</button>
-        @if (VM.CreateErrorMessage is not null)
-        {
-            <div class="error-banner">@VM.CreateErrorMessage</div>
-        }
-    </div>
-}
 
 @if (VM.IsLoading)
 {
@@ -92,16 +75,5 @@ else
 
     private void OpenShare(string name) => Nav.NavigateTo($"/files/{name}");
 
-    private async Task CreateShare()
-    {
-        if (!VM.CanCreateShare) return;
-        await VM.CreateShareAsync();
-        StateHasChanged();
-    }
 
-    private async Task HandleCreateKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
-            await CreateShare();
-    }
 }

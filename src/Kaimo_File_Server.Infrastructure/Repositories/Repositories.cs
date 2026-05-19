@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -227,6 +228,47 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             await _db.ShareAccessEntries
                 .Where(e => e.ShareName == oldName)
                 .ExecuteUpdateAsync(e => e.SetProperty(x => x.ShareName, newName));
+        }
+
+        public async Task EnsureShareRootAclAsync(Guid shareId, Guid ownerId)
+        {
+            // Prüfen ob Root-FileMetadata schon existiert
+            var rootMeta = await _db.FileMetadata
+                .Include(m => m.Acl)
+                .FirstOrDefaultAsync(m => m.ShareId == shareId && m.Path == "");
+
+            if (rootMeta != null)
+                return; // Schon vorhanden, nichts tun
+
+            // Root-FileMetadata anlegen
+            rootMeta = new FileMetadata
+            {
+                Id = Guid.NewGuid(),
+                ShareId = shareId,
+                OwnerId = ownerId,
+                Path = "",
+                Name = "(root)",
+                Size = 0,
+                IsDirectory = true,
+                CreatedAt = DateTime.UtcNow,
+                ModifiedAt = DateTime.UtcNow
+            };
+
+            _db.FileMetadata.Add(rootMeta);
+            await _db.SaveChangesAsync();
+
+            // Initiale ACL: Owner bekommt FullControl mit Vererbung auf alles
+            var ownerAcl = new AccessEntry(
+                ownerId,
+                AclEntryType.Allow,
+                FilePermission.FullControl,
+                AclInheritance.Everything)
+            {
+                FileMetadataId = rootMeta.Id
+            };
+
+            _db.AccessEntries.Add(ownerAcl);
+            await _db.SaveChangesAsync();
         }
     }
 }

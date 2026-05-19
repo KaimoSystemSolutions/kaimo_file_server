@@ -24,7 +24,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
             var changed = false;
 
             // -- Rollen (by Name, da systemdefiniert) --
-            var requiredRoles = new[] { "Administrator", "User", "ShareCreator", "UserManager" };
+            var requiredRoles = new[] { "Administrator", "User", "ShareManager", "UserManager" };
             var existingRoleNames = (await _db.Roles.Select(r => r.Name).ToListAsync())
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var roleName in requiredRoles)
@@ -62,7 +62,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
 
                 var adminRole = _db.Roles.First(r => r.Name == "Administrator");
                 var userRole = _db.Roles.First(r => r.Name == "User");
-                var shareCreatorRole = _db.Roles.First(r => r.Name == "ShareCreator");
+                var ShareManagerRole = _db.Roles.First(r => r.Name == "ShareManager");
                 var userManagerRole = _db.Roles.First(r => r.Name == "UserManager");
 
                 var adminGroup = _db.Groups.First(g => g.Name == "Admins");
@@ -97,7 +97,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
 
                 _db.UserRoles.AddRange(
                     new UserRole(admin.Id, adminRole.Id),
-                    new UserRole(admin.Id, shareCreatorRole.Id),
+                    new UserRole(admin.Id, ShareManagerRole.Id),
                     new UserRole(admin.Id, userManagerRole.Id),
                     new UserRole(marco.Id, userRole.Id),
                     new UserRole(guest.Id, userRole.Id));

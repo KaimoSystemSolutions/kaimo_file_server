@@ -27,6 +27,72 @@
 
     @if (_loaded)
     {
+        @* -- Geerbte ACLs (readonly) -- *@
+        @if (VM.InheritedEntries.Any())
+        {
+            <div class="acl-inherited-section">
+                <span class="detail-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    Geerbt
+                </span>
+                <div class="acl-list">
+                    @foreach (var inherited in VM.InheritedEntries)
+                    {
+                        var entry = inherited.Entry;
+                        var principalType = VM.GetPrincipalType(entry.PrincipalId);
+                        var sourceName = string.IsNullOrEmpty(inherited.SourcePath) ? "(Share-Root)" : inherited.SourcePath;
+
+                        <div class="acl-entry acl-entry--inherited @(entry.EntryType == AclEntryType.Deny ? "acl-entry--deny" : "acl-entry--allow")">
+                            <div class="acl-entry-header">
+                                <div class="acl-entry-principal">
+                                    @if (principalType == "group")
+                                    {
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" class="acl-icon">
+                                            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                                            <circle cx="9" cy="7" r="4" />
+                                            <path d="M23 21v-2a4 4 0 00-3-3.87" />
+                                            <path d="M16 3.13a4 4 0 010 7.75" />
+                                        </svg>
+                                    }
+                                    else if (principalType == "role")
+                                    {
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" class="acl-icon">
+                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" class="acl-icon">
+                                            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                                            <circle cx="12" cy="7" r="4" />
+                                        </svg>
+                                    }
+                                    <span class="acl-entry-name">@VM.GetPrincipalDisplayName(entry.PrincipalId)</span>
+                                    <span class="acl-entry-type-badge @(entry.EntryType == AclEntryType.Deny ? "badge--deny" : "badge--allow")">
+                                        @(entry.EntryType == AclEntryType.Allow ? "Allow" : "Deny")
+                                    </span>
+                                    <span class="acl-inherited-badge" title="Geerbt von @sourceName">
+                                        ↑ @sourceName
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="acl-entry-details">
+                                <span class="acl-detail-label">Berechtigungen:</span>
+                                <span class="acl-detail-value">@FormatPermissions(entry.Permissions)</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* -- Eigene ACLs (editierbar) -- *@
+        @if (VM.InheritedEntries.Any() || VM.Entries.Any())
+        {
+            <span class="detail-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 12px; display: block;">
+                Direkt
+            </span>
+        }
+
         @if (VM.Entries.Any())
         {
             <div class="acl-list">
@@ -263,7 +329,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && !string.IsNullOrEmpty(Path))
+        if (firstRender)
         {
             await LoadDataAsync();
         }
@@ -271,17 +337,25 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (_loaded && !string.IsNullOrEmpty(Path) && Path != VM.Path)
+        // Reload wenn sich Path oder ShareId ändern
+        if (_loaded)
         {
-            await LoadDataAsync();
+            var normalizedNew = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Normalize(Path);
+            if (normalizedNew != VM.NormalizedPath || ShareId != VM.ShareId)
+            {
+                await LoadDataAsync();
+            }
         }
     }
 
     private async Task LoadDataAsync()
     {
-        if (string.IsNullOrEmpty(Path))
+        Console.WriteLine($"[AclEditor] LoadDataAsync called! Path='{Path}', ShareId={ShareId}");
+    
+        if (Path is null)
         {
             _errorMessage = "Kein Pfad angegeben.";
+            Console.WriteLine("[AclEditor] Path is null, aborting");
             StateHasChanged();
             return;
         }
@@ -289,6 +363,7 @@
         if (ShareId == Guid.Empty)
         {
             _errorMessage = "Keine Share-ID angegeben.";
+            Console.WriteLine($"[AclEditor] ShareId is empty, aborting");
             StateHasChanged();
             return;
         }
@@ -300,7 +375,10 @@
 
         try
         {
-            await VM.LoadAsync(Path, ShareId, IsDirectory); 
+            Console.WriteLine($"[AclEditor] Calling VM.LoadAsync('{Path}', {ShareId}, {IsDirectory})");
+            await VM.LoadAsync(Path, ShareId, IsDirectory);
+
+            Console.WriteLine($"[AclEditor] VM.IsLoaded={VM.IsLoaded}, Entries={VM.Entries.Count}, Inherited={VM.InheritedEntries.Count}");
 
             if (VM.IsLoaded)
             {
@@ -309,11 +387,13 @@
             else
             {
                 _errorMessage = VM.ErrorMessage ?? "Laden fehlgeschlagen (unbekannter Fehler).";
+                Console.WriteLine($"[AclEditor] Load failed: {_errorMessage}");
             }
         }
         catch (Exception ex)
         {
             _errorMessage = $"Exception: {ex.Message}";
+            Console.WriteLine($"[AclEditor] Exception: {ex}");
         }
         finally
         {

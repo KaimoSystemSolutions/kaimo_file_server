@@ -1,8 +1,11 @@
+@using Kaimo_File_Server.Web.Components.Pages.Acl
+
 @page "/files/{ShareName}/{*SubPath}"
 @page "/files/{ShareName}"
 @inject FileBrowserViewModel VM
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
 
 <PageTitle>@(VM.CurrentShare?.Name ?? "Dateien") – Kaimo Files</PageTitle>
 
@@ -17,9 +20,18 @@
             <a class="breadcrumb-link" href="/files/@ShareName/@fullPath">@name</a>
         }
     </div>
-    @if (_isAdmin)
-    {
-        <div style="display: flex; gap: 0.5rem;">
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+        @* -- Neuer Ordner erstellen -- *@
+        <button class="btn-icon" title="Neuen Ordner erstellen"
+                @onclick="ShowCreateFolderDialog">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.5">
+                <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                <path d="M12 11v6M9 14h6" />
+            </svg>
+        </button>
+        @if (_isAdmin)
+        {
             <button class="btn-icon" title="Berechtigungen verwalten"
                     @onclick="ToggleAclPanel">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -27,9 +39,58 @@
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
             </button>
-        </div>
-    }
+        }
+    </div>
 </div>
+
+@* -- Dialog: Neuen Ordner erstellen -- *@
+@if (_showCreateFolder)
+{
+    <div class="modal-backdrop" @onclick="CancelCreateFolder">
+        <div class="modal-dialog" @onclick:stopPropagation="true">
+            <h3 class="modal-title">Neuen Ordner erstellen</h3>
+            <input class="modal-input" type="text" placeholder="Ordnername…"
+                   @bind="_newFolderName" @bind:event="oninput"
+                   @onkeydown="OnCreateFolderKeyDown" />
+            @if (_createFolderError is not null)
+            {
+                <div class="modal-error">@_createFolderError</div>
+            }
+            <div class="modal-actions">
+                <button class="btn btn-secondary" @onclick="CancelCreateFolder">Abbrechen</button>
+                <button class="btn btn-primary" @onclick="ConfirmCreateFolder"
+                        disabled="@string.IsNullOrWhiteSpace(_newFolderName)">
+                    Erstellen
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* -- Dialog: Löschen bestätigen -- *@
+@if (_showDeleteConfirm)
+{
+    <div class="modal-backdrop" @onclick="CancelDelete">
+        <div class="modal-dialog" @onclick:stopPropagation="true">
+            <h3 class="modal-title">Löschen bestätigen</h3>
+            <p class="modal-text">
+                Möchten Sie <strong>„@_deleteTarget?.Name"</strong> wirklich löschen?
+                @if (_deleteTarget?.IsDirectory == true)
+                {
+                    <br /><span class="modal-warning">Alle Inhalte des Ordners werden ebenfalls gelöscht.</span>
+                }
+            </p>
+            @if (_deleteError is not null)
+            {
+                <div class="modal-error">@_deleteError</div>
+            }
+            <div class="modal-actions">
+                <button class="btn btn-secondary" @onclick="CancelDelete">Abbrechen</button>
+                <button class="btn btn-danger" @onclick="ConfirmDelete">Löschen</button>
+            </div>
+        </div>
+    </div>
+}
 
 @if (VM.IsLoading)
 {
@@ -55,13 +116,16 @@ else
                     </svg>
                     Berechtigungen
                 </h3>
-                <span class="detail-subtitle">@_aclPath</span>
+                <span class="detail-subtitle">@(_aclPath == "" ? "(Share-Root)" : _aclPath)</span>
             </div>
-            <AclEditor Path="@_aclPath" ShareId="@VM.CurrentShare.Id" IsDirectory="true" />
+            <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclPath}-{_showAclPanel}")"
+                       Path="@_aclPath"
+                       ShareId="@VM.CurrentShare.Id"
+                       IsDirectory="true" />
         </div>
     }
 
-    <div class="file-list">
+    <div class="file-list" @oncontextmenu="OnBackgroundContextMenu" @oncontextmenu:preventDefault="true">
         @if (VM.HasParent)
         {
             <div class="file-row file-row-dir" @onclick="NavigateUp">
@@ -80,7 +144,9 @@ else
 
         @foreach (var dir in VM.Directories)
         {
-            <div class="file-row file-row-dir">
+            <div class="file-row file-row-dir"
+                 @oncontextmenu="(e) => OnItemContextMenu(e, dir)"
+                 @oncontextmenu:preventDefault="true">
                 <div class="file-cell file-name" @onclick="() => NavigateTo(dir)">
                     <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
                          fill="var(--folder-fill)" stroke="var(--folder-stroke)" stroke-width="1.5">
@@ -90,9 +156,18 @@ else
                 </div>
                 <div class="file-cell file-size">–</div>
                 <div class="file-cell file-date">@dir.ModifiedAt.ToString("dd.MM.yyyy HH:mm")</div>
-                @if (_isAdmin)
-                {
-                    <div class="file-cell file-actions">
+                <div class="file-cell file-actions">
+                    <button class="btn-icon btn-icon--small btn-icon--danger" title="@dir.Name löschen"
+                            @onclick="() => RequestDelete(dir)" @onclick:stopPropagation="true">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                             stroke="var(--text-tertiary)" stroke-width="1.5">
+                            <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+                            <line x1="10" y1="11" x2="10" y2="17" />
+                            <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                    </button>
+                    @if (_isAdmin)
+                    {
                         <button class="btn-icon btn-icon--small" title="ACL für @dir.Name"
                                 @onclick="() => OpenFolderAcl(dir)" @onclick:stopPropagation="true">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -101,8 +176,8 @@ else
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                             </svg>
                         </button>
-                    </div>
-                }
+                    }
+                </div>
             </div>
 
             @* Inline ACL editor for this specific folder *@
@@ -120,14 +195,20 @@ else
                             </svg>
                         </button>
                     </div>
-                    <AclEditor Path="@_aclFolderPath" ShareId="@VM.CurrentShare.Id" IsDirectory="true" />
+                    <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclPath}-{_showAclPanel}")"
+                               Path="@_aclPath"
+                               ShareId="@VM.CurrentShare.Id"
+                               IsDirectory="true" />
                 </div>
             }
         }
 
         @foreach (var file in VM.Files)
         {
-            <div class="file-row">
+            <div class="file-row"
+                 @oncontextmenu="(e) => OnItemContextMenu(e, file)"
+                 @oncontextmenu:preventDefault="true"
+                 @oncontextmenu:stopPropagation="true">
                 <div class="file-cell file-name">
                     <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
                          fill="none" stroke="var(--text-tertiary)" stroke-width="1.5">
@@ -138,9 +219,18 @@ else
                 </div>
                 <div class="file-cell file-size">@FormatHelper.FormatFileSize(file.Size)</div>
                 <div class="file-cell file-date">@file.ModifiedAt.ToString("dd.MM.yyyy HH:mm")</div>
-                @if (_isAdmin)
-                {
-                    <div class="file-cell file-actions">
+                <div class="file-cell file-actions">
+                    <button class="btn-icon btn-icon--small btn-icon--danger" title="@file.Name löschen"
+                            @onclick="() => RequestDelete(file)" @onclick:stopPropagation="true">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                             stroke="var(--text-tertiary)" stroke-width="1.5">
+                            <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+                            <line x1="10" y1="11" x2="10" y2="17" />
+                            <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                    </button>
+                    @if (_isAdmin)
+                    {
                         <button class="btn-icon btn-icon--small" title="ACL für @file.Name"
                                 @onclick="() => OpenFileAcl(file)">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -149,8 +239,8 @@ else
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                             </svg>
                         </button>
-                    </div>
-                }
+                    }
+                </div>
             </div>
 
             @* Inline ACL editor for this specific file *@
@@ -168,7 +258,10 @@ else
                             </svg>
                         </button>
                     </div>
-                    <AclEditor Path="@_aclFolderPath" ShareId="@VM.CurrentShare.Id" IsDirectory="false" />
+                    <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclPath}-{_showAclPanel}")"
+                               Path="@_aclPath"
+                               ShareId="@VM.CurrentShare.Id"
+                               IsDirectory="true" />
                 </div>
             }
         }
@@ -179,6 +272,95 @@ else
                 <p>Dieser Ordner ist leer.</p>
             </div>
         }
+    </div>
+}
+
+@* -- Kontextmenü (Rechtsklick) -- *@
+@if (_showContextMenu)
+{
+    <div class="context-menu-backdrop" @onclick="CloseContextMenu" @oncontextmenu="CloseContextMenu"
+         @oncontextmenu:preventDefault="true"></div>
+    <div class="context-menu" style="top: @(_contextMenuY)px; left: @(_contextMenuX)px;">
+        @if (_contextTarget is not null)
+        {
+            @* Kontextmenü für eine Datei/Ordner *@
+            <div class="context-menu-header">@_contextTarget.Name</div>
+            @if (_contextTarget.IsDirectory)
+            {
+                <button class="context-menu-item" @onclick="() => ContextNavigateTo(_contextTarget)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                    Öffnen
+                </button>
+            }
+            <button class="context-menu-item" @onclick="() => ContextRename(_contextTarget)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                </svg>
+                Umbenennen
+            </button>
+            <button class="context-menu-item context-menu-item--danger" @onclick="() => ContextDelete(_contextTarget)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                </svg>
+                Löschen
+            </button>
+            @if (_isAdmin)
+            {
+                <div class="context-menu-separator"></div>
+                <button class="context-menu-item" @onclick="() => ContextAcl(_contextTarget)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                    Berechtigungen
+                </button>
+            }
+        }
+        else
+        {
+            @* Kontextmenü für den Hintergrund (leerer Bereich) *@
+            <button class="context-menu-item" @onclick="ContextNewFolder">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    <path d="M12 11v6M9 14h6" />
+                </svg>
+                Neuer Ordner
+            </button>
+            <button class="context-menu-item" @onclick="ContextRefresh">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M1 4v6h6M23 20v-6h-6" />
+                    <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
+                </svg>
+                Aktualisieren
+            </button>
+        }
+    </div>
+}
+
+@* -- Dialog: Umbenennen -- *@
+@if (_showRenameDialog)
+{
+    <div class="modal-backdrop" @onclick="CancelRename">
+        <div class="modal-dialog" @onclick:stopPropagation="true">
+            <h3 class="modal-title">Umbenennen</h3>
+            <input class="modal-input" type="text" placeholder="Neuer Name…"
+                   @bind="_renameNewName" @bind:event="oninput"
+                   @onkeydown="OnRenameKeyDown" />
+            @if (_renameError is not null)
+            {
+                <div class="modal-error">@_renameError</div>
+            }
+            <div class="modal-actions">
+                <button class="btn btn-secondary" @onclick="CancelRename">Abbrechen</button>
+                <button class="btn btn-primary" @onclick="ConfirmRename"
+                        disabled="@string.IsNullOrWhiteSpace(_renameNewName)">
+                    Umbenennen
+                </button>
+            </div>
+        </div>
     </div>
 }
 
@@ -194,11 +376,33 @@ else
     private bool _showFolderAcl;
     private string _aclFolderPath = "";
 
+    // Ordner erstellen
+    private bool _showCreateFolder;
+    private string _newFolderName = "";
+    private string? _createFolderError;
+
+    // Löschen
+    private bool _showDeleteConfirm;
+    private FileMetadata? _deleteTarget;
+    private string? _deleteError;
+
+    // Kontextmenü
+    private bool _showContextMenu;
+    private double _contextMenuX;
+    private double _contextMenuY;
+    private FileMetadata? _contextTarget; // null = Hintergrund-Klick
+
+    // Umbenennen
+    private bool _showRenameDialog;
+    private FileMetadata? _renameTarget;
+    private string _renameNewName = "";
+    private string? _renameError;
+
     protected override async Task OnParametersSetAsync()
     {
-        // Beim Navigieren ACL-Panels schließen
         _showFolderAcl = false;
         _aclFolderPath = "";
+        CloseContextMenu();
 
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
         UpdateAclPath();
@@ -210,22 +414,192 @@ else
         {
             var state = await AuthStateProvider.GetAuthenticationStateAsync();
             _isAdmin = state.User.IsInRole("Administrator")
-                    || state.User.IsInRole("ShareCreator");
+                    || state.User.IsInRole("ShareManager");
             StateHasChanged();
         }
     }
 
     private void UpdateAclPath()
     {
-        // Nur der Pfad innerhalb des Shares, OHNE Share-Name
         _aclPath = VM.CurrentPath ?? "";
     }
 
     private void ToggleAclPanel()
     {
         _showAclPanel = !_showAclPanel;
-        _showFolderAcl = false; // Folder-ACL schließen wenn Panel getoggelt wird
+        _showFolderAcl = false;
     }
+
+    // ========== Ordner erstellen ==========
+
+    private void ShowCreateFolderDialog()
+    {
+        _newFolderName = "";
+        _createFolderError = null;
+        _showCreateFolder = true;
+    }
+
+    private void CancelCreateFolder()
+    {
+        _showCreateFolder = false;
+    }
+
+    private async Task OnCreateFolderKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_newFolderName))
+            await ConfirmCreateFolder();
+        else if (e.Key == "Escape")
+            CancelCreateFolder();
+    }
+
+    private async Task ConfirmCreateFolder()
+    {
+        if (string.IsNullOrWhiteSpace(_newFolderName)) return;
+
+        var result = await VM.CreateFolderAsync(_newFolderName.Trim());
+        if (result.Success)
+        {
+            _showCreateFolder = false;
+            await VM.LoadShareAsync(ShareName, SubPath ?? "");
+        }
+        else
+        {
+            _createFolderError = result.Error;
+        }
+    }
+
+    // ========== Löschen ==========
+
+    private void RequestDelete(FileMetadata item)
+    {
+        _deleteTarget = item;
+        _deleteError = null;
+        _showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        _showDeleteConfirm = false;
+        _deleteTarget = null;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (_deleteTarget is null) return;
+
+        var result = await VM.DeleteAsync(_deleteTarget);
+        if (result.Success)
+        {
+            _showDeleteConfirm = false;
+            _deleteTarget = null;
+            await VM.LoadShareAsync(ShareName, SubPath ?? "");
+        }
+        else
+        {
+            _deleteError = result.Error;
+        }
+    }
+
+    // ========== Kontextmenü ==========
+
+    private void OnItemContextMenu(MouseEventArgs e, FileMetadata item)
+    {
+        _contextTarget = item;
+        _contextMenuX = e.ClientX;
+        _contextMenuY = e.ClientY;
+        _showContextMenu = true;
+    }
+
+    private void OnBackgroundContextMenu(MouseEventArgs e)
+    {
+        _contextTarget = null;
+        _contextMenuX = e.ClientX;
+        _contextMenuY = e.ClientY;
+        _showContextMenu = true;
+    }
+
+    private void CloseContextMenu()
+    {
+        _showContextMenu = false;
+        _contextTarget = null;
+    }
+
+    private void ContextNavigateTo(FileMetadata dir)
+    {
+        CloseContextMenu();
+        NavigateTo(dir);
+    }
+
+    private void ContextDelete(FileMetadata item)
+    {
+        CloseContextMenu();
+        RequestDelete(item);
+    }
+
+    private void ContextRename(FileMetadata item)
+    {
+        CloseContextMenu();
+        _renameTarget = item;
+        _renameNewName = item.Name;
+        _renameError = null;
+        _showRenameDialog = true;
+    }
+
+    private void ContextAcl(FileMetadata item)
+    {
+        CloseContextMenu();
+        if (item.IsDirectory)
+            OpenFolderAcl(item);
+        else
+            OpenFileAcl(item);
+    }
+
+    private void ContextNewFolder()
+    {
+        CloseContextMenu();
+        ShowCreateFolderDialog();
+    }
+
+    private async Task ContextRefresh()
+    {
+        CloseContextMenu();
+        await VM.LoadShareAsync(ShareName, SubPath ?? "");
+    }
+
+    // ========== Umbenennen ==========
+
+    private void CancelRename()
+    {
+        _showRenameDialog = false;
+        _renameTarget = null;
+    }
+
+    private async Task OnRenameKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_renameNewName))
+            await ConfirmRename();
+        else if (e.Key == "Escape")
+            CancelRename();
+    }
+
+    private async Task ConfirmRename()
+    {
+        if (_renameTarget is null || string.IsNullOrWhiteSpace(_renameNewName)) return;
+
+        var result = await VM.RenameAsync(_renameTarget, _renameNewName.Trim());
+        if (result.Success)
+        {
+            _showRenameDialog = false;
+            _renameTarget = null;
+            await VM.LoadShareAsync(ShareName, SubPath ?? "");
+        }
+        else
+        {
+            _renameError = result.Error;
+        }
+    }
+
+    // ========== ACL Helpers (unverändert) ==========
 
     private string GetDirAclPath(FileMetadata dir)
     {
@@ -248,7 +622,6 @@ else
         var path = GetDirAclPath(dir);
         if (_showFolderAcl && _aclFolderPath == path)
         {
-            // Toggle: schließen wenn gleicher Ordner
             _showFolderAcl = false;
             _aclFolderPath = "";
         }
@@ -279,6 +652,8 @@ else
         _showFolderAcl = false;
         _aclFolderPath = "";
     }
+
+    // ========== Navigation (unverändert) ==========
 
     private void NavigateTo(FileMetadata dir)
     {

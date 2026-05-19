@@ -1,127 +1,145 @@
 ﻿using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Storage;
 
-namespace Kaimo_File_Server.Core.Services
+namespace Kaimo_File_Server.Core.Services;
+
+public class FileService : IFileService
 {
-    public class FileService : IFileService
+    private readonly IStorageEngine _storage;
+    private readonly IAclService _acl;
+    private readonly Guid _shareId;
+
+    public FileService(IStorageEngine storage, IAclService acl, Guid shareId)
     {
-        private readonly IStorageEngine _storage;
-        private readonly IAclService _acl;
-        private readonly Guid _shareId;
+        _storage = storage;
+        _acl = acl;
+        _shareId = shareId;
+    }
 
-        public FileService(IStorageEngine storage, IAclService acl, Guid shareId)
+    // ────────────────── Directory Listing ──────────────────
+
+    public async Task<List<FileMetadata>> ListAsync(string directoryPath, UserContext user)
+    {
+        var normalizedDir = ShareRelativePath.Normalize(directoryPath);
+
+        if (!await _acl.HasAccessAsync(user, _shareId, normalizedDir, true, FilePermission.ListReadData))
+            throw new UnauthorizedAccessException($"List denied for '{normalizedDir}'");
+
+        var items = await _storage.ListAsync(normalizedDir);
+
+        // Filter each item individually — user only sees what they're allowed to
+        var visible = new List<FileMetadata>();
+        foreach (var item in items)
         {
-            _storage = storage;
-            _acl = acl;
-            _shareId = shareId;
+            var itemPath = ShareRelativePath.Combine(normalizedDir, item.Name);
+
+            if (await _acl.HasAccessAsync(user, _shareId, itemPath, item.IsDirectory, FilePermission.ListReadData))
+                visible.Add(item);
         }
 
-        public async Task<List<FileMetadata>> ListAsync(string directoryPath, UserContext user)
-        {
-            // Prüfe ob der User das Verzeichnis überhaupt listen darf
-            if (!await _acl.HasAccessAsync(user, _shareId, directoryPath, true, FilePermission.ListReadData))
-                throw new UnauthorizedAccessException($"List denied for '{directoryPath}'");
+        return visible;
+    }
 
-            var items = await _storage.ListAsync(directoryPath);
+    // ────────────────── Permission Checks ──────────────────
 
-            // Jedes Item einzeln prüfen — User sieht nur was er darf
-            var visible = new List<FileMetadata>();
-            foreach (var item in items)
-            {
-                // Relativen Pfad innerhalb des Shares berechnen
-                var itemRelativePath = string.IsNullOrEmpty(directoryPath)
-                    ? item.Name
-                    : $"{directoryPath}/{item.Name}";
+    public async Task<bool> CanReadAsync(string path, UserContext user)
+    {
+        var normalized = ShareRelativePath.Normalize(path);
+        var isDir = await _storage.IsDirectoryAsync(normalized);
+        return await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.ListReadData);
+    }
 
-                if (await _acl.HasAccessAsync(user, _shareId, itemRelativePath, item.IsDirectory, FilePermission.ListReadData))
-                    visible.Add(item);
-            }
+    public async Task<bool> CanWriteAsync(string path, UserContext user)
+    {
+        var normalized = ShareRelativePath.Normalize(path);
+        var isDir = await _storage.IsDirectoryAsync(normalized);
+        return await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.CreateWriteData);
+    }
 
-            return visible;
-        }
+    public async Task<bool> CanCreateAsync(string path, UserContext user)
+    {
+        var parentPath = ShareRelativePath.GetParent(path);
+        return await _acl.HasAccessAsync(user, _shareId, parentPath, true, FilePermission.CreateWriteData);
+    }
 
-        // ------------ Permission Checks ------------
+    public async Task<bool> CanDeleteAsync(string path, UserContext user)
+    {
+        var normalized = ShareRelativePath.Normalize(path);
+        var isDir = await _storage.IsDirectoryAsync(normalized);
+        return await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.Delete);
+    }
 
-        public async Task<bool> CanReadAsync(string path, UserContext user)
-        {
-            var isDir = await _storage.IsDirectoryAsync(path);
-            return await _acl.HasAccessAsync(user, _shareId, path, isDir, FilePermission.ListReadData);
-        }
+    public async Task<bool> CanListAsync(string path, UserContext user)
+    {
+        var normalized = ShareRelativePath.Normalize(path);
+        return await _acl.HasAccessAsync(user, _shareId, normalized, true, FilePermission.ListReadData);
+    }
 
-        public async Task<bool> CanWriteAsync(string path, UserContext user)
-        {
-            var isDir = await _storage.IsDirectoryAsync(path);
-            return await _acl.HasAccessAsync(user, _shareId, path, isDir, FilePermission.CreateWriteData);
-        }
+    // ────────────────── Full Operations ──────────────────
 
-        public async Task<bool> CanCreateAsync(string path, UserContext user)
-        {
-            var parentPath = GetParentPath(path);
-            return await _acl.HasAccessAsync(user, _shareId, parentPath, true, FilePermission.CreateWriteData);
-        }
+    public async Task<Stream> ReadFileAsync(string path, UserContext user)
+    {
+        var normalized = ShareRelativePath.Normalize(path);
+        var isDir = await _storage.IsDirectoryAsync(normalized);
 
-        public async Task<bool> CanDeleteAsync(string path, UserContext user)
-        {
-            var isDir = await _storage.IsDirectoryAsync(path);
-            return await _acl.HasAccessAsync(user, _shareId, path, isDir, FilePermission.Delete);
-        }
+        if (!await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.ListReadData))
+            throw new UnauthorizedAccessException($"Read denied for '{normalized}'");
 
-        public async Task<bool> CanListAsync(string path, UserContext user)
-        {
-            return await _acl.HasAccessAsync(user, _shareId, path, true, FilePermission.ListReadData);
-        }
+        return await _storage.ReadAsync(normalized);
+    }
 
-        // ------------ Full Operations ------------
+    public async Task WriteFileAsync(string path, Stream data, UserContext user)
+    {
+        var normalized = ShareRelativePath.Normalize(path);
+        var isDir = await _storage.IsDirectoryAsync(normalized);
 
-        public async Task<Stream> ReadFileAsync(string path, UserContext user)
-        {
-            var isDir = await _storage.IsDirectoryAsync(path);
-            if (!await _acl.HasAccessAsync(user, _shareId, path, isDir, FilePermission.ListReadData))
-                throw new UnauthorizedAccessException($"Read denied for '{path}'");
-            return await _storage.ReadAsync(path);
-        }
+        if (!await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.CreateWriteData))
+            throw new UnauthorizedAccessException($"Write denied for '{normalized}'");
 
-        public async Task WriteFileAsync(string path, Stream data, UserContext user)
-        {
-            var isDir = await _storage.IsDirectoryAsync(path);
-            if (!await _acl.HasAccessAsync(user, _shareId, path, isDir, FilePermission.CreateWriteData))
-                throw new UnauthorizedAccessException($"Write denied for '{path}'");
-            await _storage.WriteAsync(path, data);
-        }
+        await _storage.WriteAsync(normalized, data);
+    }
 
-        public async Task CreateFileAsync(string path, UserContext user)
-        {
-            var parentPath = GetParentPath(path);
-            if (!await _acl.HasAccessAsync(user, _shareId, parentPath, true, FilePermission.CreateWriteData))
-                throw new UnauthorizedAccessException($"Create denied for '{path}'");
-            await _storage.WriteAsync(path, Stream.Null);
-        }
+    public async Task CreateFileAsync(string path, UserContext user)
+    {
+        var parentPath = ShareRelativePath.GetParent(path);
 
-        public async Task DeleteFileAsync(string path, UserContext user)
-        {
-            var isDir = await _storage.IsDirectoryAsync(path);
-            if (!await _acl.HasAccessAsync(user, _shareId, path, isDir, FilePermission.Delete))
-                throw new UnauthorizedAccessException($"Delete denied for '{path}'");
-            await _storage.DeleteAsync(path);
-        }
+        if (!await _acl.HasAccessAsync(user, _shareId, parentPath, true, FilePermission.CreateWriteData))
+            throw new UnauthorizedAccessException($"Create denied for '{path}'");
 
-        public async Task<FileMetadata> GetMetadataAsync(string path, UserContext user)
-        {
-            var meta = await _storage.GetMetadataAsync(path);
-            if (!await _acl.HasAccessAsync(user, _shareId, path, meta.IsDirectory, FilePermission.ListReadData))
-                throw new UnauthorizedAccessException($"Metadata read denied for '{path}'");
-            return meta;
-        }
+        await _storage.WriteAsync(ShareRelativePath.Normalize(path), Stream.Null);
+    }
 
-        // ------------ Helpers ------------
+    public async Task CreateDirectoryAsync(string path, UserContext user)
+    {
+        var parentPath = ShareRelativePath.GetParent(path);
 
-        private static string GetParentPath(string path)
-        {
-            if (string.IsNullOrEmpty(path)) return "";
-            var normalized = path.TrimEnd('/');
-            var lastSlash = normalized.LastIndexOf('/');
-            return lastSlash > 0 ? normalized[..lastSlash] : "";
-        }
+        if (!await _acl.HasAccessAsync(user, _shareId, parentPath, true, FilePermission.CreateWriteData))
+            throw new UnauthorizedAccessException($"Create denied for '{path}'");
+
+        await _storage.CreateDirectory(ShareRelativePath.Normalize(path));
+    }
+
+    public async Task DeleteFileAsync(string path, UserContext user)
+    {
+        var normalized = ShareRelativePath.Normalize(path);
+        var isDir = await _storage.IsDirectoryAsync(normalized);
+
+        if (!await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.Delete))
+            throw new UnauthorizedAccessException($"Delete denied for '{normalized}'");
+
+        await _storage.DeleteAsync(normalized);
+    }
+
+    public async Task<FileMetadata> GetMetadataAsync(string path, UserContext user)
+    {
+        var normalized = ShareRelativePath.Normalize(path);
+        var meta = await _storage.GetMetadataAsync(normalized);
+
+        if (!await _acl.HasAccessAsync(user, _shareId, normalized, meta.IsDirectory, FilePermission.ListReadData))
+            throw new UnauthorizedAccessException($"Metadata read denied for '{normalized}'");
+
+        return meta;
     }
 }

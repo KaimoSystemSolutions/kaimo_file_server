@@ -13,6 +13,6 @@ namespace Kaimo_File_Server.Core.Domain
         public DateTime CreatedAt { get; set; }
         public DateTime ModifiedAt { get; set; }
         public Guid OwnerId { get; set; }
-        public IReadOnlyList<AccessEntry> Acl { get; set; } = [];
+        public List<AccessEntry> Acl { get; set; } = new();
     }
 }

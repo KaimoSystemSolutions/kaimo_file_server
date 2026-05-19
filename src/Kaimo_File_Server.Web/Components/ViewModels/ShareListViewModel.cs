@@ -97,7 +97,7 @@ public partial class ShareListViewModel
                            ?? "";
 
             IsAdmin = state.User.IsInRole("Administrator")
-                   || state.User.IsInRole("ShareCreator");
+                   || state.User.IsInRole("ShareManager");
             CanCreateShare = IsAdmin;
 
             var userId = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -188,7 +188,13 @@ public partial class ShareListViewModel
             var state = await _authState.GetAuthenticationStateAsync();
             var userId = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userId is not null && Guid.TryParse(userId, out var uid))
+            {
+                // 1. Share-Sichtbarkeit
                 await _accessRepo.GrantAccessAsync(share.Name, uid);
+
+                // 2. Root-FileMetadata für den Share anlegen + Owner-ACL
+                await _accessRepo.EnsureShareRootAclAsync(share.Id, uid);
+            }
 
             _logger.LogInformation("Share '{ShareName}' erstellt", name);
 
