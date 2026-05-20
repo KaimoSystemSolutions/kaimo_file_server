@@ -45,6 +45,9 @@ public class FileBrowserViewModel
 
     // -- State --
 
+    public event Action? OnStateChanged;
+    public Dictionary<string, long> DirectorySizes { get; private set; } = new();
+    private CancellationTokenSource? _sizeCts;
     public Dictionary<string, int> AclCounts { get; private set; } = new();
     public ShareDefinition? CurrentShare { get; private set; }
     public List<FileMetadata> Items { get; private set; } = [];
@@ -138,6 +141,8 @@ public class FileBrowserViewModel
 
             _logger.LogDebug("Found {Total} items ({Dirs} dirs, {Files} files)",
                 Items.Count, Directories.Count(), Files.Count());
+
+            _ = LoadDirectorySizesInBackgroundAsync();
         }
         catch (UnauthorizedAccessException)
         {
@@ -331,5 +336,55 @@ public class FileBrowserViewModel
     public int GetAclCount(string path)
     {
         return AclCounts.TryGetValue(path, out var count) ? count : 0;
+    }
+
+    private async Task LoadDirectorySizesInBackgroundAsync()
+    {
+        // Vorherigen Lauf abbrechen (z.B. bei schnellem Ordnerwechsel)
+        _sizeCts?.Cancel();
+        _sizeCts = new CancellationTokenSource();
+        var ct = _sizeCts.Token;
+
+        DirectorySizes.Clear();
+
+        if (_fileService is null || CurrentShare is null) return;
+
+        var userContext = await GetCurrentUserContextAsync();
+        if (userContext is null) return;
+
+        var dirs = Items.Where(f => f.IsDirectory).ToList();
+
+        foreach (var dir in dirs)
+        {
+            if (ct.IsCancellationRequested) return;
+
+            try
+            {
+                var relativePath = dir.Path;
+                if (relativePath.StartsWith(CurrentShare.Path))
+                    relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
+
+                var size = await _fileService.GetDirectorySizeAsync(relativePath, userContext);
+
+                DirectorySizes[relativePath] = size;
+                OnStateChanged?.Invoke(); // UI updaten nach jedem Ordner
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not calculate size for '{Path}'", dir.Path);
+            }
+        }
+    }
+
+    /// <summary>Holt die berechnete Größe, falls schon da.</summary>
+    public long? GetDirectorySize(FileMetadata dir)
+    {
+        if (!dir.IsDirectory || CurrentShare is null) return dir.Size;
+
+        var relativePath = dir.Path;
+        if (relativePath.StartsWith(CurrentShare.Path))
+            relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
+
+        return DirectorySizes.TryGetValue(relativePath, out var size) ? size : null;
     }
 }

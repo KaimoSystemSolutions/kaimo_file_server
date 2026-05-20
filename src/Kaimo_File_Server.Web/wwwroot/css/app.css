@@ -2046,3 +2046,167 @@ html, body, #app {
     .toolbar-btn:disabled svg {
         opacity: 0.7;
     }
+
+/* ══════════════════════════════════════════════════════════
+   Column Drag & Drop
+   ══════════════════════════════════════════════════════════ */
+
+.file-list-header .file-cell[draggable="true"] {
+    cursor: grab;
+    user-select: none;
+    transition: background 0.15s, box-shadow 0.15s;
+}
+
+    .file-list-header .file-cell[draggable="true"]:active {
+        cursor: grabbing;
+    }
+
+.file-list-header .file-cell.col-dragging {
+    opacity: 0.4;
+}
+
+.file-list-header .file-cell.col-drop-target {
+    box-shadow: inset 3px 0 0 0 var(--accent);
+    background: var(--accent-subtle);
+    border-radius: 2px;
+}
+
+.drag-handle {
+    opacity: 0.3;
+    margin-right: 4px;
+    flex-shrink: 0;
+    transition: opacity 0.15s;
+}
+
+.file-list-header .file-cell:hover .drag-handle {
+    opacity: 0.7;
+}
+
+/* --- Wrapper: definiert die CSS-Variablen-Defaults --- */
+.file-table-wrap {
+    --col-size: 90px;
+    --col-created: 140px;
+    --col-modified: 140px;
+    --col-lastaccess: 140px;
+    --col-actions: 100px;
+}
+
+    /* --- Gemeinsame Basis für Header + Datenzeilen --- */
+    .file-table-wrap .file-list-header,
+    .file-table-wrap .file-row {
+        display: flex;
+        align-items: center;
+    }
+
+    /* --- Spaltenbreiten via CSS-Variablen --- */
+
+    /* Name: nimmt den gesamten verbleibenden Platz */
+    .file-table-wrap .col-name {
+        flex: 1 1 0%;
+        min-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        position: relative;
+    }
+
+    .file-table-wrap .col-size {
+        width: var(--col-size);
+        min-width: 50px;
+        flex-shrink: 0;
+        padding: 0 12px;
+        text-align: right;
+        position: relative;
+    }
+
+    .file-table-wrap .col-created {
+        width: var(--col-created);
+        min-width: 50px;
+        flex-shrink: 0;
+        padding: 0 12px;
+        position: relative;
+    }
+
+    .file-table-wrap .col-modified {
+        width: var(--col-modified);
+        min-width: 50px;
+        flex-shrink: 0;
+        padding: 0 12px;
+        position: relative;
+    }
+
+    .file-table-wrap .col-lastaccess {
+        width: var(--col-lastaccess);
+        min-width: 50px;
+        flex-shrink: 0;
+        padding: 0 12px;
+        position: relative;
+    }
+
+    .file-table-wrap .col-actions {
+        width: var(--col-actions);
+        min-width: 50px;
+        flex-shrink: 0;
+        padding: 0 8px;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        justify-content: flex-end;
+    }
+
+/* --- Resize Handle --- */
+.col-resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+    z-index: 2;
+    user-select: none;
+    /* Unsichtbar, aber klickbar */
+    background: transparent;
+    transition: background 0.15s;
+}
+
+    .col-resize-handle:hover,
+    .col-resize-handle:active {
+        background: var(--accent, #4f8ff7);
+        opacity: 0.4;
+        border-radius: 3px;
+    }
+
+/* --- Header-Zeile: Zellen brauchen position:relative für den Handle --- */
+.file-table-wrap .file-list-header .file-cell {
+    position: relative;
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    padding-top: 8px;
+    padding-bottom: 8px;
+    user-select: none;
+}
+
+/* --- Responsive: kleine Screens verstecken optionale Spalten --- */
+@media (max-width: 900px) {
+    .file-table-wrap .col-lastaccess {
+        display: none;
+    }
+}
+
+@media (max-width: 700px) {
+    .file-table-wrap .col-created,
+    .file-table-wrap .col-modified {
+        display: none;
+    }
+}
+
+@media (max-width: 500px) {
+    .file-table-wrap .col-size {
+        display: none;
+    }
+}

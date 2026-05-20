@@ -2,6 +2,7 @@
 
 @page "/files/{ShareName}/{*SubPath}"
 @page "/files/{ShareName}"
+@implements IDisposable
 @inject FileBrowserViewModel VM
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
@@ -21,7 +22,6 @@
         }
     </div>
     <div style="display: flex; gap: 0.5rem; align-items: center;">
-        @* -- Neuer Ordner erstellen -- *@
         <button class="btn-icon" title="Neuen Ordner erstellen"
                 @onclick="ShowCreateFolderDialog">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -57,35 +57,25 @@
                 : $"{_selectedItems.Count} ausgewählt")
         </span>
     </div>
-
     <div class="toolbar-actions">
-
-        <button class="toolbar-btn"
-                title="Öffnen"
-                disabled="@(!CanOpenSelection)"
-                @onclick="OpenSelected">
+        <button class="toolbar-btn" title="Öffnen"
+                disabled="@(!CanOpenSelection)" @onclick="OpenSelected">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" stroke-width="1.5">
                 <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
             <span>Öffnen</span>
         </button>
-
-        <button class="toolbar-btn"
-                title="Umbenennen"
-                disabled="@(!CanRenameSelection)"
-                @onclick="RenameSelected">
+        <button class="toolbar-btn" title="Umbenennen"
+                disabled="@(!CanRenameSelection)" @onclick="RenameSelected">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" stroke-width="1.5">
                 <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
             </svg>
             <span>Umbenennen</span>
         </button>
-
-        <button class="toolbar-btn toolbar-btn--danger"
-                title="Löschen"
-                disabled="@(!CanDeleteSelection)"
-                @onclick="DeleteSelected">
+        <button class="toolbar-btn toolbar-btn--danger" title="Löschen"
+                disabled="@(!CanDeleteSelection)" @onclick="DeleteSelected">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" stroke-width="1.5">
                 <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
@@ -94,18 +84,14 @@
             </svg>
             <span>Löschen</span>
         </button>
-
-        <button class="toolbar-btn"
-                title="Berechtigungen"
-                disabled="@(!CanAclSelection)"
-                @onclick="AclSelected">
+        <button class="toolbar-btn" title="Berechtigungen"
+                disabled="@(!CanAclSelection)" @onclick="AclSelected">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" stroke-width="1.5">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
             <span>Berechtigungen</span>
         </button>
-
     </div>
 </div>
 
@@ -205,200 +191,242 @@ else
         </div>
     }
 
-    @* -- Spaltenüberschriften -- *@
-    <div class="file-list-header">
-        <div class="file-cell file-name">Name</div>
-        <div class="file-cell file-size">Größe</div>
-        <div class="file-cell file-date">Erstellt</div>
-        <div class="file-cell file-date">Geändert</div>
-        <div class="file-cell file-date">Letzter Zugriff</div>
-        <div class="file-cell file-actions"></div>
-    </div>
+    @* ══════════════════════════════════════════════════
+       Resizable Column Table
+       CSS-Variablen steuern alle Spaltenbreiten.
+       Name-Spalte (flex:1) nimmt den Rest.
+       ══════════════════════════════════════════════════ *@
+    <div class="file-table-wrap"
+         style="--col-size:@(_colWidths["size"])px; --col-created:@(_colWidths["created"])px; --col-modified:@(_colWidths["modified"])px; --col-lastaccess:@(_colWidths["lastaccess"])px; --col-actions:@(_colWidths["actions"])px;">
 
-    <div class="file-list"
-         @onclick="OnListBackgroundClick"
-         @oncontextmenu="OnBackgroundContextMenu"
-         @oncontextmenu:preventDefault="true">
-        @if (VM.HasParent)
-        {
-            <div class="file-row file-row-dir" @ondblclick="NavigateUp">
-                <div class="file-cell file-name">
-                    <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                         stroke="var(--text-tertiary)" stroke-width="1.5">
-                        <path d="M15 18l-6-6 6-6" />
-                    </svg>
-                    <span>..</span>
-                </div>
-                <div class="file-cell file-size"></div>
-                <div class="file-cell file-date"></div>
-                <div class="file-cell file-date"></div>
-                <div class="file-cell file-date"></div>
-                <div class="file-cell file-actions"></div>
+        @* -- Spaltenüberschriften mit Resize-Handles -- *@
+        <div class="file-list-header">
+            <div class="file-cell col-name">
+                Name
+                <div class="col-resize-handle" @onmousedown="@(e => OnResizeStart(e, "name"))" @onmousedown:stopPropagation="true"></div>
             </div>
-        }
+            <div class="file-cell col-size">
+                Größe
+                <div class="col-resize-handle" @onmousedown="@(e => OnResizeStart(e, "size"))" @onmousedown:stopPropagation="true"></div>
+            </div>
+            <div class="file-cell col-created">
+                Erstellt
+                <div class="col-resize-handle" @onmousedown="@(e => OnResizeStart(e, "created"))" @onmousedown:stopPropagation="true"></div>
+            </div>
+            <div class="file-cell col-modified">
+                Geändert
+                <div class="col-resize-handle" @onmousedown="@(e => OnResizeStart(e, "modified"))" @onmousedown:stopPropagation="true"></div>
+            </div>
+            <div class="file-cell col-lastaccess">
+                Letzter Zugriff
+                <div class="col-resize-handle" @onmousedown="@(e => OnResizeStart(e, "lastaccess"))" @onmousedown:stopPropagation="true"></div>
+            </div>
+            <div class="file-cell col-actions"></div>
+        </div>
 
-        @foreach (var dir in VM.Directories)
-        {
-            var isSelected = _selectedItems.Contains(dir);
-            <div class="file-row file-row-dir @(isSelected ? "file-row--selected" : "")"
-                 @onclick="(e) => OnItemClick(e, dir)"
-                 @onclick:stopPropagation="true"
-                 @ondblclick="() => NavigateTo(dir)"
-                 @oncontextmenu="(e) => OnItemContextMenu(e, dir)"
-                 @oncontextmenu:preventDefault="true"
-                 @oncontextmenu:stopPropagation="true">
-                <div class="file-cell file-name">
-                    <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
-                         fill="var(--folder-fill)" stroke="var(--folder-stroke)" stroke-width="1.5">
-                        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                    </svg>
-                    <span>@dir.Name</span>
-                </div>
-                <div class="file-cell file-size">@FormatHelper.FormatFileSize(dir.Size)</div>
-                <div class="file-cell file-date">@dir.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                <div class="file-cell file-date">@dir.ModifiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                <div class="file-cell file-date">@(dir.LastAccessedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</div>
-                <div class="file-cell file-actions">
-                    <button class="btn-icon btn-icon--small btn-icon--danger" title="@dir.Name löschen"
-                            @onclick="() => RequestDelete(dir)" @onclick:stopPropagation="true">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+        <div class="file-list"
+             @onclick="OnListBackgroundClick"
+             @oncontextmenu="OnBackgroundContextMenu"
+             @oncontextmenu:preventDefault="true">
+
+            @* -- ".." Elternverzeichnis -- *@
+            @if (VM.HasParent)
+            {
+                <div class="file-row file-row-dir" @ondblclick="NavigateUp">
+                    <div class="file-cell col-name">
+                        <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
                              stroke="var(--text-tertiary)" stroke-width="1.5">
-                            <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
-                            <line x1="10" y1="11" x2="10" y2="17" />
-                            <line x1="14" y1="11" x2="14" y2="17" />
+                            <path d="M15 18l-6-6 6-6" />
                         </svg>
-                    </button>
-                    @if (_isAdmin)
-                    {
-                        <button class="btn-icon btn-icon--small" title="ACL für @dir.Name"
-                                @onclick="() => OpenFolderAcl(dir)" @onclick:stopPropagation="true">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                 stroke="@(_aclFolderPath == GetDirAclPath(dir) && _showFolderAcl ? "var(--accent)" : "var(--text-tertiary)")"
-                                 stroke-width="1.5">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                            </svg>
-                        </button>
-                        var dirCount = GetAclCount(GetDirAclPath(dir));
-                        @if (dirCount > 0)
+                        <span>..</span>
+                    </div>
+                    <div class="file-cell col-size"></div>
+                    <div class="file-cell col-created"></div>
+                    <div class="file-cell col-modified"></div>
+                    <div class="file-cell col-lastaccess"></div>
+                    <div class="file-cell col-actions"></div>
+                </div>
+            }
+
+            @* -- Ordner -- *@
+            @foreach (var dir in VM.Directories)
+            {
+                var isSelected = _selectedItems.Contains(dir);
+                <div class="file-row file-row-dir @(isSelected ? "file-row--selected" : "")"
+                     @onclick="(e) => OnItemClick(e, dir)"
+                     @onclick:stopPropagation="true"
+                     @ondblclick="() => NavigateTo(dir)"
+                     @oncontextmenu="(e) => OnItemContextMenu(e, dir)"
+                     @oncontextmenu:preventDefault="true"
+                     @oncontextmenu:stopPropagation="true">
+
+                    <div class="file-cell col-name">
+                        <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
+                             fill="var(--folder-fill)" stroke="var(--folder-stroke)" stroke-width="1.5">
+                            <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                        <span>@dir.Name</span>
+                    </div>
+
+                    <div class="file-cell col-size">
+                        @{
+                            var dirSize = VM.GetDirectorySize(dir);
+                        }
+                        @if (dirSize.HasValue)
                         {
-                            <span class="acl-badge acl-badge--small">@dirCount</span>
+                            @FormatHelper.FormatFileSize(dirSize.Value)
                         }
                         else
                         {
-                            <span class="acl-badge acl-badge--small" style="visibility: hidden;">0</span>
-                        }
-                    }
-                </div>
-            </div>
 
-            @* Inline ACL editor for this specific folder *@
-            @if (_showFolderAcl && _aclFolderPath == GetDirAclPath(dir))
-            {
-                <div class="file-row-acl-expand">
-                    <div class="acl-panel-header" style="padding: 0 0 8px 0;">
-                        <span class="detail-subtitle">Berechtigungen für „@dir.Name"</span>
-                        <button class="btn-icon btn-icon--small" title="Schließen"
-                                @onclick="CloseFolderAcl">
+                            <span class="size-loading">…</span>
+                        }
+                    </div>
+
+                    <div class="file-cell col-created">@dir.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                    <div class="file-cell col-modified">@dir.ModifiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                    <div class="file-cell col-lastaccess">@(dir.LastAccessedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</div>
+
+                    <div class="file-cell col-actions">
+                        <button class="btn-icon btn-icon--small btn-icon--danger" title="@dir.Name löschen"
+                                @onclick="() => RequestDelete(dir)" @onclick:stopPropagation="true">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                 stroke="currentColor" stroke-width="2">
-                                <line x1="18" y1="6" x2="6" y2="18" />
-                                <line x1="6" y1="6" x2="18" y2="18" />
+                                 stroke="var(--text-tertiary)" stroke-width="1.5">
+                                <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+                                <line x1="10" y1="11" x2="10" y2="17" />
+                                <line x1="14" y1="11" x2="14" y2="17" />
                             </svg>
                         </button>
-                    </div>
-                    <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
-                               Path="@_aclFolderPath"
-                               ShareId="@VM.CurrentShare.Id"
-                               IsDirectory="true"
-                               OnChanged="LoadAclCounts" />
-                </div>
-            }
-        }
+                        @if (_isAdmin)
+                        {
+                            <button class="btn-icon btn-icon--small" title="ACL für @dir.Name"
+                                    @onclick="() => OpenFolderAcl(dir)" @onclick:stopPropagation="true">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                     stroke="@(_aclFolderPath == GetDirAclPath(dir) && _showFolderAcl ? "var(--accent)" : "var(--text-tertiary)")"
+                                     stroke-width="1.5">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                </svg>
+                            </button>
+                            var dirCount = GetAclCount(GetDirAclPath(dir));
+                            @if (dirCount > 0)
+                            {
+                                <span class="acl-badge acl-badge--small">@dirCount</span>
+                            }
+                            else
+                            {
 
-        @foreach (var file in VM.Files)
-        {
-            var isSelected = _selectedItems.Contains(file);
-            <div class="file-row @(isSelected ? "file-row--selected" : "")"
-                 @onclick="(e) => OnItemClick(e, file)"
-                 @onclick:stopPropagation="true"
-                 @oncontextmenu="(e) => OnItemContextMenu(e, file)"
-                 @oncontextmenu:preventDefault="true"
-                 @oncontextmenu:stopPropagation="true">
-                <div class="file-cell file-name">
-                    <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
-                         fill="none" stroke="var(--text-tertiary)" stroke-width="1.5">
-                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                        <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-                    </svg>
-                    <span>@file.Name</span>
+                                <span class="acl-badge acl-badge--small" style="visibility: hidden;">0</span>
+                            }
+                        }
+                    </div>
                 </div>
-                <div class="file-cell file-size">@FormatHelper.FormatFileSize(file.Size)</div>
-                <div class="file-cell file-date">@file.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                <div class="file-cell file-date">@file.ModifiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                <div class="file-cell file-date">@(file.LastAccessedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</div>
-                <div class="file-cell file-actions">
-                    <button class="btn-icon btn-icon--small btn-icon--danger" title="@file.Name löschen"
-                            @onclick="() => RequestDelete(file)" @onclick:stopPropagation="true">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                             stroke="var(--text-tertiary)" stroke-width="1.5">
-                            <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
-                            <line x1="10" y1="11" x2="10" y2="17" />
-                            <line x1="14" y1="11" x2="14" y2="17" />
+
+                @if (_showFolderAcl && _aclFolderPath == GetDirAclPath(dir))
+                {
+                    <div class="file-row-acl-expand">
+                        <div class="acl-panel-header" style="padding: 0 0 8px 0;">
+                            <span class="detail-subtitle">Berechtigungen für „@dir.Name"</span>
+                            <button class="btn-icon btn-icon--small" title="Schließen" @onclick="CloseFolderAcl">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                     stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                            </button>
+                        </div>
+                        <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
+                                   Path="@_aclFolderPath" ShareId="@VM.CurrentShare.Id"
+                                   IsDirectory="true" OnChanged="LoadAclCounts" />
+                    </div>
+                }
+            }
+
+            @* -- Dateien -- *@
+            @foreach (var file in VM.Files)
+            {
+                var isSelected = _selectedItems.Contains(file);
+                <div class="file-row @(isSelected ? "file-row--selected" : "")"
+                     @onclick="(e) => OnItemClick(e, file)"
+                     @onclick:stopPropagation="true"
+                     @oncontextmenu="(e) => OnItemContextMenu(e, file)"
+                     @oncontextmenu:preventDefault="true"
+                     @oncontextmenu:stopPropagation="true">
+
+                    <div class="file-cell col-name">
+                        <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
+                             fill="none" stroke="var(--text-tertiary)" stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                            <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
                         </svg>
-                    </button>
-                    @if (_isAdmin)
-                    {
-                        <button class="btn-icon btn-icon--small" title="ACL für @file.Name"
-                                @onclick="() => OpenFileAcl(file)" @onclick:stopPropagation="true">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                 stroke="@(_aclFolderPath == GetFileAclPath(file) && _showFolderAcl ? "var(--accent)" : "var(--text-tertiary)")"
-                                 stroke-width="1.5">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                            </svg>
-                        </button>
-                        var fileCount = GetAclCount(GetFileAclPath(file));
-                        @if (fileCount > 0)
-                        {
-                            <span class="acl-badge acl-badge--small">@fileCount</span>
-                        }
-                        else
-                        {
-                            <span class="acl-badge acl-badge--small" style="visibility: hidden;">0</span>
-                        }
-                    }
-                </div>
-            </div>
-
-            @* Inline ACL editor for this specific file *@
-            @if (_showFolderAcl && _aclFolderPath == GetFileAclPath(file))
-            {
-                <div class="file-row-acl-expand">
-                    <div class="acl-panel-header" style="padding: 0 0 8px 0;">
-                        <span class="detail-subtitle">Berechtigungen für „@file.Name"</span>
-                        <button class="btn-icon btn-icon--small" title="Schließen"
-                                @onclick="CloseFolderAcl">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                 stroke="currentColor" stroke-width="2">
-                                <line x1="18" y1="6" x2="6" y2="18" />
-                                <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
-                        </button>
+                        <span>@file.Name</span>
                     </div>
-                    <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
-                               Path="@_aclFolderPath"
-                               ShareId="@VM.CurrentShare.Id"
-                               IsDirectory="false"
-                               OnChanged="LoadAclCounts" />
+
+                    <div class="file-cell col-size">@FormatHelper.FormatFileSize(file.Size)</div>
+                    <div class="file-cell col-created">@file.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                    <div class="file-cell col-modified">@file.ModifiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                    <div class="file-cell col-lastaccess">@(file.LastAccessedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</div>
+
+                    <div class="file-cell col-actions">
+                        <button class="btn-icon btn-icon--small btn-icon--danger" title="@file.Name löschen"
+                                @onclick="() => RequestDelete(file)" @onclick:stopPropagation="true">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                 stroke="var(--text-tertiary)" stroke-width="1.5">
+                                <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+                                <line x1="10" y1="11" x2="10" y2="17" />
+                                <line x1="14" y1="11" x2="14" y2="17" />
+                            </svg>
+                        </button>
+                        @if (_isAdmin)
+                        {
+                            <button class="btn-icon btn-icon--small" title="ACL für @file.Name"
+                                    @onclick="() => OpenFileAcl(file)" @onclick:stopPropagation="true">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                     stroke="@(_aclFolderPath == GetFileAclPath(file) && _showFolderAcl ? "var(--accent)" : "var(--text-tertiary)")"
+                                     stroke-width="1.5">
+                                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                                </svg>
+                            </button>
+                            var fileCount = GetAclCount(GetFileAclPath(file));
+                            @if (fileCount > 0)
+                            {
+                                <span class="acl-badge acl-badge--small">@fileCount</span>
+                            }
+                            else
+                            {
+
+                                <span class="acl-badge acl-badge--small" style="visibility: hidden;">0</span>
+                            }
+                        }
+                    </div>
+                </div>
+
+                @if (_showFolderAcl && _aclFolderPath == GetFileAclPath(file))
+                {
+                    <div class="file-row-acl-expand">
+                        <div class="acl-panel-header" style="padding: 0 0 8px 0;">
+                            <span class="detail-subtitle">Berechtigungen für „@file.Name"</span>
+                            <button class="btn-icon btn-icon--small" title="Schließen" @onclick="CloseFolderAcl">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                     stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                            </button>
+                        </div>
+                        <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
+                                   Path="@_aclFolderPath" ShareId="@VM.CurrentShare.Id"
+                                   IsDirectory="false" OnChanged="LoadAclCounts" />
+                    </div>
+                }
+            }
+
+            @if (!VM.Items.Any())
+            {
+                <div class="empty-state">
+                    <p>Dieser Ordner ist leer.</p>
                 </div>
             }
-        }
-
-        @if (!VM.Items.Any())
-        {
-            <div class="empty-state">
-                <p>Dieser Ordner ist leer.</p>
-            </div>
-        }
+        </div>
     </div>
 }
 
@@ -410,7 +438,6 @@ else
     <div class="context-menu" style="top: @(_contextMenuY)px; left: @(_contextMenuX)px;">
         @if (_contextTarget is not null)
         {
-            @* Kontextmenü für eine Datei/Ordner *@
             <div class="context-menu-header">@_contextTarget.Name</div>
             @if (_contextTarget.IsDirectory)
             {
@@ -437,7 +464,6 @@ else
             </button>
             @if (_isAdmin)
             {
-                
                 <button class="context-menu-item" @onclick="() => ContextAcl(_contextTarget)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -447,7 +473,6 @@ else
             }
             <div class="context-menu-separator"></div>
             <div class="context-menu-header">General</div>
-            @* Kontextmenü für den Hintergrund (leerer Bereich) *@
             <button class="context-menu-item" @onclick="ContextNewFolder">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -462,11 +487,9 @@ else
                 </svg>
                 Aktualisieren
             </button>
-
         }
         else
         {
-            @* Kontextmenü für den Hintergrund (leerer Bereich) *@
             <button class="context-menu-item" @onclick="ContextNewFolder">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                     <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -514,56 +537,83 @@ else
     [Parameter] public string ShareName { get; set; } = "";
     [Parameter] public string? SubPath { get; set; }
 
-    // General ACL
-    private Dictionary<string, int> _aclCounts = new();
+    // ========== Column Resize ==========
 
-    // Root ACL
+    private Dictionary<string, double> _colWidths = new()
+    {
+        ["name"] = 0,   // 0 = flex:1, wird nicht als feste Breite verwendet
+        ["size"] = 90,
+        ["created"] = 140,
+        ["modified"] = 140,
+        ["lastaccess"] = 140,
+        ["actions"] = 100
+    };
+
+    private const double ColMinWidth = 50;
+
+    private string? _resizingCol;
+    private double _resizeStartX;
+    private double _resizeStartWidth;
+    private DotNetObjectReference<FileBrowser>? _dotNetRef;
+
+    private async Task OnResizeStart(MouseEventArgs e, string colKey)
+    {
+        _resizingCol = colKey;
+        _resizeStartX = e.ClientX;
+        _resizeStartWidth = _colWidths[colKey];
+
+        _dotNetRef ??= DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("columnResize.start", _dotNetRef);
+    }
+
+    [JSInvokable]
+    public void OnResizeMove(double clientX)
+    {
+        if (_resizingCol is null) return;
+
+        var delta = clientX - _resizeStartX;
+        var newWidth = Math.Max(ColMinWidth, _resizeStartWidth + delta);
+        _colWidths[_resizingCol] = newWidth;
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public void OnResizeEnd()
+    {
+        _resizingCol = null;
+    }
+
+    // ========== State ==========
+
+    private Dictionary<string, int> _aclCounts = new();
     private bool _isAdmin;
     private bool _showAclPanel;
     private string _aclPath = "";
-
-    // Folder/File-level ACL
     private bool _showFolderAcl;
     private string _aclFolderPath = "";
-
-    // Ordner erstellen
     private bool _showCreateFolder;
     private string _newFolderName = "";
     private string? _createFolderError;
-
-    // Löschen (unterstützt jetzt mehrere Targets)
     private bool _showDeleteConfirm;
     private List<FileMetadata> _deleteTargets = new();
     private string? _deleteError;
-
-    // Selektion
     private HashSet<FileMetadata> _selectedItems = new();
-
-    // Kontextmenü
     private bool _showContextMenu;
     private double _contextMenuX;
     private double _contextMenuY;
     private FileMetadata? _contextTarget;
-
-    // Umbenennen
     private bool _showRenameDialog;
     private FileMetadata? _renameTarget;
     private string _renameNewName = "";
     private string? _renameError;
 
-    // ========== Toolbar Computed Properties ==========
+    // ========== Toolbar Computed ==========
 
-    private bool CanOpenSelection =>
-        _selectedItems.Count == 1 && _selectedItems.First().IsDirectory;
-
-    private bool CanRenameSelection =>
-        _selectedItems.Count == 1;
-
-    private bool CanDeleteSelection =>
-        _selectedItems.Count > 0;
-
-    private bool CanAclSelection =>
-        _isAdmin && _selectedItems.Count == 1;
+    private bool CanOpenSelection => _selectedItems.Count == 1 && _selectedItems.First().IsDirectory;
+    private bool CanRenameSelection => _selectedItems.Count == 1;
+    private bool CanDeleteSelection => _selectedItems.Count > 0;
+    private bool CanAclSelection => _isAdmin && _selectedItems.Count == 1;
 
     // ========== Selektion ==========
 
@@ -571,15 +621,12 @@ else
     {
         if (e.CtrlKey || e.MetaKey)
         {
-            // Toggle: Element hinzufügen/entfernen
             if (!_selectedItems.Remove(item))
                 _selectedItems.Add(item);
         }
         else if (e.ShiftKey && _selectedItems.Count > 0)
         {
-            // Range-Selektion
-            var allItems = VM.Directories.Cast<FileMetadata>()
-                .Concat(VM.Files).ToList();
+            var allItems = VM.Directories.Cast<FileMetadata>().Concat(VM.Files).ToList();
             var lastSelected = _selectedItems.Last();
             var idxStart = allItems.IndexOf(lastSelected);
             var idxEnd = allItems.IndexOf(item);
@@ -593,26 +640,17 @@ else
         }
         else
         {
-            // Wenn Objekt zweites mal ausgewählt wird, selektiere es nicht erneut
-            if(_selectedItems.Count == 1 && _selectedItems.First() == item)
-            {
+            if (_selectedItems.Count == 1 && _selectedItems.First() == item)
                 _selectedItems.Clear();
-            }
             else
             {
                 _selectedItems.Clear();
                 _selectedItems.Add(item);
             }
-
-
         }
     }
 
-    private void OnListBackgroundClick(MouseEventArgs e)
-    {
-        // Klick auf leeren Bereich: Selektion aufheben
-        _selectedItems.Clear();
-    }
+    private void OnListBackgroundClick(MouseEventArgs e) => _selectedItems.Clear();
 
     // ========== Toolbar Aktionen ==========
 
@@ -624,36 +662,27 @@ else
 
     private void RenameSelected()
     {
-        if (_selectedItems.Count == 1)
-        {
-            var item = _selectedItems.First();
-            _renameTarget = item;
-            _renameNewName = item.Name;
-            _renameError = null;
-            _showRenameDialog = true;
-        }
+        if (_selectedItems.Count != 1) return;
+        var item = _selectedItems.First();
+        _renameTarget = item;
+        _renameNewName = item.Name;
+        _renameError = null;
+        _showRenameDialog = true;
     }
 
     private void DeleteSelected()
     {
-        if (_selectedItems.Count > 0)
-        {
-            _deleteTargets = _selectedItems.ToList();
-            _deleteError = null;
-            _showDeleteConfirm = true;
-        }
+        if (_selectedItems.Count == 0) return;
+        _deleteTargets = _selectedItems.ToList();
+        _deleteError = null;
+        _showDeleteConfirm = true;
     }
 
     private void AclSelected()
     {
-        if (_selectedItems.Count == 1)
-        {
-            var item = _selectedItems.First();
-            if (item.IsDirectory)
-                OpenFolderAcl(item);
-            else
-                OpenFileAcl(item);
-        }
+        if (_selectedItems.Count != 1) return;
+        var item = _selectedItems.First();
+        if (item.IsDirectory) OpenFolderAcl(item); else OpenFileAcl(item);
     }
 
     // ========== Lifecycle ==========
@@ -668,6 +697,16 @@ else
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
         UpdateAclPath();
         await LoadAclCounts();
+        VM.OnStateChanged -= OnVmStateChanged;
+        VM.OnStateChanged += OnVmStateChanged;
+    }
+
+    private void OnVmStateChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        VM.OnStateChanged -= OnVmStateChanged;
+        _dotNetRef?.Dispose();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -681,10 +720,7 @@ else
         }
     }
 
-    private void UpdateAclPath()
-    {
-        _aclPath = VM.CurrentPath ?? "";
-    }
+    private void UpdateAclPath() => _aclPath = VM.CurrentPath ?? "";
 
     private void ToggleAclPanel()
     {
@@ -701,10 +737,7 @@ else
         _showCreateFolder = true;
     }
 
-    private void CancelCreateFolder()
-    {
-        _showCreateFolder = false;
-    }
+    private void CancelCreateFolder() => _showCreateFolder = false;
 
     private async Task OnCreateFolderKeyDown(KeyboardEventArgs e)
     {
@@ -717,7 +750,6 @@ else
     private async Task ConfirmCreateFolder()
     {
         if (string.IsNullOrWhiteSpace(_newFolderName)) return;
-
         var result = await VM.CreateFolderAsync(_newFolderName.Trim());
         if (result.Success)
         {
@@ -725,9 +757,7 @@ else
             await VM.LoadShareAsync(ShareName, SubPath ?? "");
         }
         else
-        {
             _createFolderError = result.Error;
-        }
     }
 
     // ========== Löschen ==========
@@ -748,17 +778,11 @@ else
     private async Task ConfirmDelete()
     {
         if (!_deleteTargets.Any()) return;
-
         foreach (var target in _deleteTargets.ToList())
         {
             var result = await VM.DeleteAsync(target);
-            if (!result.Success)
-            {
-                _deleteError = result.Error;
-                return;
-            }
+            if (!result.Success) { _deleteError = result.Error; return; }
         }
-
         _showDeleteConfirm = false;
         _deleteTargets.Clear();
         _selectedItems.Clear();
@@ -769,7 +793,6 @@ else
 
     private void OnItemContextMenu(MouseEventArgs e, FileMetadata item)
     {
-        // Rechtsklick selektiert auch das Element, wenn es nicht schon selektiert ist
         if (!_selectedItems.Contains(item))
         {
             _selectedItems.Clear();
@@ -795,17 +818,8 @@ else
         _contextTarget = null;
     }
 
-    private void ContextNavigateTo(FileMetadata dir)
-    {
-        CloseContextMenu();
-        NavigateTo(dir);
-    }
-
-    private void ContextDelete(FileMetadata item)
-    {
-        CloseContextMenu();
-        RequestDelete(item);
-    }
+    private void ContextNavigateTo(FileMetadata dir) { CloseContextMenu(); NavigateTo(dir); }
+    private void ContextDelete(FileMetadata item) { CloseContextMenu(); RequestDelete(item); }
 
     private void ContextRename(FileMetadata item)
     {
@@ -819,17 +833,10 @@ else
     private void ContextAcl(FileMetadata item)
     {
         CloseContextMenu();
-        if (item.IsDirectory)
-            OpenFolderAcl(item);
-        else
-            OpenFileAcl(item);
+        if (item.IsDirectory) OpenFolderAcl(item); else OpenFileAcl(item);
     }
 
-    private void ContextNewFolder()
-    {
-        CloseContextMenu();
-        ShowCreateFolderDialog();
-    }
+    private void ContextNewFolder() { CloseContextMenu(); ShowCreateFolderDialog(); }
 
     private async Task ContextRefresh()
     {
@@ -857,7 +864,6 @@ else
     private async Task ConfirmRename()
     {
         if (_renameTarget is null || string.IsNullOrWhiteSpace(_renameNewName)) return;
-
         var result = await VM.RenameAsync(_renameTarget, _renameNewName.Trim());
         if (result.Success)
         {
@@ -868,22 +874,13 @@ else
             await LoadAclCounts();
         }
         else
-        {
             _renameError = result.Error;
-        }
     }
 
     // ========== ACL Helpers ==========
 
-    private int GetAclCount(string path)
-    {
-        return VM.GetAclCount(path);
-    }
-
-    private async Task LoadAclCounts()
-    {
-        await VM.LoadAclCountsAsync();
-    }
+    private int GetAclCount(string path) => VM.GetAclCount(path);
+    private async Task LoadAclCounts() => await VM.LoadAclCountsAsync();
 
     private string GetDirAclPath(FileMetadata dir)
     {
@@ -904,38 +901,18 @@ else
     private void OpenFolderAcl(FileMetadata dir)
     {
         var path = GetDirAclPath(dir);
-        if (_showFolderAcl && _aclFolderPath == path)
-        {
-            _showFolderAcl = false;
-            _aclFolderPath = "";
-        }
-        else
-        {
-            _showFolderAcl = true;
-            _aclFolderPath = path;
-        }
+        if (_showFolderAcl && _aclFolderPath == path) { _showFolderAcl = false; _aclFolderPath = ""; }
+        else { _showFolderAcl = true; _aclFolderPath = path; }
     }
 
     private void OpenFileAcl(FileMetadata file)
     {
         var path = GetFileAclPath(file);
-        if (_showFolderAcl && _aclFolderPath == path)
-        {
-            _showFolderAcl = false;
-            _aclFolderPath = "";
-        }
-        else
-        {
-            _showFolderAcl = true;
-            _aclFolderPath = path;
-        }
+        if (_showFolderAcl && _aclFolderPath == path) { _showFolderAcl = false; _aclFolderPath = ""; }
+        else { _showFolderAcl = true; _aclFolderPath = path; }
     }
 
-    private void CloseFolderAcl()
-    {
-        _showFolderAcl = false;
-        _aclFolderPath = "";
-    }
+    private void CloseFolderAcl() { _showFolderAcl = false; _aclFolderPath = ""; }
 
     // ========== Navigation ==========
 
@@ -943,9 +920,7 @@ else
     {
         var relativePath = dir.Path;
         if (VM.CurrentShare is not null && relativePath.StartsWith(VM.CurrentShare.Path))
-        {
             relativePath = relativePath[VM.CurrentShare.Path.Length..].TrimStart('/');
-        }
         Nav.NavigateTo($"/files/{ShareName}/{relativePath}");
     }
 

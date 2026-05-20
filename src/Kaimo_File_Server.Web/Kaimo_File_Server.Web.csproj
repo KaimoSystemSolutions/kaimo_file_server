@@ -18,6 +18,10 @@
 	<ItemGroup>
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
+
+	<ItemGroup>
+	  <None Include="wwwroot\js\columnResize.js" />
+	</ItemGroup>
 	
 	<ItemGroup>
 	  <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.18.0" />

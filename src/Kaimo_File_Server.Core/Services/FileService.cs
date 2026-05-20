@@ -165,4 +165,14 @@ public class FileService : IFileService
             await _acl.RenameAclPathAsync(_shareId, oldNormalized, newNormalized);
         }
     }
+
+    public async Task<long> GetDirectorySizeAsync(string relativePath, UserContext user)
+    {
+        var normalized = ShareRelativePath.Normalize(relativePath);
+
+        if (!await _acl.HasAccessAsync(user, _shareId, normalized, true, FilePermission.ListReadData))
+            throw new UnauthorizedAccessException($"Size read denied for '{normalized}'");
+
+        return await _storage.GetDirectorySizeAsync(normalized);
+    }
 }

@@ -118,17 +118,15 @@ public class FileSystemStorage : IStorageEngine
     // ────────────────── Directory Size ──────────────────
 
     /// <inheritdoc />
-    public Task<long> GetDirectorySizeAsync(string directoryPath)
+    public Task<long> GetDirectorySizeAsync(string relativePath)
     {
-        var normalized = ShareRelativePath.Normalize(directoryPath);
-        var fullPath = string.IsNullOrEmpty(normalized)
-            ? _rootPath
-            : ToAbsolutePath(normalized);
+        var fullPath = ToAbsolutePath(relativePath);
+        var dirInfo = new DirectoryInfo(fullPath);
+        if (!dirInfo.Exists) return Task.FromResult(0L);
 
-        if (!Directory.Exists(fullPath))
-            return Task.FromResult(0L);
-
-        return Task.FromResult(CalculateDirectorySize(fullPath));
+        var size = dirInfo.EnumerateFiles("*", SearchOption.AllDirectories)
+                          .Sum(f => f.Length);
+        return Task.FromResult(size);
     }
 
     /// <summary>
@@ -212,7 +210,7 @@ public class FileSystemStorage : IStorageEngine
                 ShareId = _shareId,
                 Path = normalized,
                 Name = ShareRelativePath.GetFileName(normalized),
-                Size = CalculateDirectorySize(fullPath),
+                Size = 0,
                 IsDirectory = true,
                 CreatedAt = dirInfo.CreationTimeUtc,
                 ModifiedAt = dirInfo.LastWriteTimeUtc,
@@ -261,7 +259,7 @@ public class FileSystemStorage : IStorageEngine
                 ShareId = _shareId,
                 Path = ShareRelativePath.Combine(normalized, dirInfo.Name),
                 Name = dirInfo.Name,
-                Size = CalculateDirectorySize(dir),
+                Size = 0,
                 IsDirectory = true,
                 CreatedAt = dirInfo.CreationTimeUtc,
                 ModifiedAt = dirInfo.LastWriteTimeUtc,
