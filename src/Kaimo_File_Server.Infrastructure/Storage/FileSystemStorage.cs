@@ -22,6 +22,14 @@ public class FileSystemStorage : IStorageEngine
         Directory.CreateDirectory(_rootPath);
     }
 
+    public FileSystemStorage(string rootPath)
+    {
+        _rootPath = rootPath;
+        _shareId = new Guid();
+        _serviceProvider = null;
+        Directory.CreateDirectory(_rootPath);
+    }
+
     // ────────────────── Path Resolution ──────────────────
 
     /// <summary>

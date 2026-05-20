@@ -18,82 +18,155 @@ public class AclServiceTests
         return new UserContext(user, groups ?? [], roles ?? [], []);
     }
 
-    private static FileMetadata CreateFile(IReadOnlyList<AccessEntry>? acl = null)
+    private static FileMetadata CreateFile(List<AccessEntry>? acl = null)
         => new()
         {
-            Id = Guid.NewGuid(), Path = "/test/file.txt", Name = "file.txt",
-            Size = 100, IsDirectory = false, CreatedAt = DateTime.UtcNow,
-            ModifiedAt = DateTime.UtcNow, OwnerId = Guid.NewGuid(), Acl = acl ?? []
+            Id = Guid.NewGuid(),
+            Path = "/test/file.txt",
+            Name = "file.txt",
+            Size = 100,
+            IsDirectory = false,
+            CreatedAt = DateTime.UtcNow,
+            ModifiedAt = DateTime.UtcNow,
+            OwnerId = Guid.NewGuid(),
+            Acl = acl ?? []
         };
 
-    [Fact] public void HasAccess_NullUserContext_ReturnsFalse()
-    { Assert.False(_sut.HasAccess(null!, CreateFile(), FilePermission.ListReadData)); }
+    // ═══════════════════ Null / Empty ACL ═══════════════════
 
-    [Fact] public void HasAccess_EmptyAcl_ReturnsTrue()
-    { Assert.True(_sut.HasAccess(CreateContext(), CreateFile(acl: []), FilePermission.ListReadData)); }
-
-    [Fact] public void HasAccess_NullAcl_ReturnsTrue()
+    [Fact]
+    public void HasAccess_NullUserContext_ReturnsFalse()
     {
-        var file = new FileMetadata { Id = Guid.NewGuid(), Path = "/test", Name = "test", Size = 0, IsDirectory = false, CreatedAt = DateTime.UtcNow, ModifiedAt = DateTime.UtcNow, Acl = null! };
+        Assert.False(_sut.HasAccess(null!, CreateFile(), FilePermission.ListReadData));
+    }
+
+    [Fact]
+    public void HasAccess_EmptyAcl_ReturnsTrue()
+    {
+        Assert.True(_sut.HasAccess(CreateContext(), CreateFile(acl: []), FilePermission.ListReadData));
+    }
+
+    [Fact]
+    public void HasAccess_NullAcl_ReturnsTrue()
+    {
+        var file = new FileMetadata
+        {
+            Id = Guid.NewGuid(),
+            Path = "/test",
+            Name = "test",
+            Size = 0,
+            IsDirectory = false,
+            CreatedAt = DateTime.UtcNow,
+            ModifiedAt = DateTime.UtcNow,
+            Acl = null!
+        };
         Assert.True(_sut.HasAccess(CreateContext(), file, FilePermission.ListReadData));
     }
 
-    [Fact] public void HasAccess_ExplicitAllow_ForUser_ReturnsTrue()
+    // ═══════════════════ Allow via User / Group / Role ═══════════════════
+
+    [Fact]
+    public void HasAccess_ExplicitAllow_ForUser_ReturnsTrue()
     {
-        var user = CreateUser(); var ctx = CreateContext(user);
+        var user = CreateUser();
+        var ctx = CreateContext(user);
         var entry = new AccessEntry(user.Id, AclEntryType.Allow, FilePermission.ListReadData, AclInheritance.ThisOnly);
         Assert.True(_sut.HasAccess(ctx, CreateFile(acl: [entry]), FilePermission.ListReadData));
     }
 
-    [Fact] public void HasAccess_AllowViaGroup_ReturnsTrue()
+    [Fact]
+    public void HasAccess_AllowViaGroup_ReturnsTrue()
     {
-        var user = CreateUser(); var group = new Group(Guid.NewGuid(), "Devs");
+        var user = CreateUser();
+        var group = new Group(Guid.NewGuid(), "Devs");
         var ctx = CreateContext(user, groups: [group]);
         var entry = new AccessEntry(group.Id, AclEntryType.Allow, FilePermission.ListReadData, AclInheritance.ThisOnly);
         Assert.True(_sut.HasAccess(ctx, CreateFile(acl: [entry]), FilePermission.ListReadData));
     }
 
-    [Fact] public void HasAccess_AllowViaRole_ReturnsTrue()
+    [Fact]
+    public void HasAccess_AllowViaRole_ReturnsTrue()
     {
-        var user = CreateUser(); var role = new Role(Guid.NewGuid(), "Admin");
+        var user = CreateUser();
+        var role = new Role(Guid.NewGuid(), "Admin");
         var ctx = CreateContext(user, roles: [role]);
         var entry = new AccessEntry(role.Id, AclEntryType.Allow, FilePermission.ListReadData, AclInheritance.ThisOnly);
         Assert.True(_sut.HasAccess(ctx, CreateFile(acl: [entry]), FilePermission.ListReadData));
     }
 
-    [Fact] public void HasAccess_NoMatchingPrincipal_ReturnsFalse()
+    // ═══════════════════ No Match / Wrong Permission ═══════════════════
+
+    [Fact]
+    public void HasAccess_NoMatchingPrincipal_ReturnsFalse()
     {
         var entry = new AccessEntry(Guid.NewGuid(), AclEntryType.Allow, FilePermission.ListReadData, AclInheritance.ThisOnly);
         Assert.False(_sut.HasAccess(CreateContext(), CreateFile(acl: [entry]), FilePermission.ListReadData));
     }
 
-    [Fact] public void HasAccess_WrongPermission_ReturnsFalse()
+    [Fact]
+    public void HasAccess_WrongPermission_ReturnsFalse()
     {
-        var user = CreateUser(); var ctx = CreateContext(user);
+        var user = CreateUser();
+        var ctx = CreateContext(user);
         var entry = new AccessEntry(user.Id, AclEntryType.Allow, FilePermission.CreateWriteData, AclInheritance.ThisOnly);
         Assert.False(_sut.HasAccess(ctx, CreateFile(acl: [entry]), FilePermission.ListReadData));
     }
 
-    [Fact] public void HasAccess_DenyOverridesAllow_ReturnsFalse()
+    // ═══════════════════ Deny overrides ═══════════════════
+
+    [Fact]
+    public void HasAccess_DenyOverridesAllow_ReturnsFalse()
     {
-        var user = CreateUser(); var ctx = CreateContext(user);
+        var user = CreateUser();
+        var ctx = CreateContext(user);
         var allow = new AccessEntry(user.Id, AclEntryType.Allow, FilePermission.ListReadData, AclInheritance.ThisOnly);
         var deny = new AccessEntry(user.Id, AclEntryType.Deny, FilePermission.ListReadData, AclInheritance.ThisOnly);
         Assert.False(_sut.HasAccess(ctx, CreateFile(acl: [allow, deny]), FilePermission.ListReadData));
     }
 
-    [Fact] public void HasAccess_DenyViaGroup_OverridesUserAllow()
+    [Fact]
+    public void HasAccess_DenyViaGroup_OverridesUserAllow()
     {
-        var user = CreateUser(); var group = new Group(Guid.NewGuid(), "Restricted");
+        var user = CreateUser();
+        var group = new Group(Guid.NewGuid(), "Restricted");
         var ctx = CreateContext(user, groups: [group]);
         var allow = new AccessEntry(user.Id, AclEntryType.Allow, FilePermission.ListReadData, AclInheritance.ThisOnly);
         var deny = new AccessEntry(group.Id, AclEntryType.Deny, FilePermission.ListReadData, AclInheritance.ThisOnly);
         Assert.False(_sut.HasAccess(ctx, CreateFile(acl: [allow, deny]), FilePermission.ListReadData));
     }
 
-    [Fact] public void HasAccess_CombinedPermissions_PartialMatch()
+    [Fact]
+    public void HasAccess_DenyViaRole_OverridesUserAllow()
     {
-        var user = CreateUser(); var ctx = CreateContext(user);
+        var user = CreateUser();
+        var role = new Role(Guid.NewGuid(), "Blocked");
+        var ctx = CreateContext(user, roles: [role]);
+        var allow = new AccessEntry(user.Id, AclEntryType.Allow, FilePermission.FullControl, AclInheritance.ThisOnly);
+        var deny = new AccessEntry(role.Id, AclEntryType.Deny, FilePermission.ListReadData, AclInheritance.ThisOnly);
+        Assert.False(_sut.HasAccess(ctx, CreateFile(acl: [allow, deny]), FilePermission.ListReadData));
+    }
+
+    [Fact]
+    public void HasAccess_DenyOnlyPartialPermission_OtherPermissionsStillAllowed()
+    {
+        var user = CreateUser();
+        var ctx = CreateContext(user);
+        var allow = new AccessEntry(user.Id, AclEntryType.Allow, FilePermission.FullControl, AclInheritance.ThisOnly);
+        var deny = new AccessEntry(user.Id, AclEntryType.Deny, FilePermission.Delete, AclInheritance.ThisOnly);
+        var file = CreateFile(acl: [allow, deny]);
+
+        Assert.True(_sut.HasAccess(ctx, file, FilePermission.ListReadData));
+        Assert.True(_sut.HasAccess(ctx, file, FilePermission.CreateWriteData));
+        Assert.False(_sut.HasAccess(ctx, file, FilePermission.Delete));
+    }
+
+    // ═══════════════════ Combined / FullControl ═══════════════════
+
+    [Fact]
+    public void HasAccess_CombinedPermissions_PartialMatch()
+    {
+        var user = CreateUser();
+        var ctx = CreateContext(user);
         var entry = new AccessEntry(user.Id, AclEntryType.Allow, FilePermission.ReadAll, AclInheritance.ThisOnly);
         var file = CreateFile(acl: [entry]);
         Assert.True(_sut.HasAccess(ctx, file, FilePermission.ListReadData));
@@ -101,9 +174,11 @@ public class AclServiceTests
         Assert.False(_sut.HasAccess(ctx, file, FilePermission.CreateWriteData));
     }
 
-    [Fact] public void HasAccess_FullControl_AllowsEverything()
+    [Fact]
+    public void HasAccess_FullControl_AllowsEverything()
     {
-        var user = CreateUser(); var ctx = CreateContext(user);
+        var user = CreateUser();
+        var ctx = CreateContext(user);
         var entry = new AccessEntry(user.Id, AclEntryType.Allow, FilePermission.FullControl, AclInheritance.ThisOnly);
         var file = CreateFile(acl: [entry]);
         Assert.True(_sut.HasAccess(ctx, file, FilePermission.ListReadData));
@@ -113,35 +188,69 @@ public class AclServiceTests
         Assert.True(_sut.HasAccess(ctx, file, FilePermission.TakeOwnership));
     }
 
-    [Fact] public void GetEffectiveAcl_AllDescendants_AppliesToBoth()
+    // ═══════════════════ Multiple principals ═══════════════════
+
+    [Fact]
+    public void HasAccess_MultipleGroups_AllowFromAnyGroupWorks()
+    {
+        var user = CreateUser();
+        var group1 = new Group(Guid.NewGuid(), "GroupA");
+        var group2 = new Group(Guid.NewGuid(), "GroupB");
+        var ctx = CreateContext(user, groups: [group1, group2]);
+
+        // Only group2 has Allow
+        var entry = new AccessEntry(group2.Id, AclEntryType.Allow, FilePermission.ListReadData, AclInheritance.ThisOnly);
+        Assert.True(_sut.HasAccess(ctx, CreateFile(acl: [entry]), FilePermission.ListReadData));
+    }
+
+    [Fact]
+    public void HasAccess_UserAndGroupBothAllow_StillAllowed()
+    {
+        var user = CreateUser();
+        var group = new Group(Guid.NewGuid(), "Team");
+        var ctx = CreateContext(user, groups: [group]);
+
+        var a1 = new AccessEntry(user.Id, AclEntryType.Allow, FilePermission.ListReadData, AclInheritance.ThisOnly);
+        var a2 = new AccessEntry(group.Id, AclEntryType.Allow, FilePermission.ListReadData, AclInheritance.ThisOnly);
+        Assert.True(_sut.HasAccess(ctx, CreateFile(acl: [a1, a2]), FilePermission.ListReadData));
+    }
+
+    // ═══════════════════ GetEffectiveAcl — Inheritance ═══════════════════
+
+    [Fact]
+    public void GetEffectiveAcl_AllDescendants_AppliesToBoth()
     {
         var entry = new AccessEntry(Guid.NewGuid(), AclEntryType.Allow, FilePermission.ReadAll, AclInheritance.AllDescendants);
         Assert.Single(_sut.GetEffectiveAcl([entry], isDirectory: true));
         Assert.Single(_sut.GetEffectiveAcl([entry], isDirectory: false));
     }
 
-    [Fact] public void GetEffectiveAcl_SubFoldersOnly_AppliesToDirectoryOnly()
+    [Fact]
+    public void GetEffectiveAcl_SubFoldersOnly_AppliesToDirectoryOnly()
     {
         var entry = new AccessEntry(Guid.NewGuid(), AclEntryType.Allow, FilePermission.ReadAll, AclInheritance.SubFolders);
         Assert.Single(_sut.GetEffectiveAcl([entry], isDirectory: true));
         Assert.Empty(_sut.GetEffectiveAcl([entry], isDirectory: false));
     }
 
-    [Fact] public void GetEffectiveAcl_SubFilesOnly_AppliesToFileOnly()
+    [Fact]
+    public void GetEffectiveAcl_SubFilesOnly_AppliesToFileOnly()
     {
         var entry = new AccessEntry(Guid.NewGuid(), AclEntryType.Allow, FilePermission.ReadAll, AclInheritance.SubFiles);
         Assert.Empty(_sut.GetEffectiveAcl([entry], isDirectory: true));
         Assert.Single(_sut.GetEffectiveAcl([entry], isDirectory: false));
     }
 
-    [Fact] public void GetEffectiveAcl_ThisFolderOnly_NeverInherited()
+    [Fact]
+    public void GetEffectiveAcl_ThisFolderOnly_NeverInherited()
     {
         var entry = new AccessEntry(Guid.NewGuid(), AclEntryType.Allow, FilePermission.ReadAll, AclInheritance.ThisOnly);
         Assert.Empty(_sut.GetEffectiveAcl([entry], isDirectory: true));
         Assert.Empty(_sut.GetEffectiveAcl([entry], isDirectory: false));
     }
 
-    [Fact] public void GetEffectiveAcl_MixedEntries_FiltersCorrectly()
+    [Fact]
+    public void GetEffectiveAcl_MixedEntries_FiltersCorrectly()
     {
         var entries = new List<AccessEntry>
         {
@@ -150,7 +259,36 @@ public class AclServiceTests
             new(Guid.NewGuid(), AclEntryType.Deny, FilePermission.Delete, AclInheritance.AllDescendants),
             new(Guid.NewGuid(), AclEntryType.Allow, FilePermission.FullControl, AclInheritance.ThisOnly),
         };
+        // Directories: SubFolders + AllDescendants = 2
         Assert.Equal(2, _sut.GetEffectiveAcl(entries, isDirectory: true).Count);
+        // Files: SubFiles + AllDescendants = 2
         Assert.Equal(2, _sut.GetEffectiveAcl(entries, isDirectory: false).Count);
+    }
+
+    [Fact]
+    public void GetEffectiveAcl_EmptyList_ReturnsEmpty()
+    {
+        Assert.Empty(_sut.GetEffectiveAcl([], isDirectory: true));
+        Assert.Empty(_sut.GetEffectiveAcl([], isDirectory: false));
+    }
+
+    [Fact]
+    public void GetEffectiveAcl_AllThisOnly_ReturnsEmpty()
+    {
+        var entries = new List<AccessEntry>
+        {
+            new(Guid.NewGuid(), AclEntryType.Allow, FilePermission.ReadAll, AclInheritance.ThisOnly),
+            new(Guid.NewGuid(), AclEntryType.Allow, FilePermission.WriteAll, AclInheritance.ThisOnly),
+        };
+        Assert.Empty(_sut.GetEffectiveAcl(entries, isDirectory: true));
+        Assert.Empty(_sut.GetEffectiveAcl(entries, isDirectory: false));
+    }
+
+    [Fact]
+    public void GetEffectiveAcl_DenyEntries_AlsoInherited()
+    {
+        var entry = new AccessEntry(Guid.NewGuid(), AclEntryType.Deny, FilePermission.Delete, AclInheritance.AllDescendants);
+        Assert.Single(_sut.GetEffectiveAcl([entry], isDirectory: true));
+        Assert.Single(_sut.GetEffectiveAcl([entry], isDirectory: false));
     }
 }

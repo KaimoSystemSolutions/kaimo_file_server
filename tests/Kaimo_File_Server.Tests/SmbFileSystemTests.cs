@@ -14,6 +14,7 @@ namespace Kaimo_File_Server.Tests;
 public class SmbFileSystemTests : IDisposable
 {
     private readonly string _testRoot;
+    private readonly string _shareName = "testshare";
     private readonly Mock<IFileService> _fileServiceMock;
     private readonly SmbFileSystem _sut;
     private readonly UserContext _testUser;
@@ -39,7 +40,7 @@ public class SmbFileSystemTests : IDisposable
             .Setup(f => f.CanDeleteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
             .ReturnsAsync(true);
 
-        _sut = new SmbFileSystem(_testRoot, _fileServiceMock.Object);
+        _sut = new SmbFileSystem(_testRoot, _shareName, _fileServiceMock.Object);
 
         var user = new User(Guid.NewGuid(), "Test User", "testuser", "hash", "nthash");
         _testUser = new UserContext(user, [], [], []);
@@ -70,6 +71,12 @@ public class SmbFileSystemTests : IDisposable
         Directory.CreateDirectory(Path.Combine(_testRoot, rel));
     }
 
+    /// <summary>
+    /// Helper to create a SmbFileSystem with a custom mock (for denial tests).
+    /// </summary>
+    private SmbFileSystem CreateSutWithMock(Mock<IFileService> mock)
+        => new SmbFileSystem(_testRoot, _shareName, mock.Object);
+
     // ═══════════════════════════════════════════════════════════
     //  RACE CONDITION REGRESSION TESTS
     // ═══════════════════════════════════════════════════════════
@@ -77,8 +84,6 @@ public class SmbFileSystemTests : IDisposable
     [Fact]
     public void SessionUser_IsIsolatedPerAsyncFlow()
     {
-        // Verify that AsyncLocal gives each flow its own user.
-        // This is the core regression test for the old CurrentUser race condition.
         UserContext? capturedOnThread1 = null;
         UserContext? capturedOnThread2 = null;
 
@@ -87,25 +92,22 @@ public class SmbFileSystemTests : IDisposable
         var t1 = Task.Run(() =>
         {
             SmbFileSystem.SetSessionUser(_testUser);
-            barrier.SignalAndWait(); // sync: both threads have set their user
-            barrier.SignalAndWait(); // sync: wait for thread2 to set its user too
-            // Now read back should still be _testUser, not _secondUser
-            // We verify by creating a file and checking the handle captures the right user
+            barrier.SignalAndWait();
+            barrier.SignalAndWait();
             CreateTestFile("race_t1.txt");
             _sut.CreateFile(out var h, out _, "race_t1.txt",
                 AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
                 CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
                 CreateSecurityContext());
-            // The handle should have captured _testUser
-            capturedOnThread1 = _testUser; // we can't inspect FileHandle directly, but...
+            capturedOnThread1 = _testUser;
             _sut.CloseFile(h);
         });
 
         var t2 = Task.Run(() =>
         {
-            barrier.SignalAndWait(); // sync with thread1
+            barrier.SignalAndWait();
             SmbFileSystem.SetSessionUser(_secondUser);
-            barrier.SignalAndWait(); // let thread1 continue
+            barrier.SignalAndWait();
             CreateTestFile("race_t2.txt");
             _sut.CreateFile(out var h, out _, "race_t2.txt",
                 AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
@@ -117,7 +119,6 @@ public class SmbFileSystemTests : IDisposable
 
         Task.WaitAll(t1, t2);
 
-        // Both threads should have seen their own user, not each other's
         Assert.Equal(_testUser, capturedOnThread1);
         Assert.Equal(_secondUser, capturedOnThread2);
     }
@@ -125,8 +126,6 @@ public class SmbFileSystemTests : IDisposable
     [Fact]
     public void ConcurrentSessions_PermissionChecksUseCorrectUser()
     {
-        // Two sessions with different users verify FileService receives the correct
-        // UserContext for each session's operations.
         var userAId = _testUser.User.Id;
         var userBId = _secondUser.User.Id;
 
@@ -165,7 +164,6 @@ public class SmbFileSystemTests : IDisposable
 
         Task.WaitAll(t1, t2);
 
-        // Both user IDs should appear in the permission checks
         Assert.Contains(userAId, seenUserIds);
         Assert.Contains(userBId, seenUserIds);
     }
@@ -173,14 +171,9 @@ public class SmbFileSystemTests : IDisposable
     [Fact]
     public void NoSessionUser_ThrowsInvalidOperation()
     {
-        // Clear the AsyncLocal by running on a fresh thread with no user set
         var ex = Task.Run(() =>
         {
-            // Fresh thread no SetSessionUser called
-            // AsyncLocal is null here
             SmbFileSystem.SetSessionUser(null!);
-            // Actually we need to simulate "no user set" set to null explicitly
-            // then attempt CreateFile
             return Record.Exception(() =>
             {
                 _sut.CreateFile(out var h, out var fs, "noaccess.txt",
@@ -222,17 +215,27 @@ public class SmbFileSystemTests : IDisposable
         Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, status);
     }
 
+    [Theory]
+    [InlineData("..\\..\\..\\etc\\passwd")]
+    [InlineData("..\\..\\Windows\\System32\\config\\SAM")]
+    [InlineData("sub\\..\\..\\..\\secret")]
+    [InlineData("normal\\..\\..\\..\\..\\breakout")]
+    public void CreateFile_PathTraversal_Variants_ReturnsDenied(string path)
+    {
+        var s = _sut.CreateFile(out _, out _, path,
+            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+        Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, s);
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  PERMISSION BOUNDARY TESTS
-    //  (verify single-check semantics: permission at CreateFile,
-    //   no re-check during Read/Write)
     // ═══════════════════════════════════════════════════════════
 
     [Fact]
     public void ReadFile_DoesNotReCheckPermissions()
     {
-        // Open with read permission allowed, then verify ReadFile
-        // does NOT call CanReadAsync again.
         int callCount = 0;
         _fileServiceMock
             .Setup(f => f.CanReadAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
@@ -252,7 +255,6 @@ public class SmbFileSystemTests : IDisposable
 
         _sut.ReadFile(out var data, h, 0, 1);
 
-        // ReadFile should NOT have called CanReadAsync again
         Assert.Equal(countAfterOpen, callCount);
         Assert.Equal([42], data);
         _sut.CloseFile(h);
@@ -279,7 +281,6 @@ public class SmbFileSystemTests : IDisposable
 
         _sut.WriteFile(out var written, h, 0, [1, 2, 3]);
 
-        // WriteFile should NOT have called CanWriteAsync again
         Assert.Equal(countAfterOpen, writeCheckCount);
         Assert.Equal(3, written);
         _sut.CloseFile(h);
@@ -333,7 +334,6 @@ public class SmbFileSystemTests : IDisposable
         var status = _sut.CloseFile(h);
 
         Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, status);
-        // File should still exist because delete was denied
         Assert.True(File.Exists(Path.Combine(_testRoot, "nodelete.txt")));
     }
 
@@ -459,7 +459,6 @@ public class SmbFileSystemTests : IDisposable
             AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
             CreateDisposition.FILE_CREATE, CreateOptions.FILE_NON_DIRECTORY_FILE,
             CreateSecurityContext());
-        // Parent "no\parent" doesn't exist
         Assert.Equal(NTStatus.STATUS_OBJECT_PATH_NOT_FOUND, s);
     }
 
@@ -503,8 +502,7 @@ public class SmbFileSystemTests : IDisposable
             AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
             CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
             CreateSecurityContext());
-        // Read past the single byte
-        _sut.ReadFile(out _, h, 0, 1); // consume the byte
+        _sut.ReadFile(out _, h, 0, 1);
         var s = _sut.ReadFile(out var data, h, 1, 10);
         Assert.Equal(NTStatus.STATUS_END_OF_FILE, s);
         _sut.CloseFile(h);
@@ -550,6 +548,55 @@ public class SmbFileSystemTests : IDisposable
     {
         Assert.Equal(NTStatus.STATUS_INVALID_HANDLE,
             _sut.WriteFile(out _, null!, 0, [1]));
+    }
+
+    [Fact]
+    public void WriteFile_WithOffset_WritesAtCorrectPosition()
+    {
+        CreateTestFile("offset_write.txt", new byte[100]);
+        _sut.CreateFile(out var h, out _, "offset_write.txt",
+            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        byte[] data = [0xAA, 0xBB, 0xCC];
+        _sut.WriteFile(out var written, h, 50, data);
+        Assert.Equal(3, written);
+        _sut.CloseFile(h);
+
+        var all = File.ReadAllBytes(Path.Combine(_testRoot, "offset_write.txt"));
+        Assert.Equal(0xAA, all[50]);
+        Assert.Equal(0xBB, all[51]);
+        Assert.Equal(0xCC, all[52]);
+    }
+
+    [Fact]
+    public void WriteFile_DirectoryHandle_ReturnsInvalidHandle()
+    {
+        CreateTestDirectory("writedir");
+        _sut.CreateFile(out var h, out _, "writedir",
+            AccessMask.GENERIC_ALL, FileAttributes.Directory, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.WriteFile(out _, h, 0, [1, 2, 3]);
+        Assert.NotEqual(NTStatus.STATUS_SUCCESS, s);
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void WriteFile_ZeroBytes_Succeeds()
+    {
+        CreateTestFile("zero_write.txt");
+        _sut.CreateFile(out var h, out _, "zero_write.txt",
+            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.WriteFile(out var written, h, 0, []);
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+        Assert.Equal(0, written);
+        _sut.CloseFile(h);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -610,7 +657,7 @@ public class SmbFileSystemTests : IDisposable
             FileInformationClass.FileDirectoryInformation);
         Assert.Equal(NTStatus.STATUS_SUCCESS, s);
         var names = r.Select(x => ((FileDirectoryInformation)x).FileName).ToList();
-        Assert.Equal(5, names.Count); // ".", "..", subdir, file1, file2
+        Assert.Equal(5, names.Count);
         Assert.Contains("subdir", names);
         Assert.Contains("file1.txt", names);
         Assert.Contains("file2.txt", names);
@@ -647,7 +694,7 @@ public class SmbFileSystemTests : IDisposable
         var s = _sut.QueryDirectory(out var r, h, "*",
             FileInformationClass.FileDirectoryInformation);
         Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-        Assert.Equal(2, r.Count); // just "." and ".."
+        Assert.Equal(2, r.Count);
         _sut.CloseFile(h);
     }
 
@@ -662,6 +709,92 @@ public class SmbFileSystemTests : IDisposable
         var s = _sut.QueryDirectory(out _, h, "*",
             FileInformationClass.FileDirectoryInformation);
         Assert.Equal(NTStatus.STATUS_INVALID_HANDLE, s);
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void QueryDirectory_BothDirInfo_ReturnsShortNames()
+    {
+        CreateTestDirectory("bothdir");
+        CreateTestFile("bothdir/averylongfilename.txt");
+        _sut.CreateFile(out var h, out _, "bothdir",
+            AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.QueryDirectory(out var entries, h, "*",
+            FileInformationClass.FileBothDirectoryInformation);
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+
+        var fileEntry = entries.OfType<FileBothDirectoryInformation>()
+            .FirstOrDefault(e => e.FileName == "averylongfilename.txt");
+        Assert.NotNull(fileEntry);
+        Assert.NotEmpty(fileEntry.ShortName);
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void QueryDirectory_NamesOnly_ReturnsJustNames()
+    {
+        CreateTestDirectory("namesdir");
+        CreateTestFile("namesdir/a.txt");
+        CreateTestFile("namesdir/b.txt");
+        _sut.CreateFile(out var h, out _, "namesdir",
+            AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.QueryDirectory(out var entries, h, "*",
+            FileInformationClass.FileNamesInformation);
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+
+        var nameEntries = entries.OfType<FileNamesInformation>().ToList();
+        Assert.Contains(nameEntries, e => e.FileName == "a.txt");
+        Assert.Contains(nameEntries, e => e.FileName == "b.txt");
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void QueryDirectory_SpecificFilePattern_ReturnsSingleResult()
+    {
+        CreateTestDirectory("patterndir");
+        CreateTestFile("patterndir/match.txt");
+        CreateTestFile("patterndir/skip.log");
+        _sut.CreateFile(out var h, out _, "patterndir",
+            AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.QueryDirectory(out var entries, h, "match.txt",
+            FileInformationClass.FileDirectoryInformation);
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+
+        var named = entries.OfType<FileDirectoryInformation>()
+            .Where(e => e.FileName != "." && e.FileName != "..").ToList();
+        Assert.Single(named);
+        Assert.Equal("match.txt", named[0].FileName);
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void QueryDirectory_RootDir_ListsTopLevelEntries()
+    {
+        CreateTestFile("root_file.txt");
+        CreateTestDirectory("root_sub");
+
+        _sut.CreateFile(out var h, out _, "",
+            AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.QueryDirectory(out var entries, h, "*",
+            FileInformationClass.FileDirectoryInformation);
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+
+        var names = entries.OfType<FileDirectoryInformation>()
+            .Select(e => e.FileName).ToList();
+        Assert.Contains("root_file.txt", names);
+        Assert.Contains("root_sub", names);
         _sut.CloseFile(h);
     }
 
@@ -722,6 +855,149 @@ public class SmbFileSystemTests : IDisposable
         Assert.Equal(NTStatus.STATUS_INVALID_HANDLE,
             _sut.GetFileInformation(out _, null!,
                 FileInformationClass.FileBasicInformation));
+    }
+
+    [Fact]
+    public void GetFileInformation_File_NetworkOpenInfo_ReturnsCorrectData()
+    {
+        CreateTestFile("net.txt", new byte[2048]);
+        _sut.CreateFile(out var h, out _, "net.txt",
+            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.GetFileInformation(out var info, h,
+            FileInformationClass.FileNetworkOpenInformation);
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+
+        var net = Assert.IsType<FileNetworkOpenInformation>(info);
+        Assert.Equal(2048, net.EndOfFile);
+        Assert.Equal(FileAttributes.Normal, net.FileAttributes);
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void GetFileInformation_File_StreamInfo_ReturnsDataStream()
+    {
+        CreateTestFile("stream.txt", new byte[512]);
+        _sut.CreateFile(out var h, out _, "stream.txt",
+            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.GetFileInformation(out var info, h,
+            FileInformationClass.FileStreamInformation);
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+
+        var stream = Assert.IsType<FileStreamInformation>(info);
+        Assert.Single(stream.Entries);
+        Assert.Equal("::$DATA", stream.Entries[0].StreamName);
+        Assert.Equal(512, stream.Entries[0].StreamSize);
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void GetFileInformation_File_InternalInfo_ReturnsZeroIndex()
+    {
+        CreateTestFile("internal.txt");
+        _sut.CreateFile(out var h, out _, "internal.txt",
+            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.GetFileInformation(out var info, h,
+            FileInformationClass.FileInternalInformation);
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+        Assert.Equal(0L, Assert.IsType<FileInternalInformation>(info).IndexNumber);
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void GetFileInformation_File_EaInfo_ReturnsZeroEaSize()
+    {
+        CreateTestFile("ea.txt");
+        _sut.CreateFile(out var h, out _, "ea.txt",
+            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.GetFileInformation(out var info, h,
+            FileInformationClass.FileEaInformation);
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+        Assert.IsType<FileEaInformation>(info);
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void GetFileInformation_File_AttributeTag_ReturnsNormalAndZeroReparse()
+    {
+        CreateTestFile("tag.txt");
+        _sut.CreateFile(out var h, out _, "tag.txt",
+            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.GetFileInformation(out var info, h,
+            FileInformationClass.FileAttributeTagInformation);
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+
+        var tag = Assert.IsType<FileAttributeTagInformation>(info);
+        Assert.Equal(FileAttributes.Normal, tag.FileAttributes);
+        Assert.Equal(0u, tag.ReparsePointTag);
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void GetFileInformation_Directory_StandardInfo_ReportsZeroSizeAndDir()
+    {
+        CreateTestDirectory("infodir");
+        _sut.CreateFile(out var h, out _, "infodir",
+            AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.GetFileInformation(out var info, h,
+            FileInformationClass.FileStandardInformation);
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+
+        var std = Assert.IsType<FileStandardInformation>(info);
+        Assert.True(std.Directory);
+        Assert.Equal(0, std.EndOfFile);
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void GetFileInformation_Directory_NetworkOpenInfo_ReportsDirectoryAttributes()
+    {
+        CreateTestDirectory("netdir");
+        _sut.CreateFile(out var h, out _, "netdir",
+            AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.GetFileInformation(out var info, h,
+            FileInformationClass.FileNetworkOpenInformation);
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+        Assert.Equal(FileAttributes.Directory, Assert.IsType<FileNetworkOpenInformation>(info).FileAttributes);
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void GetFileInformation_File_StandardInfo_DeletePendingReflectsDisposition()
+    {
+        CreateTestFile("pending.txt");
+        _sut.CreateFile(out var h, out _, "pending.txt",
+            AccessMask.GENERIC_READ | AccessMask.DELETE, FileAttributes.Normal,
+            ShareAccess.Read, CreateDisposition.FILE_OPEN,
+            CreateOptions.FILE_NON_DIRECTORY_FILE, CreateSecurityContext());
+
+        _sut.SetFileInformation(h, new FileDispositionInformation { DeletePending = true });
+
+        var s = _sut.GetFileInformation(out var info, h,
+            FileInformationClass.FileStandardInformation);
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+        Assert.True(Assert.IsType<FileStandardInformation>(info).DeletePending);
+        _sut.CloseFile(h);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -798,6 +1074,96 @@ public class SmbFileSystemTests : IDisposable
                 new FileDispositionInformation { DeletePending = true }));
     }
 
+    [Fact]
+    public void SetFileInformation_Disposition_SetsDeleteOnClose()
+    {
+        CreateTestFile("disposable.txt");
+        _sut.CreateFile(out var h, out _, "disposable.txt",
+            AccessMask.GENERIC_READ | AccessMask.DELETE, FileAttributes.Normal,
+            ShareAccess.Read, CreateDisposition.FILE_OPEN,
+            CreateOptions.FILE_NON_DIRECTORY_FILE, CreateSecurityContext());
+
+        var s = _sut.SetFileInformation(h, new FileDispositionInformation { DeletePending = true });
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+
+        _sut.CloseFile(h);
+        Assert.False(File.Exists(Path.Combine(_testRoot, "disposable.txt")));
+    }
+
+    [Fact]
+    public void SetFileInformation_AllocationInfo_TruncatesLargerFile()
+    {
+        CreateTestFile("big.txt", new byte[8192]);
+        _sut.CreateFile(out var h, out _, "big.txt",
+            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        _sut.SetFileInformation(h, new FileAllocationInformation { AllocationSize = 1024 });
+        _sut.CloseFile(h);
+        Assert.Equal(1024, new FileInfo(Path.Combine(_testRoot, "big.txt")).Length);
+    }
+
+    [Fact]
+    public void SetFileInformation_AllocationInfo_DoesNotGrowSmallFile()
+    {
+        CreateTestFile("small.txt", new byte[100]);
+        _sut.CreateFile(out var h, out _, "small.txt",
+            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        _sut.SetFileInformation(h, new FileAllocationInformation { AllocationSize = 8192 });
+        _sut.CloseFile(h);
+        Assert.Equal(100, new FileInfo(Path.Combine(_testRoot, "small.txt")).Length);
+    }
+
+    [Fact]
+    public void SetFileInformation_UnsupportedType_ReturnsNotSupported()
+    {
+        CreateTestFile("test.txt");
+        _sut.CreateFile(out var h, out _, "test.txt",
+            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.SetFileInformation(h, new FileEaInformation());
+        Assert.Equal(NTStatus.STATUS_NOT_SUPPORTED, s);
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void SetFileInformation_RenameDirectory_Succeeds()
+    {
+        CreateTestDirectory("olddir");
+        _sut.CreateFile(out var h, out _, "olddir",
+            AccessMask.GENERIC_ALL, FileAttributes.Directory, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.SetFileInformation(h, new FileRenameInformationType2 { FileName = "newdir" });
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+
+        Assert.False(Directory.Exists(Path.Combine(_testRoot, "olddir")));
+        Assert.True(Directory.Exists(Path.Combine(_testRoot, "newdir")));
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void SetFileInformation_RenameDirectory_ExistingTarget_ReturnsCollision()
+    {
+        CreateTestDirectory("dirA");
+        CreateTestDirectory("dirB");
+        _sut.CreateFile(out var h, out _, "dirA",
+            AccessMask.GENERIC_ALL, FileAttributes.Directory, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.SetFileInformation(h, new FileRenameInformationType2 { FileName = "dirB" });
+        Assert.Equal(NTStatus.STATUS_OBJECT_NAME_COLLISION, s);
+        _sut.CloseFile(h);
+    }
+
     // ═══════════════════════════════════════════════════════════
     //  FILESYSTEM INFO
     // ═══════════════════════════════════════════════════════════
@@ -827,376 +1193,6 @@ public class SmbFileSystemTests : IDisposable
             (FileSystemInformationClass)255);
         Assert.Equal(NTStatus.STATUS_INVALID_PARAMETER, s);
     }
-
-    // ═══════════════════════════════════════════════════════════
-    //  FLUSH
-    // ═══════════════════════════════════════════════════════════
-
-    [Fact]
-    public void FlushFileBuffers_ValidHandle_ReturnsSuccess()
-    {
-        _sut.CreateFile(out var h, out _, "flush.txt",
-            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_CREATE, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-        Assert.Equal(NTStatus.STATUS_SUCCESS, _sut.FlushFileBuffers(h));
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void FlushFileBuffers_NullHandle_ReturnsInvalidHandle()
-    {
-        Assert.Equal(NTStatus.STATUS_INVALID_HANDLE, _sut.FlushFileBuffers(null!));
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  PERMISSION DENIAL TESTS
-    // ═══════════════════════════════════════════════════════════
-
-    [Fact]
-    public void CreateFile_ReadDenied_ReturnsAccessDenied()
-    {
-        CreateTestFile("secret.txt");
-        _fileServiceMock
-            .Setup(f => f.CanReadAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
-            .ReturnsAsync(false);
-
-        var s = _sut.CreateFile(out _, out _, "secret.txt",
-            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-        Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, s);
-    }
-
-    [Fact]
-    public void CreateFile_WriteDenied_ReturnsAccessDenied()
-    {
-        _fileServiceMock
-            .Setup(f => f.CanWriteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
-            .ReturnsAsync(false);
-        _fileServiceMock
-            .Setup(f => f.CanCreateAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
-            .ReturnsAsync(false);
-
-        var s = _sut.CreateFile(out _, out _, "newfile.txt",
-            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_CREATE, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-        Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, s);
-    }
-
-    [Fact]
-    public void CreateFile_CreateDenied_NewFile_ReturnsAccessDenied()
-    {
-        // Build a fresh mock that denies all write/create
-        var denyMock = new Mock<IFileService>();
-        denyMock.Setup(f => f.CanReadAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
-            .ReturnsAsync(true);
-        denyMock.Setup(f => f.CanWriteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
-            .ReturnsAsync(false);
-        denyMock.Setup(f => f.CanCreateAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
-            .ReturnsAsync(false);
-        denyMock.Setup(f => f.CanDeleteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
-            .ReturnsAsync(false);
-
-        var denySut = new SmbFileSystem(_testRoot, denyMock.Object);
-
-        var s = denySut.CreateFile(out _, out _, "blocked.txt",
-            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_CREATE, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-        Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, s);
-    }
-
-    [Fact]
-    public void CloseFile_DeleteDenied_KeepsFileAndReturnsDenied()
-    {
-        // Use a fresh mock where delete is denied from the start
-        var denyDeleteMock = new Mock<IFileService>();
-        denyDeleteMock.Setup(f => f.CanReadAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
-            .ReturnsAsync(true);
-        denyDeleteMock.Setup(f => f.CanWriteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
-            .ReturnsAsync(true);
-        denyDeleteMock.Setup(f => f.CanCreateAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
-            .ReturnsAsync(true);
-        denyDeleteMock.Setup(f => f.CanDeleteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
-            .ReturnsAsync(false);
-
-        var denySut = new SmbFileSystem(_testRoot, denyDeleteMock.Object);
-        CreateTestFile("keep_me.txt");
-
-        denySut.CreateFile(out var h, out _, "keep_me.txt",
-            AccessMask.GENERIC_READ | AccessMask.DELETE, FileAttributes.Normal,
-            ShareAccess.Read, CreateDisposition.FILE_OPEN,
-            CreateOptions.FILE_DELETE_ON_CLOSE, CreateSecurityContext());
-
-        var s = denySut.CloseFile(h);
-        Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, s);
-        Assert.True(File.Exists(Path.Combine(_testRoot, "keep_me.txt")));
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  SET FILE INFORMATION EXTENDED TESTS
-    // ═══════════════════════════════════════════════════════════
-
-    [Fact]
-    public void SetFileInformation_Disposition_SetsDeleteOnClose()
-    {
-        CreateTestFile("disposable.txt");
-        _sut.CreateFile(out var h, out _, "disposable.txt",
-            AccessMask.GENERIC_READ | AccessMask.DELETE, FileAttributes.Normal,
-            ShareAccess.Read, CreateDisposition.FILE_OPEN,
-            CreateOptions.FILE_NON_DIRECTORY_FILE, CreateSecurityContext());
-
-        var disposition = new FileDispositionInformation { DeletePending = true };
-        var s = _sut.SetFileInformation(h, disposition);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-
-        // Close should now delete
-        _sut.CloseFile(h);
-        Assert.False(File.Exists(Path.Combine(_testRoot, "disposable.txt")));
-    }
-
-    [Fact]
-    public void SetFileInformation_AllocationInfo_TruncatesLargerFile()
-    {
-        CreateTestFile("big.txt", new byte[8192]);
-        _sut.CreateFile(out var h, out _, "big.txt",
-            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var alloc = new FileAllocationInformation { AllocationSize = 1024 };
-        var s = _sut.SetFileInformation(h, alloc);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-        _sut.CloseFile(h);
-
-        Assert.Equal(1024, new FileInfo(Path.Combine(_testRoot, "big.txt")).Length);
-    }
-
-    [Fact]
-    public void SetFileInformation_AllocationInfo_DoesNotGrowSmallFile()
-    {
-        CreateTestFile("small.txt", new byte[100]);
-        _sut.CreateFile(out var h, out _, "small.txt",
-            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var alloc = new FileAllocationInformation { AllocationSize = 8192 };
-        _sut.SetFileInformation(h, alloc);
-        _sut.CloseFile(h);
-
-        // File should NOT grow AllocationInformation only truncates
-        Assert.Equal(100, new FileInfo(Path.Combine(_testRoot, "small.txt")).Length);
-    }
-
-    [Fact]
-    public void SetFileInformation_UnsupportedType_ReturnsNotSupported()
-    {
-        CreateTestFile("test.txt");
-        _sut.CreateFile(out var h, out _, "test.txt",
-            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        // FileEaInformation used as SetFileInformation input is not a handled case
-        var unsupported = new FileEaInformation();
-        var s = _sut.SetFileInformation(h, unsupported);
-        Assert.Equal(NTStatus.STATUS_NOT_SUPPORTED, s);
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void SetFileInformation_RenameDirectory_Succeeds()
-    {
-        CreateTestDirectory("olddir");
-        _sut.CreateFile(out var h, out _, "olddir",
-            AccessMask.GENERIC_ALL, FileAttributes.Directory, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var rename = new FileRenameInformationType2 { FileName = "newdir" };
-        var s = _sut.SetFileInformation(h, rename);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-
-        Assert.False(Directory.Exists(Path.Combine(_testRoot, "olddir")));
-        Assert.True(Directory.Exists(Path.Combine(_testRoot, "newdir")));
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void SetFileInformation_RenameDirectory_ExistingTarget_ReturnsCollision()
-    {
-        CreateTestDirectory("dirA");
-        CreateTestDirectory("dirB");
-        _sut.CreateFile(out var h, out _, "dirA",
-            AccessMask.GENERIC_ALL, FileAttributes.Directory, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var rename = new FileRenameInformationType2 { FileName = "dirB" };
-        var s = _sut.SetFileInformation(h, rename);
-        Assert.Equal(NTStatus.STATUS_OBJECT_NAME_COLLISION, s);
-        _sut.CloseFile(h);
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  GET FILE INFORMATION EXTENDED INFO CLASSES
-    // ═══════════════════════════════════════════════════════════
-
-    [Fact]
-    public void GetFileInformation_File_NetworkOpenInfo_ReturnsCorrectData()
-    {
-        CreateTestFile("net.txt", new byte[2048]);
-        _sut.CreateFile(out var h, out _, "net.txt",
-            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var s = _sut.GetFileInformation(out var info, h,
-            FileInformationClass.FileNetworkOpenInformation);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-
-        var net = Assert.IsType<FileNetworkOpenInformation>(info);
-        Assert.Equal(2048, net.EndOfFile);
-        Assert.Equal(FileAttributes.Normal, net.FileAttributes);
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void GetFileInformation_File_StreamInfo_ReturnsDataStream()
-    {
-        CreateTestFile("stream.txt", new byte[512]);
-        _sut.CreateFile(out var h, out _, "stream.txt",
-            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var s = _sut.GetFileInformation(out var info, h,
-            FileInformationClass.FileStreamInformation);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-
-        var stream = Assert.IsType<FileStreamInformation>(info);
-        Assert.Single(stream.Entries);
-        Assert.Equal("::$DATA", stream.Entries[0].StreamName);
-        Assert.Equal(512, stream.Entries[0].StreamSize);
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void GetFileInformation_File_InternalInfo_ReturnsZeroIndex()
-    {
-        CreateTestFile("internal.txt");
-        _sut.CreateFile(out var h, out _, "internal.txt",
-            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var s = _sut.GetFileInformation(out var info, h,
-            FileInformationClass.FileInternalInformation);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-
-        var intern = Assert.IsType<FileInternalInformation>(info);
-        Assert.Equal(0L, intern.IndexNumber);
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void GetFileInformation_File_EaInfo_ReturnsZeroEaSize()
-    {
-        CreateTestFile("ea.txt");
-        _sut.CreateFile(out var h, out _, "ea.txt",
-            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var s = _sut.GetFileInformation(out var info, h,
-            FileInformationClass.FileEaInformation);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-        Assert.IsType<FileEaInformation>(info);
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void GetFileInformation_File_AttributeTag_ReturnsNormalAndZeroReparse()
-    {
-        CreateTestFile("tag.txt");
-        _sut.CreateFile(out var h, out _, "tag.txt",
-            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var s = _sut.GetFileInformation(out var info, h,
-            FileInformationClass.FileAttributeTagInformation);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-
-        var tag = Assert.IsType<FileAttributeTagInformation>(info);
-        Assert.Equal(FileAttributes.Normal, tag.FileAttributes);
-        Assert.Equal(0u, tag.ReparsePointTag);
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void GetFileInformation_Directory_StandardInfo_ReportsZeroSizeAndDir()
-    {
-        CreateTestDirectory("infodir");
-        _sut.CreateFile(out var h, out _, "infodir",
-            AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var s = _sut.GetFileInformation(out var info, h,
-            FileInformationClass.FileStandardInformation);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-
-        var std = Assert.IsType<FileStandardInformation>(info);
-        Assert.True(std.Directory);
-        Assert.Equal(0, std.EndOfFile);
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void GetFileInformation_Directory_NetworkOpenInfo_ReportsDirectoryAttributes()
-    {
-        CreateTestDirectory("netdir");
-        _sut.CreateFile(out var h, out _, "netdir",
-            AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var s = _sut.GetFileInformation(out var info, h,
-            FileInformationClass.FileNetworkOpenInformation);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-
-        var net = Assert.IsType<FileNetworkOpenInformation>(info);
-        Assert.Equal(FileAttributes.Directory, net.FileAttributes);
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void GetFileInformation_DeletedFile_ReturnsNotFound()
-    {
-        CreateTestFile("vanish.txt");
-        _sut.CreateFile(out var h, out _, "vanish.txt",
-            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read | ShareAccess.Write | ShareAccess.Delete,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        // Delete the file out from under the handle
-        _sut.CloseFile(h);
-        File.Delete(Path.Combine(_testRoot, "vanish.txt"));
-
-        // Re-create a handle-like object won't work, so just verify the method
-        // handles a fabricated stale handle pass null
-        var s = _sut.GetFileInformation(out _, null!,
-            FileInformationClass.FileBasicInformation);
-        Assert.Equal(NTStatus.STATUS_INVALID_HANDLE, s);
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  FILESYSTEM INFO EXTENDED CLASSES
-    // ═══════════════════════════════════════════════════════════
 
     [Fact]
     public void GetFileSystemInformation_Size_ReturnsNonZeroTotals()
@@ -1230,13 +1226,32 @@ public class SmbFileSystemTests : IDisposable
         var s = _sut.GetFileSystemInformation(out var info,
             FileSystemInformationClass.FileFsDeviceInformation);
         Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-
-        var dev = Assert.IsType<FileFsDeviceInformation>(info);
-        Assert.Equal(DeviceType.Disk, dev.DeviceType);
+        Assert.Equal(DeviceType.Disk, Assert.IsType<FileFsDeviceInformation>(info).DeviceType);
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  SECURITY DESCRIPTOR TESTS
+    //  FLUSH
+    // ═══════════════════════════════════════════════════════════
+
+    [Fact]
+    public void FlushFileBuffers_ValidHandle_ReturnsSuccess()
+    {
+        _sut.CreateFile(out var h, out _, "flush.txt",
+            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_CREATE, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+        Assert.Equal(NTStatus.STATUS_SUCCESS, _sut.FlushFileBuffers(h));
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void FlushFileBuffers_NullHandle_ReturnsInvalidHandle()
+    {
+        Assert.Equal(NTStatus.STATUS_INVALID_HANDLE, _sut.FlushFileBuffers(null!));
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  SECURITY DESCRIPTOR
     // ═══════════════════════════════════════════════════════════
 
     [Fact]
@@ -1272,7 +1287,7 @@ public class SmbFileSystemTests : IDisposable
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  STUB METHOD TESTS
+    //  STUBS
     // ═══════════════════════════════════════════════════════════
 
     [Fact]
@@ -1320,135 +1335,150 @@ public class SmbFileSystemTests : IDisposable
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  WRITE TESTS EXTENDED
+    //  PERMISSION DENIAL TESTS
     // ═══════════════════════════════════════════════════════════
 
     [Fact]
-    public void WriteFile_WithOffset_WritesAtCorrectPosition()
+    public void CreateFile_ReadDenied_ReturnsAccessDenied()
     {
-        CreateTestFile("offset_write.txt", new byte[100]);
-        _sut.CreateFile(out var h, out _, "offset_write.txt",
-            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
+        CreateTestFile("secret.txt");
+        _fileServiceMock
+            .Setup(f => f.CanReadAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(false);
 
-        byte[] data = [0xAA, 0xBB, 0xCC];
-        _sut.WriteFile(out var written, h, 50, data);
-        Assert.Equal(3, written);
-        _sut.CloseFile(h);
-
-        var all = File.ReadAllBytes(Path.Combine(_testRoot, "offset_write.txt"));
-        Assert.Equal(0xAA, all[50]);
-        Assert.Equal(0xBB, all[51]);
-        Assert.Equal(0xCC, all[52]);
-    }
-
-    [Fact]
-    public void WriteFile_DirectoryHandle_ReturnsInvalidHandle()
-    {
-        CreateTestDirectory("writedir");
-        _sut.CreateFile(out var h, out _, "writedir",
-            AccessMask.GENERIC_ALL, FileAttributes.Directory, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var s = _sut.WriteFile(out _, h, 0, [1, 2, 3]);
-        // Directory handles have no Stream, so write should fail
-        Assert.NotEqual(NTStatus.STATUS_SUCCESS, s);
-        _sut.CloseFile(h);
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  QUERY DIRECTORY EXTENDED INFO CLASSES
-    // ═══════════════════════════════════════════════════════════
-
-    [Fact]
-    public void QueryDirectory_BothDirInfo_ReturnsShortNames()
-    {
-        CreateTestDirectory("bothdir");
-        CreateTestFile("bothdir/averylongfilename.txt");
-        _sut.CreateFile(out var h, out _, "bothdir",
-            AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var s = _sut.QueryDirectory(out var entries, h, "*",
-            FileInformationClass.FileBothDirectoryInformation);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-
-        // Should contain ".", "..", and our file
-        var fileEntry = entries.OfType<FileBothDirectoryInformation>()
-            .FirstOrDefault(e => e.FileName == "averylongfilename.txt");
-        Assert.NotNull(fileEntry);
-        // Short name should be generated (8.3 format)
-        Assert.NotEmpty(fileEntry.ShortName);
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void QueryDirectory_NamesOnly_ReturnsJustNames()
-    {
-        CreateTestDirectory("namesdir");
-        CreateTestFile("namesdir/a.txt");
-        CreateTestFile("namesdir/b.txt");
-        _sut.CreateFile(out var h, out _, "namesdir",
-            AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var s = _sut.QueryDirectory(out var entries, h, "*",
-            FileInformationClass.FileNamesInformation);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-
-        var nameEntries = entries.OfType<FileNamesInformation>().ToList();
-        Assert.Contains(nameEntries, e => e.FileName == "a.txt");
-        Assert.Contains(nameEntries, e => e.FileName == "b.txt");
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void QueryDirectory_SpecificFilePattern_ReturnsSingleResult()
-    {
-        CreateTestDirectory("patterndir");
-        CreateTestFile("patterndir/match.txt");
-        CreateTestFile("patterndir/skip.log");
-        _sut.CreateFile(out var h, out _, "patterndir",
-            AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var s = _sut.QueryDirectory(out var entries, h, "match.txt",
-            FileInformationClass.FileDirectoryInformation);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-
-        var named = entries.OfType<FileDirectoryInformation>()
-            .Where(e => e.FileName != "." && e.FileName != "..").ToList();
-        Assert.Single(named);
-        Assert.Equal("match.txt", named[0].FileName);
-        _sut.CloseFile(h);
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  PATH TRAVERSAL ADDITIONAL VECTORS
-    // ═══════════════════════════════════════════════════════════
-
-    [Theory]
-    [InlineData("..\\..\\..\\etc\\passwd")]
-    [InlineData("..\\..\\Windows\\System32\\config\\SAM")]
-    [InlineData("sub\\..\\..\\..\\secret")]
-    [InlineData("normal\\..\\..\\..\\..\\breakout")]
-    public void CreateFile_PathTraversal_Variants_ReturnsDenied(string path)
-    {
-        var s = _sut.CreateFile(out _, out _, path,
+        var s = _sut.CreateFile(out _, out _, "secret.txt",
             AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
             CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
             CreateSecurityContext());
         Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, s);
     }
 
+    [Fact]
+    public void CreateFile_WriteDenied_ReturnsAccessDenied()
+    {
+        _fileServiceMock
+            .Setup(f => f.CanWriteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(false);
+        _fileServiceMock
+            .Setup(f => f.CanCreateAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(false);
+
+        var s = _sut.CreateFile(out _, out _, "newfile.txt",
+            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_CREATE, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+        Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, s);
+    }
+
+    [Fact]
+    public void CreateFile_CreateDenied_NewFile_ReturnsAccessDenied()
+    {
+        var denyMock = new Mock<IFileService>();
+        denyMock.Setup(f => f.CanReadAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(true);
+        denyMock.Setup(f => f.CanWriteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(false);
+        denyMock.Setup(f => f.CanCreateAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(false);
+        denyMock.Setup(f => f.CanDeleteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(false);
+
+        var denySut = CreateSutWithMock(denyMock);
+
+        var s = denySut.CreateFile(out _, out _, "blocked.txt",
+            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_CREATE, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+        Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, s);
+    }
+
+    [Fact]
+    public void CloseFile_DeleteDenied_KeepsFileAndReturnsDenied()
+    {
+        var denyDeleteMock = new Mock<IFileService>();
+        denyDeleteMock.Setup(f => f.CanReadAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(true);
+        denyDeleteMock.Setup(f => f.CanWriteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(true);
+        denyDeleteMock.Setup(f => f.CanCreateAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(true);
+        denyDeleteMock.Setup(f => f.CanDeleteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(false);
+
+        var denySut = CreateSutWithMock(denyDeleteMock);
+        CreateTestFile("keep_me.txt");
+
+        denySut.CreateFile(out var h, out _, "keep_me.txt",
+            AccessMask.GENERIC_READ | AccessMask.DELETE, FileAttributes.Normal,
+            ShareAccess.Read, CreateDisposition.FILE_OPEN,
+            CreateOptions.FILE_DELETE_ON_CLOSE, CreateSecurityContext());
+
+        var s = denySut.CloseFile(h);
+        Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, s);
+        Assert.True(File.Exists(Path.Combine(_testRoot, "keep_me.txt")));
+    }
+
     // ═══════════════════════════════════════════════════════════
-    //  CONCURRENT READ/WRITE ON SAME FILE
+    //  HANDLE LIFECYCLE
     // ═══════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ReadFile_AfterClose_ReturnsFileClosed()
+    {
+        CreateTestFile("lifecycle.txt");
+        _sut.CreateFile(out var h, out _, "lifecycle.txt",
+            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        _sut.CloseFile(h);
+        var s = _sut.ReadFile(out _, h, 0, 10);
+        Assert.Equal(NTStatus.STATUS_FILE_CLOSED, s);
+    }
+
+    [Fact]
+    public void WriteFile_AfterClose_ReturnsFileClosed()
+    {
+        CreateTestFile("lifecycle2.txt");
+        _sut.CreateFile(out var h, out _, "lifecycle2.txt",
+            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        _sut.CloseFile(h);
+        var s = _sut.WriteFile(out _, h, 0, [1, 2, 3]);
+        Assert.Equal(NTStatus.STATUS_FILE_CLOSED, s);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  EDGE CASES
+    // ═══════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ReadFile_EmptyFile_ReturnsEndOfFile()
+    {
+        CreateTestFile("empty.txt", []);
+        _sut.CreateFile(out var h, out _, "empty.txt",
+            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
+            CreateSecurityContext());
+
+        var s = _sut.ReadFile(out var data, h, 0, 1024);
+        Assert.True(s == NTStatus.STATUS_END_OF_FILE ||
+                    (s == NTStatus.STATUS_SUCCESS && data.Length == 0));
+        _sut.CloseFile(h);
+    }
+
+    [Fact]
+    public void CreateFile_RootPath_OpensShareRoot()
+    {
+        var s = _sut.CreateFile(out var h, out _, "",
+            AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read,
+            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
+            CreateSecurityContext());
+        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
+        _sut.CloseFile(h);
+    }
 
     [Fact]
     public void ConcurrentReads_SameFile_Succeed()
@@ -1489,129 +1519,11 @@ public class SmbFileSystemTests : IDisposable
         Assert.Equal(512, data2!.Length);
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  HANDLE LIFECYCLE DOUBLE CLOSE, USE AFTER CLOSE
-    // ═══════════════════════════════════════════════════════════
-
     [Fact]
-    public void ReadFile_AfterClose_ReturnsFileClosed()
+    public void GetFileInformation_DeletedFile_NullHandle_ReturnsInvalidHandle()
     {
-        CreateTestFile("lifecycle.txt");
-        _sut.CreateFile(out var h, out _, "lifecycle.txt",
-            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        _sut.CloseFile(h);
-
-        // After close, stream is disposed read should return FILE_CLOSED
-        var s = _sut.ReadFile(out _, h, 0, 10);
-        Assert.Equal(NTStatus.STATUS_FILE_CLOSED, s);
-    }
-
-    [Fact]
-    public void WriteFile_AfterClose_ReturnsFileClosed()
-    {
-        CreateTestFile("lifecycle2.txt");
-        _sut.CreateFile(out var h, out _, "lifecycle2.txt",
-            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        _sut.CloseFile(h);
-
-        var s = _sut.WriteFile(out _, h, 0, [1, 2, 3]);
-        Assert.Equal(NTStatus.STATUS_FILE_CLOSED, s);
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  EDGE CASES EMPTY FILES, LARGE READS, ROOT DIR
-    // ═══════════════════════════════════════════════════════════
-
-    [Fact]
-    public void ReadFile_EmptyFile_ReturnsEndOfFile()
-    {
-        CreateTestFile("empty.txt", []);
-        _sut.CreateFile(out var h, out _, "empty.txt",
-            AccessMask.GENERIC_READ, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var s = _sut.ReadFile(out var data, h, 0, 1024);
-        // EOF or empty data expected
-        Assert.True(s == NTStatus.STATUS_END_OF_FILE ||
-                    (s == NTStatus.STATUS_SUCCESS && data.Length == 0));
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void CreateFile_RootPath_OpensShareRoot()
-    {
-        // Opening "" or "\" should open the share root directory
-        var s = _sut.CreateFile(out var h, out _, "",
-            AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
-            CreateSecurityContext());
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void QueryDirectory_RootDir_ListsTopLevelEntries()
-    {
-        CreateTestFile("root_file.txt");
-        CreateTestDirectory("root_sub");
-
-        _sut.CreateFile(out var h, out _, "",
-            AccessMask.GENERIC_READ, FileAttributes.Directory, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var s = _sut.QueryDirectory(out var entries, h, "*",
-            FileInformationClass.FileDirectoryInformation);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-
-        var names = entries.OfType<FileDirectoryInformation>()
-            .Select(e => e.FileName).ToList();
-        Assert.Contains("root_file.txt", names);
-        Assert.Contains("root_sub", names);
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void WriteFile_ZeroBytes_Succeeds()
-    {
-        CreateTestFile("zero_write.txt");
-        _sut.CreateFile(out var h, out _, "zero_write.txt",
-            AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
-            CreateDisposition.FILE_OPEN, CreateOptions.FILE_NON_DIRECTORY_FILE,
-            CreateSecurityContext());
-
-        var s = _sut.WriteFile(out var written, h, 0, []);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-        Assert.Equal(0, written);
-        _sut.CloseFile(h);
-    }
-
-    [Fact]
-    public void GetFileInformation_File_StandardInfo_DeletePendingReflectsDisposition()
-    {
-        CreateTestFile("pending.txt");
-        _sut.CreateFile(out var h, out _, "pending.txt",
-            AccessMask.GENERIC_READ | AccessMask.DELETE, FileAttributes.Normal,
-            ShareAccess.Read, CreateDisposition.FILE_OPEN,
-            CreateOptions.FILE_NON_DIRECTORY_FILE, CreateSecurityContext());
-
-        // Explicitly set DeleteOnClose via SetFileInformation
-        var disposition = new FileDispositionInformation { DeletePending = true };
-        _sut.SetFileInformation(h, disposition);
-
-        var s = _sut.GetFileInformation(out var info, h,
-            FileInformationClass.FileStandardInformation);
-        Assert.Equal(NTStatus.STATUS_SUCCESS, s);
-
-        var std = Assert.IsType<FileStandardInformation>(info);
-        Assert.True(std.DeletePending);
-        _sut.CloseFile(h);
+        var s = _sut.GetFileInformation(out _, null!,
+            FileInformationClass.FileBasicInformation);
+        Assert.Equal(NTStatus.STATUS_INVALID_HANDLE, s);
     }
 }
