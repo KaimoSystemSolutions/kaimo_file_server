@@ -130,6 +130,7 @@ public class FileService : IFileService
             throw new UnauthorizedAccessException($"Delete denied for '{normalized}'");
 
         await _storage.DeleteAsync(normalized);
+        await _acl.DeleteAclAsync(_shareId, normalized);
     }
 
     public async Task<FileMetadata> GetMetadataAsync(string path, UserContext user)
@@ -154,9 +155,14 @@ public class FileService : IFileService
         if (!await _acl.HasAccessAsync(user, _shareId, newNormalized, isDir, FilePermission.CreateWriteData))
             throw new UnauthorizedAccessException($"Rename (create) denied for '{newNormalized}'");
         if (isDir)
+        {
             await _storage.RenameDirectoryAsync(oldNormalized, newNormalized);
+            await _acl.RenameAclPathAsync(_shareId, oldNormalized, newNormalized);
+        }
         else
+        {
             await _storage.RenameFileAsync(oldNormalized, newNormalized);
-        await _acl.RenameAclPathAsync(_shareId, oldNormalized, newNormalized);
+            await _acl.RenameAclPathAsync(_shareId, oldNormalized, newNormalized);
+        }
     }
 }

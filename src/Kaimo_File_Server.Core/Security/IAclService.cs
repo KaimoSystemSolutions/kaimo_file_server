@@ -8,5 +8,6 @@ namespace Kaimo_File_Server.Core.Security
             string relativePath, bool isDirectory, FilePermission permission);
 
         Task RenameAclPathAsync(Guid shareId, string oldRelativePath, string newRelativePath);
+        Task DeleteAclAsync(Guid shareId, string relativePath);
     }
 }

@@ -564,6 +564,7 @@ html, body, #app {
 .file-list {
     border: 1px solid var(--border);
     border-radius: 8px;
+    border-top-left-radius: 0px;
     overflow: hidden;
     background: var(--bg-secondary);
     display: flex;
@@ -1889,3 +1890,159 @@ html, body, #app {
     font-size: 0.75rem;
     border-radius: 11px;
 }
+
+/* -- File List Header -- */
+
+.file-list-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 16px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-tertiary);
+    user-select: none;
+}
+
+    .file-list-header .file-name {
+        color: var(--text-tertiary);
+    }
+
+    .file-list-header .file-size,
+    .file-list-header .file-date {
+        color: var(--text-tertiary);
+    }
+
+/* -- Selection Toolbar -- */
+
+.selection-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background: var(--accent-subtle);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    animation: fadeIn 0.15s ease-out;
+}
+
+.toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.toolbar-count {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    white-space: nowrap;
+}
+
+.toolbar-count--muted {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* -- Toolbar Buttons -- */
+
+.toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+    .toolbar-btn:hover {
+        background: var(--bg-hover);
+        border-color: var(--border-light);
+    }
+
+.toolbar-btn--danger {
+    color: var(--danger);
+    border-color: rgba(248, 113, 113, 0.3);
+    background: var(--danger-subtle);
+}
+
+    .toolbar-btn--danger:hover {
+        background: var(--danger);
+        color: #fff;
+        border-color: var(--danger);
+    }
+
+.toolbar-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* -- Selected File Row -- */
+
+.file-row--selected {
+    background: var(--accent-selected);
+    border-left: 3px solid var(--accent);
+}
+
+    .file-row--selected:hover {
+        background: var(--accent-selected);
+    }
+
+/* -- Mobile Toolbar -- */
+
+@media (max-width: 768px) {
+    .selection-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .toolbar-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+
+/* -- Toolbar Disabled State -- */
+
+.selection-toolbar--inactive {
+    opacity: 0.72;
+}
+
+    .selection-toolbar--inactive .toolbar-btn {
+        pointer-events: none;
+    }
+
+    .selection-toolbar--inactive .toolbar-count {
+        color: var(--text-secondary);
+    }
+
+.toolbar-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+    .toolbar-btn:disabled svg {
+        opacity: 0.7;
+    }

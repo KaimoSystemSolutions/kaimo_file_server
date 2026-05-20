@@ -48,6 +48,67 @@
     </div>
 </div>
 
+@* -- Toolbar für selektierte Einträge -- *@
+<div class="selection-toolbar @(_selectedItems.Count == 0 ? "selection-toolbar--inactive" : "")">
+    <div class="toolbar-left">
+        <span class="toolbar-count">
+            @(_selectedItems.Count == 0
+                ? "Keine Auswahl"
+                : $"{_selectedItems.Count} ausgewählt")
+        </span>
+    </div>
+
+    <div class="toolbar-actions">
+
+        <button class="toolbar-btn"
+                title="Öffnen"
+                disabled="@(!CanOpenSelection)"
+                @onclick="OpenSelected">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.5">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+            <span>Öffnen</span>
+        </button>
+
+        <button class="toolbar-btn"
+                title="Umbenennen"
+                disabled="@(!CanRenameSelection)"
+                @onclick="RenameSelected">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.5">
+                <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+            </svg>
+            <span>Umbenennen</span>
+        </button>
+
+        <button class="toolbar-btn toolbar-btn--danger"
+                title="Löschen"
+                disabled="@(!CanDeleteSelection)"
+                @onclick="DeleteSelected">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.5">
+                <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
+            <span>Löschen</span>
+        </button>
+
+        <button class="toolbar-btn"
+                title="Berechtigungen"
+                disabled="@(!CanAclSelection)"
+                @onclick="AclSelected">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.5">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            <span>Berechtigungen</span>
+        </button>
+
+    </div>
+</div>
+
 @* -- Dialog: Neuen Ordner erstellen -- *@
 @if (_showCreateFolder)
 {
@@ -78,13 +139,26 @@
     <div class="modal-backdrop" @onclick="CancelDelete">
         <div class="modal-dialog" @onclick:stopPropagation="true">
             <h3 class="modal-title">Löschen bestätigen</h3>
-            <p class="modal-text">
-                Möchten Sie <strong>„@_deleteTarget?.Name"</strong> wirklich löschen?
-                @if (_deleteTarget?.IsDirectory == true)
-                {
-                    <br /><span class="modal-warning">Alle Inhalte des Ordners werden ebenfalls gelöscht.</span>
-                }
-            </p>
+            @if (_deleteTargets.Count == 1)
+            {
+                <p class="modal-text">
+                    Möchten Sie <strong>„@_deleteTargets[0].Name"</strong> wirklich löschen?
+                    @if (_deleteTargets[0].IsDirectory)
+                    {
+                        <br /><span class="modal-warning">Alle Inhalte des Ordners werden ebenfalls gelöscht.</span>
+                    }
+                </p>
+            }
+            else
+            {
+                <p class="modal-text">
+                    Möchten Sie <strong>@_deleteTargets.Count Elemente</strong> wirklich löschen?
+                    @if (_deleteTargets.Any(t => t.IsDirectory))
+                    {
+                        <br /><span class="modal-warning">Alle Inhalte enthaltener Ordner werden ebenfalls gelöscht.</span>
+                    }
+                </p>
+            }
             @if (_deleteError is not null)
             {
                 <div class="modal-error">@_deleteError</div>
@@ -141,10 +215,13 @@ else
         <div class="file-cell file-actions"></div>
     </div>
 
-    <div class="file-list" @oncontextmenu="OnBackgroundContextMenu" @oncontextmenu:preventDefault="true">
+    <div class="file-list"
+         @onclick="OnListBackgroundClick"
+         @oncontextmenu="OnBackgroundContextMenu"
+         @oncontextmenu:preventDefault="true">
         @if (VM.HasParent)
         {
-            <div class="file-row file-row-dir" @onclick="NavigateUp">
+            <div class="file-row file-row-dir" @ondblclick="NavigateUp">
                 <div class="file-cell file-name">
                     <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
                          stroke="var(--text-tertiary)" stroke-width="1.5">
@@ -162,11 +239,15 @@ else
 
         @foreach (var dir in VM.Directories)
         {
-            <div class="file-row file-row-dir"
+            var isSelected = _selectedItems.Contains(dir);
+            <div class="file-row file-row-dir @(isSelected ? "file-row--selected" : "")"
+                 @onclick="(e) => OnItemClick(e, dir)"
+                 @onclick:stopPropagation="true"
+                 @ondblclick="() => NavigateTo(dir)"
                  @oncontextmenu="(e) => OnItemContextMenu(e, dir)"
                  @oncontextmenu:preventDefault="true"
                  @oncontextmenu:stopPropagation="true">
-                <div class="file-cell file-name" @onclick="() => NavigateTo(dir)">
+                <div class="file-cell file-name">
                     <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
                          fill="var(--folder-fill)" stroke="var(--folder-stroke)" stroke-width="1.5">
                         <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -236,7 +317,10 @@ else
 
         @foreach (var file in VM.Files)
         {
-            <div class="file-row"
+            var isSelected = _selectedItems.Contains(file);
+            <div class="file-row @(isSelected ? "file-row--selected" : "")"
+                 @onclick="(e) => OnItemClick(e, file)"
+                 @onclick:stopPropagation="true"
                  @oncontextmenu="(e) => OnItemContextMenu(e, file)"
                  @oncontextmenu:preventDefault="true"
                  @oncontextmenu:stopPropagation="true">
@@ -353,7 +437,7 @@ else
             </button>
             @if (_isAdmin)
             {
-                <div class="context-menu-separator"></div>
+                
                 <button class="context-menu-item" @onclick="() => ContextAcl(_contextTarget)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -361,6 +445,24 @@ else
                     Berechtigungen
                 </button>
             }
+            <div class="context-menu-separator"></div>
+            <div class="context-menu-header">General</div>
+            @* Kontextmenü für den Hintergrund (leerer Bereich) *@
+            <button class="context-menu-item" @onclick="ContextNewFolder">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    <path d="M12 11v6M9 14h6" />
+                </svg>
+                Neuer Ordner
+            </button>
+            <button class="context-menu-item" @onclick="ContextRefresh">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M1 4v6h6M23 20v-6h-6" />
+                    <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
+                </svg>
+                Aktualisieren
+            </button>
+
         }
         else
         {
@@ -407,14 +509,13 @@ else
     </div>
 }
 
+
 @code {
     [Parameter] public string ShareName { get; set; } = "";
     [Parameter] public string? SubPath { get; set; }
 
-
     // General ACL
     private Dictionary<string, int> _aclCounts = new();
-
 
     // Root ACL
     private bool _isAdmin;
@@ -430,16 +531,19 @@ else
     private string _newFolderName = "";
     private string? _createFolderError;
 
-    // Löschen
+    // Löschen (unterstützt jetzt mehrere Targets)
     private bool _showDeleteConfirm;
-    private FileMetadata? _deleteTarget;
+    private List<FileMetadata> _deleteTargets = new();
     private string? _deleteError;
+
+    // Selektion
+    private HashSet<FileMetadata> _selectedItems = new();
 
     // Kontextmenü
     private bool _showContextMenu;
     private double _contextMenuX;
     private double _contextMenuY;
-    private FileMetadata? _contextTarget; // null = Hintergrund-Klick
+    private FileMetadata? _contextTarget;
 
     // Umbenennen
     private bool _showRenameDialog;
@@ -447,10 +551,118 @@ else
     private string _renameNewName = "";
     private string? _renameError;
 
+    // ========== Toolbar Computed Properties ==========
+
+    private bool CanOpenSelection =>
+        _selectedItems.Count == 1 && _selectedItems.First().IsDirectory;
+
+    private bool CanRenameSelection =>
+        _selectedItems.Count == 1;
+
+    private bool CanDeleteSelection =>
+        _selectedItems.Count > 0;
+
+    private bool CanAclSelection =>
+        _isAdmin && _selectedItems.Count == 1;
+
+    // ========== Selektion ==========
+
+    private void OnItemClick(MouseEventArgs e, FileMetadata item)
+    {
+        if (e.CtrlKey || e.MetaKey)
+        {
+            // Toggle: Element hinzufügen/entfernen
+            if (!_selectedItems.Remove(item))
+                _selectedItems.Add(item);
+        }
+        else if (e.ShiftKey && _selectedItems.Count > 0)
+        {
+            // Range-Selektion
+            var allItems = VM.Directories.Cast<FileMetadata>()
+                .Concat(VM.Files).ToList();
+            var lastSelected = _selectedItems.Last();
+            var idxStart = allItems.IndexOf(lastSelected);
+            var idxEnd = allItems.IndexOf(item);
+            if (idxStart >= 0 && idxEnd >= 0)
+            {
+                var from = Math.Min(idxStart, idxEnd);
+                var to = Math.Max(idxStart, idxEnd);
+                for (int i = from; i <= to; i++)
+                    _selectedItems.Add(allItems[i]);
+            }
+        }
+        else
+        {
+            // Wenn Objekt zweites mal ausgewählt wird, selektiere es nicht erneut
+            if(_selectedItems.Count == 1 && _selectedItems.First() == item)
+            {
+                _selectedItems.Clear();
+            }
+            else
+            {
+                _selectedItems.Clear();
+                _selectedItems.Add(item);
+            }
+
+
+        }
+    }
+
+    private void OnListBackgroundClick(MouseEventArgs e)
+    {
+        // Klick auf leeren Bereich: Selektion aufheben
+        _selectedItems.Clear();
+    }
+
+    // ========== Toolbar Aktionen ==========
+
+    private void OpenSelected()
+    {
+        if (_selectedItems.Count == 1 && _selectedItems.First().IsDirectory)
+            NavigateTo(_selectedItems.First());
+    }
+
+    private void RenameSelected()
+    {
+        if (_selectedItems.Count == 1)
+        {
+            var item = _selectedItems.First();
+            _renameTarget = item;
+            _renameNewName = item.Name;
+            _renameError = null;
+            _showRenameDialog = true;
+        }
+    }
+
+    private void DeleteSelected()
+    {
+        if (_selectedItems.Count > 0)
+        {
+            _deleteTargets = _selectedItems.ToList();
+            _deleteError = null;
+            _showDeleteConfirm = true;
+        }
+    }
+
+    private void AclSelected()
+    {
+        if (_selectedItems.Count == 1)
+        {
+            var item = _selectedItems.First();
+            if (item.IsDirectory)
+                OpenFolderAcl(item);
+            else
+                OpenFileAcl(item);
+        }
+    }
+
+    // ========== Lifecycle ==========
+
     protected override async Task OnParametersSetAsync()
     {
         _showFolderAcl = false;
         _aclFolderPath = "";
+        _selectedItems.Clear();
         CloseContextMenu();
 
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
@@ -522,7 +734,7 @@ else
 
     private void RequestDelete(FileMetadata item)
     {
-        _deleteTarget = item;
+        _deleteTargets = new List<FileMetadata> { item };
         _deleteError = null;
         _showDeleteConfirm = true;
     }
@@ -530,30 +742,39 @@ else
     private void CancelDelete()
     {
         _showDeleteConfirm = false;
-        _deleteTarget = null;
+        _deleteTargets.Clear();
     }
 
     private async Task ConfirmDelete()
     {
-        if (_deleteTarget is null) return;
+        if (!_deleteTargets.Any()) return;
 
-        var result = await VM.DeleteAsync(_deleteTarget);
-        if (result.Success)
+        foreach (var target in _deleteTargets.ToList())
         {
-            _showDeleteConfirm = false;
-            _deleteTarget = null;
-            await VM.LoadShareAsync(ShareName, SubPath ?? "");
+            var result = await VM.DeleteAsync(target);
+            if (!result.Success)
+            {
+                _deleteError = result.Error;
+                return;
+            }
         }
-        else
-        {
-            _deleteError = result.Error;
-        }
+
+        _showDeleteConfirm = false;
+        _deleteTargets.Clear();
+        _selectedItems.Clear();
+        await VM.LoadShareAsync(ShareName, SubPath ?? "");
     }
 
     // ========== Kontextmenü ==========
 
     private void OnItemContextMenu(MouseEventArgs e, FileMetadata item)
     {
+        // Rechtsklick selektiert auch das Element, wenn es nicht schon selektiert ist
+        if (!_selectedItems.Contains(item))
+        {
+            _selectedItems.Clear();
+            _selectedItems.Add(item);
+        }
         _contextTarget = item;
         _contextMenuX = e.ClientX;
         _contextMenuY = e.ClientY;
@@ -612,6 +833,7 @@ else
 
     private async Task ContextRefresh()
     {
+        _selectedItems.Clear();
         CloseContextMenu();
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
     }
@@ -641,6 +863,7 @@ else
         {
             _showRenameDialog = false;
             _renameTarget = null;
+            _selectedItems.Clear();
             await VM.LoadShareAsync(ShareName, SubPath ?? "");
             await LoadAclCounts();
         }
@@ -714,7 +937,7 @@ else
         _aclFolderPath = "";
     }
 
-    // ========== Navigation (unverändert) ==========
+    // ========== Navigation ==========
 
     private void NavigateTo(FileMetadata dir)
     {

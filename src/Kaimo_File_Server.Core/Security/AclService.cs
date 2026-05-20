@@ -86,15 +86,28 @@ public class AclService : IAclService
 
     public async Task RenameAclPathAsync(Guid shareId, string oldRelativePath, string newRelativePath)
     {
-        var scope = _serviceProvider.CreateScope();
+        var scope = _serviceProvider.CreateAsyncScope();
         var aclRepo = scope.ServiceProvider.GetRequiredService<IAclRepository>();
 
-        var taskOldEntries = aclRepo.GetAclsForPathsAsync(shareId, new List<string>() { oldRelativePath });
-        //var oldEntries = taskOldEntries?.Result;
-
-        
         await aclRepo.RenameFileMetadataPathsAsync(shareId, oldRelativePath, newRelativePath);
+    }
+
+    public async Task DeleteAclAsync(Guid shareId, string relativePath)
+    {
+        var scope = _serviceProvider.CreateAsyncScope();
+        var aclRepo = scope.ServiceProvider.GetRequiredService<IAclRepository>();
+
+        // Get ACL Entries which shall be deleted
+        var aclEntries = await aclRepo.GetAclsForPathsAsync(shareId, new List<string>() { relativePath });
+
+        var listOfGuids = aclEntries.SelectMany(e => e.Acl.Select(a => a.Id)).Distinct().ToList();
+
+        foreach (var entryGuid in listOfGuids)
+        {
+            await aclRepo.DeleteAsync(entryGuid);
+        }
         
+
     }
 
     // ── Async API für Produktion (mit DB) ──

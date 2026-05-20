@@ -1,12 +1,13 @@
-using System.Security.Claims;
-using System.Text.RegularExpressions;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Storage;
+using Kaimo_File_Server.Infrastructure.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
+using System.Security.Claims;
+using System.Text.RegularExpressions;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -185,10 +186,15 @@ public partial class ShareListViewModel
             await _shareRepo.CreateAsync(share);
             await _storage.CreateDirectoryAsync(name);
 
+
             var state = await _authState.GetAuthenticationStateAsync();
-            var userId = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userId is not null && Guid.TryParse(userId, out var uid))
+            //var userId = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var user = await _userRepo.GetByUsernameAsync(state.User.Identity.Name);
+
+            //if (userId is not null && Guid.TryParse(userId, out var uid))
+            if (user is not null)
             {
+                var uid = user.Id;
                 // 1. Share-Sichtbarkeit
                 await _accessRepo.GrantAccessAsync(share.Name, uid);
 
