@@ -1,32 +1,41 @@
-﻿window.columnResize = {
+﻿
+window.columnResize = {
     _dotNetRef: null,
     _onMouseMove: null,
     _onMouseUp: null,
- 
-    start: function (dotNetRef) {
-        // Vorherige Listener aufräumen (Sicherheit)
+
+    /**
+     * @param {DotNetObjectReference} dotNetRef
+     * @param {string} colClass - CSS-Klasse der Spalte (z.B. "col-size")
+     */
+    start: function (dotNetRef, colClass) {
         columnResize._cleanup();
- 
         columnResize._dotNetRef = dotNetRef;
- 
+
+        // Aktuelle Breite der Spalte messen (wichtig für flex-Spalten)
+        var headerCell = document.querySelector('.file-list-header .' + colClass);
+        var actualWidth = headerCell ? headerCell.getBoundingClientRect().width : 0;
+
+        // Blazor mitteilen, welche Breite die Spalte aktuell tatsächlich hat
+        dotNetRef.invokeMethodAsync('OnResizeStartMeasured', actualWidth);
+
         columnResize._onMouseMove = function (e) {
             e.preventDefault();
             dotNetRef.invokeMethodAsync('OnResizeMove', e.clientX);
         };
- 
-        columnResize._onMouseUp = function (e) {
+
+        columnResize._onMouseUp = function () {
             dotNetRef.invokeMethodAsync('OnResizeEnd');
             columnResize._cleanup();
         };
- 
+
         document.addEventListener('mousemove', columnResize._onMouseMove);
         document.addEventListener('mouseup', columnResize._onMouseUp);
- 
-        // Während des Resize: kein Text-Selektieren
+
         document.body.style.userSelect = 'none';
         document.body.style.cursor = 'col-resize';
     },
- 
+
     _cleanup: function () {
         if (columnResize._onMouseMove) {
             document.removeEventListener('mousemove', columnResize._onMouseMove);

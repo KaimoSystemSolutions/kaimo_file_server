@@ -2082,13 +2082,15 @@ html, body, #app {
     opacity: 0.7;
 }
 
-/* --- Wrapper: definiert die CSS-Variablen-Defaults --- */
+/* --- Wrapper --- */
 .file-table-wrap {
     --col-size: 90px;
     --col-created: 140px;
     --col-modified: 140px;
     --col-lastaccess: 140px;
     --col-actions: 100px;
+    overflow: hidden; /* Nichts läuft raus */
+    width: 100%;
 }
 
     /* --- Gemeinsame Basis für Header + Datenzeilen --- */
@@ -2096,14 +2098,16 @@ html, body, #app {
     .file-table-wrap .file-row {
         display: flex;
         align-items: center;
+        width: 100%;
+        overflow: hidden; /* Zeilen laufen nicht über */
     }
 
     /* --- Spaltenbreiten via CSS-Variablen --- */
 
-    /* Name: nimmt den gesamten verbleibenden Platz */
+    /* Name: nimmt den gesamten verbleibenden Platz (flex) */
     .file-table-wrap .col-name {
         flex: 1 1 0%;
-        min-width: 120px;
+        min-width: 80px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -2114,43 +2118,65 @@ html, body, #app {
         position: relative;
     }
 
+        /* Wenn Name eine feste Breite hat (nach Resize), flex deaktivieren */
+        .file-table-wrap .col-name[style*="width"] {
+            flex: 0 0 auto;
+        }
+
     .file-table-wrap .col-size {
         width: var(--col-size);
         min-width: 50px;
-        flex-shrink: 0;
+        max-width: 300px;
+        flex: 0 0 auto;
         padding: 0 12px;
         text-align: right;
         position: relative;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .file-table-wrap .col-created {
         width: var(--col-created);
         min-width: 50px;
-        flex-shrink: 0;
+        max-width: 400px;
+        flex: 0 0 auto;
         padding: 0 12px;
         position: relative;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .file-table-wrap .col-modified {
         width: var(--col-modified);
         min-width: 50px;
-        flex-shrink: 0;
+        max-width: 400px;
+        flex: 0 0 auto;
         padding: 0 12px;
         position: relative;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .file-table-wrap .col-lastaccess {
         width: var(--col-lastaccess);
         min-width: 50px;
-        flex-shrink: 0;
+        max-width: 400px;
+        flex: 0 0 auto;
         padding: 0 12px;
         position: relative;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .file-table-wrap .col-actions {
         width: var(--col-actions);
         min-width: 50px;
-        flex-shrink: 0;
+        max-width: 200px;
+        flex: 0 0 auto;
         padding: 0 8px;
         display: flex;
         align-items: center;
@@ -2158,17 +2184,16 @@ html, body, #app {
         justify-content: flex-end;
     }
 
-/* --- Resize Handle --- */
+/* --- Resize Handle (nur im Header) --- */
 .col-resize-handle {
     position: absolute;
     top: 0;
-    right: 0;
+    right: -3px; /* Zentriert über der Spaltengrenze */
     bottom: 0;
-    width: 6px;
+    width: 7px;
     cursor: col-resize;
     z-index: 2;
     user-select: none;
-    /* Unsichtbar, aber klickbar */
     background: transparent;
     transition: background 0.15s;
 }
@@ -2176,11 +2201,11 @@ html, body, #app {
     .col-resize-handle:hover,
     .col-resize-handle:active {
         background: var(--accent, #4f8ff7);
-        opacity: 0.4;
+        opacity: 0.5;
         border-radius: 3px;
     }
 
-/* --- Header-Zeile: Zellen brauchen position:relative für den Handle --- */
+/* --- Header Styling --- */
 .file-table-wrap .file-list-header .file-cell {
     position: relative;
     font-weight: 600;
@@ -2191,7 +2216,7 @@ html, body, #app {
     user-select: none;
 }
 
-/* --- Responsive: kleine Screens verstecken optionale Spalten --- */
+/* --- Responsive --- */
 @media (max-width: 900px) {
     .file-table-wrap .col-lastaccess {
         display: none;
@@ -2210,3 +2235,4 @@ html, body, #app {
         display: none;
     }
 }
+ 
