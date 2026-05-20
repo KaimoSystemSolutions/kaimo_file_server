@@ -76,7 +76,6 @@ public class FileSystemStorage : IStorageEngine
     public async Task CreateDirectory(string dirPath)
     {
         var fullPath = ToAbsolutePath(dirPath);
-        //Directory.CreateDirectory(Path.GetDirectoryName(fullPath + "/")!);
         Directory.CreateDirectory(fullPath);
     }
 
@@ -116,13 +115,73 @@ public class FileSystemStorage : IStorageEngine
         return Task.FromResult(Directory.Exists(fullPath));
     }
 
+    // ────────────────── Directory Size ──────────────────
+
+    /// <inheritdoc />
+    public Task<long> GetDirectorySizeAsync(string directoryPath)
+    {
+        var normalized = ShareRelativePath.Normalize(directoryPath);
+        var fullPath = string.IsNullOrEmpty(normalized)
+            ? _rootPath
+            : ToAbsolutePath(normalized);
+
+        if (!Directory.Exists(fullPath))
+            return Task.FromResult(0L);
+
+        return Task.FromResult(CalculateDirectorySize(fullPath));
+    }
+
+    /// <summary>
+    /// Recursively calculates total file size within a directory.
+    /// Uses EnumerateFiles for memory efficiency on large trees.
+    /// </summary>
+    private static long CalculateDirectorySize(string path)
+    {
+        try
+        {
+            return new DirectoryInfo(path)
+                .EnumerateFiles("*", SearchOption.AllDirectories)
+                .Sum(f => f.Length);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // If we can't read some subdirectory, return what we can
+            return CalculateDirectorySizeSafe(path);
+        }
+    }
+
+    /// <summary>
+    /// Fallback that skips inaccessible subdirectories instead of failing.
+    /// </summary>
+    private static long CalculateDirectorySizeSafe(string path)
+    {
+        long total = 0;
+
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(path))
+            {
+                try { total += new FileInfo(file).Length; }
+                catch { /* skip inaccessible file */ }
+            }
+
+            foreach (var dir in Directory.EnumerateDirectories(path))
+            {
+                total += CalculateDirectorySizeSafe(dir);
+            }
+        }
+        catch { /* skip inaccessible directory */ }
+
+        return total;
+    }
+
     // ────────────────── Metadata ──────────────────
 
     public async Task<FileMetadata> GetMetadataAsync(string path)
     {
         var normalized = ShareRelativePath.Normalize(path);
         var fullPath = ToAbsolutePath(normalized);
-        var info = new FileInfo(fullPath);
+        var isDir = Directory.Exists(fullPath);
 
         List<AccessEntry> acl = new();
 
@@ -145,17 +204,38 @@ public class FileSystemStorage : IStorageEngine
             }
         }
 
-        return new FileMetadata
+        if (isDir)
         {
-            ShareId = _shareId,
-            Path = normalized,
-            Name = ShareRelativePath.GetFileName(normalized),
-            Size = info.Exists ? info.Length : 0,
-            IsDirectory = Directory.Exists(fullPath),
-            CreatedAt = info.Exists ? info.CreationTimeUtc : DateTime.UtcNow,
-            ModifiedAt = info.Exists ? info.LastWriteTimeUtc : DateTime.UtcNow,
-            Acl = acl
-        };
+            var dirInfo = new DirectoryInfo(fullPath);
+            return new FileMetadata
+            {
+                ShareId = _shareId,
+                Path = normalized,
+                Name = ShareRelativePath.GetFileName(normalized),
+                Size = CalculateDirectorySize(fullPath),
+                IsDirectory = true,
+                CreatedAt = dirInfo.CreationTimeUtc,
+                ModifiedAt = dirInfo.LastWriteTimeUtc,
+                LastAccessedAt = dirInfo.LastAccessTimeUtc,
+                Acl = acl
+            };
+        }
+        else
+        {
+            var fileInfo = new FileInfo(fullPath);
+            return new FileMetadata
+            {
+                ShareId = _shareId,
+                Path = normalized,
+                Name = ShareRelativePath.GetFileName(normalized),
+                Size = fileInfo.Exists ? fileInfo.Length : 0,
+                IsDirectory = false,
+                CreatedAt = fileInfo.Exists ? fileInfo.CreationTimeUtc : DateTime.UtcNow,
+                ModifiedAt = fileInfo.Exists ? fileInfo.LastWriteTimeUtc : DateTime.UtcNow,
+                LastAccessedAt = fileInfo.Exists ? fileInfo.LastAccessTimeUtc : null,
+                Acl = acl
+            };
+        }
     }
 
     // ────────────────── Directory Listing ──────────────────
@@ -181,10 +261,11 @@ public class FileSystemStorage : IStorageEngine
                 ShareId = _shareId,
                 Path = ShareRelativePath.Combine(normalized, dirInfo.Name),
                 Name = dirInfo.Name,
-                Size = 0,
+                Size = CalculateDirectorySize(dir),
                 IsDirectory = true,
                 CreatedAt = dirInfo.CreationTimeUtc,
-                ModifiedAt = dirInfo.LastWriteTimeUtc
+                ModifiedAt = dirInfo.LastWriteTimeUtc,
+                LastAccessedAt = dirInfo.LastAccessTimeUtc
             });
         }
 
@@ -200,7 +281,8 @@ public class FileSystemStorage : IStorageEngine
                 Size = fileInfo.Length,
                 IsDirectory = false,
                 CreatedAt = fileInfo.CreationTimeUtc,
-                ModifiedAt = fileInfo.LastWriteTimeUtc
+                ModifiedAt = fileInfo.LastWriteTimeUtc,
+                LastAccessedAt = fileInfo.LastAccessTimeUtc
             });
         }
 

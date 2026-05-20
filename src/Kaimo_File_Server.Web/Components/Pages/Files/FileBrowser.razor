@@ -33,17 +33,17 @@
         @if (_isAdmin)
         {
             <button class="btn-icon" title="Berechtigungen verwalten"
-                @onclick="ToggleAclPanel">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                stroke="@(_showAclPanel ? "var(--accent)" : "currentColor")" stroke-width="1.5">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
+                    @onclick="ToggleAclPanel">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                     stroke="@(_showAclPanel ? "var(--accent)" : "currentColor")" stroke-width="1.5">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
             </button>
-        var rootCount = GetAclCount(_aclPath);
-        @if (rootCount > 0)
-        {
-            <span class="acl-badge">@rootCount</span>
-        }
+            var rootCount = GetAclCount(_aclPath);
+            @if (rootCount > 0)
+            {
+                <span class="acl-badge">@rootCount</span>
+            }
         }
     </div>
 </div>
@@ -131,6 +131,16 @@ else
         </div>
     }
 
+    @* -- Spaltenüberschriften -- *@
+    <div class="file-list-header">
+        <div class="file-cell file-name">Name</div>
+        <div class="file-cell file-size">Größe</div>
+        <div class="file-cell file-date">Erstellt</div>
+        <div class="file-cell file-date">Geändert</div>
+        <div class="file-cell file-date">Letzter Zugriff</div>
+        <div class="file-cell file-actions"></div>
+    </div>
+
     <div class="file-list" @oncontextmenu="OnBackgroundContextMenu" @oncontextmenu:preventDefault="true">
         @if (VM.HasParent)
         {
@@ -143,6 +153,8 @@ else
                     <span>..</span>
                 </div>
                 <div class="file-cell file-size"></div>
+                <div class="file-cell file-date"></div>
+                <div class="file-cell file-date"></div>
                 <div class="file-cell file-date"></div>
                 <div class="file-cell file-actions"></div>
             </div>
@@ -161,8 +173,10 @@ else
                     </svg>
                     <span>@dir.Name</span>
                 </div>
-                <div class="file-cell file-size">–</div>
-                <div class="file-cell file-date">@dir.ModifiedAt.ToString("dd.MM.yyyy HH:mm")</div>
+                <div class="file-cell file-size">@FormatHelper.FormatFileSize(dir.Size)</div>
+                <div class="file-cell file-date">@dir.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                <div class="file-cell file-date">@dir.ModifiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                <div class="file-cell file-date">@(dir.LastAccessedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</div>
                 <div class="file-cell file-actions">
                     <button class="btn-icon btn-icon--small btn-icon--danger" title="@dir.Name löschen"
                             @onclick="() => RequestDelete(dir)" @onclick:stopPropagation="true">
@@ -176,10 +190,10 @@ else
                     @if (_isAdmin)
                     {
                         <button class="btn-icon btn-icon--small" title="ACL für @dir.Name"
-                            @onclick="() => OpenFolderAcl(dir)" @onclick:stopPropagation="true">
+                                @onclick="() => OpenFolderAcl(dir)" @onclick:stopPropagation="true">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                stroke="@(_aclFolderPath == GetDirAclPath(dir) && _showFolderAcl ? "var(--accent)" : "var(--text-tertiary)")"
-                                stroke-width="1.5">
+                                 stroke="@(_aclFolderPath == GetDirAclPath(dir) && _showFolderAcl ? "var(--accent)" : "var(--text-tertiary)")"
+                                 stroke-width="1.5">
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                             </svg>
                         </button>
@@ -235,7 +249,9 @@ else
                     <span>@file.Name</span>
                 </div>
                 <div class="file-cell file-size">@FormatHelper.FormatFileSize(file.Size)</div>
-                <div class="file-cell file-date">@file.ModifiedAt.ToString("dd.MM.yyyy HH:mm")</div>
+                <div class="file-cell file-date">@file.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                <div class="file-cell file-date">@file.ModifiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                <div class="file-cell file-date">@(file.LastAccessedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</div>
                 <div class="file-cell file-actions">
                     <button class="btn-icon btn-icon--small btn-icon--danger" title="@file.Name löschen"
                             @onclick="() => RequestDelete(file)" @onclick:stopPropagation="true">

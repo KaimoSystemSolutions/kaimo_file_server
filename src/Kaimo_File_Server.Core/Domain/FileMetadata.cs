@@ -12,6 +12,7 @@ namespace Kaimo_File_Server.Core.Domain
         public bool IsDirectory { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime ModifiedAt { get; set; }
+        public DateTime? LastAccessedAt { get; set; }
         public Guid OwnerId { get; set; }
         public List<AccessEntry> Acl { get; set; } = new();
     }

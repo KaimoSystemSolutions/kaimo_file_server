@@ -1,7 +1,4 @@
 ﻿using Kaimo_File_Server.Core.Domain;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Kaimo_File_Server.Core.Storage
 {
@@ -17,5 +14,11 @@ namespace Kaimo_File_Server.Core.Storage
         Task<bool> IsDirectoryAsync(string path);
         Task RenameFileAsync(string oldPath, string newPath);
         Task RenameDirectoryAsync(string oldDirPath, string newDirPath);
+
+        /// <summary>
+        /// Calculates the total size of all files within a directory (recursive).
+        /// Returns 0 if the directory doesn't exist or is empty.
+        /// </summary>
+        Task<long> GetDirectorySizeAsync(string directoryPath);
     }
 }

@@ -58,7 +58,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasKey(e => new { e.UserId, e.RoleId });
             });
 
-            // In OnModelCreating, den FileMetadata-Block ersetzen:
+            
             modelBuilder.Entity<FileMetadata>(entity =>
             {
                 entity.ToTable("file_metadata");
@@ -66,6 +66,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.ShareId).IsRequired();
                 entity.Property(e => e.Path).IsRequired();
                 entity.Property(e => e.OwnerId).IsRequired();
+                entity.Property(e => e.LastAccessedAt);  // <-- NEU
 
                 // Unique pro Share + Pfad
                 entity.HasIndex(e => new { e.ShareId, e.Path }).IsUnique();
