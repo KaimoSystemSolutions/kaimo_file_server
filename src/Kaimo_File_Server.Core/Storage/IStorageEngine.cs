@@ -15,5 +15,7 @@ namespace Kaimo_File_Server.Core.Storage
         Task<List<FileMetadata>> ListAsync(string directoryPath);
         Task CreateDirectoryAsync(string path);
         Task<bool> IsDirectoryAsync(string path);
+        Task RenameFileAsync(string oldPath, string newPath);
+        Task RenameDirectoryAsync(string oldDirPath, string newDirPath);
     }
 }

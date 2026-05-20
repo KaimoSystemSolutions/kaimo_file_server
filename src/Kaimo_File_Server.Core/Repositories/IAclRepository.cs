@@ -15,4 +15,5 @@ public interface IAclRepository
         Guid shareId, List<string> paths);
 
     Task<Dictionary<string, int>> GetAclCountsByPathAsync(Guid shareId, IEnumerable<string> paths);
+    Task RenameFileMetadataPathsAsync(Guid shareId, string oldRelativePath, string newRelativePath);
 }

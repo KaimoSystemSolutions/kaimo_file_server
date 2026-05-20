@@ -4,6 +4,7 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Kaimo_File_Server.Infrastructure.Repositories;
 
@@ -33,6 +34,37 @@ public class AclRepository : IAclRepository
     public async Task UpdateAsync(AccessEntry entry)
     {
         _db.AccessEntries.Update(entry);
+        await _db.SaveChangesAsync();
+    }
+
+    public async Task RenameFileMetadataPathsAsync(Guid shareId, string oldRelativePath, string newRelativePath)
+    {
+
+        var oldNormalized = ShareRelativePath.Normalize(oldRelativePath);
+        var newNormalized = ShareRelativePath.Normalize(newRelativePath);
+
+        // Exakter Treffer (Datei oder Ordner selbst)
+        // + alle Kindpfade (beginnen mit oldPath + "/")
+        var prefix = oldNormalized + "/";
+
+        var affected = await _db.FileMetadata
+            .Where(m => m.ShareId == shareId &&
+                         (m.Path == oldNormalized || m.Path.StartsWith(prefix)))
+            .ToListAsync();
+
+        foreach (var meta in affected)
+        {
+            if (meta.Path == oldNormalized)
+            {
+                meta.Path = newNormalized;
+            }
+            else
+            {
+                // Kind: alten Prefix durch neuen ersetzen
+                meta.Path = newNormalized + meta.Path.Substring(oldNormalized.Length);
+            }
+        }
+
         await _db.SaveChangesAsync();
     }
 

@@ -80,6 +80,22 @@ public class FileSystemStorage : IStorageEngine
         Directory.CreateDirectory(fullPath);
     }
 
+    public async Task RenameFileAsync(string oldPath, string newPath)
+    {
+        var oldFullPath = ToAbsolutePath(oldPath);
+        var newFullPath = ToAbsolutePath(newPath);
+
+        File.Move(oldFullPath, newFullPath, false);
+    }
+
+    public async Task RenameDirectoryAsync(string oldDirPath, string newDirPath)
+    {
+        var oldFullPath = ToAbsolutePath(oldDirPath);
+        var newFullPath = ToAbsolutePath(newDirPath);
+
+        Directory.Move(oldFullPath, newFullPath);
+    }
+
     public Task DeleteAsync(string path)
     {
         var fullPath = ToAbsolutePath(path);

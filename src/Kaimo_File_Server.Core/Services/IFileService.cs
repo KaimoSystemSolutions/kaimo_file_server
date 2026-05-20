@@ -28,5 +28,6 @@ namespace Kaimo_File_Server.Core.Services
         Task DeleteFileAsync(string path, UserContext user);
         Task<FileMetadata> GetMetadataAsync(string path, UserContext user);
         Task<List<FileMetadata>> ListAsync(string directoryPath, UserContext user);
+        Task RenameAsync(string oldPath, string newPath, UserContext user);
     }
 }

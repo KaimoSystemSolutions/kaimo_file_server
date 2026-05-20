@@ -2,6 +2,7 @@
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Microsoft.Extensions.DependencyInjection;
+using System.Net.NetworkInformation;
 
 namespace Kaimo_File_Server.Core.Security;
 
@@ -81,6 +82,19 @@ public class AclService : IAclService
             }
         }
         return result;
+    }
+
+    public async Task RenameAclPathAsync(Guid shareId, string oldRelativePath, string newRelativePath)
+    {
+        var scope = _serviceProvider.CreateScope();
+        var aclRepo = scope.ServiceProvider.GetRequiredService<IAclRepository>();
+
+        var taskOldEntries = aclRepo.GetAclsForPathsAsync(shareId, new List<string>() { oldRelativePath });
+        //var oldEntries = taskOldEntries?.Result;
+
+        
+        await aclRepo.RenameFileMetadataPathsAsync(shareId, oldRelativePath, newRelativePath);
+        
     }
 
     // ── Async API für Produktion (mit DB) ──

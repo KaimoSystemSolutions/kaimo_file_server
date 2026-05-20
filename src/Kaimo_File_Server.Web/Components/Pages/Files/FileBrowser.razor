@@ -51,7 +51,7 @@
 @* -- Dialog: Neuen Ordner erstellen -- *@
 @if (_showCreateFolder)
 {
-    <div class="modal-backdrop" @onclick="CancelCreateFolder">
+    <div class="modal-backdrop" @onkeydown="OnCreateFolderKeyDown" tabindex="0">
         <div class="modal-dialog" @onclick:stopPropagation="true">
             <h3 class="modal-title">Neuen Ordner erstellen</h3>
             <input class="modal-input" type="text" placeholder="Ordnername…"
@@ -109,7 +109,7 @@ else if (VM.ErrorMessage is not null)
 }
 else
 {
-    @* -- ACL Panel (Slide-Down) -- *@
+    @* -- ACL Panel (Slide-Down) Root -- *@
     @if (_showAclPanel && _isAdmin)
     {
         <div class="acl-panel">
@@ -126,7 +126,8 @@ else
             <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclPath}-{_showAclPanel}")"
                        Path="@_aclPath"
                        ShareId="@VM.CurrentShare.Id"
-                       IsDirectory="true" />
+                       IsDirectory="true"
+                       OnChanged="LoadAclCounts" />
         </div>
     }
 
@@ -213,7 +214,8 @@ else
                     <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
                                Path="@_aclFolderPath"
                                ShareId="@VM.CurrentShare.Id"
-                               IsDirectory="true" />
+                               IsDirectory="true"
+                               OnChanged="LoadAclCounts" />
                 </div>
             }
         }
@@ -285,7 +287,8 @@ else
                     <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
                                Path="@_aclFolderPath"
                                ShareId="@VM.CurrentShare.Id"
-                               IsDirectory="false" />
+                               IsDirectory="false"
+                               OnChanged="LoadAclCounts" />
                 </div>
             }
         }
@@ -623,6 +626,7 @@ else
             _showRenameDialog = false;
             _renameTarget = null;
             await VM.LoadShareAsync(ShareName, SubPath ?? "");
+            await LoadAclCounts();
         }
         else
         {

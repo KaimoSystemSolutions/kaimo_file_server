@@ -142,4 +142,21 @@ public class FileService : IFileService
 
         return meta;
     }
+
+    public async Task RenameAsync(string oldPath, string newPath, UserContext user)
+    {
+        var oldNormalized = ShareRelativePath.Normalize(oldPath);
+        var newNormalized = ShareRelativePath.Normalize(newPath);
+        var isDir = await _storage.IsDirectoryAsync(oldNormalized);
+        
+        if (!await _acl.HasAccessAsync(user, _shareId, oldNormalized, isDir, FilePermission.Delete))
+            throw new UnauthorizedAccessException($"Rename (delete) denied for '{oldNormalized}'");
+        if (!await _acl.HasAccessAsync(user, _shareId, newNormalized, isDir, FilePermission.CreateWriteData))
+            throw new UnauthorizedAccessException($"Rename (create) denied for '{newNormalized}'");
+        if (isDir)
+            await _storage.RenameDirectoryAsync(oldNormalized, newNormalized);
+        else
+            await _storage.RenameFileAsync(oldNormalized, newNormalized);
+        await _acl.RenameAclPathAsync(_shareId, oldNormalized, newNormalized);
+    }
 }

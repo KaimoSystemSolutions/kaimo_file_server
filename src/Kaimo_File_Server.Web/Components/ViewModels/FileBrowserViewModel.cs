@@ -165,13 +165,12 @@ public class FileBrowserViewModel
         if (string.IsNullOrWhiteSpace(folderName))
             return OperationResult.Fail("Bitte einen Ordnernamen eingeben.");
 
-        // Basic validation
-        var invalidChars = Path.GetInvalidFileNameChars();
-        if (folderName.Any(c => invalidChars.Contains(c)))
-            return OperationResult.Fail("Der Name enthält ungültige Zeichen.");
-
-        if (folderName.Contains(".."))
-            return OperationResult.Fail("Ungültiger Ordnername.");
+        // File- / Directoryname Validation
+        if (!WindowsFileNameHelper.IsValid(folderName))
+        {
+            var errors = WindowsFileNameHelper.GetValidationErrors(folderName);
+            return OperationResult.Fail("Der Name enthält ungültige Zeichen.  Fehler: " + string.Join(", ", errors));
+        }
 
         try
         {
@@ -197,7 +196,7 @@ public class FileBrowserViewModel
         }
         catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
         {
-            return OperationResult.Fail("Ein Ordner mit diesem Namen existiert bereits.");
+            return OperationResult.Fail("Ein Element mit diesem Namen existiert bereits.");
         }
         catch (Exception ex)
         {
@@ -255,12 +254,12 @@ public class FileBrowserViewModel
         if (string.IsNullOrWhiteSpace(newName))
             return OperationResult.Fail("Bitte einen neuen Namen eingeben.");
 
-        var invalidChars = Path.GetInvalidFileNameChars();
-        if (newName.Any(c => invalidChars.Contains(c)))
-            return OperationResult.Fail("Der Name enthält ungültige Zeichen.");
-
-        if (newName.Contains(".."))
-            return OperationResult.Fail("Ungültiger Name.");
+        // File- / Directoryname Validation
+        if (!WindowsFileNameHelper.IsValid(newName))
+        {
+            var errors = WindowsFileNameHelper.GetValidationErrors(newName);
+            return OperationResult.Fail("Der Name enthält ungültige Zeichen.  Fehler: " + string.Join(", ", errors));
+        }
 
         try
         {
@@ -272,7 +271,7 @@ public class FileBrowserViewModel
             if (relativePath.StartsWith(CurrentShare.Path))
                 relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
 
-            //await _fileService.RenameAsync(relativePath, newName, userContext);
+            await _fileService.RenameAsync(relativePath, newName, userContext);
 
             _logger.LogInformation("{Type} renamed: '{OldPath}' -> '{NewName}' by {User}",
                 item.IsDirectory ? "Directory" : "File",
