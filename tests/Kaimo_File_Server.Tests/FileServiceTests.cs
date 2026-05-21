@@ -255,7 +255,7 @@ public class FileServiceTests
         _storageMock.Setup(s => s.IsDirectoryAsync(It.IsAny<string>())).ReturnsAsync(false);
         AllowAccess(FilePermission.Delete);
 
-        await _sut.DeleteFileAsync("/test.txt", ctx);
+        await _sut.DeleteFileAsync("/test.txt", ctx, false);
         _storageMock.Verify(s => s.DeleteAsync(It.IsAny<string>()), Times.Once);
     }
 
@@ -267,7 +267,7 @@ public class FileServiceTests
         DenyAccess(FilePermission.Delete);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => _sut.DeleteFileAsync("/test.txt", ctx));
+            () => _sut.DeleteFileAsync("/test.txt", ctx, false));
     }
 
     // ═══════════════════ GetMetadataAsync ═══════════════════

@@ -8,6 +8,7 @@ namespace Kaimo_File_Server.Core.Storage
         Task WriteAsync(string path, Stream data);
         Task CreateDirectory(string path);
         Task DeleteAsync(string path);
+        Task MoveAsync(string oldPath, string newPath);
         Task<FileMetadata> GetMetadataAsync(string path);
         Task<List<FileMetadata>> ListAsync(string directoryPath);
         Task CreateDirectoryAsync(string path);

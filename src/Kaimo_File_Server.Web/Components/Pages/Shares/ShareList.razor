@@ -181,8 +181,20 @@ else
                             <span class="detail-value">
                                 @(VM.SelectedShare.IsEnabled ? "Aktiv" : "Deaktiviert")
                             </span>
-                            <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" @onclick="ToggleEnabled">
+                            <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" @onclick="ToggleShareEnabled">
                                 @(VM.SelectedShare.IsEnabled ? "Deaktivieren" : "Aktivieren")
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <span class="detail-label">Papierkorb</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="detail-value">
+                                @(VM.SelectedShare.IsRecycleEnabled ? "Aktiv" : "Deaktiviert")
+                            </span>
+                            <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" @onclick="ToggleRecycleEnabled">
+                                @(VM.SelectedShare.IsRecycleEnabled ? "Deaktivieren" : "Aktivieren")
                             </button>
                         </div>
                     </div>
@@ -395,9 +407,15 @@ else
         StateHasChanged();
     }
 
-    private async Task ToggleEnabled()
+    private async Task ToggleShareEnabled()
     {
         await VM.ToggleShareEnabledAsync();
+        StateHasChanged();
+    }
+
+    private async Task ToggleRecycleEnabled()
+    {
+        await VM.ToggleRecycleEnabledAsync();
         StateHasChanged();
     }
 

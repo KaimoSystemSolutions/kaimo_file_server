@@ -329,7 +329,7 @@ public partial class ShareListViewModel
         }
     }
 
-    // -- Toggle Enabled --
+    // -- Toggle Share Enabled and Recycle Enabled --
 
     public async Task<bool> ToggleShareEnabledAsync()
     {
@@ -359,6 +359,39 @@ public partial class ShareListViewModel
         catch (Exception ex)
         {
             _logger.LogError(ex, "Fehler beim Ändern des Share-Status");
+            EditErrorMessage = "Fehler beim Ändern des Status.";
+            return false;
+        }
+    }
+
+    public async Task<bool> ToggleRecycleEnabledAsync()
+    {
+        if (SelectedShare is null) return false;
+
+        EditErrorMessage = null;
+        EditSuccessMessage = null;
+
+        try
+        {
+            SelectedShare.IsRecycleEnabled = !SelectedShare.IsRecycleEnabled;
+            await _shareRepo.UpdateAsync(SelectedShare);
+
+            var status = SelectedShare.IsRecycleEnabled ? "aktiviert" : "deaktiviert";
+            _logger.LogInformation("Papierkorb für Share '{ShareName}' {Status}", SelectedShare.Name, status);
+            EditSuccessMessage = $"Papierkorb für Share {status}.";
+
+            await LoadAsync();
+
+            // Re-select
+            var updated = Shares.FirstOrDefault(s => s.Id == SelectedShare.Id);
+            if (updated is not null)
+                SelectedShare = updated;
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Ändern des Recycle-Status");
             EditErrorMessage = "Fehler beim Ändern des Status.";
             return false;
         }

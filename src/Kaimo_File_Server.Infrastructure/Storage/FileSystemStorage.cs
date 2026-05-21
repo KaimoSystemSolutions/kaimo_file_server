@@ -5,6 +5,7 @@ using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using System.Linq.Expressions;
 
 namespace Kaimo_File_Server.Infrastructure.Storage;
 
@@ -113,6 +114,38 @@ public class FileSystemStorage : IStorageEngine
 
         var fullPath = ToAbsolutePath(normalized);
         return Task.FromResult(Directory.Exists(fullPath));
+    }
+
+    public Task MoveAsync(string oldPath, string newPath)
+    {
+        var fullOldPath = ToAbsolutePath(oldPath);
+        var fullNewPath = ToAbsolutePath(newPath);
+
+
+        try
+        {
+
+            Directory.CreateDirectory( Path.GetDirectoryName(fullNewPath)! );
+            if (File.Exists(fullNewPath) || Directory.Exists(fullNewPath))
+                fullNewPath += "_" + DateTime.UtcNow.ToString("yyyy-MM-dd_HH-mm-ss");
+
+            if (File.Exists(fullOldPath))
+            {
+                //Directory.CreateDirectory(Path.GetDirectoryName(fullNewPath)!);
+                File.Move(fullOldPath, fullNewPath);
+
+            }
+            else if (Directory.Exists(fullOldPath))
+            {
+                Directory.Move(fullOldPath, fullNewPath);
+            }
+        }
+        catch (Exception e)
+        {
+            var fotzen = 1;
+        }
+        
+        return Task.CompletedTask;
     }
 
     // ────────────────── Directory Size ──────────────────
@@ -295,4 +328,6 @@ public class FileSystemStorage : IStorageEngine
         Directory.CreateDirectory(fullPath);
         return Task.CompletedTask;
     }
+
+
 }

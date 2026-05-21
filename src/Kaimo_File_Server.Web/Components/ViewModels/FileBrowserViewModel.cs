@@ -227,7 +227,7 @@ public class FileBrowserViewModel
             if (relativePath.StartsWith(CurrentShare.Path))
                 relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
             
-            await _fileService.DeleteFileAsync(relativePath, userContext);
+            await _fileService.DeleteFileAsync(relativePath, userContext, CurrentShare.IsRecycleEnabled);
 
             _logger.LogInformation("{Type} deleted: '{Path}' by {User}",
                 item.IsDirectory ? "Directory" : "File",

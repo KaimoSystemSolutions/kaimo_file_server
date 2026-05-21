@@ -101,6 +101,8 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
                 entity.HasIndex(e => e.Name).IsUnique();
                 entity.Property(e => e.Path).IsRequired();
+                entity.Property(e => e.IsEnabled).IsRequired();
+                entity.Property(e => e.IsRecycleEnabled).IsRequired();
             });
 
             modelBuilder.Entity<FileVersion>(entity =>

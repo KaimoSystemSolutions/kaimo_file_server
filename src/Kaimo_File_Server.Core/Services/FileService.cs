@@ -121,7 +121,7 @@ public class FileService : IFileService
         await _storage.CreateDirectory(ShareRelativePath.Normalize(path));
     }
 
-    public async Task DeleteFileAsync(string path, UserContext user)
+    public async Task DeleteFileAsync(string path, UserContext user, bool isRecycleEnabled)
     {
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
@@ -129,8 +129,17 @@ public class FileService : IFileService
         if (!await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.Delete))
             throw new UnauthorizedAccessException($"Delete denied for '{normalized}'");
 
-        await _storage.DeleteAsync(normalized);
-        await _acl.DeleteAclAsync(_shareId, normalized);
+        // Entry will be moved to .recycle of share
+        if (isRecycleEnabled && !(path.StartsWith(".RECYCLE_BIN")))
+        {
+            await _storage.MoveAsync(normalized, ".RECYCLE_BIN/"+normalized);
+            await _acl.RenameAclPathAsync(_shareId, normalized, ".RECYCLE_BIN/" + normalized);
+        }
+        else // Entry will be deleted
+        {
+            await _storage.DeleteAsync(normalized);
+            await _acl.DeleteAclAsync(_shareId, normalized);
+        }
     }
 
     public async Task<FileMetadata> GetMetadataAsync(string path, UserContext user)
