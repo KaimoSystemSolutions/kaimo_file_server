@@ -2082,113 +2082,115 @@ html, body, #app {
     opacity: 0.7;
 }
 
-/* --- Wrapper --- */
+/* ══════════════════════════════════════════════════════════
+   File Table – CSS Grid
+   .file-table-wrap = Grid-Container mit grid-template-columns
+   Rows = display:contents → Zellen werden direkt Grid-Items
+   Name = 1fr (Restplatz), Rest = feste px
+   ══════════════════════════════════════════════════════════ */
+
 .file-table-wrap {
-    --col-size: 90px;
-    --col-created: 140px;
-    --col-modified: 140px;
-    --col-lastaccess: 140px;
-    --col-actions: 100px;
-    overflow: hidden; /* Nichts läuft raus */
+    display: grid;
+    grid-template-columns: 1fr 90px 140px 140px 140px 100px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    overflow: hidden;
     width: 100%;
 }
 
-    /* --- Gemeinsame Basis für Header + Datenzeilen --- */
-    .file-table-wrap .file-list-header,
-    .file-table-wrap .file-row {
-        display: flex;
-        align-items: center;
-        width: 100%;
-        overflow: hidden; /* Zeilen laufen nicht über */
+/* --- Header Row --- */
+.file-grid-header {
+    display: contents;
+}
+
+    .file-grid-header > div {
+        background: var(--bg-tertiary);
+        padding: 10px 12px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-tertiary);
+        border-bottom: 1px solid var(--border);
+        position: relative;
+        user-select: none;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
     }
 
-    /* --- Spaltenbreiten via CSS-Variablen --- */
+/* --- Data Rows --- */
+.file-grid-row {
+    display: contents;
+}
 
-    /* Name: nimmt den gesamten verbleibenden Platz (flex) */
-    .file-table-wrap .col-name {
-        flex: 1 1 0%;
-        min-width: 80px;
+    .file-grid-row > div {
+        padding: 10px 12px;
+        font-size: 13px;
+        color: var(--text-secondary);
+        border-bottom: 1px solid var(--border);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 0 12px;
-        position: relative;
+        transition: background 0.1s;
     }
 
-        /* Wenn Name eine feste Breite hat (nach Resize), flex deaktivieren */
-        .file-table-wrap .col-name[style*="width"] {
-            flex: 0 0 auto;
+    .file-grid-row:hover > div {
+        background: var(--bg-hover);
+    }
+
+    .file-grid-row.file-row-dir {
+        cursor: pointer;
+    }
+
+    /* --- Name-Spalte --- */
+    .file-grid-row > .col-name,
+    .file-grid-header > .col-name {
+        min-width: 0; /* wichtig damit text-overflow in grid funktioniert */
+    }
+
+    .file-grid-row > .col-name {
+        color: var(--text-primary);
+    }
+
+        .file-grid-row > .col-name svg,
+        .file-grid-row > .col-name .file-icon {
+            vertical-align: middle;
+            margin-right: 8px;
         }
 
-    .file-table-wrap .col-size {
-        width: var(--col-size);
-        min-width: 50px;
-        max-width: 300px;
-        flex: 0 0 auto;
-        padding: 0 12px;
-        text-align: right;
-        position: relative;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        .file-grid-row > .col-name span {
+            vertical-align: middle;
+        }
+
+/* --- Size rechts --- */
+.col-size {
+    text-align: right;
+}
+
+/* --- Actions rechts --- */
+.col-actions {
+    text-align: right;
+    overflow: visible !important;
+    white-space: nowrap;
+}
+
+    .col-actions .btn-icon {
+        display: inline-flex;
+        vertical-align: middle;
     }
 
-    .file-table-wrap .col-created {
-        width: var(--col-created);
-        min-width: 50px;
-        max-width: 400px;
-        flex: 0 0 auto;
-        padding: 0 12px;
-        position: relative;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .file-table-wrap .col-modified {
-        width: var(--col-modified);
-        min-width: 50px;
-        max-width: 400px;
-        flex: 0 0 auto;
-        padding: 0 12px;
-        position: relative;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .file-table-wrap .col-lastaccess {
-        width: var(--col-lastaccess);
-        min-width: 50px;
-        max-width: 400px;
-        flex: 0 0 auto;
-        padding: 0 12px;
-        position: relative;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .file-table-wrap .col-actions {
-        width: var(--col-actions);
-        min-width: 50px;
-        max-width: 200px;
-        flex: 0 0 auto;
-        padding: 0 8px;
-        display: flex;
-        align-items: center;
-        gap: 2px;
-        justify-content: flex-end;
+    .col-actions .acl-badge {
+        display: inline-flex;
+        vertical-align: middle;
     }
 
 /* --- Resize Handle (nur im Header) --- */
 .col-resize-handle {
     position: absolute;
     top: 0;
-    right: -3px; /* Zentriert über der Spaltengrenze */
+    right: -3px;
     bottom: 0;
     width: 7px;
     cursor: col-resize;
@@ -2200,39 +2202,86 @@ html, body, #app {
 
     .col-resize-handle:hover,
     .col-resize-handle:active {
-        background: var(--accent, #4f8ff7);
+        background: var(--accent);
         opacity: 0.5;
         border-radius: 3px;
     }
 
-/* --- Header Styling --- */
-.file-table-wrap .file-list-header .file-cell {
-    position: relative;
-    font-weight: 600;
-    font-size: 0.82rem;
-    color: var(--text-secondary);
-    padding-top: 8px;
-    padding-bottom: 8px;
-    user-select: none;
+/* --- Selektion --- */
+.file-grid-row.file-row--selected > div {
+    background: var(--accent-selected);
+}
+
+    .file-grid-row.file-row--selected > div:first-child {
+        box-shadow: inset 3px 0 0 0 var(--accent);
+    }
+
+.file-grid-row.file-row--selected:hover > div {
+    background: var(--accent-selected);
+}
+
+/* --- ACL Expand --- */
+.file-row-acl-expand-wrap {
+    grid-column: 1 / -1; /* Volle Breite */
+    border-bottom: 1px solid var(--border);
+}
+
+.file-row-acl-expand {
+    padding: 12px 16px 16px 44px;
+    background: var(--bg-tertiary);
+}
+
+/* --- Empty State --- */
+.file-grid-empty {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 0;
+    gap: 12px;
+    color: var(--text-tertiary);
+    font-size: 13px;
 }
 
 /* --- Responsive --- */
 @media (max-width: 900px) {
-    .file-table-wrap .col-lastaccess {
+    .file-table-wrap {
+        grid-template-columns: 1fr 90px 140px 140px 100px;
+    }
+
+    .col-lastaccess {
         display: none;
     }
 }
 
 @media (max-width: 700px) {
-    .file-table-wrap .col-created,
-    .file-table-wrap .col-modified {
+    .file-table-wrap {
+        grid-template-columns: 1fr 90px 100px;
+    }
+
+    .col-created, .col-modified, .col-lastaccess {
         display: none;
     }
 }
 
 @media (max-width: 500px) {
-    .file-table-wrap .col-size {
+    .file-table-wrap {
+        grid-template-columns: 1fr 100px;
+    }
+
+    .col-size, .col-created, .col-modified, .col-lastaccess {
         display: none;
     }
 }
- 
+
+.file-grid-header > div,
+.file-grid-row > div {
+    border-right: 1px solid var(--border);
+}
+
+    /* Letzte Spalte: keine Linie rechts */
+    .file-grid-header > div:last-child,
+    .file-grid-row > div:last-child {
+        border-right: none;
+    }

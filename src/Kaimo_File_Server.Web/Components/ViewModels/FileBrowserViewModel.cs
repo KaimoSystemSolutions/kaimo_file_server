@@ -326,11 +326,18 @@ public class FileBrowserViewModel
         var distinctPaths = paths.Distinct().ToList();
 
         await using var db = await _dbFactory.CreateDbContextAsync();
+        // Todo, better error handling, but not important at the moment
+        try
+        {
+            AclCounts = await db.FileMetadata
+                .Where(fm => fm.ShareId == CurrentShare.Id && distinctPaths.Contains(fm.Path))
+                .Select(fm => new { fm.Path, Count = fm.Acl.Count })
+                .ToDictionaryAsync(x => x.Path, x => x.Count);
+        }
+        catch
+        {
 
-        AclCounts = await db.FileMetadata
-            .Where(fm => fm.ShareId == CurrentShare.Id && distinctPaths.Contains(fm.Path))
-            .Select(fm => new { fm.Path, Count = fm.Acl.Count })
-            .ToDictionaryAsync(x => x.Path, x => x.Count);
+        }
     }
 
     public int GetAclCount(string path)
