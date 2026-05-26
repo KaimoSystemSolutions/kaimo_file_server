@@ -230,6 +230,7 @@ else
                     <div class="detail-section">
                         <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
                             Welche Benutzer und Gruppen diesen Share in der Übersicht sehen.
+                            Ohne Einträge ist der Share für alle sichtbar.
                         </p>
 
                         @if (!_accessLoaded)
@@ -240,81 +241,101 @@ else
                         }
                         else
                         {
-                            
-                            var availableUsers = VM.AllUsers.Where(u => !VM.HasAccess(u.Id)).ToList();
-                            var availableGroups = VM.AllGroups.Where(g => !VM.HasAccess(g.Id)).ToList();
-                            
-
-                            @if (availableUsers.Any() || availableGroups.Any())
-                            {
-                                <div class="access-add-row">
-                                    <select class="edit-input access-select" @onchange="OnAccessPrincipalAdd">
-                                        <option value="">+ Benutzer oder Gruppe hinzufügen…</option>
-                                        @if (availableUsers.Any())
-                                        {
-                                            <optgroup label="Benutzer">
-                                                @foreach (var u in availableUsers)
-                                                {
-                                                    <option value="@u.Id">@(u.Name ?? u.Username)</option>
-                                                }
-                                            </optgroup>
-                                        }
-                                        @if (availableGroups.Any())
-                                        {
-                                            <optgroup label="Gruppen">
-                                                @foreach (var g in availableGroups)
-                                                {
-                                                    <option value="@g.Id">@g.Name</option>
-                                                }
-                                            </optgroup>
-                                        }
-                                    </select>
-                                </div>
-                            }
-
-                            @* -- Aktuelle Einträge als kompakte Chips -- *@
-                            @if (VM.AccessEntries.Any())
-                            {
-                                <div class="access-chip-list">
-                                    @foreach (var entry in VM.AccessEntries)
+                            <div class="form-group" style="margin-bottom: 14px;">
+                                <label>Benutzer</label>
+                                <div class="multi-select @(_accessUsersOpen ? "open" : "")">
+                                    <div class="multi-select-display" @onclick="() => _accessUsersOpen = !_accessUsersOpen">
+                                        <span class="multi-select-text">
+                                            @{
+                                                var grantedUsers = VM.AllUsers.Where(u => VM.HasAccess(u.Id)).ToList();
+                                            }
+                                            @(grantedUsers.Any()
+                                                ? string.Join(", ", grantedUsers.Select(u => u.Name ?? u.Username))
+                                                : "Keine Benutzer")
+                                        </span>
+                                        <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
+                                             fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M6 9l6 6 6-6" />
+                                        </svg>
+                                    </div>
+                                    @if (_accessUsersOpen)
                                     {
-                                        var pType = VM.GetPrincipalType(entry.PrincipalId);
-                                        <div class="access-chip">
-                                            <div class="access-chip-icon">
-                                                @if (pType == "group")
-                                                {
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
-                                                        <path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
-                                                    </svg>
-                                                }
-                                                else
-                                                {
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
-                                                    </svg>
-                                                }
-                                            </div>
-                                            <span class="access-chip-name">@VM.GetPrincipalDisplayName(entry.PrincipalId)</span>
-                                            <button class="access-chip-remove" title="Entfernen"
-                                                    @onclick="() => RevokeAccess(entry.PrincipalId)">
-                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                                                </svg>
-                                            </button>
+                                        <div class="multi-select-backdrop" @onclick="() => _accessUsersOpen = false"></div>
+                                        <div class="multi-select-dropdown">
+                                            @foreach (var u in VM.AllUsers)
+                                            {
+                                                var isChecked = VM.HasAccess(u.Id);
+                                                <label class="multi-select-option">
+                                                    <input type="checkbox" checked="@isChecked"
+                                                           @onchange="async (e) => await ToggleAccessPrincipal(u.Id, (bool)(e.Value ?? false))" />
+                                                    <span>@(u.Name ?? u.Username)</span>
+                                                    <span class="multi-select-hint">@u.Username</span>
+                                                </label>
+                                            }
+                                            @if (!VM.AllUsers.Any())
+                                            {
+                                                <span class="empty-hint">Keine Benutzer vorhanden</span>
+                                            }
                                         </div>
                                     }
                                 </div>
-                            }
-                            else
+                            </div>
+
+                            <div class="form-group">
+                                <label>Gruppen</label>
+                                <div class="multi-select @(_accessGroupsOpen ? "open" : "")">
+                                    <div class="multi-select-display" @onclick="() => _accessGroupsOpen = !_accessGroupsOpen">
+                                        <span class="multi-select-text">
+                                            @{
+                                                var grantedGroups = VM.AllGroups.Where(g => VM.HasAccess(g.Id)).ToList();
+                                            }
+                                            @(grantedGroups.Any()
+                                                ? string.Join(", ", grantedGroups.Select(g => g.Name))
+                                                : "Keine Gruppen")
+                                        </span>
+                                        <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
+                                             fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M6 9l6 6 6-6" />
+                                        </svg>
+                                    </div>
+                                    @if (_accessGroupsOpen)
+                                    {
+                                        <div class="multi-select-backdrop" @onclick="() => _accessGroupsOpen = false"></div>
+                                        <div class="multi-select-dropdown">
+                                            @foreach (var g in VM.AllGroups)
+                                            {
+                                                var isChecked = VM.HasAccess(g.Id);
+                                                <label class="multi-select-option">
+                                                    <input type="checkbox" checked="@isChecked"
+                                                           @onchange="async (e) => await ToggleAccessPrincipal(g.Id, (bool)(e.Value ?? false))" />
+                                                    <span>@g.Name</span>
+                                                </label>
+                                            }
+                                            @if (!VM.AllGroups.Any())
+                                            {
+                                                <span class="empty-hint">Keine Gruppen vorhanden</span>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            @if (!grantedUsers.Any() && !grantedGroups.Any())
                             {
-                                <p class="empty-hint">Keine Sichtbarkeitsregeln – Share ist für alle sichtbar.</p>
+                                <div class="detail-info" style="margin-top: 14px;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                         stroke="var(--text-tertiary)" stroke-width="1.5">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="12" y1="16" x2="12" y2="12" />
+                                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                                    </svg>
+                                    <span>Für alle Benutzer sichtbar.</span>
+                                </div>
                             }
                         }
                     </div>
                 }
 
-                @* -- Tab: ACL -- *@
                 @if (_activeTab == DetailTab.Acl)
                 {
                     <div class="detail-section">
@@ -335,6 +356,8 @@ else
     private DetailTab _activeTab = DetailTab.Settings;
     private string _aclEditorKey = "";
     private bool _accessLoaded;
+    private bool _accessUsersOpen;
+    private bool _accessGroupsOpen;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -351,6 +374,8 @@ else
         {
             _activeTab = DetailTab.Settings;
             _accessLoaded = false;
+            _accessUsersOpen = false;
+            _accessGroupsOpen = false;
             VM.SelectShare(share);
             StateHasChanged();
         }
@@ -363,6 +388,8 @@ else
     private async Task SwitchTab(DetailTab tab)
     {
         _activeTab = tab;
+        _accessUsersOpen = false;
+        _accessGroupsOpen = false;
 
         if (tab == DetailTab.Access && !_accessLoaded)
         {
@@ -383,6 +410,8 @@ else
         VM.DeselectShare();
         _activeTab = DetailTab.Settings;
         _accessLoaded = false;
+        _accessUsersOpen = false;
+        _accessGroupsOpen = false;
         VM.IsCreating = !VM.IsCreating;
         StateHasChanged();
     }
@@ -427,13 +456,14 @@ else
         StateHasChanged();
     }
 
-    private async Task OnAccessPrincipalAdd(ChangeEventArgs e)
+    private async Task ToggleAccessPrincipal(Guid principalId, bool shouldGrant)
     {
-        var val = e.Value?.ToString();
-        if (!string.IsNullOrEmpty(val) && Guid.TryParse(val, out var id))
-        {
-            await GrantAccess(id);
-        }
+        if (shouldGrant)
+            await VM.GrantAccessAsync(principalId);
+        else
+            await VM.RevokeAccessAsync(principalId);
+
+        StateHasChanged();
     }
 
     private async Task GrantAccess(Guid principalId)

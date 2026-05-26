@@ -19,6 +19,8 @@ services:
     container_name: kaimo_file_server_web
     ports:
       - 8081:8080
+    environment:
+      TZ: Europe/Berlin
     volumes:
       - ./tests/data/storage:/data/storage
     depends_on:

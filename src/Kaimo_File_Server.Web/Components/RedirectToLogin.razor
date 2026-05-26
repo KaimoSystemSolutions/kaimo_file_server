@@ -1,20 +1,8 @@
 @inject NavigationManager Nav
-@inject AuthenticationStateProvider AuthState
 
 @code {
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnInitialized()
     {
-        if (!firstRender) return;
-
-        var state = await AuthState.GetAuthenticationStateAsync();
-
-        if (state.User.Identity is null || !state.User.Identity.IsAuthenticated)
-        {
-            Nav.NavigateTo("/login", forceLoad: false);
-        }
-        // Authentifiziert aber nicht autorisiert → NICHT nach "/" redirecten,
-        // das würde eine Endlosschleife verursachen.
-        // Der User bleibt auf der Seite und sieht die "Keine Berechtigung"-Meldung
-        // der jeweiligen Seite (z.B. UserList zeigt das bereits).
+        Nav.NavigateTo("/login", forceLoad: false);
     }
 }
