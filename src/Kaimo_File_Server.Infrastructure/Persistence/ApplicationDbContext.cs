@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Security;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
+        // ── Existing ──
         public DbSet<User> Users { get; set; }
         public DbSet<Group> Groups { get; set; }
         public DbSet<Role> Roles { get; set; }
@@ -20,9 +22,18 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<ShareDefinition> ShareDefinitions { get; set; }
         public DbSet<FileVersion> FileVersions { get; set; }
 
+        // ── NEW: Departments & Scoped Roles ──
+        public DbSet<Department> Departments { get; set; }
+        public DbSet<DepartmentUser> DepartmentUsers { get; set; }
+        public DbSet<DepartmentGroup> DepartmentGroups { get; set; }
+        public DbSet<DepartmentShare> DepartmentShares { get; set; }
+        public DbSet<ScopedRoleAssignment> ScopedRoleAssignments { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // ── Existing configurations (unchanged) ──
 
             modelBuilder.Entity<Identity>().UseTpcMappingStrategy();
             modelBuilder.Entity<Identity>(entity =>
@@ -44,7 +55,18 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
             });
 
             modelBuilder.Entity<Group>(entity => { entity.ToTable("groups"); });
-            modelBuilder.Entity<Role>(entity => { entity.ToTable("roles"); });
+
+            // UPDATED: Role now has ManagementPermissions + IsSystemRole
+            modelBuilder.Entity<Role>(entity =>
+            {
+                entity.ToTable("roles");
+                entity.Property(e => e.ManagementPermissions)
+                    .HasConversion<long>()
+                    .HasDefaultValue(ManagementPermission.None);
+                entity.Property(e => e.IsSystemRole)
+                    .IsRequired()
+                    .HasDefaultValue(false);
+            });
 
             modelBuilder.Entity<UserGroup>(entity =>
             {
@@ -58,7 +80,6 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasKey(e => new { e.UserId, e.RoleId });
             });
 
-            
             modelBuilder.Entity<FileMetadata>(entity =>
             {
                 entity.ToTable("file_metadata");
@@ -66,9 +87,8 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.ShareId).IsRequired();
                 entity.Property(e => e.Path).IsRequired();
                 entity.Property(e => e.OwnerId).IsRequired();
-                entity.Property(e => e.LastAccessedAt);  // <-- NEU
+                entity.Property(e => e.LastAccessedAt);
 
-                // Unique pro Share + Pfad
                 entity.HasIndex(e => new { e.ShareId, e.Path }).IsUnique();
 
                 entity.HasMany(e => e.Acl)
@@ -109,34 +129,64 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
             {
                 entity.ToTable("file_versions");
                 entity.HasKey(e => e.Id);
+                entity.Property(e => e.FilePath).IsRequired().HasMaxLength(1000);
+                entity.Property(e => e.SnapshotTimestampUtc).IsRequired();
+                entity.Property(e => e.StoragePath).IsRequired().HasMaxLength(500);
+                entity.Property(e => e.ContentHash).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.CreatedBy).HasMaxLength(200);
+                entity.HasIndex(e => new { e.FilePath, e.SnapshotTimestampUtc }).IsUnique();
+                entity.HasIndex(e => e.SnapshotTimestampUtc);
+                entity.HasIndex(e => new { e.FilePath, e.ContentHash });
+            });
 
-                entity.Property(e => e.FilePath)
-                    .IsRequired()
-                    .HasMaxLength(1000);
+            // ══════════════════════════════════════════════════
+            // NEW: Department & Scoped Role Assignment tables
+            // ══════════════════════════════════════════════════
 
-                entity.Property(e => e.SnapshotTimestampUtc)
-                    .IsRequired();
+            modelBuilder.Entity<Department>(entity =>
+            {
+                entity.ToTable("departments");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+                entity.HasIndex(e => e.Name).IsUnique();
+                entity.Property(e => e.Description).HasMaxLength(500);
+                entity.Property(e => e.ParentDepartmentId);
+            });
 
-                entity.Property(e => e.StoragePath)
-                    .IsRequired()
-                    .HasMaxLength(500);
+            modelBuilder.Entity<DepartmentUser>(entity =>
+            {
+                entity.ToTable("department_users");
+                entity.HasKey(e => new { e.DepartmentId, e.UserId });
+            });
 
-                entity.Property(e => e.ContentHash)
-                    .IsRequired()
-                    .HasMaxLength(64); // SHA-256 hex = 64 chars
+            modelBuilder.Entity<DepartmentGroup>(entity =>
+            {
+                entity.ToTable("department_groups");
+                entity.HasKey(e => new { e.DepartmentId, e.GroupId });
+            });
 
-                entity.Property(e => e.CreatedBy)
-                    .HasMaxLength(200);
+            modelBuilder.Entity<DepartmentShare>(entity =>
+            {
+                entity.ToTable("department_shares");
+                entity.HasKey(e => new { e.DepartmentId, e.ShareId });
+            });
 
-                // Unique: one file can't have two versions at the exact same second
-                entity.HasIndex(e => new { e.FilePath, e.SnapshotTimestampUtc })
+            modelBuilder.Entity<ScopedRoleAssignment>(entity =>
+            {
+                entity.ToTable("scoped_role_assignments");
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.ScopeType).HasConversion<int>();
+
+                // Unique: one principal can't have the same role twice in the same scope
+                entity.HasIndex(e => new { e.PrincipalId, e.RoleId, e.ScopeType, e.ScopeId })
                     .IsUnique();
 
-                // Fast lookup for "all snapshots" query
-                entity.HasIndex(e => e.SnapshotTimestampUtc);
+                // Fast lookup: "all assignments for this principal"
+                entity.HasIndex(e => e.PrincipalId);
 
-                // Fast lookup for "latest version hash" dedup check
-                entity.HasIndex(e => new { e.FilePath, e.ContentHash });
+                // Fast lookup: "all assignments in this scope"
+                entity.HasIndex(e => new { e.ScopeType, e.ScopeId });
             });
         }
     }

@@ -23,7 +23,12 @@ namespace Kaimo_File_Server.Infrastructure.Services
                 .Join(_db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r)
                 .ToHashSetAsync();
 
-            return new UserContext(user, groups, roles, new HashSet<string>());
+            var departments = await _db.DepartmentUsers
+                .Where(du => du.UserId == user.Id)
+                .Join(_db.Departments, du => du.DepartmentId, d => d.Id, (du, d) => d)
+                .ToHashSetAsync();
+
+            return new UserContext(user, groups, roles, new HashSet<string>(), departments);
         }
 
         public async Task<UserContext?> CreateByUsernameAsync(string username)

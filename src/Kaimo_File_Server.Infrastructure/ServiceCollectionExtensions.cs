@@ -32,34 +32,40 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IGroupRepository, GroupRepository>();
             services.AddScoped<IRoleRepository, RoleRepository>();
 
+            // Department & Scoped Role repositories
+            services.AddScoped<IDepartmentRepository, DepartmentRepository>();
+            services.AddScoped<IScopedRoleAssignmentRepository, ScopedRoleAssignmentRepository>();
+
             // Services
             services.AddSingleton<IPasswordService, PasswordService>();
             services.AddScoped<IUserContextFactory, UserContextFactory>();
             services.AddScoped<DatabaseSeeder>();
 
-            // AuthenticationLookup das Interface aus Core, die Implementierung aus Infrastructure
+            // AuthenticationLookup
             services.AddScoped<IAuthenticationLookup, AuthenticationLookup>();
 
             // FileVersionRepository
             services.AddScoped<IFileVersionRepository, FileVersionRepository>();
+
+            // NEW: Management Authorization Service
+            services.AddScoped<IManagementAuthService, ManagementAuthService>();
 
             return services;
         }
 
         /// <summary>
         /// Registers Core services (FileService, AclService, StorageEngine).
-        /// Called from the Host project after AddInfrastructure..
+        /// Called from the Host project after AddInfrastructure.
         /// </summary>
         public static IServiceCollection AddCoreServices(this IServiceCollection services, string storagePath)
         {
-
-            services.AddScoped<IAclRepository, Kaimo_File_Server.Infrastructure.Repositories.AclRepository>();
-            services.AddScoped<IFileMetadataRepository, Kaimo_File_Server.Infrastructure.Repositories.FileMetadataRepository>();
+            services.AddScoped<IAclRepository, AclRepository>();
+            services.AddScoped<IFileMetadataRepository, FileMetadataRepository>();
 
             // Factory für share-spezifische FileService-Instanzen (mit ACL)
             services.AddSingleton<IFileServiceFactory, FileServiceFactory>();
 
-            // Root-StorageEngine für die Web-UI (Listing, Ordner erstellen — ohne ACL)
+            // Root-StorageEngine für die Web-UI
             services.AddSingleton<IStorageEngine>(sp =>
                 new FileSystemStorage(storagePath, Guid.Empty, sp));
 
@@ -103,8 +109,5 @@ namespace Kaimo_File_Server.Infrastructure
 
             throw new Exception("Datenbank konnte nicht erreicht werden");
         }
-
-
     }
-
 }

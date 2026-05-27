@@ -1,4 +1,5 @@
 ﻿using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Microsoft.Extensions.DependencyInjection;
@@ -92,6 +93,11 @@ public class AclService : IAclService
         await aclRepo.RenameFileMetadataPathsAsync(shareId, oldRelativePath, newRelativePath);
     }
 
+    /// <summary>
+    /// Deletes an ACL entry
+    /// </summary>
+    /// <param name="shareId">Guid of share, where ACL is based in</param>
+    /// <param name="relativePath">Path from share to file/folder</param>
     public async Task DeleteAclAsync(Guid shareId, string relativePath)
     {
         var scope = _serviceProvider.CreateAsyncScope();
@@ -100,14 +106,16 @@ public class AclService : IAclService
         // Get ACL Entries which shall be deleted
         var aclEntries = await aclRepo.GetAclsForPathsAsync(shareId, new List<string>() { relativePath });
 
-        var listOfGuids = aclEntries.SelectMany(e => e.Acl.Select(a => a.Id)).Distinct().ToList();
+        var listOfGuids = aclEntries
+            .SelectMany(e => e.Acl
+            .Select(a => a.Id))
+            .Distinct()
+            .ToList();
 
         foreach (var entryGuid in listOfGuids)
         {
             await aclRepo.DeleteAsync(entryGuid);
         }
-        
-
     }
 
     // ── Async API für Produktion (mit DB) ──
