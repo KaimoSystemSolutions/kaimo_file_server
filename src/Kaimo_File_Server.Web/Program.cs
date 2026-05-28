@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure;
+using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Infrastructure.Storage;
 using Kaimo_File_Server.Web.Components;
 using Kaimo_File_Server.Web.Components.ViewModels;
@@ -41,6 +42,8 @@ builder.Services.AddSingleton<ShareLockManager>();
 
 // -- Services --
 builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<IManagementAuthService, ManagementAuthService>();
+builder.Services.AddScoped<IUserContextFactory, UserContextFactory>();
 
 // -- ViewModels --
 builder.Services.AddScoped<LoginViewModel>();
