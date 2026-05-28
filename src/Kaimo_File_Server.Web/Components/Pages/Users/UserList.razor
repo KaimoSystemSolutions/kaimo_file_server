@@ -1,4 +1,7 @@
 ﻿@page "/users"
+@using Kaimo_File_Server.Core.Domain.Department
+@using Kaimo_File_Server.Core.Domain.Identity
+@using Kaimo_File_Server.Core.Security
 @inject UserListViewModel VM
 @inject NavigationManager Nav
 
@@ -11,14 +14,14 @@
         <p>Lade...</p>
     </div>
 }
-else if (!VM.CanManageUsers)
+else if (!VM.CanAccessPage)
 {
     <div class="page-header">
         <div>
             <h1>Verwaltung</h1>
         </div>
     </div>
-    <div class="error-banner">Keine Berechtigung. Diese Seite ist nur für Benutzer mit der Rolle „UserManager" oder „Administrator" zugänglich.</div>
+    <div class="error-banner">Keine Berechtigung. Sie haben keine Verwaltungsrechte zugewiesen.</div>
 }
 else
 {
@@ -28,7 +31,7 @@ else
             <p class="subtitle">@VM.TabSubtitle</p>
         </div>
         <div style="display: flex; gap: 0.5rem;">
-            @if (VM.ActiveTab == AdminTab.Users)
+            @if (VM.ActiveTab == AdminTab.Users && VM.CanCreateUsers)
             {
                 <button class="btn-icon" title="Benutzer erstellen" @onclick="() => VM.StartCreateUser()">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -37,7 +40,7 @@ else
                     </svg>
                 </button>
             }
-            else if (VM.ActiveTab == AdminTab.Groups)
+            else if (VM.ActiveTab == AdminTab.Groups && (VM.CanManageGroups || VM.IsGlobalAdmin))
             {
                 <button class="btn-icon" title="Gruppe erstellen" @onclick="() => VM.StartCreateGroup()">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -46,7 +49,7 @@ else
                     </svg>
                 </button>
             }
-            else if (VM.ActiveTab == AdminTab.Roles)
+            else if (VM.ActiveTab == AdminTab.Roles && (VM.CanManageRoles || VM.IsGlobalAdmin))
             {
                 <button class="btn-icon" title="Rolle erstellen" @onclick="() => VM.StartCreateRole()">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -58,41 +61,66 @@ else
         </div>
     </div>
 
-    @* ── Tabs ── *@
+    @* ── Tabs (only show tabs the actor has permissions for) ── *@
     <div class="admin-tabs">
-        <button class="admin-tab @(VM.ActiveTab == AdminTab.Users ? "active" : "")"
-                @onclick="() => SwitchTab(AdminTab.Users)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-            </svg>
-            Benutzer
-        </button>
-        <button class="admin-tab @(VM.ActiveTab == AdminTab.Groups ? "active" : "")"
-                @onclick="() => SwitchTab(AdminTab.Groups)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
-            </svg>
-            Gruppen
-        </button>
-        <button class="admin-tab @(VM.ActiveTab == AdminTab.Roles ? "active" : "")"
-                @onclick="() => SwitchTab(AdminTab.Roles)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-            Rollen
-        </button>
+        @if (VM.CanCreateUsers || VM.IsGlobalAdmin || VM.AuthorizedDepartmentsForView.Any())
+        {
+            <button class="admin-tab @(VM.ActiveTab == AdminTab.Users ? "active" : "")"
+                    @onclick="() => SwitchTab(AdminTab.Users)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                </svg>
+                Benutzer
+            </button>
+        }
+        @if (VM.CanManageGroups || VM.IsGlobalAdmin)
+        {
+            <button class="admin-tab @(VM.ActiveTab == AdminTab.Groups ? "active" : "")"
+                    @onclick="() => SwitchTab(AdminTab.Groups)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+                </svg>
+                Gruppen
+            </button>
+        }
+        @if (VM.CanManageRoles || VM.IsGlobalAdmin)
+        {
+            <button class="admin-tab @(VM.ActiveTab == AdminTab.Roles ? "active" : "")"
+                    @onclick="() => SwitchTab(AdminTab.Roles)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                Rollen
+            </button>
+        }
     </div>
 
-    @* ── Create Forms ── *@
+    @* ── Create User Form (with Department dropdown) ── *@
 
     @if (VM.IsCreatingUser)
     {
         <div class="create-form-card">
             <h3>Neuen Benutzer erstellen</h3>
             <div class="create-form-fields">
+                <div class="form-group">
+                    <label>Abteilung</label>
+                    <select class="edit-input" @bind="CreateUserDepartmentIdString">
+                        @if (!VM.AuthorizedDepartmentsForCreate.Any())
+                        {
+                            <option value="">— Keine Abteilungen verfügbar —</option>
+                        }
+                        else
+                        {
+                            @foreach (var dept in VM.AuthorizedDepartmentsForCreate)
+                            {
+                                <option value="@dept.Id">@dept.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
                 <div class="form-group">
                     <label>Anzeigename</label>
                     <input type="text" class="edit-input" placeholder="z.B. Max Mustermann"
@@ -364,19 +392,25 @@ else
                                     <input type="text" class="edit-input" placeholder="Optional"
                                            @bind="VM.EditUserDescription" @bind:event="oninput" />
                                 </div>
-                                <div class="form-group">
-                                    <label>Neues Passwort (optional)</label>
-                                    <input type="password" class="edit-input" placeholder="Leer lassen = unverändert"
-                                           @bind="VM.NewPassword" @bind:event="oninput" />
-                                </div>
-                                @if (!string.IsNullOrEmpty(VM.NewPassword))
+
+                                @* Password reset — only if actor has ResetPasswords permission *@
+                                @if (VM.CanResetPasswordForSelected)
                                 {
                                     <div class="form-group">
-                                        <label>Passwort bestätigen</label>
-                                        <input type="password" class="edit-input" placeholder="Passwort wiederholen"
-                                               @bind="VM.ConfirmPassword" @bind:event="oninput" />
+                                        <label>Neues Passwort (optional)</label>
+                                        <input type="password" class="edit-input" placeholder="Leer lassen = unverändert"
+                                               @bind="VM.NewPassword" @bind:event="oninput" />
                                     </div>
+                                    @if (!string.IsNullOrEmpty(VM.NewPassword))
+                                    {
+                                        <div class="form-group">
+                                            <label>Passwort bestätigen</label>
+                                            <input type="password" class="edit-input" placeholder="Passwort wiederholen"
+                                                   @bind="VM.ConfirmPassword" @bind:event="oninput" />
+                                        </div>
+                                    }
                                 }
+
                                 <div class="create-form-toggles">
                                     <div class="toggle-row">
                                         <span class="toggle-label-text">Konto aktiviert</span>
@@ -513,7 +547,6 @@ else
                                     }
                                     else
                                     {
-
                                         <span class="detail-field-value detail-field-value--empty">Nicht angegeben</span>
                                     }
                                 </div>
@@ -525,7 +558,6 @@ else
                                     }
                                     else
                                     {
-
                                         <span class="detail-field-value detail-field-value--empty">Keine Beschreibung</span>
                                     }
                                 </div>
@@ -590,14 +622,17 @@ else
                                                         @FormatScopeType(a.ScopeType): @a.ScopeName
                                                     </span>
                                                 </div>
-                                                <button class="btn-icon btn-icon--small" title="Zuweisung entfernen"
-                                                        @onclick="() => DeleteAssignment(a.AssignmentId)">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                         stroke="var(--danger)" stroke-width="2">
-                                                        <line x1="18" y1="6" x2="6" y2="18" />
-                                                        <line x1="6" y1="6" x2="18" y2="18" />
-                                                    </svg>
-                                                </button>
+                                                @if (VM.IsGlobalAdmin || VM.CanManageRoles)
+                                                {
+                                                    <button class="btn-icon btn-icon--small" title="Zuweisung entfernen"
+                                                            @onclick="() => DeleteAssignment(a.AssignmentId)">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                             stroke="var(--danger)" stroke-width="2">
+                                                            <line x1="18" y1="6" x2="6" y2="18" />
+                                                            <line x1="6" y1="6" x2="18" y2="18" />
+                                                        </svg>
+                                                    </button>
+                                                }
                                             </div>
                                         }
                                     </div>
@@ -605,22 +640,28 @@ else
                             }
 
                             <div class="detail-actions">
-                                <button class="btn-secondary" @onclick="EditUser">Bearbeiten</button>
-                                @if (VM.IsConfirmingDelete)
+                                @if (VM.CanEditSelectedUser)
                                 {
-                                    <div class="confirm-delete">
-                                        <p>Benutzer wirklich löschen?</p>
-                                        <div style="display: flex; gap: 8px;">
-                                            <button class="btn-danger-outline" @onclick="ConfirmDeleteUser" disabled="@VM.IsSaving">
-                                                @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
-                                            </button>
-                                            <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">Abbrechen</button>
-                                        </div>
-                                    </div>
+                                    <button class="btn-secondary" @onclick="EditUser">Bearbeiten</button>
                                 }
-                                else
+                                @if (VM.CanDeleteSelectedUser)
                                 {
-                                    <button class="btn-danger-outline" @onclick="() => VM.RequestDeleteUser()">Benutzer löschen</button>
+                                    @if (VM.IsConfirmingDelete)
+                                    {
+                                        <div class="confirm-delete">
+                                            <p>Benutzer wirklich löschen?</p>
+                                            <div style="display: flex; gap: 8px;">
+                                                <button class="btn-danger-outline" @onclick="ConfirmDeleteUser" disabled="@VM.IsSaving">
+                                                    @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
+                                                </button>
+                                                <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">Abbrechen</button>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn-danger-outline" @onclick="() => VM.RequestDeleteUser()">Benutzer löschen</button>
+                                    }
                                 }
                             </div>
                         }
@@ -703,23 +744,28 @@ else
                                 <span class="detail-value">@VM.SelectedGroup.Id</span>
                             </div>
                             <div class="detail-actions">
-                                <button class="btn-secondary" @onclick="EditGroup">Mitglieder verwalten</button>
-                                @if (VM.IsConfirmingDelete)
+                                @if (VM.CanManageGroups || VM.IsGlobalAdmin)
                                 {
-                                    <div class="confirm-delete">
-                                        <p>Gruppe wirklich löschen?</p>
-                                        <div style="display: flex; gap: 8px;">
-                                            <button class="btn-danger-outline" @onclick="ConfirmDeleteGroup" disabled="@VM.IsSaving">
-                                                @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
-                                            </button>
-                                            <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">Abbrechen</button>
-                                        </div>
-                                    </div>
+                                    <button class="btn-secondary" @onclick="EditGroup">Mitglieder verwalten</button>
                                 }
-                                else
+                                @if (VM.IsGlobalAdmin)
                                 {
-
-                                    <button class="btn-danger-outline" @onclick="() => VM.RequestDeleteGroup()">Gruppe löschen</button>
+                                    @if (VM.IsConfirmingDelete)
+                                    {
+                                        <div class="confirm-delete">
+                                            <p>Gruppe wirklich löschen?</p>
+                                            <div style="display: flex; gap: 8px;">
+                                                <button class="btn-danger-outline" @onclick="ConfirmDeleteGroup" disabled="@VM.IsSaving">
+                                                    @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
+                                                </button>
+                                                <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">Abbrechen</button>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn-danger-outline" @onclick="() => VM.RequestDeleteGroup()">Gruppe löschen</button>
+                                    }
                                 }
                             </div>
                         }
@@ -785,7 +831,7 @@ else
                                                 @preset.Label
                                             </button>
                                         }
-                                        <button class="preset-chip" @onclick="() => VM.ApplyPermissionPreset(Core.Security.ManagementPermission.None)">
+                                        <button class="preset-chip" @onclick="() => VM.ApplyPermissionPreset(ManagementPermission.None)">
                                             Keine
                                         </button>
                                     </div>
@@ -858,7 +904,7 @@ else
                                 <div class="detail-field">
                                     <span class="detail-field-label">Berechtigungen</span>
                                     <span class="detail-field-value">
-                                        @if (VM.SelectedRole.ManagementPermissions == Core.Security.ManagementPermission.None)
+                                        @if (VM.SelectedRole.ManagementPermissions == ManagementPermission.None)
                                         {
                                             <span class="detail-field-value--empty">Keine Berechtigungen</span>
                                         }
@@ -892,7 +938,7 @@ else
                             <div class="detail-section" style="margin-top: 16px;">
                                 <div style="display: flex; align-items: center; justify-content: space-between;">
                                     <span class="detail-label">Delegierte Zuweisungen</span>
-                                    @if (!VM.IsAddingAssignment)
+                                    @if (!VM.IsAddingAssignment && (VM.IsGlobalAdmin || VM.CanManageRoles))
                                     {
                                         <button class="btn-icon btn-icon--small" title="Zuweisung hinzufügen"
                                                 @onclick="StartAddAssignment">
@@ -956,7 +1002,7 @@ else
                                         </div>
 
                                         @* Scope ID (if not Global) *@
-                                        @if (VM.NewAssignmentScopeType == Core.Security.ScopeType.Department)
+                                        @if (VM.NewAssignmentScopeType == ScopeType.Department)
                                         {
                                             <div class="form-group">
                                                 <label>Abteilung</label>
@@ -969,7 +1015,7 @@ else
                                                 </select>
                                             </div>
                                         }
-                                        else if (VM.NewAssignmentScopeType == Core.Security.ScopeType.Share)
+                                        else if (VM.NewAssignmentScopeType == ScopeType.Share)
                                         {
                                             <div class="form-group">
                                                 <label>Freigabe-ID</label>
@@ -1022,14 +1068,17 @@ else
                                                         @FormatScopeType(a.ScopeType): @a.ScopeName
                                                     </span>
                                                 </div>
-                                                <button class="btn-icon btn-icon--small" title="Zuweisung entfernen"
-                                                        @onclick="() => DeleteAssignment(a.AssignmentId)">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                         stroke="var(--danger)" stroke-width="2">
-                                                        <line x1="18" y1="6" x2="6" y2="18" />
-                                                        <line x1="6" y1="6" x2="18" y2="18" />
-                                                    </svg>
-                                                </button>
+                                                @if (VM.IsGlobalAdmin || VM.CanManageRoles)
+                                                {
+                                                    <button class="btn-icon btn-icon--small" title="Zuweisung entfernen"
+                                                            @onclick="() => DeleteAssignment(a.AssignmentId)">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                             stroke="var(--danger)" stroke-width="2">
+                                                            <line x1="18" y1="6" x2="6" y2="18" />
+                                                            <line x1="6" y1="6" x2="18" y2="18" />
+                                                        </svg>
+                                                    </button>
+                                                }
                                             </div>
                                         }
                                     </div>
@@ -1042,7 +1091,7 @@ else
                                 }
                             </div>
 
-                            @* ── System Role Info ── *@
+                            @* ── Actions ── *@
                             @if (VM.SelectedRole.IsSystemRole)
                             {
                                 <div class="detail-info">
@@ -1054,30 +1103,38 @@ else
                                     </svg>
                                     <span>Systemrollen können nicht gelöscht werden. Berechtigungen und Mitglieder können verwaltet werden.</span>
                                 </div>
-                                <div class="detail-actions">
-                                    <button class="btn-secondary" @onclick="EditRole">Bearbeiten</button>
-                                </div>
+                                @if (VM.IsGlobalAdmin || VM.CanManageRoles)
+                                {
+                                    <div class="detail-actions">
+                                        <button class="btn-secondary" @onclick="EditRole">Bearbeiten</button>
+                                    </div>
+                                }
                             }
                             else
                             {
                                 <div class="detail-actions">
-                                    <button class="btn-secondary" @onclick="EditRole">Bearbeiten</button>
-                                    @if (VM.IsConfirmingDelete)
+                                    @if (VM.IsGlobalAdmin || VM.CanManageRoles)
                                     {
-                                        <div class="confirm-delete">
-                                            <p>Rolle wirklich löschen?</p>
-                                            <div style="display: flex; gap: 8px;">
-                                                <button class="btn-danger-outline" @onclick="ConfirmDeleteRole" disabled="@VM.IsSaving">
-                                                    @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
-                                                </button>
-                                                <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">Abbrechen</button>
-                                            </div>
-                                        </div>
+                                        <button class="btn-secondary" @onclick="EditRole">Bearbeiten</button>
                                     }
-                                    else
+                                    @if (VM.IsGlobalAdmin)
                                     {
-
-                                        <button class="btn-danger-outline" @onclick="() => VM.RequestDeleteRole()">Rolle löschen</button>
+                                        @if (VM.IsConfirmingDelete)
+                                        {
+                                            <div class="confirm-delete">
+                                                <p>Rolle wirklich löschen?</p>
+                                                <div style="display: flex; gap: 8px;">
+                                                    <button class="btn-danger-outline" @onclick="ConfirmDeleteRole" disabled="@VM.IsSaving">
+                                                        @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
+                                                    </button>
+                                                    <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">Abbrechen</button>
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn-danger-outline" @onclick="() => VM.RequestDeleteRole()">Rolle löschen</button>
+                                        }
                                     }
                                 </div>
                             }
@@ -1109,7 +1166,7 @@ else
         get => VM.NewAssignmentScopeType.ToString();
         set
         {
-            VM.NewAssignmentScopeType = Enum.TryParse<Core.Security.ScopeType>(value, out var st) ? st : Core.Security.ScopeType.Global;
+            VM.NewAssignmentScopeType = Enum.TryParse<ScopeType>(value, out var st) ? st : ScopeType.Global;
             VM.NewAssignmentScopeId = null;
         }
     }
@@ -1124,6 +1181,12 @@ else
     {
         get => VM.NewAssignmentScopeId?.ToString() ?? "";
         set => VM.NewAssignmentScopeId = Guid.TryParse(value, out var id) ? id : null;
+    }
+
+    private string CreateUserDepartmentIdString
+    {
+        get => VM.CreateUserDepartmentId?.ToString() ?? "";
+        set => VM.CreateUserDepartmentId = Guid.TryParse(value, out var id) ? id : null;
     }
 
     // ── Lifecycle ──
@@ -1215,11 +1278,11 @@ else
         if (e.Key == "Enter") await CreateRole();
     }
 
-    private static string FormatScopeType(Core.Security.ScopeType type) => type switch
+    private static string FormatScopeType(ScopeType type) => type switch
     {
-        Core.Security.ScopeType.Global => "Global",
-        Core.Security.ScopeType.Department => "Abteilung",
-        Core.Security.ScopeType.Share => "Freigabe",
+        ScopeType.Global => "Global",
+        ScopeType.Department => "Abteilung",
+        ScopeType.Share => "Freigabe",
         _ => type.ToString()
     };
 }
