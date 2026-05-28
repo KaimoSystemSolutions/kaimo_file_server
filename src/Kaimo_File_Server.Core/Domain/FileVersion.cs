@@ -1,102 +1,130 @@
-﻿namespace Kaimo_File_Server.Core.Domain
+﻿using System;
+using System.Globalization;
+
+namespace Kaimo_File_Server.Core.Domain
 {
     /// <summary>
     /// Represents a single historical version of a file.
-    /// Each write-and-close cycle creates a new version.
-    /// 
-    /// The SnapshotTimestamp is stored as UTC and formatted as @GMT-YYYY.MM.DD-HH.MM.SS
-    /// for Windows "Previous Versions" compatibility via SMB.
-    /// 
-    /// This entity is transport-agnostic usable from SMB, HTTP, NFS, or any future adapter.
+    /// A new version is created on every write-and-close cycle.
+    ///
+    /// The <see cref="SnapshotTimestampUtc"/> is formatted as
+    /// <c>@GMT-YYYY.MM.DD-HH.MM.SS</c> for compatibility with
+    /// Windows "Previous Versions" via SMB.
+    ///
+    /// This entity is transport-agnostic and can be consumed by
+    /// SMB, HTTP, NFS, or any future protocol adapter.
     /// </summary>
     public class FileVersion
     {
+        /// <summary>Unique identifier for this version record.</summary>
         public Guid Id { get; set; }
 
         /// <summary>
-        /// The storage-relative path of the file (e.g. "docs/report.docx").
-        /// Not a FK to FileMetadata versions can exist even if metadata hasn't been created yet.
+        /// Storage-relative path of the file (e.g. "docs/report.docx").
+        /// Not a foreign key to <see cref="FileMetadata"/> — versions may
+        /// exist before metadata has been created.
         /// </summary>
         public string FilePath { get; set; } = string.Empty;
 
         /// <summary>
-        /// UTC timestamp of when this version was created (= snapshot time).
-        /// Used to build the @GMT- string for SMB and as a version identifier for HTTP APIs.
+        /// UTC timestamp of when this version was captured.
+        /// Used to build the <c>@GMT-</c> token for SMB and as the
+        /// version identifier for HTTP APIs.
         /// </summary>
         public DateTime SnapshotTimestampUtc { get; set; }
 
         /// <summary>
-        /// Where the version's content is stored on disk, relative to the version storage root.
-        /// E.g. "versions/ab/cd/abcdef12-3456-7890-abcd-ef1234567890.bin"
+        /// On-disk location of the version blob, relative to the
+        /// version storage root (e.g.
+        /// "versions/ab/cd/abcdef12-…-567890.bin").
         /// </summary>
         public string StoragePath { get; set; } = string.Empty;
 
         /// <summary>
-        /// SHA-256 hash of the file content. Enables deduplication:
-        /// if two versions have the same hash, they share the same blob.
+        /// SHA-256 hash of the file content.
+        /// Enables content-addressable deduplication: versions with
+        /// identical hashes share the same physical blob.
         /// </summary>
         public string ContentHash { get; set; } = string.Empty;
 
-        /// <summary>
-        /// File size in bytes at the time of this version.
-        /// </summary>
+        /// <summary>File size in bytes at the time of this version.</summary>
         public long Size { get; set; }
 
         /// <summary>
-        /// Who created this version (user ID as string for flexibility).
+        /// Id (as string) of the user who triggered this version.
+        /// Stored as a string for flexibility with external identity providers.
         /// </summary>
         public string? CreatedBy { get; set; }
 
         /// <summary>
-        /// Sequential version number per file (1, 2, 3, ...).
-        /// Makes it easy to show "Version 3 of 7" in any UI.
+        /// Sequential per-file version number (1, 2, 3, …).
+        /// Makes it easy to display "Version 3 of 7" in any UI.
         /// </summary>
         public int VersionNumber { get; set; }
 
+        private const string GmtFormat = "'@GMT-'yyyy.MM.dd-HH.mm.ss";
+
+        /// <summary>EF Core / serialization constructor.</summary>
         internal FileVersion() { }
 
-        public FileVersion(string filePath, DateTime snapshotTimestampUtc,
-            string storagePath, string contentHash, long size,
-            string? createdBy, int versionNumber)
+        /// <exception cref="ArgumentException">
+        /// Thrown when <paramref name="filePath"/>, <paramref name="storagePath"/>,
+        /// or <paramref name="contentHash"/> is null or whitespace.
+        /// </exception>
+        public FileVersion(
+            string filePath,
+            DateTime snapshotTimestampUtc,
+            string storagePath,
+            string contentHash,
+            long size,
+            string? createdBy,
+            int versionNumber)
         {
             Id = Guid.NewGuid();
-            FilePath = filePath;
+
+            FilePath = !string.IsNullOrWhiteSpace(filePath)
+                ? filePath
+                : throw new ArgumentException("Must not be empty.", nameof(filePath));
+
             SnapshotTimestampUtc = snapshotTimestampUtc;
-            StoragePath = storagePath;
-            ContentHash = contentHash;
+
+            StoragePath = !string.IsNullOrWhiteSpace(storagePath)
+                ? storagePath
+                : throw new ArgumentException("Must not be empty.", nameof(storagePath));
+
+            ContentHash = !string.IsNullOrWhiteSpace(contentHash)
+                ? contentHash
+                : throw new ArgumentException("Must not be empty.", nameof(contentHash));
+
             Size = size;
             CreatedBy = createdBy;
             VersionNumber = versionNumber;
         }
 
         /// <summary>
-        /// Returns the @GMT- formatted string that Windows expects.
-        /// Format: @GMT-YYYY.MM.DD-HH.MM.SS
+        /// Returns the <c>@GMT-</c> formatted string that Windows
+        /// "Previous Versions" expects (e.g. <c>@GMT-2025.05.28-14.30.00</c>).
         /// </summary>
         public string ToGmtToken()
-        {
-            return SnapshotTimestampUtc.ToString("'@GMT-'yyyy.MM.dd-HH.mm.ss");
-        }
+            => SnapshotTimestampUtc.ToString(GmtFormat, CultureInfo.InvariantCulture);
 
         /// <summary>
-        /// Parses a @GMT- token back to a UTC DateTime.
-        /// Returns null if the format is invalid.
+        /// Parses a <c>@GMT-</c> token back to a UTC <see cref="DateTime"/>.
+        /// Returns <c>null</c> if the format is invalid.
         /// </summary>
         public static DateTime? ParseGmtToken(string token)
         {
-            if (string.IsNullOrEmpty(token) || !token.StartsWith("@GMT-"))
+            if (string.IsNullOrEmpty(token) || !token.StartsWith("@GMT-", StringComparison.Ordinal))
                 return null;
 
-            if (DateTime.TryParseExact(token, "'@GMT-'yyyy.MM.dd-HH.mm.ss",
-                System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.AssumeUniversal |
-                System.Globalization.DateTimeStyles.AdjustToUniversal,
-                out var result))
-            {
-                return result;
-            }
-
-            return null;
+            return DateTime.TryParseExact(
+                token,
+                GmtFormat,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var result)
+                ? result
+                : null;
         }
     }
 }

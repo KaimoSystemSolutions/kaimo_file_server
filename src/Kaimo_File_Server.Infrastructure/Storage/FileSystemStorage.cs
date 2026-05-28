@@ -142,7 +142,7 @@ public class FileSystemStorage : IStorageEngine
         }
         catch (Exception e)
         {
-            var fotzen = 1;
+            return Task.FromException(e);
         }
         
         return Task.CompletedTask;

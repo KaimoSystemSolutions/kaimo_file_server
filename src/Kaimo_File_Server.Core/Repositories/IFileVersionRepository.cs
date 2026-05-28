@@ -4,63 +4,82 @@ namespace Kaimo_File_Server.Core.Repositories
 {
     /// <summary>
     /// Repository for file version history.
-    /// Lives in Core so it's available to all transports (SMB, HTTP, NFS).
-    /// 
-    /// The implementation in Infrastructure handles the actual DB queries.
+    /// Lives in Core so it is available to all transports (SMB, HTTP, NFS).
+    /// The implementation in Infrastructure handles the actual database queries.
     /// </summary>
     public interface IFileVersionRepository
     {
         /// <summary>
-        /// Get all versions of a file, ordered by SnapshotTimestampUtc descending (newest first).
+        /// Returns all versions of a file, ordered by
+        /// <see cref="FileVersion.SnapshotTimestampUtc"/> descending (newest first).
         /// </summary>
+        /// <param name="filePath">The normalised relative file path.</param>
         Task<List<FileVersion>> GetVersionsAsync(string filePath);
 
         /// <summary>
-        /// Get a specific version by its snapshot timestamp.
-        /// Used when resolving @GMT- paths from SMB or version requests from HTTP.
+        /// Resolves a specific version by its snapshot timestamp.
+        /// Used when handling @GMT- paths from SMB or version requests from HTTP.
         /// </summary>
+        /// <param name="filePath">The normalised relative file path.</param>
+        /// <param name="snapshotTimestampUtc">The exact UTC timestamp of the snapshot.</param>
         Task<FileVersion?> GetVersionAsync(string filePath, DateTime snapshotTimestampUtc);
 
         /// <summary>
-        /// Get all distinct snapshot timestamps for a given file.
-        /// This is what FSCTL_SRV_ENUMERATE_SNAPSHOTS needs for SMB,
+        /// Returns all distinct snapshot timestamps for a given file.
+        /// This is what <c>FSCTL_SRV_ENUMERATE_SNAPSHOTS</c> needs at file level
         /// and what an HTTP "list versions" endpoint would return.
         /// </summary>
+        /// <param name="filePath">The normalised relative file path.</param>
         Task<List<DateTime>> GetSnapshotTimestampsAsync(string filePath);
 
         /// <summary>
-        /// Get all distinct snapshot timestamps across ALL files in a share/path prefix.
-        /// SMB's FSCTL_SRV_ENUMERATE_SNAPSHOTS operates at share level, not file level.
+        /// Returns all distinct snapshot timestamps across every file
+        /// under a given path prefix (or the entire share when empty).
+        /// SMB's <c>FSCTL_SRV_ENUMERATE_SNAPSHOTS</c> operates at share level.
         /// </summary>
+        /// <param name="pathPrefix">
+        /// A path prefix to filter by, or an empty string for the whole share.
+        /// </param>
         Task<List<DateTime>> GetAllSnapshotTimestampsAsync(string pathPrefix = "");
 
         /// <summary>
-        /// Create a new version entry.
+        /// Persists a new version entry.
         /// </summary>
+        /// <param name="version">The version to store.</param>
+        /// <returns>The created version with server-generated fields populated.</returns>
         Task<FileVersion> CreateAsync(FileVersion version);
 
         /// <summary>
-        /// Get the highest version number for a file (for incrementing).
-        /// Returns 0 if no versions exist.
+        /// Returns the highest version number for a file (used when incrementing).
+        /// Returns <c>0</c> if no versions exist yet.
         /// </summary>
+        /// <param name="filePath">The normalised relative file path.</param>
         Task<int> GetMaxVersionNumberAsync(string filePath);
 
         /// <summary>
-        /// Delete versions older than the given date for a specific file.
+        /// Deletes all versions with a snapshot timestamp older than <paramref name="cutoff"/>.
         /// Used by retention policies.
         /// </summary>
+        /// <param name="filePath">The normalised relative file path.</param>
+        /// <param name="cutoff">Versions older than this UTC date are removed.</param>
+        /// <returns>The number of deleted version records.</returns>
         Task<int> DeleteOlderThanAsync(string filePath, DateTime cutoff);
 
         /// <summary>
-        /// Delete excess versions beyond maxCount for a specific file,
-        /// keeping the newest ones. Returns number of deleted versions.
+        /// Trims excess versions beyond <paramref name="maxCount"/>,
+        /// keeping the newest ones. Used by retention policies.
         /// </summary>
+        /// <param name="filePath">The normalised relative file path.</param>
+        /// <param name="maxCount">Maximum number of versions to keep.</param>
+        /// <returns>The number of deleted version records.</returns>
         Task<int> TrimToMaxVersionsAsync(string filePath, int maxCount);
 
         /// <summary>
-        /// Check if a version with the given content hash already exists for this file.
-        /// Enables skipping version creation if content hasn't changed.
+        /// Checks whether a version with the given content hash already exists.
+        /// Enables skipping version creation when the file content has not changed.
         /// </summary>
+        /// <param name="filePath">The normalised relative file path.</param>
+        /// <param name="contentHash">The SHA-256 (or equivalent) hash of the file content.</param>
         Task<bool> ExistsWithHashAsync(string filePath, string contentHash);
     }
 }
