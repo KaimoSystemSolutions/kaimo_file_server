@@ -395,4 +395,36 @@ public class FileBrowserViewModel
 
         return DirectorySizes.TryGetValue(relativePath, out var size) ? size : null;
     }
+    
+    public async Task<(byte[] Data, string ContentType)?> ReadFileForPreviewAsync(FileMetadata file)
+    {
+        if (_fileService is null || CurrentShare is null) return null;
+
+        var userContext = await GetCurrentUserContextAsync();
+        if (userContext is null) return null;
+
+        var relativePath = file.Path;
+        if (relativePath.StartsWith(CurrentShare.Path))
+            relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
+
+        var stream = await _fileService.ReadFileAsync(relativePath, userContext);
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms);
+
+        var contentType = Path.GetExtension(file.Name).ToLower() switch
+        {
+            ".pdf"  => "application/pdf",
+            ".png"  => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".gif"  => "image/gif",
+            ".webp" => "image/webp",
+            ".mp4"  => "video/mp4",
+            ".webm" => "video/webm",
+            ".mp3"  => "audio/mpeg",
+            ".txt"  => "text/plain",
+            _       => "application/octet-stream"
+        };
+
+        return (ms.ToArray(), contentType);
+    }
 }

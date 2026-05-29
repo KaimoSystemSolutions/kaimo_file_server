@@ -373,6 +373,7 @@ else
             <div class="file-grid-row @(isSelected ? "file-row--selected" : "")"
                  @onclick="(e) => OnItemClick(e, file)"
                  @onclick:stopPropagation="true"
+                 @ondblclick="() => OpenFilePreview(file)"
                  @oncontextmenu="(e) => OnItemContextMenu(e, file)"
                  @oncontextmenu:preventDefault="true"
                  @oncontextmenu:stopPropagation="true">
@@ -559,6 +560,40 @@ else
     </div>
 }
 
+@if (_showFilePreview)
+{
+    <div class="modal-backdrop" @onclick="CloseFilePreview">
+        <div class="preview-dialog" @onclick:stopPropagation="true">
+            <div class="preview-header">
+                <span class="preview-title">@_previewFileName</span>
+                <button class="btn-icon" title="Schließen" @onclick="CloseFilePreview">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                </button>
+            </div>
+            @if (_previewLoading)
+            {
+                <div class="preview-loading">
+                    <div class="preview-spinner"></div>
+                    <span class="preview-loading-text">Datei wird geladen…</span>
+                </div>
+            }
+            else if (_previewIsImage)
+            {
+                <div class="preview-image-container">
+                    <img class="preview-image" src="@_previewUrl" alt="@_previewFileName" />
+                </div>
+            }
+            else
+            {
+                <iframe class="preview-frame" src="@_previewUrl"></iframe>
+            }
+        </div>
+    </div>
+}
 
 @code {
     [Parameter] public string ShareName { get; set; } = "";
@@ -643,9 +678,13 @@ else
     private string _renameNewName = "";
     private string? _renameError;
 
+    private bool _showFilePreview;
+    private string _previewUrl = "";
+    private string _previewFileName = "";
+    
     // ========== Toolbar Computed ==========
 
-    private bool CanOpenSelection => _selectedItems.Count == 1 && _selectedItems.First().IsDirectory;
+    private bool CanOpenSelection => _selectedItems.Count == 1; //&& _selectedItems.First().IsDirectory;
     private bool CanRenameSelection => _selectedItems.Count == 1;
     private bool CanDeleteSelection => _selectedItems.Count > 0;
     private bool CanAclSelection => _isAdmin && _selectedItems.Count == 1;
@@ -689,10 +728,15 @@ else
 
     // ========== Toolbar Aktionen ==========
 
-    private void OpenSelected()
+    private async Task OpenSelected()
     {
-        if (_selectedItems.Count == 1 && _selectedItems.First().IsDirectory)
-            NavigateTo(_selectedItems.First());
+        if (_selectedItems.Count != 1) return;
+        var item = _selectedItems.First();
+
+        if (item.IsDirectory)
+            NavigateTo(item);
+        else
+            await OpenFilePreview(item);
     }
 
     private void RenameSelected()
@@ -959,6 +1003,45 @@ else
         Nav.NavigateTo($"/files/{ShareName}/{relativePath}");
     }
 
+    private bool _previewIsImage;
+
+    private bool _previewLoading;
+
+    private async Task OpenFilePreview(FileMetadata file)
+    {
+        _previewFileName = file.Name;
+        _previewIsImage = false;
+        _previewUrl = "";
+        _previewLoading = true;
+        _showFilePreview = true;
+        StateHasChanged();
+
+        var result = await VM.ReadFileForPreviewAsync(file);
+        if (result is null)
+        {
+            _showFilePreview = false;
+            _previewLoading = false;
+            return;
+        }
+
+        var (data, contentType) = result.Value;
+
+        _previewUrl = await JS.InvokeAsync<string>(
+            "filePreview.showBlob", data, contentType);
+
+        _previewIsImage = contentType.StartsWith("image/");
+        _previewLoading = false;
+    }
+    
+    private async Task CloseFilePreview()
+    {
+        if (!string.IsNullOrEmpty(_previewUrl))
+            await JS.InvokeVoidAsync("filePreview.revokeBlob", _previewUrl);
+
+        _showFilePreview = false;
+        _previewUrl = "";
+    }
+    
     private void NavigateUp()
     {
         if (string.IsNullOrEmpty(VM.ParentPath))

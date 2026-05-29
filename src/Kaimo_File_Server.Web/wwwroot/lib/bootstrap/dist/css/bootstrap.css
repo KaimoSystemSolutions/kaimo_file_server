@@ -2052,6 +2052,8 @@ progress {
   -webkit-overflow-scrolling: touch;
 }
 
+
+
 @media (max-width: 575.98px) {
   .table-responsive-sm {
     overflow-x: auto;
@@ -5524,6 +5526,7 @@ textarea.form-control-lg {
 .modal.modal-static .modal-dialog {
   transform: scale(1.02);
 }
+
 
 .modal-dialog-scrollable {
   height: calc(100% - var(--bs-modal-margin) * 2);

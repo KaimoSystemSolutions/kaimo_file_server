@@ -2544,6 +2544,9 @@ html, body, #app {
     color: var(--accent);
 }
 
+
+
+
 /* ══════════════════════════════════════════════════════════
    Permission Groups (Gruppierte Checkboxen)
    ══════════════════════════════════════════════════════════ */
@@ -2772,6 +2775,95 @@ html, body, #app {
             box-shadow: 0 0 0 2px var(--accent-subtle);
         }
 
+/* ══════════════════════════════════════════════════════════
+   Preview dialog
+   ══════════════════════════════════════════════════════════ */
+
+.preview-dialog {
+    width: 85vw;
+    max-width: 1200px;
+    height: 90vh;
+    background: var(--bg-primary);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 8px;
+}
+.preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+}
+
+.preview-title {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.preview-header .btn-icon {
+    position: absolute;
+    right: 1rem;
+}
+
+.preview-frame {
+    flex: 1;
+    border: none;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-secondary);
+}
+
+.preview-image-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: var(--bg-secondary);
+}
+
+.preview-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.preview-loading {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.preview-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: preview-spin 0.8s linear infinite;
+}
+
+.preview-loading-text {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+@keyframes preview-spin {
+    to { transform: rotate(360deg); }
+}
+
+        
 /* ══════════════════════════════════════════════════════════
    Responsive Adjustments
    ══════════════════════════════════════════════════════════ */
