@@ -11,7 +11,7 @@ var storagePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? 
 builder.Services.AddCoreServices(storagePath);
 
 // -- SMB Transport --
-builder.Services.AddSmb();
+builder.Services.AddSmb(builder.Configuration);
 
 var host = builder.Build();
 await host.InitializeDatabaseAsync();
