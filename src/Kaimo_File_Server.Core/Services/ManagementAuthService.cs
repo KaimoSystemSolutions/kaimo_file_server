@@ -57,8 +57,6 @@ public class ManagementAuthService : IManagementAuthService
                             targetUserId, assignment.ScopeId))
                         return true;
                     break;
-
-                    // Share scope doesn't apply to user management
             }
         }
 
@@ -176,11 +174,14 @@ public class ManagementAuthService : IManagementAuthService
         UserContext actor, ManagementPermission required)
     {
         var assignments = await GetEffectiveAssignmentsAsync(actor);
-
         return assignments.Any(a => HasPermission(a.Role, required));
     }
 
-    public async Task<List<Guid>> GetAuthorizedDepartmentIdsAsync(
+    // FIX: Returns AuthorizedScopeResult instead of List<Guid>.
+    //      Global admin → IsUnrestricted = true (caller skips filtering).
+    //      Scoped admin → LimitedTo(specific department IDs).
+    //      No permission → None (empty + not unrestricted).
+    public async Task<AuthorizedScopeResult> GetAuthorizedDepartmentIdsAsync(
         UserContext actor, ManagementPermission required)
     {
         var assignments = await GetEffectiveAssignmentsAsync(actor);
@@ -192,20 +193,19 @@ public class ManagementAuthService : IManagementAuthService
                 continue;
 
             if (assignment.ScopeType == ScopeType.Global)
-            {
-                // Global admin → return ALL departments
-                var all = await _departmentRepo.GetAllAsync();
-                return all.Select(d => d.Id).ToList();
-            }
+                return AuthorizedScopeResult.Unrestricted();
 
             if (assignment.ScopeType == ScopeType.Department)
                 result.Add(assignment.ScopeId);
         }
 
-        return result.Distinct().ToList();
+        return result.Count > 0
+            ? AuthorizedScopeResult.LimitedTo(result)
+            : AuthorizedScopeResult.None();
     }
 
-    public async Task<List<Guid>> GetAuthorizedShareIdsAsync(
+    // FIX: Same pattern as departments — no more ambiguous empty list.
+    public async Task<AuthorizedScopeResult> GetAuthorizedShareIdsAsync(
         UserContext actor, ManagementPermission required)
     {
         var assignments = await GetEffectiveAssignmentsAsync(actor);
@@ -217,15 +217,10 @@ public class ManagementAuthService : IManagementAuthService
                 continue;
 
             if (assignment.ScopeType == ScopeType.Global)
-            {
-                // Return empty → caller should interpret as "all"
-                return new List<Guid>();
-            }
+                return AuthorizedScopeResult.Unrestricted();
 
             if (assignment.ScopeType == ScopeType.Share)
-            {
                 result.Add(assignment.ScopeId);
-            }
 
             if (assignment.ScopeType == ScopeType.Department)
             {
@@ -234,7 +229,9 @@ public class ManagementAuthService : IManagementAuthService
             }
         }
 
-        return result.Distinct().ToList();
+        return result.Count > 0
+            ? AuthorizedScopeResult.LimitedTo(result)
+            : AuthorizedScopeResult.None();
     }
 
     // ── Internals ──
@@ -244,11 +241,6 @@ public class ManagementAuthService : IManagementAuthService
         return (role.ManagementPermissions & required) == required;
     }
 
-    /// <summary>
-    /// Loads all effective ScopedRoleAssignments for the actor,
-    /// including assignments via group membership.
-    /// Returns tuples of (assignment, resolved role).
-    /// </summary>
     private async Task<List<(ScopedRoleAssignment Assignment, Role Role)>>
         GetEffectiveAssignmentsAsync(UserContext actor)
     {

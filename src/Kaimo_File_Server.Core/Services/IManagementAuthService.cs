@@ -42,14 +42,23 @@ namespace Kaimo_File_Server.Core.Services
         Task<bool> HasAnyPermissionAsync(UserContext actor, ManagementPermission required);
 
         /// <summary>
-        /// Returns all departments where the actor has the given permission.
-        /// Used for UI: "which departments can I manage users in?"
+        /// Returns which departments the actor may manage with the given permission.
+        ///
+        /// Check <see cref="AuthorizedScopeResult.IsUnrestricted"/> first:
+        ///   true  → global admin, no filtering needed
+        ///   false → only the IDs in <see cref="AuthorizedScopeResult.ScopeIds"/>
         /// </summary>
-        Task<List<Guid>> GetAuthorizedDepartmentIdsAsync(UserContext actor, ManagementPermission required);
+        Task<AuthorizedScopeResult> GetAuthorizedDepartmentIdsAsync(
+            UserContext actor, ManagementPermission required);
 
         /// <summary>
-        /// Returns all share IDs where the actor has the given permission.
+        /// Returns which shares the actor may manage with the given permission.
+        ///
+        /// Check <see cref="AuthorizedScopeResult.IsUnrestricted"/> first:
+        ///   true  → global admin, no filtering needed
+        ///   false → only the IDs in <see cref="AuthorizedScopeResult.ScopeIds"/>
         /// </summary>
-        Task<List<Guid>> GetAuthorizedShareIdsAsync(UserContext actor, ManagementPermission required);
+        Task<AuthorizedScopeResult> GetAuthorizedShareIdsAsync(
+            UserContext actor, ManagementPermission required);
     }
 }

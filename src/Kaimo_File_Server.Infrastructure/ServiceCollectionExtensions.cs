@@ -15,60 +15,71 @@ namespace Kaimo_File_Server.Infrastructure
 {
     public static class ServiceCollectionExtensions
     {
-        public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+        /// <summary>
+        /// Registers all Infrastructure services: DB context, repositories,
+        /// password hashing, user context factory, management auth, and
+        /// authentication lookup.
+        ///
+        /// Call this once from every host (Host, Web). Do NOT re-register
+        /// these services in individual Program.cs files.
+        /// </summary>
+        public static IServiceCollection AddInfrastructure(
+            this IServiceCollection services, IConfiguration configuration)
         {
             var connectionString = configuration.GetConnectionString("Default")
                 ?? "Host=kaimo_file_server_db;Database=kaimo_file_server;Username=kaimo_test_user;Password=change_me";
 
+            // ── EF Core ──
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseNpgsql(connectionString));
+
             services.AddDbContextFactory<ApplicationDbContext>(options =>
                 options.UseNpgsql(connectionString), ServiceLifetime.Scoped);
 
-            // Repositories
+            // ── Repositories ──
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<IShareAccessRepository, ShareAccessRepository>();
             services.AddScoped<IShareRepository, ShareRepository>();
             services.AddScoped<IGroupRepository, GroupRepository>();
             services.AddScoped<IRoleRepository, RoleRepository>();
-
-            // Department & Scoped Role repositories
             services.AddScoped<IDepartmentRepository, DepartmentRepository>();
             services.AddScoped<IScopedRoleAssignmentRepository, ScopedRoleAssignmentRepository>();
-
-            // Services
-            services.AddSingleton<IPasswordService, PasswordService>();
-            services.AddScoped<IUserContextFactory, UserContextFactory>();
-            services.AddScoped<DatabaseSeeder>();
-
-            // AuthenticationLookup
-            services.AddScoped<IAuthenticationLookup, AuthenticationLookup>();
-
-            // FileVersionRepository
             services.AddScoped<IFileVersionRepository, FileVersionRepository>();
 
-            // NEW: Management Authorization Service
+            // ── Services (infrastructure-level) ──
+            services.AddSingleton<IPasswordService, PasswordService>();
+            services.AddScoped<IUserContextFactory, UserContextFactory>();
+            services.AddScoped<IAuthenticationLookup, AuthenticationLookup>();
             services.AddScoped<IManagementAuthService, ManagementAuthService>();
+
+            // ── Seeder ──
+            services.AddScoped<DatabaseSeeder>();
 
             return services;
         }
 
         /// <summary>
-        /// Registers Core services (FileService, AclService, StorageEngine).
-        /// Called from the Host project after AddInfrastructure.
+        /// Registers Core services that depend on a storage root path:
+        /// ACL repository, file metadata repository, file service factory,
+        /// root storage engine, file versioning, and the share lock manager.
+        ///
+        /// Call this once from every host AFTER <see cref="AddInfrastructure"/>.
         /// </summary>
-        public static IServiceCollection AddCoreServices(this IServiceCollection services, string storagePath)
+        public static IServiceCollection AddCoreServices(
+            this IServiceCollection services, string storagePath)
         {
+            // ── ACL + Metadata ──
             services.AddScoped<IAclRepository, AclRepository>();
             services.AddScoped<IFileMetadataRepository, FileMetadataRepository>();
 
-            // Factory für share-spezifische FileService-Instanzen (mit ACL)
+            // ── File Service Factory (creates per-share FileService instances) ──
             services.AddSingleton<IFileServiceFactory, FileServiceFactory>();
 
-            // Root-StorageEngine für die Web-UI
+            // ── Root StorageEngine (share-agnostic, used by Web UI for raw I/O) ──
             services.AddSingleton<IStorageEngine>(sp =>
                 new FileSystemStorage(storagePath, Guid.Empty, sp));
 
+            // ── Versioning ──
             var versionStoragePath = Path.Combine(storagePath, ".versions");
 
             services.AddScoped<IFileVersionService>(sp =>
@@ -78,15 +89,22 @@ namespace Kaimo_File_Server.Infrastructure
                     defaultMaxVersions: 64,
                     defaultMaxAge: TimeSpan.FromDays(90)));
 
+            // ── Share Lock Manager (in-memory, single instance) ──
             services.AddSingleton<ShareLockManager>();
 
             return services;
         }
 
+        /// <summary>
+        /// Applies pending migrations / EnsureCreated and runs the seeder.
+        /// Retries up to 5 times with a 3-second delay for cold-start scenarios
+        /// (e.g. Docker Compose where the DB container isn't ready yet).
+        /// </summary>
         public static async Task InitializeDatabaseAsync(this IHost host)
         {
-            var retries = 5;
-            while (retries > 0)
+            const int maxRetries = 5;
+
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
             {
                 try
                 {
@@ -99,15 +117,17 @@ namespace Kaimo_File_Server.Infrastructure
                     await seeder.SeedAsync();
                     return;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    retries--;
-                    Console.WriteLine($"[!] DB nicht bereit, warte 3s... ({retries} Versuche übrig)");
+                    if (attempt == maxRetries)
+                        throw new InvalidOperationException(
+                            "Datenbank konnte nach mehreren Versuchen nicht erreicht werden.", ex);
+
+                    Console.WriteLine(
+                        $"[!] DB nicht bereit, warte 3s... ({maxRetries - attempt} Versuche übrig)");
                     await Task.Delay(3000);
                 }
             }
-
-            throw new Exception("Datenbank konnte nicht erreicht werden");
         }
     }
 }

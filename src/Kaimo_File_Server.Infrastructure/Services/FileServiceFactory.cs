@@ -10,7 +10,8 @@ namespace Kaimo_File_Server.Infrastructure.Services
 
         public FileServiceFactory(IServiceProvider serviceProvider)
         {
-            _serviceProvider = serviceProvider;
+            _serviceProvider = serviceProvider
+                ?? throw new ArgumentNullException(nameof(serviceProvider));
         }
 
         public IFileService CreateForShare(Guid shareId, string sharePath)

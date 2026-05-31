@@ -1,57 +1,62 @@
 using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure;
-using Kaimo_File_Server.Infrastructure.Services;
-using Kaimo_File_Server.Infrastructure.Storage;
 using Kaimo_File_Server.Web.Components;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.DataProtection.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// -- Infrastructure (DB + Repositories) --
+// ══════════════════════════════════════════
+//  Shared infrastructure (DB, repos, core services)
+//  — registered ONCE via extension methods
+// ══════════════════════════════════════════
+
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// -- Blazor --
+var storagePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
+builder.Services.AddCoreServices(storagePath);
+
+// ══════════════════════════════════════════
+//  Blazor + Auth
+// ══════════════════════════════════════════
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorizationCore();
 
-// -- JWT --
+// ── JWT ──
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<JwtAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
     sp.GetRequiredService<JwtAuthenticationStateProvider>());
 
+// ══════════════════════════════════════════
+//  Web-only services
+// ══════════════════════════════════════════
 
-// -- Core Services --
-var storagePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
-builder.Services.AddCoreServices(storagePath);
-
-// -- Share Lock Manager (Singleton – ein Lock pro Share, In-Memory) --
-builder.Services.AddSingleton<ShareLockManager>();
-
-// -- Additional Repositories --
-
-// -- Services --
 builder.Services.AddScoped<ThemeService>();
-builder.Services.AddScoped<IManagementAuthService, ManagementAuthService>();
-builder.Services.AddScoped<IUserContextFactory, UserContextFactory>();
 
-// -- ViewModels --
+// ══════════════════════════════════════════
+//  ViewModels
+//
+//  NOTE: ManagementAuthService, UserContextFactory, ShareLockManager
+//  are already registered by AddInfrastructure / AddCoreServices.
+//  Do NOT re-register them here.
+// ══════════════════════════════════════════
+
 builder.Services.AddScoped<LoginViewModel>();
 builder.Services.AddScoped<ShareBrowserViewModel>();
 builder.Services.AddScoped<FileBrowserViewModel>();
 builder.Services.AddScoped<UserListViewModel>();
 builder.Services.AddScoped<AclEditorViewModel>();
 
+// ShareListViewModel needs the storagePath string — use a factory lambda.
 builder.Services.AddScoped<ShareListViewModel>(sp =>
     new ShareListViewModel(
         sp.GetRequiredService<IShareRepository>(),
@@ -64,12 +69,24 @@ builder.Services.AddScoped<ShareListViewModel>(sp =>
         sp.GetRequiredService<ILogger<ShareListViewModel>>(),
         storagePath));
 
-// -- DataProtection --
+// ══════════════════════════════════════════
+//  DataProtection
+// ══════════════════════════════════════════
+
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo("/data/storage/.dp-keys"))
     .SetApplicationName("KaimoFiles");
 
+// ══════════════════════════════════════════
+//  Build & configure pipeline
+// ══════════════════════════════════════════
+
 var app = builder.Build();
+
+// BUG FIX: DB was never initialized in the Web project.
+// Without this, tables and seed data are missing when Web starts
+// independently of the Host project.
+await app.InitializeDatabaseAsync();
 
 if (app.Environment.IsDevelopment())
 {
@@ -86,6 +103,5 @@ app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
-
 
 app.Run();

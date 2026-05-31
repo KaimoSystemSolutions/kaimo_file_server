@@ -5,7 +5,6 @@ using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System.Linq.Expressions;
 
 namespace Kaimo_File_Server.Infrastructure.Storage;
 
@@ -15,7 +14,10 @@ public class FileSystemStorage : IStorageEngine
     private readonly Guid _shareId;
     private readonly IServiceProvider? _serviceProvider;
 
-    public FileSystemStorage(string rootPath, Guid shareId, IServiceProvider serviceProvider)
+    /// <summary>
+    /// Creates a storage engine bound to a specific share.
+    /// </summary>
+    public FileSystemStorage(string rootPath, Guid shareId, IServiceProvider? serviceProvider)
     {
         _rootPath = rootPath;
         _shareId = shareId;
@@ -23,20 +25,8 @@ public class FileSystemStorage : IStorageEngine
         Directory.CreateDirectory(_rootPath);
     }
 
-    public FileSystemStorage(string rootPath)
-    {
-        _rootPath = rootPath;
-        _shareId = new Guid();
-        _serviceProvider = null;
-        Directory.CreateDirectory(_rootPath);
-    }
-
     // ────────────────── Path Resolution ──────────────────
 
-    /// <summary>
-    /// Resolves a share-relative path to an absolute filesystem path.
-    /// Includes path traversal protection.
-    /// </summary>
     private string ToAbsolutePath(string shareRelativePath)
     {
         var normalized = ShareRelativePath.Normalize(shareRelativePath);
@@ -69,31 +59,35 @@ public class FileSystemStorage : IStorageEngine
         var fullPath = ToAbsolutePath(path);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
-        using var file = new FileStream(
+        await using var file = new FileStream(
             fullPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, 4096, true);
         await data.CopyToAsync(file);
     }
 
-    public async Task CreateDirectory(string dirPath)
+    // BUG FIX: was `async` without `await` → compiler warning, swallowed exceptions
+    public Task CreateDirectory(string dirPath)
     {
         var fullPath = ToAbsolutePath(dirPath);
         Directory.CreateDirectory(fullPath);
+        return Task.CompletedTask;
     }
 
-    public async Task RenameFileAsync(string oldPath, string newPath)
+    // BUG FIX: was `async` without `await`
+    public Task RenameFileAsync(string oldPath, string newPath)
     {
         var oldFullPath = ToAbsolutePath(oldPath);
         var newFullPath = ToAbsolutePath(newPath);
-
         File.Move(oldFullPath, newFullPath, false);
+        return Task.CompletedTask;
     }
 
-    public async Task RenameDirectoryAsync(string oldDirPath, string newDirPath)
+    // BUG FIX: was `async` without `await`
+    public Task RenameDirectoryAsync(string oldDirPath, string newDirPath)
     {
         var oldFullPath = ToAbsolutePath(oldDirPath);
         var newFullPath = ToAbsolutePath(newDirPath);
-
         Directory.Move(oldFullPath, newFullPath);
+        return Task.CompletedTask;
     }
 
     public Task DeleteAsync(string path)
@@ -110,7 +104,7 @@ public class FileSystemStorage : IStorageEngine
     {
         var normalized = ShareRelativePath.Normalize(path);
         if (string.IsNullOrEmpty(normalized))
-            return Task.FromResult(true); // Share root is always a directory
+            return Task.FromResult(true);
 
         var fullPath = ToAbsolutePath(normalized);
         return Task.FromResult(Directory.Exists(fullPath));
@@ -121,69 +115,31 @@ public class FileSystemStorage : IStorageEngine
         var fullOldPath = ToAbsolutePath(oldPath);
         var fullNewPath = ToAbsolutePath(newPath);
 
+        Directory.CreateDirectory(Path.GetDirectoryName(fullNewPath)!);
 
-        try
-        {
+        if (File.Exists(fullNewPath) || Directory.Exists(fullNewPath))
+            fullNewPath += "_" + DateTime.UtcNow.ToString("yyyy-MM-dd_HH-mm-ss");
 
-            Directory.CreateDirectory( Path.GetDirectoryName(fullNewPath)! );
-            if (File.Exists(fullNewPath) || Directory.Exists(fullNewPath))
-                fullNewPath += "_" + DateTime.UtcNow.ToString("yyyy-MM-dd_HH-mm-ss");
+        if (File.Exists(fullOldPath))
+            File.Move(fullOldPath, fullNewPath);
+        else if (Directory.Exists(fullOldPath))
+            Directory.Move(fullOldPath, fullNewPath);
 
-            if (File.Exists(fullOldPath))
-            {
-                //Directory.CreateDirectory(Path.GetDirectoryName(fullNewPath)!);
-                File.Move(fullOldPath, fullNewPath);
-
-            }
-            else if (Directory.Exists(fullOldPath))
-            {
-                Directory.Move(fullOldPath, fullNewPath);
-            }
-        }
-        catch (Exception e)
-        {
-            return Task.FromException(e);
-        }
-        
         return Task.CompletedTask;
     }
 
     // ────────────────── Directory Size ──────────────────
 
-    /// <inheritdoc />
     public Task<long> GetDirectorySizeAsync(string relativePath)
     {
         var fullPath = ToAbsolutePath(relativePath);
         var dirInfo = new DirectoryInfo(fullPath);
         if (!dirInfo.Exists) return Task.FromResult(0L);
 
-        var size = dirInfo.EnumerateFiles("*", SearchOption.AllDirectories)
-                          .Sum(f => f.Length);
+        var size = CalculateDirectorySizeSafe(fullPath);
         return Task.FromResult(size);
     }
 
-    /// <summary>
-    /// Recursively calculates total file size within a directory.
-    /// Uses EnumerateFiles for memory efficiency on large trees.
-    /// </summary>
-    private static long CalculateDirectorySize(string path)
-    {
-        try
-        {
-            return new DirectoryInfo(path)
-                .EnumerateFiles("*", SearchOption.AllDirectories)
-                .Sum(f => f.Length);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // If we can't read some subdirectory, return what we can
-            return CalculateDirectorySizeSafe(path);
-        }
-    }
-
-    /// <summary>
-    /// Fallback that skips inaccessible subdirectories instead of failing.
-    /// </summary>
     private static long CalculateDirectorySizeSafe(string path)
     {
         long total = 0;
@@ -216,7 +172,6 @@ public class FileSystemStorage : IStorageEngine
 
         List<AccessEntry> acl = new();
 
-        // Try to load ACLs from DB if a service provider is available
         if (_serviceProvider != null)
         {
             try
@@ -328,6 +283,4 @@ public class FileSystemStorage : IStorageEngine
         Directory.CreateDirectory(fullPath);
         return Task.CompletedTask;
     }
-
-
 }

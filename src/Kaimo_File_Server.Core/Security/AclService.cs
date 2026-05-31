@@ -3,7 +3,6 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Microsoft.Extensions.DependencyInjection;
-using System.Net.NetworkInformation;
 
 namespace Kaimo_File_Server.Core.Security;
 
@@ -13,18 +12,14 @@ public class AclService : IAclService
 
     public AclService(IServiceProvider serviceProvider)
     {
-        _serviceProvider = serviceProvider;
+        _serviceProvider = serviceProvider
+            ?? throw new ArgumentNullException(nameof(serviceProvider));
     }
 
-    // Parameterloser Konstruktor für Unit Tests (kein DB-Zugriff)
-    public AclService() : this(null!)
-    {
-    }
-
-    // ── Sync API für Unit Tests und direkte ACL-Auswertung ──
+    // ── Sync API for unit tests and direct ACL evaluation ──
 
     /// <summary>
-    /// Prüft Zugriff anhand einer bereits geladenen ACL-Liste (kein DB-Zugriff).
+    /// Checks access against an already-loaded ACL list (no DB access).
     /// </summary>
     public bool HasAccess(UserContext? userContext, FileMetadata file, FilePermission permission)
     {
@@ -57,8 +52,8 @@ public class AclService : IAclService
     }
 
     /// <summary>
-    /// Filtert geerbte ACL-Einträge nach Vererbungsregeln (kein DB-Zugriff).
-    /// Simuliert: "Welche Einträge eines Eltern-Ordners gelten für ein Kind?"
+    /// Filters inherited ACL entries by inheritance rules (no DB access).
+    /// Simulates: "Which parent-folder entries apply to a child?"
     /// </summary>
     public List<AccessEntry> GetEffectiveAcl(List<AccessEntry> parentAcl, bool isDirectory)
     {
@@ -85,40 +80,36 @@ public class AclService : IAclService
         return result;
     }
 
+    // BUG FIX: was missing `await using` → scope was never disposed
     public async Task RenameAclPathAsync(Guid shareId, string oldRelativePath, string newRelativePath)
     {
-        var scope = _serviceProvider.CreateAsyncScope();
+        await using var scope = _serviceProvider.CreateAsyncScope();
         var aclRepo = scope.ServiceProvider.GetRequiredService<IAclRepository>();
 
         await aclRepo.RenameFileMetadataPathsAsync(shareId, oldRelativePath, newRelativePath);
     }
 
-    /// <summary>
-    /// Deletes an ACL entry
-    /// </summary>
-    /// <param name="shareId">Guid of share, where ACL is based in</param>
-    /// <param name="relativePath">Path from share to file/folder</param>
+    // BUG FIX: was missing `await using` → scope was never disposed
     public async Task DeleteAclAsync(Guid shareId, string relativePath)
     {
-        var scope = _serviceProvider.CreateAsyncScope();
+        await using var scope = _serviceProvider.CreateAsyncScope();
         var aclRepo = scope.ServiceProvider.GetRequiredService<IAclRepository>();
 
-        // Get ACL Entries which shall be deleted
-        var aclEntries = await aclRepo.GetAclsForPathsAsync(shareId, new List<string>() { relativePath });
+        var aclEntries = await aclRepo.GetAclsForPathsAsync(
+            shareId, new List<string> { relativePath });
 
-        var listOfGuids = aclEntries
-            .SelectMany(e => e.Acl
-            .Select(a => a.Id))
+        var entryIds = aclEntries
+            .SelectMany(e => e.Acl.Select(a => a.Id))
             .Distinct()
             .ToList();
 
-        foreach (var entryGuid in listOfGuids)
+        foreach (var entryGuid in entryIds)
         {
             await aclRepo.DeleteAsync(entryGuid);
         }
     }
 
-    // ── Async API für Produktion (mit DB) ──
+    // ── Async API for production (with DB) ──
 
     public async Task<bool> HasAccessAsync(
         UserContext userContext, Guid shareId,

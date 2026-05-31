@@ -311,12 +311,10 @@ public class UserListViewModel
     {
         if (_actorContext == null) return;
 
-        // Global admin = has Administrator system role
         IsGlobalAdmin = _actorContext.Roles.Any(r => r.Name == "Administrator");
 
         if (IsGlobalAdmin)
         {
-            // Global admin can do everything
             CanAccessPage = true;
             CanCreateUsers = true;
             CanManageGroups = true;
@@ -328,7 +326,6 @@ public class UserListViewModel
         }
         else
         {
-            // Check scoped permissions via ManagementAuthService
             CanCreateUsers = await _mgmtAuth.HasAnyPermissionAsync(
                 _actorContext, ManagementPermission.CreateUsers);
 
@@ -345,25 +342,35 @@ public class UserListViewModel
             CanManageRoles = await _mgmtAuth.HasAnyPermissionAsync(
                 _actorContext, ManagementPermission.AssignRoles);
 
-            // Page is accessible if the actor has ANY management permission
             CanAccessPage = CanCreateUsers || canEditUsers || CanManageGroups
                           || CanManageRoles || canViewDepts;
 
-            // Resolve authorized departments
-            var createDeptIds = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
-                _actorContext, ManagementPermission.CreateUsers);
-            AuthorizedDepartmentsForCreate = await LoadDepartmentsByIdsAsync(createDeptIds);
+            // ── Resolve authorized departments using AuthorizedScopeResult ──
 
-            var viewDeptIds = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
+            var createResult = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
+                _actorContext, ManagementPermission.CreateUsers);
+            AuthorizedDepartmentsForCreate = await LoadDepartmentsFromScopeResultAsync(createResult);
+
+            var editResult = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
                 _actorContext, ManagementPermission.EditUserProfiles);
-            // Also include departments where the actor can view
-            var viewOnlyIds = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
+            var viewResult = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
                 _actorContext, ManagementPermission.ViewDepartment);
-            var allViewIds = viewDeptIds.Union(viewOnlyIds).Distinct().ToList();
-            AuthorizedDepartmentsForView = await LoadDepartmentsByIdsAsync(allViewIds);
+
+            // Merge: if either result is unrestricted, view is unrestricted
+            if (editResult.IsUnrestricted || viewResult.IsUnrestricted)
+            {
+                AuthorizedDepartmentsForView = await _departmentRepo.GetAllAsync();
+            }
+            else
+            {
+                var mergedIds = editResult.ScopeIds
+                    .Concat(viewResult.ScopeIds)
+                    .Distinct()
+                    .ToList();
+                AuthorizedDepartmentsForView = await LoadDepartmentsByIdsAsync(mergedIds);
+            }
         }
 
-        // Pre-select the first authorized department for create
         CreateUserDepartmentId = AuthorizedDepartmentsForCreate.FirstOrDefault()?.Id;
     }
 
@@ -399,6 +406,21 @@ public class UserListViewModel
             _actorContext, user.Id, ManagementPermission.ResetPasswords);
     }
 
+    /// <summary>
+    /// Converts an AuthorizedScopeResult into a list of Department entities.
+    /// If unrestricted, loads all departments from the DB.
+    /// </summary>
+    private async Task<List<Department>> LoadDepartmentsFromScopeResultAsync(
+        AuthorizedScopeResult result)
+    {
+        if (result.IsUnrestricted)
+            return await _departmentRepo.GetAllAsync();
+
+        if (result.ScopeIds.Count == 0)
+            return [];
+
+        return await LoadDepartmentsByIdsAsync(result.ScopeIds.ToList());
+    }
     private async Task<List<Department>> LoadDepartmentsByIdsAsync(List<Guid> ids)
     {
         if (ids.Count == 0) return [];
