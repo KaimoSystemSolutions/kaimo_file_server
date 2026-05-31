@@ -32,14 +32,34 @@ public class SmbFileSystem : INTFileStore
     // The FileHandle captures the user at creation time — no mutable shared state.
 
     private static readonly AsyncLocal<UserContext?> _sessionUser = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, UserContext>
+        _userContextFallback = new(StringComparer.OrdinalIgnoreCase);
 
-    public static void SetSessionUser(UserContext user) => _sessionUser.Value = user;
-
-    private UserContext RequireSessionUser()
+    public static void SetSessionUser(UserContext user)
     {
-        return _sessionUser.Value
-            ?? throw new InvalidOperationException(
-                "No authenticated user context. SetSessionUser must be called before filesystem operations.");
+        _sessionUser.Value = user;
+        // Fallback cache keyed by username for cross-context scenarios
+        var name = user?.User?.Username;
+        if (!string.IsNullOrEmpty(name))
+            _userContextFallback[name] = user;
+    }
+
+    private UserContext RequireSessionUser(SecurityContext? securityContext = null)
+    {
+        // 1. AsyncLocal — works when same ExecutionContext
+        if (_sessionUser.Value != null)
+            return _sessionUser.Value;
+
+        // 2. Fallback — resolve via SecurityContext username
+        if (securityContext?.UserName != null &&
+            _userContextFallback.TryGetValue(securityContext.UserName, out var cached))
+        {
+            _sessionUser.Value = cached; // re-populate for subsequent calls in this context
+            return cached;
+        }
+
+        throw new InvalidOperationException(
+            "No authenticated user context. SetSessionUser must be called before filesystem operations.");
     }
 
     // ────────────────── Path helpers ──────────────────
@@ -147,7 +167,7 @@ public class SmbFileSystem : INTFileStore
 
         try
         {
-            var user = RequireSessionUser();
+            var user = RequireSessionUser(securityContext);
 
             // Snapshot path → route to version store (readonly)
             if (SmbSnapshotHandler.IsSnapshotPath(path) && _serviceProvider != null)
@@ -255,8 +275,11 @@ public class SmbFileSystem : INTFileStore
         }
 
         // Single permission gate — no double-checking in ReadFile/WriteFile
-        bool needsWrite = (createDisposition != CreateDisposition.FILE_OPEN);
-        if (needsWrite)
+        FileAccess fileAccess = MapFileAccess(desiredAccess);
+        bool requestsWrite = createDisposition != CreateDisposition.FILE_OPEN
+            || fileAccess is FileAccess.Write or FileAccess.ReadWrite;
+
+        if (requestsWrite)
         {
             if (!CanWrite(relativePath, user))
                 return NTStatus.STATUS_ACCESS_DENIED;
@@ -278,7 +301,6 @@ public class SmbFileSystem : INTFileStore
             _ => FileMode.OpenOrCreate
         };
 
-        FileAccess fileAccess = MapFileAccess(desiredAccess);
         FileShare fileShare = MapFileShare(shareAccess);
         var fs = new FileStream(absolutePath, mode, fileAccess, fileShare);
 
@@ -664,21 +686,40 @@ public class SmbFileSystem : INTFileStore
             if (Directory.Exists(newAbsPath))
                 return NTStatus.STATUS_OBJECT_NAME_COLLISION;
             Directory.Move(h.AbsolutePath, newAbsPath);
-        }
-        else
-        {
-            h.Stream?.Dispose();
-            h.Stream = null;
-            if (File.Exists(newAbsPath) && !rename.ReplaceIfExists)
-                return NTStatus.STATUS_OBJECT_NAME_COLLISION;
-            if (File.Exists(newAbsPath) && rename.ReplaceIfExists)
-                File.Delete(newAbsPath);
-            File.Move(h.AbsolutePath, newAbsPath);
-            h.Stream = new FileStream(newAbsPath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+            h.AbsolutePath = newAbsPath;
+            return NTStatus.STATUS_SUCCESS;
         }
 
-        h.AbsolutePath = newAbsPath;
-        return NTStatus.STATUS_SUCCESS;
+        // Check collision before touching the stream
+        if (File.Exists(newAbsPath) && !rename.ReplaceIfExists)
+            return NTStatus.STATUS_OBJECT_NAME_COLLISION;
+
+        var oldPath = h.AbsolutePath;
+        h.Stream?.Dispose();
+        h.Stream = null;
+
+        try
+        {
+            if (File.Exists(newAbsPath) && rename.ReplaceIfExists)
+                File.Delete(newAbsPath);
+
+            File.Move(oldPath, newAbsPath);
+            h.AbsolutePath = newAbsPath;
+            h.Stream = new FileStream(newAbsPath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+            return NTStatus.STATUS_SUCCESS;
+        }
+        catch (Exception)
+        {
+            // Recovery: try to reopen the original file so the handle isn't dead
+            try
+            {
+                if (File.Exists(oldPath))
+                    h.Stream = new FileStream(oldPath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+            }
+            catch { /* Stream bleibt null — CloseFile handled das */ }
+
+            return NTStatus.STATUS_ACCESS_DENIED;
+        }
     }
 
     private static NTStatus HandleSetBasicInfo(FileHandle h, FileBasicInformation basicInfo)

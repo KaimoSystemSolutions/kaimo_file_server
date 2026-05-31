@@ -81,7 +81,7 @@ public class LoginViewModel
             var roleNames = userContext.Roles.Select(r => r.Name);
 
             var token = _jwtService.GenerateToken(user.Id, user.Username, user.Name, roleNames);
-            await _authState.LoginAsync(token);
+            await _authState.StoreTokenInLocalStorageAsync(token);
 
             // Passwort sofort aus dem Speicher entfernen
             Password = "";

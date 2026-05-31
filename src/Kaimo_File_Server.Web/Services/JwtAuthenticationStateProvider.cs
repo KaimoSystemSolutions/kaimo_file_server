@@ -70,7 +70,7 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
         }
     }
 
-    public async Task LoginAsync(string token)
+    public async Task StoreTokenInLocalStorageAsync(string token)
     {
         await _js.InvokeVoidAsync("localStorage.setItem", "auth_token", token);
 
