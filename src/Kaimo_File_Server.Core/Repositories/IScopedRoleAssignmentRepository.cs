@@ -17,15 +17,17 @@ namespace Kaimo_File_Server.Core.Repositories
         /// Returns all role assignments for a given principal (user or group),
         /// across every scope type.
         /// </summary>
-        /// <param name="principalId">The user or group identifier.</param>
         Task<List<ScopedRoleAssignment>> GetByPrincipalAsync(Guid principalId);
 
         /// <summary>
-        /// Returns all role assignments within a specific scope.
-        /// Example: "Who has roles in Department X?"
+        /// Returns all role assignments that reference a specific role.
+        /// Used to display "who has this role?" without N+1 queries.
         /// </summary>
-        /// <param name="scopeType">The kind of scope (Global, Department, Share).</param>
-        /// <param name="scopeId">The identifier of the scope entity.</param>
+        Task<List<ScopedRoleAssignment>> GetByRoleAsync(Guid roleId);
+
+        /// <summary>
+        /// Returns all role assignments within a specific scope.
+        /// </summary>
         Task<List<ScopedRoleAssignment>> GetByScopeAsync(ScopeType scopeType, Guid scopeId);
 
         /// <summary>
@@ -38,17 +40,12 @@ namespace Kaimo_File_Server.Core.Repositories
         /// Collects the effective role assignments for a user by considering
         /// both direct user assignments and assignments inherited via group membership.
         /// </summary>
-        /// <param name="userId">The user's identifier.</param>
-        /// <param name="groupIds">
-        /// All group IDs the user belongs to (pre-resolved by the caller).
-        /// </param>
         Task<List<ScopedRoleAssignment>> GetEffectiveAssignmentsAsync(
             Guid userId, IEnumerable<Guid> groupIds);
 
         /// <summary>
         /// Creates a new scoped role assignment.
         /// </summary>
-        /// <returns>The created assignment with server-generated fields populated.</returns>
         Task<ScopedRoleAssignment> CreateAsync(ScopedRoleAssignment assignment);
 
         /// <summary>
@@ -58,7 +55,6 @@ namespace Kaimo_File_Server.Core.Repositories
 
         /// <summary>
         /// Removes all role assignments that belong to a given scope.
-        /// Typically called when deleting the scope entity itself (e.g. a department).
         /// </summary>
         Task DeleteByScopeAsync(ScopeType scopeType, Guid scopeId);
     }

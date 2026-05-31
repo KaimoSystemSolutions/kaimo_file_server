@@ -1386,24 +1386,13 @@ public class UserListViewModel
     /// </summary>
     private async Task LoadRoleScopedAssignmentsAsync(Guid roleId)
     {
-        var allAssignments = new List<ScopedRoleAssignment>();
+        // FIX: Single query instead of iterating all users + groups
+        var allAssignments = await _assignmentRepo.GetByRoleAsync(roleId);
 
         var users = await _userRepo.GetAllAsync();
-        foreach (var user in users)
-        {
-            var assignments = await _assignmentRepo.GetByPrincipalAsync(user.Id);
-            allAssignments.AddRange(assignments.Where(a => a.RoleId == roleId));
-        }
-
         var groups = await _groupRepo.GetAllAsync();
-        foreach (var group in groups)
-        {
-            var assignments = await _assignmentRepo.GetByPrincipalAsync(group.Id);
-            allAssignments.AddRange(assignments.Where(a => a.RoleId == roleId));
-        }
-
-        allAssignments = allAssignments.DistinctBy(a => a.Id).ToList();
-        RoleScopedAssignments = await ResolveScopedAssignmentsAsync(allAssignments, users, groups);
+        RoleScopedAssignments = await ResolveScopedAssignmentsAsync(
+            allAssignments, users, groups);
     }
 
     /// <summary>

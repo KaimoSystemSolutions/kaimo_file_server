@@ -24,6 +24,17 @@ public class ScopedRoleAssignmentRepository : IScopedRoleAssignmentRepository
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Single-query lookup: all assignments referencing a given role.
+    /// Replaces the old O(users + groups) iteration in the UI layer.
+    /// </summary>
+    public async Task<List<ScopedRoleAssignment>> GetByRoleAsync(Guid roleId)
+    {
+        return await _db.ScopedRoleAssignments
+            .Where(a => a.RoleId == roleId)
+            .ToListAsync();
+    }
+
     public async Task<List<ScopedRoleAssignment>> GetByScopeAsync(
         ScopeType scopeType, Guid scopeId)
     {

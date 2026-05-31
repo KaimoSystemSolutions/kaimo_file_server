@@ -12,6 +12,8 @@ public class FileService : IFileService
     private readonly IAclService _acl;
     private readonly Guid _shareId;
 
+    private const string RecycleBinFolder = ".RECYCLE_BIN";
+
     public FileService(IStorageEngine storage, IAclService acl, Guid shareId)
     {
         _storage = storage;
@@ -30,7 +32,6 @@ public class FileService : IFileService
 
         var items = await _storage.ListAsync(normalizedDir);
 
-        // Filter each item individually — user only sees what they're allowed to
         var visible = new List<FileMetadata>();
         foreach (var item in items)
         {
@@ -130,13 +131,18 @@ public class FileService : IFileService
         if (!await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.Delete))
             throw new UnauthorizedAccessException($"Delete denied for '{normalized}'");
 
-        // Entry will be moved to .recycle of share
-        if (isRecycleEnabled && !(path.StartsWith(".RECYCLE_BIN")))
+        // BUG FIX: was checking unnormalized `path` instead of `normalized`.
+        // Also: use OrdinalIgnoreCase to handle case-insensitive file systems.
+        var isAlreadyInRecycleBin = normalized.StartsWith(
+            RecycleBinFolder, StringComparison.OrdinalIgnoreCase);
+
+        if (isRecycleEnabled && !isAlreadyInRecycleBin)
         {
-            await _storage.MoveAsync(normalized, ".RECYCLE_BIN/"+normalized);
-            await _acl.RenameAclPathAsync(_shareId, normalized, ".RECYCLE_BIN/" + normalized);
+            var recyclePath = ShareRelativePath.Combine(RecycleBinFolder, normalized);
+            await _storage.MoveAsync(normalized, recyclePath);
+            await _acl.RenameAclPathAsync(_shareId, normalized, recyclePath);
         }
-        else // Entry will be deleted
+        else
         {
             await _storage.DeleteAsync(normalized);
             await _acl.DeleteAclAsync(_shareId, normalized);
@@ -159,11 +165,12 @@ public class FileService : IFileService
         var oldNormalized = ShareRelativePath.Normalize(oldPath);
         var newNormalized = ShareRelativePath.Normalize(newPath);
         var isDir = await _storage.IsDirectoryAsync(oldNormalized);
-        
+
         if (!await _acl.HasAccessAsync(user, _shareId, oldNormalized, isDir, FilePermission.Delete))
             throw new UnauthorizedAccessException($"Rename (delete) denied for '{oldNormalized}'");
         if (!await _acl.HasAccessAsync(user, _shareId, newNormalized, isDir, FilePermission.CreateWriteData))
             throw new UnauthorizedAccessException($"Rename (create) denied for '{newNormalized}'");
+
         if (isDir)
         {
             await _storage.RenameDirectoryAsync(oldNormalized, newNormalized);

@@ -260,11 +260,11 @@ public class FileBrowserViewModel
         if (string.IsNullOrWhiteSpace(newName))
             return OperationResult.Fail("Bitte einen neuen Namen eingeben.");
 
-        // File- / Directoryname Validation
         if (!WindowsFileNameHelper.IsValid(newName))
         {
             var errors = WindowsFileNameHelper.GetValidationErrors(newName);
-            return OperationResult.Fail("Der Name enthält ungültige Zeichen.  Fehler: " + string.Join(", ", errors));
+            return OperationResult.Fail(
+                "Der Name enthält ungültige Zeichen.  Fehler: " + string.Join(", ", errors));
         }
 
         try
@@ -277,11 +277,17 @@ public class FileBrowserViewModel
             if (relativePath.StartsWith(CurrentShare.Path))
                 relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
 
-            await _fileService.RenameAsync(relativePath, newName, userContext);
+            // BUG FIX: Construct the full sibling path instead of passing
+            // just the bare name. FileService.RenameAsync expects a complete
+            // share-relative target path, not just a filename.
+            var parentDir = Kaimo_File_Server.Core.Helpers.ShareRelativePath.GetParent(relativePath);
+            var newRelativePath = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Combine(parentDir, newName);
 
-            _logger.LogInformation("{Type} renamed: '{OldPath}' -> '{NewName}' by {User}",
+            await _fileService.RenameAsync(relativePath, newRelativePath, userContext);
+
+            _logger.LogInformation("{Type} renamed: '{OldPath}' -> '{NewPath}' by {User}",
                 item.IsDirectory ? "Directory" : "File",
-                relativePath, newName, userContext.User.Username);
+                relativePath, newRelativePath, userContext.User.Username);
 
             return OperationResult.Ok();
         }
@@ -327,7 +333,7 @@ public class FileBrowserViewModel
         var distinctPaths = paths.Distinct().ToList();
 
         await using var db = await _dbFactory.CreateDbContextAsync();
-        // Todo, better error handling, but not important at the moment
+
         try
         {
             AclCounts = await db.FileMetadata
@@ -335,9 +341,11 @@ public class FileBrowserViewModel
                 .Select(fm => new { fm.Path, Count = fm.Acl.Count })
                 .ToDictionaryAsync(x => x.Path, x => x.Count);
         }
-        catch
+        catch (Exception ex)
         {
-
+            // FIX: was silently swallowed — now logged so failures are visible
+            _logger.LogWarning(ex, "Failed to load ACL counts for share '{ShareName}'",
+                CurrentShare.Name);
         }
     }
 

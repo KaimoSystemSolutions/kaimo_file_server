@@ -32,16 +32,27 @@ public class SmbFileSystem : INTFileStore
     // The FileHandle captures the user at creation time — no mutable shared state.
 
     private static readonly AsyncLocal<UserContext?> _sessionUser = new();
+
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, UserContext>
         _userContextFallback = new(StringComparer.OrdinalIgnoreCase);
+
+    private const int MaxCachedUsers = 256;
 
     public static void SetSessionUser(UserContext user)
     {
         _sessionUser.Value = user;
-        // Fallback cache keyed by username for cross-context scenarios
+
         var name = user?.User?.Username;
         if (!string.IsNullOrEmpty(name))
+        {
+            // FIX: Prevent unbounded growth — evict all when cache is full.
+            // A proper LRU would be better for production, but this stops
+            // the memory leak without adding a dependency.
+            if (_userContextFallback.Count >= MaxCachedUsers)
+                _userContextFallback.Clear();
+
             _userContextFallback[name] = user;
+        }
     }
 
     private UserContext RequireSessionUser(SecurityContext? securityContext = null)
@@ -925,6 +936,8 @@ public class SmbFileSystem : INTFileStore
             ? FileAttributes.Directory | FileAttributes.ReadOnly
             : FileAttributes.Normal | FileAttributes.ReadOnly;
 
+        long alloc = RoundUpAllocation(size);
+
         return cls switch
         {
             FileInformationClass.FileBasicInformation => new FileBasicInformation
@@ -935,14 +948,48 @@ public class SmbFileSystem : INTFileStore
                 ChangeTime = timestamp,
                 FileAttributes = attrs
             },
+
             FileInformationClass.FileStandardInformation => new FileStandardInformation
             {
-                AllocationSize = RoundUpAllocation(size),
+                AllocationSize = alloc,
                 EndOfFile = size,
                 NumberOfLinks = 1,
                 DeletePending = false,
                 Directory = isDirectory
             },
+
+            // FIX: This was missing — caused the InvalidCastException
+            FileInformationClass.FileNetworkOpenInformation => new FileNetworkOpenInformation
+            {
+                CreationTime = timestamp,
+                LastWriteTime = timestamp,
+                LastAccessTime = timestamp,
+                ChangeTime = timestamp,
+                AllocationSize = alloc,
+                EndOfFile = size,
+                FileAttributes = attrs
+            },
+
+            FileInformationClass.FileInternalInformation =>
+                new FileInternalInformation { IndexNumber = 0 },
+
+            FileInformationClass.FileEaInformation =>
+                new FileEaInformation { EaSize = 0 },
+
+            FileInformationClass.FileAttributeTagInformation =>
+                new FileAttributeTagInformation
+                {
+                    FileAttributes = attrs,
+                    ReparsePointTag = 0
+                },
+
+            FileInformationClass.FileStreamInformation when !isDirectory =>
+                CreateFileStreamInfo(size, alloc),
+
+            // Fallback: return the type that matches the requested class
+            // where possible. If we truly don't know what to return,
+            // FileBasicInformation is the safest default — but only for
+            // FileBasicInformation requests. For unknown classes, log it.
             _ => new FileBasicInformation
             {
                 CreationTime = timestamp,

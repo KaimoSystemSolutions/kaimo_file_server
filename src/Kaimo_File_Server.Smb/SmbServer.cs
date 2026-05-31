@@ -155,24 +155,14 @@ namespace Kaimo_File_Server.Smb
 
                 SmbFileSystem.SetSessionUser(userContext);
 
-                bool hasAccess = authLookup
+                // BUG FIX: ShareAccessRepository.HasAccessAsync already checks
+                // all of the user's groups internally (via a JOIN on UserGroups).
+                // The old code had an extra loop over userContext.Groups that
+                // duplicated this work and could produce false positives if the
+                // repository and the cached UserContext disagreed.
+                args.Allow = authLookup
                     .HasShareAccessAsync(shareName, userContext.User.Id)
                     .GetAwaiter().GetResult();
-
-                if (!hasAccess)
-                {
-                    foreach (var group in userContext.Groups)
-                    {
-                        if (authLookup.HasShareAccessAsync(shareName, group.Id)
-                                .GetAwaiter().GetResult())
-                        {
-                            hasAccess = true;
-                            break;
-                        }
-                    }
-                }
-
-                args.Allow = hasAccess;
             }
             catch (Exception ex)
             {
