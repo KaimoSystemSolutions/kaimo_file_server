@@ -165,6 +165,20 @@ public class SmbFileSystem : INTFileStore
     private bool CanDelete(string relativePath, UserContext user)
         => Task.Run(() => _fileService.CanDeleteAsync(relativePath, user)).GetAwaiter().GetResult();
 
+    private bool CanList(string relativePath, UserContext user)
+        => Task.Run(() => _fileService.CanListAsync(relativePath, user)).GetAwaiter().GetResult();
+
+    // ────────────────── Share-level access gate ──────────────────
+    //
+    // Verifies the user can access the share at all before any file operation.
+    // Uses CanList("") on the share root as the gate — if the user has no
+    // ListReadData permission on the root, they cannot see or touch anything.
+
+    private bool EnsureShareAccess(UserContext user)
+    {
+        return CanList("", user);
+    }
+
     // ═══════════════════════ CREATE ═══════════════════════
 
     public NTStatus CreateFile(
@@ -179,6 +193,12 @@ public class SmbFileSystem : INTFileStore
         try
         {
             var user = RequireSessionUser(securityContext);
+
+            // ── Share-level access gate ──
+            // If the user has no list permission on the share root,
+            // deny access entirely — the share is invisible to them.
+            if (!EnsureShareAccess(user))
+                return NTStatus.STATUS_ACCESS_DENIED;
 
             // Snapshot path → route to version store (readonly)
             if (SmbSnapshotHandler.IsSnapshotPath(path) && _serviceProvider != null)
@@ -231,6 +251,9 @@ public class SmbFileSystem : INTFileStore
             case CreateDisposition.FILE_OPEN:
                 if (!Directory.Exists(absolutePath))
                 { fileStatus = FileStatus.FILE_DOES_NOT_EXIST; return NTStatus.STATUS_OBJECT_PATH_NOT_FOUND; }
+                // Opening an existing directory requires at least list/read permission
+                if (!CanRead(relativePath, user))
+                    return NTStatus.STATUS_ACCESS_DENIED;
                 fileStatus = FileStatus.FILE_OPENED;
                 break;
 
@@ -244,6 +267,9 @@ public class SmbFileSystem : INTFileStore
                 }
                 else
                 {
+                    // Opening an existing directory requires at least list/read permission
+                    if (!CanRead(relativePath, user))
+                        return NTStatus.STATUS_ACCESS_DENIED;
                     fileStatus = FileStatus.FILE_OPENED;
                 }
                 break;
@@ -285,19 +311,34 @@ public class SmbFileSystem : INTFileStore
                 break;
         }
 
-        // Single permission gate — no double-checking in ReadFile/WriteFile
+        // ── Granular permission check based on requested access ──
         FileAccess fileAccess = MapFileAccess(desiredAccess);
         bool requestsWrite = createDisposition != CreateDisposition.FILE_OPEN
             || fileAccess is FileAccess.Write or FileAccess.ReadWrite;
 
-        if (requestsWrite)
+        if (!exists)
         {
+            // Creating a new file → need CreateWriteData on parent
+            if (!CanCreate(relativePath, user))
+                return NTStatus.STATUS_ACCESS_DENIED;
+        }
+        else if (requestsWrite)
+        {
+            // Opening existing file for write → need CreateWriteData on the file
             if (!CanWrite(relativePath, user))
                 return NTStatus.STATUS_ACCESS_DENIED;
         }
         else
         {
+            // Opening existing file for read → need ListReadData on the file
             if (!CanRead(relativePath, user))
+                return NTStatus.STATUS_ACCESS_DENIED;
+        }
+
+        // If DELETE_ON_CLOSE is requested, verify delete permission upfront
+        if ((createOptions & CreateOptions.FILE_DELETE_ON_CLOSE) != 0)
+        {
+            if (!CanDelete(relativePath, user))
                 return NTStatus.STATUS_ACCESS_DENIED;
         }
 
@@ -490,6 +531,8 @@ public class SmbFileSystem : INTFileStore
             // Empty path = snapshot root directory
             if (string.IsNullOrEmpty(relativePath))
             {
+                // Even snapshot root requires share-level list permission
+                // (already checked by EnsureShareAccess, but guard anyway)
                 handle = new SnapshotDirectoryHandle
                 {
                     AbsolutePath = _root,
@@ -500,6 +543,7 @@ public class SmbFileSystem : INTFileStore
                 return NTStatus.STATUS_SUCCESS;
             }
 
+            // Snapshot files are read-only — check read permission
             if (!CanRead(relativePath, user))
                 return NTStatus.STATUS_ACCESS_DENIED;
 
@@ -540,17 +584,23 @@ public class SmbFileSystem : INTFileStore
 
         // Snapshot directory listing
         if (handle is SnapshotDirectoryHandle sdh)
-            return QueryDirectoryImpl(out result, sdh.AbsolutePath, fileName, informationClass);
+            return QueryDirectoryImpl(out result, sdh.AbsolutePath, fileName, informationClass, sdh.User);
 
         var h = handle as FileHandle;
         if (h == null || !h.IsDirectory) return NTStatus.STATUS_INVALID_HANDLE;
 
-        return QueryDirectoryImpl(out result, h.AbsolutePath, fileName, informationClass);
+        // Check list permission on the directory itself
+        string dirRelativePath = ToShareRelativePath(h.AbsolutePath);
+        if (!CanList(dirRelativePath, h.User))
+            return NTStatus.STATUS_ACCESS_DENIED;
+
+        return QueryDirectoryImpl(out result, h.AbsolutePath, fileName, informationClass, h.User);
     }
 
     private NTStatus QueryDirectoryImpl(
         out List<QueryDirectoryFileInformation> result,
-        string absoluteDirPath, string fileName, FileInformationClass informationClass)
+        string absoluteDirPath, string fileName, FileInformationClass informationClass,
+        UserContext user)
     {
         result = new List<QueryDirectoryFileInformation>();
 
@@ -568,13 +618,27 @@ public class SmbFileSystem : INTFileStore
                 result.Add(CreateDirEntryInfo("..", dirInfo.Parent ?? dirInfo, informationClass));
             }
 
+            // ── ACL-filtered directory listing ──
+            // Each child entry is only included if the user has ListReadData permission.
+            string dirRelativePath = ToShareRelativePath(absoluteDirPath);
+
             foreach (var sub in dirInfo.GetDirectories())
-                if (MatchesPattern(sub.Name, pattern))
+            {
+                if (!MatchesPattern(sub.Name, pattern)) continue;
+
+                string childRelative = ShareRelativePath.Combine(dirRelativePath, sub.Name);
+                if (CanRead(childRelative, user))
                     result.Add(CreateEntryInfo(sub.Name, sub, true, informationClass));
+            }
 
             foreach (var file in dirInfo.GetFiles())
-                if (MatchesPattern(file.Name, pattern))
+            {
+                if (!MatchesPattern(file.Name, pattern)) continue;
+
+                string childRelative = ShareRelativePath.Combine(dirRelativePath, file.Name);
+                if (CanRead(childRelative, user))
                     result.Add(CreateEntryInfo(file.Name, file, false, informationClass));
+            }
 
             return result.Count == 0 ? NTStatus.STATUS_NO_SUCH_FILE : NTStatus.STATUS_SUCCESS;
         }
@@ -654,6 +718,13 @@ public class SmbFileSystem : INTFileStore
         {
             if (information is FileDispositionInformation disposition)
             {
+                // If requesting delete, verify permission upfront
+                if (disposition.DeletePending)
+                {
+                    string relativePath = ToShareRelativePath(h.AbsolutePath);
+                    if (!CanDelete(relativePath, h.User))
+                        return NTStatus.STATUS_ACCESS_DENIED;
+                }
                 h.DeleteOnClose = disposition.DeletePending;
                 return NTStatus.STATUS_SUCCESS;
             }
@@ -691,6 +762,18 @@ public class SmbFileSystem : INTFileStore
     private NTStatus HandleRename(FileHandle h, FileRenameInformationType2 rename)
     {
         string newAbsPath = ToAbsolutePath(rename.FileName);
+        string oldRelativePath = ToShareRelativePath(h.AbsolutePath);
+        string newRelativePath = ToShareRelativePath(newAbsPath);
+
+        // ── ACL check: Delete on source + Create on destination ──
+        // Mirrors Windows NTFS rename semantics:
+        //   - Source requires DELETE permission
+        //   - Destination parent requires FILE_ADD_FILE / FILE_ADD_SUBDIRECTORY
+        if (!CanDelete(oldRelativePath, h.User))
+            return NTStatus.STATUS_ACCESS_DENIED;
+
+        if (!CanCreate(newRelativePath, h.User))
+            return NTStatus.STATUS_ACCESS_DENIED;
 
         if (h.IsDirectory)
         {
@@ -698,12 +781,23 @@ public class SmbFileSystem : INTFileStore
                 return NTStatus.STATUS_OBJECT_NAME_COLLISION;
             Directory.Move(h.AbsolutePath, newAbsPath);
             h.AbsolutePath = newAbsPath;
+
+            // Propagate rename to ACL paths in the database
+            UpdateAclPathsOnRename(oldRelativePath, newRelativePath);
+
             return NTStatus.STATUS_SUCCESS;
         }
 
         // Check collision before touching the stream
         if (File.Exists(newAbsPath) && !rename.ReplaceIfExists)
             return NTStatus.STATUS_OBJECT_NAME_COLLISION;
+
+        // If replacing an existing file, check delete permission on the target too
+        if (File.Exists(newAbsPath) && rename.ReplaceIfExists)
+        {
+            if (!CanDelete(newRelativePath, h.User))
+                return NTStatus.STATUS_ACCESS_DENIED;
+        }
 
         var oldPath = h.AbsolutePath;
         h.Stream?.Dispose();
@@ -717,6 +811,10 @@ public class SmbFileSystem : INTFileStore
             File.Move(oldPath, newAbsPath);
             h.AbsolutePath = newAbsPath;
             h.Stream = new FileStream(newAbsPath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+
+            // Propagate rename to ACL paths in the database
+            UpdateAclPathsOnRename(oldRelativePath, newRelativePath);
+
             return NTStatus.STATUS_SUCCESS;
         }
         catch (Exception)
@@ -730,6 +828,25 @@ public class SmbFileSystem : INTFileStore
             catch { /* Stream bleibt null — CloseFile handled das */ }
 
             return NTStatus.STATUS_ACCESS_DENIED;
+        }
+    }
+
+    /// <summary>
+    /// After a successful rename, update ACL paths in the database
+    /// so that permissions follow the file/directory to its new location.
+    /// </summary>
+    private void UpdateAclPathsOnRename(string oldRelativePath, string newRelativePath)
+    {
+        try
+        {
+            Task.Run(() => _fileService.RenameAsync(oldRelativePath, newRelativePath,
+                RequireSessionUser())).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            // ACL path update failure is logged but must not break the rename
+            Console.WriteLine(
+                $"[ACL Rename] Failed to update ACL paths '{oldRelativePath}' → '{newRelativePath}': {ex.Message}");
         }
     }
 
@@ -986,10 +1103,6 @@ public class SmbFileSystem : INTFileStore
             FileInformationClass.FileStreamInformation when !isDirectory =>
                 CreateFileStreamInfo(size, alloc),
 
-            // Fallback: return the type that matches the requested class
-            // where possible. If we truly don't know what to return,
-            // FileBasicInformation is the safest default — but only for
-            // FileBasicInformation requests. For unknown classes, log it.
             _ => new FileBasicInformation
             {
                 CreationTime = timestamp,
