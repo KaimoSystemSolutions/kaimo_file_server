@@ -58,6 +58,15 @@ else
                     </svg>
                 </button>
             }
+            else if (VM.ActiveTab == AdminTab.Departments && (VM.CanManageDepartments || VM.IsGlobalAdmin))
+            {
+                <button class="btn-icon" title="Abteilung erstellen" @onclick="() => VM.StartCreateDepartment()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                </button>
+            }
         </div>
     </div>
 
@@ -94,6 +103,17 @@ else
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 </svg>
                 Rollen
+            </button>
+        }
+        @if (VM.CanManageDepartments || VM.IsGlobalAdmin)
+        {
+            <button class="admin-tab @(VM.ActiveTab == AdminTab.Departments ? "active" : "")"
+                    @onclick="() => SwitchTab(AdminTab.Departments)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+                Abteilungen
             </button>
         }
     </div>
@@ -226,9 +246,34 @@ else
         </div>
     }
 
+    @if (VM.IsCreatingDepartment)
+    {
+        <div class="create-form-card">
+            <h3>Neue Abteilung erstellen</h3>
+            <div class="create-form-fields">
+                <div class="form-group">
+                    <label>Abteilungsname</label>
+                    <input type="text" class="edit-input" placeholder="z.B. Vertrieb"
+                           @bind="VM.CreateDepartmentName" @bind:event="oninput"
+                           @onkeydown="HandleCreateDepartmentKeyDown" />
+                </div>
+            </div>
+            @if (VM.ErrorMessage is not null)
+            {
+                <div class="error-banner" style="margin-top: 12px;">@VM.ErrorMessage</div>
+            }
+            <div class="create-form-actions">
+                <button class="btn-primary" @onclick="CreateDepartment" disabled="@VM.IsSaving">
+                    @(VM.IsSaving ? "Erstellt…" : "Erstellen")
+                </button>
+                <button class="btn-secondary" @onclick="() => VM.CancelCreate()">Abbrechen</button>
+            </div>
+        </div>
+    }
+
     @* ── Main Content ── *@
 
-    @if (VM.ErrorMessage is not null && !VM.IsEditing && !VM.IsCreatingUser && !VM.IsCreatingGroup && !VM.IsCreatingRole)
+    @if (VM.ErrorMessage is not null && !VM.IsEditing && !VM.IsCreatingUser && !VM.IsCreatingGroup && !VM.IsCreatingRole && !VM.IsCreatingDepartment)
     {
         <div class="error-banner">@VM.ErrorMessage</div>
     }
@@ -354,11 +399,45 @@ else
                             </div>
                         }
                         break;
+
+                    case AdminTab.Departments:
+                        @if (!VM.Departments.Any())
+                        {
+                            <div class="empty-state"><p>Keine Abteilungen vorhanden.</p></div>
+                        }
+                        else
+                        {
+                            <div class="file-list">
+                                <div class="file-row admin-row-header">
+                                    <div class="file-cell user-name">Abteilungsname</div>
+                                    <div class="file-cell user-size">ID</div>
+                                </div>
+                                @foreach (var dept in VM.Departments)
+                                {
+                                    var isSelected = VM.SelectedDepartment?.Id == dept.Id;
+                                    <div class="file-row admin-row-selectable @(isSelected ? "admin-row-selected" : "")"
+                                         @onclick="() => SelectDepartment(dept)">
+                                        <div class="file-cell user-name">
+                                            <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
+                                                 fill="none" stroke="@(isSelected ? "var(--accent)" : "var(--text-tertiary)")" stroke-width="1.5">
+                                                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                <polyline points="9 22 9 12 15 12 15 22" />
+                                            </svg>
+                                            <span>@dept.Name</span>
+                                        </div>
+                                        <div class="file-cell user-size" style="color: var(--text-tertiary); font-size: 12px;">
+                                            @dept.Id.ToString()
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        break;
                 }
             </div>
 
             @* ════════════════════ DETAIL PANEL (right) ════════════════════ *@
-            @if (VM.SelectedUser is not null || VM.SelectedGroup is not null || VM.SelectedRole is not null)
+            @if (VM.SelectedUser is not null || VM.SelectedGroup is not null || VM.SelectedRole is not null || VM.SelectedDepartment is not null)
             {
                 <div class="admin-detail">
 
@@ -1141,6 +1220,134 @@ else
                         }
                     }
 
+                    @* ──────────── DEPARTMENT DETAIL ──────────── *@
+                    else if (VM.SelectedDepartment is not null)
+                    {
+                        @if (VM.IsEditing)
+                        {
+                            @* ── Department Edit Mode ── *@
+                            <div class="detail-header">
+                                <h3>Abteilung bearbeiten</h3>
+                                <span class="detail-subtitle">@VM.SelectedDepartment.Name</span>
+                            </div>
+
+                            <div class="detail-field-grid">
+                                <div class="form-group">
+                                    <label>Name</label>
+                                    <input type="text" class="edit-input" @bind="VM.EditDepartmentName" />
+                                </div>
+                            </div>
+
+                            <div class="detail-section" style="margin-top: 16px;">
+                                <span class="detail-label">Mitglieder</span>
+                                <div class="multi-select @(membersOpen ? "open" : "")">
+                                    <div class="multi-select-display" @onclick="() => membersOpen = !membersOpen">
+                                        <span class="multi-select-text">
+                                            @{
+                                                var selDeptMembers = VM.EditDepartmentMembers.Where(m => m.IsChecked).Select(m => m.Item.Name);
+                                            }
+                                            @(selDeptMembers.Any() ? string.Join(", ", selDeptMembers) : "Keine Mitglieder")
+                                        </span>
+                                        <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
+                                             fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M6 9l6 6 6-6" />
+                                        </svg>
+                                    </div>
+                                    @if (membersOpen)
+                                    {
+                                        <div class="multi-select-backdrop" @onclick="() => membersOpen = false"></div>
+                                        <div class="multi-select-dropdown">
+                                            @foreach (var item in VM.EditDepartmentMembers)
+                                            {
+                                                <label class="multi-select-option">
+                                                    <input type="checkbox" @bind="item.IsChecked" />
+                                                    <span>@item.Item.Name</span>
+                                                    <span class="multi-select-hint">@item.Item.Username</span>
+                                                </label>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            @if (VM.ErrorMessage is not null)
+                            {
+                                <div class="error-banner" style="margin: 12px 0;">@VM.ErrorMessage</div>
+                            }
+
+                            <div class="detail-actions">
+                                <button class="btn-primary" @onclick="SaveDepartment" disabled="@VM.IsSaving">
+                                    @(VM.IsSaving ? "Speichert…" : "Speichern")
+                                </button>
+                                <button class="btn-secondary" @onclick="CancelEdit" disabled="@VM.IsSaving">Abbrechen</button>
+                            </div>
+                        }
+                        else
+                        {
+                            @* ── Department View Mode ── *@
+                            <div class="detail-header">
+                                <h3>@VM.SelectedDepartment.Name</h3>
+                                <span class="detail-subtitle">Abteilung</span>
+                            </div>
+
+                            <div class="detail-field-grid">
+                                <div class="detail-field">
+                                    <span class="detail-field-label">Mitglieder</span>
+                                    <span class="detail-field-value">
+                                        @if (VM.DepartmentMembers.Any())
+                                        {
+                                            @string.Join(", ", VM.DepartmentMembers.Select(u => u.Name).Take(8))
+                                            @if (VM.DepartmentMembers.Count > 8)
+                                            {
+                                                <span class="truncated-hint"> +@(VM.DepartmentMembers.Count - 8) weitere</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="detail-field-value--empty">Keine Mitglieder</span>
+                                        }
+                                    </span>
+                                </div>
+                                <div class="detail-field">
+                                    <span class="detail-field-label">Anzahl Mitglieder</span>
+                                    <span class="detail-field-value">@VM.DepartmentMembers.Count</span>
+                                </div>
+                                <div class="detail-field">
+                                    <span class="detail-field-label">ID</span>
+                                    <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">
+                                        @VM.SelectedDepartment.Id
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="detail-actions">
+                                @if (VM.IsGlobalAdmin || VM.CanManageDepartments)
+                                {
+                                    <button class="btn-secondary" @onclick="EditDepartment">Bearbeiten</button>
+                                }
+                                @if (VM.IsGlobalAdmin)
+                                {
+                                    @if (VM.IsConfirmingDelete)
+                                    {
+                                        <div class="confirm-delete">
+                                            <p>Abteilung wirklich löschen?</p>
+                                            <div style="display: flex; gap: 8px;">
+                                                <button class="btn-danger-outline" @onclick="ConfirmDeleteDepartment" disabled="@VM.IsSaving">
+                                                    @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
+                                                </button>
+                                                <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">Abbrechen</button>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn-danger-outline" @onclick="() => VM.RequestDeleteDepartment()">Abteilung löschen</button>
+                                    }
+                                }
+                            </div>
+                        }
+                    }
+
                 </div>
             }
 
@@ -1214,30 +1421,35 @@ else
     private async Task SelectUser(User user) { CloseDropdowns(); await VM.SelectUserAsync(user); StateHasChanged(); }
     private async Task SelectGroup(Group group) { CloseDropdowns(); await VM.SelectGroupAsync(group); StateHasChanged(); }
     private async Task SelectRole(Role role) { CloseDropdowns(); await VM.SelectRoleAsync(role); StateHasChanged(); }
+    private async Task SelectDepartment(Department dept) { CloseDropdowns(); await VM.SelectDepartmentAsync(dept); StateHasChanged(); }
 
     // ── Edit ──
 
     private async Task EditUser() { CloseDropdowns(); await VM.StartEditUserAsync(); StateHasChanged(); }
     private async Task EditGroup() { CloseDropdowns(); await VM.StartEditGroupAsync(); StateHasChanged(); }
     private async Task EditRole() { CloseDropdowns(); await VM.StartEditRoleAsync(); StateHasChanged(); }
+    private async Task EditDepartment() { CloseDropdowns(); await VM.StartEditDepartmentAsync(); StateHasChanged(); }
 
     // ── Save ──
 
     private async Task SaveUser() { CloseDropdowns(); await VM.SaveUserAsync(); StateHasChanged(); }
     private async Task SaveGroup() { CloseDropdowns(); await VM.SaveGroupAsync(); StateHasChanged(); }
     private async Task SaveRole() { CloseDropdowns(); await VM.SaveRoleAsync(); StateHasChanged(); }
+    private async Task SaveDepartment() { CloseDropdowns(); await VM.SaveDepartmentAsync(); StateHasChanged(); }
 
     // ── Create ──
 
     private async Task CreateUser() { await VM.CreateUserAsync(); StateHasChanged(); }
     private async Task CreateGroup() { await VM.CreateGroupAsync(); StateHasChanged(); }
     private async Task CreateRole() { await VM.CreateRoleAsync(); StateHasChanged(); }
+    private async Task CreateDepartment() { await VM.CreateDepartmentAsync(); StateHasChanged(); }
 
     // ── Delete ──
 
     private async Task ConfirmDeleteUser() { await VM.ConfirmDeleteUserAsync(); StateHasChanged(); }
     private async Task ConfirmDeleteGroup() { await VM.ConfirmDeleteGroupAsync(); StateHasChanged(); }
     private async Task ConfirmDeleteRole() { await VM.ConfirmDeleteRoleAsync(); StateHasChanged(); }
+    private async Task ConfirmDeleteDepartment() { await VM.ConfirmDeleteDepartmentAsync(); StateHasChanged(); }
 
     // ── Cancel ──
 
@@ -1276,6 +1488,11 @@ else
     private async Task HandleCreateRoleKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter") await CreateRole();
+    }
+
+    private async Task HandleCreateDepartmentKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await CreateDepartment();
     }
 
     private static string FormatScopeType(ScopeType type) => type switch

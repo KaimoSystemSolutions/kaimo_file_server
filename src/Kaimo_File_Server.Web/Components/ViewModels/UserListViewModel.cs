@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
-public enum AdminTab { Users, Groups, Roles }
+public enum AdminTab { Users, Groups, Roles, Departments }
 
 public class UserListViewModel
 {
@@ -61,6 +61,7 @@ public class UserListViewModel
     public List<User> Users { get; private set; } = [];
     public List<Group> Groups { get; private set; } = [];
     public List<Role> Roles { get; private set; } = [];
+    public List<Department> Departments { get; private set; } = [];
     public bool IsLoading { get; private set; }
     public string? ErrorMessage { get; private set; }
     public string? SuccessMessage { get; private set; }
@@ -72,6 +73,7 @@ public class UserListViewModel
     public bool CanCreateUsers { get; private set; }
     public bool CanManageGroups { get; private set; }
     public bool CanManageRoles { get; private set; }
+    public bool CanManageDepartments { get; private set; }
 
     /// <summary>Departments where the actor can create users.</summary>
     public List<Department> AuthorizedDepartmentsForCreate { get; private set; } = [];
@@ -88,6 +90,7 @@ public class UserListViewModel
     public User? SelectedUser { get; set; }
     public Group? SelectedGroup { get; set; }
     public Role? SelectedRole { get; set; }
+    public Department? SelectedDepartment { get; set; }
 
     // ── Edit-Modus ──
     public bool IsEditing { get; private set; }
@@ -114,6 +117,13 @@ public class UserListViewModel
     // ── Role-Details ──
     public List<User> RoleMembers { get; private set; } = [];
     public List<ScopedAssignmentDisplayItem> RoleScopedAssignments { get; private set; } = [];
+
+    // ── Department-Details ──
+    public List<User> DepartmentMembers { get; private set; } = [];
+
+    // ── Department-Edit ──
+    public string EditDepartmentName { get; set; } = "";
+    public List<CheckboxItem<User>> EditDepartmentMembers { get; private set; } = [];
 
     // ── Password-Change ──
     public string NewPassword { get; set; } = "";
@@ -144,6 +154,10 @@ public class UserListViewModel
     // ── Create Role ──
     public bool IsCreatingRole { get; set; }
     public string CreateRoleName { get; set; } = "";
+
+    // ── Create Department ──
+    public bool IsCreatingDepartment { get; set; }
+    public string CreateDepartmentName { get; set; } = "";
 
     // ── Delete Confirmation ──
     public bool IsConfirmingDelete { get; set; }
@@ -176,6 +190,7 @@ public class UserListViewModel
         AdminTab.Users => $"{Users.Count} Benutzer",
         AdminTab.Groups => $"{Groups.Count} Gruppen",
         AdminTab.Roles => $"{Roles.Count} Rollen",
+        AdminTab.Departments => $"{Departments.Count} Abteilungen",
         _ => ""
     };
 
@@ -319,6 +334,7 @@ public class UserListViewModel
             CanCreateUsers = true;
             CanManageGroups = true;
             CanManageRoles = true;
+            CanManageDepartments = true;
 
             var allDepts = await _departmentRepo.GetAllAsync();
             AuthorizedDepartmentsForCreate = allDepts;
@@ -335,6 +351,9 @@ public class UserListViewModel
             var canViewDepts = await _mgmtAuth.HasAnyPermissionAsync(
                 _actorContext, ManagementPermission.ViewDepartment);
 
+            var canEditDepts = await _mgmtAuth.HasAnyPermissionAsync(
+                _actorContext, ManagementPermission.EditDepartment);
+
             CanManageGroups = await _mgmtAuth.HasAnyPermissionAsync(
                 _actorContext, ManagementPermission.CreateGroups
                              | ManagementPermission.ManageGroupMembers);
@@ -342,8 +361,10 @@ public class UserListViewModel
             CanManageRoles = await _mgmtAuth.HasAnyPermissionAsync(
                 _actorContext, ManagementPermission.AssignRoles);
 
+            CanManageDepartments = canEditDepts || canViewDepts;
+
             CanAccessPage = CanCreateUsers || canEditUsers || CanManageGroups
-                          || CanManageRoles || canViewDepts;
+                          || CanManageRoles || CanManageDepartments;
 
             // ── Resolve authorized departments using AuthorizedScopeResult ──
 
@@ -440,6 +461,7 @@ public class UserListViewModel
         SelectedUser = null;
         SelectedGroup = null;
         SelectedRole = null;
+        SelectedDepartment = null;
         ErrorMessage = null;
         SuccessMessage = null;
 
@@ -464,7 +486,7 @@ public class UserListViewModel
     {
         CancelEdit(); CancelCreate();
         SelectedUser = SelectedUser?.Id == user.Id ? null : user;
-        SelectedGroup = null; SelectedRole = null;
+        SelectedGroup = null; SelectedRole = null; SelectedDepartment = null;
         SuccessMessage = null;
     }
 
@@ -472,7 +494,7 @@ public class UserListViewModel
     {
         CancelEdit(); CancelCreate();
         SelectedGroup = SelectedGroup?.Id == group.Id ? null : group;
-        SelectedUser = null; SelectedRole = null;
+        SelectedUser = null; SelectedRole = null; SelectedDepartment = null;
         SuccessMessage = null;
     }
 
@@ -480,7 +502,15 @@ public class UserListViewModel
     {
         CancelEdit(); CancelCreate();
         SelectedRole = SelectedRole?.Id == role.Id ? null : role;
-        SelectedUser = null; SelectedGroup = null;
+        SelectedUser = null; SelectedGroup = null; SelectedDepartment = null;
+        SuccessMessage = null;
+    }
+
+    public void SelectDepartment(Department department)
+    {
+        CancelEdit(); CancelCreate();
+        SelectedDepartment = SelectedDepartment?.Id == department.Id ? null : department;
+        SelectedUser = null; SelectedGroup = null; SelectedRole = null;
         SuccessMessage = null;
     }
 
@@ -491,7 +521,7 @@ public class UserListViewModel
     public async Task SelectUserAsync(User user)
     {
         CancelEdit(); CancelCreate();
-        SelectedGroup = null; SelectedRole = null;
+        SelectedGroup = null; SelectedRole = null; SelectedDepartment = null;
         SuccessMessage = null;
 
         if (SelectedUser?.Id == user.Id)
@@ -517,7 +547,7 @@ public class UserListViewModel
     public async Task SelectGroupAsync(Group group)
     {
         CancelEdit(); CancelCreate();
-        SelectedUser = null; SelectedRole = null;
+        SelectedUser = null; SelectedRole = null; SelectedDepartment = null;
         SuccessMessage = null;
 
         if (SelectedGroup?.Id == group.Id)
@@ -534,7 +564,7 @@ public class UserListViewModel
     public async Task SelectRoleAsync(Role role)
     {
         CancelEdit(); CancelCreate();
-        SelectedUser = null; SelectedGroup = null;
+        SelectedUser = null; SelectedGroup = null; SelectedDepartment = null;
         SuccessMessage = null;
 
         if (SelectedRole?.Id == role.Id)
@@ -547,6 +577,24 @@ public class UserListViewModel
         SelectedRole = role;
         RoleMembers = (await _roleRepo.GetMembersAsync(role.Id)).OrderBy(u => u.Name).ToList();
         await LoadRoleScopedAssignmentsAsync(role.Id);
+    }
+
+    public async Task SelectDepartmentAsync(Department department)
+    {
+        CancelEdit(); CancelCreate();
+        SelectedUser = null; SelectedGroup = null; SelectedRole = null;
+        SuccessMessage = null;
+
+        if (SelectedDepartment?.Id == department.Id)
+        {
+            SelectedDepartment = null;
+            DepartmentMembers = [];
+            return;
+        }
+
+        SelectedDepartment = department;
+        DepartmentMembers = (await _departmentRepo.GetUsersAsync(department.Id))
+            .OrderBy(u => u.Name).ToList();
     }
 
     public async Task GetUserRoles(User user)
@@ -827,6 +875,99 @@ public class UserListViewModel
     }
 
     // ══════════════════════════════════════════
+    //  Edit Department
+    // ══════════════════════════════════════════
+
+    public async Task StartEditDepartmentAsync()
+    {
+        if (SelectedDepartment is null) return;
+
+        if (!IsGlobalAdmin && _actorContext != null)
+        {
+            var canEdit = await _mgmtAuth.HasAnyPermissionAsync(
+                _actorContext, ManagementPermission.EditDepartment);
+            if (!canEdit)
+            {
+                ErrorMessage = "Keine Berechtigung, diese Abteilung zu bearbeiten.";
+                return;
+            }
+        }
+
+        IsEditing = true;
+        ErrorMessage = null; SuccessMessage = null;
+
+        EditDepartmentName = SelectedDepartment.Name;
+
+        var allUsers = (await _userRepo.GetAllAsync()).OrderBy(u => u.Name).ToList();
+        var members = await _departmentRepo.GetUsersAsync(SelectedDepartment.Id);
+        var memberIds = members.Select(u => u.Id).ToHashSet();
+        EditDepartmentMembers = allUsers.Select(u => new CheckboxItem<User>(u, memberIds.Contains(u.Id))).ToList();
+    }
+
+    public async Task SaveDepartmentAsync()
+    {
+        if (SelectedDepartment is null) return;
+
+        if (!IsGlobalAdmin && _actorContext != null)
+        {
+            var canEdit = await _mgmtAuth.HasAnyPermissionAsync(
+                _actorContext, ManagementPermission.EditDepartment);
+            if (!canEdit)
+            {
+                ErrorMessage = "Keine Berechtigung, diese Abteilung zu bearbeiten.";
+                return;
+            }
+        }
+
+        try
+        {
+            IsSaving = true;
+            ErrorMessage = null;
+
+            // Update name if changed
+            if (!string.IsNullOrWhiteSpace(EditDepartmentName)
+                && EditDepartmentName.Trim() != SelectedDepartment.Name)
+            {
+                SelectedDepartment.Name = EditDepartmentName.Trim();
+                await _departmentRepo.UpdateAsync(SelectedDepartment);
+            }
+
+            // Update members via diff (Add/Remove)
+            var desiredUserIds = EditDepartmentMembers
+                .Where(m => m.IsChecked).Select(m => m.Item.Id).ToHashSet();
+
+            var currentMembers = await _departmentRepo.GetUsersAsync(SelectedDepartment.Id);
+            var currentUserIds = currentMembers.Select(u => u.Id).ToHashSet();
+
+            // Add new members
+            foreach (var userId in desiredUserIds.Except(currentUserIds))
+                await _departmentRepo.AddUserAsync(SelectedDepartment.Id, userId);
+
+            // Remove old members
+            foreach (var userId in currentUserIds.Except(desiredUserIds))
+                await _departmentRepo.RemoveUserAsync(SelectedDepartment.Id, userId);
+
+            DepartmentMembers = (await _departmentRepo.GetUsersAsync(SelectedDepartment.Id))
+                .OrderBy(u => u.Name).ToList();
+
+            // Refresh department from DB
+            var refreshed = await _departmentRepo.GetByIdAsync(SelectedDepartment.Id);
+            if (refreshed is not null) SelectedDepartment = refreshed;
+
+            await LoadTabDataAsync();
+
+            IsEditing = false;
+            SuccessMessage = "Abteilung gespeichert.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Speichern der Abteilung {DeptId}", SelectedDepartment.Id);
+            ErrorMessage = "Fehler beim Speichern.";
+        }
+        finally { IsSaving = false; }
+    }
+
+    // ══════════════════════════════════════════
     //  Scoped Role Assignments
     // ══════════════════════════════════════════
 
@@ -964,8 +1105,8 @@ public class UserListViewModel
         }
 
         CancelEdit();
-        SelectedUser = null; SelectedGroup = null; SelectedRole = null;
-        IsCreatingUser = true; IsCreatingGroup = false; IsCreatingRole = false;
+        SelectedUser = null; SelectedGroup = null; SelectedRole = null; SelectedDepartment = null;
+        IsCreatingUser = true; IsCreatingGroup = false; IsCreatingRole = false; IsCreatingDepartment = false;
         CreateUserName = ""; CreateUserUsername = ""; CreateUserPassword = "";
         CreateUserDescription = ""; CreateUserEmail = "";
         CreateUserIsEnabled = true; CreateUserCanChangePassword = true;
@@ -1054,8 +1195,8 @@ public class UserListViewModel
         }
 
         CancelEdit();
-        SelectedUser = null; SelectedGroup = null; SelectedRole = null;
-        IsCreatingGroup = true; IsCreatingUser = false; IsCreatingRole = false;
+        SelectedUser = null; SelectedGroup = null; SelectedRole = null; SelectedDepartment = null;
+        IsCreatingGroup = true; IsCreatingUser = false; IsCreatingRole = false; IsCreatingDepartment = false;
         CreateGroupName = "";
         ErrorMessage = null; SuccessMessage = null;
     }
@@ -1108,8 +1249,8 @@ public class UserListViewModel
         }
 
         CancelEdit();
-        SelectedUser = null; SelectedGroup = null; SelectedRole = null;
-        IsCreatingRole = true; IsCreatingUser = false; IsCreatingGroup = false;
+        SelectedUser = null; SelectedGroup = null; SelectedRole = null; SelectedDepartment = null;
+        IsCreatingRole = true; IsCreatingUser = false; IsCreatingGroup = false; IsCreatingDepartment = false;
         CreateRoleName = "";
         ErrorMessage = null; SuccessMessage = null;
     }
@@ -1150,12 +1291,71 @@ public class UserListViewModel
     }
 
     // ══════════════════════════════════════════
-    //  Delete User / Group / Role (with permission checks)
+    //  Create Department (with permission check)
+    // ══════════════════════════════════════════
+
+    public void StartCreateDepartment()
+    {
+        if (!IsGlobalAdmin && !CanManageDepartments)
+        {
+            ErrorMessage = "Keine Berechtigung, Abteilungen zu erstellen.";
+            return;
+        }
+
+        CancelEdit();
+        SelectedUser = null; SelectedGroup = null; SelectedRole = null; SelectedDepartment = null;
+        IsCreatingDepartment = true; IsCreatingUser = false; IsCreatingGroup = false; IsCreatingRole = false;
+        CreateDepartmentName = "";
+        ErrorMessage = null; SuccessMessage = null;
+    }
+
+    public async Task CreateDepartmentAsync()
+    {
+        ErrorMessage = null;
+        if (string.IsNullOrWhiteSpace(CreateDepartmentName))
+        {
+            ErrorMessage = "Abteilungsname erforderlich.";
+            return;
+        }
+
+        if (!IsGlobalAdmin && _actorContext != null)
+        {
+            var canEdit = await _mgmtAuth.HasAnyPermissionAsync(
+                _actorContext, ManagementPermission.EditDepartment);
+            if (!canEdit)
+            {
+                ErrorMessage = "Keine Berechtigung, Abteilungen zu erstellen.";
+                return;
+            }
+        }
+
+        try
+        {
+            IsSaving = true;
+            var department = new Department(CreateDepartmentName.Trim());
+            await _departmentRepo.CreateAsync(department);
+            _logger.LogInformation("Abteilung '{DeptName}' erstellt", department.Name);
+
+            IsCreatingDepartment = false; CreateDepartmentName = "";
+            await LoadTabDataAsync();
+            SuccessMessage = "Abteilung erstellt.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Erstellen der Abteilung");
+            ErrorMessage = "Fehler beim Erstellen.";
+        }
+        finally { IsSaving = false; }
+    }
+
+    // ══════════════════════════════════════════
+    //  Delete User / Group / Role / Department
     // ══════════════════════════════════════════
 
     public void RequestDeleteUser() { IsConfirmingDelete = true; ErrorMessage = null; }
     public void RequestDeleteGroup() { IsConfirmingDelete = true; ErrorMessage = null; }
     public void RequestDeleteRole() { IsConfirmingDelete = true; ErrorMessage = null; }
+    public void RequestDeleteDepartment() { IsConfirmingDelete = true; ErrorMessage = null; }
 
     public async Task ConfirmDeleteUserAsync()
     {
@@ -1255,6 +1455,39 @@ public class UserListViewModel
         finally { IsSaving = false; }
     }
 
+    public async Task ConfirmDeleteDepartmentAsync()
+    {
+        if (SelectedDepartment is null) return;
+
+        if (!IsGlobalAdmin && _actorContext != null)
+        {
+            var canEdit = await _mgmtAuth.HasAnyPermissionAsync(
+                _actorContext, ManagementPermission.EditDepartment);
+            if (!canEdit)
+            {
+                ErrorMessage = "Keine Berechtigung, diese Abteilung zu löschen.";
+                return;
+            }
+        }
+
+        try
+        {
+            IsSaving = true;
+            await _departmentRepo.DeleteAsync(SelectedDepartment.Id);
+            _logger.LogInformation("Abteilung '{DeptName}' gelöscht", SelectedDepartment.Name);
+            SelectedDepartment = null; DepartmentMembers = [];
+            IsConfirmingDelete = false;
+            await LoadTabDataAsync();
+            SuccessMessage = "Abteilung gelöscht.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Löschen der Abteilung");
+            ErrorMessage = "Fehler beim Löschen.";
+        }
+        finally { IsSaving = false; }
+    }
+
     // ══════════════════════════════════════════
     //  Helpers
     // ══════════════════════════════════════════
@@ -1271,12 +1504,12 @@ public class UserListViewModel
 
     public void CancelCreate()
     {
-        IsCreatingUser = false; IsCreatingGroup = false; IsCreatingRole = false;
+        IsCreatingUser = false; IsCreatingGroup = false; IsCreatingRole = false; IsCreatingDepartment = false;
         IsConfirmingDelete = false;
         CreateUserName = ""; CreateUserUsername = ""; CreateUserPassword = "";
         CreateUserDescription = ""; CreateUserEmail = "";
         CreateUserIsEnabled = true; CreateUserCanChangePassword = true;
-        CreateGroupName = ""; CreateRoleName = "";
+        CreateGroupName = ""; CreateRoleName = ""; CreateDepartmentName = "";
         ErrorMessage = null;
     }
 
@@ -1296,6 +1529,9 @@ public class UserListViewModel
                 break;
             case AdminTab.Roles:
                 Roles = (await _roleRepo.GetAllAsync()).OrderBy(r => r.Name).ToList();
+                break;
+            case AdminTab.Departments:
+                await LoadFilteredDepartmentsAsync();
                 break;
         }
     }
@@ -1378,6 +1614,22 @@ public class UserListViewModel
         }
 
         Groups = filtered;
+    }
+
+    /// <summary>
+    /// Load departments filtered by the actor's permissions.
+    /// Global admins see all; scoped admins see only authorized departments.
+    /// </summary>
+    private async Task LoadFilteredDepartmentsAsync()
+    {
+        if (IsGlobalAdmin)
+        {
+            Departments = (await _departmentRepo.GetAllAsync()).OrderBy(d => d.Name).ToList();
+            return;
+        }
+
+        // Scoped admins: show departments they can view or edit
+        Departments = AuthorizedDepartmentsForView.OrderBy(d => d.Name).ToList();
     }
 
     /// <summary>
