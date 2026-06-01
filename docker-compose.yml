@@ -2,7 +2,7 @@ services:
   kaimo_file_server.host:
     image: ${DOCKER_REGISTRY-}kaimofileserver
     container_name: kaimo_file_server
-    user: root
+    #user: root
     ports:
       - 4445:445
     volumes: 

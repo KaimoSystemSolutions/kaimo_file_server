@@ -64,15 +64,13 @@ public class FileSystemStorage : IStorageEngine
         await data.CopyToAsync(file);
     }
 
-    // BUG FIX: was `async` without `await` → compiler warning, swallowed exceptions
     public Task CreateDirectory(string dirPath)
     {
-        var fullPath = ToAbsolutePath(dirPath);
-        Directory.CreateDirectory(fullPath);
+        var fullPath = ToAbsolutePath(dirPath);   
+         Directory.CreateDirectory(fullPath);
         return Task.CompletedTask;
     }
 
-    // BUG FIX: was `async` without `await`
     public Task RenameFileAsync(string oldPath, string newPath)
     {
         var oldFullPath = ToAbsolutePath(oldPath);
@@ -81,7 +79,7 @@ public class FileSystemStorage : IStorageEngine
         return Task.CompletedTask;
     }
 
-    // BUG FIX: was `async` without `await`
+    
     public Task RenameDirectoryAsync(string oldDirPath, string newDirPath)
     {
         var oldFullPath = ToAbsolutePath(oldDirPath);
