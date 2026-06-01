@@ -2091,6 +2091,7 @@ html, body, #app {
 
 .file-table-wrap {
     display: grid;
+    position: relative;
     grid-template-columns: 1fr 90px 140px 140px 140px 100px;
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -2774,6 +2775,130 @@ html, body, #app {
             border-color: var(--accent);
             box-shadow: 0 0 0 2px var(--accent-subtle);
         }
+
+/* ══════════════════════════════════════════════════════════
+   File Upload
+   ══════════════════════════════════════════════════════════ */
+
+.file-dragged-over {
+    border: 2px dashed var(--accent) !important;
+    border-radius: 8px;
+}
+
+.file-dragged-over::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent-subtle);
+    backdrop-filter: blur(2px);
+    z-index: 10;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    /* upload icon as inline SVG */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%237facf5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpolyline points='17 8 12 3 7 8'/%3E%3Cline x1='12' y1='3' x2='12' y2='15'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center calc(50% - 16px);
+    animation: fadeIn 0.15s ease-out;
+}
+
+.file-dragged-over::before {
+    content: 'Dateien hier ablegen';
+    position: absolute;
+    inset: 0;
+    z-index: 11;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 56px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+    pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════
+   Toasts
+   ══════════════════════════════════════════════════════════ */
+
+.toast-container {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    background: var(--surface, #1e1e2e);
+    border: 1px solid var(--border, #333);
+    color: var(--text-primary, #e0e0e0);
+    font-size: 0.875rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    pointer-events: auto;
+    animation: toast-in 0.3s ease forwards;
+    max-width: 380px;
+}
+
+.toast--removing {
+    animation: toast-out 0.3s ease forwards;
+}
+
+.toast--success .toast-icon { color: #4ade80; }
+.toast--error .toast-icon { color: #f87171; }
+.toast--info .toast-icon { color: #60a5fa; }
+
+.toast-text {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    color: var(--text-tertiary, #888);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+    display: flex;
+}
+
+.toast-close:hover {
+    color: var(--text-primary, #e0e0e0);
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(1rem) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes toast-out {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(0.5rem) scale(0.95);
+    }
+}
 
 /* ══════════════════════════════════════════════════════════
    Preview dialog

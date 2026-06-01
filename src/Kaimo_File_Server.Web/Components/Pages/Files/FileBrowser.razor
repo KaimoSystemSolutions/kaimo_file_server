@@ -7,6 +7,7 @@
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IJSRuntime JS
+@inject ToastService Toast
 
 <PageTitle>@(VM.CurrentShare?.Name ?? "Dateien") – Kaimo Files</PageTitle>
 
@@ -200,10 +201,12 @@ else
        CSS-Variablen steuern alle Spaltenbreiten.
        Name-Spalte (flex:1) nimmt den Rest.
        ══════════════════════════════════════════════════ *@
-    <div class="file-table-wrap"
+    <div class="file-table-wrap" @ref="_fileDropZone" 
          style="grid-template-columns: @GridColumns">
 
-        @* -- Header -- *@
+        @* -- file upload area -- *@
+        <InputFile OnChange="OnFileUploaded" style="display:none" />
+    @* -- Header -- *@
         <div class="file-grid-header">
             <div class="col-name">
                 Name
@@ -653,6 +656,49 @@ else
 
         InvokeAsync(StateHasChanged);
     }
+    
+    // ========== File Uploading ==========
+    
+    [JSInvokable]
+    public void OnFilesDropped(int fileCount)
+    {
+        // update UI.
+        StateHasChanged();
+    }
+    
+    private long MaxFileSize => 1100L * 1024 * 1024; // 1.1 GB
+    
+    private async Task OnFileUploaded(InputFileChangeEventArgs e)
+    {
+        foreach (var file in e.GetMultipleFiles())
+        {
+            Toast.Show($"Uploading \"{file.Name}\"…");
+
+            Stream stream;
+            try
+            {
+                stream = file.OpenReadStream(maxAllowedSize: MaxFileSize);
+            }
+            catch (IOException)
+            {
+                Toast.Show($"\"{file.Name}\" ist zu groß (max. 1.1 GB).", ToastType.Error);
+                continue;
+            }
+
+            await using (stream)
+            {
+                var result = await VM.UploadFileAsync(file.Name, stream);
+
+                if (result.Success)
+                    Toast.Show($"\"{file.Name}\" hochgeladen.", ToastType.Success);
+                else
+                    Toast.Show(result.Error ?? "Upload fehlgeschlagen.", ToastType.Error);
+            }
+        }
+
+        await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
+    }
+    
 
     // ========== State ==========
 
@@ -681,6 +727,9 @@ else
     private bool _showFilePreview;
     private string _previewUrl = "";
     private string _previewFileName = "";
+    
+    private ElementReference _fileDropZone;
+    private bool _jsInitialized = false;
     
     // ========== Toolbar Computed ==========
 
@@ -795,7 +844,18 @@ else
             var state = await AuthStateProvider.GetAuthenticationStateAsync();
             _isAdmin = state.User.IsInRole("Administrator")
                     || state.User.IsInRole("ShareManager");
+            
             StateHasChanged();
+
+            // init file uploading 
+            //await JS.InvokeVoidAsync("initFileUpload", _fileDropZone, _dotNetRef);
+        }
+
+        if (!_jsInitialized && _fileDropZone.Id is not null)
+        {
+            _jsInitialized = true;
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("initFileUpload", _fileDropZone, _dotNetRef);
         }
     }
 
