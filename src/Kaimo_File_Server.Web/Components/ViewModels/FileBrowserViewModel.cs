@@ -19,6 +19,8 @@ public record OperationResult(bool Success, string? Error = null)
 
 public class FileBrowserViewModel
 {
+    private long MaxUploadSizeBytes => 1100L * 1024 * 1024; // 1.1 GB
+    
     private readonly IFileServiceFactory _fileServiceFactory;
     private readonly IShareRepository _shareRepo;
     private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
@@ -483,5 +485,9 @@ public class FileBrowserViewModel
             return OperationResult.Fail("Fehler beim Hochladen.");
         }
     }
-    
+
+    public long GetMaxUploadSizeBytes()
+    {
+        return MaxUploadSizeBytes;
+    }
 }

@@ -666,7 +666,6 @@ else
         StateHasChanged();
     }
     
-    private long MaxFileSize => 1100L * 1024 * 1024; // 1.1 GB
     
     private async Task OnFileUploaded(InputFileChangeEventArgs e)
     {
@@ -677,7 +676,7 @@ else
             Stream stream;
             try
             {
-                stream = file.OpenReadStream(maxAllowedSize: MaxFileSize);
+                stream = file.OpenReadStream(maxAllowedSize: VM.GetMaxUploadSizeBytes());
             }
             catch (IOException)
             {
