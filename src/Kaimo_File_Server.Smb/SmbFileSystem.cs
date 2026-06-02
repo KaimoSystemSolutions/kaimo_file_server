@@ -49,6 +49,25 @@ public class SmbFileSystem : INTFileStore
         }
     }
 
+    public static void RestoreSessionFromFallback(string username)
+    {
+        if (_sessionUser.Value != null)
+            return;
+
+        if (username != null && _userContextFallback.TryGetValue(username, out var cached))
+            _sessionUser.Value = cached;
+    }
+
+    /// <summary>
+    /// Returns the current session user, or null if none is set.
+    /// Used by SmbServer for ABE filtering during share enumeration,
+    /// where throwing on missing context would be wrong.
+    /// </summary>
+    public static UserContext? GetSessionUserOrDefault()
+    {
+        return _sessionUser.Value;
+    }
+
     private UserContext RequireSessionUser(SecurityContext? securityContext = null)
     {
         if (_sessionUser.Value != null)
@@ -125,9 +144,6 @@ public class SmbFileSystem : INTFileStore
     }
 
     // ────────────────── Permission wrappers ──────────────────
-    //
-    // SMBLibrary forces synchronous interfaces, so we use Task.Run
-    // to avoid blocking the calling sync context.
 
     private bool CanRead(string relativePath, UserContext user)
         => Task.Run(() => _fileService.CanReadAsync(relativePath, user)).GetAwaiter().GetResult();
@@ -144,15 +160,9 @@ public class SmbFileSystem : INTFileStore
     private bool CanList(string relativePath, UserContext user)
         => Task.Run(() => _fileService.CanListAsync(relativePath, user)).GetAwaiter().GetResult();
 
-    /// <summary>
-    /// Batch permission filter — single DB round trip for all items.
-    /// Returns the set of normalized relative paths the user can read.
-    /// </summary>
     private HashSet<string> FilterReadablePaths(
         IReadOnlyList<(string relativePath, bool isDirectory)> items, UserContext user)
         => Task.Run(() => _fileService.FilterReadablePathsAsync(items, user)).GetAwaiter().GetResult();
-
-    // ────────────────── Share-level access gate ──────────────────
 
     private bool EnsureShareAccess(UserContext user)
     {
@@ -174,11 +184,9 @@ public class SmbFileSystem : INTFileStore
         {
             var user = RequireSessionUser(securityContext);
 
-            // Share-level access gate
             if (!EnsureShareAccess(user))
                 return NTStatus.STATUS_ACCESS_DENIED;
 
-            // Snapshot path → version store (readonly)
             if (SmbSnapshotHandler.IsSnapshotPath(path) && _serviceProvider != null)
                 return OpenSnapshotFile(out handle, out fileStatus, path, user);
 
@@ -581,7 +589,6 @@ public class SmbFileSystem : INTFileStore
 
             string dirRelativePath = ToShareRelativePath(absoluteDirPath);
 
-            // ── Collect all matching children ──
             var candidates = new List<(FileSystemInfo info, string name, bool isDir, string relativePath)>();
 
             foreach (var sub in dirInfo.GetDirectories())
@@ -600,8 +607,6 @@ public class SmbFileSystem : INTFileStore
 
             if (candidates.Count > 0)
             {
-                // ── Single batch ACL check for all children ──
-                // 1 DB round trip regardless of directory size
                 var itemsToCheck = candidates
                     .Select(c => (c.relativePath, c.isDir))
                     .ToList();
