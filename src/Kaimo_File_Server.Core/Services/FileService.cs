@@ -32,16 +32,53 @@ public class FileService : IFileService
 
         var items = await _storage.ListAsync(normalizedDir);
 
-        var visible = new List<FileMetadata>();
+        // Batch ACL check — single DB round trip for all children
+        var itemsToCheck = items
+            .Select(i => (ShareRelativePath.Combine(normalizedDir, i.Name), i.IsDirectory))
+            .ToList();
+
+        var accessMap = await _acl.HasAccessBatchAsync(
+            user, _shareId, itemsToCheck, FilePermission.ListReadData);
+
+        var visible = new List<FileMetadata>(items.Count);
         foreach (var item in items)
         {
             var itemPath = ShareRelativePath.Combine(normalizedDir, item.Name);
-
-            if (await _acl.HasAccessAsync(user, _shareId, itemPath, item.IsDirectory, FilePermission.ListReadData))
+            if (accessMap.TryGetValue(itemPath, out var allowed) && allowed)
                 visible.Add(item);
         }
 
         return visible;
+    }
+
+    // ────────────────── Batch Permission Check ──────────────────
+
+    /// <summary>
+    /// Returns the subset of paths the user can read — single DB round trip.
+    /// Used by SMB QueryDirectory to filter listings efficiently.
+    /// </summary>
+    public async Task<HashSet<string>> FilterReadablePathsAsync(
+        IReadOnlyList<(string relativePath, bool isDirectory)> items,
+        UserContext user)
+    {
+        if (items.Count == 0)
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var normalized = items
+            .Select(i => (ShareRelativePath.Normalize(i.relativePath), i.isDirectory))
+            .ToList();
+
+        var accessMap = await _acl.HasAccessBatchAsync(
+            user, _shareId, normalized, FilePermission.ListReadData);
+
+        var readable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (path, allowed) in accessMap)
+        {
+            if (allowed)
+                readable.Add(path);
+        }
+
+        return readable;
     }
 
     // ────────────────── Permission Checks ──────────────────
@@ -131,8 +168,6 @@ public class FileService : IFileService
         if (!await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.Delete))
             throw new UnauthorizedAccessException($"Delete denied for '{normalized}'");
 
-        // BUG FIX: was checking unnormalized `path` instead of `normalized`.
-        // Also: use OrdinalIgnoreCase to handle case-insensitive file systems.
         var isAlreadyInRecycleBin = normalized.StartsWith(
             RecycleBinFolder, StringComparison.OrdinalIgnoreCase);
 

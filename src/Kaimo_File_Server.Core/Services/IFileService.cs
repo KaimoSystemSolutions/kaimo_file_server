@@ -31,5 +31,15 @@ namespace Kaimo_File_Server.Core.Services
         Task<List<FileMetadata>> ListAsync(string directoryPath, UserContext user);
         Task RenameAsync(string oldPath, string newPath, UserContext user);
         Task<long> GetDirectorySizeAsync(string relativePath, UserContext userContext);
+        
+        /// <summary>
+        /// Returns the subset of paths the user has ListReadData permission on.
+        /// Single DB round trip via batch ACL evaluation.
+        ///
+        /// Used by SMB QueryDirectory to filter listings without N+1 queries.
+        /// </summary>
+        Task<HashSet<string>> FilterReadablePathsAsync(
+            IReadOnlyList<(string relativePath, bool isDirectory)> items,
+            UserContext user);
     }
 }
