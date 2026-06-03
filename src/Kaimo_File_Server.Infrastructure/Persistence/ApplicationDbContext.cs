@@ -22,7 +22,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<ShareDefinition> ShareDefinitions { get; set; }
         public DbSet<FileVersion> FileVersions { get; set; }
 
-        // ── NEW: Departments & Scoped Roles ──
+        // ── Departments & Scoped Roles ──
         public DbSet<Department> Departments { get; set; }
         public DbSet<DepartmentUser> DepartmentUsers { get; set; }
         public DbSet<DepartmentGroup> DepartmentGroups { get; set; }
@@ -56,7 +56,6 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
 
             modelBuilder.Entity<Group>(entity => { entity.ToTable("groups"); });
 
-            // UPDATED: Role now has ManagementPermissions + IsSystemRole
             modelBuilder.Entity<Role>(entity =>
             {
                 entity.ToTable("roles");
@@ -140,7 +139,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
             });
 
             // ══════════════════════════════════════════════════
-            // NEW: Department & Scoped Role Assignment tables
+            // Department & Scoped Role Assignment tables
             // ══════════════════════════════════════════════════
 
             modelBuilder.Entity<Department>(entity =>
@@ -151,24 +150,41 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(e => e.Name).IsUnique();
                 entity.Property(e => e.Description).HasMaxLength(500);
                 entity.Property(e => e.ParentDepartmentId);
+
+                // NEW: Default file permission for department members on department shares.
+                // Nullable — null means "inherit from parent department".
+                // Stored as long? mapping to FilePermission flags.
+                entity.Property(e => e.DefaultFilePermission)
+                    .HasColumnName("default_file_permission")
+                    .IsRequired(false);
+
+                // Index for hierarchy traversal
+                entity.HasIndex(e => e.ParentDepartmentId);
             });
 
             modelBuilder.Entity<DepartmentUser>(entity =>
             {
                 entity.ToTable("department_users");
                 entity.HasKey(e => new { e.DepartmentId, e.UserId });
+
+                // Index for "which departments does user X belong to?"
+                entity.HasIndex(e => e.UserId);
             });
 
             modelBuilder.Entity<DepartmentGroup>(entity =>
             {
                 entity.ToTable("department_groups");
                 entity.HasKey(e => new { e.DepartmentId, e.GroupId });
+
+                entity.HasIndex(e => e.GroupId);
             });
 
             modelBuilder.Entity<DepartmentShare>(entity =>
             {
                 entity.ToTable("department_shares");
                 entity.HasKey(e => new { e.DepartmentId, e.ShareId });
+
+                entity.HasIndex(e => e.ShareId);
             });
 
             modelBuilder.Entity<ScopedRoleAssignment>(entity =>
@@ -178,15 +194,14 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
 
                 entity.Property(e => e.ScopeType).HasConversion<int>();
 
-                // Unique: one principal can't have the same role twice in the same scope
                 entity.HasIndex(e => new { e.PrincipalId, e.RoleId, e.ScopeType, e.ScopeId })
                     .IsUnique();
 
-                // Fast lookup: "all assignments for this principal"
                 entity.HasIndex(e => e.PrincipalId);
-
-                // Fast lookup: "all assignments in this scope"
                 entity.HasIndex(e => new { e.ScopeType, e.ScopeId });
+
+                // NEW: Index for "all assignments for this role"
+                entity.HasIndex(e => e.RoleId);
             });
         }
     }

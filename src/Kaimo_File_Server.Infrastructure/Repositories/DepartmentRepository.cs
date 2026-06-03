@@ -16,6 +16,10 @@ public class DepartmentRepository : IDepartmentRepository
         _db = db;
     }
 
+    // ══════════════════════════════════════════
+    //  CRUD
+    // ══════════════════════════════════════════
+
     public async Task<Department?> GetByIdAsync(Guid id)
         => await _db.Departments.FindAsync(id);
 
@@ -24,12 +28,6 @@ public class DepartmentRepository : IDepartmentRepository
 
     public async Task<List<Department>> GetAllAsync()
         => await _db.Departments.OrderBy(d => d.Name).ToListAsync();
-
-    public async Task<List<Department>> GetChildrenAsync(Guid parentId)
-        => await _db.Departments
-            .Where(d => d.ParentDepartmentId == parentId)
-            .OrderBy(d => d.Name)
-            .ToListAsync();
 
     public async Task<Department> CreateAsync(Department department)
     {
@@ -54,7 +52,89 @@ public class DepartmentRepository : IDepartmentRepository
         }
     }
 
-    // ── User ↔ Department ──
+    // ══════════════════════════════════════════
+    //  Hierarchy
+    // ══════════════════════════════════════════
+
+    public async Task<List<Department>> GetChildrenAsync(Guid parentId)
+        => await _db.Departments
+            .Where(d => d.ParentDepartmentId == parentId)
+            .OrderBy(d => d.Name)
+            .ToListAsync();
+
+    /// <inheritdoc />
+    public async Task<List<Department>> GetAncestorChainAsync(Guid departmentId)
+    {
+        var ancestors = new List<Department>();
+        var visited = new HashSet<Guid> { departmentId }; // cycle protection
+
+        var current = await _db.Departments.FindAsync(departmentId);
+        if (current == null) return ancestors;
+
+        var parentId = current.ParentDepartmentId;
+
+        while (parentId.HasValue && !visited.Contains(parentId.Value))
+        {
+            visited.Add(parentId.Value);
+            var parent = await _db.Departments.FindAsync(parentId.Value);
+            if (parent == null) break;
+
+            ancestors.Add(parent);
+            parentId = parent.ParentDepartmentId;
+        }
+
+        return ancestors; // ordered: immediate parent → root
+    }
+
+    /// <inheritdoc />
+    public async Task<HashSet<Guid>> GetDescendantIdsAsync(Guid departmentId)
+    {
+        var result = new HashSet<Guid>();
+        var queue = new Queue<Guid>();
+        queue.Enqueue(departmentId);
+
+        // Load all departments once to avoid N+1
+        var allDepts = await _db.Departments
+            .Select(d => new { d.Id, d.ParentDepartmentId })
+            .ToListAsync();
+
+        var childrenLookup = allDepts
+            .Where(d => d.ParentDepartmentId.HasValue)
+            .GroupBy(d => d.ParentDepartmentId!.Value)
+            .ToDictionary(g => g.Key, g => g.Select(d => d.Id).ToList());
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+
+            if (childrenLookup.TryGetValue(current, out var children))
+            {
+                foreach (var childId in children)
+                {
+                    if (result.Add(childId)) // cycle protection
+                        queue.Enqueue(childId);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /// <inheritdoc />
+    public async Task<List<Department>> GetDescendantsAsync(Guid departmentId)
+    {
+        var ids = await GetDescendantIdsAsync(departmentId);
+        if (ids.Count == 0) return [];
+
+        return await _db.Departments
+            .Where(d => ids.Contains(d.Id))
+            .OrderBy(d => d.Name)
+            .ToListAsync();
+    }
+
+    // ══════════════════════════════════════════
+    //  User ↔ Department
+    // ══════════════════════════════════════════
 
     public async Task<List<User>> GetUsersAsync(Guid departmentId)
     {
@@ -102,7 +182,24 @@ public class DepartmentRepository : IDepartmentRepository
             du => du.UserId == userId && du.DepartmentId == departmentId);
     }
 
-    // ── Group ↔ Department ──
+    /// <inheritdoc />
+    public async Task<bool> IsUserInDepartmentOrDescendantAsync(Guid userId, Guid departmentId)
+    {
+        // Check direct membership first (fast path)
+        if (await IsUserInDepartmentAsync(userId, departmentId))
+            return true;
+
+        // Check descendant departments
+        var descendantIds = await GetDescendantIdsAsync(departmentId);
+        if (descendantIds.Count == 0) return false;
+
+        return await _db.DepartmentUsers.AnyAsync(
+            du => du.UserId == userId && descendantIds.Contains(du.DepartmentId));
+    }
+
+    // ══════════════════════════════════════════
+    //  Group ↔ Department
+    // ══════════════════════════════════════════
 
     public async Task<List<Group>> GetGroupsAsync(Guid departmentId)
     {
@@ -150,7 +247,22 @@ public class DepartmentRepository : IDepartmentRepository
             dg => dg.GroupId == groupId && dg.DepartmentId == departmentId);
     }
 
-    // ── Share ↔ Department ──
+    /// <inheritdoc />
+    public async Task<bool> IsGroupInDepartmentOrDescendantAsync(Guid groupId, Guid departmentId)
+    {
+        if (await IsGroupInDepartmentAsync(groupId, departmentId))
+            return true;
+
+        var descendantIds = await GetDescendantIdsAsync(departmentId);
+        if (descendantIds.Count == 0) return false;
+
+        return await _db.DepartmentGroups.AnyAsync(
+            dg => dg.GroupId == groupId && descendantIds.Contains(dg.DepartmentId));
+    }
+
+    // ══════════════════════════════════════════
+    //  Share ↔ Department
+    // ══════════════════════════════════════════
 
     public async Task<List<ShareDefinition>> GetSharesAsync(Guid departmentId)
     {
@@ -196,5 +308,18 @@ public class DepartmentRepository : IDepartmentRepository
     {
         return await _db.DepartmentShares.AnyAsync(
             ds => ds.ShareId == shareId && ds.DepartmentId == departmentId);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsShareInDepartmentOrDescendantAsync(Guid shareId, Guid departmentId)
+    {
+        if (await IsShareInDepartmentAsync(shareId, departmentId))
+            return true;
+
+        var descendantIds = await GetDescendantIdsAsync(departmentId);
+        if (descendantIds.Count == 0) return false;
+
+        return await _db.DepartmentShares.AnyAsync(
+            ds => ds.ShareId == shareId && descendantIds.Contains(ds.DepartmentId));
     }
 }

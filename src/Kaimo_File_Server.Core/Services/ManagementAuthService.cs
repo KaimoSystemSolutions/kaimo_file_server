@@ -6,7 +6,8 @@ using Kaimo_File_Server.Core.Security;
 namespace Kaimo_File_Server.Core.Services;
 
 /// <summary>
-/// Core implementation of scoped management authorization.
+/// Core implementation of scoped management authorization
+/// with department hierarchy support.
 ///
 /// Decision logic:
 ///   1. Collect all ScopedRoleAssignments for the actor (user ID + group IDs)
@@ -14,7 +15,13 @@ namespace Kaimo_File_Server.Core.Services;
 ///   3. Check if the target falls within the assignment's scope:
 ///      - Global → always matches
 ///      - Department → target must belong to the same department
+///        OR any descendant (hierarchy inheritance)
 ///      - Share → target share ID must match exactly
+///
+/// Hierarchy inheritance:
+///   An admin scoped to "Engineering" can also manage users/groups/shares
+///   in "Engineering → Backend" and "Engineering → Frontend" (descendants).
+///   This is controlled by the DepartmentRepository's hierarchy methods.
 ///
 /// Deny-by-default: if no matching assignment grants the permission, access is denied.
 /// No explicit deny entries — absence of a grant = no access.
@@ -53,7 +60,8 @@ public class ManagementAuthService : IManagementAuthService
                     return true;
 
                 case ScopeType.Department:
-                    if (await _departmentRepo.IsUserInDepartmentAsync(
+                    // Check direct membership AND descendant departments
+                    if (await _departmentRepo.IsUserInDepartmentOrDescendantAsync(
                             targetUserId, assignment.ScopeId))
                         return true;
                     break;
@@ -76,9 +84,16 @@ public class ManagementAuthService : IManagementAuthService
             if (assignment.ScopeType == ScopeType.Global)
                 return true;
 
-            if (assignment.ScopeType == ScopeType.Department
-                && assignment.ScopeId == departmentId)
-                return true;
+            if (assignment.ScopeType == ScopeType.Department)
+            {
+                // Exact match or target department is a descendant
+                if (assignment.ScopeId == departmentId)
+                    return true;
+
+                var descendants = await _departmentRepo.GetDescendantIdsAsync(assignment.ScopeId);
+                if (descendants.Contains(departmentId))
+                    return true;
+            }
         }
 
         return false;
@@ -102,7 +117,8 @@ public class ManagementAuthService : IManagementAuthService
                     return true;
 
                 case ScopeType.Department:
-                    if (await _departmentRepo.IsGroupInDepartmentAsync(
+                    // Check direct membership AND descendant departments
+                    if (await _departmentRepo.IsGroupInDepartmentOrDescendantAsync(
                             groupId, assignment.ScopeId))
                         return true;
                     break;
@@ -130,7 +146,8 @@ public class ManagementAuthService : IManagementAuthService
                     return true;
 
                 case ScopeType.Department:
-                    if (await _departmentRepo.IsShareInDepartmentAsync(
+                    // Check direct membership AND descendant departments
+                    if (await _departmentRepo.IsShareInDepartmentOrDescendantAsync(
                             shareId, assignment.ScopeId))
                         return true;
                     break;
@@ -160,9 +177,17 @@ public class ManagementAuthService : IManagementAuthService
             if (assignment.ScopeType == ScopeType.Global)
                 return true;
 
-            if (assignment.ScopeType == ScopeType.Department
-                && assignment.ScopeId == departmentId)
-                return true;
+            if (assignment.ScopeType == ScopeType.Department)
+            {
+                // Exact match
+                if (assignment.ScopeId == departmentId)
+                    return true;
+
+                // Target is a descendant of the scoped department
+                var descendants = await _departmentRepo.GetDescendantIdsAsync(assignment.ScopeId);
+                if (descendants.Contains(departmentId))
+                    return true;
+            }
         }
 
         return false;
@@ -177,15 +202,11 @@ public class ManagementAuthService : IManagementAuthService
         return assignments.Any(a => HasPermission(a.Role, required));
     }
 
-    // FIX: Returns AuthorizedScopeResult instead of List<Guid>.
-    //      Global admin → IsUnrestricted = true (caller skips filtering).
-    //      Scoped admin → LimitedTo(specific department IDs).
-    //      No permission → None (empty + not unrestricted).
     public async Task<AuthorizedScopeResult> GetAuthorizedDepartmentIdsAsync(
         UserContext actor, ManagementPermission required)
     {
         var assignments = await GetEffectiveAssignmentsAsync(actor);
-        var result = new List<Guid>();
+        var result = new HashSet<Guid>();
 
         foreach (var (assignment, role) in assignments)
         {
@@ -196,20 +217,27 @@ public class ManagementAuthService : IManagementAuthService
                 return AuthorizedScopeResult.Unrestricted();
 
             if (assignment.ScopeType == ScopeType.Department)
+            {
+                // Include the scoped department itself
                 result.Add(assignment.ScopeId);
+
+                // Include all descendants (hierarchy inheritance)
+                var descendants = await _departmentRepo.GetDescendantIdsAsync(assignment.ScopeId);
+                foreach (var id in descendants)
+                    result.Add(id);
+            }
         }
 
         return result.Count > 0
-            ? AuthorizedScopeResult.LimitedTo(result)
+            ? AuthorizedScopeResult.LimitedTo(result.ToList())
             : AuthorizedScopeResult.None();
     }
 
-    // FIX: Same pattern as departments — no more ambiguous empty list.
     public async Task<AuthorizedScopeResult> GetAuthorizedShareIdsAsync(
         UserContext actor, ManagementPermission required)
     {
         var assignments = await GetEffectiveAssignmentsAsync(actor);
-        var result = new List<Guid>();
+        var result = new HashSet<Guid>();
 
         foreach (var (assignment, role) in assignments)
         {
@@ -220,17 +248,28 @@ public class ManagementAuthService : IManagementAuthService
                 return AuthorizedScopeResult.Unrestricted();
 
             if (assignment.ScopeType == ScopeType.Share)
+            {
                 result.Add(assignment.ScopeId);
+            }
 
             if (assignment.ScopeType == ScopeType.Department)
             {
+                // Shares from the scoped department
                 var shares = await _departmentRepo.GetSharesAsync(assignment.ScopeId);
-                result.AddRange(shares.Select(s => s.Id));
+                foreach (var s in shares) result.Add(s.Id);
+
+                // Shares from descendant departments
+                var descendants = await _departmentRepo.GetDescendantIdsAsync(assignment.ScopeId);
+                foreach (var descId in descendants)
+                {
+                    var descShares = await _departmentRepo.GetSharesAsync(descId);
+                    foreach (var s in descShares) result.Add(s.Id);
+                }
             }
         }
 
         return result.Count > 0
-            ? AuthorizedScopeResult.LimitedTo(result)
+            ? AuthorizedScopeResult.LimitedTo(result.ToList())
             : AuthorizedScopeResult.None();
     }
 
