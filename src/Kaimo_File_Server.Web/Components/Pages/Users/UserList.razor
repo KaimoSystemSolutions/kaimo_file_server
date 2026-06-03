@@ -1232,19 +1232,88 @@ else
                             </div>
 
                             <div class="detail-field-grid">
+                                @* Name *@
                                 <div class="form-group">
                                     <label>Name</label>
                                     <input type="text" class="edit-input" @bind="VM.EditDepartmentName" />
                                 </div>
+
+                                @* Parent Department (Hierarchy / Inheritance) *@
+                                <div class="form-group">
+                                    <label>Erbt von (Elternabteilung)</label>
+                                    <select class="edit-input" @bind="EditDepartmentParentIdString">
+                                        <option value="">— Keine (Oberste Ebene) —</option>
+                                        @foreach (var dept in VM.AvailableParentDepartments)
+                                        {
+                                            <option value="@dept.Id">@dept.Name</option>
+                                        }
+                                    </select>
+                                    <span class="form-hint">
+                                        Wie in OOP: Diese Abteilung erbt Admin-Rechte und Default-Berechtigungen
+                                        von der gewählten Elternabteilung.
+                                    </span>
+                                </div>
                             </div>
 
+                            @* ── Default File Permission ── *@
+                            <div class="detail-section" style="margin-top: 16px;">
+                                <span class="detail-label">Standard-Dateiberechtigung</span>
+                                <p class="form-hint" style="margin-bottom: 8px;">
+                                    Diese Berechtigung wird automatisch auf alle Abteilungsmitglieder
+                                    für alle zugeordneten Freigaben angewandt.
+                                </p>
+
+                                @* Toggle: own vs inherit *@
+                                <div class="toggle-row" style="margin-bottom: 12px;">
+                                    <span class="toggle-label-text">Eigene Berechtigung definieren</span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" @bind="VM.EditDepartmentHasOwnPermission" />
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+
+                                @if (VM.EditDepartmentHasOwnPermission)
+                                {
+                                    @* Permission checkboxes *@
+                                    <div class="permission-flags" style="margin-left: 4px;">
+                                        @foreach (var flag in DepartmentPermissionDisplay.AllFlags)
+                                        {
+                                            var isChecked = VM.HasDeptPermFlag(flag.Flag);
+                                            <label class="permission-flag" title="@flag.Description">
+                                                <input type="checkbox" checked="@isChecked"
+                                                       @onchange="e => VM.ToggleDeptPermFlag(flag.Flag, (bool)(e.Value ?? false))" />
+                                                <span>@flag.Label</span>
+                                            </label>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    @* Show what will be inherited *@
+                                    @if (VM.EditDepartmentParentId.HasValue)
+                                    {
+                                        <span class="detail-field-value detail-field-value--empty">
+                                            Wird von Elternabteilung geerbt.
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="detail-field-value detail-field-value--empty">
+                                            Keine Elternabteilung — keine Default-Berechtigung.
+                                        </span>
+                                    }
+                                }
+                            </div>
+
+                            @* ── Members ── *@
                             <div class="detail-section" style="margin-top: 16px;">
                                 <span class="detail-label">Mitglieder</span>
                                 <div class="multi-select @(membersOpen ? "open" : "")">
                                     <div class="multi-select-display" @onclick="() => membersOpen = !membersOpen">
                                         <span class="multi-select-text">
                                             @{
-                                                var selDeptMembers = VM.EditDepartmentMembers.Where(m => m.IsChecked).Select(m => m.Item.Name);
+                                                var selDeptMembers = VM.EditDepartmentMembers
+                                                    .Where(m => m.IsChecked).Select(m => m.Item.Name);
                                             }
                                             @(selDeptMembers.Any() ? string.Join(", ", selDeptMembers) : "Keine Mitglieder")
                                         </span>
@@ -1264,6 +1333,44 @@ else
                                                     <span>@item.Item.Name</span>
                                                     <span class="multi-select-hint">@item.Item.Username</span>
                                                 </label>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            @* ── Share Assignment ── *@
+                            <div class="detail-section" style="margin-top: 16px;">
+                                <span class="detail-label">Zugeordnete Freigaben</span>
+                                <div class="multi-select @(sharesOpen ? "open" : "")">
+                                    <div class="multi-select-display" @onclick="() => sharesOpen = !sharesOpen">
+                                        <span class="multi-select-text">
+                                            @{
+                                                var selShares = VM.EditDepartmentShares
+                                                    .Where(s => s.IsChecked).Select(s => s.Item.Name);
+                                            }
+                                            @(selShares.Any() ? string.Join(", ", selShares) : "Keine Freigaben")
+                                        </span>
+                                        <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
+                                             fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M6 9l6 6 6-6" />
+                                        </svg>
+                                    </div>
+                                    @if (sharesOpen)
+                                    {
+                                        <div class="multi-select-backdrop" @onclick="() => sharesOpen = false"></div>
+                                        <div class="multi-select-dropdown">
+                                            @foreach (var item in VM.EditDepartmentShares)
+                                            {
+                                                <label class="multi-select-option">
+                                                    <input type="checkbox" @bind="item.IsChecked" />
+                                                    <span>@item.Item.Name</span>
+                                                    <span class="multi-select-hint">@item.Item.Path</span>
+                                                </label>
+                                            }
+                                            @if (!VM.EditDepartmentShares.Any())
+                                            {
+                                                <span class="empty-hint">Keine Freigaben vorhanden</span>
                                             }
                                         </div>
                                     }
@@ -1291,6 +1398,28 @@ else
                             </div>
 
                             <div class="detail-field-grid">
+                                @* Parent / Hierarchy *@
+                                <div class="detail-field">
+                                    <span class="detail-field-label">Erbt von</span>
+                                    @if (VM.SelectedDepartment.ParentDepartmentId.HasValue)
+                                    {
+                                        
+                                        var parentDept = VM.Departments
+                                            .FirstOrDefault(d => d.Id == VM.SelectedDepartment.ParentDepartmentId);
+                                        
+                                        <span class="detail-field-value">
+                                            @(parentDept?.Name ?? VM.SelectedDepartment.ParentDepartmentId.ToString())
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="detail-field-value detail-field-value--empty">
+                                            Keine (Oberste Ebene)
+                                        </span>
+                                    }
+                                </div>
+
+                                @* Members *@
                                 <div class="detail-field">
                                     <span class="detail-field-label">Mitglieder</span>
                                     <span class="detail-field-value">
@@ -1308,10 +1437,85 @@ else
                                         }
                                     </span>
                                 </div>
+
                                 <div class="detail-field">
                                     <span class="detail-field-label">Anzahl Mitglieder</span>
                                     <span class="detail-field-value">@VM.DepartmentMembers.Count</span>
                                 </div>
+
+                                @* Shares *@
+                                <div class="detail-field">
+                                    <span class="detail-field-label">Zugeordnete Freigaben</span>
+                                    <span class="detail-field-value">
+                                        @if (VM.DepartmentShares.Any())
+                                        {
+                                            @string.Join(", ", VM.DepartmentShares.Select(s => s.Name).Take(5))
+                                            @if (VM.DepartmentShares.Count > 5)
+                                            {
+                                                <span class="truncated-hint"> +@(VM.DepartmentShares.Count - 5) weitere</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="detail-field-value--empty">Keine Freigaben zugeordnet</span>
+                                        }
+                                    </span>
+                                </div>
+
+                                @* Default File Permission *@
+                                <div class="detail-field">
+                                    <span class="detail-field-label">Standard-Dateiberechtigung</span>
+                                    <span class="detail-field-value">
+                                        @if (VM.DepartmentPermInfo is not null)
+                                        {
+                                            @if (VM.DepartmentPermInfo.HasNoDefault)
+                                            {
+                                                <span class="detail-field-value--empty">Keine Default-Berechtigung</span>
+                                            }
+                                            else if (VM.DepartmentPermInfo.IsOwnPermission)
+                                            {
+                                                <div class="permission-tags">
+                                                    @foreach (var flag in DepartmentPermissionDisplay.AllFlags)
+                                                    {
+                                                        if (DepartmentPermissionDisplay.HasFlag(
+                                                            VM.DepartmentPermInfo.EffectivePermission, flag.Flag))
+                                                        {
+                                                            <span class="permission-tag">@flag.Label</span>
+                                                        }
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <div>
+                                                    <div class="permission-tags">
+                                                        @foreach (var flag in DepartmentPermissionDisplay.AllFlags)
+                                                        {
+                                                            if (DepartmentPermissionDisplay.HasFlag(
+                                                                VM.DepartmentPermInfo.EffectivePermission, flag.Flag))
+                                                            {
+                                                                <span class="permission-tag">@flag.Label</span>
+                                                            }
+                                                        }
+                                                    </div>
+                                                    <span class="inherited-hint">
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                                                             stroke="var(--text-tertiary)" stroke-width="1.5"
+                                                             style="vertical-align: -1px; margin-right: 2px;">
+                                                            <path d="M9 18l6-6-6-6" />
+                                                        </svg>
+                                                        Geerbt von: @VM.DepartmentPermInfo.InheritedFromDepartmentName
+                                                    </span>
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="detail-field-value--empty">Wird geladen…</span>
+                                        }
+                                    </span>
+                                </div>
+
                                 <div class="detail-field">
                                     <span class="detail-field-label">ID</span>
                                     <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">
@@ -1332,16 +1536,23 @@ else
                                         <div class="confirm-delete">
                                             <p>Abteilung wirklich löschen?</p>
                                             <div style="display: flex; gap: 8px;">
-                                                <button class="btn-danger-outline" @onclick="ConfirmDeleteDepartment" disabled="@VM.IsSaving">
+                                                <button class="btn-danger-outline" @onclick="ConfirmDeleteDepartment"
+                                                        disabled="@VM.IsSaving">
                                                     @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
                                                 </button>
-                                                <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">Abbrechen</button>
+                                                <button class="btn-secondary"
+                                                        @onclick="() => VM.IsConfirmingDelete = false">
+                                                    Abbrechen
+                                                </button>
                                             </div>
                                         </div>
                                     }
                                     else
                                     {
-                                        <button class="btn-danger-outline" @onclick="() => VM.RequestDeleteDepartment()">Abteilung löschen</button>
+                                        <button class="btn-danger-outline"
+                                                @onclick="() => VM.RequestDeleteDepartment()">
+                                            Abteilung löschen
+                                        </button>
                                     }
                                 }
                             </div>
@@ -1359,6 +1570,8 @@ else
     private bool groupsOpen;
     private bool rolesOpen;
     private bool membersOpen;
+    private bool sharesOpen;
+    private bool groupsDeptOpen;
 
     // ── Binding helpers for select elements (Guid <-> string) ──
 
@@ -1407,6 +1620,12 @@ else
         }
     }
 
+    private string EditDepartmentParentIdString
+    {
+        get => VM.EditDepartmentParentId?.ToString() ?? "";
+        set => VM.EditDepartmentParentId = Guid.TryParse(value, out var id) ? id : (Guid?)null;
+    }
+
     // ── Tab switching ──
 
     private async Task SwitchTab(AdminTab tab)
@@ -1430,6 +1649,7 @@ else
     private async Task EditRole() { CloseDropdowns(); await VM.StartEditRoleAsync(); StateHasChanged(); }
     private async Task EditDepartment() { CloseDropdowns(); await VM.StartEditDepartmentAsync(); StateHasChanged(); }
 
+    
     // ── Save ──
 
     private async Task SaveUser() { CloseDropdowns(); await VM.SaveUserAsync(); StateHasChanged(); }
@@ -1478,7 +1698,14 @@ else
 
     // ── Helpers ──
 
-    private void CloseDropdowns() { groupsOpen = false; rolesOpen = false; membersOpen = false; }
+    private void CloseDropdowns()
+    {
+        groupsOpen = false;
+        rolesOpen = false;
+        membersOpen = false;
+        sharesOpen = false;
+        groupsDeptOpen = false;
+    }
 
     private async Task HandleCreateGroupKeyDown(KeyboardEventArgs e)
     {

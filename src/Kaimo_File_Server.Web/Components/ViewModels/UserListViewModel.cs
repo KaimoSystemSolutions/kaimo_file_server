@@ -23,6 +23,8 @@ public class UserListViewModel
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<UserListViewModel> _logger;
+    private readonly IDepartmentPermissionService _deptPermService;
+    private readonly IShareRepository _shareRepo;
 
     public UserListViewModel(
         IUserRepository userRepo,
@@ -34,7 +36,9 @@ public class UserListViewModel
         IManagementAuthService mgmtAuth,
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authState,
-        ILogger<UserListViewModel> logger)
+        ILogger<UserListViewModel> logger,
+        IDepartmentPermissionService deptPermService,
+        IShareRepository shareRepo)
     {
         _userRepo = userRepo;
         _groupRepo = groupRepo;
@@ -46,6 +50,8 @@ public class UserListViewModel
         _userContextFactory = userContextFactory;
         _authState = authState;
         _logger = logger;
+        _deptPermService = deptPermService;
+        _shareRepo = shareRepo;
     }
 
     // ══════════════════════════════════════════
@@ -120,10 +126,17 @@ public class UserListViewModel
 
     // ── Department-Details ──
     public List<User> DepartmentMembers { get; private set; } = [];
+    public List<ShareDefinition> DepartmentShares { get; private set; } = [];
+    public DepartmentPermissionInfo? DepartmentPermInfo { get; private set; }
 
     // ── Department-Edit ──
     public string EditDepartmentName { get; set; } = "";
     public List<CheckboxItem<User>> EditDepartmentMembers { get; private set; } = [];
+    public Guid? EditDepartmentParentId { get; set; }
+    public long? EditDepartmentDefaultPermission { get; set; }
+    public bool EditDepartmentHasOwnPermission { get; set; }
+    public List<CheckboxItem<ShareDefinition>> EditDepartmentShares { get; private set; } = [];
+    public List<Department> AvailableParentDepartments { get; private set; } = [];
 
     // ── Password-Change ──
     public string NewPassword { get; set; } = "";
@@ -209,6 +222,17 @@ public class UserListViewModel
             EditRolePermissions &= ~flag;
     }
 
+    // ── Department Default Permission Helpers ──
+
+    public bool HasDeptPermFlag(long flag)
+        => DepartmentPermissionDisplay.HasFlag(EditDepartmentDefaultPermission ?? 0, flag);
+
+    public void ToggleDeptPermFlag(long flag, bool value)
+    {
+        EditDepartmentDefaultPermission = DepartmentPermissionDisplay.SetFlag(
+            EditDepartmentDefaultPermission ?? 0, flag, value);
+    }
+
     /// <summary>
     /// All individual permission flags grouped for display.
     /// </summary>
@@ -277,7 +301,6 @@ public class UserListViewModel
             IsLoading = true;
             ErrorMessage = null;
 
-            // 1. Build the actor's UserContext from the JWT claims
             _actorContext = await BuildActorContextAsync();
             if (_actorContext == null)
             {
@@ -286,7 +309,6 @@ public class UserListViewModel
                 return;
             }
 
-            // 2. Resolve what the actor is allowed to do
             await ResolveActorPermissionsAsync();
 
             if (!CanAccessPage)
@@ -295,7 +317,6 @@ public class UserListViewModel
                 return;
             }
 
-            // 3. Load data filtered by permissions
             await LoadTabDataAsync();
         }
         catch (Exception ex)
@@ -306,9 +327,6 @@ public class UserListViewModel
         finally { IsLoading = false; }
     }
 
-    /// <summary>
-    /// Build a UserContext for the currently logged-in user.
-    /// </summary>
     private async Task<UserContext?> BuildActorContextAsync()
     {
         var state = await _authState.GetAuthenticationStateAsync();
@@ -318,10 +336,6 @@ public class UserListViewModel
         return await _userContextFactory.CreateByUsernameAsync(username);
     }
 
-    /// <summary>
-    /// Determines all management capabilities of the actor.
-    /// Called once on load — results are cached in properties.
-    /// </summary>
     private async Task ResolveActorPermissionsAsync()
     {
         if (_actorContext == null) return;
@@ -366,8 +380,6 @@ public class UserListViewModel
             CanAccessPage = CanCreateUsers || canEditUsers || CanManageGroups
                           || CanManageRoles || CanManageDepartments;
 
-            // ── Resolve authorized departments using AuthorizedScopeResult ──
-
             var createResult = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
                 _actorContext, ManagementPermission.CreateUsers);
             AuthorizedDepartmentsForCreate = await LoadDepartmentsFromScopeResultAsync(createResult);
@@ -377,7 +389,6 @@ public class UserListViewModel
             var viewResult = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
                 _actorContext, ManagementPermission.ViewDepartment);
 
-            // Merge: if either result is unrestricted, view is unrestricted
             if (editResult.IsUnrestricted || viewResult.IsUnrestricted)
             {
                 AuthorizedDepartmentsForView = await _departmentRepo.GetAllAsync();
@@ -395,10 +406,6 @@ public class UserListViewModel
         CreateUserDepartmentId = AuthorizedDepartmentsForCreate.FirstOrDefault()?.Id;
     }
 
-    /// <summary>
-    /// Resolve per-user permissions when selecting a user.
-    /// Determines which buttons (edit, delete, password reset) are shown.
-    /// </summary>
     private async Task ResolveSelectedUserPermissionsAsync(User user)
     {
         if (_actorContext == null)
@@ -427,10 +434,6 @@ public class UserListViewModel
             _actorContext, user.Id, ManagementPermission.ResetPasswords);
     }
 
-    /// <summary>
-    /// Converts an AuthorizedScopeResult into a list of Department entities.
-    /// If unrestricted, loads all departments from the DB.
-    /// </summary>
     private async Task<List<Department>> LoadDepartmentsFromScopeResultAsync(
         AuthorizedScopeResult result)
     {
@@ -442,6 +445,7 @@ public class UserListViewModel
 
         return await LoadDepartmentsByIdsAsync(result.ScopeIds.ToList());
     }
+
     private async Task<List<Department>> LoadDepartmentsByIdsAsync(List<Guid> ids)
     {
         if (ids.Count == 0) return [];
@@ -536,7 +540,6 @@ public class UserListViewModel
 
         SelectedUser = user;
 
-        // Resolve per-user permissions
         await ResolveSelectedUserPermissionsAsync(user);
 
         UserRoles = (await _userRepo.GetRolesForUserAsync(user.Id)).OrderBy(r => r.Name).ToList();
@@ -589,12 +592,20 @@ public class UserListViewModel
         {
             SelectedDepartment = null;
             DepartmentMembers = [];
+            DepartmentShares = [];
+            DepartmentPermInfo = null;
             return;
         }
 
         SelectedDepartment = department;
+
         DepartmentMembers = (await _departmentRepo.GetUsersAsync(department.Id))
             .OrderBy(u => u.Name).ToList();
+
+        DepartmentShares = (await _departmentRepo.GetSharesAsync(department.Id))
+            .OrderBy(s => s.Name).ToList();
+
+        DepartmentPermInfo = await _deptPermService.GetPermissionInfoAsync(department.Id);
     }
 
     public async Task GetUserRoles(User user)
@@ -610,7 +621,6 @@ public class UserListViewModel
     {
         if (SelectedUser is null) return;
 
-        // Permission check
         if (!CanEditSelectedUser)
         {
             ErrorMessage = "Keine Berechtigung, diesen Benutzer zu bearbeiten.";
@@ -642,7 +652,6 @@ public class UserListViewModel
     {
         if (SelectedUser is null || _actorContext is null) return;
 
-        // Re-verify permission (defense in depth)
         if (!IsGlobalAdmin)
         {
             var canEdit = await _mgmtAuth.CanManageUserAsync(
@@ -669,7 +678,6 @@ public class UserListViewModel
                 EditUserIsEnabled,
                 EditUserCanChangePassword);
 
-            // Password reset requires separate permission
             if (!string.IsNullOrWhiteSpace(NewPassword))
             {
                 if (!IsGlobalAdmin)
@@ -691,7 +699,6 @@ public class UserListViewModel
                 _logger.LogInformation("Passwort geändert für Benutzer {UserId}", SelectedUser.Id);
             }
 
-            // Group assignment requires AssignGroups permission
             var selectedGroupIds = EditUserGroups.Where(g => g.IsChecked).Select(g => g.Item.Id).ToList();
             if (!IsGlobalAdmin)
             {
@@ -699,14 +706,12 @@ public class UserListViewModel
                     _actorContext, SelectedUser.Id, ManagementPermission.AssignGroups);
                 if (canAssignGroups)
                     await _userRepo.SetGroupsForUserAsync(SelectedUser.Id, selectedGroupIds);
-                // If no permission, silently skip group changes
             }
             else
             {
                 await _userRepo.SetGroupsForUserAsync(SelectedUser.Id, selectedGroupIds);
             }
 
-            // Role assignment requires AssignRoles permission
             var selectedRoleIds = EditUserRoles.Where(r => r.IsChecked).Select(r => r.Item.Id).ToList();
             if (!IsGlobalAdmin)
             {
@@ -849,7 +854,6 @@ public class UserListViewModel
             var selectedUserIds = EditRoleMembers.Where(m => m.IsChecked).Select(m => m.Item.Id).ToList();
             await _roleRepo.SetMembersAsync(SelectedRole.Id, selectedUserIds);
 
-            // Save permissions (only for non-system roles)
             if (!SelectedRole.IsSystemRole)
             {
                 SelectedRole.ManagementPermissions = EditRolePermissions;
@@ -875,7 +879,7 @@ public class UserListViewModel
     }
 
     // ══════════════════════════════════════════
-    //  Edit Department
+    //  Edit Department (with hierarchy + default permissions + shares)
     // ══════════════════════════════════════════
 
     public async Task StartEditDepartmentAsync()
@@ -898,10 +902,34 @@ public class UserListViewModel
 
         EditDepartmentName = SelectedDepartment.Name;
 
+        // Parent department — exclude self + all descendants to prevent cycles
+        EditDepartmentParentId = SelectedDepartment.ParentDepartmentId;
+        var allDepts = await _departmentRepo.GetAllAsync();
+        var descendantIds = await _departmentRepo.GetDescendantIdsAsync(SelectedDepartment.Id);
+        descendantIds.Add(SelectedDepartment.Id);
+        AvailableParentDepartments = allDepts
+            .Where(d => !descendantIds.Contains(d.Id))
+            .OrderBy(d => d.Name)
+            .ToList();
+
+        // Default file permission
+        EditDepartmentHasOwnPermission = SelectedDepartment.DefaultFilePermission.HasValue;
+        EditDepartmentDefaultPermission = SelectedDepartment.DefaultFilePermission ?? 0;
+
+        // Members
         var allUsers = (await _userRepo.GetAllAsync()).OrderBy(u => u.Name).ToList();
         var members = await _departmentRepo.GetUsersAsync(SelectedDepartment.Id);
         var memberIds = members.Select(u => u.Id).ToHashSet();
-        EditDepartmentMembers = allUsers.Select(u => new CheckboxItem<User>(u, memberIds.Contains(u.Id))).ToList();
+        EditDepartmentMembers = allUsers
+            .Select(u => new CheckboxItem<User>(u, memberIds.Contains(u.Id))).ToList();
+
+        // Shares
+        var allShares = (await _shareRepo.GetAllAsync()).OrderBy(s => s.Name).ToList();
+        var deptShares = await _departmentRepo.GetSharesAsync(SelectedDepartment.Id);
+        var deptShareIds = deptShares.Select(s => s.Id).ToHashSet();
+        EditDepartmentShares = allShares
+            .Select(s => new CheckboxItem<ShareDefinition>(s, deptShareIds.Contains(s.Id)))
+            .ToList();
     }
 
     public async Task SaveDepartmentAsync()
@@ -924,35 +952,65 @@ public class UserListViewModel
             IsSaving = true;
             ErrorMessage = null;
 
-            // Update name if changed
+            // Update name
             if (!string.IsNullOrWhiteSpace(EditDepartmentName)
                 && EditDepartmentName.Trim() != SelectedDepartment.Name)
             {
                 SelectedDepartment.Name = EditDepartmentName.Trim();
-                await _departmentRepo.UpdateAsync(SelectedDepartment);
             }
 
-            // Update members via diff (Add/Remove)
+            // Update parent (hierarchy inheritance)
+            SelectedDepartment.ParentDepartmentId = EditDepartmentParentId;
+
+            // Update default file permission
+            if (EditDepartmentHasOwnPermission)
+            {
+                SelectedDepartment.DefaultFilePermission = EditDepartmentDefaultPermission;
+            }
+            else
+            {
+                SelectedDepartment.DefaultFilePermission = null; // inherit from parent
+            }
+
+            await _departmentRepo.UpdateAsync(SelectedDepartment);
+
+            // Update members via diff
             var desiredUserIds = EditDepartmentMembers
                 .Where(m => m.IsChecked).Select(m => m.Item.Id).ToHashSet();
 
             var currentMembers = await _departmentRepo.GetUsersAsync(SelectedDepartment.Id);
             var currentUserIds = currentMembers.Select(u => u.Id).ToHashSet();
 
-            // Add new members
             foreach (var userId in desiredUserIds.Except(currentUserIds))
                 await _departmentRepo.AddUserAsync(SelectedDepartment.Id, userId);
 
-            // Remove old members
             foreach (var userId in currentUserIds.Except(desiredUserIds))
                 await _departmentRepo.RemoveUserAsync(SelectedDepartment.Id, userId);
 
+            // Update share assignments via diff
+            var desiredShareIds = EditDepartmentShares
+                .Where(s => s.IsChecked).Select(s => s.Item.Id).ToHashSet();
+
+            var currentShares = await _departmentRepo.GetSharesAsync(SelectedDepartment.Id);
+            var currentShareIds = currentShares.Select(s => s.Id).ToHashSet();
+
+            foreach (var shareId in desiredShareIds.Except(currentShareIds))
+                await _departmentRepo.AddShareAsync(SelectedDepartment.Id, shareId);
+
+            foreach (var shareId in currentShareIds.Except(desiredShareIds))
+                await _departmentRepo.RemoveShareAsync(SelectedDepartment.Id, shareId);
+
+            // Refresh
             DepartmentMembers = (await _departmentRepo.GetUsersAsync(SelectedDepartment.Id))
                 .OrderBy(u => u.Name).ToList();
 
-            // Refresh department from DB
+            DepartmentShares = (await _departmentRepo.GetSharesAsync(SelectedDepartment.Id))
+                .OrderBy(s => s.Name).ToList();
+
             var refreshed = await _departmentRepo.GetByIdAsync(SelectedDepartment.Id);
             if (refreshed is not null) SelectedDepartment = refreshed;
+
+            DepartmentPermInfo = await _deptPermService.GetPermissionInfoAsync(SelectedDepartment.Id);
 
             await LoadTabDataAsync();
 
@@ -1010,7 +1068,6 @@ public class UserListViewModel
             return;
         }
 
-        // Permission check: only GlobalAdmin or users with AssignRoles can create assignments
         if (!IsGlobalAdmin && _actorContext != null)
         {
             var canAssign = await _mgmtAuth.HasAnyPermissionAsync(
@@ -1056,7 +1113,6 @@ public class UserListViewModel
 
     public async Task DeleteAssignmentAsync(Guid assignmentId)
     {
-        // Permission check
         if (!IsGlobalAdmin && _actorContext != null)
         {
             var canAssign = await _mgmtAuth.HasAnyPermissionAsync(
@@ -1124,14 +1180,12 @@ public class UserListViewModel
         if (string.IsNullOrWhiteSpace(CreateUserPassword) || CreateUserPassword.Length < 6)
         { ErrorMessage = "Passwort muss mindestens 6 Zeichen lang sein."; return; }
 
-        // Department must be selected
         if (CreateUserDepartmentId is null)
         {
             ErrorMessage = "Bitte eine Abteilung auswählen.";
             return;
         }
 
-        // Permission check: can the actor create users in this department?
         if (!IsGlobalAdmin)
         {
             var allowed = await _mgmtAuth.CanCreateUserInDepartmentAsync(
@@ -1159,8 +1213,6 @@ public class UserListViewModel
                 isEnabled: CreateUserIsEnabled, canChangePassword: CreateUserCanChangePassword);
 
             await _userRepo.CreateAsync(user);
-
-            // Assign user to the selected department
             await _departmentRepo.AddUserAsync(CreateUserDepartmentId.Value, user.Id);
 
             _logger.LogInformation(
@@ -1361,7 +1413,6 @@ public class UserListViewModel
     {
         if (SelectedUser is null || _actorContext is null) return;
 
-        // Permission check
         if (!IsGlobalAdmin)
         {
             var canDelete = await _mgmtAuth.CanManageUserAsync(
@@ -1475,7 +1526,8 @@ public class UserListViewModel
             IsSaving = true;
             await _departmentRepo.DeleteAsync(SelectedDepartment.Id);
             _logger.LogInformation("Abteilung '{DeptName}' gelöscht", SelectedDepartment.Name);
-            SelectedDepartment = null; DepartmentMembers = [];
+            SelectedDepartment = null; DepartmentMembers = []; DepartmentShares = [];
+            DepartmentPermInfo = null;
             IsConfirmingDelete = false;
             await LoadTabDataAsync();
             SuccessMessage = "Abteilung gelöscht.";
@@ -1513,10 +1565,6 @@ public class UserListViewModel
         ErrorMessage = null;
     }
 
-    /// <summary>
-    /// Load data for the active tab, filtered by actor permissions.
-    /// Scoped admins only see users/groups within their authorized departments.
-    /// </summary>
     private async Task LoadTabDataAsync()
     {
         switch (ActiveTab)
@@ -1536,11 +1584,6 @@ public class UserListViewModel
         }
     }
 
-    /// <summary>
-    /// Load users filtered by the actor's department scope.
-    /// Global admins see all users; scoped admins only see users
-    /// in departments they have ViewDepartment or EditUserProfiles for.
-    /// </summary>
     private async Task LoadFilteredUsersAsync()
     {
         var allUsers = (await _userRepo.GetAllAsync()).OrderBy(u => u.Name).ToList();
@@ -1551,7 +1594,6 @@ public class UserListViewModel
             return;
         }
 
-        // Collect all department IDs where the actor has any user-related permission
         var authorizedDeptIds = AuthorizedDepartmentsForView
             .Select(d => d.Id).ToHashSet();
 
@@ -1561,7 +1603,6 @@ public class UserListViewModel
             return;
         }
 
-        // Filter: only show users that belong to at least one authorized department
         var filtered = new List<User>();
         foreach (var user in allUsers)
         {
@@ -1573,11 +1614,6 @@ public class UserListViewModel
         Users = filtered;
     }
 
-    /// <summary>
-    /// Load groups filtered by the actor's department scope.
-    /// Global admins see all groups; scoped admins only see groups
-    /// in their authorized departments.
-    /// </summary>
     private async Task LoadFilteredGroupsAsync()
     {
         var allGroups = (await _groupRepo.GetAllAsync()).OrderBy(g => g.Name).ToList();
@@ -1594,13 +1630,12 @@ public class UserListViewModel
             return;
         }
 
-        // Filter groups by authorized departments
         var authorizedDeptIds = AuthorizedDepartmentsForView
             .Select(d => d.Id).ToHashSet();
 
         if (authorizedDeptIds.Count == 0)
         {
-            Groups = allGroups; // If no dept-scoped, show all (global group perm)
+            Groups = allGroups;
             return;
         }
 
@@ -1608,7 +1643,6 @@ public class UserListViewModel
         foreach (var group in allGroups)
         {
             var groupDepts = await _departmentRepo.GetDepartmentsForGroupAsync(group.Id);
-            // Show if group is in an authorized department, or has no department (global group)
             if (groupDepts.Count == 0 || groupDepts.Any(d => authorizedDeptIds.Contains(d.Id)))
                 filtered.Add(group);
         }
@@ -1616,10 +1650,6 @@ public class UserListViewModel
         Groups = filtered;
     }
 
-    /// <summary>
-    /// Load departments filtered by the actor's permissions.
-    /// Global admins see all; scoped admins see only authorized departments.
-    /// </summary>
     private async Task LoadFilteredDepartmentsAsync()
     {
         if (IsGlobalAdmin)
@@ -1628,17 +1658,11 @@ public class UserListViewModel
             return;
         }
 
-        // Scoped admins: show departments they can view or edit
         Departments = AuthorizedDepartmentsForView.OrderBy(d => d.Name).ToList();
     }
 
-    /// <summary>
-    /// Load all scoped assignments that reference this role,
-    /// resolved into display-friendly items.
-    /// </summary>
     private async Task LoadRoleScopedAssignmentsAsync(Guid roleId)
     {
-        // FIX: Single query instead of iterating all users + groups
         var allAssignments = await _assignmentRepo.GetByRoleAsync(roleId);
 
         var users = await _userRepo.GetAllAsync();
@@ -1647,9 +1671,6 @@ public class UserListViewModel
             allAssignments, users, groups);
     }
 
-    /// <summary>
-    /// Load all scoped assignments for a specific user (as principal).
-    /// </summary>
     private async Task LoadUserScopedAssignmentsAsync(Guid userId)
     {
         var assignments = await _assignmentRepo.GetByPrincipalAsync(userId);
@@ -1658,9 +1679,6 @@ public class UserListViewModel
         UserScopedAssignments = await ResolveScopedAssignmentsAsync(assignments, users, groups);
     }
 
-    /// <summary>
-    /// Resolve raw assignments into display items with human-readable names.
-    /// </summary>
     private async Task<List<ScopedAssignmentDisplayItem>> ResolveScopedAssignmentsAsync(
         List<ScopedRoleAssignment> assignments,
         IEnumerable<User> users,
@@ -1716,7 +1734,6 @@ public class CheckboxItem<T>
     public CheckboxItem(T item, bool isChecked) { Item = item; IsChecked = isChecked; }
 }
 
-/// <summary>Display-friendly version of a ScopedRoleAssignment.</summary>
 public record ScopedAssignmentDisplayItem(
     Guid AssignmentId,
     string PrincipalName,
@@ -1725,11 +1742,37 @@ public record ScopedAssignmentDisplayItem(
     ScopeType ScopeType,
     string ScopeName);
 
-/// <summary>A group of related permission flags for UI display.</summary>
 public record PermissionGroup(string Label, List<PermissionFlag> Flags);
 
-/// <summary>A single permission flag for checkbox binding.</summary>
 public record PermissionFlag(ManagementPermission Flag, string Label);
 
-/// <summary>A named permission preset (shortcut).</summary>
 public record PermissionPreset(string Label, ManagementPermission Permissions);
+
+// ══════════════════════════════════════════
+//  Department Default Permission Display
+// ══════════════════════════════════════════
+
+/// <summary>
+/// Display helpers for the department default file permission editor.
+/// Adjust the flag values to match your FilePermission enum.
+/// </summary>
+public static class DepartmentPermissionDisplay
+{
+    public static readonly List<DepartmentPermFlag> AllFlags =
+    [
+        new(1L, "Lesen", "Dateien und Ordner lesen"),
+        new(2L, "Schreiben", "Dateien erstellen und ändern"),
+        new(4L, "Löschen", "Dateien und Ordner löschen"),
+        new(8L, "Dateien erstellen", "Neue Dateien anlegen"),
+        new(16L, "Ordner erstellen", "Neue Ordner anlegen"),
+        new(32L, "Umbenennen", "Dateien und Ordner umbenennen"),
+    ];
+
+    public static bool HasFlag(long permissions, long flag)
+        => (permissions & flag) == flag;
+
+    public static long SetFlag(long permissions, long flag, bool value)
+        => value ? (permissions | flag) : (permissions & ~flag);
+}
+
+public record DepartmentPermFlag(long Flag, string Label, string Description);
