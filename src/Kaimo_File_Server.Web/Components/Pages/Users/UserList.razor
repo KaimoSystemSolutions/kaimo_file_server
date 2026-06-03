@@ -1,7 +1,10 @@
 ﻿@page "/users"
+@using Kaimo_File_Server.Core.Domain
 @using Kaimo_File_Server.Core.Domain.Department
 @using Kaimo_File_Server.Core.Domain.Identity
 @using Kaimo_File_Server.Core.Security
+@using Kaimo_File_Server.Core.Services
+@using Kaimo_File_Server.Web.Components.ViewModels
 @inject UserListViewModel VM
 @inject NavigationManager Nav
 
@@ -70,7 +73,7 @@ else
         </div>
     </div>
 
-    @* ── Tabs (only show tabs the actor has permissions for) ── *@
+    @* ── Tabs ── *@
     <div class="admin-tabs">
         @if (VM.CanCreateUsers || VM.IsGlobalAdmin || VM.AuthorizedDepartmentsForView.Any())
         {
@@ -118,8 +121,7 @@ else
         }
     </div>
 
-    @* ── Create User Form (with Department dropdown) ── *@
-
+    @* ── Create User Form ── *@
     @if (VM.IsCreatingUser)
     {
         <div class="create-form-card">
@@ -272,7 +274,6 @@ else
     }
 
     @* ── Main Content ── *@
-
     @if (VM.ErrorMessage is not null && !VM.IsEditing && !VM.IsCreatingUser && !VM.IsCreatingGroup && !VM.IsCreatingRole && !VM.IsCreatingDepartment)
     {
         <div class="error-banner">@VM.ErrorMessage</div>
@@ -410,7 +411,7 @@ else
                             <div class="file-list">
                                 <div class="file-row admin-row-header">
                                     <div class="file-cell user-name">Abteilungsname</div>
-                                    <div class="file-cell user-size">ID</div>
+                                    <div class="file-cell user-size">Elternabteilung</div>
                                 </div>
                                 @foreach (var dept in VM.Departments)
                                 {
@@ -426,7 +427,7 @@ else
                                             <span>@dept.Name</span>
                                         </div>
                                         <div class="file-cell user-size" style="color: var(--text-tertiary); font-size: 12px;">
-                                            @dept.Id.ToString()
+                                            @(GetParentName(dept.ParentDepartmentId))
                                         </div>
                                     </div>
                                 }
@@ -472,7 +473,6 @@ else
                                            @bind="VM.EditUserDescription" @bind:event="oninput" />
                                 </div>
 
-                                @* Password reset — only if actor has ResetPasswords permission *@
                                 @if (VM.CanResetPasswordForSelected)
                                 {
                                     <div class="form-group">
@@ -507,16 +507,12 @@ else
                                     </div>
                                 </div>
 
-                                @* Groups multi-select *@
                                 <div class="form-group">
                                     <label>Gruppen</label>
                                     <div class="multi-select @(groupsOpen ? "open" : "")">
                                         <div class="multi-select-display" @onclick="() => groupsOpen = !groupsOpen">
                                             <span class="multi-select-text">
-                                                @{
-                                                    var selGroups = VM.EditUserGroups.Where(g => g.IsChecked).Select(g => g.Item.Name);
-                                                }
-                                                @(selGroups.Any() ? string.Join(", ", selGroups) : "Keine Gruppen")
+                                                @GetCheckedNames(VM.EditUserGroups.Where(g => g.IsChecked).Select(g => g.Item.Name), "Keine Gruppen")
                                             </span>
                                             <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
                                                  fill="none" stroke="currentColor" stroke-width="2">
@@ -543,16 +539,12 @@ else
                                     </div>
                                 </div>
 
-                                @* Roles multi-select *@
                                 <div class="form-group">
                                     <label>Rollen</label>
                                     <div class="multi-select @(rolesOpen ? "open" : "")">
                                         <div class="multi-select-display" @onclick="() => rolesOpen = !rolesOpen">
                                             <span class="multi-select-text">
-                                                @{
-                                                    var selRoles = VM.EditUserRoles.Where(r => r.IsChecked).Select(r => r.Item.Name);
-                                                }
-                                                @(selRoles.Any() ? string.Join(", ", selRoles) : "Keine Rollen")
+                                                @GetCheckedNames(VM.EditUserRoles.Where(r => r.IsChecked).Select(r => r.Item.Name), "Keine Rollen")
                                             </span>
                                             <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
                                                  fill="none" stroke="currentColor" stroke-width="2">
@@ -594,7 +586,6 @@ else
                         }
                         else
                         {
-                            @* ── User View Mode ── *@
                             <div class="detail-header">
                                 <h3>@VM.SelectedUser.Name</h3>
                                 <span class="detail-subtitle">@VM.SelectedUser.Username</span>
@@ -651,11 +642,7 @@ else
                                     <span class="detail-field-value">
                                         @if (VM.UserRoles.Any())
                                         {
-                                            @string.Join(", ", VM.UserRoles.Select(r => r.Name).Take(5))
-                                            @if (VM.UserRoles.Count > 5)
-                                            {
-                                                <span class="truncated-hint"> +@(VM.UserRoles.Count - 5) weitere</span>
-                                            }
+                                            @FormatList(VM.UserRoles.Select(r => r.Name), 5)
                                         }
                                         else
                                         {
@@ -668,11 +655,7 @@ else
                                     <span class="detail-field-value">
                                         @if (VM.UserGroups.Any())
                                         {
-                                            @string.Join(", ", VM.UserGroups.Select(g => g.Name).Take(5))
-                                            @if (VM.UserGroups.Count > 5)
-                                            {
-                                                <span class="truncated-hint"> +@(VM.UserGroups.Count - 5) weitere</span>
-                                            }
+                                            @FormatList(VM.UserGroups.Select(g => g.Name), 5)
                                         }
                                         else
                                         {
@@ -686,7 +669,6 @@ else
                                 </div>
                             </div>
 
-                            @* ── User Scoped Assignments ── *@
                             @if (VM.UserScopedAssignments.Any())
                             {
                                 <div class="detail-section" style="margin-top: 16px;">
@@ -760,10 +742,7 @@ else
                                 <div class="multi-select @(membersOpen ? "open" : "")">
                                     <div class="multi-select-display" @onclick="() => membersOpen = !membersOpen">
                                         <span class="multi-select-text">
-                                            @{
-                                                var selGroupMembers = VM.EditGroupMembers.Where(m => m.IsChecked).Select(m => m.Item.Name);
-                                            }
-                                            @(selGroupMembers.Any() ? string.Join(", ", selGroupMembers) : "Keine Mitglieder")
+                                            @GetCheckedNames(VM.EditGroupMembers.Where(m => m.IsChecked).Select(m => m.Item.Name), "Keine Mitglieder")
                                         </span>
                                         <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
                                              fill="none" stroke="currentColor" stroke-width="2">
@@ -808,11 +787,7 @@ else
                                 <span class="detail-value">
                                     @if (VM.GroupMembers.Any())
                                     {
-                                        @string.Join(", ", VM.GroupMembers.Select(u => u.Name).Take(5))
-                                        @if (VM.GroupMembers.Count > 5)
-                                        {
-                                            <span class="truncated-hint"> +@(VM.GroupMembers.Count - 5) weitere</span>
-                                        }
+                                        @FormatList(VM.GroupMembers.Select(u => u.Name), 5)
                                     }
                                     else
                                     {
@@ -855,22 +830,17 @@ else
                     {
                         @if (VM.IsEditing)
                         {
-                            @* ── Role Edit Mode ── *@
                             <div class="detail-header">
                                 <h3>Rolle bearbeiten</h3>
                                 <span class="detail-subtitle">@VM.SelectedRole.Name</span>
                             </div>
 
-                            @* ── Members ── *@
                             <div class="detail-section">
                                 <span class="detail-label">Direkte Mitglieder</span>
                                 <div class="multi-select @(membersOpen ? "open" : "")">
                                     <div class="multi-select-display" @onclick="() => membersOpen = !membersOpen">
                                         <span class="multi-select-text">
-                                            @{
-                                                var selRoleMembers = VM.EditRoleMembers.Where(m => m.IsChecked).Select(m => m.Item.Name);
-                                            }
-                                            @(selRoleMembers.Any() ? string.Join(", ", selRoleMembers) : "Keine Mitglieder")
+                                            @GetCheckedNames(VM.EditRoleMembers.Where(m => m.IsChecked).Select(m => m.Item.Name), "Keine Mitglieder")
                                         </span>
                                         <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
                                              fill="none" stroke="currentColor" stroke-width="2">
@@ -894,13 +864,11 @@ else
                                 </div>
                             </div>
 
-                            @* ── Management Permissions (only for non-system roles) ── *@
                             @if (!VM.SelectedRole.IsSystemRole)
                             {
                                 <div class="detail-section" style="margin-top: 16px;">
                                     <span class="detail-label">Berechtigungen</span>
 
-                                    @* Presets *@
                                     <div class="permission-presets">
                                         @foreach (var preset in UserListViewModel.PermissionPresets)
                                         {
@@ -915,14 +883,13 @@ else
                                         </button>
                                     </div>
 
-                                    @* Grouped checkboxes *@
                                     <div class="permission-groups">
-                                        @foreach (var group in UserListViewModel.PermissionGroups)
+                                        @foreach (var permGroup in UserListViewModel.PermissionGroups)
                                         {
                                             <div class="permission-group">
-                                                <span class="permission-group-label">@group.Label</span>
+                                                <span class="permission-group-label">@permGroup.Label</span>
                                                 <div class="permission-flags">
-                                                    @foreach (var flag in group.Flags)
+                                                    @foreach (var flag in permGroup.Flags)
                                                     {
                                                         var isChecked = VM.HasEditPermission(flag.Flag);
                                                         <label class="permission-flag">
@@ -952,7 +919,6 @@ else
                         }
                         else
                         {
-                            @* ── Role View Mode ── *@
                             <div class="detail-header">
                                 <h3>@VM.SelectedRole.Name</h3>
                                 <span class="detail-subtitle">
@@ -966,11 +932,7 @@ else
                                     <span class="detail-field-value">
                                         @if (VM.RoleMembers.Any())
                                         {
-                                            @string.Join(", ", VM.RoleMembers.Select(u => u.Name).Take(5))
-                                            @if (VM.RoleMembers.Count > 5)
-                                            {
-                                                <span class="truncated-hint"> +@(VM.RoleMembers.Count - 5) weitere</span>
-                                            }
+                                            @FormatList(VM.RoleMembers.Select(u => u.Name), 5)
                                         }
                                         else
                                         {
@@ -979,7 +941,6 @@ else
                                     </span>
                                 </div>
 
-                                @* ── Current Permissions Display ── *@
                                 <div class="detail-field">
                                     <span class="detail-field-label">Berechtigungen</span>
                                     <span class="detail-field-value">
@@ -990,9 +951,9 @@ else
                                         else
                                         {
                                             <div class="permission-tags">
-                                                @foreach (var group in UserListViewModel.PermissionGroups)
+                                                @foreach (var permGroup in UserListViewModel.PermissionGroups)
                                                 {
-                                                    @foreach (var flag in group.Flags)
+                                                    @foreach (var flag in permGroup.Flags)
                                                     {
                                                         if ((VM.SelectedRole.ManagementPermissions & flag.Flag) == flag.Flag)
                                                         {
@@ -1013,7 +974,6 @@ else
                                 </div>
                             </div>
 
-                            @* ── Scoped Assignments for this Role ── *@
                             <div class="detail-section" style="margin-top: 16px;">
                                 <div style="display: flex; align-items: center; justify-content: space-between;">
                                     <span class="detail-label">Delegierte Zuweisungen</span>
@@ -1033,7 +993,6 @@ else
                                 @if (VM.IsAddingAssignment)
                                 {
                                     <div class="assignment-form">
-                                        @* Principal Type *@
                                         <div class="form-group">
                                             <label>Zuweisen an</label>
                                             <div class="toggle-button-group">
@@ -1048,7 +1007,6 @@ else
                                             </div>
                                         </div>
 
-                                        @* Principal Select *@
                                         <div class="form-group">
                                             <label>@(VM.NewAssignmentPrincipalIsGroup ? "Gruppe" : "Benutzer")</label>
                                             <select class="edit-input" @bind="SelectedPrincipalIdString">
@@ -1070,7 +1028,6 @@ else
                                             </select>
                                         </div>
 
-                                        @* Scope Type *@
                                         <div class="form-group">
                                             <label>Geltungsbereich</label>
                                             <select class="edit-input" @bind="SelectedScopeTypeString">
@@ -1080,7 +1037,6 @@ else
                                             </select>
                                         </div>
 
-                                        @* Scope ID (if not Global) *@
                                         @if (VM.NewAssignmentScopeType == ScopeType.Department)
                                         {
                                             <div class="form-group">
@@ -1170,7 +1126,6 @@ else
                                 }
                             </div>
 
-                            @* ── Actions ── *@
                             @if (VM.SelectedRole.IsSystemRole)
                             {
                                 <div class="detail-info">
@@ -1225,7 +1180,6 @@ else
                     {
                         @if (VM.IsEditing)
                         {
-                            @* ── Department Edit Mode ── *@
                             <div class="detail-header">
                                 <h3>Abteilung bearbeiten</h3>
                                 <span class="detail-subtitle">@VM.SelectedDepartment.Name</span>
@@ -1345,6 +1299,40 @@ else
                                 <div class="multi-select @(sharesOpen ? "open" : "")">
                                     <div class="multi-select-display" @onclick="() => sharesOpen = !sharesOpen">
                                         <span class="multi-select-text">
+                                            @GetCheckedNames(VM.EditDepartmentShares.Where(s => s.IsChecked).Select(s => s.Item.Name), "Keine Freigaben")
+                                        </span>
+                                        <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
+                                             fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M6 9l6 6 6-6" />
+                                        </svg>
+                                    </div>
+                                    @if (sharesOpen)
+                                    {
+                                        <div class="multi-select-backdrop" @onclick="() => sharesOpen = false"></div>
+                                        <div class="multi-select-dropdown">
+                                            @foreach (var item in VM.EditDepartmentShares)
+                                            {
+                                                <label class="multi-select-option">
+                                                    <input type="checkbox" @bind="item.IsChecked" />
+                                                    <span>@item.Item.Name</span>
+                                                    <span class="multi-select-hint">@item.Item.Path</span>
+                                                </label>
+                                            }
+                                            @if (!VM.EditDepartmentShares.Any())
+                                            {
+                                                <span class="empty-hint">Keine Freigaben vorhanden</span>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            @* ── Share Assignment ── *@
+                            <div class="detail-section" style="margin-top: 16px;">
+                                <span class="detail-label">Zugeordnete Freigaben</span>
+                                <div class="multi-select @(sharesOpen ? "open" : "")">
+                                    <div class="multi-select-display" @onclick="() => sharesOpen = !sharesOpen">
+                                        <span class="multi-select-text">
                                             @{
                                                 var selShares = VM.EditDepartmentShares
                                                     .Where(s => s.IsChecked).Select(s => s.Item.Name);
@@ -1391,7 +1379,6 @@ else
                         }
                         else
                         {
-                            @* ── Department View Mode ── *@
                             <div class="detail-header">
                                 <h3>@VM.SelectedDepartment.Name</h3>
                                 <span class="detail-subtitle">Abteilung</span>
@@ -1425,11 +1412,7 @@ else
                                     <span class="detail-field-value">
                                         @if (VM.DepartmentMembers.Any())
                                         {
-                                            @string.Join(", ", VM.DepartmentMembers.Select(u => u.Name).Take(8))
-                                            @if (VM.DepartmentMembers.Count > 8)
-                                            {
-                                                <span class="truncated-hint"> +@(VM.DepartmentMembers.Count - 8) weitere</span>
-                                            }
+                                            @FormatList(VM.DepartmentMembers.Select(u => u.Name), 8)
                                         }
                                         else
                                         {
@@ -1517,6 +1500,55 @@ else
                                 </div>
 
                                 <div class="detail-field">
+                                    <span class="detail-field-label">Zugeordnete Freigaben</span>
+                                    <span class="detail-field-value">
+                                        @if (VM.DepartmentShares.Any())
+                                        {
+                                            @FormatList(VM.DepartmentShares.Select(s => s.Name), 5)
+                                        }
+                                        else
+                                        {
+                                            <span class="detail-field-value--empty">Keine Freigaben zugeordnet</span>
+                                        }
+                                    </span>
+                                </div>
+                                <div class="detail-field">
+                                    <span class="detail-field-label">Standard-Dateiberechtigung</span>
+                                    <span class="detail-field-value">
+                                        @if (VM.DepartmentPermInfo is not null)
+                                        {
+                                            @if (VM.DepartmentPermInfo.HasNoDefault)
+                                            {
+                                                <span class="detail-field-value--empty">Keine Default-Berechtigung</span>
+                                            }
+                                            else
+                                            {
+                                                <div>
+                                                    <div class="permission-tags">
+                                                        @foreach (var flag in DepartmentPermissionDisplay.AllFlags)
+                                                        {
+                                                            if (DepartmentPermissionDisplay.HasFlag(VM.DepartmentPermInfo.EffectivePermission, flag.Flag))
+                                                            {
+                                                                <span class="permission-tag">@flag.Label</span>
+                                                            }
+                                                        }
+                                                    </div>
+                                                    @if (!VM.DepartmentPermInfo.IsOwnPermission && VM.DepartmentPermInfo.InheritedFromDepartmentName is not null)
+                                                    {
+                                                        <span class="inherited-hint">
+                                                            Geerbt von: @VM.DepartmentPermInfo.InheritedFromDepartmentName
+                                                        </span>
+                                                    }
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="detail-field-value--empty">Wird geladen…</span>
+                                        }
+                                    </span>
+                                </div>
+                                <div class="detail-field">
                                     <span class="detail-field-label">ID</span>
                                     <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">
                                         @VM.SelectedDepartment.Id
@@ -1573,7 +1605,7 @@ else
     private bool sharesOpen;
     private bool groupsDeptOpen;
 
-    // ── Binding helpers for select elements (Guid <-> string) ──
+    // ── Binding helpers ──
 
     private string SelectedPrincipalIdString
     {
@@ -1609,6 +1641,12 @@ else
         set => VM.CreateUserDepartmentId = Guid.TryParse(value, out var id) ? id : null;
     }
 
+    private string EditDepartmentParentIdString
+    {
+        get => VM.EditDepartmentParentId?.ToString() ?? "";
+        set => VM.EditDepartmentParentId = Guid.TryParse(value, out var id) ? id : (Guid?)null;
+    }
+
     // ── Lifecycle ──
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -1618,12 +1656,6 @@ else
             await VM.LoadAsync();
             StateHasChanged();
         }
-    }
-
-    private string EditDepartmentParentIdString
-    {
-        get => VM.EditDepartmentParentId?.ToString() ?? "";
-        set => VM.EditDepartmentParentId = Guid.TryParse(value, out var id) ? id : (Guid?)null;
     }
 
     // ── Tab switching ──
@@ -1720,6 +1752,41 @@ else
     private async Task HandleCreateDepartmentKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter") await CreateDepartment();
+    }
+
+    /// <summary>
+    /// Returns a comma-separated string of names, or a fallback if empty.
+    /// Replaces inline @{ var x = ... } blocks that cause Razor compile errors.
+    /// </summary>
+    private static string GetCheckedNames(IEnumerable<string> names, string fallback)
+    {
+        var list = names.ToList();
+        return list.Count > 0 ? string.Join(", ", list) : fallback;
+    }
+
+    /// <summary>
+    /// Formats a list with truncation: "A, B, C +2 weitere"
+    /// </summary>
+    private static string FormatList(IEnumerable<string> items, int max)
+    {
+        var list = items.ToList();
+        if (list.Count == 0) return "";
+        var visible = string.Join(", ", list.Take(max));
+        if (list.Count > max)
+            visible += $" +{list.Count - max} weitere";
+        return visible;
+    }
+
+    /// <summary>
+    /// Resolves a parent department ID to its display name.
+    /// </summary>
+    private string GetParentName(Guid? parentId)
+    {
+        if (!parentId.HasValue)
+            return "— Keine (Oberste Ebene)";
+
+        var parent = VM.Departments.FirstOrDefault(d => d.Id == parentId.Value);
+        return parent?.Name ?? parentId.Value.ToString();
     }
 
     private static string FormatScopeType(ScopeType type) => type switch

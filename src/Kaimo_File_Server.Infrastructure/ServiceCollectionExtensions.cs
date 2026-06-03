@@ -47,6 +47,7 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IFileVersionRepository, FileVersionRepository>();
 
             // ── Services (infrastructure-level) ──
+            services.AddScoped<IDepartmentPermissionService, DepartmentPermissionService>();
             services.AddSingleton<IPasswordService, PasswordService>();
             services.AddScoped<IUserContextFactory, UserContextFactory>();
             services.AddScoped<IAuthenticationLookup, AuthenticationLookup>();
@@ -110,7 +111,8 @@ namespace Kaimo_File_Server.Infrastructure
                 {
                     using var scope = host.Services.CreateScope();
                     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                    await db.Database.EnsureCreatedAsync();
+                    //await db.Database.EnsureCreatedAsync();
+                    await db.Database.MigrateAsync();
                     Console.WriteLine("[+] Datenbank bereit");
 
                     var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
