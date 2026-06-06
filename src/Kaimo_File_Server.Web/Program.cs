@@ -42,6 +42,7 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
 
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<ToastService>();
+builder.Services.AddScoped<FileUploadCoordinator>();
 
 // ══════════════════════════════════════════
 //  ViewModels

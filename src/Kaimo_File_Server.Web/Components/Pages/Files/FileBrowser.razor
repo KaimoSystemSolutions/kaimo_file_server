@@ -8,6 +8,7 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IJSRuntime JS
 @inject ToastService Toast
+@inject FileUploadCoordinator UploadCoordinator
 
 <PageTitle>@(VM.CurrentShare?.Name ?? "Dateien") – Kaimo Files</PageTitle>
 
@@ -204,8 +205,6 @@ else
     <div class="file-table-wrap" @ref="_fileDropZone" 
          style="grid-template-columns: @GridColumns">
 
-        @* -- file upload area -- *@
-        <InputFile OnChange="OnFileUploaded" style="display:none" />
     @* -- Header -- *@
         <div class="file-grid-header">
             <div class="col-name">
@@ -659,6 +658,12 @@ else
     
     // ========== File Uploading ==========
     
+    protected override void OnInitialized()
+    {
+        UploadCoordinator.OnFilesSelected += OnFileUploaded;
+    }
+    
+    
     [JSInvokable]
     public void OnFilesDropped(int fileCount)
     {
@@ -666,12 +671,11 @@ else
         StateHasChanged();
     }
     
-    
     private async Task OnFileUploaded(InputFileChangeEventArgs e)
     {
         foreach (var file in e.GetMultipleFiles())
         {
-            Toast.Show($"Uploading \"{file.Name}\"…");
+            var toastId = Toast.Show($"Uploading \"{file.Name}\"…", ToastType.Progress);
 
             Stream stream;
             try
@@ -680,25 +684,89 @@ else
             }
             catch (IOException)
             {
-                Toast.Show($"\"{file.Name}\" ist zu groß (max. 1.1 GB).", ToastType.Error);
+                Toast.Update(toastId, $"\"{file.Name}\" ist zu groß (max. 1.1 GB).", type: ToastType.Error);
                 continue;
             }
 
-            await using (stream)
+            try
             {
-                var result = await VM.UploadFileAsync(file.Name, stream);
+                await using (stream)
+                {
+                    var progressStream = new ProgressStream(stream, file.Size, (bytesRead, total) =>
+                    {
+                        var percent = (int)(bytesRead * 100 / total);
+                        InvokeAsync(() =>
+                        {
+                            Toast.Update(toastId, progress: percent);
+                            StateHasChanged();
+                        });
+                    });
 
-                if (result.Success)
-                    Toast.Show($"\"{file.Name}\" hochgeladen.", ToastType.Success);
-                else
-                    Toast.Show(result.Error ?? "Upload fehlgeschlagen.", ToastType.Error);
+                    var result = await VM.UploadFileAsync(file.Name, progressStream);
+
+                    if (result.Success)
+                        Toast.Update(toastId, $"\"{file.Name}\" hochgeladen.", type: ToastType.Success);
+                    else
+                        Toast.Update(toastId, result.Error ?? "Upload fehlgeschlagen.", type: ToastType.Error);
+                }
+            }
+            catch (JSException)
+            {
+                Toast.Update(toastId, $"\"{file.Name}\" abgebrochen — Seite verlassen.", type: ToastType.Error);
+                break; // remaining files are also dead, no point continuing
             }
         }
-
+        
         await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
-    }
-    
 
+    }
+
+    /* concurrent file uploading. microsoft doesn't suppor it uwu
+    private async Task OnFilesUploaded(InputFileChangeEventArgs e)
+       {
+           var tasks = e.GetMultipleFiles().Select(OnFileUploaded);
+           await Task.WhenAll(tasks);
+           await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
+       }
+       
+       private async Task OnFileUploaded(IBrowserFile file)
+       {
+           var toastId = Toast.Show($"Uploading \"{file.Name}\"…", ToastType.Progress);
+       
+           Stream stream;
+           try
+           {
+               stream = file.OpenReadStream(maxAllowedSize: VM.GetMaxUploadSizeBytes());
+           }
+           catch (IOException)
+           {
+               Toast.Update(toastId, $"\"{file.Name}\" ist zu groß (max. 1.1 GB).", type: ToastType.Error);
+               return;
+           }
+       
+           await using (stream)
+           {
+               var progressStream = new ProgressStream(stream, file.Size, (bytesRead, total) =>
+               {
+                   var percent = (int)(bytesRead * 100 / total);
+                   InvokeAsync(() =>
+                   {
+                       Toast.Update(toastId, progress: percent);
+                       StateHasChanged();
+                   });
+               });
+       
+               var result = await VM.UploadFileAsync(file.Name, progressStream);
+       
+               if (result.Success)
+                   Toast.Update(toastId, $"\"{file.Name}\" hochgeladen.", type: ToastType.Success);
+               else
+                   Toast.Update(toastId, result.Error ?? "Upload fehlgeschlagen.", type: ToastType.Error);
+           }
+       }     
+     
+     */
+    
     // ========== State ==========
 
     private Dictionary<string, int> _aclCounts = new();
@@ -834,6 +902,8 @@ else
     {
         VM.OnStateChanged -= OnVmStateChanged;
         _dotNetRef?.Dispose();
+        UploadCoordinator.OnFilesSelected -= OnFileUploaded;
+
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

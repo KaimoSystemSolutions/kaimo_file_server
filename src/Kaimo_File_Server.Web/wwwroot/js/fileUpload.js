@@ -6,14 +6,12 @@ function initFileUpload(element, dotNetRef) {
     });
 
     element.addEventListener('dragover', e => {
-        e.preventDefault(); // Required to allow dropping
+        e.preventDefault();
     });
 
     element.addEventListener('dragleave', e => {
         e.preventDefault();
 
-        // Check if the cursor is actually leaving the element
-        // .contains(null) is false, so leaving the window entirely is also handled safely
         if (!element.contains(e.relatedTarget)) {
             element.classList.remove('file-dragged-over');
         }
@@ -23,7 +21,7 @@ function initFileUpload(element, dotNetRef) {
         e.preventDefault();
         element.classList.remove('file-dragged-over');
 
-        const input = element.querySelector('input[type=file]');
+        const input = document.getElementById('global-file-input');
         input.files = e.dataTransfer.files;
         input.dispatchEvent(new Event('change', { bubbles: true }));
     });

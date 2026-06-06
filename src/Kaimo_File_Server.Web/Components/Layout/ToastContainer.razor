@@ -17,6 +17,11 @@
                         <line x1="15" y1="9" x2="9" y2="15" />
                         <line x1="9" y1="9" x2="15" y2="15" />
                         break;
+                    case ToastType.Progress:
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                        break;
                     default:
                         <circle cx="12" cy="12" r="10" />
                         <line x1="12" y1="16" x2="12" y2="12" />
@@ -32,6 +37,12 @@
                     <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
             </button>
+            @if (toast.Type == ToastType.Progress)
+            {
+                <div class="toast-progress-bar">
+                    <div class="toast-progress-bar-fill" style="width: @(toast.Progress)%"></div>
+                </div>
+            }
         </div>
     }
 </div>
@@ -49,16 +60,21 @@
     {
         InvokeAsync(() =>
         {
-            // start auto-dismiss timer for any new toasts
             foreach (var toast in Toasts.Toasts)
             {
-                if (!_timers.ContainsKey(toast.Id))
-                {
-                    var id = toast.Id;
-                    var delay = toast.Type == ToastType.Error ? 6000 : 4000;
-                    var timer = new Timer(_ => InvokeAsync(() => Dismiss(id)), null, delay, Timeout.Infinite);
-                    _timers[id] = timer;
-                }
+                if (toast.Type == ToastType.Progress)
+                    continue;
+
+                var delay = toast.Type == ToastType.Error ? 6000 : 4000;
+                var elapsed = (int)(DateTime.Now - toast.CreatedAt).TotalMilliseconds;
+                var remaining = Math.Max(delay - elapsed, 0);
+
+                // Reset existing timer or create new one
+                var id = toast.Id;
+                if (_timers.TryGetValue(id, out var existing))
+                    existing.Change(remaining, Timeout.Infinite);
+                else
+                    _timers[id] = new Timer(_ => InvokeAsync(() => Dismiss(id)), null, remaining, Timeout.Infinite);
             }
             StateHasChanged();
         });
@@ -71,7 +87,6 @@
         _removing.Add(id);
         StateHasChanged();
 
-        // wait for the fade-out animation
         await Task.Delay(300);
 
         _removing.Remove(id);
