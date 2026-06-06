@@ -124,8 +124,6 @@
 }
 
 @* -- Dialog: Löschen bestätigen -- *@
-
-
 @if (_showDeleteConfirm)
 {
     <div class="modal-backdrop" @onclick="CancelDelete">
@@ -199,46 +197,61 @@ else
     }
 
     @* ══════════════════════════════════════════════════
-       Resizable Column Table
-       CSS-Variablen steuern alle Spaltenbreiten.
-       Name-Spalte (flex:1) nimmt den Rest.
+       Resizable Column Table – 5 Spalten (ohne Actions)
+       Name-Spalte (1fr) nimmt den Rest.
        ══════════════════════════════════════════════════ *@
-    <div class="file-table-wrap" @ref="_fileDropZone" 
+    <div class="file-table-wrap" @ref="_fileDropZone"
          style="grid-template-columns: @GridColumns">
 
-    @* -- Header -- *@
+        @* -- Header (sortierbar) -- *@
         <div class="file-grid-header">
-            <div class="col-name">
-                Name
+            <div class="col-name col-sortable" @onclick="@(() => OnHeaderClick("name"))">
+                <span class="col-header-text">Name</span>
+                @if (_sortColumn == "name")
+                {
+                    <span class="sort-arrow @(_sortDirection == 1 ? "sort-arrow--desc" : "sort-arrow--asc")"></span>
+                }
                 <div class="col-resize-handle"
                      @onmousedown="@(e => OnResizeStart(e, 0))"
-                     @onmousedown:stopPropagation="true"></div>
+                     @onmousedown:stopPropagation="true"
+                     @onclick:stopPropagation="true"></div>
             </div>
-            <div class="col-size">
-                Größe
+            <div class="col-size col-sortable" @onclick="@(() => OnHeaderClick("size"))">
+                <span class="col-header-text">Größe</span>
+                @if (_sortColumn == "size")
+                {
+                    <span class="sort-arrow @(_sortDirection == 1 ? "sort-arrow--desc" : "sort-arrow--asc")"></span>
+                }
                 <div class="col-resize-handle"
                      @onmousedown="@(e => OnResizeStart(e, 1))"
-                     @onmousedown:stopPropagation="true"></div>
+                     @onmousedown:stopPropagation="true"
+                     @onclick:stopPropagation="true"></div>
             </div>
-            <div class="col-created">
-                Erstellt
+            <div class="col-created col-sortable" @onclick="@(() => OnHeaderClick("created"))">
+                <span class="col-header-text">Erstellt</span>
+                @if (_sortColumn == "created")
+                {
+                    <span class="sort-arrow @(_sortDirection == 1 ? "sort-arrow--desc" : "sort-arrow--asc")"></span>
+                }
                 <div class="col-resize-handle"
                      @onmousedown="@(e => OnResizeStart(e, 2))"
-                     @onmousedown:stopPropagation="true"></div>
+                     @onmousedown:stopPropagation="true"
+                     @onclick:stopPropagation="true"></div>
             </div>
-            <div class="col-modified">
-                Geändert
+            <div class="col-modified col-sortable" @onclick="@(() => OnHeaderClick("modified"))">
+                <span class="col-header-text">Geändert</span>
+                @if (_sortColumn == "modified")
+                {
+                    <span class="sort-arrow @(_sortDirection == 1 ? "sort-arrow--desc" : "sort-arrow--asc")"></span>
+                }
                 <div class="col-resize-handle"
                      @onmousedown="@(e => OnResizeStart(e, 3))"
-                     @onmousedown:stopPropagation="true"></div>
+                     @onmousedown:stopPropagation="true"
+                     @onclick:stopPropagation="true"></div>
             </div>
-            <div class="col-lastaccess">
-                Letzter Zugriff
-                <div class="col-resize-handle"
-                     @onmousedown="@(e => OnResizeStart(e, 4))"
-                     @onmousedown:stopPropagation="true"></div>
+            <div class="col-lastaccess col-sortable" @onclick="@(() => OnHeaderClick("lastaccess"))">
+                <span class="col-header-text">Letzter Zugriff</span>
             </div>
-            <div class="col-actions"></div>
         </div>
 
         @* -- ".." Elternverzeichnis -- *@
@@ -256,14 +269,15 @@ else
                 <div class="col-created"></div>
                 <div class="col-modified"></div>
                 <div class="col-lastaccess"></div>
-                <div class="col-actions"></div>
             </div>
         }
 
         @* -- Ordner -- *@
-        @foreach (var dir in VM.Directories)
+        @foreach (var dir in SortedDirectories)
         {
             var isSelected = _selectedItems.Contains(dir);
+            var dirAclCount = _isAdmin ? GetAclCount(GetDirAclPath(dir)) : 0;
+
             <div class="file-grid-row file-row-dir @(isSelected ? "file-row--selected" : "")"
                  @onclick="(e) => OnItemClick(e, dir)"
                  @onclick:stopPropagation="true"
@@ -272,29 +286,38 @@ else
                  @oncontextmenu:preventDefault="true"
                  @oncontextmenu:stopPropagation="true">
 
-                @if (dir.Name == ".RECYCLE_BIN")
-                {
-                    <div class="col-name">
+                <div class="col-name">
+                    @if (dir.Name == ".RECYCLE_BIN")
+                    {
                         <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
                              fill="none" stroke="currentColor" stroke-width="1.5">
                             <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
                             <line x1="10" y1="11" x2="10" y2="17" />
                             <line x1="14" y1="11" x2="14" y2="17" />
                         </svg>
-                        <span>@dir.Name</span>
-                    </div>
-                }
-                else
-                {
-                    <div class="col-name">
+                    }
+                    else
+                    {
                         <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
                              fill="var(--folder-fill)" stroke="var(--folder-stroke)" stroke-width="1.5">
                             <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                         </svg>
-                        <span>@dir.Name</span>
-                    </div>
-                }
-
+                    }
+                    <span>@dir.Name</span>
+                    @if (dirAclCount > 0)
+                    {
+                        <span class="acl-indicator"
+                              title="@dirAclCount Berechtigungsregel@(dirAclCount != 1 ? "n" : "")"
+                              @onclick="() => OpenFolderAcl(dir)"
+                              @onclick:stopPropagation="true">
+                            <svg class="acl-indicator-icon" width="12" height="12" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            </svg>
+                            <span class="acl-indicator-count">@dirAclCount</span>
+                        </span>
+                    }
+                </div>
 
                 <div class="col-size">
                     @{
@@ -313,38 +336,6 @@ else
                 <div class="col-created">@dir.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
                 <div class="col-modified">@dir.ModifiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
                 <div class="col-lastaccess">@(dir.LastAccessedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</div>
-
-                <div class="col-actions">
-                    <button class="btn-icon btn-icon--small btn-icon--danger" title="@dir.Name löschen"
-                            @onclick="() => RequestDelete(dir)" @onclick:stopPropagation="true">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                             stroke="var(--text-tertiary)" stroke-width="1.5">
-                            <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
-                            <line x1="10" y1="11" x2="10" y2="17" />
-                            <line x1="14" y1="11" x2="14" y2="17" />
-                        </svg>
-                    </button>
-                    @if (_isAdmin)
-                    {
-                        <button class="btn-icon btn-icon--small" title="ACL für @dir.Name"
-                                @onclick="() => OpenFolderAcl(dir)" @onclick:stopPropagation="true">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                 stroke="@(_aclFolderPath == GetDirAclPath(dir) && _showFolderAcl ? "var(--accent)" : "var(--text-tertiary)")"
-                                 stroke-width="1.5">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                            </svg>
-                        </button>
-                        var dirCount = GetAclCount(GetDirAclPath(dir));
-                        @if (dirCount > 0)
-                        {
-                            <span class="acl-badge acl-badge--small">@dirCount</span>
-                        }
-                        else
-                        {
-                            <span class="acl-badge acl-badge--small" style="visibility: hidden;">0</span>
-                        }
-                    }
-                </div>
             </div>
 
             @if (_showFolderAcl && _aclFolderPath == GetDirAclPath(dir))
@@ -370,9 +361,11 @@ else
         }
 
         @* -- Dateien -- *@
-        @foreach (var file in VM.Files)
+        @foreach (var file in SortedFiles)
         {
             var isSelected = _selectedItems.Contains(file);
+            var fileAclCount = _isAdmin ? GetAclCount(GetFileAclPath(file)) : 0;
+
             <div class="file-grid-row @(isSelected ? "file-row--selected" : "")"
                  @onclick="(e) => OnItemClick(e, file)"
                  @onclick:stopPropagation="true"
@@ -388,44 +381,25 @@ else
                         <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
                     </svg>
                     <span>@file.Name</span>
+                    @if (fileAclCount > 0)
+                    {
+                        <span class="acl-indicator"
+                              title="@fileAclCount Berechtigungsregel@(fileAclCount != 1 ? "n" : "")"
+                              @onclick="() => OpenFileAcl(file)"
+                              @onclick:stopPropagation="true">
+                            <svg class="acl-indicator-icon" width="12" height="12" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                            </svg>
+                            <span class="acl-indicator-count">@fileAclCount</span>
+                        </span>
+                    }
                 </div>
 
                 <div class="col-size">@FormatHelper.FormatFileSize(file.Size)</div>
                 <div class="col-created">@file.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
                 <div class="col-modified">@file.ModifiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
                 <div class="col-lastaccess">@(file.LastAccessedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</div>
-
-                <div class="col-actions">
-                    <button class="btn-icon btn-icon--small btn-icon--danger" title="@file.Name löschen"
-                            @onclick="() => RequestDelete(file)" @onclick:stopPropagation="true">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                             stroke="var(--text-tertiary)" stroke-width="1.5">
-                            <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
-                            <line x1="10" y1="11" x2="10" y2="17" />
-                            <line x1="14" y1="11" x2="14" y2="17" />
-                        </svg>
-                    </button>
-                    @if (_isAdmin)
-                    {
-                        <button class="btn-icon btn-icon--small" title="ACL für @file.Name"
-                                @onclick="() => OpenFileAcl(file)" @onclick:stopPropagation="true">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                 stroke="@(_aclFolderPath == GetFileAclPath(file) && _showFolderAcl ? "var(--accent)" : "var(--text-tertiary)")"
-                                 stroke-width="1.5">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                            </svg>
-                        </button>
-                        var fileCount = GetAclCount(GetFileAclPath(file));
-                        @if (fileCount > 0)
-                        {
-                            <span class="acl-badge acl-badge--small">@fileCount</span>
-                        }
-                        else
-                        {
-                            <span class="acl-badge acl-badge--small" style="visibility: hidden;">0</span>
-                        }
-                    }
-                </div>
             </div>
 
             @if (_showFolderAcl && _aclFolderPath == GetFileAclPath(file))
@@ -538,8 +512,6 @@ else
 }
 
 @* -- Dialog: Umbenennen -- *@
-
-
 @if (_showRenameDialog)
 {
     <div class="modal-backdrop" @onclick="CancelRename">
@@ -602,18 +574,14 @@ else
     [Parameter] public string ShareName { get; set; } = "";
     [Parameter] public string? SubPath { get; set; }
 
-    // ========== Column Resize ==========
+    // ========== Column Resize (5 Spalten, ohne Actions) ==========
 
-    // Spaltenreihenfolge – Handle am rechten Rand einer Spalte resized
-    // die Spalte LINKS (diese selbst) + die Spalte RECHTS davon.
-    
     private Dictionary<string, double> _colWidths = new()
     {
         ["size"] = 90,
         ["created"] = 140,
         ["modified"] = 140,
-        ["lastaccess"] = 140,
-        ["actions"] = 100
+        ["lastaccess"] = 140
     };
 
     // Name-Breite: 0 = noch nicht resized → 1fr; > 0 = feste px
@@ -622,9 +590,13 @@ else
     private const double ColMinWidth = 50;
     private DotNetObjectReference<FileBrowser>? _dotNetRef;
 
-    /// <summary>Baut den grid-template-columns String.</summary>
+    /// <summary>Baut den grid-template-columns String (5 Spalten).</summary>
     private string GridColumns =>
-        $"{(_nameWidth > 0 ? $"{_nameWidth}px" : "1fr")} {_colWidths["size"]}px {_colWidths["created"]}px {_colWidths["modified"]}px {_colWidths["lastaccess"]}px {_colWidths["actions"]}px";
+        $"{(_nameWidth > 0 ? $"{_nameWidth}px" : "1fr")} " +
+        $"{_colWidths["size"]}px " +
+        $"{_colWidths["created"]}px " +
+        $"{_colWidths["modified"]}px " +
+        $"{_colWidths["lastaccess"]}px";
 
     private async Task OnResizeStart(MouseEventArgs e, int colIndex)
     {
@@ -648,7 +620,7 @@ else
                     _nameWidth = w >= ColMinWidth ? Math.Round(w) : 0;
                     continue;
                 }
-                if (w >= ColMinWidth)
+                if (_colWidths.ContainsKey(col) && w >= ColMinWidth)
                     _colWidths[col] = Math.Round(w);
             }
         }
@@ -656,22 +628,63 @@ else
 
         InvokeAsync(StateHasChanged);
     }
-    
-    // ========== File Uploading ==========
-    
+
+    // ========== Column Sorting ==========
+
+    private string? _sortColumn;
+    private int _sortDirection; // 0 = default, 1 = descending, 2 = ascending
+
+    private void OnHeaderClick(string column)
+    {
+        if (_sortColumn == column)
+        {
+            _sortDirection = (_sortDirection + 1) % 3;
+            if (_sortDirection == 0)
+                _sortColumn = null;
+        }
+        else
+        {
+            _sortColumn = column;
+            _sortDirection = 1; // Erst absteigend
+        }
+    }
+
+    private IEnumerable<FileMetadata> SortedDirectories => ApplySort(VM.Directories);
+    private IEnumerable<FileMetadata> SortedFiles => ApplySort(VM.Files);
+
+    private IEnumerable<FileMetadata> ApplySort(IEnumerable<FileMetadata> items)
+    {
+        if (_sortColumn is null || _sortDirection == 0)
+            return items; // Default: alphabetisch nach Name (vom VM)
+
+        Func<FileMetadata, object> keySelector = _sortColumn switch
+        {
+            "name" => f => f.Name.ToLowerInvariant(),
+            "size" => f => f.IsDirectory ? (VM.GetDirectorySize(f) ?? 0L) : f.Size,
+            "created" => f => f.CreatedAt,
+            "modified" => f => f.ModifiedAt,
+            "lastaccess" => f => f.LastAccessedAt ?? DateTime.MinValue,
+            _ => f => f.Name.ToLowerInvariant()
+        };
+
+        return _sortDirection == 1
+            ? items.OrderByDescending(keySelector)
+            : items.OrderBy(keySelector);
+    }
+
+    // ========== File Uploading (UploadCoordinator + ProgressStream) ==========
+
     protected override void OnInitialized()
     {
         UploadCoordinator.OnFilesSelected += OnFileUploaded;
     }
-    
-    
+
     [JSInvokable]
     public void OnFilesDropped(int fileCount)
     {
-        // update UI.
         StateHasChanged();
     }
-    
+
     private async Task OnFileUploaded(InputFileChangeEventArgs e)
     {
         foreach (var file in e.GetMultipleFiles())
@@ -717,57 +730,10 @@ else
                 break; // remaining files are also dead, no point continuing
             }
         }
-        
-        await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
 
+        await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
     }
 
-    /* concurrent file uploading. microsoft doesn't suppor it uwu
-    private async Task OnFilesUploaded(InputFileChangeEventArgs e)
-       {
-           var tasks = e.GetMultipleFiles().Select(OnFileUploaded);
-           await Task.WhenAll(tasks);
-           await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
-       }
-       
-       private async Task OnFileUploaded(IBrowserFile file)
-       {
-           var toastId = Toast.Show($"Uploading \"{file.Name}\"…", ToastType.Progress);
-       
-           Stream stream;
-           try
-           {
-               stream = file.OpenReadStream(maxAllowedSize: VM.GetMaxUploadSizeBytes());
-           }
-           catch (IOException)
-           {
-               Toast.Update(toastId, $"\"{file.Name}\" ist zu groß (max. 1.1 GB).", type: ToastType.Error);
-               return;
-           }
-       
-           await using (stream)
-           {
-               var progressStream = new ProgressStream(stream, file.Size, (bytesRead, total) =>
-               {
-                   var percent = (int)(bytesRead * 100 / total);
-                   InvokeAsync(() =>
-                   {
-                       Toast.Update(toastId, progress: percent);
-                       StateHasChanged();
-                   });
-               });
-       
-               var result = await VM.UploadFileAsync(file.Name, progressStream);
-       
-               if (result.Success)
-                   Toast.Update(toastId, $"\"{file.Name}\" hochgeladen.", type: ToastType.Success);
-               else
-                   Toast.Update(toastId, result.Error ?? "Upload fehlgeschlagen.", type: ToastType.Error);
-           }
-       }     
-     
-     */
-    
     // ========== State ==========
 
     private Dictionary<string, int> _aclCounts = new();
@@ -795,13 +761,13 @@ else
     private bool _showFilePreview;
     private string _previewUrl = "";
     private string _previewFileName = "";
-    
+
     private ElementReference _fileDropZone;
     private bool _jsInitialized = false;
-    
+
     // ========== Toolbar Computed ==========
 
-    private bool CanOpenSelection => _selectedItems.Count == 1; //&& _selectedItems.First().IsDirectory;
+    private bool CanOpenSelection => _selectedItems.Count == 1;
     private bool CanRenameSelection => _selectedItems.Count == 1;
     private bool CanDeleteSelection => _selectedItems.Count > 0;
     private bool CanAclSelection => _isAdmin && _selectedItems.Count == 1;
@@ -888,6 +854,8 @@ else
         _showFolderAcl = false;
         _aclFolderPath = "";
         _selectedItems.Clear();
+        _sortColumn = null;
+        _sortDirection = 0;
         CloseContextMenu();
 
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
@@ -904,7 +872,6 @@ else
         VM.OnStateChanged -= OnVmStateChanged;
         _dotNetRef?.Dispose();
         UploadCoordinator.OnFilesSelected -= OnFileUploaded;
-
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -914,11 +881,8 @@ else
             var state = await AuthStateProvider.GetAuthenticationStateAsync();
             _isAdmin = state.User.IsInRole("Administrator")
                     || state.User.IsInRole("ShareManager");
-            
-            StateHasChanged();
 
-            // init file uploading 
-            //await JS.InvokeVoidAsync("initFileUpload", _fileDropZone, _dotNetRef);
+            StateHasChanged();
         }
 
         if (!_jsInitialized && _fileDropZone.Id is not null)
@@ -1134,7 +1098,6 @@ else
     }
 
     private bool _previewIsImage;
-
     private bool _previewLoading;
 
     private async Task OpenFilePreview(FileMetadata file)
@@ -1162,7 +1125,7 @@ else
         _previewIsImage = contentType.StartsWith("image/");
         _previewLoading = false;
     }
-    
+
     private async Task CloseFilePreview()
     {
         if (!string.IsNullOrEmpty(_previewUrl))
@@ -1171,7 +1134,7 @@ else
         _showFilePreview = false;
         _previewUrl = "";
     }
-    
+
     private void NavigateUp()
     {
         if (string.IsNullOrEmpty(VM.ParentPath))

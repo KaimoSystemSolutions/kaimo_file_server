@@ -1,14 +1,12 @@
 ﻿/**
- * Column Resize v8 – Windows Explorer
+ * Column Resize v9 – 5 Spalten (ohne Actions-Spalte)
  *
  * Handle sitzt am rechten Rand von Spalte [i].
  * Drag tauscht Breite zwischen Spalte [i] (links) und [i+1] (rechts).
  * Keine andere Spalte ändert sich.
  *
- * Beispiel: Handle zwischen "Erstellt" (i=2) und "Geändert" (i=3):
- *   → Nach links: Erstellt schmaler, Geändert breiter
- *   → Nach rechts: Erstellt breiter, Geändert schmaler
- *   → Name, Größe, Letzter Zugriff, Actions: unverändert
+ * Spalten: name(0), size(1), created(2), modified(3), lastaccess(4)
+ * Handles: 0→name|size, 1→size|created, 2→created|modified, 3→modified|lastaccess
  */
 window.columnResize = {
     _onMouseMove: null,
@@ -28,9 +26,18 @@ window.columnResize = {
 
         var rightIndex = leftIndex + 1;
 
-        // Alle Header-Zellen finden und deren gerenderte Breiten messen
+        // Nur sichtbare Header-Zellen messen
         var headers = wrap.querySelectorAll('.file-grid-header > div');
         if (rightIndex >= headers.length) return;
+
+        // Prüfen ob die Spalten sichtbar sind (responsive hiding)
+        var leftHeader = headers[leftIndex];
+        var rightHeader = headers[rightIndex];
+        if (!leftHeader || !rightHeader) return;
+
+        var leftStyle = window.getComputedStyle(leftHeader);
+        var rightStyle = window.getComputedStyle(rightHeader);
+        if (leftStyle.display === 'none' || rightStyle.display === 'none') return;
 
         var allWidths = [];
         headers.forEach(function (h) {
@@ -54,7 +61,6 @@ window.columnResize = {
             allWidths[leftIndex] = newLeft;
             allWidths[rightIndex] = newRight;
 
-            // Alle Spalten als feste px setzen (auch Name)
             var parts = allWidths.map(function (w) {
                 return Math.round(w) + 'px';
             });
@@ -62,9 +68,8 @@ window.columnResize = {
         };
 
         columnResize._onMouseUp = function () {
-            // Finale Breiten auslesen
             var finalHeaders = wrap.querySelectorAll('.file-grid-header > div');
-            var colNames = ['name', 'size', 'created', 'modified', 'lastaccess', 'actions'];
+            var colNames = ['name', 'size', 'created', 'modified', 'lastaccess'];
             var result = {};
             finalHeaders.forEach(function (h, i) {
                 if (i < colNames.length) {

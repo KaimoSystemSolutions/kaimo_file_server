@@ -1,0 +1,479 @@
+﻿/* ══════════════════════════════════════════════════════════
+   FileBrowser.razor.css – Scoped Styles
+   File Table Grid, Column Sorting, ACL Indicators, Responsive
+   ══════════════════════════════════════════════════════════ */
+
+/* ── File Table – CSS Grid (5 Spalten, ohne Actions) ───── */
+
+.file-table-wrap {
+    display: grid;
+    position: relative;
+    grid-template-columns: 1fr 90px 140px 140px 140px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    overflow: hidden;
+    width: 100%;
+}
+
+/* --- Header Row --- */
+
+.file-grid-header {
+    display: contents;
+}
+
+    .file-grid-header > div {
+        background: var(--bg-tertiary);
+        padding: 10px 12px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-tertiary);
+        border-bottom: 1px solid var(--border);
+        position: relative;
+        user-select: none;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+/* --- Sortable Header --- */
+
+.col-sortable {
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+}
+
+    .col-sortable:hover {
+        color: var(--text-primary);
+        background: var(--bg-hover);
+    }
+
+.col-header-text {
+    vertical-align: middle;
+}
+
+/* --- Sort Arrows --- */
+
+.sort-arrow {
+    display: inline-block;
+    width: 0;
+    height: 0;
+    margin-left: 5px;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+}
+
+.sort-arrow--asc {
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 5px solid var(--accent);
+}
+
+.sort-arrow--desc {
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--accent);
+}
+
+/* --- Data Rows --- */
+
+.file-grid-row {
+    display: contents;
+}
+
+    .file-grid-row > div {
+        padding: 10px 12px;
+        user-select: none;
+        font-size: 13px;
+        color: var(--text-secondary);
+        border-bottom: 1px solid var(--border);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        transition: background 0.1s;
+    }
+
+    .file-grid-row:hover > div {
+        background: var(--bg-hover);
+    }
+
+    .file-grid-row.file-row-dir {
+        cursor: pointer;
+    }
+
+    /* --- Column Borders --- */
+
+    .file-grid-header > div,
+    .file-grid-row > div {
+        border-right: 1px solid var(--border);
+    }
+
+        .file-grid-header > div:last-child,
+        .file-grid-row > div:last-child {
+            border-right: none;
+        }
+
+    /* --- Name-Spalte --- */
+
+    .file-grid-row > .col-name,
+    .file-grid-header > .col-name {
+        min-width: 0;
+    }
+
+    .file-grid-row > .col-name {
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 0;
+    }
+
+        .file-grid-row > .col-name svg,
+        .file-grid-row > .col-name .file-icon {
+            flex-shrink: 0;
+            margin-right: 8px;
+        }
+
+        .file-grid-row > .col-name > span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+        }
+
+/* --- Size rechts --- */
+
+.col-size {
+    text-align: right;
+}
+
+/* --- Resize Handle (nur im Header) --- */
+
+.col-resize-handle {
+    position: absolute;
+    top: 0;
+    right: -3px;
+    bottom: 0;
+    width: 7px;
+    cursor: col-resize;
+    z-index: 2;
+    user-select: none;
+    background: transparent;
+    transition: background 0.15s;
+}
+
+    .col-resize-handle:hover,
+    .col-resize-handle:active {
+        background: var(--accent);
+        opacity: 0.5;
+        border-radius: 3px;
+    }
+
+/* --- Selektion --- */
+
+.file-grid-row.file-row--selected > div {
+    background: var(--accent-selected);
+}
+
+    .file-grid-row.file-row--selected > div:first-child {
+        box-shadow: inset 3px 0 0 0 var(--accent);
+    }
+
+.file-grid-row.file-row--selected:hover > div {
+    background: var(--accent-selected);
+}
+
+/* --- ACL Expand --- */
+
+.file-row-acl-expand-wrap {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--border);
+}
+
+.file-row-acl-expand {
+    padding: 12px 16px 16px 44px;
+    background: var(--bg-tertiary);
+}
+
+/* --- Empty State --- */
+
+.file-grid-empty {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 0;
+    gap: 12px;
+    color: var(--text-tertiary);
+    font-size: 13px;
+}
+
+/* ══════════════════════════════════════════════════════════
+   ACL Indicator (im Name-Feld, neben Dateiname)
+   ══════════════════════════════════════════════════════════ */
+
+.acl-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: 8px;
+    padding: 1px 6px 1px 4px;
+    background: var(--accent-subtle);
+    border: 1px solid rgba(127, 172, 245, 0.25);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+    .acl-indicator:hover {
+        background: var(--accent-selected);
+        border-color: var(--accent);
+    }
+
+.acl-indicator-icon {
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+.acl-indicator-count {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+}
+
+[data-theme="light"] .acl-indicator {
+    border-color: rgba(37, 99, 235, 0.2);
+}
+
+/* ══════════════════════════════════════════════════════════
+   File Upload Drag-Over
+   ══════════════════════════════════════════════════════════ */
+
+.file-dragged-over {
+    border: 2px dashed var(--accent) !important;
+    border-radius: 8px;
+}
+
+    .file-dragged-over::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: var(--accent-subtle);
+        backdrop-filter: blur(2px);
+        z-index: 10;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%237facf5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpolyline points='17 8 12 3 7 8'/%3E%3Cline x1='12' y1='3' x2='12' y2='15'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: center calc(50% - 16px);
+        animation: fadeIn 0.15s ease-out;
+    }
+
+    .file-dragged-over::before {
+        content: 'Dateien hier ablegen';
+        position: absolute;
+        inset: 0;
+        z-index: 11;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-top: 56px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--accent);
+        letter-spacing: 0.02em;
+        pointer-events: none;
+    }
+
+/* ══════════════════════════════════════════════════════════
+   Responsive – Spalten ausblenden bei schmalen Viewports
+   !important überschreibt inline grid-template-columns
+   ══════════════════════════════════════════════════════════ */
+
+/* < 1024px: "Letzter Zugriff" ausblenden → 4 Spalten */
+@media (max-width: 1024px) {
+    .file-table-wrap {
+        grid-template-columns: 1fr 90px 140px 140px !important;
+    }
+
+    .col-lastaccess {
+        display: none !important;
+    }
+}
+
+/* < 800px: "Erstellt" auch ausblenden → 3 Spalten */
+@media (max-width: 800px) {
+    .file-table-wrap {
+        grid-template-columns: 1fr 90px 140px !important;
+    }
+
+    .col-created,
+    .col-lastaccess {
+        display: none !important;
+    }
+}
+
+/* < 600px: "Geändert" auch ausblenden → 2 Spalten */
+@media (max-width: 600px) {
+    .file-table-wrap {
+        grid-template-columns: 1fr 90px !important;
+    }
+
+    .col-created,
+    .col-modified,
+    .col-lastaccess {
+        display: none !important;
+    }
+}
+
+/* < 420px: "Größe" auch ausblenden → nur Name */
+@media (max-width: 420px) {
+    .file-table-wrap {
+        grid-template-columns: 1fr !important;
+    }
+
+    .col-size,
+    .col-created,
+    .col-modified,
+    .col-lastaccess {
+        display: none !important;
+    }
+
+    /* ACL Indicator kürzer auf sehr kleinen Screens */
+    .acl-indicator {
+        padding: 1px 4px;
+        margin-left: 4px;
+    }
+
+    .acl-indicator-count {
+        font-size: 9px;
+    }
+}
+
+/* ── Toolbar responsive ── */
+
+@media (max-width: 600px) {
+    .selection-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .toolbar-actions {
+        width: 100%;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .toolbar-btn span {
+        display: none;
+    }
+
+    .toolbar-btn {
+        padding: 8px;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════
+   Preview Dialog (scoped)
+   ══════════════════════════════════════════════════════════ */
+
+.preview-dialog {
+    width: 85vw;
+    max-width: 1200px;
+    height: 90vh;
+    background: var(--bg-primary);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 8px;
+}
+
+.preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+}
+
+.preview-title {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.preview-header .btn-icon {
+    position: absolute;
+    right: 1rem;
+}
+
+.preview-frame {
+    flex: 1;
+    border: none;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-secondary);
+}
+
+.preview-image-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: var(--bg-secondary);
+}
+
+.preview-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.preview-loading {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.preview-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: preview-spin 0.8s linear infinite;
+}
+
+.preview-loading-text {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+@keyframes preview-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.size-loading {
+    color: var(--text-tertiary);
+    font-style: italic;
+}
