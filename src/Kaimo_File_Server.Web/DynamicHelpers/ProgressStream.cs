@@ -1,4 +1,4 @@
-namespace Kaimo_File_Server.Web.Helpers;
+namespace Kaimo_File_Server.Web.DynamicHelpers;
 
 public class ProgressStream : Stream
 {
