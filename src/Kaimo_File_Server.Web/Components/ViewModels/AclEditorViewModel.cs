@@ -2,6 +2,8 @@
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Language;
+using System.Runtime.Versioning;
 
 public class AclEditorViewModel
 {
@@ -185,17 +187,16 @@ public class AclEditorViewModel
         SuccessMessage = null;
 
         if (NewPrincipalId is null)
-        { ErrorMessage = "Bitte einen Benutzer, eine Gruppe oder Rolle auswählen."; return false; }
+        { ErrorMessage = Resources.Web_Error_PrincipalNotSelected; return false; }
 
         if (NewPermissions == FilePermission.None)
-        { ErrorMessage = "Bitte mindestens eine Berechtigung auswählen."; return false; }
+        { ErrorMessage = Resources.Web_Error_PermissionNotSelected; return false; }
 
         var duplicate = Entries.FirstOrDefault(e =>
             e.PrincipalId == NewPrincipalId.Value && e.EntryType == NewEntryType);
         if (duplicate is not null)
         {
-            ErrorMessage = "Es existiert bereits ein Eintrag für diesen Principal mit diesem Typ. " +
-                           "Bitte bearbeite den bestehenden Eintrag.";
+            ErrorMessage = Resources.Web_Error_DuplicatePermissionEntry;
             return false;
         }
 
