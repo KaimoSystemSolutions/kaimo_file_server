@@ -328,8 +328,8 @@ public class ManagementAuthService : IManagementAuthService
             // Skip if we already have this role as Global (from direct assignment)
             // to avoid double-counting
             if (result.Any(r =>
-                r.Role.Id == assignment.RoleId &&
-                r.Assignment.ScopeType == ScopeType.Global))
+                r.Item1.RoleId == assignment.RoleId &&
+                r.Item1.ScopeType == ScopeType.Global))
                 continue;
 
             var role = await _roleRepo.GetByIdAsync(assignment.RoleId);

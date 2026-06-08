@@ -4,6 +4,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Web.Helpers;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
 
@@ -1455,3 +1456,33 @@ public class UserListViewModel
         UserRoles = await _userRepo.GetRolesForUserAsync(user.Id);
     }
 }
+
+
+// ══════════════════════════════════════════
+//  Helper Classes
+// ══════════════════════════════════════════
+
+public class CheckboxItem<T>
+{
+    public T Item { get; }
+    public bool IsChecked { get; set; }
+    public CheckboxItem(T item, bool isChecked) { Item = item; IsChecked = isChecked; }
+}
+
+/// <summary>Display-friendly version of a ScopedRoleAssignment.</summary>
+public record ScopedAssignmentDisplayItem(
+    Guid AssignmentId,
+    string PrincipalName,
+    bool IsGroup,
+    string RoleName,
+    ScopeType ScopeType,
+    string ScopeName);
+
+/// <summary>A group of related permission flags for UI display.</summary>
+public record PermissionGroup(string Label, List<PermissionFlag> Flags);
+
+/// <summary>A single permission flag for checkbox binding.</summary>
+public record PermissionFlag(ManagementPermission Flag, string Label);
+
+/// <summary>A named permission preset (shortcut).</summary>
+public record PermissionPreset(string Label, ManagementPermission Permissions);

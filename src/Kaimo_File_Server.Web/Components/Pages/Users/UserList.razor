@@ -43,7 +43,7 @@ else
                     </svg>
                 </button>
             }
-            else if (VM.ActiveTab == AdminTab.Groups && (VM.CanManageGroups || VM.IsGlobalAdmin))
+            else if (VM.ActiveTab == AdminTab.Groups && VM.CanManageGroups)
             {
                 <button class="btn-icon" title="Gruppe erstellen" @onclick="() => VM.StartCreateGroup()">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -52,7 +52,7 @@ else
                     </svg>
                 </button>
             }
-            else if (VM.ActiveTab == AdminTab.Roles && (VM.CanManageRoles || VM.IsGlobalAdmin))
+            else if (VM.ActiveTab == AdminTab.Roles && VM.CanManageRoles)
             {
                 <button class="btn-icon" title="Rolle erstellen" @onclick="() => VM.StartCreateRole()">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -61,7 +61,7 @@ else
                     </svg>
                 </button>
             }
-            else if (VM.ActiveTab == AdminTab.Departments && (VM.CanManageDepartments || VM.IsGlobalAdmin))
+            else if (VM.ActiveTab == AdminTab.Departments && VM.CanManageDepartments)
             {
                 <button class="btn-icon" title="Abteilung erstellen" @onclick="() => VM.StartCreateDepartment()">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -75,7 +75,7 @@ else
 
     @* ── Tabs ── *@
     <div class="admin-tabs">
-        @if (VM.CanCreateUsers || VM.IsGlobalAdmin || VM.AuthorizedDepartmentsForView.Any())
+        @if (VM.CanCreateUsers || VM.AuthorizedDepartmentsForView.Any())
         {
             <button class="admin-tab @(VM.ActiveTab == AdminTab.Users ? "active" : "")"
                     @onclick="() => SwitchTab(AdminTab.Users)">
@@ -86,7 +86,7 @@ else
                 Benutzer
             </button>
         }
-        @if (VM.CanManageGroups || VM.IsGlobalAdmin)
+        @if (VM.CanManageGroups)
         {
             <button class="admin-tab @(VM.ActiveTab == AdminTab.Groups ? "active" : "")"
                     @onclick="() => SwitchTab(AdminTab.Groups)">
@@ -98,7 +98,7 @@ else
                 Gruppen
             </button>
         }
-        @if (VM.CanManageRoles || VM.IsGlobalAdmin)
+        @if (VM.CanManageRoles)
         {
             <button class="admin-tab @(VM.ActiveTab == AdminTab.Roles ? "active" : "")"
                     @onclick="() => SwitchTab(AdminTab.Roles)">
@@ -108,7 +108,7 @@ else
                 Rollen
             </button>
         }
-        @if (VM.CanManageDepartments || VM.IsGlobalAdmin)
+        @if (VM.CanManageDepartments)
         {
             <button class="admin-tab @(VM.ActiveTab == AdminTab.Departments ? "active" : "")"
                     @onclick="() => SwitchTab(AdminTab.Departments)">
@@ -597,15 +597,11 @@ else
                                     <span>
                                         @if (VM.SelectedUser.IsEnabled)
                                         {
-                                            <span class="status-badge status-badge--active">
-                                                <span class="status-dot status-dot--active"></span>Aktiv
-                                            </span>
+                                            <span class="status-badge status-badge--active"><span class="status-dot status-dot--active"></span>Aktiv</span>
                                         }
                                         else
                                         {
-                                            <span class="status-badge status-badge--disabled">
-                                                <span class="status-dot status-dot--disabled"></span>Deaktiviert
-                                            </span>
+                                            <span class="status-badge status-badge--disabled"><span class="status-dot status-dot--disabled"></span>Deaktiviert</span>
                                         }
                                     </span>
                                 </div>
@@ -617,6 +613,7 @@ else
                                     }
                                     else
                                     {
+
                                         <span class="detail-field-value detail-field-value--empty">Nicht angegeben</span>
                                     }
                                 </div>
@@ -628,39 +625,24 @@ else
                                     }
                                     else
                                     {
+
                                         <span class="detail-field-value detail-field-value--empty">Keine Beschreibung</span>
                                     }
                                 </div>
                                 <div class="detail-field">
                                     <span class="detail-field-label">Passwort ändern</span>
-                                    <span class="detail-field-value">
-                                        @(VM.SelectedUser.CanChangePassword ? "Erlaubt" : "Gesperrt")
-                                    </span>
+                                    <span class="detail-field-value">@(VM.SelectedUser.CanChangePassword ? "Erlaubt" : "Gesperrt")</span>
                                 </div>
                                 <div class="detail-field">
                                     <span class="detail-field-label">Rollen</span>
                                     <span class="detail-field-value">
-                                        @if (VM.UserRoles.Any())
-                                        {
-                                            @FormatList(VM.UserRoles.Select(r => r.Name), 5)
-                                        }
-                                        else
-                                        {
-                                            <text>Keine Rollen</text>
-                                        }
+                                        @(VM.UserRoles.Any() ? FormatList(VM.UserRoles.Select(r => r.Name), 5) : "Keine Rollen")
                                     </span>
                                 </div>
                                 <div class="detail-field">
                                     <span class="detail-field-label">Gruppen</span>
                                     <span class="detail-field-value">
-                                        @if (VM.UserGroups.Any())
-                                        {
-                                            @FormatList(VM.UserGroups.Select(g => g.Name), 5)
-                                        }
-                                        else
-                                        {
-                                            <text>Keine Gruppen</text>
-                                        }
+                                        @(VM.UserGroups.Any() ? FormatList(VM.UserGroups.Select(g => g.Name), 5) : "Keine Gruppen")
                                     </span>
                                 </div>
                                 <div class="detail-field">
@@ -679,16 +661,13 @@ else
                                             <div class="scoped-assignment-row">
                                                 <div class="scoped-assignment-info">
                                                     <span class="scoped-assignment-role">@a.RoleName</span>
-                                                    <span class="scoped-assignment-scope">
-                                                        @FormatScopeType(a.ScopeType): @a.ScopeName
-                                                    </span>
+                                                    <span class="scoped-assignment-scope">@FormatScopeType(a.ScopeType): @a.ScopeName</span>
                                                 </div>
-                                                @if (VM.IsGlobalAdmin || VM.CanManageRoles)
+                                                @if (VM.CanManageRoles)
                                                 {
                                                     <button class="btn-icon btn-icon--small" title="Zuweisung entfernen"
                                                             @onclick="() => DeleteAssignment(a.AssignmentId)">
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                             stroke="var(--danger)" stroke-width="2">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2">
                                                             <line x1="18" y1="6" x2="6" y2="18" />
                                                             <line x1="6" y1="6" x2="18" y2="18" />
                                                         </svg>
@@ -785,24 +764,17 @@ else
                             <div class="detail-section">
                                 <span class="detail-label">Mitglieder</span>
                                 <span class="detail-value">
-                                    @if (VM.GroupMembers.Any())
-                                    {
-                                        @FormatList(VM.GroupMembers.Select(u => u.Name), 5)
-                                    }
-                                    else
-                                    {
-                                        <text>Keine Mitglieder</text>
-                                    }
+                                    @(VM.GroupMembers.Any() ? FormatList(VM.GroupMembers.Select(u => u.Name), 5) : "Keine Mitglieder")
                                 </span>
                                 <span class="detail-label">ID</span>
                                 <span class="detail-value">@VM.SelectedGroup.Id</span>
                             </div>
                             <div class="detail-actions">
-                                @if (VM.CanManageGroups || VM.IsGlobalAdmin)
+                                @if (VM.CanManageGroups)
                                 {
                                     <button class="btn-secondary" @onclick="EditGroup">Mitglieder verwalten</button>
                                 }
-                                @if (VM.IsGlobalAdmin)
+                                @if (VM.CanDeleteGroups)
                                 {
                                     @if (VM.IsConfirmingDelete)
                                     {
@@ -868,7 +840,6 @@ else
                             {
                                 <div class="detail-section" style="margin-top: 16px;">
                                     <span class="detail-label">Berechtigungen</span>
-
                                     <div class="permission-presets">
                                         @foreach (var preset in UserListViewModel.PermissionPresets)
                                         {
@@ -878,11 +849,8 @@ else
                                                 @preset.Label
                                             </button>
                                         }
-                                        <button class="preset-chip" @onclick="() => VM.ApplyPermissionPreset(ManagementPermission.None)">
-                                            Keine
-                                        </button>
+                                        <button class="preset-chip" @onclick="() => VM.ApplyPermissionPreset(ManagementPermission.None)">Keine</button>
                                     </div>
-
                                     <div class="permission-groups">
                                         @foreach (var permGroup in UserListViewModel.PermissionGroups)
                                         {
@@ -904,12 +872,22 @@ else
                                     </div>
                                 </div>
                             }
+                            else
+                            {
+                                <div class="detail-info" style="margin-top: 16px;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="12" y1="16" x2="12" y2="12" />
+                                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                                    </svg>
+                                    <span>Berechtigungen von Systemrollen werden automatisch verwaltet und können hier nicht geändert werden.</span>
+                                </div>
+                            }
 
                             @if (VM.ErrorMessage is not null)
                             {
                                 <div class="error-banner" style="margin: 12px 0;">@VM.ErrorMessage</div>
                             }
-
                             <div class="detail-actions">
                                 <button class="btn-primary" @onclick="SaveRole" disabled="@VM.IsSaving">
                                     @(VM.IsSaving ? "Speichert…" : "Speichern")
@@ -921,26 +899,16 @@ else
                         {
                             <div class="detail-header">
                                 <h3>@VM.SelectedRole.Name</h3>
-                                <span class="detail-subtitle">
-                                    @(VM.SelectedRole.IsSystemRole ? "Systemrolle" : "Benutzerdefinierte Rolle")
-                                </span>
+                                <span class="detail-subtitle">@(VM.SelectedRole.IsSystemRole ? "Systemrolle" : "Benutzerdefinierte Rolle")</span>
                             </div>
 
                             <div class="detail-field-grid">
                                 <div class="detail-field">
                                     <span class="detail-field-label">Direkte Mitglieder</span>
                                     <span class="detail-field-value">
-                                        @if (VM.RoleMembers.Any())
-                                        {
-                                            @FormatList(VM.RoleMembers.Select(u => u.Name), 5)
-                                        }
-                                        else
-                                        {
-                                            <text>Keine Mitglieder</text>
-                                        }
+                                        @(VM.RoleMembers.Any() ? FormatList(VM.RoleMembers.Select(u => u.Name), 5) : "Keine Mitglieder")
                                     </span>
                                 </div>
-
                                 <div class="detail-field">
                                     <span class="detail-field-label">Berechtigungen</span>
                                     <span class="detail-field-value">
@@ -965,24 +933,20 @@ else
                                         }
                                     </span>
                                 </div>
-
                                 <div class="detail-field">
                                     <span class="detail-field-label">ID</span>
-                                    <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">
-                                        @VM.SelectedRole.Id
-                                    </span>
+                                    <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">@VM.SelectedRole.Id</span>
                                 </div>
                             </div>
 
+                            @* ── Scoped Assignments ── *@
                             <div class="detail-section" style="margin-top: 16px;">
                                 <div style="display: flex; align-items: center; justify-content: space-between;">
                                     <span class="detail-label">Delegierte Zuweisungen</span>
-                                    @if (!VM.IsAddingAssignment && (VM.IsGlobalAdmin || VM.CanManageRoles))
+                                    @if (!VM.IsAddingAssignment && VM.CanManageRoles)
                                     {
-                                        <button class="btn-icon btn-icon--small" title="Zuweisung hinzufügen"
-                                                @onclick="StartAddAssignment">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                 stroke="currentColor" stroke-width="2">
+                                        <button class="btn-icon btn-icon--small" title="Zuweisung hinzufügen" @onclick="StartAddAssignment">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                 <line x1="12" y1="5" x2="12" y2="19" />
                                                 <line x1="5" y1="12" x2="19" y2="12" />
                                             </svg>
@@ -1006,595 +970,422 @@ else
                                                 </button>
                                             </div>
                                         </div>
-
                                         <div class="form-group">
                                             <label>@(VM.NewAssignmentPrincipalIsGroup ? "Gruppe" : "Benutzer")</label>
                                             <select class="edit-input" @bind="SelectedPrincipalIdString">
                                                 <option value="">— Auswählen —</option>
                                                 @if (VM.NewAssignmentPrincipalIsGroup)
                                                 {
-                                                    @foreach (var g in VM.AllGroups)
-                                                    {
-                                                        <option value="@g.Id">@g.Name</option>
-                                                    }
+                                                    @foreach (var g in VM.AllGroups) {
+                                                    <option value="@g.Id">@g.Name</option>
                                                 }
+                                            }
                                                 else
-                                                {
-                                                    @foreach (var u in VM.AllUsers)
-                                                    {
-                                                        <option value="@u.Id">@u.Name (@u.Username)</option>
-                                                    }
-                                                }
-                                            </select>
-                                        </div>
-
-                                        <div class="form-group">
-                                            <label>Geltungsbereich</label>
-                                            <select class="edit-input" @bind="SelectedScopeTypeString">
-                                                <option value="Global">Global (systemweit)</option>
-                                                <option value="Department">Abteilung</option>
-                                                <option value="Share">Freigabe</option>
-                                            </select>
-                                        </div>
-
-                                        @if (VM.NewAssignmentScopeType == ScopeType.Department)
-                                        {
-                                            <div class="form-group">
-                                                <label>Abteilung</label>
-                                                <select class="edit-input" @bind="SelectedScopeIdString">
-                                                    <option value="">— Auswählen —</option>
-                                                    @foreach (var dept in VM.AllDepartments)
-                                                    {
-                                                        <option value="@dept.Id">@dept.Name</option>
-                                                    }
-                                                </select>
-                                            </div>
-                                        }
-                                        else if (VM.NewAssignmentScopeType == ScopeType.Share)
-                                        {
-                                            <div class="form-group">
-                                                <label>Freigabe-ID</label>
-                                                <input type="text" class="edit-input" placeholder="GUID der Freigabe"
-                                                       @bind="ShareScopeIdInput" @bind:event="oninput" />
-                                            </div>
-                                        }
-
-                                        @if (VM.ErrorMessage is not null)
-                                        {
-                                            <div class="error-banner" style="margin: 8px 0;">@VM.ErrorMessage</div>
-                                        }
-
-                                        <div class="create-form-actions" style="margin-top: 8px;">
-                                            <button class="btn-primary" @onclick="CreateAssignment" disabled="@VM.IsSaving">
-                                                @(VM.IsSaving ? "Erstellt…" : "Zuweisen")
-                                            </button>
-                                            <button class="btn-secondary" @onclick="() => VM.CancelAddAssignment()">Abbrechen</button>
-                                        </div>
-                                    </div>
-                                }
-
-                                @if (VM.RoleScopedAssignments.Any())
-                                {
-                                    <div class="scoped-assignments-list">
-                                        @foreach (var a in VM.RoleScopedAssignments)
-                                        {
-                                            <div class="scoped-assignment-row">
-                                                <div class="scoped-assignment-info">
-                                                    <span class="scoped-assignment-principal">
-                                                        @if (a.IsGroup)
-                                                        {
-                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                                                                 stroke="var(--text-tertiary)" stroke-width="1.5" style="vertical-align: -1px; margin-right: 4px;">
-                                                                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                                                                <circle cx="9" cy="7" r="4" />
-                                                            </svg>
-                                                        }
-                                                        else
-                                                        {
-                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                                                                 stroke="var(--text-tertiary)" stroke-width="1.5" style="vertical-align: -1px; margin-right: 4px;">
-                                                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                                                                <circle cx="12" cy="7" r="4" />
-                                                            </svg>
-                                                        }
-                                                        @a.PrincipalName
-                                                    </span>
-                                                    <span class="scoped-assignment-scope">
-                                                        @FormatScopeType(a.ScopeType): @a.ScopeName
-                                                    </span>
-                                                </div>
-                                                @if (VM.IsGlobalAdmin || VM.CanManageRoles)
-                                                {
-                                                    <button class="btn-icon btn-icon--small" title="Zuweisung entfernen"
-                                                            @onclick="() => DeleteAssignment(a.AssignmentId)">
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                                             stroke="var(--danger)" stroke-width="2">
-                                                            <line x1="18" y1="6" x2="6" y2="18" />
-                                                            <line x1="6" y1="6" x2="18" y2="18" />
-                                                        </svg>
-                                                    </button>
-                                                }
-                                            </div>
-                                        }
-                                    </div>
-                                }
-                                else if (!VM.IsAddingAssignment)
-                                {
-                                    <span class="detail-field-value detail-field-value--empty">
-                                        Keine delegierten Zuweisungen
-                                    </span>
-                                }
-                            </div>
-
-                            @if (VM.SelectedRole.IsSystemRole)
-                            {
-                                <div class="detail-info">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                         stroke="var(--text-tertiary)" stroke-width="1.5">
-                                        <circle cx="12" cy="12" r="10" />
-                                        <line x1="12" y1="16" x2="12" y2="12" />
-                                        <line x1="12" y1="8" x2="12.01" y2="8" />
-                                    </svg>
-                                    <span>Systemrollen können nicht gelöscht werden. Berechtigungen und Mitglieder können verwaltet werden.</span>
-                                </div>
-                                @if (VM.IsGlobalAdmin || VM.CanManageRoles)
-                                {
-                                    <div class="detail-actions">
-                                        <button class="btn-secondary" @onclick="EditRole">Bearbeiten</button>
-                                    </div>
-                                }
-                            }
-                            else
-                            {
-                                <div class="detail-actions">
-                                    @if (VM.IsGlobalAdmin || VM.CanManageRoles)
-                                    {
-                                        <button class="btn-secondary" @onclick="EditRole">Bearbeiten</button>
-                                    }
-                                    @if (VM.IsGlobalAdmin)
-                                    {
-                                        @if (VM.IsConfirmingDelete)
-                                        {
-                                            <div class="confirm-delete">
-                                                <p>Rolle wirklich löschen?</p>
-                                                <div style="display: flex; gap: 8px;">
-                                                    <button class="btn-danger-outline" @onclick="ConfirmDeleteRole" disabled="@VM.IsSaving">
-                                                        @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
-                                                    </button>
-                                                    <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">Abbrechen</button>
-                                                </div>
-                                            </div>
-                                        }
-                                        else
-                                        {
-                                            <button class="btn-danger-outline" @onclick="() => VM.RequestDeleteRole()">Rolle löschen</button>
-                                        }
-                                    }
-                                </div>
-                            }
-                        }
-                    }
-
-                    @* ──────────── DEPARTMENT DETAIL ──────────── *@
-                    else if (VM.SelectedDepartment is not null)
-                    {
-                        @if (VM.IsEditing)
-                        {
-                            <div class="detail-header">
-                                <h3>Abteilung bearbeiten</h3>
-                                <span class="detail-subtitle">@VM.SelectedDepartment.Name</span>
-                            </div>
-
-                            <div class="detail-field-grid">
-                                @* Name *@
-                                <div class="form-group">
-                                    <label>Name</label>
-                                    <input type="text" class="edit-input" @bind="VM.EditDepartmentName" />
-                                </div>
-
-                                @* Parent Department (Hierarchy / Inheritance) *@
-                                <div class="form-group">
-                                    <label>Erbt von (Elternabteilung)</label>
-                                    <select class="edit-input" @bind="EditDepartmentParentIdString">
-                                        <option value="">— Keine (Oberste Ebene) —</option>
-                                        @foreach (var dept in VM.AvailableParentDepartments)
-                                        {
-                                            <option value="@dept.Id">@dept.Name</option>
+                                            {
+                                                @foreach (var u in VM.AllUsers) {
+                                                <option value="@u.Id">@u.Name (@u.Username)</option>
+                                            }
                                         }
                                     </select>
-                                    <span class="form-hint">
-                                        Wie in OOP: Diese Abteilung erbt Admin-Rechte und Default-Berechtigungen
-                                        von der gewählten Elternabteilung.
-                                    </span>
+                                </div>
+                                <div class="form-group">
+                                    <label>Geltungsbereich</label>
+                                    <select class="edit-input" @bind="SelectedScopeTypeString">
+                                        <option value="Global">Global (systemweit)</option>
+                                        <option value="Department">Abteilung</option>
+                                        <option value="Share">Freigabe</option>
+                                    </select>
+                                </div>
+                                @if (VM.NewAssignmentScopeType == ScopeType.Department)
+                                {
+                                    <div class="form-group">
+                                        <label>Abteilung</label>
+                                        <select class="edit-input" @bind="SelectedScopeIdString">
+                                            <option value="">— Auswählen —</option>
+                                            @foreach (var dept in VM.AllDepartments)
+                                            {
+                                                <option value="@dept.Id">@dept.Name</option>
+                                            }
+                                        </select>
+                                    </div>
+                                }
+                                else if (VM.NewAssignmentScopeType == ScopeType.Share)
+                                {
+                                    <div class="form-group">
+                                        <label>Freigabe-ID</label>
+                                        <input type="text" class="edit-input" placeholder="GUID der Freigabe"
+                                               @bind="ShareScopeIdInput" @bind:event="oninput" />
+                                    </div>
+                                }
+                                @if (VM.ErrorMessage is not null)
+                                {
+                                    <div class="error-banner" style="margin: 8px 0;">@VM.ErrorMessage</div>
+                                }
+                                <div class="create-form-actions" style="margin-top: 8px;">
+                                    <button class="btn-primary" @onclick="CreateAssignment" disabled="@VM.IsSaving">
+                                        @(VM.IsSaving ? "Erstellt…" : "Zuweisen")
+                                    </button>
+                                    <button class="btn-secondary" @onclick="() => VM.CancelAddAssignment()">Abbrechen</button>
                                 </div>
                             </div>
+                        }
 
-                            @* ── Default File Permission ── *@
-                            <div class="detail-section" style="margin-top: 16px;">
-                                <span class="detail-label">Standard-Dateiberechtigung</span>
-                                <p class="form-hint" style="margin-bottom: 8px;">
-                                    Diese Berechtigung wird automatisch auf alle Abteilungsmitglieder
-                                    für alle zugeordneten Freigaben angewandt.
-                                </p>
-
-                                @* Toggle: own vs inherit *@
-                                <div class="toggle-row" style="margin-bottom: 12px;">
-                                    <span class="toggle-label-text">Eigene Berechtigung definieren</span>
-                                    <label class="toggle-switch">
-                                        <input type="checkbox" @bind="VM.EditDepartmentHasOwnPermission" />
-                                        <span class="toggle-slider"></span>
-                                    </label>
-                                </div>
-
-                                @if (VM.EditDepartmentHasOwnPermission)
+                        @if (VM.RoleScopedAssignments.Any())
+                        {
+                            <div class="scoped-assignments-list">
+                                @foreach (var a in VM.RoleScopedAssignments)
                                 {
-                                    @* Permission checkboxes *@
-                                    <div class="permission-flags" style="margin-left: 4px;">
-                                        @foreach (var flag in DepartmentPermissionDisplay.AllFlags)
+                                    <div class="scoped-assignment-row">
+                                        <div class="scoped-assignment-info">
+                                            <span class="scoped-assignment-principal">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                                                     stroke="var(--text-tertiary)" stroke-width="1.5" style="vertical-align: -1px; margin-right: 4px;">
+                                                    @if (a.IsGroup)
+                                                    {
+                                                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                                                        <circle cx="9" cy="7" r="4" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                                                        <circle cx="12" cy="7" r="4" />
+                                                    }
+                                                </svg>
+                                                @a.PrincipalName
+                                            </span>
+                                            <span class="scoped-assignment-scope">@FormatScopeType(a.ScopeType): @a.ScopeName</span>
+                                        </div>
+                                        @if (VM.CanManageRoles)
                                         {
-                                            var isChecked = VM.HasDeptPermFlag(flag.Flag);
-                                            <label class="permission-flag" title="@flag.Description">
-                                                <input type="checkbox" checked="@isChecked"
-                                                       @onchange="e => VM.ToggleDeptPermFlag(flag.Flag, (bool)(e.Value ?? false))" />
-                                                <span>@flag.Label</span>
-                                            </label>
+                                            <button class="btn-icon btn-icon--small" title="Zuweisung entfernen"
+                                                    @onclick="() => DeleteAssignment(a.AssignmentId)">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2">
+                                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                                </svg>
+                                            </button>
                                         }
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else if (!VM.IsAddingAssignment)
+                        {
+                            <span class="detail-field-value detail-field-value--empty">Keine delegierten Zuweisungen</span>
+                        }
+                    </div>
+
+                    @if (VM.SelectedRole.IsSystemRole)
+                    {
+                        <div class="detail-info">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5">
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="12" y1="16" x2="12" y2="12" />
+                                <line x1="12" y1="8" x2="12.01" y2="8" />
+                            </svg>
+                            <span>Systemrollen können nicht gelöscht werden. Mitglieder und Zuweisungen können verwaltet werden.</span>
+                        </div>
+                        @if (VM.CanManageRoles)
+                        {
+                            <div class="detail-actions">
+                                <button class="btn-secondary" @onclick="EditRole">Bearbeiten</button>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="detail-actions">
+                            @if (VM.CanManageRoles)
+                            {
+                                <button class="btn-secondary" @onclick="EditRole">Bearbeiten</button>
+                            }
+                            @if (VM.CanDeleteRoles)
+                            {
+                                @if (VM.IsConfirmingDelete)
+                                {
+                                    <div class="confirm-delete">
+                                        <p>Rolle wirklich löschen?</p>
+                                        <div style="display: flex; gap: 8px;">
+                                            <button class="btn-danger-outline" @onclick="ConfirmDeleteRole" disabled="@VM.IsSaving">
+                                                @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
+                                            </button>
+                                            <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">Abbrechen</button>
+                                        </div>
                                     </div>
                                 }
                                 else
                                 {
-                                    @* Show what will be inherited *@
-                                    @if (VM.EditDepartmentParentId.HasValue)
-                                    {
-                                        <span class="detail-field-value detail-field-value--empty">
-                                            Wird von Elternabteilung geerbt.
-                                        </span>
-                                    }
-                                    else
-                                    {
-                                        <span class="detail-field-value detail-field-value--empty">
-                                            Keine Elternabteilung — keine Default-Berechtigung.
-                                        </span>
-                                    }
+                                    <button class="btn-danger-outline" @onclick="() => VM.RequestDeleteRole()">Rolle löschen</button>
+                                }
+                            }
+                        </div>
+                    }
+                }
+            }
+
+            @* ──────────── DEPARTMENT DETAIL ──────────── *@
+            else if (VM.SelectedDepartment is not null)
+            {
+                @if (VM.IsEditing)
+                {
+                    <div class="detail-header">
+                        <h3>Abteilung bearbeiten</h3>
+                        <span class="detail-subtitle">@VM.SelectedDepartment.Name</span>
+                    </div>
+
+                    <div class="detail-field-grid">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" class="edit-input" @bind="VM.EditDepartmentName" />
+                        </div>
+                        <div class="form-group">
+                            <label>Erbt von (Elternabteilung)</label>
+                            <select class="edit-input" @bind="EditDepartmentParentIdString">
+                                <option value="">— Keine (Oberste Ebene) —</option>
+                                @foreach (var dept in VM.AvailableParentDepartments)
+                                {
+                                    <option value="@dept.Id">@dept.Name</option>
+                                }
+                            </select>
+                            <span class="form-hint">Diese Abteilung erbt Admin-Rechte und Default-Berechtigungen von der gewählten Elternabteilung.</span>
+                        </div>
+                    </div>
+
+                    @* ── Default File Permission ── *@
+                    <div class="detail-section" style="margin-top: 16px;">
+                        <span class="detail-label">Standard-Dateiberechtigung</span>
+                        <p class="form-hint" style="margin-bottom: 8px;">
+                            Diese Berechtigung wird automatisch auf alle Abteilungsmitglieder
+                            für die zugeordnete Freigabe angewandt.
+                        </p>
+                        <div class="toggle-row" style="margin-bottom: 12px;">
+                            <span class="toggle-label-text">Eigene Berechtigung definieren</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" @bind="VM.EditDepartmentHasOwnPermission" />
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        @if (VM.EditDepartmentHasOwnPermission)
+                        {
+                            <div class="permission-flags" style="margin-left: 4px;">
+                                @foreach (var flag in DepartmentPermissionDisplay.AllFlags)
+                                {
+                                    var isChecked = VM.HasDeptPermFlag(flag.Flag);
+                                    <label class="permission-flag" title="@flag.Description">
+                                        <input type="checkbox" checked="@isChecked"
+                                               @onchange="e => VM.ToggleDeptPermFlag(flag.Flag, (bool)(e.Value ?? false))" />
+                                        <span>@flag.Label</span>
+                                    </label>
                                 }
                             </div>
-
-                            @* ── Members ── *@
-                            <div class="detail-section" style="margin-top: 16px;">
-                                <span class="detail-label">Mitglieder</span>
-                                <div class="multi-select @(membersOpen ? "open" : "")">
-                                    <div class="multi-select-display" @onclick="() => membersOpen = !membersOpen">
-                                        <span class="multi-select-text">
-                                            @{
-                                                var selDeptMembers = VM.EditDepartmentMembers
-                                                    .Where(m => m.IsChecked).Select(m => m.Item.Name);
-                                            }
-                                            @(selDeptMembers.Any() ? string.Join(", ", selDeptMembers) : "Keine Mitglieder")
-                                        </span>
-                                        <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
-                                             fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M6 9l6 6 6-6" />
-                                        </svg>
-                                    </div>
-                                    @if (membersOpen)
-                                    {
-                                        <div class="multi-select-backdrop" @onclick="() => membersOpen = false"></div>
-                                        <div class="multi-select-dropdown">
-                                            @foreach (var item in VM.EditDepartmentMembers)
-                                            {
-                                                <label class="multi-select-option">
-                                                    <input type="checkbox" @bind="item.IsChecked" />
-                                                    <span>@item.Item.Name</span>
-                                                    <span class="multi-select-hint">@item.Item.Username</span>
-                                                </label>
-                                            }
-                                        </div>
-                                    }
-                                </div>
-                            </div>
-
-                            @* ── Share Assignment ── *@
-                            <div class="detail-section" style="margin-top: 16px;">
-                                <span class="detail-label">Zugeordnete Freigaben</span>
-                                <div class="multi-select @(sharesOpen ? "open" : "")">
-                                    <div class="multi-select-display" @onclick="() => sharesOpen = !sharesOpen">
-                                        <span class="multi-select-text">
-                                            @GetCheckedNames(VM.EditDepartmentShares.Where(s => s.IsChecked).Select(s => s.Item.Name), "Keine Freigaben")
-                                        </span>
-                                        <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
-                                             fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M6 9l6 6 6-6" />
-                                        </svg>
-                                    </div>
-                                    @if (sharesOpen)
-                                    {
-                                        <div class="multi-select-backdrop" @onclick="() => sharesOpen = false"></div>
-                                        <div class="multi-select-dropdown">
-                                            @foreach (var item in VM.EditDepartmentShares)
-                                            {
-                                                <label class="multi-select-option">
-                                                    <input type="checkbox" @bind="item.IsChecked" />
-                                                    <span>@item.Item.Name</span>
-                                                    <span class="multi-select-hint">@item.Item.Path</span>
-                                                </label>
-                                            }
-                                            @if (!VM.EditDepartmentShares.Any())
-                                            {
-                                                <span class="empty-hint">Keine Freigaben vorhanden</span>
-                                            }
-                                        </div>
-                                    }
-                                </div>
-                            </div>
-
-                            @* ── Share Assignment ── *@
-                            <div class="detail-section" style="margin-top: 16px;">
-                                <span class="detail-label">Zugeordnete Freigaben</span>
-                                <div class="multi-select @(sharesOpen ? "open" : "")">
-                                    <div class="multi-select-display" @onclick="() => sharesOpen = !sharesOpen">
-                                        <span class="multi-select-text">
-                                            @{
-                                                var selShares = VM.EditDepartmentShares
-                                                    .Where(s => s.IsChecked).Select(s => s.Item.Name);
-                                            }
-                                            @(selShares.Any() ? string.Join(", ", selShares) : "Keine Freigaben")
-                                        </span>
-                                        <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
-                                             fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M6 9l6 6 6-6" />
-                                        </svg>
-                                    </div>
-                                    @if (sharesOpen)
-                                    {
-                                        <div class="multi-select-backdrop" @onclick="() => sharesOpen = false"></div>
-                                        <div class="multi-select-dropdown">
-                                            @foreach (var item in VM.EditDepartmentShares)
-                                            {
-                                                <label class="multi-select-option">
-                                                    <input type="checkbox" @bind="item.IsChecked" />
-                                                    <span>@item.Item.Name</span>
-                                                    <span class="multi-select-hint">@item.Item.Path</span>
-                                                </label>
-                                            }
-                                            @if (!VM.EditDepartmentShares.Any())
-                                            {
-                                                <span class="empty-hint">Keine Freigaben vorhanden</span>
-                                            }
-                                        </div>
-                                    }
-                                </div>
-                            </div>
-
-                            @if (VM.ErrorMessage is not null)
-                            {
-                                <div class="error-banner" style="margin: 12px 0;">@VM.ErrorMessage</div>
-                            }
-
-                            <div class="detail-actions">
-                                <button class="btn-primary" @onclick="SaveDepartment" disabled="@VM.IsSaving">
-                                    @(VM.IsSaving ? "Speichert…" : "Speichern")
-                                </button>
-                                <button class="btn-secondary" @onclick="CancelEdit" disabled="@VM.IsSaving">Abbrechen</button>
-                            </div>
+                        }
+                        else if (VM.EditDepartmentParentId.HasValue)
+                        {
+                            <span class="detail-field-value detail-field-value--empty">Wird von Elternabteilung geerbt.</span>
                         }
                         else
                         {
-                            <div class="detail-header">
-                                <h3>@VM.SelectedDepartment.Name</h3>
-                                <span class="detail-subtitle">Abteilung</span>
-                            </div>
+                            <span class="detail-field-value detail-field-value--empty">Keine Elternabteilung — keine Default-Berechtigung.</span>
+                        }
+                    </div>
 
-                            <div class="detail-field-grid">
-                                @* Parent / Hierarchy *@
-                                <div class="detail-field">
-                                    <span class="detail-field-label">Erbt von</span>
-                                    @if (VM.SelectedDepartment.ParentDepartmentId.HasValue)
+                    @* ── Members ── *@
+                    <div class="detail-section" style="margin-top: 16px;">
+                        <span class="detail-label">Mitglieder</span>
+                        <div class="multi-select @(membersOpen ? "open" : "")">
+                            <div class="multi-select-display" @onclick="() => membersOpen = !membersOpen">
+                                <span class="multi-select-text">
+                                    @GetCheckedNames(VM.EditDepartmentMembers.Where(m => m.IsChecked).Select(m => m.Item.Name), "Keine Mitglieder")
+                                </span>
+                                <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
+                                     fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 9l6 6 6-6" />
+                                </svg>
+                            </div>
+                            @if (membersOpen)
+                            {
+                                <div class="multi-select-backdrop" @onclick="() => membersOpen = false"></div>
+                                <div class="multi-select-dropdown">
+                                    @foreach (var item in VM.EditDepartmentMembers)
                                     {
-                                        
-                                        var parentDept = VM.Departments
-                                            .FirstOrDefault(d => d.Id == VM.SelectedDepartment.ParentDepartmentId);
-                                        
-                                        <span class="detail-field-value">
-                                            @(parentDept?.Name ?? VM.SelectedDepartment.ParentDepartmentId.ToString())
-                                        </span>
+                                        <label class="multi-select-option">
+                                            <input type="checkbox" @bind="item.IsChecked" />
+                                            <span>@item.Item.Name</span>
+                                            <span class="multi-select-hint">@item.Item.Username</span>
+                                        </label>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    @* ── Share Assignment ── *@
+                    <div class="detail-section" style="margin-top: 16px;">
+                        <span class="detail-label">Zugeordnete Freigaben</span>
+                        <div class="multi-select @(sharesOpen ? "open" : "")">
+                            <div class="multi-select-display" @onclick="() => sharesOpen = !sharesOpen">
+                                <span class="multi-select-text">
+                                    @GetCheckedNames(VM.EditDepartmentShares.Where(s => s.IsChecked).Select(s => s.Item.Name), "Keine Freigaben")
+                                </span>
+                                <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
+                                     fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 9l6 6 6-6" />
+                                </svg>
+                            </div>
+                            @if (sharesOpen)
+                            {
+                                <div class="multi-select-backdrop" @onclick="() => sharesOpen = false"></div>
+                                <div class="multi-select-dropdown">
+                                    @foreach (var item in VM.EditDepartmentShares)
+                                    {
+                                        <label class="multi-select-option">
+                                            <input type="checkbox" @bind="item.IsChecked" />
+                                            <span>@item.Item.Name</span>
+                                            <span class="multi-select-hint">@item.Item.Path</span>
+                                        </label>
+                                    }
+                                    @if (!VM.EditDepartmentShares.Any())
+                                    {
+                                        <span class="empty-hint">Keine Freigaben vorhanden</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    @if (VM.ErrorMessage is not null)
+                    {
+                        <div class="error-banner" style="margin: 12px 0;">@VM.ErrorMessage</div>
+                    }
+                    <div class="detail-actions">
+                        <button class="btn-primary" @onclick="SaveDepartment" disabled="@VM.IsSaving">
+                            @(VM.IsSaving ? "Speichert…" : "Speichern")
+                        </button>
+                        <button class="btn-secondary" @onclick="CancelEdit" disabled="@VM.IsSaving">Abbrechen</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="detail-header">
+                        <h3>@VM.SelectedDepartment.Name</h3>
+                        <span class="detail-subtitle">Abteilung</span>
+                    </div>
+
+                    <div class="detail-field-grid">
+                        <div class="detail-field">
+                            <span class="detail-field-label">Erbt von</span>
+                            @if (VM.SelectedDepartment.ParentDepartmentId.HasValue)
+                            {
+                                var parentDept = VM.Departments.FirstOrDefault(d => d.Id == VM.SelectedDepartment.ParentDepartmentId);
+                                <span class="detail-field-value">@(parentDept?.Name ?? VM.SelectedDepartment.ParentDepartmentId.ToString())</span>
+                            }
+                            else
+                            {
+                                <span class="detail-field-value detail-field-value--empty">Keine (Oberste Ebene)</span>
+                            }
+                        </div>
+                        <div class="detail-field">
+                            <span class="detail-field-label">Mitglieder</span>
+                            <span class="detail-field-value">
+                                @(VM.DepartmentMembers.Any() ? FormatList(VM.DepartmentMembers.Select(u => u.Name), 8) : "Keine Mitglieder")
+                            </span>
+                        </div>
+                        <div class="detail-field">
+                            <span class="detail-field-label">Anzahl Mitglieder</span>
+                            <span class="detail-field-value">@VM.DepartmentMembers.Count</span>
+                        </div>
+                        <div class="detail-field">
+                            <span class="detail-field-label">Zugeordnete Freigaben</span>
+                            <span class="detail-field-value">
+                                @if (VM.DepartmentShares.Any())
+                                {
+                                    @FormatList(VM.DepartmentShares.Select(s => s.Name), 5)
+                                }
+                                else
+                                {
+                                    <span class="detail-field-value--empty">Keine Freigaben zugeordnet</span>
+                                }
+                            </span>
+                        </div>
+                        <div class="detail-field">
+                            <span class="detail-field-label">Standard-Dateiberechtigung</span>
+                            <span class="detail-field-value">
+                                @if (VM.DepartmentPermInfo is not null)
+                                {
+                                    @if (VM.DepartmentPermInfo.HasNoDefault)
+                                    {
+                                        <span class="detail-field-value--empty">Keine Default-Berechtigung</span>
                                     }
                                     else
                                     {
-                                        <span class="detail-field-value detail-field-value--empty">
-                                            Keine (Oberste Ebene)
-                                        </span>
-                                    }
-                                </div>
-
-                                @* Members *@
-                                <div class="detail-field">
-                                    <span class="detail-field-label">Mitglieder</span>
-                                    <span class="detail-field-value">
-                                        @if (VM.DepartmentMembers.Any())
-                                        {
-                                            @FormatList(VM.DepartmentMembers.Select(u => u.Name), 8)
-                                        }
-                                        else
-                                        {
-                                            <span class="detail-field-value--empty">Keine Mitglieder</span>
-                                        }
-                                    </span>
-                                </div>
-
-                                <div class="detail-field">
-                                    <span class="detail-field-label">Anzahl Mitglieder</span>
-                                    <span class="detail-field-value">@VM.DepartmentMembers.Count</span>
-                                </div>
-
-                                @* Shares *@
-                                <div class="detail-field">
-                                    <span class="detail-field-label">Zugeordnete Freigaben</span>
-                                    <span class="detail-field-value">
-                                        @if (VM.DepartmentShares.Any())
-                                        {
-                                            @string.Join(", ", VM.DepartmentShares.Select(s => s.Name).Take(5))
-                                            @if (VM.DepartmentShares.Count > 5)
-                                            {
-                                                <span class="truncated-hint"> +@(VM.DepartmentShares.Count - 5) weitere</span>
-                                            }
-                                        }
-                                        else
-                                        {
-                                            <span class="detail-field-value--empty">Keine Freigaben zugeordnet</span>
-                                        }
-                                    </span>
-                                </div>
-
-                                @* Default File Permission *@
-                                <div class="detail-field">
-                                    <span class="detail-field-label">Standard-Dateiberechtigung</span>
-                                    <span class="detail-field-value">
-                                        @if (VM.DepartmentPermInfo is not null)
-                                        {
-                                            @if (VM.DepartmentPermInfo.HasNoDefault)
-                                            {
-                                                <span class="detail-field-value--empty">Keine Default-Berechtigung</span>
-                                            }
-                                            else if (VM.DepartmentPermInfo.IsOwnPermission)
-                                            {
-                                                <div class="permission-tags">
-                                                    @foreach (var flag in DepartmentPermissionDisplay.AllFlags)
+                                        <div>
+                                            <div class="permission-tags">
+                                                @foreach (var flag in DepartmentPermissionDisplay.AllFlags)
+                                                {
+                                                    if (DepartmentPermissionDisplay.HasFlag(VM.DepartmentPermInfo.EffectivePermission, flag.Flag))
                                                     {
-                                                        if (DepartmentPermissionDisplay.HasFlag(
-                                                            VM.DepartmentPermInfo.EffectivePermission, flag.Flag))
-                                                        {
-                                                            <span class="permission-tag">@flag.Label</span>
-                                                        }
+                                                        <span class="permission-tag">@flag.Label</span>
                                                     }
-                                                </div>
-                                            }
-                                            else
-                                            {
-                                                <div>
-                                                    <div class="permission-tags">
-                                                        @foreach (var flag in DepartmentPermissionDisplay.AllFlags)
-                                                        {
-                                                            if (DepartmentPermissionDisplay.HasFlag(
-                                                                VM.DepartmentPermInfo.EffectivePermission, flag.Flag))
-                                                            {
-                                                                <span class="permission-tag">@flag.Label</span>
-                                                            }
-                                                        }
-                                                    </div>
-                                                    <span class="inherited-hint">
-                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                                                             stroke="var(--text-tertiary)" stroke-width="1.5"
-                                                             style="vertical-align: -1px; margin-right: 2px;">
-                                                            <path d="M9 18l6-6-6-6" />
-                                                        </svg>
-                                                        Geerbt von: @VM.DepartmentPermInfo.InheritedFromDepartmentName
-                                                    </span>
-                                                </div>
-                                            }
-                                        }
-                                        else
-                                        {
-                                            <span class="detail-field-value--empty">Wird geladen…</span>
-                                        }
-                                    </span>
-                                </div>
-
-                                <div class="detail-field">
-                                    <span class="detail-field-label">Zugeordnete Freigaben</span>
-                                    <span class="detail-field-value">
-                                        @if (VM.DepartmentShares.Any())
-                                        {
-                                            @FormatList(VM.DepartmentShares.Select(s => s.Name), 5)
-                                        }
-                                        else
-                                        {
-                                            <span class="detail-field-value--empty">Keine Freigaben zugeordnet</span>
-                                        }
-                                    </span>
-                                </div>
-                                <div class="detail-field">
-                                    <span class="detail-field-label">Standard-Dateiberechtigung</span>
-                                    <span class="detail-field-value">
-                                        @if (VM.DepartmentPermInfo is not null)
-                                        {
-                                            @if (VM.DepartmentPermInfo.HasNoDefault)
-                                            {
-                                                <span class="detail-field-value--empty">Keine Default-Berechtigung</span>
-                                            }
-                                            else
-                                            {
-                                                <div>
-                                                    <div class="permission-tags">
-                                                        @foreach (var flag in DepartmentPermissionDisplay.AllFlags)
-                                                        {
-                                                            if (DepartmentPermissionDisplay.HasFlag(VM.DepartmentPermInfo.EffectivePermission, flag.Flag))
-                                                            {
-                                                                <span class="permission-tag">@flag.Label</span>
-                                                            }
-                                                        }
-                                                    </div>
-                                                    @if (!VM.DepartmentPermInfo.IsOwnPermission && VM.DepartmentPermInfo.InheritedFromDepartmentName is not null)
-                                                    {
-                                                        <span class="inherited-hint">
-                                                            Geerbt von: @VM.DepartmentPermInfo.InheritedFromDepartmentName
-                                                        </span>
-                                                    }
-                                                </div>
-                                            }
-                                        }
-                                        else
-                                        {
-                                            <span class="detail-field-value--empty">Wird geladen…</span>
-                                        }
-                                    </span>
-                                </div>
-                                <div class="detail-field">
-                                    <span class="detail-field-label">ID</span>
-                                    <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">
-                                        @VM.SelectedDepartment.Id
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div class="detail-actions">
-                                @if (VM.IsGlobalAdmin || VM.CanManageDepartments)
-                                {
-                                    <button class="btn-secondary" @onclick="EditDepartment">Bearbeiten</button>
-                                }
-                                @if (VM.IsGlobalAdmin)
-                                {
-                                    @if (VM.IsConfirmingDelete)
-                                    {
-                                        <div class="confirm-delete">
-                                            <p>Abteilung wirklich löschen?</p>
-                                            <div style="display: flex; gap: 8px;">
-                                                <button class="btn-danger-outline" @onclick="ConfirmDeleteDepartment"
-                                                        disabled="@VM.IsSaving">
-                                                    @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
-                                                </button>
-                                                <button class="btn-secondary"
-                                                        @onclick="() => VM.IsConfirmingDelete = false">
-                                                    Abbrechen
-                                                </button>
+                                                }
                                             </div>
+                                            @if (!VM.DepartmentPermInfo.IsOwnPermission && VM.DepartmentPermInfo.InheritedFromDepartmentName is not null)
+                                            {
+                                                <span class="inherited-hint">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                                                         stroke="var(--text-tertiary)" stroke-width="1.5"
+                                                         style="vertical-align: -1px; margin-right: 2px;">
+                                                        <path d="M9 18l6-6-6-6" />
+                                                    </svg>
+                                                    Geerbt von: @VM.DepartmentPermInfo.InheritedFromDepartmentName
+                                                </span>
+                                            }
                                         </div>
                                     }
-                                    else
-                                    {
-                                        <button class="btn-danger-outline"
-                                                @onclick="() => VM.RequestDeleteDepartment()">
-                                            Abteilung löschen
-                                        </button>
-                                    }
                                 }
-                            </div>
-                        }
-                    }
+                                else
+                                {
+                                    <span class="detail-field-value--empty">Wird geladen…</span>
+                                }
+                            </span>
+                        </div>
+                        <div class="detail-field">
+                            <span class="detail-field-label">ID</span>
+                            <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">@VM.SelectedDepartment.Id</span>
+                        </div>
+                    </div>
 
-                </div>
+                    <div class="detail-actions">
+                        @if (VM.CanManageDepartments)
+                        {
+                            <button class="btn-secondary" @onclick="EditDepartment">Bearbeiten</button>
+                        }
+                        @if (VM.CanDeleteDepartments)
+                        {
+                            @if (VM.IsConfirmingDelete)
+                            {
+                                <div class="confirm-delete">
+                                    <p>Abteilung wirklich löschen?</p>
+                                    <div style="display: flex; gap: 8px;">
+                                        <button class="btn-danger-outline" @onclick="ConfirmDeleteDepartment" disabled="@VM.IsSaving">
+                                            @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
+                                        </button>
+                                        <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">Abbrechen</button>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <button class="btn-danger-outline" @onclick="() => VM.RequestDeleteDepartment()">Abteilung löschen</button>
+                            }
+                        }
+                    </div>
+                }
             }
 
         </div>
+    }
+
+</div>
     }
 }
 
@@ -1603,7 +1394,6 @@ else
     private bool rolesOpen;
     private bool membersOpen;
     private bool sharesOpen;
-    private bool groupsDeptOpen;
 
     // ── Binding helpers ──
 
@@ -1660,12 +1450,7 @@ else
 
     // ── Tab switching ──
 
-    private async Task SwitchTab(AdminTab tab)
-    {
-        CloseDropdowns();
-        await VM.SwitchTabAsync(tab);
-        StateHasChanged();
-    }
+    private async Task SwitchTab(AdminTab tab) { CloseDropdowns(); await VM.SwitchTabAsync(tab); StateHasChanged(); }
 
     // ── Selection ──
 
@@ -1674,117 +1459,62 @@ else
     private async Task SelectRole(Role role) { CloseDropdowns(); await VM.SelectRoleAsync(role); StateHasChanged(); }
     private async Task SelectDepartment(Department dept) { CloseDropdowns(); await VM.SelectDepartmentAsync(dept); StateHasChanged(); }
 
-    // ── Edit ──
+    // ── Edit / Save / Create / Delete ──
 
     private async Task EditUser() { CloseDropdowns(); await VM.StartEditUserAsync(); StateHasChanged(); }
     private async Task EditGroup() { CloseDropdowns(); await VM.StartEditGroupAsync(); StateHasChanged(); }
     private async Task EditRole() { CloseDropdowns(); await VM.StartEditRoleAsync(); StateHasChanged(); }
     private async Task EditDepartment() { CloseDropdowns(); await VM.StartEditDepartmentAsync(); StateHasChanged(); }
 
-    
-    // ── Save ──
-
     private async Task SaveUser() { CloseDropdowns(); await VM.SaveUserAsync(); StateHasChanged(); }
     private async Task SaveGroup() { CloseDropdowns(); await VM.SaveGroupAsync(); StateHasChanged(); }
     private async Task SaveRole() { CloseDropdowns(); await VM.SaveRoleAsync(); StateHasChanged(); }
     private async Task SaveDepartment() { CloseDropdowns(); await VM.SaveDepartmentAsync(); StateHasChanged(); }
-
-    // ── Create ──
 
     private async Task CreateUser() { await VM.CreateUserAsync(); StateHasChanged(); }
     private async Task CreateGroup() { await VM.CreateGroupAsync(); StateHasChanged(); }
     private async Task CreateRole() { await VM.CreateRoleAsync(); StateHasChanged(); }
     private async Task CreateDepartment() { await VM.CreateDepartmentAsync(); StateHasChanged(); }
 
-    // ── Delete ──
-
     private async Task ConfirmDeleteUser() { await VM.ConfirmDeleteUserAsync(); StateHasChanged(); }
     private async Task ConfirmDeleteGroup() { await VM.ConfirmDeleteGroupAsync(); StateHasChanged(); }
     private async Task ConfirmDeleteRole() { await VM.ConfirmDeleteRoleAsync(); StateHasChanged(); }
     private async Task ConfirmDeleteDepartment() { await VM.ConfirmDeleteDepartmentAsync(); StateHasChanged(); }
 
-    // ── Cancel ──
-
     private void CancelEdit() { CloseDropdowns(); VM.CancelEdit(); StateHasChanged(); }
 
     // ── Scoped Assignments ──
 
-    private async Task StartAddAssignment()
-    {
-        VM.StartAddAssignment();
-        await VM.LoadAssignmentFormDataAsync();
-        StateHasChanged();
-    }
-
-    private async Task CreateAssignment()
-    {
-        await VM.CreateAssignmentAsync();
-        StateHasChanged();
-    }
-
-    private async Task DeleteAssignment(Guid id)
-    {
-        await VM.DeleteAssignmentAsync(id);
-        StateHasChanged();
-    }
+    private async Task StartAddAssignment() { VM.StartAddAssignment(); await VM.LoadAssignmentFormDataAsync(); StateHasChanged(); }
+    private async Task CreateAssignment() { await VM.CreateAssignmentAsync(); StateHasChanged(); }
+    private async Task DeleteAssignment(Guid id) { await VM.DeleteAssignmentAsync(id); StateHasChanged(); }
 
     // ── Helpers ──
 
-    private void CloseDropdowns()
-    {
-        groupsOpen = false;
-        rolesOpen = false;
-        membersOpen = false;
-        sharesOpen = false;
-        groupsDeptOpen = false;
-    }
+    private void CloseDropdowns() { groupsOpen = false; rolesOpen = false; membersOpen = false; sharesOpen = false; }
 
-    private async Task HandleCreateGroupKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") await CreateGroup();
-    }
+    private async Task HandleCreateGroupKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") await CreateGroup(); }
+    private async Task HandleCreateRoleKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") await CreateRole(); }
+    private async Task HandleCreateDepartmentKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") await CreateDepartment(); }
 
-    private async Task HandleCreateRoleKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") await CreateRole();
-    }
-
-    private async Task HandleCreateDepartmentKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") await CreateDepartment();
-    }
-
-    /// <summary>
-    /// Returns a comma-separated string of names, or a fallback if empty.
-    /// Replaces inline @{ var x = ... } blocks that cause Razor compile errors.
-    /// </summary>
     private static string GetCheckedNames(IEnumerable<string> names, string fallback)
     {
         var list = names.ToList();
         return list.Count > 0 ? string.Join(", ", list) : fallback;
     }
 
-    /// <summary>
-    /// Formats a list with truncation: "A, B, C +2 weitere"
-    /// </summary>
     private static string FormatList(IEnumerable<string> items, int max)
     {
         var list = items.ToList();
         if (list.Count == 0) return "";
         var visible = string.Join(", ", list.Take(max));
-        if (list.Count > max)
-            visible += $" +{list.Count - max} weitere";
+        if (list.Count > max) visible += $" +{list.Count - max} weitere";
         return visible;
     }
 
-    /// <summary>
-    /// Resolves a parent department ID to its display name.
-    /// </summary>
     private string GetParentName(Guid? parentId)
     {
-        if (!parentId.HasValue)
-            return "— Keine (Oberste Ebene)";
-
+        if (!parentId.HasValue) return "— Keine (Oberste Ebene)";
         var parent = VM.Departments.FirstOrDefault(d => d.Id == parentId.Value);
         return parent?.Name ?? parentId.Value.ToString();
     }

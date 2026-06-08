@@ -56,22 +56,3 @@ public interface IManagementAuthService
     /// </summary>
     Task<AuthorizedScopeResult> GetAuthorizedShareIdsAsync(UserContext actor, ManagementPermission required);
 }
-
-/// <summary>
-/// Result of a scope-limited authorization check.
-/// Either unrestricted (Global admin) or limited to a set of entity IDs.
-/// </summary>
-public class AuthorizedScopeResult
-{
-    public bool IsUnrestricted { get; private init; }
-    public IReadOnlyList<Guid> ScopeIds { get; private init; } = [];
-
-    public static AuthorizedScopeResult Unrestricted()
-        => new() { IsUnrestricted = true };
-
-    public static AuthorizedScopeResult LimitedTo(List<Guid> ids)
-        => new() { ScopeIds = ids };
-
-    public static AuthorizedScopeResult None()
-        => new() { ScopeIds = [] };
-}
