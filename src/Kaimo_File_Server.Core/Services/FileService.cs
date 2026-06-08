@@ -10,15 +10,108 @@ public class FileService : IFileService
 {
     private readonly IStorageEngine _storage;
     private readonly IAclService _acl;
+    private readonly IDepartmentPermissionService _deptPerm;
     private readonly Guid _shareId;
 
     private const string RecycleBinFolder = ".RECYCLE_BIN";
 
-    public FileService(IStorageEngine storage, IAclService acl, Guid shareId)
+    /// <summary>
+    /// Cache: department default permission per user ID for this share.
+    /// Since the FileService instance is per-share, and department defaults
+    /// don't vary by path (only by user + share), we can cache after first lookup.
+    /// </summary>
+    private readonly Dictionary<Guid, long> _deptPermCache = new();
+
+    public FileService(
+        IStorageEngine storage,
+        IAclService acl,
+        IDepartmentPermissionService deptPerm,
+        Guid shareId)
     {
         _storage = storage;
         _acl = acl;
+        _deptPerm = deptPerm;
         _shareId = shareId;
+    }
+
+    // ────────────────── Combined Permission Check ──────────────────
+
+    /// <summary>
+    /// Checks ACL first; if denied, falls back to department default permissions.
+    /// Department defaults are additive (OR) — they grant baseline access for all
+    /// members of the share's department.
+    /// </summary>
+    private async Task<bool> HasEffectiveAccessAsync(
+        UserContext user, string normalizedPath, bool isDirectory, FilePermission required)
+    {
+        // 1. ACL grants access → done
+        if (await _acl.HasAccessAsync(user, _shareId, normalizedPath, isDirectory, required))
+            return true;
+
+        // 2. Check department default permissions as additive fallback
+        var deptPerm = await GetCachedDeptPermissionAsync(user);
+        return DepartmentFilePermissionMapper.Grants(deptPerm, required);
+    }
+
+    /// <summary>
+    /// Resolves the combined department default permission for a user on this share.
+    /// Checks both direct user membership and group memberships.
+    /// Cached per user ID for the lifetime of this FileService instance.
+    /// </summary>
+    private async Task<long> GetCachedDeptPermissionAsync(UserContext user)
+    {
+        if (_deptPermCache.TryGetValue(user.User.Id, out var cached))
+            return cached;
+
+        // User's own department membership
+        long combined = await _deptPerm.GetEffectiveDefaultPermissionForUserOnShareAsync(
+            user.User.Id, _shareId);
+
+        // Group department memberships (union)
+        foreach (var group in user.Groups)
+        {
+            var groupPerm = await _deptPerm.GetEffectiveDefaultPermissionForGroupOnShareAsync(
+                group.Id, _shareId);
+            combined |= groupPerm;
+        }
+
+        _deptPermCache[user.User.Id] = combined;
+        return combined;
+    }
+
+    /// <summary>
+    /// Batch version: checks ACL for all items first, then fills denied items
+    /// with department default permission checks.
+    /// Department permission is path-independent (same for all items on this share),
+    /// so it's resolved once and applied to all ACL-denied items.
+    /// </summary>
+    private async Task<Dictionary<string, bool>> HasEffectiveAccessBatchAsync(
+        UserContext user,
+        IReadOnlyList<(string path, bool isDirectory)> items,
+        FilePermission required)
+    {
+        // 1. Batch ACL check (single DB round trip)
+        var aclResults = await _acl.HasAccessBatchAsync(user, _shareId, items, required);
+
+        // 2. If ACL allows everything, skip department check
+        if (aclResults.Values.All(v => v))
+            return aclResults;
+
+        // 3. Resolve department default once for this user + share
+        var deptPerm = await GetCachedDeptPermissionAsync(user);
+        var hasDeptAccess = DepartmentFilePermissionMapper.Grants(deptPerm, required);
+
+        if (!hasDeptAccess)
+            return aclResults; // No department access either → ACL result stands
+
+        // 4. Merge: ACL-denied items get upgraded via department defaults
+        var merged = new Dictionary<string, bool>(aclResults.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (var (path, aclAllowed) in aclResults)
+        {
+            merged[path] = aclAllowed || hasDeptAccess;
+        }
+
+        return merged;
     }
 
     // ────────────────── Directory Listing ──────────────────
@@ -27,18 +120,18 @@ public class FileService : IFileService
     {
         var normalizedDir = ShareRelativePath.Normalize(directoryPath);
 
-        if (!await _acl.HasAccessAsync(user, _shareId, normalizedDir, true, FilePermission.ListReadData))
+        if (!await HasEffectiveAccessAsync(user, normalizedDir, true, FilePermission.ListReadData))
             throw new UnauthorizedAccessException($"List denied for '{normalizedDir}'");
 
         var items = await _storage.ListAsync(normalizedDir);
 
-        // Batch ACL check — single DB round trip for all children
+        // Batch permission check for all children
         var itemsToCheck = items
             .Select(i => (ShareRelativePath.Combine(normalizedDir, i.Name), i.IsDirectory))
             .ToList();
 
-        var accessMap = await _acl.HasAccessBatchAsync(
-            user, _shareId, itemsToCheck, FilePermission.ListReadData);
+        var accessMap = await HasEffectiveAccessBatchAsync(
+            user, itemsToCheck, FilePermission.ListReadData);
 
         var visible = new List<FileMetadata>(items.Count);
         foreach (var item in items)
@@ -53,10 +146,6 @@ public class FileService : IFileService
 
     // ────────────────── Batch Permission Check ──────────────────
 
-    /// <summary>
-    /// Returns the subset of paths the user can read — single DB round trip.
-    /// Used by SMB QueryDirectory to filter listings efficiently.
-    /// </summary>
     public async Task<HashSet<string>> FilterReadablePathsAsync(
         IReadOnlyList<(string relativePath, bool isDirectory)> items,
         UserContext user)
@@ -68,8 +157,8 @@ public class FileService : IFileService
             .Select(i => (ShareRelativePath.Normalize(i.relativePath), i.isDirectory))
             .ToList();
 
-        var accessMap = await _acl.HasAccessBatchAsync(
-            user, _shareId, normalized, FilePermission.ListReadData);
+        var accessMap = await HasEffectiveAccessBatchAsync(
+            user, normalized, FilePermission.ListReadData);
 
         var readable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (path, allowed) in accessMap)
@@ -87,33 +176,33 @@ public class FileService : IFileService
     {
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
-        return await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.ListReadData);
+        return await HasEffectiveAccessAsync(user, normalized, isDir, FilePermission.ListReadData);
     }
 
     public async Task<bool> CanWriteAsync(string path, UserContext user)
     {
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
-        return await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.CreateWriteData);
+        return await HasEffectiveAccessAsync(user, normalized, isDir, FilePermission.CreateWriteData);
     }
 
     public async Task<bool> CanCreateAsync(string path, UserContext user)
     {
         var parentPath = ShareRelativePath.GetParent(path);
-        return await _acl.HasAccessAsync(user, _shareId, parentPath, true, FilePermission.CreateWriteData);
+        return await HasEffectiveAccessAsync(user, parentPath, true, FilePermission.CreateWriteData);
     }
 
     public async Task<bool> CanDeleteAsync(string path, UserContext user)
     {
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
-        return await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.Delete);
+        return await HasEffectiveAccessAsync(user, normalized, isDir, FilePermission.Delete);
     }
 
     public async Task<bool> CanListAsync(string path, UserContext user)
     {
         var normalized = ShareRelativePath.Normalize(path);
-        return await _acl.HasAccessAsync(user, _shareId, normalized, true, FilePermission.ListReadData);
+        return await HasEffectiveAccessAsync(user, normalized, true, FilePermission.ListReadData);
     }
 
     // ────────────────── Full Operations ──────────────────
@@ -123,7 +212,7 @@ public class FileService : IFileService
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
 
-        if (!await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.ListReadData))
+        if (!await HasEffectiveAccessAsync(user, normalized, isDir, FilePermission.ListReadData))
             throw new UnauthorizedAccessException($"Read denied for '{normalized}'");
 
         return await _storage.ReadAsync(normalized);
@@ -134,18 +223,17 @@ public class FileService : IFileService
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
 
-        if (!await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.CreateWriteData))
+        if (!await HasEffectiveAccessAsync(user, normalized, isDir, FilePermission.CreateWriteData))
             throw new UnauthorizedAccessException($"Write denied for '{normalized}'");
 
         await _storage.WriteAsync(normalized, data);
     }
-    
 
     public async Task CreateFileAsync(string path, UserContext user)
     {
         var parentPath = ShareRelativePath.GetParent(path);
 
-        if (!await _acl.HasAccessAsync(user, _shareId, parentPath, true, FilePermission.CreateWriteData))
+        if (!await HasEffectiveAccessAsync(user, parentPath, true, FilePermission.CreateWriteData))
             throw new UnauthorizedAccessException($"Create denied for '{path}'");
 
         await _storage.WriteAsync(ShareRelativePath.Normalize(path), Stream.Null);
@@ -155,7 +243,7 @@ public class FileService : IFileService
     {
         var parentPath = ShareRelativePath.GetParent(path);
 
-        if (!await _acl.HasAccessAsync(user, _shareId, parentPath, true, FilePermission.CreateWriteData))
+        if (!await HasEffectiveAccessAsync(user, parentPath, true, FilePermission.CreateWriteData))
             throw new UnauthorizedAccessException($"Create denied for '{path}'");
 
         await _storage.CreateDirectory(ShareRelativePath.Normalize(path));
@@ -166,7 +254,7 @@ public class FileService : IFileService
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
 
-        if (!await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.Delete))
+        if (!await HasEffectiveAccessAsync(user, normalized, isDir, FilePermission.Delete))
             throw new UnauthorizedAccessException($"Delete denied for '{normalized}'");
 
         var isAlreadyInRecycleBin = normalized.StartsWith(
@@ -190,7 +278,7 @@ public class FileService : IFileService
         var normalized = ShareRelativePath.Normalize(path);
         var meta = await _storage.GetMetadataAsync(normalized);
 
-        if (!await _acl.HasAccessAsync(user, _shareId, normalized, meta.IsDirectory, FilePermission.ListReadData))
+        if (!await HasEffectiveAccessAsync(user, normalized, meta.IsDirectory, FilePermission.ListReadData))
             throw new UnauthorizedAccessException($"Metadata read denied for '{normalized}'");
 
         return meta;
@@ -202,9 +290,9 @@ public class FileService : IFileService
         var newNormalized = ShareRelativePath.Normalize(newPath);
         var isDir = await _storage.IsDirectoryAsync(oldNormalized);
 
-        if (!await _acl.HasAccessAsync(user, _shareId, oldNormalized, isDir, FilePermission.Delete))
+        if (!await HasEffectiveAccessAsync(user, oldNormalized, isDir, FilePermission.Delete))
             throw new UnauthorizedAccessException($"Rename (delete) denied for '{oldNormalized}'");
-        if (!await _acl.HasAccessAsync(user, _shareId, newNormalized, isDir, FilePermission.CreateWriteData))
+        if (!await HasEffectiveAccessAsync(user, newNormalized, isDir, FilePermission.CreateWriteData))
             throw new UnauthorizedAccessException($"Rename (create) denied for '{newNormalized}'");
 
         if (isDir)
@@ -223,7 +311,7 @@ public class FileService : IFileService
     {
         var normalized = ShareRelativePath.Normalize(relativePath);
 
-        if (!await _acl.HasAccessAsync(user, _shareId, normalized, true, FilePermission.ListReadData))
+        if (!await HasEffectiveAccessAsync(user, normalized, true, FilePermission.ListReadData))
             throw new UnauthorizedAccessException($"Size read denied for '{normalized}'");
 
         return await _storage.GetDirectorySizeAsync(normalized);

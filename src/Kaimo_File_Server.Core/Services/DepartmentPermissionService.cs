@@ -1,5 +1,4 @@
 ﻿using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Services;
 
 namespace Kaimo_File_Server.Core.Services;
 
@@ -7,16 +6,26 @@ namespace Kaimo_File_Server.Core.Services;
 /// Resolves effective default file permissions for departments
 /// by walking the hierarchy chain (OOP-style inheritance).
 ///
-/// Permission inheritance:
-///   Department "Backend" (DefaultFilePermission = null, Parent = "Engineering")
+/// Key simplification: A share is assigned to at most ONE department.
+/// Permission logic:
+///   1. Find the share's department (0 or 1)
+///   2. Check if the user/group is a direct member of that department
+///   3. If yes → resolve the department's effective default permission
+///      (which may be inherited from a parent department)
+///   4. If no match → 0 (no department-based access)
+///
+/// The hierarchy only affects the PERMISSION VALUE inheritance,
+/// not the membership check. A user must be a direct member of
+/// the share's department to get department-based file access.
+///
+/// Example:
 ///   Department "Engineering" (DefaultFilePermission = Read|Write)
-///   → Backend's effective permission = Read|Write (inherited from Engineering)
+///     └── Department "Backend" (DefaultFilePermission = null → inherits Read|Write)
 ///
-///   Department "HR" (DefaultFilePermission = Read, Parent = null)
-///   → HR's effective permission = Read (own)
-///
-///   Department "NewDept" (DefaultFilePermission = null, Parent = null)
-///   → NewDept's effective permission = None (no inheritance chain)
+///   Share "Docs" → assigned to "Engineering"
+///   User "Alice" → member of "Engineering" → gets Read|Write on "Docs"
+///   User "Bob"   → member of "Backend"     → gets nothing on "Docs"
+///                   (Bob is NOT a direct member of Engineering)
 /// </summary>
 public class DepartmentPermissionService : IDepartmentPermissionService
 {
@@ -47,7 +56,7 @@ public class DepartmentPermissionService : IDepartmentPermissionService
             };
         }
 
-        // If this department has its own default, use it directly
+        // Department defines its own default → use it
         if (dept.DefaultFilePermission.HasValue)
         {
             return new DepartmentPermissionInfo
@@ -74,7 +83,7 @@ public class DepartmentPermissionService : IDepartmentPermissionService
             }
         }
 
-        // No default found in the entire chain
+        // No default in the entire chain
         return new DepartmentPermissionInfo
         {
             EffectivePermission = 0,
@@ -86,104 +95,35 @@ public class DepartmentPermissionService : IDepartmentPermissionService
     public async Task<long> GetEffectiveDefaultPermissionForUserOnShareAsync(
         Guid userId, Guid shareId)
     {
-        // Find departments the user belongs to
-        var userDepts = await _departmentRepo.GetDepartmentsForUserAsync(userId);
-        if (userDepts.Count == 0) return 0;
-
-        // Find departments the share belongs to
+        // 1. Find the share's department (max 1)
         var shareDepts = await _departmentRepo.GetDepartmentsForShareAsync(shareId);
-        if (shareDepts.Count == 0) return 0;
+        var shareDept = shareDepts.FirstOrDefault();
+        if (shareDept == null) return 0; // Share not assigned to any department
 
-        var shareDeptIds = shareDepts.Select(d => d.Id).ToHashSet();
-        long combined = 0;
+        // 2. Check if user is a direct member of that department
+        var userDepts = await _departmentRepo.GetDepartmentsForUserAsync(userId);
+        if (!userDepts.Any(d => d.Id == shareDept.Id))
+            return 0; // User is not in the share's department
 
-        foreach (var userDept in userDepts)
-        {
-            // Direct match: user and share are in the same department
-            if (shareDeptIds.Contains(userDept.Id))
-            {
-                var effective = await GetEffectiveDefaultPermissionAsync(userDept.Id);
-                combined |= effective;
-                continue;
-            }
-
-            // Ancestor match: the share's department is an ancestor of the user's department
-            // (user in "Backend", share assigned to "Engineering" which is parent)
-            var ancestors = await _departmentRepo.GetAncestorChainAsync(userDept.Id);
-            foreach (var ancestor in ancestors)
-            {
-                if (shareDeptIds.Contains(ancestor.Id))
-                {
-                    // Use the user's department's effective permission (not the ancestor's),
-                    // because the user's more specific department may override
-                    var effective = await GetEffectiveDefaultPermissionAsync(userDept.Id);
-                    combined |= effective;
-                    break;
-                }
-            }
-
-            // Descendant match: the user's department is an ancestor of the share's department
-            // (user in "Engineering", share assigned to "Backend" which is child)
-            var descendants = await _departmentRepo.GetDescendantIdsAsync(userDept.Id);
-            foreach (var shareDept in shareDepts)
-            {
-                if (descendants.Contains(shareDept.Id))
-                {
-                    var effective = await GetEffectiveDefaultPermissionAsync(userDept.Id);
-                    combined |= effective;
-                    break;
-                }
-            }
-        }
-
-        return combined;
+        // 3. Resolve effective default (with hierarchy inheritance for the VALUE)
+        return await GetEffectiveDefaultPermissionAsync(shareDept.Id);
     }
 
     /// <inheritdoc />
     public async Task<long> GetEffectiveDefaultPermissionForGroupOnShareAsync(
         Guid groupId, Guid shareId)
     {
-        var groupDepts = await _departmentRepo.GetDepartmentsForGroupAsync(groupId);
-        if (groupDepts.Count == 0) return 0;
-
+        // 1. Find the share's department (max 1)
         var shareDepts = await _departmentRepo.GetDepartmentsForShareAsync(shareId);
-        if (shareDepts.Count == 0) return 0;
+        var shareDept = shareDepts.FirstOrDefault();
+        if (shareDept == null) return 0;
 
-        var shareDeptIds = shareDepts.Select(d => d.Id).ToHashSet();
-        long combined = 0;
+        // 2. Check if group is a direct member of that department
+        var groupDepts = await _departmentRepo.GetDepartmentsForGroupAsync(groupId);
+        if (!groupDepts.Any(d => d.Id == shareDept.Id))
+            return 0;
 
-        foreach (var groupDept in groupDepts)
-        {
-            if (shareDeptIds.Contains(groupDept.Id))
-            {
-                var effective = await GetEffectiveDefaultPermissionAsync(groupDept.Id);
-                combined |= effective;
-                continue;
-            }
-
-            var ancestors = await _departmentRepo.GetAncestorChainAsync(groupDept.Id);
-            foreach (var ancestor in ancestors)
-            {
-                if (shareDeptIds.Contains(ancestor.Id))
-                {
-                    var effective = await GetEffectiveDefaultPermissionAsync(groupDept.Id);
-                    combined |= effective;
-                    break;
-                }
-            }
-
-            var descendants = await _departmentRepo.GetDescendantIdsAsync(groupDept.Id);
-            foreach (var shareDept in shareDepts)
-            {
-                if (descendants.Contains(shareDept.Id))
-                {
-                    var effective = await GetEffectiveDefaultPermissionAsync(groupDept.Id);
-                    combined |= effective;
-                    break;
-                }
-            }
-        }
-
-        return combined;
+        // 3. Resolve effective default
+        return await GetEffectiveDefaultPermissionAsync(shareDept.Id);
     }
 }
