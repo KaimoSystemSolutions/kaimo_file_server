@@ -43,6 +43,7 @@
 .col-sortable {
     cursor: pointer;
     transition: color 0.15s, background 0.15s;
+    text-align: left;
 }
 
     .col-sortable:hover {
@@ -52,6 +53,7 @@
 
 .col-header-text {
     vertical-align: middle;
+    text-align: left;
 }
 
 /* --- Sort Arrows --- */
@@ -144,11 +146,11 @@
         }
 
 /* --- Size rechts --- */
-
+/* nein margo, das sieht komisch aus.
 .col-size {
     text-align: right;
 }
-
+*/
 /* --- Resize Handle (nur im Header) --- */
 
 .col-resize-handle {
