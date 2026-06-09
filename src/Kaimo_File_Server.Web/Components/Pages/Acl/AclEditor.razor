@@ -1,6 +1,8 @@
 ﻿@using Kaimo_File_Server.Core.Security
 @using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
 @inject AclEditorViewModel VM
+@inject AssetProvider Assets
 
 <div class="acl-editor">
 
@@ -44,28 +46,12 @@
                         <div class="acl-entry acl-entry--inherited @(entry.EntryType == AclEntryType.Deny ? "acl-entry--deny" : "acl-entry--allow")">
                             <div class="acl-entry-header">
                                 <div class="acl-entry-principal">
-                                    @if (principalType == "group")
+                                    @(principalType switch
                                     {
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" class="acl-icon">
-                                            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                                            <circle cx="9" cy="7" r="4" />
-                                            <path d="M23 21v-2a4 4 0 00-3-3.87" />
-                                            <path d="M16 3.13a4 4 0 010 7.75" />
-                                        </svg>
-                                    }
-                                    else if (principalType == "role")
-                                    {
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" class="acl-icon">
-                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                                        </svg>
-                                    }
-                                    else
-                                    {
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" class="acl-icon">
-                                            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                                            <circle cx="12" cy="7" r="4" />
-                                        </svg>
-                                    }
+                                        "group" => Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
+                                        "role"  => Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
+                                        _       => Assets.SVG("user.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
+                                    })
                                     <span class="acl-entry-name">@VM.GetPrincipalDisplayName(entry.PrincipalId)</span>
                                     <span class="acl-entry-type-badge @(entry.EntryType == AclEntryType.Deny ? "badge--deny" : "badge--allow")">
                                         @(entry.EntryType == AclEntryType.Allow ? "Allow" : "Deny")
@@ -104,28 +90,12 @@
                     <div class="acl-entry @(entry.EntryType == AclEntryType.Deny ? "acl-entry--deny" : "acl-entry--allow") @(isEditing ? "acl-entry--editing" : "")">
                         <div class="acl-entry-header">
                             <div class="acl-entry-principal">
-                                @if (principalType == "group")
+                                @(principalType switch
                                 {
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" class="acl-icon">
-                                        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                                        <circle cx="9" cy="7" r="4" />
-                                        <path d="M23 21v-2a4 4 0 00-3-3.87" />
-                                        <path d="M16 3.13a4 4 0 010 7.75" />
-                                    </svg>
-                                }
-                                else if (principalType == "role")
-                                {
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" class="acl-icon">
-                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                                    </svg>
-                                }
-                                else
-                                {
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="2" class="acl-icon">
-                                        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                                        <circle cx="12" cy="7" r="4" />
-                                    </svg>
-                                }
+                                    "group" => Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
+                                    "role"  => Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
+                                    _       => Assets.SVG("user.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
+                                })
                                 <span class="acl-entry-name">@VM.GetPrincipalDisplayName(entry.PrincipalId)</span>
                                 <span class="acl-entry-type-badge @(entry.EntryType == AclEntryType.Deny ? "badge--deny" : "badge--allow")">
                                     @(entry.EntryType == AclEntryType.Allow ? "Allow" : "Deny")
@@ -135,16 +105,10 @@
                                 @if (!isEditing)
                                 {
                                     <button class="btn-icon btn-icon--small" title="Bearbeiten" @onclick="() => StartEdit(entry)">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                        </svg>
+                                        @Assets.SVG("edit_box.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                                     </button>
                                     <button class="btn-icon btn-icon--small btn-icon--danger" title="Entfernen" @onclick="() => DeleteEntry(entry.Id)">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <line x1="18" y1="6" x2="6" y2="18" />
-                                            <line x1="6" y1="6" x2="18" y2="18" />
-                                        </svg>
+                                        @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                                     </button>
                                 }
                             </div>
@@ -253,10 +217,7 @@
             @* -- Collapsible Einzelberechtigungen -- *@
             <div class="acl-form-row">
                 <button class="acl-collapse-toggle" @onclick="() => _showDetailPerms = !_showDetailPerms">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                         class="acl-collapse-chevron @(_showDetailPerms ? "acl-collapse-chevron--open" : "")">
-                        <polyline points="9 18 15 12 9 6" />
-                    </svg>
+                    @Assets.SVG("chevron_right.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-collapse-chevron" + (_showDetailPerms ? " acl-collapse-chevron--open" : "")))
                     <span class="detail-label" style="margin-bottom: 0; cursor: pointer;">Einzelberechtigungen</span>
                 </button>
                 @if (_showDetailPerms)
@@ -282,10 +243,7 @@
             @* -- Collapsible Vererbung -- *@
             <div class="acl-form-row">
                 <button class="acl-collapse-toggle" @onclick="() => _showInheritance = !_showInheritance">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                         class="acl-collapse-chevron @(_showInheritance ? "acl-collapse-chevron--open" : "")">
-                        <polyline points="9 18 15 12 9 6" />
-                    </svg>
+                    @Assets.SVG("chevron_right.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-collapse-chevron" + (_showInheritance ? " acl-collapse-chevron--open" : "")))
                     <span class="detail-label" style="margin-bottom: 0; cursor: pointer;">Vererbung</span>
                 </button>
                 @if (_showInheritance)
@@ -314,7 +272,6 @@
         </div>
     };
 }
-
 @code {
     [Parameter] public string Path { get; set; } = "";
     [Parameter] public Guid ShareId { get; set; }
