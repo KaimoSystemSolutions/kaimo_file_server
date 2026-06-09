@@ -1,3 +1,10 @@
+@* 
+    Decides which Layout (base page) to load for every url.
+    for any given url, it checks if the user is authenticated.
+    if so, they will be granted the MainLayout, which cointains e.g the navbar
+    
+    if they are not, they will be redirced to the login page, and granted the EmptyLayout, if they already are there
+*@
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">
