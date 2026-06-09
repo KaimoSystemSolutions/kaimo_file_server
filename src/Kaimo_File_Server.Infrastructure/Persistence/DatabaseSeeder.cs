@@ -168,26 +168,22 @@ public class DatabaseSeeder
     //  3. Department Hierarchy
     // ══════════════════════════════════════════
 
-    // DepartmentPermission flags (must match DepartmentFilePermissionMapper)
-    private const long PermRead = 1L;
-    private const long PermWrite = 2L;
-    private const long PermDelete = 4L;
-
     /// <summary>
     /// Seeds the department hierarchy:
     ///
     ///   Global (well-known, already seeded)
     ///
-    ///   Entwicklung (Default: Read|Write)
-    ///   ├── Backend    (null → erbt Read|Write)
-    ///   └── Frontend   (null → erbt Read|Write)
+    ///   Entwicklung (Default: ReadAll | CreateWriteData)
+    ///   ├── Backend    (null → erbt von Entwicklung)
+    ///   └── Frontend   (null → erbt von Entwicklung)
     ///
-    ///   Marketing (Default: Read)
+    ///   Marketing (Default: ReadAll)
     ///
-    ///   Geschäftsleitung (Default: Read|Write|Delete)
+    ///   Geschäftsleitung (Default: ReadAll | WriteAll)
     ///
-    /// Permission inheritance follows OOP semantics:
-    ///   null = inherit from parent, explicit value = override.
+    /// DefaultFilePermission stores FilePermission flags directly.
+    /// These are evaluated as a "virtual allow" layer in the AclService.
+    /// null = inherit from parent, explicit value = override.
     /// </summary>
     private async Task SeedDepartmentsAsync()
     {
@@ -196,13 +192,13 @@ public class DatabaseSeeder
             return;
 
         var entwicklung = new Department("Entwicklung", "Software-Entwicklung")
-        { DefaultFilePermission = PermRead | PermWrite };
+        { DefaultFilePermission = (long)(FilePermission.ReadAll | FilePermission.CreateWriteData) };
 
         var marketing = new Department("Marketing", "Marketing & Kommunikation")
-        { DefaultFilePermission = PermRead };
+        { DefaultFilePermission = (long)FilePermission.ReadAll };
 
         var geschaeftsl = new Department("Geschäftsleitung", "Unternehmensführung")
-        { DefaultFilePermission = PermRead | PermWrite | PermDelete };
+        { DefaultFilePermission = (long)(FilePermission.ReadAll | FilePermission.WriteAll) };
 
         _db.Departments.AddRange(entwicklung, marketing, geschaeftsl);
         await _db.SaveChangesAsync();
