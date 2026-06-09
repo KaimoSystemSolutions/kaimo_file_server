@@ -14,8 +14,9 @@ public class AssetProvider
 
     private static readonly HashSet<string> RELEVANT_SVG_TAGS = new()
     {
-        "<path",
-        "<line"
+        "path",
+        "line",
+        "circle"
     };
     
     private readonly IWebHostEnvironment _env;
@@ -38,27 +39,15 @@ public class AssetProvider
 
     private string loadSvgPaths(string relativePath)
     {
-        if (_pathsCache.TryGetValue(relativePath, out var svgPaths) && !_env.IsDevelopment())
-            return svgPaths;
+        if (!_env.IsDevelopment() && _pathsCache.TryGetValue(relativePath, out var cached))
+            return cached;
         
         var fullPath = Path.Combine(_env.WebRootPath, relativePath);
-        var rawSVG = File.ReadAllText(fullPath);
         
-        // remove everything that is not a svg path
-        var lines = rawSVG.Split("\n");
-        svgPaths = string.Join('\n', lines.Where(l =>
-        {
-            string trimmedLine = l.Trim();
-            
-            foreach (var tag in RELEVANT_SVG_TAGS)
-            {
-                if (trimmedLine.StartsWith(tag))
-                    return true;
-            }
+        // remove every tag that isn't part of the drawing
+        var svgPaths = string.Join('\n', File.ReadAllLines(fullPath)
+            .Where(l => RELEVANT_SVG_TAGS.Any(tag => l.TrimStart().StartsWith("<" + tag))));
 
-            return false;
-        }));
-        
         _pathsCache[relativePath] = svgPaths;
         return svgPaths;
     }
