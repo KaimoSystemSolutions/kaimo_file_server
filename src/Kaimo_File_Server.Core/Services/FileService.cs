@@ -127,7 +127,7 @@ public class FileService : IFileService
         return await _storage.ReadAsync(normalized);
     }
 
-    public async Task WriteFileAsync(string path, Stream data, UserContext user)
+    public async Task WriteFileAsync(string path, Stream data, UserContext user, CancellationToken cancellationToken = default)
     {
         var normalized = ShareRelativePath.Normalize(path);
         var isDir = await _storage.IsDirectoryAsync(normalized);
@@ -135,7 +135,7 @@ public class FileService : IFileService
         if (!await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.CreateWriteData))
             throw new UnauthorizedAccessException($"Write denied for '{normalized}'");
 
-        await _storage.WriteAsync(normalized, data);
+        await _storage.WriteAsync(normalized, data, cancellationToken);
     }
 
     public async Task CreateFileAsync(string path, UserContext user)

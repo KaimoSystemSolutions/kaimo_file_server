@@ -5,7 +5,7 @@ namespace Kaimo_File_Server.Core.Storage
     public interface IStorageEngine
     {
         Task<Stream> ReadAsync(string path);
-        Task WriteAsync(string path, Stream data);
+        Task WriteAsync(string path, Stream data, CancellationToken cancellationToken = default);
         Task CreateDirectory(string path);
         Task DeleteAsync(string path);
         Task MoveAsync(string oldPath, string newPath);

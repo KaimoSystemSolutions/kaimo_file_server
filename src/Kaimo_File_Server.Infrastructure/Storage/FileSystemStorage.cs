@@ -54,14 +54,14 @@ public class FileSystemStorage : IStorageEngine
         return Task.FromResult(stream);
     }
 
-    public async Task WriteAsync(string path, Stream data)
+    public async Task WriteAsync(string path, Stream data, CancellationToken cancellationToken = default)
     {
         var fullPath = ToAbsolutePath(path);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
         await using var file = new FileStream(
             fullPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, 4096, true);
-        await data.CopyToAsync(file);
+        await data.CopyToAsync(file, cancellationToken);
     }
 
     public Task CreateDirectory(string dirPath)

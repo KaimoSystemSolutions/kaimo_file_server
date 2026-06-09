@@ -614,13 +614,25 @@ else
     {
         StateHasChanged();
     }
-
+    
     private async Task OnFileUploaded(InputFileChangeEventArgs e)
     {
         foreach (var file in e.GetMultipleFiles())
         {
-            var toastId = Toast.Show($"Uploading \"{file.Name}\"…", ToastType.Progress);
-
+            var cts = new CancellationTokenSource();
+            string? toastId = null;
+    
+            toastId = Toast.Show(
+                $"Uploading \"{file.Name}\"…",
+                ToastType.Progress,
+                onDismiss: () =>
+                {
+                    cts.Cancel();
+                    if (toastId is not null)
+                        Toast.Update(toastId, $"\"{file.Name}\" — Upload abgebrochen.", type: ToastType.Error);
+                    return Task.CompletedTask;
+                });
+    
             Stream stream;
             try
             {
@@ -631,7 +643,7 @@ else
                 Toast.Update(toastId, $"\"{file.Name}\" ist zu groß (max. 1.1 GB).", type: ToastType.Error);
                 continue;
             }
-
+    
             try
             {
                 await using (stream)
@@ -645,24 +657,35 @@ else
                             StateHasChanged();
                         });
                     });
-
-                    var result = await VM.UploadFileAsync(file.Name, progressStream);
-
+    
+                    var result = await VM.UploadFileAsync(file.Name, progressStream, cts.Token);
+    
                     if (result.Success)
                         Toast.Update(toastId, $"\"{file.Name}\" hochgeladen.", type: ToastType.Success);
                     else
                         Toast.Update(toastId, result.Error ?? "Upload fehlgeschlagen.", type: ToastType.Error);
                 }
             }
+            catch (OperationCanceledException)
+            {
+                // Already handled by the onDismiss callback
+            }
             catch (JSException)
             {
                 Toast.Update(toastId, $"\"{file.Name}\" abgebrochen — Seite verlassen.", type: ToastType.Error);
-                break; // remaining files are also dead, no point continuing
+                break;
             }
+            finally
+            {
+                cts.Dispose();
+            }
+            
+            await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
+            StateHasChanged();
         }
-
-        await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
+        
     }
+
 
     // ========== State ==========
 
