@@ -1,10 +1,10 @@
 namespace Kaimo_File_Server.Web.Services;
 public enum ToastType { Info, Success, Error, Progress }
-
 public record ToastMessage(string Id, string Text, ToastType Type, DateTime CreatedAt)
 {
     public int Progress { get; set; }
     public DateTime CreatedAt { get; set; } = CreatedAt;
+    public Func<Task>? OnDismiss { get; set; }
 }
 
 public class ToastService
@@ -13,15 +13,16 @@ public class ToastService
     public IReadOnlyList<ToastMessage> Toasts => _toasts;
     public event Action? OnChanged;
 
-    public string Show(string text, ToastType type = ToastType.Info)
+    public string Show(string text, ToastType type = ToastType.Info, Func<Task>? onDismiss = null)
     {
         var id = Guid.NewGuid().ToString();
-        _toasts.Add(new ToastMessage(id, text, type, DateTime.Now));
+        _toasts.Add(new ToastMessage(id, text, type, DateTime.Now) { OnDismiss = onDismiss });
         OnChanged?.Invoke();
         return id;
     }
 
-    public void Update(string id, string? text = null, int? progress = null, ToastType? type = null)
+    public void Update(string id, string? text = null, int? progress = null, 
+        ToastType? type = null, Func<Task>? onDismiss = null)
     {
         var toast = _toasts.FirstOrDefault(t => t.Id == id);
         if (toast is null) return;
@@ -40,6 +41,9 @@ public class ToastService
 
         if (progress is not null)
             toast.Progress = progress.Value;
+
+        if (onDismiss is not null)
+            toast.OnDismiss = onDismiss;
 
         OnChanged?.Invoke();
     }

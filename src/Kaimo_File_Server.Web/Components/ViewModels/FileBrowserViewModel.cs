@@ -440,51 +440,61 @@ public class FileBrowserViewModel
     
     // In FileBrowserViewModel
 
-    public async Task<OperationResult> UploadFileAsync(string fileName, Stream fileStream)
+    public async Task<OperationResult> UploadFileAsync(string fileName, Stream fileStream, 
+    CancellationToken cancellationToken = default)
+{
+    if (_fileService is null || CurrentShare is null)
+        return OperationResult.Fail("Kein Share geladen.");
+
+    if (string.IsNullOrWhiteSpace(fileName))
+        return OperationResult.Fail("Dateiname fehlt.");
+
+    if (!WindowsFileNameHelper.IsValid(fileName))
     {
-        if (_fileService is null || CurrentShare is null)
-            return OperationResult.Fail("Kein Share geladen.");
+        var errors = WindowsFileNameHelper.GetValidationErrors(fileName);
+        return OperationResult.Fail("Der Dateiname enthält ungültige Zeichen. Fehler: " + string.Join(", ", errors));
+    }
 
-        if (string.IsNullOrWhiteSpace(fileName))
-            return OperationResult.Fail("Dateiname fehlt.");
+    var userContext = await GetCurrentUserContextAsync();
+    if (userContext is null)
+        return OperationResult.Fail("Nicht authentifiziert.");
 
-        if (!WindowsFileNameHelper.IsValid(fileName))
-        {
-            var errors = WindowsFileNameHelper.GetValidationErrors(fileName);
-            return OperationResult.Fail("Der Dateiname enthält ungültige Zeichen. Fehler: " + string.Join(", ", errors));
-        }
+    var targetPath = string.IsNullOrEmpty(CurrentPath)
+        ? fileName
+        : $"{CurrentPath}/{fileName}";
 
+    try
+    {
+        await _fileService.WriteFileAsync(targetPath, fileStream, userContext, cancellationToken);
+
+        _logger.LogInformation("File uploaded: '{Path}' by {User}",
+            targetPath, userContext.User.Username);
+
+        return OperationResult.Ok();
+    }
+    catch (Exception ex)
+    {
+        // Clean up the partial file
         try
         {
-            var userContext = await GetCurrentUserContextAsync();
-            if (userContext is null)
-                return OperationResult.Fail("Nicht authentifiziert.");
-
-            var targetPath = string.IsNullOrEmpty(CurrentPath)
-                ? fileName
-                : $"{CurrentPath}/{fileName}";
-
-            await _fileService.WriteFileAsync(targetPath, fileStream, userContext);
-
-            _logger.LogInformation("File uploaded: '{Path}' by {User}",
-                targetPath, userContext.User.Username);
-
-            return OperationResult.Ok();
+            await _fileService.DeleteFileAsync(targetPath, userContext, isRecycleEnabled: false);
+            _logger.LogInformation("Cleaned up partial upload: '{Path}'", targetPath);
         }
-        catch (UnauthorizedAccessException)
+        catch (Exception cleanupEx)
         {
-            return OperationResult.Fail("Zugriff verweigert.");
+            _logger.LogWarning(cleanupEx, "Failed to clean up partial upload: '{Path}'", targetPath);
         }
-        catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+
+        return ex switch
         {
-            return OperationResult.Fail("Eine Datei mit diesem Namen existiert bereits.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error uploading file '{FileName}'", fileName);
-            return OperationResult.Fail("Fehler beim Hochladen.");
-        }
+            OperationCanceledException => OperationResult.Fail("Upload abgebrochen."),
+            UnauthorizedAccessException => OperationResult.Fail("Zugriff verweigert."),
+            IOException ioEx when ioEx.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase)
+                => OperationResult.Fail("Eine Datei mit diesem Namen existiert bereits."),
+            _ => OperationResult.Fail("Fehler beim Hochladen.")
+        };
     }
+}
 
     public long GetMaxUploadSizeBytes()
     {

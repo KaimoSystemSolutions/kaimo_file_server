@@ -15,7 +15,7 @@
                 _                 => Assets.SVG("info.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2, CssClass: "toast-icon")),
             })
             <span class="toast-text">@toast.Text</span>
-            <button class="toast-close" @onclick="() => Dismiss(toast.Id)">
+            <button class="toast-close" @onclick="() => DismissManual(toast.Id)">
                 @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
             </button>
             @if (toast.Type == ToastType.Progress)
@@ -27,7 +27,6 @@
         </div>
     }
 </div>
-
 @code {
     private HashSet<string> _removing = new();
     private Dictionary<string, Timer> _timers = new();
@@ -50,7 +49,6 @@
                 var elapsed = (int)(DateTime.Now - toast.CreatedAt).TotalMilliseconds;
                 var remaining = Math.Max(delay - elapsed, 0);
 
-                // Reset existing timer or create new one
                 var id = toast.Id;
                 if (_timers.TryGetValue(id, out var existing))
                     existing.Change(remaining, Timeout.Infinite);
@@ -59,6 +57,15 @@
             }
             StateHasChanged();
         });
+    }
+
+    private async Task DismissManual(string id)
+    {
+        var toast = Toasts.Toasts.FirstOrDefault(t => t.Id == id);
+        if (toast?.OnDismiss is not null)
+            await toast.OnDismiss();
+
+        await Dismiss(id);
     }
 
     private async Task Dismiss(string id)

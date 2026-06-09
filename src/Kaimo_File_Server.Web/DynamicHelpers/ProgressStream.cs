@@ -17,6 +17,7 @@ public class ProgressStream : Stream
     public override async Task<int> ReadAsync(byte[] buffer, int offset, int count,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var read = await _inner.ReadAsync(buffer, offset, count, cancellationToken);
         _bytesRead += read;
         _onProgress(_bytesRead, _totalBytes);
