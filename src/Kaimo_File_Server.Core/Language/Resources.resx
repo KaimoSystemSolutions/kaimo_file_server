@@ -126,4 +126,10 @@
   <data name="Web_Error_PermissionNotSelected" xml:space="preserve">
     <value>Please select at least one permission.</value>
   </data>
+  <data name="Context_Menu_Rename" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="Context_Menu_Delete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
 </root>

@@ -31,6 +31,8 @@ namespace Kaimo_File_Server.Core.Services
         Task<List<FileMetadata>> ListAsync(string directoryPath, UserContext user);
         Task RenameAsync(string oldPath, string newPath, UserContext user);
         Task<long> GetDirectorySizeAsync(string relativePath, UserContext userContext);
+        Task UnzipAsync(string zipPath, string targetPath, UserContext user);
+        Task ArchiveAsync(List<string> sourcePaths, string targetPath, string format, UserContext user);
         
         /// <summary>
         /// Returns the subset of paths the user has ListReadData permission on.

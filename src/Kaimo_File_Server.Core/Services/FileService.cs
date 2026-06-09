@@ -137,6 +137,49 @@ public class FileService : IFileService
 
         await _storage.WriteAsync(normalized, data, cancellationToken);
     }
+    
+    public async Task ArchiveAsync(List<string> sourcePaths, string targetPath, string format, UserContext user)
+    {
+        var normalizedTarget = ShareRelativePath.Normalize(targetPath);
+
+        // Check read on all sources
+        foreach (var source in sourcePaths)
+        {
+            var normalized = ShareRelativePath.Normalize(source);
+            var isDir = await _storage.IsDirectoryAsync(normalized);
+
+            if (!await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.ListReadData))
+                throw new UnauthorizedAccessException($"Read denied for '{normalized}'");
+        }
+
+        // Check write on target directory
+        var parentDir = ShareRelativePath.GetParent(normalizedTarget);
+        if (!await _acl.HasAccessAsync(user, _shareId, parentDir, true, FilePermission.CreateWriteData))
+            throw new UnauthorizedAccessException($"Write denied for '{parentDir}'");
+
+        await _storage.ArchiveAsync(
+            sourcePaths.Select(ShareRelativePath.Normalize).ToList(),
+            normalizedTarget,
+            format);
+    }
+    
+    public async Task UnzipAsync(string zipPath, string targetPath, UserContext user)
+    {
+        var normalizedZip = ShareRelativePath.Normalize(zipPath);
+        var normalizedTarget = ShareRelativePath.Normalize(targetPath);
+
+        // Check read permission on the zip
+        if (!await _acl.HasAccessAsync(user, _shareId, normalizedZip, false, FilePermission.ListReadData))
+            throw new UnauthorizedAccessException($"Read denied for '{normalizedZip}'");
+
+        // Check write permission on the target directory
+        var parentDir = ShareRelativePath.GetParent(normalizedTarget);
+        if (!await _acl.HasAccessAsync(user, _shareId, parentDir, true, FilePermission.CreateWriteData))
+            throw new UnauthorizedAccessException($"Write denied for '{parentDir}'");
+
+        await _storage.UnzipAsync(normalizedZip, normalizedTarget);
+    }
+    
 
     public async Task CreateFileAsync(string path, UserContext user)
     {

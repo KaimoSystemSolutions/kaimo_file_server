@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
+using Kaimo_File_Server.Web.Helpers;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -421,24 +422,105 @@ public class FileBrowserViewModel
         using var ms = new MemoryStream();
         await stream.CopyToAsync(ms);
 
-        var contentType = Path.GetExtension(file.Name).ToLower() switch
-        {
-            ".pdf"  => "application/pdf",
-            ".png"  => "image/png",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".gif"  => "image/gif",
-            ".webp" => "image/webp",
-            ".mp4"  => "video/mp4",
-            ".webm" => "video/webm",
-            ".mp3"  => "audio/mpeg",
-            ".txt"  => "text/plain",
-            _       => "application/octet-stream"
-        };
+        var contentType = FileHelper.GetContentType(file.Name);
 
         return (ms.ToArray(), contentType);
     }
     
-    // In FileBrowserViewModel
+    public async Task<OperationResult> ArchiveAsync(List<FileMetadata> items, string format)
+    {
+        if (_fileService is null || CurrentShare is null)
+            return OperationResult.Fail("Kein Share geladen.");
+
+        try
+        {
+            var userContext = await GetCurrentUserContextAsync();
+            if (userContext is null)
+                return OperationResult.Fail("Nicht authentifiziert.");
+
+            var relativePaths = items.Select(item =>
+            {
+                var path = item.Path;
+                if (path.StartsWith(CurrentShare.Path))
+                    path = path[CurrentShare.Path.Length..].TrimStart('/');
+                return path;
+            }).ToList();
+
+            var archiveName = items.Count == 1
+                ? Path.GetFileNameWithoutExtension(items[0].Name) + format
+                : "archiv" + format;
+
+            var targetPath = string.IsNullOrEmpty(CurrentPath)
+                ? archiveName
+                : $"{CurrentPath}/{archiveName}";
+
+            await _fileService.ArchiveAsync(relativePaths, targetPath, format, userContext);
+
+            _logger.LogInformation("Archived {Count} items -> '{Target}' by {User}",
+                items.Count, targetPath, userContext.User.Username);
+
+            return OperationResult.Ok();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return OperationResult.Fail("Zugriff verweigert.");
+        }
+        catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+        {
+            return OperationResult.Fail($"Ein Archiv mit dem Namen \"archiv.{format}\" existiert bereits.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error archiving {Count} items", items.Count);
+            return OperationResult.Fail("Fehler beim Archivieren.");
+        }
+    }
+    
+    public async Task<OperationResult> UnzipAsync(FileMetadata file)
+    {
+        if (_fileService is null || CurrentShare is null)
+            return OperationResult.Fail("Kein Share geladen.");
+
+        try
+        {
+            var userContext = await GetCurrentUserContextAsync();
+            if (userContext is null)
+                return OperationResult.Fail("Nicht authentifiziert.");
+
+            var relativePath = file.Path;
+            if (relativePath.StartsWith(CurrentShare.Path))
+                relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
+
+            // Target folder = same directory, named after the zip (without extension)
+            var folderName = Path.GetFileNameWithoutExtension(file.Name);
+            var parentDir = Kaimo_File_Server.Core.Helpers.ShareRelativePath.GetParent(relativePath);
+            var targetDir = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Combine(parentDir, folderName);
+
+            await _fileService.UnzipAsync(relativePath, targetDir, userContext);
+
+            _logger.LogInformation("Unzipped: '{Path}' -> '{Target}' by {User}",
+                relativePath, targetDir, userContext.User.Username);
+
+            return OperationResult.Ok();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return OperationResult.Fail("Zugriff verweigert.");
+        }
+        catch (InvalidDataException)
+        {
+            return OperationResult.Fail("Die Datei ist kein gültiges ZIP-Archiv.");
+        }
+        catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+        {
+            return OperationResult.Fail("Ein Ordner mit diesem Namen existiert bereits.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error unzipping '{Path}'", file.Path);
+            return OperationResult.Fail("Fehler beim Entpacken.");
+        }
+    }
 
     public async Task<OperationResult> UploadFileAsync(string fileName, Stream fileStream, 
     CancellationToken cancellationToken = default)

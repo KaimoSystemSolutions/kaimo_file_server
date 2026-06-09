@@ -1,0 +1,26 @@
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AssetProvider Assets
+
+@foreach (var item in Items)
+{
+    if (item.IsSeparator)
+    {
+        <div class="context-menu-separator"></div>
+    }
+    else if (item.IsHeader)
+    {
+        <div class="context-menu-header">@item.Label</div>
+    }
+    else
+    {
+        <button class="context-menu-item @(item.IsDanger ? "context-menu-item--danger" : "")"
+                @onclick="item.Action">
+            @Assets.SVG(item.Icon, item.IconOptions)
+            @item.Label
+        </button>
+    }
+}
+
+@code {
+    [Parameter] public List<ContextMenuItem> Items { get; set; } = new();
+}

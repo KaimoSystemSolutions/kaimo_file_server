@@ -17,7 +17,9 @@ public class AssetProvider
         "path",
         "line",
         "circle",
-        "polyline"
+        "polyline",
+        "polygon",
+        "rect",
     };
     
     private readonly IWebHostEnvironment _env;

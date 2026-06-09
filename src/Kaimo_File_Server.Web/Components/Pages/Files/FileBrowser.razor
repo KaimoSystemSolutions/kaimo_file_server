@@ -1,3 +1,5 @@
+@using System.Collections
+@using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Pages.Acl
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Kaimo_File_Server.Web.Helpers
@@ -238,7 +240,7 @@ else
         @* -- ".." Elternverzeichnis -- *@
         @if (VM.HasParent)
         {
-            <div class="file-grid-row file-row-dir" @ondblclick="NavigateUp">
+            <div class="file-grid-row file-row-dir" @onclick="NavigateUp">
                 <div class="col-name">
                     
                     @Assets.SVG("chevron_left.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)", CssClass: "file-icon"))
@@ -339,7 +341,9 @@ else
                  @oncontextmenu:stopPropagation="true">
 
                 <div class="col-name">
-                    @Assets.SVG("file.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)", CssClass: "file-icon"))
+                    
+                    @Assets.SVG(FileHelper.GetIcon(file.Name), new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)", CssClass: "file-icon"))
+                    
                     <span>@file.Name</span>
                     @if (fileAclCount > 0)
                     {
@@ -392,59 +396,9 @@ else
     <div class="context-menu-backdrop" @onclick="CloseContextMenu" @oncontextmenu="CloseContextMenu"
          @oncontextmenu:preventDefault="true"></div>
     <div class="context-menu" style="top: @(_contextMenuY)px; left: @(_contextMenuX)px;">
-        @if (_contextTarget is not null)
-        {
-            <div class="context-menu-header">@_contextTarget.Name</div>
-            @if (_contextTarget.IsDirectory)
-            {
-                <button class="context-menu-item" @onclick="() => ContextNavigateTo(_contextTarget)">
-                    
-                    @Assets.SVG("arrow_right.svg", new SvgOptions(Width: 14, Height: 14))
-                    Öffnen
-                </button>
-            }
-            <button class="context-menu-item" @onclick="() => ContextRename(_contextTarget)">
-                
-                @Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14))
-                Umbenennen
-            </button>
-            <button class="context-menu-item context-menu-item--danger" @onclick="() => ContextDelete(_contextTarget)">
-                @Assets.SVG("trash.svg", new SvgOptions(Width: 14, Height: 14))
-                Löschen
-            </button>
-            @if (_isAdmin)
-            {
-                <button class="context-menu-item" @onclick="() => ContextAcl(_contextTarget)">
-                    @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
-                    Berechtigungen
-                </button>
-            }
-            <div class="context-menu-separator"></div>
-            <div class="context-menu-header">General</div>
-            <button class="context-menu-item" @onclick="ContextNewFolder">
-                @Assets.SVG("folder.svg", new SvgOptions(Width: 14, Height: 14))
-                Neuer Ordner
-            </button>
-            <button class="context-menu-item" @onclick="ContextRefresh">
-                @Assets.SVG("refresh.svg", new SvgOptions(Width: 14, Height: 14))
-                Aktualisieren
-            </button>
-        }
-        else
-        {
-            <button class="context-menu-item" @onclick="ContextNewFolder">
-                @Assets.SVG("folder.svg", new SvgOptions(Width: 14, Height: 14))
-                Neuer Ordner
-            </button>
-            <button class="context-menu-item" @onclick="ContextRefresh">
-                
-                @Assets.SVG("refresh.svg", new SvgOptions(Width: 14, Height: 14))
-                Aktualisieren
-            </button>
-        }
+        <ContextMenu Items="BuildContextMenuItems()" />
     </div>
 }
-
 @* -- Dialog: Umbenennen -- *@
 @if (_showRenameDialog)
 {
@@ -705,7 +659,6 @@ else
     private bool _showContextMenu;
     private double _contextMenuX;
     private double _contextMenuY;
-    private FileMetadata? _contextTarget;
     private bool _showRenameDialog;
     private FileMetadata? _renameTarget;
     private string _renameNewName = "";
@@ -797,9 +750,183 @@ else
     {
         if (_selectedItems.Count != 1) return;
         var item = _selectedItems.First();
-        if (item.IsDirectory) OpenFolderAcl(item); else OpenFileAcl(item);
+        if (item.IsDirectory) OpenFolderAcl(item);
+        else OpenFileAcl(item);
+    }
+    
+    // ========== Context Menu ==========
+    
+    private List<ContextMenuItem> BuildContextMenuItems()
+    {
+        var builder = new ContextMenuBuilder();
+        
+        // empty selection
+        if (_selectedItems.Count == 0)
+        {
+            builder = addGeneralItems(builder);
+            return builder.Build();
+        }
+        
+        if (_selectedItems.Count == 1)
+        {
+            var target = _selectedItems.First();
+            
+            builder.AddHeader(target.Name);
+
+            builder.AddIf(target.IsDirectory,
+                "Öffnen", "arrow_right.svg", () => { ContextNavigateTo(target); return Task.CompletedTask; });
+
+            builder.AddIf(!target.IsDirectory,
+                "Öffnen", "arrow_right.svg", async () => {
+                    _showContextMenu = false; await OpenFilePreview(target); 
+                });
+            
+            builder.AddIf(target is not null && target.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase),
+                "Entpacken", "file_zip.svg", async () =>
+                {
+                    _showContextMenu = false; 
+                    await UnzipFile(target!);
+                });
+            
+            builder.AddIf(!target.IsDirectory,
+                "Als .zip komprimieren", "archive.svg", async () =>
+                {
+                    CloseContextMenu();
+                    await ArchiveFiles(new[] { target }, ".zip");
+                });
+
+            builder.AddIf(!target.IsDirectory,
+                "Als .tar.gz komprimieren", "archive.svg", async () =>
+                {
+                    CloseContextMenu();
+                    await ArchiveFiles(new[] { target }, ".tar.gz");
+                });
+            
+            builder.AddIf(target.IsDirectory,
+                "Als .zip komprimieren", "archive.svg", async () =>
+                {
+                    CloseContextMenu();
+                    await ArchiveFiles(new[] { target }, ".zip");
+                });
+
+            builder.AddIf(target.IsDirectory,
+                "Als .tar.gz komprimieren", "archive.svg", async () =>
+                {
+                    CloseContextMenu();
+                    await ArchiveFiles(new[] { target }, ".tar.gz");
+                });
+
+            builder.Add(Resources.Context_Menu_Rename, "edit.svg", () => { ContextRename(target); return Task.CompletedTask; });
+
+            builder.Add(Resources.Context_Menu_Delete, "trash.svg", () => { ContextDelete(target); return Task.CompletedTask; },
+                isDanger: true);
+
+            builder.AddIf(_isAdmin,
+                "Berechtigungen", "shield.svg", () => { ContextAcl(target); return Task.CompletedTask; },
+                iconOptions: new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"));
+
+            builder.AddSeparator();
+            builder = addGeneralItems(builder);
+            return builder.Build();
+
+        }
+
+        // if multiple items
+        
+        builder.AddHeader($"Selected {_selectedItems.Count} Items");
+
+        var allFilesAreZipFiles = _selectedItems.All(file => !file.IsDirectory && file.Name.EndsWith(".zip"));
+
+        if (allFilesAreZipFiles)
+            builder.Add("Entpacken", "file_zip.svg", async () =>
+                {
+                    _showContextMenu = false; 
+                    
+                    foreach (var selectedItem in _selectedItems)
+                        await UnzipFile(selectedItem);
+                    
+                });
+        
+        builder.Add("Als .zip komprimieren", "archive.svg", async () =>
+        {
+            CloseContextMenu();
+            await ArchiveFiles(_selectedItems, ".zip");
+        });
+
+        builder.Add("Als .tar.gz komprimieren", "archive.svg", async () =>
+        {
+            CloseContextMenu();
+            await ArchiveFiles(_selectedItems, ".tar.gz");
+        });
+        
+        
+        builder.Add(Resources.Context_Menu_Delete, "trash.svg", () =>
+            {
+                foreach (var selectedItem in _selectedItems)
+                    ContextDelete(selectedItem);
+                
+                return Task.CompletedTask;
+            },
+            isDanger: true);
+
+        builder.AddSeparator();
+        builder = addGeneralItems(builder);
+        return builder.Build();
     }
 
+    private ContextMenuBuilder addGeneralItems(ContextMenuBuilder builder)
+    {
+        builder.AddHeader("General");
+        builder.Add("Neuer Ordner", "folder.svg", async () => { ContextNewFolder(); });
+        builder.Add("Aktualisieren", "refresh.svg", async () => { await ContextRefresh(); });
+        return builder; 
+    }
+    
+    // ========== Zip ==========
+    
+    private async Task ArchiveFiles(IEnumerable<FileMetadata> items, string format)
+    {
+        var itemList = items.ToList();
+        var archiveName = itemList.Count == 1
+            ? Path.GetFileNameWithoutExtension(itemList[0].Name) + format
+            : "archiv" + format;
+
+        var toastId = Toast.Show($"Erstelle \"{archiveName}\"…", ToastType.Progress);
+
+        var result = await VM.ArchiveAsync(itemList, format);
+
+        if (result.Success)
+        {
+            Toast.Update(toastId, $"\"{archiveName}\" erstellt.", type: ToastType.Success);
+            await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
+            StateHasChanged();
+        }
+        else
+        {
+            Toast.Update(toastId, result.Error ?? "Fehler beim Archivieren.", type: ToastType.Error);
+        }
+    }
+    
+    // ========== Unzip ==========
+    
+    private async Task UnzipFile(FileMetadata file)
+    {
+        var toastId = Toast.Show($"Entpacke \"{file.Name}\"…", ToastType.Progress);
+
+        var result = await VM.UnzipAsync(file);
+
+        if (result.Success)
+        {
+            Toast.Update(toastId, $"\"{file.Name}\" entpackt.", type: ToastType.Success);
+            await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
+            StateHasChanged();
+        }
+        else
+        {
+            Toast.Update(toastId, result.Error ?? "Fehler beim Entpacken.", type: ToastType.Error);
+        }
+    }
+    
     // ========== Lifecycle ==========
 
     protected override async Task OnParametersSetAsync()
@@ -885,7 +1012,8 @@ else
         else
             _createFolderError = result.Error;
     }
-
+    
+    
     // ========== Löschen ==========
 
     private void RequestDelete(FileMetadata item)
@@ -924,7 +1052,6 @@ else
             _selectedItems.Clear();
             _selectedItems.Add(item);
         }
-        _contextTarget = item;
         _contextMenuX = e.ClientX;
         _contextMenuY = e.ClientY;
         _showContextMenu = true;
@@ -932,7 +1059,6 @@ else
 
     private void OnBackgroundContextMenu(MouseEventArgs e)
     {
-        _contextTarget = null;
         _contextMenuX = e.ClientX;
         _contextMenuY = e.ClientY;
         _showContextMenu = true;
@@ -941,7 +1067,6 @@ else
     private void CloseContextMenu()
     {
         _showContextMenu = false;
-        _contextTarget = null;
     }
 
     private void ContextNavigateTo(FileMetadata dir) { CloseContextMenu(); NavigateTo(dir); }
