@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -15,10 +16,11 @@ namespace Kaimo_File_Server.Infrastructure.Persistence;
 ///
 /// Execution order:
 ///   1. Clean up duplicates (migration safety net)
-///   2. Seed system roles with ManagementPermission flags
-///   3. Seed default groups
-///   4. Seed department hierarchy with default file permissions
-///   5. Seed test users + assignments (first run only)
+///   2. Seed Global department (must exist before Groups/Shares)
+///   3. Seed system roles with ManagementPermission flags
+///   4. Seed default groups (with DepartmentId = Global)
+///   5. Seed department hierarchy with default file permissions
+///   6. Seed test users + assignments (first run only)
 /// </summary>
 public class DatabaseSeeder
 {
@@ -43,10 +45,42 @@ public class DatabaseSeeder
     public async Task SeedAsync()
     {
         await CleanupDuplicatesAsync();
+        await SeedGlobalDepartmentAsync();
         await SeedRolesAsync();
         await SeedGroupsAsync();
         await SeedDepartmentsAsync();
         await SeedTestUsersAsync();
+    }
+
+    // ══════════════════════════════════════════
+    //  0. Global Department (must exist first)
+    // ══════════════════════════════════════════
+
+    /// <summary>
+    /// Seeds the well-known Global department with the fixed ID
+    /// from <see cref="WellKnownDepartments.GlobalId"/>.
+    ///
+    /// This MUST run before Groups and Shares are created,
+    /// because their DepartmentId defaults to GlobalId.
+    /// </summary>
+    private async Task SeedGlobalDepartmentAsync()
+    {
+        var exists = await _db.Departments
+            .AnyAsync(d => d.Id == WellKnownDepartments.GlobalId);
+
+        if (exists)
+            return;
+
+        var global = new Department("Global", "Globale Abteilung — Standard für alle Entitäten ohne explizite Zuordnung")
+        {
+            Id = WellKnownDepartments.GlobalId
+        };
+
+        _db.Departments.Add(global);
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Global-Department angelegt (Id: {Id})", WellKnownDepartments.GlobalId);
     }
 
     // ══════════════════════════════════════════
@@ -77,7 +111,6 @@ public class DatabaseSeeder
         {
             if (byName.TryGetValue(name, out var role))
             {
-                // Ensure permissions and system flag are current
                 if (role.ManagementPermissions != perms || role.IsSystemRole != isSystem)
                 {
                     role.ManagementPermissions = perms;
@@ -99,7 +132,7 @@ public class DatabaseSeeder
     }
 
     // ══════════════════════════════════════════
-    //  2. Default Groups
+    //  2. Default Groups (DepartmentId = Global)
     // ══════════════════════════════════════════
 
     private static readonly string[] DefaultGroups =
@@ -119,8 +152,10 @@ public class DatabaseSeeder
         {
             if (existingNames.Add(name))
             {
+                // All default groups start in Global department.
+                // Department-specific groups get reassigned in SeedTestUsersAsync.
                 _db.Groups.Add(new Group(Guid.NewGuid(), name));
-                _logger.LogInformation("Gruppe '{Name}' angelegt", name);
+                _logger.LogInformation("Gruppe '{Name}' angelegt (Department: Global)", name);
                 changed = true;
             }
         }
@@ -133,13 +168,15 @@ public class DatabaseSeeder
     //  3. Department Hierarchy
     // ══════════════════════════════════════════
 
-    // FilePermission flags (must match your FilePermission enum)
+    // DepartmentPermission flags (must match DepartmentFilePermissionMapper)
     private const long PermRead = 1L;
     private const long PermWrite = 2L;
     private const long PermDelete = 4L;
 
     /// <summary>
     /// Seeds the department hierarchy:
+    ///
+    ///   Global (well-known, already seeded)
     ///
     ///   Entwicklung (Default: Read|Write)
     ///   ├── Backend    (null → erbt Read|Write)
@@ -154,10 +191,10 @@ public class DatabaseSeeder
     /// </summary>
     private async Task SeedDepartmentsAsync()
     {
-        if (await _db.Departments.AnyAsync())
+        // Global is already seeded — only add the others if they don't exist yet
+        if (await _db.Departments.CountAsync() > 1)
             return;
 
-        // Top-level
         var entwicklung = new Department("Entwicklung", "Software-Entwicklung")
         { DefaultFilePermission = PermRead | PermWrite };
 
@@ -200,8 +237,8 @@ public class DatabaseSeeder
         var groups = await LoadGroupLookupAsync();
         var departments = await LoadDepartmentLookupAsync();
 
-        // Create shares
-        var shares = CreateShares();
+        // Create shares (with DepartmentId set directly)
+        var shares = CreateShares(departments);
         _db.ShareDefinitions.AddRange(shares.Values);
 
         // Create users
@@ -214,7 +251,6 @@ public class DatabaseSeeder
         AssignShareAccess(users, groups, shares);
         AssignUsersToDepartments(users, departments);
         AssignGroupsToDepartments(groups, departments);
-        AssignSharesToDepartments(shares, departments);
 
         await _db.SaveChangesAsync();
 
@@ -236,17 +272,22 @@ public class DatabaseSeeder
     private async Task<Dictionary<string, Department>> LoadDepartmentLookupAsync()
         => (await _db.Departments.ToListAsync()).ToDictionary(d => d.Name, StringComparer.OrdinalIgnoreCase);
 
-    // ── Shares ──
+    // ── Shares (with direct DepartmentId) ──
 
-    private static Dictionary<string, ShareDefinition> CreateShares() => new()
-    {
-        ["test"] = new ShareDefinition("test", "/data/storage/test"),
-        ["projekte"] = new ShareDefinition("projekte", "/data/storage/projekte"),
-        ["general"] = new ShareDefinition("general", "/data/storage/general"),
-        ["backend-docs"] = new ShareDefinition("backend-docs", "/data/storage/backend-docs"),
-        ["frontend-docs"] = new ShareDefinition("frontend-docs", "/data/storage/frontend-docs"),
-        ["marketing-files"] = new ShareDefinition("marketing-files", "/data/storage/marketing-files"),
-    };
+    /// <summary>
+    /// Creates shares with their department assignment set directly via DepartmentId.
+    /// No more DepartmentShare join table needed.
+    /// </summary>
+    private static Dictionary<string, ShareDefinition> CreateShares(
+        Dictionary<string, Department> departments) => new()
+        {
+            ["test"] = new ShareDefinition("test", "/data/storage/test", departments["Entwicklung"].Id),
+            ["projekte"] = new ShareDefinition("projekte", "/data/storage/projekte", departments["Entwicklung"].Id),
+            ["general"] = new ShareDefinition("general", "/data/storage/general", departments["Geschäftsleitung"].Id),
+            ["backend-docs"] = new ShareDefinition("backend-docs", "/data/storage/backend-docs", departments["Backend"].Id),
+            ["frontend-docs"] = new ShareDefinition("frontend-docs", "/data/storage/frontend-docs", departments["Frontend"].Id),
+            ["marketing-files"] = new ShareDefinition("marketing-files", "/data/storage/marketing-files", departments["Marketing"].Id),
+        };
 
     // ── Users ──
 
@@ -346,7 +387,6 @@ public class DatabaseSeeder
         Dictionary<string, Group> groups,
         Dictionary<string, ShareDefinition> shares)
     {
-        // User-level access
         var userAccess = new (string Share, string User)[]
         {
             ("test", "admin"),
@@ -357,7 +397,6 @@ public class DatabaseSeeder
         foreach (var (share, user) in userAccess)
             _db.ShareAccessEntries.Add(new ShareAccessEntry(share, users[user].Id));
 
-        // Group-level access
         var groupAccess = new (string Share, string Group)[]
         {
             ("test", "Developers"),
@@ -371,7 +410,7 @@ public class DatabaseSeeder
             _db.ShareAccessEntries.Add(new ShareAccessEntry(share, groups[group].Id));
     }
 
-    // ── Department → User ──
+    // ── Department → User (M:N stays) ──
 
     private void AssignUsersToDepartments(
         Dictionary<string, User> users,
@@ -379,8 +418,8 @@ public class DatabaseSeeder
     {
         var assignments = new (string User, string Department)[]
         {
-            ("marco", "Entwicklung"),  // Top-level: Abteilungsleiter
-            ("anna",  "Backend"),      // Child of Entwicklung
+            ("marco", "Entwicklung"),
+            ("anna",  "Backend"),
             ("lisa",  "Marketing"),
         };
 
@@ -388,8 +427,13 @@ public class DatabaseSeeder
             _db.DepartmentUsers.Add(new DepartmentUser(departments[dept].Id, users[user].Id));
     }
 
-    // ── Department → Group ──
+    // ── Group → Department (direct FK on Group) ──
 
+    /// <summary>
+    /// Sets the DepartmentId directly on each group entity.
+    /// Groups were created with DepartmentId = Global (default).
+    /// This method reassigns department-specific groups.
+    /// </summary>
     private void AssignGroupsToDepartments(
         Dictionary<string, Group> groups,
         Dictionary<string, Department> departments)
@@ -403,27 +447,12 @@ public class DatabaseSeeder
         };
 
         foreach (var (group, dept) in assignments)
-            _db.DepartmentGroups.Add(new DepartmentGroup(departments[dept].Id, groups[group].Id));
-    }
-
-    // ── Department → Share ──
-
-    private void AssignSharesToDepartments(
-        Dictionary<string, ShareDefinition> shares,
-        Dictionary<string, Department> departments)
-    {
-        var assignments = new (string Share, string Department)[]
         {
-            ("projekte",        "Entwicklung"),      // Gilt auch für Backend/Frontend via Hierarchie
-            ("test",            "Entwicklung"),
-            ("backend-docs",    "Backend"),
-            ("frontend-docs",   "Frontend"),
-            ("marketing-files", "Marketing"),
-            ("general",         "Geschäftsleitung"),
-        };
+            groups[group].DepartmentId = departments[dept].Id;
+        }
 
-        foreach (var (share, dept) in assignments)
-            _db.DepartmentShares.Add(new DepartmentShare(departments[dept].Id, shares[share].Id));
+        // Groups not listed here keep their default: Global
+        // (Admins, Guests, Everyone)
     }
 
     // ── Scoped Role Assignments ──
@@ -443,11 +472,9 @@ public class DatabaseSeeder
         Dictionary<string, Group> groups,
         Dictionary<string, ShareDefinition> shares)
     {
-        // Global admin
         _db.ScopedRoleAssignments.Add(
             ScopedRoleAssignment.Global(users["admin"].Id, roles["Administrator"].Id));
 
-        // Department-scoped admins
         _db.ScopedRoleAssignments.Add(
             ScopedRoleAssignment.ForDepartment(
                 users["marco"].Id, roles["DepartmentAdmin"].Id, departments["Entwicklung"].Id));
@@ -456,7 +483,6 @@ public class DatabaseSeeder
             ScopedRoleAssignment.ForDepartment(
                 users["lisa"].Id, roles["DepartmentAdmin"].Id, departments["Marketing"].Id));
 
-        // Share-scoped group permission
         _db.ScopedRoleAssignments.Add(
             ScopedRoleAssignment.ForShare(
                 groups["Backend-Team"].Id, roles["ShareManager"].Id, shares["backend-docs"].Id));
@@ -510,10 +536,7 @@ public class DatabaseSeeder
             var remove = group.Where(r => r.Id != keep.Id).ToList();
             var removeIds = remove.Select(r => r.Id).ToHashSet();
 
-            // Migrate UserRole references
             await MigrateUserRolesAsync(removeIds, keep.Id);
-
-            // Migrate ScopedRoleAssignment references
             await MigrateScopedAssignmentsAsync(removeIds, keep.Id);
 
             _db.Roles.RemoveRange(remove);
@@ -542,7 +565,10 @@ public class DatabaseSeeder
 
             await MigrateUserGroupsAsync(removeIds, keep.Id);
             await MigrateShareAccessAsync(removeIds, keep.Id);
-            await MigrateDepartmentGroupsAsync(removeIds, keep.Id);
+
+            // No more DepartmentGroup migration needed —
+            // duplicate groups just get removed, the kept one
+            // retains its DepartmentId.
 
             _db.Groups.RemoveRange(remove);
             _logger.LogInformation(
@@ -617,21 +643,6 @@ public class DatabaseSeeder
                     x => x.ShareName == sa.ShareName && x.PrincipalId == toGroupId))
                 _db.ShareAccessEntries.Add(new ShareAccessEntry(sa.ShareName, toGroupId));
             _db.ShareAccessEntries.Remove(sa);
-        }
-    }
-
-    private async Task MigrateDepartmentGroupsAsync(HashSet<Guid> fromGroupIds, Guid toGroupId)
-    {
-        var affected = await _db.DepartmentGroups
-            .Where(dg => fromGroupIds.Contains(dg.GroupId))
-            .ToListAsync();
-
-        foreach (var dg in affected)
-        {
-            if (!await _db.DepartmentGroups.AnyAsync(
-                    x => x.DepartmentId == dg.DepartmentId && x.GroupId == toGroupId))
-                _db.DepartmentGroups.Add(new DepartmentGroup(dg.DepartmentId, toGroupId));
-            _db.DepartmentGroups.Remove(dg);
         }
     }
 }

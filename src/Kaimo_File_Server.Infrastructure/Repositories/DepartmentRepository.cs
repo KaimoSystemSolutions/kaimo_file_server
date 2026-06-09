@@ -203,61 +203,16 @@ public class DepartmentRepository : IDepartmentRepository
 
     public async Task<List<Group>> GetGroupsAsync(Guid departmentId)
     {
-        return await _db.DepartmentGroups
-            .Where(dg => dg.DepartmentId == departmentId)
-            .Join(_db.Groups, dg => dg.GroupId, g => g.Id, (_, g) => g)
-            .OrderBy(g => g.Name)
+        return await _db.Groups
+            .Where(group => group.DepartmentId == departmentId)
+            .OrderBy(group => group.Name)
             .ToListAsync();
-    }
-
-    public async Task<List<Department>> GetDepartmentsForGroupAsync(Guid groupId)
-    {
-        return await _db.DepartmentGroups
-            .Where(dg => dg.GroupId == groupId)
-            .Join(_db.Departments, dg => dg.DepartmentId, d => d.Id, (_, d) => d)
-            .OrderBy(d => d.Name)
-            .ToListAsync();
-    }
-
-    public async Task AddGroupAsync(Guid departmentId, Guid groupId)
-    {
-        var exists = await _db.DepartmentGroups.AnyAsync(
-            dg => dg.DepartmentId == departmentId && dg.GroupId == groupId);
-        if (!exists)
-        {
-            _db.DepartmentGroups.Add(new DepartmentGroup(departmentId, groupId));
-            await _db.SaveChangesAsync();
-        }
-    }
-
-    public async Task RemoveGroupAsync(Guid departmentId, Guid groupId)
-    {
-        var entry = await _db.DepartmentGroups.FirstOrDefaultAsync(
-            dg => dg.DepartmentId == departmentId && dg.GroupId == groupId);
-        if (entry != null)
-        {
-            _db.DepartmentGroups.Remove(entry);
-            await _db.SaveChangesAsync();
-        }
     }
 
     public async Task<bool> IsGroupInDepartmentAsync(Guid groupId, Guid departmentId)
     {
-        return await _db.DepartmentGroups.AnyAsync(
-            dg => dg.GroupId == groupId && dg.DepartmentId == departmentId);
-    }
-
-    /// <inheritdoc />
-    public async Task<bool> IsGroupInDepartmentOrDescendantAsync(Guid groupId, Guid departmentId)
-    {
-        if (await IsGroupInDepartmentAsync(groupId, departmentId))
-            return true;
-
-        var descendantIds = await GetDescendantIdsAsync(departmentId);
-        if (descendantIds.Count == 0) return false;
-
-        return await _db.DepartmentGroups.AnyAsync(
-            dg => dg.GroupId == groupId && descendantIds.Contains(dg.DepartmentId));
+        return await _db.Groups.AnyAsync(
+            group => group.Id == groupId && group.DepartmentId == departmentId);
     }
 
     // ══════════════════════════════════════════
@@ -266,60 +221,15 @@ public class DepartmentRepository : IDepartmentRepository
 
     public async Task<List<ShareDefinition>> GetSharesAsync(Guid departmentId)
     {
-        return await _db.DepartmentShares
-            .Where(ds => ds.DepartmentId == departmentId)
-            .Join(_db.ShareDefinitions, ds => ds.ShareId, s => s.Id, (_, s) => s)
-            .OrderBy(s => s.Name)
+        return await _db.ShareDefinitions
+            .Where(share => share.DepartmentId == departmentId)
+            .OrderBy(share => share.Name)
             .ToListAsync();
-    }
-
-    public async Task<List<Department>> GetDepartmentsForShareAsync(Guid shareId)
-    {
-        return await _db.DepartmentShares
-            .Where(ds => ds.ShareId == shareId)
-            .Join(_db.Departments, ds => ds.DepartmentId, d => d.Id, (_, d) => d)
-            .OrderBy(d => d.Name)
-            .ToListAsync();
-    }
-
-    public async Task AddShareAsync(Guid departmentId, Guid shareId)
-    {
-        var exists = await _db.DepartmentShares.AnyAsync(
-            ds => ds.DepartmentId == departmentId && ds.ShareId == shareId);
-        if (!exists)
-        {
-            _db.DepartmentShares.Add(new DepartmentShare(departmentId, shareId));
-            await _db.SaveChangesAsync();
-        }
-    }
-
-    public async Task RemoveShareAsync(Guid departmentId, Guid shareId)
-    {
-        var entry = await _db.DepartmentShares.FirstOrDefaultAsync(
-            ds => ds.DepartmentId == departmentId && ds.ShareId == shareId);
-        if (entry != null)
-        {
-            _db.DepartmentShares.Remove(entry);
-            await _db.SaveChangesAsync();
-        }
     }
 
     public async Task<bool> IsShareInDepartmentAsync(Guid shareId, Guid departmentId)
     {
-        return await _db.DepartmentShares.AnyAsync(
-            ds => ds.ShareId == shareId && ds.DepartmentId == departmentId);
-    }
-
-    /// <inheritdoc />
-    public async Task<bool> IsShareInDepartmentOrDescendantAsync(Guid shareId, Guid departmentId)
-    {
-        if (await IsShareInDepartmentAsync(shareId, departmentId))
-            return true;
-
-        var descendantIds = await GetDescendantIdsAsync(departmentId);
-        if (descendantIds.Count == 0) return false;
-
-        return await _db.DepartmentShares.AnyAsync(
-            ds => ds.ShareId == shareId && descendantIds.Contains(ds.DepartmentId));
+        return await _db.ShareDefinitions.AnyAsync(
+            share => share.Id == shareId && share.DepartmentId == departmentId);
     }
 }

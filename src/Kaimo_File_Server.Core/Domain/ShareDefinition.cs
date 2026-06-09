@@ -1,4 +1,5 @@
 ﻿using System;
+using Kaimo_File_Server.Core.Helpers;
 
 namespace Kaimo_File_Server.Core.Domain
 {
@@ -8,6 +9,9 @@ namespace Kaimo_File_Server.Core.Domain
     /// The <see cref="Name"/> serves as both the directory name on disk
     /// and the share name advertised to clients. <see cref="Path"/>
     /// points to the physical storage location on the host file system.
+    ///
+    /// Each share belongs to exactly ONE department via <see cref="DepartmentId"/>.
+    /// Shares without explicit assignment default to the Global department.
     ///
     /// Shares can be temporarily disabled (<see cref="IsEnabled"/> = false)
     /// without deleting their configuration, and optionally maintain a
@@ -31,6 +35,15 @@ namespace Kaimo_File_Server.Core.Domain
         public string Path { get; set; } = string.Empty;
 
         /// <summary>
+        /// The department this share belongs to.
+        /// Determines which department-scoped administrators can manage this share
+        /// and which department default file permissions apply.
+        /// Defaults to <see cref="WellKnownDepartments.GlobalId"/> (Global department).
+        /// A share always belongs to exactly one department.
+        /// </summary>
+        public Guid DepartmentId { get; set; } = WellKnownDepartments.GlobalId;
+
+        /// <summary>
         /// When <c>false</c>, the share is hidden from directory listings
         /// and all access attempts are rejected.
         /// </summary>
@@ -48,12 +61,21 @@ namespace Kaimo_File_Server.Core.Domain
 
         /// <param name="name">Share / directory name — must not be blank.</param>
         /// <param name="path">Absolute host path — must not be blank.</param>
+        /// <param name="departmentId">
+        /// Department this share belongs to.
+        /// Pass <c>null</c> or omit to default to the Global department.
+        /// </param>
         /// <param name="isEnabled">Whether the share is active on creation.</param>
         /// <param name="isRecycleEnabled">Whether the recycle bin is active.</param>
         /// <exception cref="ArgumentException">
         /// Thrown when <paramref name="name"/> or <paramref name="path"/> is blank.
         /// </exception>
-        public ShareDefinition(string name, string path, bool isEnabled = true, bool isRecycleEnabled = false)
+        public ShareDefinition(
+            string name,
+            string path,
+            Guid? departmentId = null,
+            bool isEnabled = true,
+            bool isRecycleEnabled = false)
         {
             Id = Guid.NewGuid();
 
@@ -65,6 +87,7 @@ namespace Kaimo_File_Server.Core.Domain
                 ? path
                 : throw new ArgumentException("Path must not be empty.", nameof(path));
 
+            DepartmentId = departmentId ?? WellKnownDepartments.GlobalId;
             IsEnabled = isEnabled;
             IsRecycleEnabled = isRecycleEnabled;
         }

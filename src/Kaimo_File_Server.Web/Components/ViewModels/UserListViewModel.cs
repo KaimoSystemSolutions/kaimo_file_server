@@ -1,6 +1,7 @@
 ﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
@@ -880,10 +881,19 @@ public class UserListViewModel
             var currentShareIds = currentShares.Select(s => s.Id).ToHashSet();
 
             foreach (var shareId in desiredShareIds.Except(currentShareIds))
-                await _departmentRepo.AddShareAsync(SelectedDepartment.Id, shareId);
-            foreach (var shareId in currentShareIds.Except(desiredShareIds))
-                await _departmentRepo.RemoveShareAsync(SelectedDepartment.Id, shareId);
+            {
+                var share = await _shareRepo.GetByIdAsync(shareId);
+                share.DepartmentId = SelectedDepartment.Id;
+                await _shareRepo.UpdateAsync(share); 
+            }
 
+            foreach (var shareId in currentShareIds.Except(desiredShareIds))
+            {
+                var share = await _shareRepo.GetByIdAsync(shareId);
+                share.DepartmentId = WellKnownDepartments.GlobalId;
+                await _shareRepo.UpdateAsync(share);
+            }
+            
             // Refresh
             DepartmentMembers = (await _departmentRepo.GetUsersAsync(SelectedDepartment.Id))
                 .OrderBy(u => u.Name).ToList();
@@ -1371,15 +1381,9 @@ public class UserListViewModel
         var authorizedDeptIds = AuthorizedDepartmentsForView.Select(d => d.Id).ToHashSet();
         if (authorizedDeptIds.Count == 0) { Groups = allGroups; return; }
 
-        var filtered = new List<Group>();
-        foreach (var group in allGroups)
-        {
-            var groupDepts = await _departmentRepo.GetDepartmentsForGroupAsync(group.Id);
-            if (groupDepts.Count == 0 || groupDepts.Any(d => authorizedDeptIds.Contains(d.Id)))
-                filtered.Add(group);
-        }
-
-        Groups = filtered;
+        Groups = allGroups
+            .Where(g => authorizedDeptIds.Contains(g.DepartmentId))
+            .ToList();
     }
 
     private async Task LoadFilteredDepartmentsAsync()

@@ -6,10 +6,10 @@ namespace Kaimo_File_Server.Core.Services;
 /// Resolves effective default file permissions for departments
 /// by walking the hierarchy chain (OOP-style inheritance).
 ///
-/// Key simplification: A share is assigned to at most ONE department.
+/// Key design: A share belongs to exactly ONE department (via direct FK).
 /// Permission logic:
-///   1. Find the share's department (0 or 1)
-///   2. Check if the user/group is a direct member of that department
+///   1. Load the share → read ShareDefinition.DepartmentId
+///   2. Check if the user/group belongs to that department
 ///   3. If yes → resolve the department's effective default permission
 ///      (which may be inherited from a parent department)
 ///   4. If no match → 0 (no department-based access)
@@ -22,7 +22,7 @@ namespace Kaimo_File_Server.Core.Services;
 ///   Department "Engineering" (DefaultFilePermission = Read|Write)
 ///     └── Department "Backend" (DefaultFilePermission = null → inherits Read|Write)
 ///
-///   Share "Docs" → assigned to "Engineering"
+///   Share "Docs" → DepartmentId = Engineering
 ///   User "Alice" → member of "Engineering" → gets Read|Write on "Docs"
 ///   User "Bob"   → member of "Backend"     → gets nothing on "Docs"
 ///                   (Bob is NOT a direct member of Engineering)
@@ -30,10 +30,17 @@ namespace Kaimo_File_Server.Core.Services;
 public class DepartmentPermissionService : IDepartmentPermissionService
 {
     private readonly IDepartmentRepository _departmentRepo;
+    private readonly IShareRepository _shareRepo;
+    private readonly IGroupRepository _groupRepo;
 
-    public DepartmentPermissionService(IDepartmentRepository departmentRepo)
+    public DepartmentPermissionService(
+        IDepartmentRepository departmentRepo,
+        IShareRepository shareRepo,
+        IGroupRepository groupRepo)
     {
         _departmentRepo = departmentRepo;
+        _shareRepo = shareRepo;
+        _groupRepo = groupRepo;
     }
 
     /// <inheritdoc />
@@ -95,35 +102,35 @@ public class DepartmentPermissionService : IDepartmentPermissionService
     public async Task<long> GetEffectiveDefaultPermissionForUserOnShareAsync(
         Guid userId, Guid shareId)
     {
-        // 1. Find the share's department (max 1)
-        var shareDepts = await _departmentRepo.GetDepartmentsForShareAsync(shareId);
-        var shareDept = shareDepts.FirstOrDefault();
-        if (shareDept == null) return 0; // Share not assigned to any department
+        // 1. Load the share → read its DepartmentId (direct FK)
+        var share = await _shareRepo.GetByIdAsync(shareId);
+        if (share == null) return 0;
 
         // 2. Check if user is a direct member of that department
-        var userDepts = await _departmentRepo.GetDepartmentsForUserAsync(userId);
-        if (!userDepts.Any(d => d.Id == shareDept.Id))
-            return 0; // User is not in the share's department
+        if (!await _departmentRepo.IsUserInDepartmentAsync(userId, share.DepartmentId))
+            return 0;
 
         // 3. Resolve effective default (with hierarchy inheritance for the VALUE)
-        return await GetEffectiveDefaultPermissionAsync(shareDept.Id);
+        return await GetEffectiveDefaultPermissionAsync(share.DepartmentId);
     }
 
     /// <inheritdoc />
     public async Task<long> GetEffectiveDefaultPermissionForGroupOnShareAsync(
         Guid groupId, Guid shareId)
     {
-        // 1. Find the share's department (max 1)
-        var shareDepts = await _departmentRepo.GetDepartmentsForShareAsync(shareId);
-        var shareDept = shareDepts.FirstOrDefault();
-        if (shareDept == null) return 0;
+        // 1. Load the share → read its DepartmentId (direct FK)
+        var share = await _shareRepo.GetByIdAsync(shareId);
+        if (share == null) return 0;
 
-        // 2. Check if group is a direct member of that department
-        var groupDepts = await _departmentRepo.GetDepartmentsForGroupAsync(groupId);
-        if (!groupDepts.Any(d => d.Id == shareDept.Id))
+        // 2. Load the group → read its DepartmentId (direct FK)
+        var group = await _groupRepo.GetByIdAsync(groupId);
+        if (group == null) return 0;
+
+        // 3. Check if group belongs to the same department as the share
+        if (group.DepartmentId != share.DepartmentId)
             return 0;
 
-        // 3. Resolve effective default
-        return await GetEffectiveDefaultPermissionAsync(shareDept.Id);
+        // 4. Resolve effective default
+        return await GetEffectiveDefaultPermissionAsync(share.DepartmentId);
     }
 }

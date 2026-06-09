@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,12 +11,14 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
-        // ── Existing ──
+        // ── Identity ──
         public DbSet<User> Users { get; set; }
         public DbSet<Group> Groups { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<UserGroup> UserGroups { get; set; }
         public DbSet<UserRole> UserRoles { get; set; }
+
+        // ── Files & Shares ──
         public DbSet<FileMetadata> FileMetadata { get; set; }
         public DbSet<AccessEntry> AccessEntries { get; set; }
         public DbSet<ShareAccessEntry> ShareAccessEntries { get; set; }
@@ -25,15 +28,16 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         // ── Departments & Scoped Roles ──
         public DbSet<Department> Departments { get; set; }
         public DbSet<DepartmentUser> DepartmentUsers { get; set; }
-        public DbSet<DepartmentGroup> DepartmentGroups { get; set; }
-        public DbSet<DepartmentShare> DepartmentShares { get; set; }
         public DbSet<ScopedRoleAssignment> ScopedRoleAssignments { get; set; }
+
+        // NOTE: DepartmentGroup and DepartmentShare are REMOVED.
+        //       Group.DepartmentId and ShareDefinition.DepartmentId are direct FKs now.
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // ── Existing configurations (unchanged) ──
+            // ── Identity base (TPC) ──
 
             modelBuilder.Entity<Identity>().UseTpcMappingStrategy();
             modelBuilder.Entity<Identity>(entity =>
@@ -54,7 +58,17 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.CanChangePassword).IsRequired().HasDefaultValue(true);
             });
 
-            modelBuilder.Entity<Group>(entity => { entity.ToTable("groups"); });
+            modelBuilder.Entity<Group>(entity =>
+            {
+                entity.ToTable("groups");
+
+                // Direct FK to Department (required, default = Global)
+                entity.Property(e => e.DepartmentId)
+                    .IsRequired()
+                    .HasDefaultValue(WellKnownDepartments.GlobalId);
+
+                entity.HasIndex(e => e.DepartmentId);
+            });
 
             modelBuilder.Entity<Role>(entity =>
             {
@@ -78,6 +92,8 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.ToTable("user_roles");
                 entity.HasKey(e => new { e.UserId, e.RoleId });
             });
+
+            // ── Files & Shares ──
 
             modelBuilder.Entity<FileMetadata>(entity =>
             {
@@ -122,6 +138,13 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.Path).IsRequired();
                 entity.Property(e => e.IsEnabled).IsRequired();
                 entity.Property(e => e.IsRecycleEnabled).IsRequired();
+
+                // Direct FK to Department (required, default = Global)
+                entity.Property(e => e.DepartmentId)
+                    .IsRequired()
+                    .HasDefaultValue(WellKnownDepartments.GlobalId);
+
+                entity.HasIndex(e => e.DepartmentId);
             });
 
             modelBuilder.Entity<FileVersion>(entity =>
@@ -138,9 +161,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(e => new { e.FilePath, e.ContentHash });
             });
 
-            // ══════════════════════════════════════════════════
-            // Department & Scoped Role Assignment tables
-            // ══════════════════════════════════════════════════
+            // ── Departments ──
 
             modelBuilder.Entity<Department>(entity =>
             {
@@ -151,14 +172,10 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.Description).HasMaxLength(500);
                 entity.Property(e => e.ParentDepartmentId);
 
-                // NEW: Default file permission for department members on department shares.
-                // Nullable — null means "inherit from parent department".
-                // Stored as long? mapping to FilePermission flags.
                 entity.Property(e => e.DefaultFilePermission)
                     .HasColumnName("default_file_permission")
                     .IsRequired(false);
 
-                // Index for hierarchy traversal
                 entity.HasIndex(e => e.ParentDepartmentId);
             });
 
@@ -166,26 +183,10 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
             {
                 entity.ToTable("department_users");
                 entity.HasKey(e => new { e.DepartmentId, e.UserId });
-
-                // Index for "which departments does user X belong to?"
                 entity.HasIndex(e => e.UserId);
             });
 
-            modelBuilder.Entity<DepartmentGroup>(entity =>
-            {
-                entity.ToTable("department_groups");
-                entity.HasKey(e => new { e.DepartmentId, e.GroupId });
-
-                entity.HasIndex(e => e.GroupId);
-            });
-
-            modelBuilder.Entity<DepartmentShare>(entity =>
-            {
-                entity.ToTable("department_shares");
-                entity.HasKey(e => new { e.DepartmentId, e.ShareId });
-
-                entity.HasIndex(e => e.ShareId);
-            });
+            // ── Scoped Role Assignments ──
 
             modelBuilder.Entity<ScopedRoleAssignment>(entity =>
             {
@@ -199,8 +200,6 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
 
                 entity.HasIndex(e => e.PrincipalId);
                 entity.HasIndex(e => new { e.ScopeType, e.ScopeId });
-
-                // NEW: Index for "all assignments for this role"
                 entity.HasIndex(e => e.RoleId);
             });
         }

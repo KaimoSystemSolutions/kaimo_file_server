@@ -7,7 +7,6 @@ using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Formats.Tar;
-using System.IO.Compression;
 
 namespace Kaimo_File_Server.Infrastructure.Storage;
 

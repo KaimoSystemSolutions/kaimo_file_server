@@ -1,5 +1,4 @@
-﻿using Kaimo_File_Server.Core.Domain;
-using Kaimo_File_Server.Core.Domain.Identity;
+﻿using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 
@@ -12,37 +11,34 @@ namespace Kaimo_File_Server.Core.Services;
 ///
 ///   1. DIRECT role assignments (User → Role, via user_roles table)
 ///      → Treated as GLOBAL scope automatically.
-///      → This is how system roles (Administrator, UserManager, ShareManager) work.
-///      → Also works for custom roles assigned directly to a user.
 ///
 ///   2. SCOPED role assignments (ScopedRoleAssignment table)
 ///      → Explicitly scoped to Global, Department, or Share.
-///      → This is how delegated administration works.
-///      → Example: "Abteilungsleiter" role scoped to Department "Engineering"
-///        → Can only manage users/groups within Engineering.
 ///
-/// The merge happens in GetEffectiveAssignmentsAsync():
-///   - Direct roles become synthetic Global-scoped assignments
-///   - Scoped assignments come from the database
-///   - Both are evaluated identically in every permission check
-///
-/// This eliminates all hardcoded IsInRole("Administrator") checks.
-/// System roles are just roles with IsSystemRole=true and fixed ManagementPermission flags.
+/// Group and Share now carry a direct DepartmentId FK,
+/// so scope checks load the entity and compare DepartmentId
+/// against the scoped department (+ its descendants).
 /// </summary>
 public class ManagementAuthService : IManagementAuthService
 {
     private readonly IScopedRoleAssignmentRepository _assignmentRepo;
     private readonly IDepartmentRepository _departmentRepo;
     private readonly IRoleRepository _roleRepo;
+    private readonly IGroupRepository _groupRepo;
+    private readonly IShareRepository _shareRepo;
 
     public ManagementAuthService(
         IScopedRoleAssignmentRepository assignmentRepo,
         IDepartmentRepository departmentRepo,
-        IRoleRepository roleRepo)
+        IRoleRepository roleRepo,
+        IGroupRepository groupRepo,
+        IShareRepository shareRepo)
     {
         _assignmentRepo = assignmentRepo;
         _departmentRepo = departmentRepo;
         _roleRepo = roleRepo;
+        _groupRepo = groupRepo;
+        _shareRepo = shareRepo;
     }
 
     // ── User Management ──
@@ -63,6 +59,7 @@ public class ManagementAuthService : IManagementAuthService
                     return true;
 
                 case ScopeType.Department:
+                    // User ↔ Department is still M:N, so the repo method remains
                     if (await _departmentRepo.IsUserInDepartmentOrDescendantAsync(
                             targetUserId, assignment.ScopeId))
                         return true;
@@ -107,6 +104,10 @@ public class ManagementAuthService : IManagementAuthService
     {
         var assignments = await GetEffectiveAssignmentsAsync(actor);
 
+        // Load group once to read its DepartmentId (direct FK)
+        var group = await _groupRepo.GetByIdAsync(groupId);
+        if (group == null) return false;
+
         foreach (var (assignment, role) in assignments)
         {
             if (!HasPermission(role, required))
@@ -118,8 +119,7 @@ public class ManagementAuthService : IManagementAuthService
                     return true;
 
                 case ScopeType.Department:
-                    if (await _departmentRepo.IsGroupInDepartmentOrDescendantAsync(
-                            groupId, assignment.ScopeId))
+                    if (await IsDepartmentInScopeAsync(group.DepartmentId, assignment.ScopeId))
                         return true;
                     break;
             }
@@ -135,6 +135,10 @@ public class ManagementAuthService : IManagementAuthService
     {
         var assignments = await GetEffectiveAssignmentsAsync(actor);
 
+        // Load share once to read its DepartmentId (direct FK)
+        var share = await _shareRepo.GetByIdAsync(shareId);
+        if (share == null) return false;
+
         foreach (var (assignment, role) in assignments)
         {
             if (!HasPermission(role, required))
@@ -146,8 +150,7 @@ public class ManagementAuthService : IManagementAuthService
                     return true;
 
                 case ScopeType.Department:
-                    if (await _departmentRepo.IsShareInDepartmentOrDescendantAsync(
-                            shareId, assignment.ScopeId))
+                    if (await IsDepartmentInScopeAsync(share.DepartmentId, assignment.ScopeId))
                         return true;
                     break;
 
@@ -199,10 +202,6 @@ public class ManagementAuthService : IManagementAuthService
         return assignments.Any(a => HasPermission(a.Role, required));
     }
 
-    /// <summary>
-    /// Checks if the actor has unrestricted (global) access for the given permission.
-    /// Returns true only if the permission is granted at Global scope.
-    /// </summary>
     public async Task<bool> HasGlobalPermissionAsync(
         UserContext actor, ManagementPermission required)
     {
@@ -262,9 +261,11 @@ public class ManagementAuthService : IManagementAuthService
 
             if (assignment.ScopeType == ScopeType.Department)
             {
+                // Get shares directly belonging to this department
                 var shares = await _departmentRepo.GetSharesAsync(assignment.ScopeId);
                 foreach (var s in shares) result.Add(s.Id);
 
+                // And shares in descendant departments
                 var descendants = await _departmentRepo.GetDescendantIdsAsync(assignment.ScopeId);
                 foreach (var descId in descendants)
                 {
@@ -287,14 +288,28 @@ public class ManagementAuthService : IManagementAuthService
     }
 
     /// <summary>
+    /// Checks if <paramref name="entityDepartmentId"/> is the same as
+    /// <paramref name="scopeDepartmentId"/> or one of its descendants.
+    ///
+    /// Used for Group and Share scope checks: both now carry a direct
+    /// DepartmentId FK, so instead of the old M:N lookup we just compare
+    /// the entity's department against the scope hierarchy.
+    /// </summary>
+    private async Task<bool> IsDepartmentInScopeAsync(
+        Guid entityDepartmentId, Guid scopeDepartmentId)
+    {
+        if (entityDepartmentId == scopeDepartmentId)
+            return true;
+
+        var descendants = await _departmentRepo.GetDescendantIdsAsync(scopeDepartmentId);
+        return descendants.Contains(entityDepartmentId);
+    }
+
+    /// <summary>
     /// Collects ALL effective assignments from two sources:
     ///
     /// 1. DIRECT role assignments (actor.Roles) → synthetic Global-scoped entries.
-    ///    This is how system roles (Administrator, ShareManager, etc.) and
-    ///    directly assigned custom roles contribute permissions.
-    ///
     /// 2. SCOPED role assignments (ScopedRoleAssignment table) → from DB.
-    ///    These carry explicit scope (Global / Department / Share).
     ///
     /// Both are returned in the same format so all permission checks
     /// evaluate them identically.
@@ -310,8 +325,6 @@ public class ManagementAuthService : IManagementAuthService
             if (role.ManagementPermissions == ManagementPermission.None)
                 continue;
 
-            // Create a synthetic Global-scoped assignment
-            // so the permission checks treat it identically
             var synthetic = new ScopedRoleAssignment(
                 actor.User.Id, role.Id, ScopeType.Global, Guid.Empty);
 
@@ -325,8 +338,6 @@ public class ManagementAuthService : IManagementAuthService
 
         foreach (var assignment in assignments)
         {
-            // Skip if we already have this role as Global (from direct assignment)
-            // to avoid double-counting
             if (result.Any(r =>
                 r.Item1.RoleId == assignment.RoleId &&
                 r.Item1.ScopeType == ScopeType.Global))

@@ -40,7 +40,7 @@ namespace Kaimo_File_Server.Core.Repositories
         /// </summary>
         Task<List<Department>> GetDescendantsAsync(Guid departmentId);
 
-        // ── User ↔ Department ──
+        // ── User ↔ Department (M:N — stays) ──
         Task<List<User>> GetUsersAsync(Guid departmentId);
         Task<List<Department>> GetDepartmentsForUserAsync(Guid userId);
         Task AddUserAsync(Guid departmentId, Guid userId);
@@ -53,28 +53,24 @@ namespace Kaimo_File_Server.Core.Repositories
         /// </summary>
         Task<bool> IsUserInDepartmentOrDescendantAsync(Guid userId, Guid departmentId);
 
-        // ── Group ↔ Department ──
+        // ── Group → Department (direct FK on Group) ──
+
+        /// <summary>
+        /// Returns all groups that belong to the given department
+        /// (via Group.DepartmentId).
+        /// </summary>
         Task<List<Group>> GetGroupsAsync(Guid departmentId);
-        Task<List<Department>> GetDepartmentsForGroupAsync(Guid groupId);
-        Task AddGroupAsync(Guid departmentId, Guid groupId);
-        Task RemoveGroupAsync(Guid departmentId, Guid groupId);
-        Task<bool> IsGroupInDepartmentAsync(Guid groupId, Guid departmentId);
 
         /// <summary>
-        /// Checks if a group is in the given department OR any of its descendants.
+        /// Returns all shares that belong to the given department
+        /// (via ShareDefinition.DepartmentId).
         /// </summary>
-        Task<bool> IsGroupInDepartmentOrDescendantAsync(Guid groupId, Guid departmentId);
-
-        // ── Share ↔ Department ──
         Task<List<ShareDefinition>> GetSharesAsync(Guid departmentId);
-        Task<List<Department>> GetDepartmentsForShareAsync(Guid shareId);
-        Task AddShareAsync(Guid departmentId, Guid shareId);
-        Task RemoveShareAsync(Guid departmentId, Guid shareId);
-        Task<bool> IsShareInDepartmentAsync(Guid shareId, Guid departmentId);
 
         /// <summary>
-        /// Checks if a share is in the given department OR any of its descendants.
+        /// Checks if a share belongs to the given department
+        /// (via ShareDefinition.DepartmentId).
         /// </summary>
-        Task<bool> IsShareInDepartmentOrDescendantAsync(Guid shareId, Guid departmentId);
+        Task<bool> IsShareInDepartmentAsync(Guid shareId, Guid departmentId);
     }
 }
