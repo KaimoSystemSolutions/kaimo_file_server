@@ -1,28 +1,36 @@
-function initFileUpload(element, dotNetRef) {
+function initFileUpload(elementSelector, dotNetRef) {
 
-    element.addEventListener('dragenter', e => {
-        e.preventDefault();
-        element.classList.add('file-dragged-over');
-    });
-
-    element.addEventListener('dragover', e => {
-        e.preventDefault();
-    });
-
-    element.addEventListener('dragleave', e => {
-        e.preventDefault();
-
-        if (!element.contains(e.relatedTarget)) {
-            element.classList.remove('file-dragged-over');
+    document.addEventListener('dragenter', e => {
+        const el = document.querySelector(elementSelector);
+        if (el?.contains(e.target)) {
+            e.preventDefault();
+            el.classList.add('file-dragged-over');
         }
     });
 
-    element.addEventListener('drop', async e => {
-        e.preventDefault();
-        element.classList.remove('file-dragged-over');
+    document.addEventListener('dragover', e => {
+        const el = document.querySelector(elementSelector);
+        if (el?.contains(e.target)) {
+            e.preventDefault();
+            el.classList.add('file-dragged-over');
+        }
+    });
 
-        const input = document.getElementById('global-file-input');
-        input.files = e.dataTransfer.files;
-        input.dispatchEvent(new Event('change', { bubbles: true }));
+    document.addEventListener('dragleave', e => {
+        const el = document.querySelector(elementSelector);
+        if (el && !el.contains(e.relatedTarget)) {
+            el.classList.remove('file-dragged-over');
+        }
+    });
+
+    document.addEventListener('drop', async e => {
+        const el = document.querySelector(elementSelector);
+        if (el?.contains(e.target)) {
+            e.preventDefault();
+            el.classList.remove('file-dragged-over');
+            const input = document.getElementById('global-file-input');
+            input.files = e.dataTransfer.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
     });
 }

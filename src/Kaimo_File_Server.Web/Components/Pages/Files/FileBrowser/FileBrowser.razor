@@ -1,6 +1,7 @@
 @using System.Collections
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Pages.Acl
+@using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser.components
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Kaimo_File_Server.Web.Helpers
 
@@ -183,8 +184,12 @@ else
        Resizable Column Table – 5 Spalten (ohne Actions)
        Name-Spalte (1fr) nimmt den Rest.
        ══════════════════════════════════════════════════ *@
-    <div class="file-table-wrap" @ref="_fileDropZone" @onkeydown="OnKeyDownItemList" tabindex="0"
-         style="grid-template-columns: @GridColumns">
+    <div class="file-table-wrap" id="file-drop-zone" @ref="_fileDropZone" @onkeydown="OnKeyDownItemList" tabindex="0"
+         style="grid-template-columns: @GridColumns"
+         @oncontextmenu="(e) => _contextMenuComponent.OnItemContextMenu(e)"
+         @oncontextmenu:preventDefault="true"
+         @oncontextmenu:stopPropagation="true"
+         >
 
         @* -- Header (sortierbar) -- *@
         <div class="file-grid-header">
@@ -844,7 +849,7 @@ else
         {
             _jsInitialized = true;
             _dotNetRef = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("initFileUpload", _fileDropZone, _dotNetRef);
+            await JS.InvokeVoidAsync("initFileUpload", "#file-drop-zone", _dotNetRef);
         }
     }
 
