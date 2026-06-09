@@ -1,0 +1,498 @@
+﻿@page "/departments"
+@using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Domain.Department
+@using Kaimo_File_Server.Core.Domain.Identity
+@using Kaimo_File_Server.Core.Security
+@using Kaimo_File_Server.Core.Helpers
+@using Kaimo_File_Server.Web.Components.ViewModels
+@inject DepartmentViewModel VM
+
+<PageTitle>Kaimo Files – Abteilungen</PageTitle>
+
+@if (VM.IsLoading)
+{
+    <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Lade...</p>
+    </div>
+}
+else if (!VM.CanAccessPage)
+{
+    <div class="page-header"><div><h1>Abteilungen</h1></div></div>
+    <div class="error-banner">Keine Berechtigung für die Abteilungsverwaltung.</div>
+}
+else
+{
+    <div class="page-header">
+        <div>
+            <h1>Abteilungen</h1>
+            <p class="subtitle">@VM.Departments.Count Abteilungen</p>
+        </div>
+        @if (VM.CanEdit)
+        {
+            <button class="btn-icon" title="Abteilung erstellen" @onclick="() => VM.StartCreate()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+            </button>
+        }
+    </div>
+
+    @* ── Create Form ── *@
+    @if (VM.IsCreating)
+    {
+        <div class="create-form-card">
+            <h3>Neue Abteilung erstellen</h3>
+            <div class="create-form-fields">
+                <div class="form-group">
+                    <label>Abteilungsname</label>
+                    <input type="text" class="edit-input" placeholder="z.B. Vertrieb"
+                           @bind="VM.CreateName" @bind:event="oninput"
+                           @onkeydown="HandleCreateKeyDown" />
+                </div>
+                <div class="form-group">
+                    <label>Beschreibung</label>
+                    <input type="text" class="edit-input" placeholder="Optional"
+                           @bind="VM.CreateDescription" @bind:event="oninput" />
+                </div>
+                <div class="form-group">
+                    <label>Elternabteilung</label>
+                    <select class="edit-input" @bind="CreateParentIdString">
+                        <option value="">— Keine (Oberste Ebene) —</option>
+                        @foreach (var dept in VM.Departments)
+                        {
+                            <option value="@dept.Id">@dept.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            @if (VM.ErrorMessage is not null)
+            {
+                <div class="error-banner" style="margin-top: 12px;">@VM.ErrorMessage</div>
+            }
+            <div class="create-form-actions">
+                <button class="btn-primary" @onclick="Create" disabled="@VM.IsSaving">
+                    @(VM.IsSaving ? "Erstellt…" : "Erstellen")
+                </button>
+                <button class="btn-secondary" @onclick="() => VM.CancelCreate()">Abbrechen</button>
+            </div>
+        </div>
+    }
+
+    @if (VM.ErrorMessage is not null && !VM.IsEditing && !VM.IsCreating)
+    {
+        <div class="error-banner">@VM.ErrorMessage</div>
+    }
+
+    <div class="admin-content">
+
+        @* ════════════ LIST ════════════ *@
+        <div class="admin-list">
+            @if (!VM.Departments.Any())
+            {
+                <div class="empty-state"><p>Keine Abteilungen vorhanden.</p></div>
+            }
+            else
+            {
+                <div class="file-list">
+                    <div class="file-row admin-row-header">
+                        <div class="file-cell user-name">Name</div>
+                        <div class="file-cell user-size">Elternabteilung</div>
+                    </div>
+                    @foreach (var dept in VM.Departments)
+                    {
+                        var isSelected = VM.Selected?.Id == dept.Id;
+                        var isGlobal = VM.IsGlobalDepartment(dept);
+                        <div class="file-row admin-row-selectable @(isSelected ? "admin-row-selected" : "")"
+                             @onclick="() => Select(dept)">
+                            <div class="file-cell user-name">
+                                <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
+                                     fill="none" stroke="@(isSelected ? "var(--accent)" : "var(--text-tertiary)")" stroke-width="1.5">
+                                    @if (isGlobal)
+                                    {
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="2" y1="12" x2="22" y2="12" />
+                                        <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
+                                    }
+                                    else
+                                    {
+                                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                        <polyline points="9 22 9 12 15 12 15 22" />
+                                    }
+                                </svg>
+                                <span>@dept.Name</span>
+                            </div>
+                            <div class="file-cell user-size" style="color: var(--text-tertiary); font-size: 12px;">
+                                @VM.GetParentName(dept.ParentDepartmentId)
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        @* ════════════ DETAIL ════════════ *@
+        @if (VM.Selected is not null)
+        {
+            <div class="admin-detail">
+
+                @if (VM.SuccessMessage is not null)
+                {
+                    <div class="success-banner">@VM.SuccessMessage</div>
+                }
+
+                @if (VM.IsEditing)
+                {
+                    @* ──────── EDIT MODE ──────── *@
+                    <div class="detail-header">
+                        <h3>Abteilung bearbeiten</h3>
+                        <span class="detail-subtitle">@VM.Selected.Name</span>
+                    </div>
+
+                    <div class="detail-field-grid">
+                        <div class="form-group">
+                            <label>Name</label>
+                            <input type="text" class="edit-input" @bind="VM.EditName" />
+                        </div>
+                        <div class="form-group">
+                            <label>Beschreibung</label>
+                            <input type="text" class="edit-input" placeholder="Optional"
+                                   @bind="VM.EditDescription" @bind:event="oninput" />
+                        </div>
+                        <div class="form-group">
+                            <label>Erbt von (Elternabteilung)</label>
+                            <select class="edit-input" @bind="EditParentIdString">
+                                <option value="">— Keine (Oberste Ebene) —</option>
+                                @foreach (var dept in VM.AvailableParents)
+                                {
+                                    <option value="@dept.Id">@dept.Name</option>
+                                }
+                            </select>
+                            <span class="form-hint">Erbt Admin-Rechte und Default-Berechtigungen von der Elternabteilung.</span>
+                        </div>
+                    </div>
+
+                    @* ── Default File Permission ── *@
+                    <div class="detail-section" style="margin-top: 16px;">
+                        <span class="detail-label">Standard-Dateiberechtigung</span>
+                        <p class="form-hint" style="margin-bottom: 8px;">
+                            Wird als virtueller Allow-Layer im ACL-System ausgewertet.
+                            Alle Abteilungsmitglieder erhalten diese Rechte auf den zugeordneten Freigaben.
+                        </p>
+                        <div class="toggle-row" style="margin-bottom: 12px;">
+                            <span class="toggle-label-text">Eigene Berechtigung definieren</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" @bind="VM.EditHasOwnPermission" />
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        @if (VM.EditHasOwnPermission)
+                        {
+                            <div class="permission-flags" style="margin-left: 4px;">
+                                @foreach (var flag in DepartmentViewModel.PermFlags)
+                                {
+                                    var isChecked = VM.HasPermFlag(flag.Flag);
+                                    <label class="permission-flag" title="@flag.Description">
+                                        <input type="checkbox" checked="@isChecked"
+                                               @onchange="e => VM.TogglePermFlag(flag.Flag, (bool)(e.Value ?? false))" />
+                                        <span>@flag.Label</span>
+                                    </label>
+                                }
+                            </div>
+                        }
+                        else if (VM.EditParentId.HasValue)
+                        {
+                            <span class="detail-field-value detail-field-value--empty">Wird von Elternabteilung geerbt.</span>
+                        }
+                        else
+                        {
+                            <span class="detail-field-value detail-field-value--empty">Keine Elternabteilung — keine Default-Berechtigung.</span>
+                        }
+                    </div>
+
+                    @* ── Members (M:N) ── *@
+                    <div class="detail-section" style="margin-top: 16px;">
+                        <span class="detail-label">Mitglieder (Benutzer)</span>
+                        <div class="multi-select @(membersOpen ? "open" : "")">
+                            <div class="multi-select-display" @onclick="() => membersOpen = !membersOpen">
+                                <span class="multi-select-text">
+                                    @Checked(VM.EditMembers.Where(m => m.IsChecked).Select(m => m.Item.Name), "Keine Mitglieder")
+                                </span>
+                                <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
+                                     fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 9l6 6 6-6" />
+                                </svg>
+                            </div>
+                            @if (membersOpen)
+                            {
+                                <div class="multi-select-backdrop" @onclick="() => membersOpen = false"></div>
+                                <div class="multi-select-dropdown">
+                                    @foreach (var item in VM.EditMembers)
+                                    {
+                                        <label class="multi-select-option">
+                                            <input type="checkbox" @bind="item.IsChecked" />
+                                            <span>@item.Item.Name</span>
+                                            <span class="multi-select-hint">@item.Item.Username</span>
+                                        </label>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    @* ── Groups (direct FK) ── *@
+                    <div class="detail-section" style="margin-top: 16px;">
+                        <span class="detail-label">Zugeordnete Gruppen</span>
+                        <p class="form-hint" style="margin-bottom: 4px;">
+                            Jede Gruppe gehört genau einer Abteilung. Abgewählte Gruppen werden auf Global zurückgesetzt.
+                        </p>
+                        <div class="multi-select @(groupsOpen ? "open" : "")">
+                            <div class="multi-select-display" @onclick="() => groupsOpen = !groupsOpen">
+                                <span class="multi-select-text">
+                                    @Checked(VM.EditGroups.Where(g => g.IsChecked).Select(g => g.Item.Name), "Keine Gruppen")
+                                </span>
+                                <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
+                                     fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 9l6 6 6-6" />
+                                </svg>
+                            </div>
+                            @if (groupsOpen)
+                            {
+                                <div class="multi-select-backdrop" @onclick="() => groupsOpen = false"></div>
+                                <div class="multi-select-dropdown">
+                                    @foreach (var item in VM.EditGroups)
+                                    {
+                                        var currentDept = VM.Departments.FirstOrDefault(d => d.Id == item.Item.DepartmentId);
+                                        <label class="multi-select-option">
+                                            <input type="checkbox" @bind="item.IsChecked" />
+                                            <span>@item.Item.Name</span>
+                                            <span class="multi-select-hint">@(currentDept?.Name ?? "Global")</span>
+                                        </label>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    @* ── Shares (direct FK) ── *@
+                    <div class="detail-section" style="margin-top: 16px;">
+                        <span class="detail-label">Zugeordnete Freigaben</span>
+                        <p class="form-hint" style="margin-bottom: 4px;">
+                            Jede Freigabe gehört genau einer Abteilung. Abgewählte Freigaben werden auf Global zurückgesetzt.
+                        </p>
+                        <div class="multi-select @(sharesOpen ? "open" : "")">
+                            <div class="multi-select-display" @onclick="() => sharesOpen = !sharesOpen">
+                                <span class="multi-select-text">
+                                    @Checked(VM.EditShares.Where(s => s.IsChecked).Select(s => s.Item.Name), "Keine Freigaben")
+                                </span>
+                                <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
+                                     fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 9l6 6 6-6" />
+                                </svg>
+                            </div>
+                            @if (sharesOpen)
+                            {
+                                <div class="multi-select-backdrop" @onclick="() => sharesOpen = false"></div>
+                                <div class="multi-select-dropdown">
+                                    @foreach (var item in VM.EditShares)
+                                    {
+                                        var currentDept = VM.Departments.FirstOrDefault(d => d.Id == item.Item.DepartmentId);
+                                        <label class="multi-select-option">
+                                            <input type="checkbox" @bind="item.IsChecked" />
+                                            <span>@item.Item.Name</span>
+                                            <span class="multi-select-hint">@item.Item.Path — @(currentDept?.Name ?? "Global")</span>
+                                        </label>
+                                    }
+                                    @if (!VM.EditShares.Any())
+                                    {
+                                        <span class="empty-hint">Keine Freigaben vorhanden</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    @if (VM.ErrorMessage is not null)
+                    {
+                        <div class="error-banner" style="margin: 12px 0;">@VM.ErrorMessage</div>
+                    }
+                    <div class="detail-actions">
+                        <button class="btn-primary" @onclick="Save" disabled="@VM.IsSaving">
+                            @(VM.IsSaving ? "Speichert…" : "Speichern")
+                        </button>
+                        <button class="btn-secondary" @onclick="CancelEdit" disabled="@VM.IsSaving">Abbrechen</button>
+                    </div>
+                }
+                else
+                {
+                    @* ──────── VIEW MODE ──────── *@
+                    <div class="detail-header">
+                        <h3>@VM.Selected.Name</h3>
+                        <span class="detail-subtitle">
+                            @(VM.IsGlobalDepartment(VM.Selected) ? "Globale Abteilung" : "Abteilung")
+                        </span>
+                    </div>
+
+                    <div class="detail-field-grid">
+                        @if (!string.IsNullOrWhiteSpace(VM.Selected.Description))
+                        {
+                            <div class="detail-field">
+                                <span class="detail-field-label">Beschreibung</span>
+                                <span class="detail-field-value">@VM.Selected.Description</span>
+                            </div>
+                        }
+                        <div class="detail-field">
+                            <span class="detail-field-label">Erbt von</span>
+                            @if (VM.Selected.ParentDepartmentId.HasValue)
+                            {
+                                <span class="detail-field-value">@VM.GetParentName(VM.Selected.ParentDepartmentId)</span>
+                            }
+                            else
+                            {
+                                <span class="detail-field-value detail-field-value--empty">Keine (Oberste Ebene)</span>
+                            }
+                        </div>
+                        <div class="detail-field">
+                            <span class="detail-field-label">Mitglieder (@VM.Members.Count)</span>
+                            <span class="detail-field-value">
+                                @(VM.Members.Any() ? Format(VM.Members.Select(u => u.Name), 8) : "Keine Mitglieder")
+                            </span>
+                        </div>
+                        <div class="detail-field">
+                            <span class="detail-field-label">Gruppen (@VM.Groups.Count)</span>
+                            <span class="detail-field-value">
+                                @(VM.Groups.Any() ? Format(VM.Groups.Select(g => g.Name), 5) : "Keine Gruppen zugeordnet")
+                            </span>
+                        </div>
+                        <div class="detail-field">
+                            <span class="detail-field-label">Freigaben (@VM.Shares.Count)</span>
+                            <span class="detail-field-value">
+                                @(VM.Shares.Any() ? Format(VM.Shares.Select(s => s.Name), 5) : "Keine Freigaben zugeordnet")
+                            </span>
+                        </div>
+
+                        @* ── Effective Permission ── *@
+                        <div class="detail-field">
+                            <span class="detail-field-label">Standard-Dateiberechtigung</span>
+                            <span class="detail-field-value">
+                                @if (VM.PermInfo is not null)
+                                {
+                                    @if (VM.PermInfo.HasNoDefault)
+                                    {
+                                        <span class="detail-field-value--empty">Keine Default-Berechtigung</span>
+                                    }
+                                    else
+                                    {
+                                        <div>
+                                            <div class="permission-tags">
+                                                @foreach (var flag in DepartmentViewModel.PermFlags)
+                                                {
+                                                    if ((VM.PermInfo.Permission & flag.Flag) == flag.Flag)
+                                                    {
+                                                        <span class="permission-tag">@flag.Label</span>
+                                                    }
+                                                }
+                                            </div>
+                                            @if (!VM.PermInfo.IsOwn && VM.PermInfo.InheritedFromName is not null)
+                                            {
+                                                <span class="inherited-hint">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                                                         stroke="var(--text-tertiary)" stroke-width="1.5"
+                                                         style="vertical-align: -1px; margin-right: 2px;">
+                                                        <path d="M9 18l6-6-6-6" />
+                                                    </svg>
+                                                    Geerbt von: @VM.PermInfo.InheritedFromName
+                                                </span>
+                                            }
+                                        </div>
+                                    }
+                                }
+                            </span>
+                        </div>
+
+                        <div class="detail-field">
+                            <span class="detail-field-label">ID</span>
+                            <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">@VM.Selected.Id</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-actions">
+                        @if (VM.CanEdit && !VM.IsGlobalDepartment(VM.Selected))
+                        {
+                            <button class="btn-secondary" @onclick="Edit">Bearbeiten</button>
+                        }
+                        @if (VM.CanDelete && !VM.IsGlobalDepartment(VM.Selected))
+                        {
+                            @if (VM.IsConfirmingDelete)
+                            {
+                                <div class="confirm-delete">
+                                    <p>Abteilung wirklich löschen? Gruppen und Freigaben werden auf Global zurückgesetzt.</p>
+                                    <div style="display: flex; gap: 8px;">
+                                        <button class="btn-danger-outline" @onclick="ConfirmDelete" disabled="@VM.IsSaving">
+                                            @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
+                                        </button>
+                                        <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">Abbrechen</button>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <button class="btn-danger-outline" @onclick="() => VM.RequestDelete()">Abteilung löschen</button>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool membersOpen, groupsOpen, sharesOpen;
+
+    private string CreateParentIdString
+    {
+        get => VM.CreateParentId?.ToString() ?? "";
+        set => VM.CreateParentId = Guid.TryParse(value, out var id) ? id : null;
+    }
+
+    private string EditParentIdString
+    {
+        get => VM.EditParentId?.ToString() ?? "";
+        set => VM.EditParentId = Guid.TryParse(value, out var id) ? id : (Guid?)null;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await VM.LoadAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task Select(Department dept) { CloseDropdowns(); await VM.SelectAsync(dept); StateHasChanged(); }
+    private async Task Edit() { CloseDropdowns(); await VM.StartEditAsync(); StateHasChanged(); }
+    private async Task Save() { CloseDropdowns(); await VM.SaveAsync(); StateHasChanged(); }
+    private async Task Create() { await VM.CreateAsync(); StateHasChanged(); }
+    private async Task ConfirmDelete() { await VM.ConfirmDeleteAsync(); StateHasChanged(); }
+    private void CancelEdit() { CloseDropdowns(); VM.CancelEdit(); StateHasChanged(); }
+    private async Task HandleCreateKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") await Create(); }
+    private void CloseDropdowns() { membersOpen = false; groupsOpen = false; sharesOpen = false; }
+
+    private static string Checked(IEnumerable<string> names, string fallback)
+    {
+        var list = names.ToList();
+        return list.Count > 0 ? string.Join(", ", list) : fallback;
+    }
+
+    private static string Format(IEnumerable<string> items, int max)
+    {
+        var list = items.ToList();
+        if (list.Count == 0) return "";
+        var visible = string.Join(", ", list.Take(max));
+        if (list.Count > max) visible += $" +{list.Count - max} weitere";
+        return visible;
+    }
+}

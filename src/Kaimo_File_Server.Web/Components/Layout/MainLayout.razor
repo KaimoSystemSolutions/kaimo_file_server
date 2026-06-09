@@ -5,7 +5,7 @@
 @inject JwtAuthenticationStateProvider AuthState
 @inject AuthenticationStateProvider AuthStateProvider
 @inject FileUploadCoordinator UploadCoordinator
-@inject AssetProvider Assets
+@inject AssetProvider Assets 
 
 <div class="app-shell" data-theme="@Theme.Current">
     <nav class="sidebar">
@@ -26,6 +26,10 @@
             <NavLink class="nav-item" href="/users" Match="NavLinkMatch.All">
                 @Assets.SVG("users.svg", new SvgOptions())
                 Benutzer
+            </NavLink>
+            <NavLink class="nav-item" href="/departments" Match="NavLinkMatch.All">
+                @Assets.SVG("users.svg", new SvgOptions())
+                Departments
             </NavLink>
             <NavLink class="nav-item" href="/files" Match="NavLinkMatch.All">
                 @Assets.SVG("compass.svg", new SvgOptions())
