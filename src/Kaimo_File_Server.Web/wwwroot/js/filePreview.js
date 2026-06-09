@@ -1,9 +1,9 @@
 window.filePreview = {
     showBlob: function (bytes, contentType) {
-        if (contentType === 'text/plain') {
+        if (contentType.includes("text")) {
             const text = new TextDecoder().decode(new Uint8Array(bytes));
             const html = `<html><body style="
-                background: #1a1a1a;
+                background: var(--bg-tertiary);
                 color: #e0e0e0;
                 font-family: monospace;
                 font-size: 14px;
