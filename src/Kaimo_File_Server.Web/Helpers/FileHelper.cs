@@ -88,9 +88,10 @@ public class FileHelper
         [".md"]   = "text/markdown",
         [".csv"]  = "text/csv",
         [".rtf"]  = "application/rtf",
-        [".json"] = "application/json",
-        [".xml"]  = "application/xml",
+        [".json"] = "text/json",
+        [".xml"]  = "text/xml",
         [".html"] = "text/html",
+        [".htm"] = "text/html",
         [".css"]  = "text/css",
         [".js"]   = "text/javascript",
 

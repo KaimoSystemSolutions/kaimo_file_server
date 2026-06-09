@@ -82,7 +82,9 @@ else
                     var isDisabled = !share.IsEnabled;
 
                     <div class="share-card @(isSelected ? "share-card--selected" : "") @(isDisabled ? "share-card--disabled" : "")"
-                         @onclick="() => HandleCardClick(share)">
+                         @onclick="() => HandleCardClick(share)"
+                         @ondblclick='() => Nav.NavigateTo("files/" + share.Name)'
+                         >
                         <div class="share-icon">
                             @Assets.SVG("folder.svg", new SvgOptions(
                                 Width: 32, Height: 32,

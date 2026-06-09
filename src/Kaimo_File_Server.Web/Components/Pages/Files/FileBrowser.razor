@@ -1092,11 +1092,12 @@ else
 
     private void ContextRename(FileMetadata item)
     {
-        CloseContextMenu();
         _renameTarget = item;
         _renameNewName = item.Name;
         _renameError = null;
         _showRenameDialog = true;
+        CloseContextMenu();
+        StateHasChanged();
     }
 
     private void ContextAcl(FileMetadata item)
@@ -1134,16 +1135,34 @@ else
     {
         if (_renameTarget is null || string.IsNullOrWhiteSpace(_renameNewName)) return;
         var result = await VM.RenameAsync(_renameTarget, _renameNewName.Trim());
-        if (result.Success)
-        {
-            _showRenameDialog = false;
-            _renameTarget = null;
-            _selectedItems.Clear();
-            await VM.LoadShareAsync(ShareName, SubPath ?? "");
-            await LoadAclCounts();
-        }
-        else
+        
+        if (!result.Success)
             _renameError = result.Error;
+        
+        _selectedItems.Clear();
+        _showRenameDialog = false;
+        _renameTarget = null;
+        
+        await VM.LoadShareAsync(ShareName, SubPath ?? "");
+        await LoadAclCounts();
+            
+        // put renamed item into the new selection
+        var newItem = FindShareItem(_renameNewName);
+        if (newItem is not null)
+            _selectedItems.Add(newItem);
+
+    }
+
+    private FileMetadata? FindShareItem(string itemName)
+    {
+        FileMetadata? file = SortedFiles
+            .FirstOrDefault(file => file.Name.Equals(itemName));
+
+        if (file is not null)
+            return file;
+        
+        return SortedDirectories
+            .FirstOrDefault(folder => folder.Name.Equals(itemName));
     }
 
     // ========== ACL Helpers ==========
