@@ -1,0 +1,87 @@
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AssetProvider Assets
+@inject FileBrowserViewModel VM
+@inject IJSRuntime JS
+
+
+@if (_showFilePreview)
+{
+    <div class="modal-backdrop" @onclick="CloseFilePreview">
+        <div class="preview-dialog" @onclick:stopPropagation="true">
+            <div class="preview-header">
+                <span class="preview-title">@_previewFileName</span>
+                <button class="btn-icon" title="Schließen" @onclick="CloseFilePreview">
+                    @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                </button>
+            </div>
+            @if (_previewLoading)
+            {
+                <div class="preview-loading">
+                    <div class="preview-spinner"></div>
+                    <span class="preview-loading-text">Datei wird geladen…</span>
+                </div>
+            }
+            else if (_previewIsImage)
+            {
+                <div class="preview-image-container">
+                    <img class="preview-image" src="@_previewUrl" alt="@_previewFileName" />
+                </div>
+            }
+            else
+            {
+                <iframe class="preview-frame" src="@_previewUrl"></iframe>
+            }
+        </div>
+    </div>
+}
+
+
+@code {
+
+    private string _previewUrl = "";
+    private string _previewFileName = "";
+    private bool _previewIsImage;
+    private bool _previewLoading;
+    private bool _showFilePreview;
+
+    public async Task CloseFilePreview()
+    {
+        if (!string.IsNullOrEmpty(_previewUrl))
+            await JS.InvokeVoidAsync("filePreview.revokeBlob", _previewUrl);
+
+        _showFilePreview = false;
+        _previewUrl = "";
+    }
+    
+    
+    public async Task OpenFilePreview(FileMetadata file)
+    {
+        _previewFileName = file.Name;
+        _previewIsImage = false;
+        _previewUrl = "";
+        _previewLoading = true;
+        _showFilePreview = true;
+        StateHasChanged();
+        
+        var result = await VM.ReadFileForPreviewAsync(file);
+        if (result is null)
+        {
+            _showFilePreview = false;
+            _previewLoading = false;
+            StateHasChanged();
+            return;
+        }
+
+        var (data, contentType) = result.Value;
+
+        _previewUrl = await JS.InvokeAsync<string>(
+            "filePreview.showBlob", data, contentType);
+
+        _previewIsImage = contentType.StartsWith("image/");
+        _previewLoading = false;
+        StateHasChanged();
+    }
+
+    
+
+}
