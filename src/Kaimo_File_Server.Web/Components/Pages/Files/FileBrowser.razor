@@ -113,7 +113,7 @@
 @* -- Dialog: Löschen bestätigen -- *@
 @if (_showDeleteConfirm)
 {
-    <div class="modal-backdrop" @onclick="CancelDelete">
+    <div class="modal-backdrop" @onclick="CancelDelete" @onkeydown="OnDeleteKeyDown" tabindex="0" @ref="_deleteModalRef">
         <div class="modal-dialog" @onclick:stopPropagation="true">
             <h3 class="modal-title">Löschen bestätigen</h3>
             @if (_deleteTargets.Count == 1)
@@ -183,7 +183,7 @@ else
        Resizable Column Table – 5 Spalten (ohne Actions)
        Name-Spalte (1fr) nimmt den Rest.
        ══════════════════════════════════════════════════ *@
-    <div class="file-table-wrap" @ref="_fileDropZone"
+    <div class="file-table-wrap" @ref="_fileDropZone" @onkeydown="OnKeyDown" tabindex="0"
          style="grid-template-columns: @GridColumns">
 
         @* -- Header (sortierbar) -- *@
@@ -664,6 +664,8 @@ else
     private string _renameNewName = "";
     private string? _renameError;
 
+    private ElementReference _deleteModalRef;
+    
     private bool _showFilePreview;
     private string _previewUrl = "";
     private string _previewFileName = "";
@@ -678,7 +680,7 @@ else
     private bool CanDeleteSelection => _selectedItems.Count > 0;
     private bool CanAclSelection => _isAdmin && _selectedItems.Count == 1;
 
-    // ========== Selektion ==========
+    // ========== Selection ==========
 
     private void OnItemClick(MouseEventArgs e, FileMetadata item)
     {
@@ -738,12 +740,15 @@ else
         _showRenameDialog = true;
     }
 
-    private void DeleteSelected()
+    private async Task DeleteSelected()
     {
         if (_selectedItems.Count == 0) return;
         _deleteTargets = _selectedItems.ToList();
         _deleteError = null;
         _showDeleteConfirm = true;
+        
+        await Task.Yield(); // let Blazor render the modal first
+        await _deleteModalRef.FocusAsync();
     }
 
     private void AclSelected()
@@ -781,21 +786,21 @@ else
                     _showContextMenu = false; await OpenFilePreview(target); 
                 });
             
-            builder.AddIf(target is not null && target.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase),
+            builder.AddIf(FileHelper.IsArchive(target.Name),
                 "Entpacken", "file_zip.svg", async () =>
                 {
                     _showContextMenu = false; 
                     await UnzipFile(target!);
                 });
             
-            builder.AddIf(!target.IsDirectory,
+            builder.AddIf(!target.IsDirectory && !FileHelper.IsArchive(target.Name),
                 "Als .zip komprimieren", "archive.svg", async () =>
                 {
                     CloseContextMenu();
                     await ArchiveFiles(new[] { target }, ".zip");
                 });
 
-            builder.AddIf(!target.IsDirectory,
+            builder.AddIf(!target.IsDirectory && !FileHelper.IsArchive(target.Name),
                 "Als .tar.gz komprimieren", "archive.svg", async () =>
                 {
                     CloseContextMenu();
@@ -835,9 +840,9 @@ else
         
         builder.AddHeader($"Selected {_selectedItems.Count} Items");
 
-        var allFilesAreZipFiles = _selectedItems.All(file => !file.IsDirectory && file.Name.EndsWith(".zip"));
+        var allFilesAreArchives = _selectedItems.All(file => !file.IsDirectory && FileHelper.IsArchive(file.Name));
 
-        if (allFilesAreZipFiles)
+        if (allFilesAreArchives)
             builder.Add("Entpacken", "file_zip.svg", async () =>
                 {
                     _showContextMenu = false; 
@@ -1013,9 +1018,21 @@ else
             _createFolderError = result.Error;
     }
     
-    
     // ========== Löschen ==========
-
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Delete" && _selectedItems.Count > 0)
+            DeleteSelected();
+    }
+    
+    private async Task OnDeleteKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await ConfirmDelete();
+        else if (e.Key == "Escape")
+            CancelDelete();
+    }
+    
     private void RequestDelete(FileMetadata item)
     {
         _deleteTargets = new List<FileMetadata> { item };

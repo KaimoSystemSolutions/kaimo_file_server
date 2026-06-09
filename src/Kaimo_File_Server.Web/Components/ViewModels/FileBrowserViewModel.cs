@@ -467,7 +467,7 @@ public class FileBrowserViewModel
         }
         catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
         {
-            return OperationResult.Fail($"Ein Archiv mit dem Namen \"archiv.{format}\" existiert bereits.");
+            return OperationResult.Fail($"Ein Archiv mit dem Namen \"archiv{format}\" existiert bereits.");
         }
         catch (Exception ex)
         {

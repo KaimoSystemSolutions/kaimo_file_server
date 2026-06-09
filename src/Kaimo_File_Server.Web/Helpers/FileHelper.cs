@@ -129,15 +129,30 @@ public class FileHelper
         [".bz2"]  = "application/x-bzip2",
     };
 
-    public static string GetIcon(string fileName)
+    private static readonly HashSet<string> ArchiveFileEndings = new()
     {
-        var ext = Path.GetExtension(fileName);
-        return IconMap.GetValueOrDefault(ext, "file.svg");
-    }
+
+        ".zip",
+        ".tar",
+        ".gz",
+        ".7z",
+        ".rar",
+        ".bz2",
+    };
+    
+    public static string GetIcon(string fileName)
+        => IconMap.GetValueOrDefault(getExt(fileName), "file.svg");
+    
 
     public static string GetContentType(string fileName)
+        => ContentTypeMap.GetValueOrDefault(getExt(fileName), "application/octet-stream");
+
+
+    public static bool IsArchive(string fileName)
+        => ArchiveFileEndings.Contains(getExt(fileName));
+
+    private static string getExt(string fileName)
     {
-        var ext = Path.GetExtension(fileName).ToLower();
-        return ContentTypeMap.GetValueOrDefault(ext, "application/octet-stream");
+        return Path.GetExtension(fileName).ToLower();
     }
 }
