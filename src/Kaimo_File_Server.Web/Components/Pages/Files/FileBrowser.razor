@@ -1092,11 +1092,12 @@ else
 
     private void ContextRename(FileMetadata item)
     {
-        CloseContextMenu();
         _renameTarget = item;
         _renameNewName = item.Name;
         _renameError = null;
         _showRenameDialog = true;
+        CloseContextMenu();
+        StateHasChanged();
     }
 
     private void ContextAcl(FileMetadata item)
