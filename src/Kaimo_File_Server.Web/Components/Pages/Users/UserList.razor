@@ -455,8 +455,12 @@ else
                                             <span class="multi-select-text">
                                                 @Checked(VM.EditUserRoles.Where(r => r.IsChecked).Select(r => r.Item.Name), "Keine Rollen")
                                             </span>
-                                            <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
-                                                 fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6" /></svg>
+                                            @Assets.SVG("chevron_down_transparent.svg", new SvgOptions(
+                                                    Width: 14,
+                                                    Height: 14,
+                                                    StrokeWidth: 2f,
+                                                    CssClass: "multi-select-chevron"
+                                                ))
                                         </div>
                                         @if (rolesOpen)
                                         {
@@ -561,9 +565,12 @@ else
                                                 {
                                                     <button class="btn-icon btn-icon--small" title="Zuweisung entfernen"
                                                             @onclick="() => DeleteAssignment(a.AssignmentId)">
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2">
-                                                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                                                        </svg>
+                                                        @Assets.SVG("cross.svg", new SvgOptions(
+                                                                Width: 14,
+                                                                Height: 14,
+                                                                Color: "var(--danger)",
+                                                                StrokeWidth: 2f
+                                                            ))
                                                     </button>
                                                 }
                                             </div>
@@ -616,8 +623,12 @@ else
                                         <span class="multi-select-text">
                                             @Checked(VM.EditGroupMembers.Where(m => m.IsChecked).Select(m => m.Item.Name), "Keine Mitglieder")
                                         </span>
-                                        <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
-                                             fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6" /></svg>
+                                        @Assets.SVG("chevron_down_transparent.svg", new SvgOptions(
+                                                Width: 14,
+                                                Height: 14,
+                                                StrokeWidth: 2f,
+                                                CssClass: "multi-select-chevron"
+                                            ))
                                     </div>
                                     @if (membersOpen)
                                     {
@@ -707,8 +718,12 @@ else
                                         <span class="multi-select-text">
                                             @Checked(VM.EditRoleMembers.Where(m => m.IsChecked).Select(m => m.Item.Name), "Keine Mitglieder")
                                         </span>
-                                        <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
-                                             fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6" /></svg>
+                                        @Assets.SVG("chevron_down_transparent.svg", new SvgOptions(
+                                                Width: 14,
+                                                Height: 14,
+                                                StrokeWidth: 2f,
+                                                CssClass: "multi-select-chevron"
+                                            ))
                                     </div>
                                     @if (membersOpen)
                                     {
@@ -765,9 +780,11 @@ else
                             else
                             {
                                 <div class="detail-info" style="margin-top: 16px;">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.5">
-                                        <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
-                                    </svg>
+                                    @Assets.SVG("circle_info.svg", new SvgOptions(
+                                            Width: 14,
+                                            Height: 14,
+                                            Color: "var(--text-tertiary)"
+                                        ))
                                     <span>Berechtigungen von Systemrollen werden automatisch verwaltet.</span>
                                 </div>
                             }
@@ -831,9 +848,11 @@ else
                                     @if (!VM.IsAddingAssignment && VM.CanManageRoles)
                                     {
                                         <button class="btn-icon btn-icon--small" title="Zuweisung hinzufügen" @onclick="StartAddAssignment">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                                            </svg>
+                                            @Assets.SVG("plus.svg", new SvgOptions(
+                                                    Width: 14,
+                                                    Height: 14,
+                                                    StrokeWidth: 2f
+                                                ))
                                         </button>
                                     }
                                 </div>
@@ -920,9 +939,12 @@ else
                                                 {
                                                     <button class="btn-icon btn-icon--small" title="Entfernen"
                                                             @onclick="() => DeleteAssignment(a.AssignmentId)">
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2">
-                                                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                                                        </svg>
+                                                        @Assets.SVG("cross.svg", new SvgOptions(
+                                                                Width: 14,
+                                                                Height: 14,
+                                                                Color: "var(--danger)",
+                                                                StrokeWidth: 2f
+                                                            ))
                                                     </button>
                                                 }
                                             </div>
