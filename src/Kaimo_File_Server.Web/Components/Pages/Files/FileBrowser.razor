@@ -823,7 +823,7 @@ else
 
             builder.Add(Resources.Context_Menu_Rename, "edit.svg", () => { ContextRename(target); return Task.CompletedTask; });
 
-            builder.Add(Resources.Context_Menu_Delete, "trash.svg", () => { ContextDelete(target); return Task.CompletedTask; },
+            builder.Add(Resources.Context_Menu_Delete, "trash.svg", async () => { await ContextDelete(target); },
                 isDanger: true);
 
             builder.AddIf(_isAdmin,
@@ -865,12 +865,11 @@ else
         });
         
         
-        builder.Add(Resources.Context_Menu_Delete, "trash.svg", () =>
+        builder.Add(Resources.Context_Menu_Delete, "trash.svg", async () =>
             {
                 foreach (var selectedItem in _selectedItems)
-                    ContextDelete(selectedItem);
+                    await ContextDelete(selectedItem);
                 
-                return Task.CompletedTask;
             },
             isDanger: true);
 
@@ -1053,6 +1052,8 @@ else
         {
             var result = await VM.DeleteAsync(target);
             if (!result.Success) { _deleteError = result.Error; return; }
+
+            Toast.Show($"Deleted \"{target.Name}\"", ToastType.Success);
         }
         _showDeleteConfirm = false;
         _deleteTargets.Clear();
@@ -1087,7 +1088,7 @@ else
     }
 
     private void ContextNavigateTo(FileMetadata dir) { CloseContextMenu(); NavigateTo(dir); }
-    private void ContextDelete(FileMetadata item) { CloseContextMenu(); RequestDelete(item); }
+    private async Task ContextDelete(FileMetadata item) { CloseContextMenu(); await DeleteSelected(); }
 
     private void ContextRename(FileMetadata item)
     {
