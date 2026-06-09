@@ -185,7 +185,7 @@ else
        Name-Spalte (1fr) nimmt den Rest.
        ══════════════════════════════════════════════════ *@
     <div class="file-table-wrap" id="file-drop-zone" @ref="_fileDropZone" @onkeydown="OnKeyDownItemList" tabindex="0"
-         style="grid-template-columns: @GridColumns"
+         style="grid-template-columns: @GridColumns; padding-bottom: @GetTableExtraPaddingPx()px"
          @oncontextmenu="(e) => _contextMenuComponent.OnItemContextMenu(e)"
          @oncontextmenu:preventDefault="true"
          @oncontextmenu:stopPropagation="true"
@@ -485,6 +485,23 @@ else
     }
 
     // ========== Column Sorting ==========
+
+    private static readonly float EmptyAreaHeightPx = 123f;
+    private static readonly float ItemHeightPx = 41f;
+    
+    private float GetTableExtraPaddingPx()
+    {
+        int itemCount = SortedDirectories.Count() + SortedFiles.Count();
+        float remainingHeight = EmptyAreaHeightPx - itemCount * ItemHeightPx;
+
+        if (itemCount == 0)
+            return 0;
+        
+        if (remainingHeight < 0)
+            return 0;
+        
+        return remainingHeight;
+    }
 
     private string? _sortColumn;
     private int _sortDirection; // 0 = default, 1 = descending, 2 = ascending
