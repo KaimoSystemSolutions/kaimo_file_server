@@ -30,16 +30,14 @@
         <button class="btn-icon" title="Neuen Ordner erstellen"
                 @onclick="ShowCreateFolderDialog"
                 @onkeydown="OnCreateFolderKeyDown">
-            @Assets.SVG("test.svg", new SvgOptions())
+            @Assets.SVG("folder.svg", new SvgOptions())
         </button>
         @if (_isAdmin)
         {
             <button class="btn-icon" title="Berechtigungen verwalten"
                     @onclick="ToggleAclPanel">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                     stroke="@(_showAclPanel ? "var(--accent)" : "currentColor")" stroke-width="1.5">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
+                
+                @Assets.SVG("acl_panel.svg", new SvgOptions(Color: _showAclPanel ? "var(--accent)" : "currentColor"))
             </button>
             var rootCount = GetAclCount(_aclPath);
             @if (rootCount > 0)
@@ -62,36 +60,25 @@
     <div class="toolbar-actions">
         <button class="toolbar-btn" title="Öffnen"
                 disabled="@(!CanOpenSelection)" @onclick="OpenSelected">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="1.5">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
+            
+            @Assets.SVG("arrow_right.svg", new SvgOptions(Width: 16, Height: 16))
             <span>Öffnen</span>
         </button>
         <button class="toolbar-btn" title="Umbenennen"
                 disabled="@(!CanRenameSelection)" @onclick="RenameSelected">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="1.5">
-                <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-            </svg>
+            @Assets.SVG("edit.svg", new SvgOptions(Width: 16, Height: 16))
             <span>Umbenennen</span>
         </button>
         <button class="toolbar-btn toolbar-btn--danger" title="Löschen"
                 disabled="@(!CanDeleteSelection)" @onclick="DeleteSelected">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="1.5">
-                <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
-                <line x1="10" y1="11" x2="10" y2="17" />
-                <line x1="14" y1="11" x2="14" y2="17" />
-            </svg>
+            
+            @Assets.SVG("trash.svg", new SvgOptions(Width: 16, Height: 16))
             <span>Löschen</span>
         </button>
         <button class="toolbar-btn" title="Berechtigungen"
                 disabled="@(!CanAclSelection)" @onclick="AclSelected">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="1.5">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
+            
+            @Assets.SVG("shield.svg", new SvgOptions(Width: 16, Height: 16, Style: "vertical-align: -2px; margin-right: 6px;"))
             <span>Berechtigungen</span>
         </button>
     </div>
@@ -178,11 +165,7 @@ else
         <div class="acl-panel">
             <div class="acl-panel-header">
                 <h3>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="1.5" style="vertical-align: -2px; margin-right: 6px;">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    </svg>
-                    Berechtigungen
+                    @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
                 </h3>
                 <span class="detail-subtitle">@(_aclPath == "" ? "(Share-Root)" : _aclPath)</span>
             </div>
@@ -257,10 +240,8 @@ else
         {
             <div class="file-grid-row file-row-dir" @ondblclick="NavigateUp">
                 <div class="col-name">
-                    <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                         stroke="var(--text-tertiary)" stroke-width="1.5">
-                        <path d="M15 18l-6-6 6-6" />
-                    </svg>
+                    
+                    @Assets.SVG("chevron_left.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)", CssClass: "file-icon"))
                     <span>..</span>
                 </div>
                 <div class="col-size"></div>
@@ -287,20 +268,12 @@ else
                 <div class="col-name">
                     @if (dir.Name == ".RECYCLE_BIN")
                     {
-                        <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
-                             fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
-                            <line x1="10" y1="11" x2="10" y2="17" />
-                            <line x1="14" y1="11" x2="14" y2="17" />
-                        </svg>
+                        Assets.SVG("trash.svg", new SvgOptions(Width: 20, Height: 20, CssClass: "file-icon"));
                     }
                     else
                     {
-                        <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
-                             fill="var(--folder-fill)" stroke="var(--folder-stroke)" stroke-width="1.5">
-                            <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                        </svg>
-                    }
+                        
+                        @Assets.SVG("folder.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)", CssClass: "file-icon"))                    }
                     <span>@dir.Name</span>
                     @if (dirAclCount > 0)
                     {
@@ -308,10 +281,7 @@ else
                               title="@dirAclCount Berechtigungsregel@(dirAclCount != 1 ? "n" : "")"
                               @onclick="() => OpenFolderAcl(dir)"
                               @onclick:stopPropagation="true">
-                            <svg class="acl-indicator-icon" width="12" height="12" viewBox="0 0 24 24"
-                                 fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                            </svg>
+                            @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
                             <span class="acl-indicator-count">@dirAclCount</span>
                         </span>
                     }
@@ -343,11 +313,7 @@ else
                         <div class="acl-panel-header" style="padding: 0 0 8px 0;">
                             <span class="detail-subtitle">Berechtigungen für „@dir.Name"</span>
                             <button class="btn-icon btn-icon--small" title="Schließen" @onclick="CloseFolderAcl">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                     stroke="currentColor" stroke-width="2">
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                </svg>
+                                @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                             </button>
                         </div>
                         <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
@@ -373,11 +339,7 @@ else
                  @oncontextmenu:stopPropagation="true">
 
                 <div class="col-name">
-                    <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
-                         fill="none" stroke="var(--text-tertiary)" stroke-width="1.5">
-                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                        <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-                    </svg>
+                    @Assets.SVG("file.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)", CssClass: "file-icon"))
                     <span>@file.Name</span>
                     @if (fileAclCount > 0)
                     {
@@ -385,10 +347,7 @@ else
                               title="@fileAclCount Berechtigungsregel@(fileAclCount != 1 ? "n" : "")"
                               @onclick="() => OpenFileAcl(file)"
                               @onclick:stopPropagation="true">
-                            <svg class="acl-indicator-icon" width="12" height="12" viewBox="0 0 24 24"
-                                 fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                            </svg>
+                            @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
                             <span class="acl-indicator-count">@fileAclCount</span>
                         </span>
                     }
@@ -407,11 +366,7 @@ else
                         <div class="acl-panel-header" style="padding: 0 0 8px 0;">
                             <span class="detail-subtitle">Berechtigungen für „@file.Name"</span>
                             <button class="btn-icon btn-icon--small" title="Schließen" @onclick="CloseFolderAcl">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                     stroke="currentColor" stroke-width="2">
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                </svg>
+                                @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                             </button>
                         </div>
                         <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
@@ -443,66 +398,47 @@ else
             @if (_contextTarget.IsDirectory)
             {
                 <button class="context-menu-item" @onclick="() => ContextNavigateTo(_contextTarget)">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M5 12h14M12 5l7 7-7 7" />
-                    </svg>
+                    
+                    @Assets.SVG("arrow_right.svg", new SvgOptions(Width: 14, Height: 14))
                     Öffnen
                 </button>
             }
             <button class="context-menu-item" @onclick="() => ContextRename(_contextTarget)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-                </svg>
+                
+                @Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14))
                 Umbenennen
             </button>
             <button class="context-menu-item context-menu-item--danger" @onclick="() => ContextDelete(_contextTarget)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6" />
-                    <line x1="10" y1="11" x2="10" y2="17" />
-                    <line x1="14" y1="11" x2="14" y2="17" />
-                </svg>
+                @Assets.SVG("trash.svg", new SvgOptions(Width: 14, Height: 14))
                 Löschen
             </button>
             @if (_isAdmin)
             {
                 <button class="context-menu-item" @onclick="() => ContextAcl(_contextTarget)">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    </svg>
+                    @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
                     Berechtigungen
                 </button>
             }
             <div class="context-menu-separator"></div>
             <div class="context-menu-header">General</div>
             <button class="context-menu-item" @onclick="ContextNewFolder">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                    <path d="M12 11v6M9 14h6" />
-                </svg>
+                @Assets.SVG("folder.svg", new SvgOptions(Width: 14, Height: 14))
                 Neuer Ordner
             </button>
             <button class="context-menu-item" @onclick="ContextRefresh">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M1 4v6h6M23 20v-6h-6" />
-                    <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
-                </svg>
+                @Assets.SVG("refresh.svg", new SvgOptions(Width: 14, Height: 14))
                 Aktualisieren
             </button>
         }
         else
         {
             <button class="context-menu-item" @onclick="ContextNewFolder">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                    <path d="M12 11v6M9 14h6" />
-                </svg>
+                @Assets.SVG("folder.svg", new SvgOptions(Width: 14, Height: 14))
                 Neuer Ordner
             </button>
             <button class="context-menu-item" @onclick="ContextRefresh">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M1 4v6h6M23 20v-6h-6" />
-                    <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
-                </svg>
+                
+                @Assets.SVG("refresh.svg", new SvgOptions(Width: 14, Height: 14))
                 Aktualisieren
             </button>
         }
@@ -540,11 +476,7 @@ else
             <div class="preview-header">
                 <span class="preview-title">@_previewFileName</span>
                 <button class="btn-icon" title="Schließen" @onclick="CloseFilePreview">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+                    @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                 </button>
             </div>
             @if (_previewLoading)
