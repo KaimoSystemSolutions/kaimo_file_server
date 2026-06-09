@@ -1,41 +1,22 @@
+@using Kaimo_File_Server.Web.DynamicHelpers
 @implements IDisposable
 @inject ToastService Toasts
+@inject AssetProvider Assets
 
 <div class="toast-container">
     @foreach (var toast in Toasts.Toasts)
     {
         <div class="toast toast--@toast.Type.ToString().ToLower() @(_removing.Contains(toast.Id) ? "toast--removing" : "")">
-            <svg class="toast-icon" width="16" height="16" viewBox="0 0 24 24"
-                 fill="none" stroke="currentColor" stroke-width="2">
-                @switch (toast.Type)
-                {
-                    case ToastType.Success:
-                        <path d="M20 6L9 17l-5-5" />
-                        break;
-                    case ToastType.Error:
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="15" y1="9" x2="9" y2="15" />
-                        <line x1="9" y1="9" x2="15" y2="15" />
-                        break;
-                    case ToastType.Progress:
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="17 8 12 3 7 8" />
-                        <line x1="12" y1="3" x2="12" y2="15" />
-                        break;
-                    default:
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="16" x2="12" y2="12" />
-                        <line x1="12" y1="8" x2="12.01" y2="8" />
-                        break;
-                }
-            </svg>
+            @(toast.Type switch
+            {
+                ToastType.Success  => Assets.SVG("check.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2, CssClass: "toast-icon")),
+                ToastType.Error    => Assets.SVG("circle_x.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2, CssClass: "toast-icon")),
+                ToastType.Progress => Assets.SVG("upload.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2, CssClass: "toast-icon")),
+                _                 => Assets.SVG("info.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2, CssClass: "toast-icon")),
+            })
             <span class="toast-text">@toast.Text</span>
             <button class="toast-close" @onclick="() => Dismiss(toast.Id)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                     stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+                @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
             </button>
             @if (toast.Type == ToastType.Progress)
             {
