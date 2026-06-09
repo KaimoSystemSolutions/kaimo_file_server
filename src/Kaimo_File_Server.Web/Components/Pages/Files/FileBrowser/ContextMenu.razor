@@ -1,0 +1,237 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AssetProvider Assets
+
+
+@if (_showContextMenu)
+{
+    <div class="context-menu-backdrop" @onclick="CloseContextMenu" @oncontextmenu="CloseContextMenu"
+         @oncontextmenu:preventDefault="true"></div>
+    <div class="context-menu" style="top: @(_contextMenuY)px; left: @(_contextMenuX)px;">
+        <ContextMenu Items="BuildContextMenuItems()" />
+    </div>
+}
+
+@foreach (var item in Items)
+{
+    if (item.IsSeparator)
+    {
+        <div class="context-menu-separator"></div>
+    }
+    else if (item.IsHeader)
+    {
+        <div class="context-menu-header">@item.Label</div>
+    }
+    else
+    {
+        <button class="context-menu-item @(item.IsDanger ? "context-menu-item--danger" : "")"
+                @onclick="item.Action">
+            @Assets.SVG(item.Icon, item.IconOptions)
+            @item.Label
+        </button>
+    }
+}
+
+@code {
+    [Parameter] public FileBrowser FileBrowser { get; set; } = default!;
+    [Parameter] public FilePreview FilePreviewComponent { get; set; } = default!;
+    [Parameter] public List<ContextMenuItem> Items { get; set; } = new();
+    
+    private bool _showContextMenu;
+    private double _contextMenuX;
+    private double _contextMenuY;
+    
+    
+    private List<ContextMenuItem> BuildContextMenuItems()
+    {
+        var builder = new ContextMenuBuilder();
+
+        HashSet<FileMetadata> selectedItems = FileBrowser.getSelectedItems();
+        int selectedItemsCount = selectedItems.Count;
+        
+        // empty selection
+        if (selectedItemsCount == 0)
+        {
+            builder = addGeneralItems(builder);
+            return builder.Build();
+        }
+        
+        if (selectedItemsCount == 1)
+        {
+            var target = FileBrowser.getFirstSelectedItem();
+            
+            builder.AddHeader(target.Name);
+
+            builder.AddIf(target.IsDirectory,
+                "Öffnen", "arrow_right.svg", () => { ContextNavigateTo(target); return Task.CompletedTask; });
+
+            builder.AddIf(!target.IsDirectory,
+                "Öffnen", "arrow_right.svg", async () => {
+                    _showContextMenu = false; await FilePreviewComponent.OpenFilePreview(target); 
+                });
+            
+            builder.AddIf(FileHelper.IsArchive(target.Name),
+                "Entpacken", "file_zip.svg", async () =>
+                {
+                    _showContextMenu = false; 
+                    await FileBrowser.UnzipFile(target!);
+                });
+            
+            builder.AddIf(!target.IsDirectory && !FileHelper.IsArchive(target.Name),
+                "Als .zip komprimieren", "archive.svg", async () =>
+                {
+                    CloseContextMenu();
+                    await FileBrowser.ArchiveFiles(new[] { target }, ".zip");
+                });
+
+            builder.AddIf(!target.IsDirectory && !FileHelper.IsArchive(target.Name),
+                "Als .tar.gz komprimieren", "archive.svg", async () =>
+                {
+                    CloseContextMenu();
+                    await FileBrowser.ArchiveFiles(new[] { target }, ".tar.gz");
+                });
+            
+            builder.AddIf(target.IsDirectory,
+                "Als .zip komprimieren", "archive.svg", async () =>
+                {
+                    CloseContextMenu();
+                    await FileBrowser.ArchiveFiles(new[] { target }, ".zip");
+                });
+
+            builder.AddIf(target.IsDirectory,
+                "Als .tar.gz komprimieren", "archive.svg", async () =>
+                {
+                    CloseContextMenu();
+                    await FileBrowser.ArchiveFiles(new[] { target }, ".tar.gz");
+                });
+
+            builder.Add(Resources.Context_Menu_Rename, "edit.svg", () => { ContextRename(target); return Task.CompletedTask; });
+
+            builder.Add(Resources.Context_Menu_Delete, "trash.svg", async () => { await ContextDelete(target); },
+                isDanger: true);
+
+            builder.AddIf(FileBrowser.CurrentUserIsAdmin(),
+                "Berechtigungen", "shield.svg", () => { ContextAcl(target); return Task.CompletedTask; },
+                iconOptions: new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"));
+
+            builder.AddSeparator();
+            builder = addGeneralItems(builder);
+            return builder.Build();
+
+        }
+
+        // if multiple items
+        
+        builder.AddHeader($"Selected {selectedItemsCount} Items");
+
+        var allFilesAreArchives = selectedItems.All(file => !file.IsDirectory && FileHelper.IsArchive(file.Name));
+
+        if (allFilesAreArchives)
+            builder.Add("Entpacken", "file_zip.svg", async () =>
+                {
+                    _showContextMenu = false; 
+                    
+                    foreach (var selectedItem in selectedItems)
+                        await FileBrowser.UnzipFile(selectedItem);
+                    
+                });
+        
+        builder.Add("Als .zip komprimieren", "archive.svg", async () =>
+        {
+            CloseContextMenu();
+            await FileBrowser.ArchiveFiles(selectedItems, ".zip");
+        });
+
+        builder.Add("Als .tar.gz komprimieren", "archive.svg", async () =>
+        {
+            CloseContextMenu();
+            await FileBrowser.ArchiveFiles(selectedItems, ".tar.gz");
+        });
+        
+        
+        builder.Add(Resources.Context_Menu_Delete, "trash.svg", async () =>
+            {
+                foreach (var selectedItem in selectedItems)
+                    await ContextDelete(selectedItem);
+                
+            },
+            isDanger: true);
+
+        builder.AddSeparator();
+        builder = addGeneralItems(builder);
+        return builder.Build();
+    }
+
+    private ContextMenuBuilder addGeneralItems(ContextMenuBuilder builder)
+    {
+        builder.AddHeader("General");
+        builder.Add("Neuer Ordner", "folder.svg", async () => { ContextNewFolder(); });
+        builder.Add("Aktualisieren", "refresh.svg", async () => { await ContextRefresh(); });
+        return builder; 
+    }
+    
+    public void OnItemContextMenu(MouseEventArgs e, FileMetadata item)
+    {
+        
+        if (!FileBrowser.SelectedItemsContain(item))
+        {
+            FileBrowser.ClearSelection();
+            FileBrowser.AddItemToSelection(item);
+        }
+        
+        _contextMenuX = e.ClientX;
+        _contextMenuY = e.ClientY;
+        _showContextMenu = true;
+    }
+
+    private void OnBackgroundContextMenu(MouseEventArgs e)
+    {
+        _contextMenuX = e.ClientX;
+        _contextMenuY = e.ClientY;
+        _showContextMenu = true;
+    }
+
+    public void CloseContextMenu()
+    {
+        _showContextMenu = false;
+    }
+
+    private void ContextNavigateTo(FileMetadata dir) { CloseContextMenu(); FileBrowser.NavigateTo(dir); }
+
+    private async Task ContextDelete(FileMetadata item)
+    {
+        CloseContextMenu(); 
+        await FileBrowser.DeleteSelected();
+        FileBrowser.TriggerReRender();
+    }
+
+    private void ContextRename(FileMetadata item)
+    {
+        FileBrowser.RenameSelected();
+        CloseContextMenu();
+        FileBrowser.TriggerReRender();
+    }
+
+    private void ContextAcl(FileMetadata item)
+    {
+        CloseContextMenu();
+        if (item.IsDirectory) 
+            FileBrowser.OpenFolderAcl(item); 
+        else 
+            FileBrowser.OpenFileAcl(item);
+        FileBrowser.TriggerReRender();
+    }
+
+    private void ContextNewFolder()
+    {
+        CloseContextMenu(); 
+        FileBrowser.ShowCreateFolderDialog();
+        FileBrowser.TriggerReRender();
+    }
+
+    private async Task ContextRefresh()
+    {
+        CloseContextMenu();
+        await FileBrowser.Refresh();
+    }
+}

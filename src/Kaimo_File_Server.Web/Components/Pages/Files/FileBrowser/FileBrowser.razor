@@ -183,7 +183,7 @@ else
        Resizable Column Table – 5 Spalten (ohne Actions)
        Name-Spalte (1fr) nimmt den Rest.
        ══════════════════════════════════════════════════ *@
-    <div class="file-table-wrap" @ref="_fileDropZone" @onkeydown="OnKeyDown" tabindex="0"
+    <div class="file-table-wrap" @ref="_fileDropZone" @onkeydown="OnKeyDownItemList" tabindex="0"
          style="grid-template-columns: @GridColumns">
 
         @* -- Header (sortierbar) -- *@
@@ -263,7 +263,7 @@ else
                  @onclick="(e) => OnItemClick(e, dir)"
                  @onclick:stopPropagation="true"
                  @ondblclick="() => NavigateTo(dir)"
-                 @oncontextmenu="(e) => OnItemContextMenu(e, dir)"
+                 @oncontextmenu="(e) => _contextMenuComponent.OnItemContextMenu(e, dir)"
                  @oncontextmenu:preventDefault="true"
                  @oncontextmenu:stopPropagation="true">
 
@@ -335,12 +335,12 @@ else
             <div class="file-grid-row @(isSelected ? "file-row--selected" : "")"
                  @onclick="(e) => OnItemClick(e, file)"
                  @onclick:stopPropagation="true"
-                 @ondblclick="() => OpenFilePreview(file)"
-                 @oncontextmenu="(e) => OnItemContextMenu(e, file)"
+                 @ondblclick="() => _filePreviewComponent.OpenFilePreview(file)"
+                 @oncontextmenu="(e) => _contextMenuComponent.OnItemContextMenu(e, file)"
                  @oncontextmenu:preventDefault="true"
                  @oncontextmenu:stopPropagation="true">
 
-                <div class="col-name">
+                <div class="col-name" >
                     
                     @Assets.SVG(FileHelper.GetIcon(file.Name), new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)", CssClass: "file-icon"))
                     
@@ -391,14 +391,8 @@ else
 }
 
 @* -- Kontextmenü (Rechtsklick) -- *@
-@if (_showContextMenu)
-{
-    <div class="context-menu-backdrop" @onclick="CloseContextMenu" @oncontextmenu="CloseContextMenu"
-         @oncontextmenu:preventDefault="true"></div>
-    <div class="context-menu" style="top: @(_contextMenuY)px; left: @(_contextMenuX)px;">
-        <ContextMenu Items="BuildContextMenuItems()" />
-    </div>
-}
+<ContextMenu @ref="_contextMenuComponent" FileBrowser="this" FilePreviewComponent="_filePreviewComponent" />
+
 @* -- Dialog: Umbenennen -- *@
 @if (_showRenameDialog)
 {
@@ -423,36 +417,8 @@ else
     </div>
 }
 
-@if (_showFilePreview)
-{
-    <div class="modal-backdrop" @onclick="CloseFilePreview">
-        <div class="preview-dialog" @onclick:stopPropagation="true">
-            <div class="preview-header">
-                <span class="preview-title">@_previewFileName</span>
-                <button class="btn-icon" title="Schließen" @onclick="CloseFilePreview">
-                    @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                </button>
-            </div>
-            @if (_previewLoading)
-            {
-                <div class="preview-loading">
-                    <div class="preview-spinner"></div>
-                    <span class="preview-loading-text">Datei wird geladen…</span>
-                </div>
-            }
-            else if (_previewIsImage)
-            {
-                <div class="preview-image-container">
-                    <img class="preview-image" src="@_previewUrl" alt="@_previewFileName" />
-                </div>
-            }
-            else
-            {
-                <iframe class="preview-frame" src="@_previewUrl"></iframe>
-            }
-        </div>
-    </div>
-}
+
+<FilePreview @ref="_filePreviewComponent"/>
 
 @code {
     [Parameter] public string ShareName { get; set; } = "";
@@ -656,9 +622,6 @@ else
     private List<FileMetadata> _deleteTargets = new();
     private string? _deleteError;
     private HashSet<FileMetadata> _selectedItems = new();
-    private bool _showContextMenu;
-    private double _contextMenuX;
-    private double _contextMenuY;
     private bool _showRenameDialog;
     private FileMetadata? _renameTarget;
     private string _renameNewName = "";
@@ -666,10 +629,9 @@ else
 
     private ElementReference _deleteModalRef;
     
-    private bool _showFilePreview;
-    private string _previewUrl = "";
-    private string _previewFileName = "";
-
+    private FilePreview _filePreviewComponent;
+    private ContextMenu _contextMenuComponent;
+    
     private ElementReference _fileDropZone;
     private bool _jsInitialized = false;
 
@@ -682,6 +644,36 @@ else
 
     // ========== Selection ==========
 
+    public void AddItemToSelection(FileMetadata item)
+    {
+        _selectedItems.Add(item);
+        StateHasChanged();
+    }
+    
+    public void RemoveItemFromSelection(FileMetadata item)
+    {
+        _selectedItems.Remove(item);
+        StateHasChanged();
+    }
+
+    public void ClearSelection()
+    {
+        _selectedItems.Clear();
+        StateHasChanged();
+    }
+
+    public bool SelectedItemsContain(FileMetadata fileMetadata)
+        => _selectedItems.Contains(fileMetadata);
+    
+    public int GetAmountSelectedItems()
+        => _selectedItems.Count;
+
+    public FileMetadata getFirstSelectedItem()
+        => _selectedItems.First();
+    
+    public HashSet<FileMetadata> getSelectedItems()
+        => _selectedItems;
+    
     private void OnItemClick(MouseEventArgs e, FileMetadata item)
     {
         if (e.CtrlKey || e.MetaKey)
@@ -727,10 +719,10 @@ else
         if (item.IsDirectory)
             NavigateTo(item);
         else
-            await OpenFilePreview(item);
+            await _filePreviewComponent.OpenFilePreview(item);
     }
 
-    private void RenameSelected()
+    internal void RenameSelected()
     {
         if (_selectedItems.Count != 1) return;
         var item = _selectedItems.First();
@@ -740,13 +732,14 @@ else
         _showRenameDialog = true;
     }
 
-    private async Task DeleteSelected()
+    internal async Task DeleteSelected()
     {
         if (_selectedItems.Count == 0) return;
         _deleteTargets = _selectedItems.ToList();
         _deleteError = null;
         _showDeleteConfirm = true;
         
+        StateHasChanged();
         await Task.Yield(); // let Blazor render the modal first
         await _deleteModalRef.FocusAsync();
     }
@@ -759,136 +752,10 @@ else
         else OpenFileAcl(item);
     }
     
-    // ========== Context Menu ==========
-    
-    private List<ContextMenuItem> BuildContextMenuItems()
-    {
-        var builder = new ContextMenuBuilder();
-        
-        // empty selection
-        if (_selectedItems.Count == 0)
-        {
-            builder = addGeneralItems(builder);
-            return builder.Build();
-        }
-        
-        if (_selectedItems.Count == 1)
-        {
-            var target = _selectedItems.First();
-            
-            builder.AddHeader(target.Name);
-
-            builder.AddIf(target.IsDirectory,
-                "Öffnen", "arrow_right.svg", () => { ContextNavigateTo(target); return Task.CompletedTask; });
-
-            builder.AddIf(!target.IsDirectory,
-                "Öffnen", "arrow_right.svg", async () => {
-                    _showContextMenu = false; await OpenFilePreview(target); 
-                });
-            
-            builder.AddIf(FileHelper.IsArchive(target.Name),
-                "Entpacken", "file_zip.svg", async () =>
-                {
-                    _showContextMenu = false; 
-                    await UnzipFile(target!);
-                });
-            
-            builder.AddIf(!target.IsDirectory && !FileHelper.IsArchive(target.Name),
-                "Als .zip komprimieren", "archive.svg", async () =>
-                {
-                    CloseContextMenu();
-                    await ArchiveFiles(new[] { target }, ".zip");
-                });
-
-            builder.AddIf(!target.IsDirectory && !FileHelper.IsArchive(target.Name),
-                "Als .tar.gz komprimieren", "archive.svg", async () =>
-                {
-                    CloseContextMenu();
-                    await ArchiveFiles(new[] { target }, ".tar.gz");
-                });
-            
-            builder.AddIf(target.IsDirectory,
-                "Als .zip komprimieren", "archive.svg", async () =>
-                {
-                    CloseContextMenu();
-                    await ArchiveFiles(new[] { target }, ".zip");
-                });
-
-            builder.AddIf(target.IsDirectory,
-                "Als .tar.gz komprimieren", "archive.svg", async () =>
-                {
-                    CloseContextMenu();
-                    await ArchiveFiles(new[] { target }, ".tar.gz");
-                });
-
-            builder.Add(Resources.Context_Menu_Rename, "edit.svg", () => { ContextRename(target); return Task.CompletedTask; });
-
-            builder.Add(Resources.Context_Menu_Delete, "trash.svg", async () => { await ContextDelete(target); },
-                isDanger: true);
-
-            builder.AddIf(_isAdmin,
-                "Berechtigungen", "shield.svg", () => { ContextAcl(target); return Task.CompletedTask; },
-                iconOptions: new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"));
-
-            builder.AddSeparator();
-            builder = addGeneralItems(builder);
-            return builder.Build();
-
-        }
-
-        // if multiple items
-        
-        builder.AddHeader($"Selected {_selectedItems.Count} Items");
-
-        var allFilesAreArchives = _selectedItems.All(file => !file.IsDirectory && FileHelper.IsArchive(file.Name));
-
-        if (allFilesAreArchives)
-            builder.Add("Entpacken", "file_zip.svg", async () =>
-                {
-                    _showContextMenu = false; 
-                    
-                    foreach (var selectedItem in _selectedItems)
-                        await UnzipFile(selectedItem);
-                    
-                });
-        
-        builder.Add("Als .zip komprimieren", "archive.svg", async () =>
-        {
-            CloseContextMenu();
-            await ArchiveFiles(_selectedItems, ".zip");
-        });
-
-        builder.Add("Als .tar.gz komprimieren", "archive.svg", async () =>
-        {
-            CloseContextMenu();
-            await ArchiveFiles(_selectedItems, ".tar.gz");
-        });
-        
-        
-        builder.Add(Resources.Context_Menu_Delete, "trash.svg", async () =>
-            {
-                foreach (var selectedItem in _selectedItems)
-                    await ContextDelete(selectedItem);
-                
-            },
-            isDanger: true);
-
-        builder.AddSeparator();
-        builder = addGeneralItems(builder);
-        return builder.Build();
-    }
-
-    private ContextMenuBuilder addGeneralItems(ContextMenuBuilder builder)
-    {
-        builder.AddHeader("General");
-        builder.Add("Neuer Ordner", "folder.svg", async () => { ContextNewFolder(); });
-        builder.Add("Aktualisieren", "refresh.svg", async () => { await ContextRefresh(); });
-        return builder; 
-    }
     
     // ========== Zip ==========
     
-    private async Task ArchiveFiles(IEnumerable<FileMetadata> items, string format)
+    public async Task ArchiveFiles(IEnumerable<FileMetadata> items, string format)
     {
         var itemList = items.ToList();
         var archiveName = itemList.Count == 1
@@ -913,7 +780,7 @@ else
     
     // ========== Unzip ==========
     
-    private async Task UnzipFile(FileMetadata file)
+    public async Task UnzipFile(FileMetadata file)
     {
         var toastId = Toast.Show($"Entpacke \"{file.Name}\"…", ToastType.Progress);
 
@@ -933,6 +800,9 @@ else
     
     // ========== Lifecycle ==========
 
+    public async Task Refresh()
+        => await OnParametersSetAsync();
+    
     protected override async Task OnParametersSetAsync()
     {
         _showFolderAcl = false;
@@ -940,7 +810,8 @@ else
         _selectedItems.Clear();
         _sortColumn = null;
         _sortDirection = 0;
-        CloseContextMenu();
+        
+        _contextMenuComponent?.CloseContextMenu();
 
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
         UpdateAclPath();
@@ -987,7 +858,7 @@ else
 
     // ========== Ordner erstellen ==========
 
-    private void ShowCreateFolderDialog()
+    internal void ShowCreateFolderDialog()
     {
         _newFolderName = "";
         _createFolderError = null;
@@ -1018,10 +889,14 @@ else
     }
     
     // ========== Löschen ==========
-    private async Task OnKeyDown(KeyboardEventArgs e)
+    private async Task OnKeyDownItemList(KeyboardEventArgs e)
     {
         if (e.Key == "Delete" && _selectedItems.Count > 0)
             DeleteSelected();
+
+        if (e.Key == "F2" && _selectedItems.Count == 1)
+            RenameSelected();
+        
     }
     
     private async Task OnDeleteKeyDown(KeyboardEventArgs e)
@@ -1058,60 +933,6 @@ else
         _showDeleteConfirm = false;
         _deleteTargets.Clear();
         _selectedItems.Clear();
-        await VM.LoadShareAsync(ShareName, SubPath ?? "");
-    }
-
-    // ========== Kontextmenü ==========
-
-    private void OnItemContextMenu(MouseEventArgs e, FileMetadata item)
-    {
-        if (!_selectedItems.Contains(item))
-        {
-            _selectedItems.Clear();
-            _selectedItems.Add(item);
-        }
-        _contextMenuX = e.ClientX;
-        _contextMenuY = e.ClientY;
-        _showContextMenu = true;
-    }
-
-    private void OnBackgroundContextMenu(MouseEventArgs e)
-    {
-        _contextMenuX = e.ClientX;
-        _contextMenuY = e.ClientY;
-        _showContextMenu = true;
-    }
-
-    private void CloseContextMenu()
-    {
-        _showContextMenu = false;
-    }
-
-    private void ContextNavigateTo(FileMetadata dir) { CloseContextMenu(); NavigateTo(dir); }
-    private async Task ContextDelete(FileMetadata item) { CloseContextMenu(); await DeleteSelected(); }
-
-    private void ContextRename(FileMetadata item)
-    {
-        _renameTarget = item;
-        _renameNewName = item.Name;
-        _renameError = null;
-        _showRenameDialog = true;
-        CloseContextMenu();
-        StateHasChanged();
-    }
-
-    private void ContextAcl(FileMetadata item)
-    {
-        CloseContextMenu();
-        if (item.IsDirectory) OpenFolderAcl(item); else OpenFileAcl(item);
-    }
-
-    private void ContextNewFolder() { CloseContextMenu(); ShowCreateFolderDialog(); }
-
-    private async Task ContextRefresh()
-    {
-        _selectedItems.Clear();
-        CloseContextMenu();
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
     }
 
@@ -1153,6 +974,9 @@ else
 
     }
 
+    public void TriggerReRender()
+        => StateHasChanged();
+    
     private FileMetadata? FindShareItem(string itemName)
     {
         FileMetadata? file = SortedFiles
@@ -1186,14 +1010,14 @@ else
         return relativePath;
     }
 
-    private void OpenFolderAcl(FileMetadata dir)
+    internal void OpenFolderAcl(FileMetadata dir)
     {
         var path = GetDirAclPath(dir);
         if (_showFolderAcl && _aclFolderPath == path) { _showFolderAcl = false; _aclFolderPath = ""; }
         else { _showFolderAcl = true; _aclFolderPath = path; }
     }
 
-    private void OpenFileAcl(FileMetadata file)
+    internal void OpenFileAcl(FileMetadata file)
     {
         var path = GetFileAclPath(file);
         if (_showFolderAcl && _aclFolderPath == path) { _showFolderAcl = false; _aclFolderPath = ""; }
@@ -1204,52 +1028,14 @@ else
 
     // ========== Navigation ==========
 
-    private void NavigateTo(FileMetadata dir)
+    internal void NavigateTo(FileMetadata dir)
     {
         var relativePath = dir.Path;
         if (VM.CurrentShare is not null && relativePath.StartsWith(VM.CurrentShare.Path))
             relativePath = relativePath[VM.CurrentShare.Path.Length..].TrimStart('/');
         Nav.NavigateTo($"/files/{ShareName}/{relativePath}");
     }
-
-    private bool _previewIsImage;
-    private bool _previewLoading;
-
-    private async Task OpenFilePreview(FileMetadata file)
-    {
-        _previewFileName = file.Name;
-        _previewIsImage = false;
-        _previewUrl = "";
-        _previewLoading = true;
-        _showFilePreview = true;
-        StateHasChanged();
-
-        var result = await VM.ReadFileForPreviewAsync(file);
-        if (result is null)
-        {
-            _showFilePreview = false;
-            _previewLoading = false;
-            return;
-        }
-
-        var (data, contentType) = result.Value;
-
-        _previewUrl = await JS.InvokeAsync<string>(
-            "filePreview.showBlob", data, contentType);
-
-        _previewIsImage = contentType.StartsWith("image/");
-        _previewLoading = false;
-    }
-
-    private async Task CloseFilePreview()
-    {
-        if (!string.IsNullOrEmpty(_previewUrl))
-            await JS.InvokeVoidAsync("filePreview.revokeBlob", _previewUrl);
-
-        _showFilePreview = false;
-        _previewUrl = "";
-    }
-
+    
     private void NavigateUp()
     {
         if (string.IsNullOrEmpty(VM.ParentPath))
@@ -1257,4 +1043,8 @@ else
         else
             Nav.NavigateTo($"/files/{ShareName}/{VM.ParentPath}");
     }
+
+    public bool CurrentUserIsAdmin()
+        => _isAdmin;
+
 }
