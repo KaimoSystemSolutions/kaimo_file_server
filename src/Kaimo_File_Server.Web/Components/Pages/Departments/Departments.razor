@@ -5,7 +5,10 @@
 @using Kaimo_File_Server.Core.Security
 @using Kaimo_File_Server.Core.Helpers
 @using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Services
 @inject DepartmentViewModel VM
+@inject AssetProvider Assets
 
 <PageTitle>Kaimo Files – Abteilungen</PageTitle>
 
@@ -28,15 +31,14 @@ else
             <h1>Abteilungen</h1>
             <p class="subtitle">@VM.Departments.Count Abteilungen</p>
         </div>
-        @if (VM.CanEdit)
-        {
-            <button class="btn-icon" title="Abteilung erstellen" @onclick="() => VM.StartCreate()">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-            </button>
-        }
+        <div style="display: flex; gap: 4px; align-items: center;">
+            @if (VM.CanEdit)
+            {
+                <button class="btn-icon" title="Abteilung erstellen" @onclick="() => VM.StartCreate()">
+                    @Assets.SVG("plus.svg", new SvgOptions(Width: 20, Height: 20, StrokeWidth: 2f))
+                </button>
+            }
+        </div>
     </div>
 
     @* ── Create Form ── *@
@@ -87,7 +89,7 @@ else
 
     <div class="admin-content">
 
-        @* ════════════ LIST ════════════ *@
+        @* ════════════ TREE LIST ════════════ *@
         <div class="admin-list">
             @if (!VM.Departments.Any())
             {
@@ -95,36 +97,76 @@ else
             }
             else
             {
-                <div class="file-list">
-                    <div class="file-row admin-row-header">
-                        <div class="file-cell user-name">Name</div>
-                        <div class="file-cell user-size">Elternabteilung</div>
-                    </div>
-                    @foreach (var dept in VM.Departments)
+                var treeNodes = VM.GetTreeOrderedDepartments();
+
+                <div class="dept-tree">
+                    @foreach (var node in treeNodes)
                     {
+                        var dept = node.Department;
                         var isSelected = VM.Selected?.Id == dept.Id;
                         var isGlobal = VM.IsGlobalDepartment(dept);
-                        <div class="file-row admin-row-selectable @(isSelected ? "admin-row-selected" : "")"
+                        var isCollapsed = VM.IsCollapsed(dept.Id);
+
+                        <div class="dept-tree-row @(isSelected ? "dept-tree-row--selected" : "")"
                              @onclick="() => Select(dept)">
-                            <div class="file-cell user-name">
-                                <svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
-                                     fill="none" stroke="@(isSelected ? "var(--accent)" : "var(--text-tertiary)")" stroke-width="1.5">
+
+                            @* ── Guide lines: sit directly in row for align-items:stretch ── *@
+                            @for (var col = 0; col < node.Depth; col++)
+                            {
+                                @if (col < node.Depth - 1)
+                                {
+                                    <span class="dept-tree-guide @(node.AncestorContinues[col] ? "dept-tree-guide--vert" : "")"></span>
+                                }
+                                else
+                                {
+                                    <span class="dept-tree-guide @(node.IsLastChild ? "dept-tree-guide--corner" : "dept-tree-guide--tee")"></span>
+                                }
+                            }
+
+                            @* ── Content: toggle + icon + name + badge ── *@
+                            <div class="dept-tree-row-content">
+                                @if (node.HasChildren)
+                                {
+                                    <button class="dept-tree-toggle @(isCollapsed ? "" : "dept-tree-toggle--open")"
+                                            @onclick="() => ToggleCollapse(dept.Id)" @onclick:stopPropagation="true"
+                                            title="@(isCollapsed ? "Aufklappen" : "Zuklappen")">
+                                        @Assets.SVG("chevron_right.svg", new SvgOptions(
+                                            Width: 14, Height: 14,
+                                            Color: "currentColor", StrokeWidth: 2f))
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="dept-tree-toggle-spacer"></span>
+                                }
+
+                                <span class="dept-tree-icon">
                                     @if (isGlobal)
                                     {
-                                        <circle cx="12" cy="12" r="10" />
-                                        <line x1="2" y1="12" x2="22" y2="12" />
-                                        <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
+                                        @Assets.SVG("compass.svg", new SvgOptions(
+                                            Width: 18, Height: 18,
+                                            Color: isSelected ? "var(--accent)" : "var(--text-tertiary)",
+                                            StrokeWidth: 1.5f))
                                     }
                                     else
                                     {
-                                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                        <polyline points="9 22 9 12 15 12 15 22" />
+                                        @Assets.SVG("folder.svg", new SvgOptions(
+                                            Width: 18, Height: 18,
+                                            Color: isSelected ? "var(--accent)" : "var(--text-tertiary)",
+                                            Fill: isSelected ? "var(--accent-subtle)" : "none",
+                                            StrokeWidth: 1.5f))
                                     }
-                                </svg>
-                                <span>@dept.Name</span>
-                            </div>
-                            <div class="file-cell user-size" style="color: var(--text-tertiary); font-size: 12px;">
-                                @VM.GetParentName(dept.ParentDepartmentId)
+                                </span>
+
+                                <span class="dept-tree-name @(isSelected ? "dept-tree-name--selected" : "")">
+                                    @dept.Name
+                                </span>
+
+                                @if (node.HasChildren)
+                                {
+                                    var childCount = VM.Departments.Count(d => d.ParentDepartmentId == dept.Id);
+                                    <span class="dept-tree-badge" title="@childCount Unterabteilungen">@childCount</span>
+                                }
                             </div>
                         </div>
                     }
@@ -219,10 +261,9 @@ else
                                 <span class="multi-select-text">
                                     @Checked(VM.EditMembers.Where(m => m.IsChecked).Select(m => m.Item.Name), "Keine Mitglieder")
                                 </span>
-                                <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M6 9l6 6 6-6" />
-                                </svg>
+                                @Assets.SVG("chevron_down.svg", new SvgOptions(
+                                    Width: 14, Height: 14, Color: "currentColor",
+                                    StrokeWidth: 2f, CssClass: "multi-select-chevron"))
                             </div>
                             @if (membersOpen)
                             {
@@ -252,10 +293,9 @@ else
                                 <span class="multi-select-text">
                                     @Checked(VM.EditGroups.Where(g => g.IsChecked).Select(g => g.Item.Name), "Keine Gruppen")
                                 </span>
-                                <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M6 9l6 6 6-6" />
-                                </svg>
+                                @Assets.SVG("chevron_down.svg", new SvgOptions(
+                                    Width: 14, Height: 14, Color: "currentColor",
+                                    StrokeWidth: 2f, CssClass: "multi-select-chevron"))
                             </div>
                             @if (groupsOpen)
                             {
@@ -286,10 +326,9 @@ else
                                 <span class="multi-select-text">
                                     @Checked(VM.EditShares.Where(s => s.IsChecked).Select(s => s.Item.Name), "Keine Freigaben")
                                 </span>
-                                <svg class="multi-select-chevron" width="14" height="14" viewBox="0 0 24 24"
-                                     fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M6 9l6 6 6-6" />
-                                </svg>
+                                @Assets.SVG("chevron_down.svg", new SvgOptions(
+                                    Width: 14, Height: 14, Color: "currentColor",
+                                    StrokeWidth: 2f, CssClass: "multi-select-chevron"))
                             </div>
                             @if (sharesOpen)
                             {
@@ -397,11 +436,10 @@ else
                                             @if (!VM.PermInfo.IsOwn && VM.PermInfo.InheritedFromName is not null)
                                             {
                                                 <span class="inherited-hint">
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                                                         stroke="var(--text-tertiary)" stroke-width="1.5"
-                                                         style="vertical-align: -1px; margin-right: 2px;">
-                                                        <path d="M9 18l6-6-6-6" />
-                                                    </svg>
+                                                    @Assets.SVG("chevron_right.svg", new SvgOptions(
+                                                        Width: 12, Height: 12,
+                                                        Color: "var(--text-tertiary)", StrokeWidth: 1.5f,
+                                                        Style: "vertical-align: -1px; margin-right: 2px;"))
                                                     Geerbt von: @VM.PermInfo.InheritedFromName
                                                 </span>
                                             }
@@ -478,6 +516,7 @@ else
     private async Task Create() { await VM.CreateAsync(); StateHasChanged(); }
     private async Task ConfirmDelete() { await VM.ConfirmDeleteAsync(); StateHasChanged(); }
     private void CancelEdit() { CloseDropdowns(); VM.CancelEdit(); StateHasChanged(); }
+    private void ToggleCollapse(Guid id) { VM.ToggleCollapse(id); StateHasChanged(); }
     private async Task HandleCreateKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") await Create(); }
     private void CloseDropdowns() { membersOpen = false; groupsOpen = false; sharesOpen = false; }
 

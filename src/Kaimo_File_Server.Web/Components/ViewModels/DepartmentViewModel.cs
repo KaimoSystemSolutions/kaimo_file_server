@@ -551,6 +551,73 @@ public class DepartmentViewModel
 
     public bool IsGlobalDepartment(Department dept)
         => dept.Id == WellKnownDepartments.GlobalId;
+
+    // ══════════════════════════════════════════
+    //  Tree helpers
+    // ══════════════════════════════════════════
+
+    private readonly HashSet<Guid> _collapsedIds = [];
+
+    public bool IsCollapsed(Guid id) => _collapsedIds.Contains(id);
+
+    public void ToggleCollapse(Guid id)
+    {
+        if (!_collapsedIds.Remove(id))
+            _collapsedIds.Add(id);
+    }
+
+    public void CollapseAll()
+    {
+        foreach (var d in Departments.Where(d => Departments.Any(c => c.ParentDepartmentId == d.Id)))
+            _collapsedIds.Add(d.Id);
+    }
+
+    public void ExpandAll() => _collapsedIds.Clear();
+
+    public List<DepartmentNode> GetTreeOrderedDepartments()
+    {
+        var result = new List<DepartmentNode>();
+        var deptIds = Departments.Select(d => d.Id).ToHashSet();
+
+        var roots = Departments
+            .Where(d => !d.ParentDepartmentId.HasValue
+                        || !deptIds.Contains(d.ParentDepartmentId.Value))
+            .OrderBy(d => d.Name)
+            .ToList();
+
+        for (var i = 0; i < roots.Count; i++)
+            AppendTree(result, roots[i], 0, i == roots.Count - 1, []);
+
+        return result;
+    }
+
+    private void AppendTree(
+        List<DepartmentNode> result,
+        Department dept,
+        int depth,
+        bool isLast,
+        bool[] ancestorContinues)
+    {
+        var children = Departments
+            .Where(d => d.ParentDepartmentId == dept.Id)
+            .OrderBy(d => d.Name)
+            .ToList();
+
+        result.Add(new DepartmentNode(dept, depth, children.Count > 0, isLast, ancestorContinues));
+
+        if (_collapsedIds.Contains(dept.Id))
+            return;
+
+        for (var i = 0; i < children.Count; i++)
+        {
+            var childContinues = new bool[depth + 1];
+            Array.Copy(ancestorContinues, childContinues, depth);
+            childContinues[depth] = i < children.Count - 1;
+
+            AppendTree(result, children[i], depth + 1, i == children.Count - 1, childContinues);
+        }
+    }
+
 }
 
 // ══════════════════════════════════════════
@@ -558,6 +625,21 @@ public class DepartmentViewModel
 // ══════════════════════════════════════════
 
 public record DeptPermFlag(string Label, string Description, FilePermission Flag);
+
+/// <param name="Department">The department entity.</param>
+/// <param name="Depth">Nesting depth (0 = root).</param>
+/// <param name="HasChildren">Whether children exist (even if collapsed).</param>
+/// <param name="IsLastChild">Last sibling at its level — determines └ vs ├.</param>
+/// <param name="AncestorContinues">
+///   Length = Depth.  Index i = true means the ancestor at depth i
+///   is NOT the last sibling, so a vertical line must be drawn at column i.
+/// </param>
+public record DepartmentNode(
+    Department Department,
+    int Depth,
+    bool HasChildren,
+    bool IsLastChild,
+    bool[] AncestorContinues);
 
 public record EffectivePermissionInfo(
     FilePermission Permission,

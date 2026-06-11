@@ -58,6 +58,7 @@ builder.Services.AddScoped<ShareBrowserViewModel>();
 builder.Services.AddScoped<FileBrowserViewModel>();
 builder.Services.AddScoped<UserListViewModel>();
 builder.Services.AddScoped<AclEditorViewModel>();
+builder.Services.AddScoped<DepartmentViewModel>();
 
 // ShareListViewModel needs the storagePath string — use a factory lambda.
 builder.Services.AddScoped<ShareListViewModel>(sp =>

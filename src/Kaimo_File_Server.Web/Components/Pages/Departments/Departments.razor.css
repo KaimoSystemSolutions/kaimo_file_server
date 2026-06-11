@@ -1,0 +1,174 @@
+﻿/* ═══════════════════════════════════════════
+   Department Tree  –  v2 (bigger, no gaps)
+   ═══════════════════════════════════════════ */
+
+.dept-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 4px 0;
+    overflow: hidden;
+}
+
+/* ── Row ── */
+
+.dept-tree-row {
+    display: flex;
+    align-items: stretch;
+    padding-right: 14px;
+    padding-left: 10px;
+    cursor: pointer;
+    transition: background 0.12s;
+    user-select: none;
+}
+
+    .dept-tree-row:hover {
+        background: var(--bg-hover);
+    }
+
+.dept-tree-row--selected {
+    background: var(--accent-selected);
+}
+
+    .dept-tree-row--selected:hover {
+        background: var(--accent-selected);
+    }
+
+/* Inner content wrapper */
+.dept-tree-row-content {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    flex: 1;
+    padding: 3px 0;
+}
+
+/* ── Guide columns ──
+   Each guide is a 28px-wide column that stretches the full row height.
+   Pseudo-elements extend ±8px to bridge sub-pixel gaps between rows.
+   Parent overflow:hidden clips the excess cleanly. */
+
+.dept-tree-guide {
+    width: 28px;
+    flex-shrink: 0;
+    position: relative;
+}
+
+/* Vertical continuation │ */
+.dept-tree-guide--vert::before,
+.dept-tree-guide--tee::before {
+    content: "";
+    position: absolute;
+    left: 13px;
+    top: 0;
+    bottom: -1px;
+    width: 2px;
+    background: var(--border);
+}
+
+/* Horizontaler Stub des ├ */
+.dept-tree-guide--tee::after {
+    content: "";
+    position: absolute;
+    left: 13px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 15px;
+    height: 2px;
+    border-radius: 0 1px 1px 0;
+    background: var(--border);
+}
+
+/* Ecke └ als abgerundeter Bogen */
+.dept-tree-guide--corner::before {
+    content: "";
+    position: absolute;
+    left: 13px;
+    top: 0;
+    width: 15px;
+    height: calc(50% + 1px); /* Unterkante exakt auf Stub-Höhe des ├ */
+    border-left: 2px solid var(--border);
+    border-bottom: 2px solid var(--border);
+    border-bottom-left-radius: 8px;
+}
+
+/* ── Expand / Collapse toggle ── */
+
+.dept-tree-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border: none;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+    color: var(--text-secondary);
+    border-radius: 6px;
+    transition: transform 0.15s ease, color 0.12s, background 0.12s;
+    transform: rotate(0deg);
+}
+
+    .dept-tree-toggle:hover {
+        color: var(--text-primary);
+        background: var(--bg-active);
+    }
+
+.dept-tree-toggle--open {
+    transform: rotate(90deg);
+}
+
+.dept-tree-toggle-spacer {
+    display: inline-block;
+    width: 28px;
+    flex-shrink: 0;
+}
+
+/* ── Icon ── */
+
+.dept-tree-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-right: 10px;
+}
+
+/* ── Name ── */
+
+.dept-tree-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 14.5px;
+    color: var(--text-primary);
+    line-height: 1.35;
+}
+
+.dept-tree-name--selected {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* ── Child count badge ── */
+
+.dept-tree-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    margin-left: 10px;
+    border-radius: 11px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1;
+    flex-shrink: 0;
+}
