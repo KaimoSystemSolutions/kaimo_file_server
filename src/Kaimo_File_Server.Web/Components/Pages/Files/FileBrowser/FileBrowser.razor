@@ -404,7 +404,8 @@ else
     <div class="modal-backdrop" @onclick="CancelRename">
         <div class="modal-dialog" @onclick:stopPropagation="true">
             <h3 class="modal-title">@Resources.Web_Action_Rename</h3>
-            <input class="modal-input" type="text" placeholder="@Resources.Web_Rename_Placeholder"
+            <input id="rename-input" class="modal-input" type="text"
+                   placeholder="@Resources.Web_Rename_Placeholder"
                    @bind="_renameNewName" @bind:event="oninput"
                    @onkeydown="OnRenameKeyDown" />
             @if (_renameError is not null)
@@ -744,7 +745,7 @@ else
             await _filePreviewComponent.OpenFilePreview(item);
     }
 
-    internal void RenameSelected()
+    internal async Task RenameSelected()
     {
         if (_selectedItems.Count != 1) return;
         var item = _selectedItems.First();
@@ -752,6 +753,10 @@ else
         _renameNewName = item.Name;
         _renameError = null;
         _showRenameDialog = true;
+        
+        // Wait one frame so the input is actually in the DOM
+        await Task.Delay(50);
+        await JS.InvokeVoidAsync("selectFileName", "#rename-input");
     }
 
     internal async Task DeleteSelected()
@@ -917,7 +922,7 @@ else
             DeleteSelected();
 
         if (e.Key == "F2" && _selectedItems.Count == 1)
-            RenameSelected();
+            await RenameSelected();
         
     }
     
