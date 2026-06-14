@@ -344,7 +344,7 @@ namespace Kaimo_File_Server.Smb
 
             var share = new FileSystemShare(name, fileSystem);
             share.AccessRequested += (sender, args) =>
-                OnAccessRequested(((FileSystemShare)sender).Name, args);
+                OnAccessRequested(shareId, args);
 
             return share;
         }
@@ -361,7 +361,7 @@ namespace Kaimo_File_Server.Smb
             });
         }
 
-        private void OnAccessRequested(string shareName, AccessRequestArgs args)
+        private void OnAccessRequested(Guid shareId, AccessRequestArgs args)
         {
             try
             {
@@ -380,12 +380,12 @@ namespace Kaimo_File_Server.Smb
                 SmbFileSystem.SetSessionUser(userContext);
 
                 args.Allow = authLookup
-                    .HasShareAccessAsync(shareName, userContext.User.Id)
+                    .HasShareAccessAsync(shareId, userContext.User.Id)
                     .GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ShareAccess ERROR] {args.UserName} -> {shareName}: {ex.Message}");
+                Console.WriteLine($"[ShareAccess ERROR] {args.UserName} -> {shareId}: {ex.Message}");
                 args.Allow = false;
             }
         }
@@ -414,7 +414,7 @@ namespace Kaimo_File_Server.Smb
                     try
                     {
                         var hasAccess = authLookup
-                            .HasShareAccessAsync(entry.DbName, userContext.User.Id)
+                            .HasShareAccessAsync(entry.Id, userContext.User.Id)
                             .GetAwaiter().GetResult();
 
                         if (hasAccess)

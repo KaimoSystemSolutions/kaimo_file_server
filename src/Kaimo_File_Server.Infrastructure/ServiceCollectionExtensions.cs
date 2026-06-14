@@ -38,7 +38,6 @@ namespace Kaimo_File_Server.Infrastructure
 
             // ── Repositories ──
             services.AddScoped<IUserRepository, UserRepository>();
-            services.AddScoped<IShareAccessRepository, ShareAccessRepository>();
             services.AddScoped<IShareRepository, ShareRepository>();
             services.AddScoped<IGroupRepository, GroupRepository>();
             services.AddScoped<IRoleRepository, RoleRepository>();

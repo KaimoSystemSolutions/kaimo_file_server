@@ -1,10 +1,12 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Services;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
@@ -14,9 +16,10 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 public partial class ShareListViewModel
 {
     private readonly IShareRepository _shareRepo;
-    private readonly IShareAccessRepository _accessRepo;
     private readonly IUserRepository _userRepo;
     private readonly IGroupRepository _groupRepo;
+    private readonly IAclRepository _aclRepo;
+    private readonly IDepartmentPermissionService _departmentPermissionService;
     private readonly IStorageEngine _storage;
     private readonly ShareLockManager _lockManager;
     private readonly AuthenticationStateProvider _authState;
@@ -25,9 +28,9 @@ public partial class ShareListViewModel
 
     public ShareListViewModel(
         IShareRepository shareRepo,
-        IShareAccessRepository accessRepo,
         IUserRepository userRepo,
         IGroupRepository groupRepo,
+        IAclRepository aclRepo,
         IStorageEngine storage,
         ShareLockManager lockManager,
         AuthenticationStateProvider authState,
@@ -35,9 +38,9 @@ public partial class ShareListViewModel
         string storagePath)
     {
         _shareRepo = shareRepo;
-        _accessRepo = accessRepo;
         _userRepo = userRepo;
         _groupRepo = groupRepo;
+        _aclRepo = aclRepo;
         _storage = storage;
         _lockManager = lockManager;
         _authState = authState;
@@ -69,7 +72,6 @@ public partial class ShareListViewModel
     // -- Access --
 
     public bool ShowAccessPanel { get; set; }
-    public List<ShareAccessEntry> AccessEntries { get; private set; } = [];
     public List<User> AllUsers { get; private set; } = [];
     public List<Core.Domain.Identity.Group> AllGroups { get; private set; } = [];
     public string? AccessErrorMessage { get; private set; }
@@ -120,8 +122,8 @@ public partial class ShareListViewModel
                     var accessible = new List<ShareDefinition>();
                     foreach (var share in allShares)
                     {
-                        if (await _accessRepo.HasAccessAsync(share.Name, uid))
-                            accessible.Add(share);
+                        
+                        accessible.Add(share);
                     }
                     Shares = accessible;
                 }
@@ -194,12 +196,30 @@ public partial class ShareListViewModel
             //if (userId is not null && Guid.TryParse(userId, out var uid))
             if (user is not null)
             {
-                var uid = user.Id;
-                // 1. Share-Sichtbarkeit
-                await _accessRepo.GrantAccessAsync(share.Name, uid);
 
-                // 2. Root-FileMetadata für den Share anlegen + Owner-ACL
-                await _accessRepo.EnsureShareRootAclAsync(share.Id, uid);
+                // Root-FileMetadata für den Share anlegen + Owner-ACL
+                var rootMeta = new FileMetadata
+                {
+                    Id = Guid.NewGuid(),
+                    ShareId = share.Id,
+                    Path = "/",
+                    IsDirectory = true,
+                    Size = 0,
+                    OwnerId = user.Id,
+                    CreatedAt = DateTime.UtcNow,
+                    ModifiedAt = DateTime.UtcNow,
+                };
+
+                var newAcl = new AccessEntry(
+                    user.Id,
+                    AclEntryType.Allow,
+                    FilePermission.FullControl,
+                    AclInheritance.AllDescendants);
+                    
+                newAcl.FileMetadataId = rootMeta.Id;
+
+                await _aclRepo.AddAsync(newAcl);
+                //await _accessRepo.EnsureShareRootAclAsync(share.Id, user.Id);
             }
 
             _logger.LogInformation("Share '{ShareName}' erstellt", name);
@@ -292,9 +312,6 @@ public partial class ShareListViewModel
                 SelectedShare.Name = newName;
                 SelectedShare.Path = BuildSharePath(newName);
                 await _shareRepo.UpdateAsync(SelectedShare);
-
-                // 3. Alle AccessEntries migrieren
-                await _accessRepo.UpdateShareNameAsync(oldName, newName);
 
                 // 4. Lock-Key umbenennen
                 _lockManager.RenameLock(oldName, newName);
@@ -436,7 +453,6 @@ public partial class ShareListViewModel
         try
         {
             ShowAccessPanel = true;
-            AccessEntries = await _accessRepo.GetByShareAsync(SelectedShare.Name);
             AllUsers = (await _userRepo.GetAllAsync()).ToList();
             AllGroups = (await _groupRepo.GetAllAsync()).ToList();
         }
@@ -454,8 +470,7 @@ public partial class ShareListViewModel
 
         try
         {
-            await _accessRepo.GrantAccessAsync(SelectedShare.Name, principalId);
-            AccessEntries = await _accessRepo.GetByShareAsync(SelectedShare.Name);
+            
         }
         catch (Exception ex)
         {
@@ -471,8 +486,7 @@ public partial class ShareListViewModel
 
         try
         {
-            await _accessRepo.RevokeAccessAsync(SelectedShare.Name, principalId);
-            AccessEntries = await _accessRepo.GetByShareAsync(SelectedShare.Name);
+            
         }
         catch (Exception ex)
         {
@@ -500,5 +514,8 @@ public partial class ShareListViewModel
     }
 
     public bool HasAccess(Guid principalId)
-        => AccessEntries.Any(e => e.PrincipalId == principalId);
+    {
+        return true;
+    }
+        
 }

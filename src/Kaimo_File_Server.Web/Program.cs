@@ -64,9 +64,9 @@ builder.Services.AddScoped<DepartmentViewModel>();
 builder.Services.AddScoped<ShareListViewModel>(sp =>
     new ShareListViewModel(
         sp.GetRequiredService<IShareRepository>(),
-        sp.GetRequiredService<IShareAccessRepository>(),
         sp.GetRequiredService<IUserRepository>(),
         sp.GetRequiredService<IGroupRepository>(),
+        sp.GetRequiredService<IAclRepository>(),
         sp.GetRequiredService<IStorageEngine>(),
         sp.GetRequiredService<ShareLockManager>(),
         sp.GetRequiredService<AuthenticationStateProvider>(),

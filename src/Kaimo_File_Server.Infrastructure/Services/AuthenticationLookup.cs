@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
@@ -12,16 +13,16 @@ namespace Kaimo_File_Server.Infrastructure.Services
     public class AuthenticationLookup : IAuthenticationLookup
     {
         private readonly IUserRepository _userRepo;
-        private readonly IShareAccessRepository _shareAccessRepo;
+        private readonly IShareRepository _shareRepo;
         private readonly IUserContextFactory _contextFactory;
 
         public AuthenticationLookup(
             IUserRepository userRepo,
-            IShareAccessRepository shareAccessRepo,
+            IShareRepository shareRepo,
             IUserContextFactory contextFactory)
         {
             _userRepo = userRepo;
-            _shareAccessRepo = shareAccessRepo;
+            _shareRepo = shareRepo;
             _contextFactory = contextFactory;
         }
 
@@ -39,9 +40,15 @@ namespace Kaimo_File_Server.Infrastructure.Services
             return await _contextFactory.CreateAsync(user);
         }
 
-        public async Task<bool> HasShareAccessAsync(string shareName, Guid principalId)
+        public async Task<bool> HasShareAccessAsync(Guid shareID, Guid principalId)
         {
-            return await _shareAccessRepo.HasAccessAsync(shareName, principalId);
+            ShareDefinition? share = await _shareRepo.GetByIdAsync(shareID);
+            if (share is null)
+                return false;
+
+            // If a share is hidden, it should not be visible to anyone, even if they have permissions to access it.
+            return !share.IsShareHidden;
+
         }
     }
 }

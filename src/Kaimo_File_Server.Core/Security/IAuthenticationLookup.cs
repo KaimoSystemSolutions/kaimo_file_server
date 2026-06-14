@@ -23,8 +23,8 @@ namespace Kaimo_File_Server.Core.Security
         Task<UserContext?> ResolveUserContextAsync(string username);
 
         /// <summary>
-        /// Checks whether a principal (user or group) has access to a specific share.
+        /// Checks whether a principal (user or group) can list a specific share.
         /// </summary>
-        Task<bool> HasShareAccessAsync(string shareName, Guid principalId);
+        Task<bool> HasShareAccessAsync(Guid shareID, Guid principalId);
     }
 }

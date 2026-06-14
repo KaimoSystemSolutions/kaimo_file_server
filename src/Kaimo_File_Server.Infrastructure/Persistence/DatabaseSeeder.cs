@@ -390,9 +390,6 @@ public class DatabaseSeeder
             ("projekte", "marco"),
         };
 
-        foreach (var (share, user) in userAccess)
-            _db.ShareAccessEntries.Add(new ShareAccessEntry(share, users[user].Id));
-
         var groupAccess = new (string Share, string Group)[]
         {
             ("test", "Developers"),
@@ -402,8 +399,6 @@ public class DatabaseSeeder
             ("marketing-files", "Marketing-Team"),
         };
 
-        foreach (var (share, group) in groupAccess)
-            _db.ShareAccessEntries.Add(new ShareAccessEntry(share, groups[group].Id));
     }
 
     // ── Department → User (M:N stays) ──
@@ -560,7 +555,6 @@ public class DatabaseSeeder
             var removeIds = remove.Select(g => g.Id).ToHashSet();
 
             await MigrateUserGroupsAsync(removeIds, keep.Id);
-            await MigrateShareAccessAsync(removeIds, keep.Id);
 
             // No more DepartmentGroup migration needed —
             // duplicate groups just get removed, the kept one
@@ -624,21 +618,6 @@ public class DatabaseSeeder
             if (!await _db.UserGroups.AnyAsync(x => x.UserId == ug.UserId && x.GroupId == toGroupId))
                 _db.UserGroups.Add(new UserGroup(ug.UserId, toGroupId));
             _db.UserGroups.Remove(ug);
-        }
-    }
-
-    private async Task MigrateShareAccessAsync(HashSet<Guid> fromGroupIds, Guid toGroupId)
-    {
-        var affected = await _db.ShareAccessEntries
-            .Where(sa => fromGroupIds.Contains(sa.PrincipalId))
-            .ToListAsync();
-
-        foreach (var sa in affected)
-        {
-            if (!await _db.ShareAccessEntries.AnyAsync(
-                    x => x.ShareName == sa.ShareName && x.PrincipalId == toGroupId))
-                _db.ShareAccessEntries.Add(new ShareAccessEntry(sa.ShareName, toGroupId));
-            _db.ShareAccessEntries.Remove(sa);
         }
     }
 }

@@ -13,20 +13,17 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 public partial class ShareBrowserViewModel
 {
     private readonly IShareRepository _shareRepo;
-    private readonly IShareAccessRepository _accessRepo;
     private readonly IStorageEngine _storage;
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<ShareBrowserViewModel> _logger;
 
     public ShareBrowserViewModel(
         IShareRepository shareRepo,
-        IShareAccessRepository accessRepo,
         IStorageEngine storage,
         AuthenticationStateProvider authState,
         ILogger<ShareBrowserViewModel> logger)
     {
         _shareRepo = shareRepo;
-        _accessRepo = accessRepo;
         _storage = storage;
         _authState = authState;
         _logger = logger;
@@ -79,7 +76,7 @@ public partial class ShareBrowserViewModel
                 var accessible = new List<ShareDefinition>();
                 foreach (var share in allShares)
                 {
-                    if (await _accessRepo.HasAccessAsync(share.Name, uid))
+                    //if (await _accessRepo.HasAccessAsync(share.Name, uid))
                         accessible.Add(share);
                 }
                 Shares = accessible;

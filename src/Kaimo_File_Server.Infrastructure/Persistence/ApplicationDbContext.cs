@@ -21,7 +21,6 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         // ── Files & Shares ──
         public DbSet<FileMetadata> FileMetadata { get; set; }
         public DbSet<AccessEntry> AccessEntries { get; set; }
-        public DbSet<ShareAccessEntry> ShareAccessEntries { get; set; }
         public DbSet<ShareDefinition> ShareDefinitions { get; set; }
         public DbSet<FileVersion> FileVersions { get; set; }
 
@@ -121,14 +120,6 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.EntryType).HasConversion<int>();
             });
 
-            modelBuilder.Entity<ShareAccessEntry>(entity =>
-            {
-                entity.ToTable("share_access");
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.ShareName).IsRequired().HasMaxLength(200);
-                entity.HasIndex(e => new { e.ShareName, e.PrincipalId }).IsUnique();
-            });
-
             modelBuilder.Entity<ShareDefinition>(entity =>
             {
                 entity.ToTable("share_definitions");
@@ -137,6 +128,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(e => e.Name).IsUnique();
                 entity.Property(e => e.Path).IsRequired();
                 entity.Property(e => e.IsEnabled).IsRequired();
+                entity.Property(e => e.IsShareHidden).IsRequired();
                 entity.Property(e => e.IsRecycleEnabled).IsRequired();
 
                 // Direct FK to Department (required, default = Global)

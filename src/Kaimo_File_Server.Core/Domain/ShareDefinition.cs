@@ -50,6 +50,12 @@ namespace Kaimo_File_Server.Core.Domain
         public bool IsEnabled { get; set; }
 
         /// <summary>
+        /// When <c>true</c>, the share is hidden from directory listings but
+        /// still accessible to users with direct proper rights.
+        /// </summary>
+        public bool IsShareHidden { get; set; }
+
+        /// <summary>
         /// When <c>true</c>, deleted files are moved to a hidden
         /// <c>.recycle</c> directory inside the share instead of
         /// being permanently removed.
@@ -75,6 +81,7 @@ namespace Kaimo_File_Server.Core.Domain
             string path,
             Guid? departmentId = null,
             bool isEnabled = true,
+            bool isShareHidden = false,
             bool isRecycleEnabled = false)
         {
             Id = Guid.NewGuid();
@@ -88,6 +95,7 @@ namespace Kaimo_File_Server.Core.Domain
                 : throw new ArgumentException("Path must not be empty.", nameof(path));
 
             DepartmentId = departmentId ?? WellKnownDepartments.GlobalId;
+            IsShareHidden = isShareHidden;
             IsEnabled = isEnabled;
             IsRecycleEnabled = isRecycleEnabled;
         }
