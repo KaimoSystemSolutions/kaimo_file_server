@@ -380,7 +380,7 @@ namespace Kaimo_File_Server.Smb
                 SmbFileSystem.SetSessionUser(userContext);
 
                 args.Allow = authLookup
-                    .HasShareAccessAsync(shareId, userContext.User.Id)
+                    .CanListShareAsync(shareId, userContext.User.Id)
                     .GetAwaiter().GetResult();
             }
             catch (Exception ex)
@@ -414,7 +414,7 @@ namespace Kaimo_File_Server.Smb
                     try
                     {
                         var hasAccess = authLookup
-                            .HasShareAccessAsync(entry.Id, userContext.User.Id)
+                            .CanListShareAsync(entry.Id, userContext.User.Id)
                             .GetAwaiter().GetResult();
 
                         if (hasAccess)

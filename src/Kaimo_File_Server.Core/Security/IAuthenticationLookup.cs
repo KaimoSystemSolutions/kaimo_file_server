@@ -25,6 +25,6 @@ namespace Kaimo_File_Server.Core.Security
         /// <summary>
         /// Checks whether a principal (user or group) can list a specific share.
         /// </summary>
-        Task<bool> HasShareAccessAsync(Guid shareID, Guid principalId);
+        Task<bool> CanListShareAsync(Guid shareID, Guid principalId);
     }
 }

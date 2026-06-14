@@ -40,5 +40,15 @@ namespace Kaimo_File_Server.Infrastructure.Services
 
             return await CreateAsync(user);
         }
+
+        public async Task<UserContext?> CreateByUserIdAsync(Guid userId)
+        {
+            var user = await _db.Users
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user is null) return null;
+
+            return await CreateAsync(user);
+        }
     }
 }

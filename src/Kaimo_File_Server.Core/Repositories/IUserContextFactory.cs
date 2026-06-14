@@ -20,5 +20,12 @@ namespace Kaimo_File_Server.Core.Repositories
         /// </summary>
         /// <param name="username">The login name to look up.</param>
         Task<UserContext?> CreateByUsernameAsync(string username);
+
+        /// <summary>
+        /// Looks up a user by userID and, if found, creates the resolved context.
+        /// Returns <c>null</c> when the user does not exist.
+        /// </summary>
+        /// <param name="userId">The unique identifier for the user.</param>
+        Task<UserContext?> CreateByUserIdAsync(Guid userId);
     }
 }

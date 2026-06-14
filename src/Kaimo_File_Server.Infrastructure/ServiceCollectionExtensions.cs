@@ -49,6 +49,7 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IDepartmentPermissionService, DepartmentPermissionService>();
             services.AddSingleton<IPasswordService, PasswordService>();
             services.AddScoped<IUserContextFactory, UserContextFactory>();
+            services.AddScoped<IAclService, AclService>();
             services.AddScoped<IAuthenticationLookup, AuthenticationLookup>();
             services.AddScoped<IManagementAuthService, ManagementAuthService>();
 
