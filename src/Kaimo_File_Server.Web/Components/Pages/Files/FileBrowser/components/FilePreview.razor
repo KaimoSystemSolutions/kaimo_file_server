@@ -1,3 +1,4 @@
+@using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject AssetProvider Assets
 @inject FileBrowserViewModel VM
@@ -18,7 +19,7 @@
             {
                 <div class="preview-loading">
                     <div class="preview-spinner"></div>
-                    <span class="preview-loading-text">Datei wird geladen…</span>
+                    <span class="preview-loading-text">@Resources.Web_File_Loading</span>
                 </div>
             }
             else if (_previewIsImage)
