@@ -39,6 +39,16 @@ public class SmbFileSystemTests : IDisposable
             .Setup(f => f.CanDeleteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
             .ReturnsAsync(true);
 
+        _fileServiceMock
+            .Setup(f => f.CanListAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(true);
+
+        _fileServiceMock
+            .Setup(f => f.FilterReadablePathsAsync(
+                It.IsAny<IReadOnlyList<(string, bool)>>(), It.IsAny<UserContext>()))
+            .ReturnsAsync((IReadOnlyList<(string relativePath, bool isDir)> items, UserContext _) =>
+                items.Select(i => i.relativePath).ToHashSet());
+
         _sut = new SmbFileSystem(_testRoot, _shareName, _fileServiceMock.Object);
 
         var user = new User(Guid.NewGuid(), "Test User", "testuser", "hash", "nthash");
@@ -308,6 +318,10 @@ public class SmbFileSystemTests : IDisposable
             .Setup(f => f.CanWriteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
             .ReturnsAsync(false);
 
+        _fileServiceMock
+            .Setup(f => f.CanCreateAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(false);
+
         var status = _sut.CreateFile(out _, out _, "writeDenied.txt",
             AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
             CreateDisposition.FILE_CREATE, CreateOptions.FILE_NON_DIRECTORY_FILE,
@@ -332,7 +346,11 @@ public class SmbFileSystemTests : IDisposable
         _sut.SetFileInformation(h, new FileDispositionInformation { DeletePending = true });
         var status = _sut.CloseFile(h);
 
-        Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, status);
+        var setResult = _sut.SetFileInformation(h, new FileDispositionInformation { DeletePending = true });
+        Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, setResult);
+
+        var closeStatus = _sut.CloseFile(h);
+        Assert.Equal(NTStatus.STATUS_SUCCESS, closeStatus);
         Assert.True(File.Exists(Path.Combine(_testRoot, "nodelete.txt")));
     }
 
@@ -1403,17 +1421,18 @@ public class SmbFileSystemTests : IDisposable
             .ReturnsAsync(true);
         denyDeleteMock.Setup(f => f.CanDeleteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
             .ReturnsAsync(false);
+        denyDeleteMock.Setup(f => f.CanListAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(true);
 
         var denySut = CreateSutWithMock(denyDeleteMock);
         CreateTestFile("keep_me.txt");
 
-        denySut.CreateFile(out var h, out _, "keep_me.txt",
+        var createStatus = denySut.CreateFile(out var h, out _, "keep_me.txt",
             AccessMask.GENERIC_READ | AccessMask.DELETE, FileAttributes.Normal,
             ShareAccess.Read, CreateDisposition.FILE_OPEN,
             CreateOptions.FILE_DELETE_ON_CLOSE, CreateSecurityContext());
 
-        var s = denySut.CloseFile(h);
-        Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, s);
+        Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, createStatus);
         Assert.True(File.Exists(Path.Combine(_testRoot, "keep_me.txt")));
     }
 

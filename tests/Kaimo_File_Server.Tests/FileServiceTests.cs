@@ -335,11 +335,10 @@ public class FileServiceTests
 
         // Allow visible.txt, deny hidden.txt
         _aclMock
-            .Setup(a => a.HasAccessAsync(ctx, _shareId, It.Is<string>(p => p.Contains("visible")), false, FilePermission.ListReadData))
-            .ReturnsAsync(true);
-        _aclMock
-            .Setup(a => a.HasAccessAsync(ctx, _shareId, It.Is<string>(p => p.Contains("hidden")), false, FilePermission.ListReadData))
-            .ReturnsAsync(false);
+            .Setup(a => a.HasAccessBatchAsync(
+                ctx, _shareId, It.IsAny<List<(string, bool)>>(), FilePermission.ListReadData))
+            .ReturnsAsync((UserContext _, Guid _, List<(string Path, bool IsDir)> entries, FilePermission _) =>
+                entries.ToDictionary(e => e.Path, e => e.Path.Contains("visible")));
 
         var result = await _sut.ListAsync("dir", ctx);
         Assert.Single(result);

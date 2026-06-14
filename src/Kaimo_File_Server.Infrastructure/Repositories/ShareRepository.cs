@@ -37,6 +37,8 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         public async Task<ShareDefinition> CreateAsync(ShareDefinition share)
         {
             _db.ShareDefinitions.Add(share);
+            //_db.ShareAccessEntries.AddRange(new ShareAccessEntry());
+
             await _db.SaveChangesAsync();
             return share;
         }
