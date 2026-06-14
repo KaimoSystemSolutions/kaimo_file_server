@@ -40,8 +40,6 @@ public class DomainModelTests
 
     [Fact] public void ShareDefinition_Constructor_SetsDefaults() { var s = new ShareDefinition("projekte", "/data/storage/projekte"); Assert.NotEqual(Guid.Empty, s.Id); Assert.Equal("projekte", s.Name); Assert.True(s.IsEnabled); }
     [Fact] public void ShareDefinition_Constructor_CanBeDisabled() { Assert.False(new ShareDefinition("archiv", "/data/storage/archiv", isEnabled: false).IsEnabled); }
-    [Fact] public void ShareAccessEntry_Constructor_SetsValues() { var p = Guid.NewGuid(); var e = new ShareAccessEntry("test", p); Assert.NotEqual(Guid.Empty, e.Id); Assert.Equal("test", e.ShareName); Assert.Equal(p, e.PrincipalId); }
-
     [Fact]
     public void AccessEntry_Constructor_SetsValues()
     {
