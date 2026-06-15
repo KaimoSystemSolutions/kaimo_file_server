@@ -11,10 +11,11 @@
     <nav class="sidebar">
         <div class="sidebar-brand">
             @* Don't replace this with an Assets.SVG call, cuz this a lil too complicated for it *@
-            <svg width="28" height="28" viewBox="0 0 48 48" fill="none">
+            @* <svg width="28" height="28" viewBox="0 0 48 48" fill="none">
                 <rect width="48" height="48" rx="10" fill="var(--accent)" />
                 <path d="M14 20h20v2H14zM14 26h20v2H14zM14 32h14v2H14z" fill="#fff" />
-            </svg>
+            </svg> *@
+            @Assets.RawSVG("icon_kaimo_default.svg", 40, 40)
             <span class="brand-text">Kaimo Files</span>
         </div>
 

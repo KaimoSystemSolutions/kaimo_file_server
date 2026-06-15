@@ -1,6 +1,7 @@
-using System.Text;
 using Kaimo_File_Server.Web.DynamicHelpers;
 using Microsoft.AspNetCore.Components;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Kaimo_File_Server.Web.Services;
 
@@ -28,6 +29,27 @@ public class AssetProvider
     public AssetProvider(IWebHostEnvironment env)
     {
         _env = env;
+    }
+
+    /// <summary>
+    /// If you need to load a raw svg, which just scales by width and height
+    /// </summary>
+    /// <param name="relativePath"></param>
+    /// <param name="width"></param>
+    /// <param name="height"></param>
+    /// <returns></returns>
+    public MarkupString RawSVG(string relativePath, int width, int height)
+    {
+        relativePath = "svg/" + relativePath;
+        var fullPath = Path.Combine(_env.WebRootPath, relativePath);
+
+        var svg = File.ReadAllText(fullPath);
+
+        // Nur width/height überschreiben, viewBox bleibt
+        svg = Regex.Replace(svg, @"(?<=\bwidth="")\d+(?="")", width.ToString());
+        svg = Regex.Replace(svg, @"(?<=\bheight="")\d+(?="")", height.ToString());
+
+        return new MarkupString(svg);
     }
 
     public MarkupString SVG(string relativePath, SvgOptions options)
