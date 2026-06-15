@@ -28,6 +28,8 @@ services:
         condition: service_healthy
       kaimo_file_server.host:
         condition: service_started
+      elasticsearch:
+        condition: service_healthy
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.Web/Dockerfile

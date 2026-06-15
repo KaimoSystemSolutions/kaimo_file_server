@@ -557,7 +557,7 @@ public class FileBrowserViewModel
         _logger.LogInformation("File uploaded: '{Path}' by {User}",
             targetPath, userContext.User.Username);
 
-        /*
+        
         var absolutePath = _fileService.ToAbsolutePath(targetPath);
         
         await _searchService.IndexDocumentAsync(new FileDocument
@@ -571,7 +571,7 @@ public class FileBrowserViewModel
             Created = DateTime.UtcNow,
             Modified = DateTime.UtcNow
         });
-        */
+        
         
         
         
