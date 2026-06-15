@@ -17,7 +17,7 @@ namespace Kaimo_File_Server.Core.Storage
         Task RenameDirectoryAsync(string oldDirPath, string newDirPath);
         Task UnzipAsync(string zipPath, string targetPath);
         Task ArchiveAsync(List<string> sourcePaths, string targetPath, string format);
-        
+        public string ToAbsolutePath(string shareRelativePath);
         /// <summary>
         /// Calculates the total size of all files within a directory (recursive).
         /// Returns 0 if the directory doesn't exist or is empty.

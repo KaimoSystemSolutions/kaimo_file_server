@@ -22,6 +22,7 @@ namespace Kaimo_File_Server.Core.Services
         Task<bool> CanListAsync(string path, UserContext user);
 
         // ------------ Full Operations ------------
+        string ToAbsolutePath(string path);
         Task<Stream> ReadFileAsync(string path, UserContext user);
         Task WriteFileAsync(string path, Stream data, UserContext user, CancellationToken cancellationToken = default);
         Task CreateFileAsync(string path, UserContext user);

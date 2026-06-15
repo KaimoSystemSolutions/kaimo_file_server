@@ -2,6 +2,8 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure;
+using Kaimo_File_Server.Infrastructure.Search;
+using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
@@ -45,6 +47,8 @@ builder.Services.AddScoped<ToastService>();
 builder.Services.AddScoped<FileUploadCoordinator>();
 builder.Services.AddSingleton<AssetProvider>();
 
+
+
 // ══════════════════════════════════════════
 //  ViewModels
 //
@@ -82,10 +86,19 @@ builder.Services.AddDataProtection()
     .SetApplicationName("KaimoFiles");
 
 // ══════════════════════════════════════════
+//  Elastic Search
+// ══════════════════════════════════════════
+
+builder.Services.AddElasticSearch(builder.Configuration);
+
+// ══════════════════════════════════════════
 //  Build & configure pipeline
 // ══════════════════════════════════════════
 
 var app = builder.Build();
+
+var search = app.Services.GetRequiredService<ISearchService>();
+await search.InitializeAsync();
 
 // BUG FIX: DB was never initialized in the Web project.
 // Without this, tables and seed data are missing when Web starts

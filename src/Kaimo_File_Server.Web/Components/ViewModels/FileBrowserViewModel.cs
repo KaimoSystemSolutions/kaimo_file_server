@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
+using Kaimo_File_Server.Infrastructure.Search;
 using Kaimo_File_Server.Web.Helpers;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
@@ -29,6 +30,8 @@ public class FileBrowserViewModel
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<FileBrowserViewModel> _logger;
 
+    private readonly ISearchService _searchService;
+
     private IFileService? _fileService;
 
     public FileBrowserViewModel(
@@ -37,7 +40,8 @@ public class FileBrowserViewModel
         IDbContextFactory<ApplicationDbContext> dbFactory,
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authState,
-        ILogger<FileBrowserViewModel> logger)
+        ILogger<FileBrowserViewModel> logger,
+        ISearchService searchService)
     {
         _fileServiceFactory = fileServiceFactory;
         _shareRepo = shareRepo;
@@ -45,6 +49,7 @@ public class FileBrowserViewModel
         _userContextFactory = userContextFactory;
         _authState = authState;
         _logger = logger;
+        _searchService = searchService;
     }
 
     // -- State --
@@ -522,9 +527,9 @@ public class FileBrowserViewModel
         }
     }
 
-    public async Task<OperationResult> UploadFileAsync(string fileName, Stream fileStream, 
-    CancellationToken cancellationToken = default)
-{
+    public async Task<OperationResult> UploadFileAsync(string fileName, Stream fileStream, CancellationToken cancellationToken = default)
+    {
+        
     if (_fileService is null || CurrentShare is null)
         return OperationResult.Fail("Kein Share geladen.");
 
@@ -552,6 +557,26 @@ public class FileBrowserViewModel
         _logger.LogInformation("File uploaded: '{Path}' by {User}",
             targetPath, userContext.User.Username);
 
+        /*
+        var absolutePath = _fileService.ToAbsolutePath(targetPath);
+        
+        await _searchService.IndexDocumentAsync(new FileDocument
+        {
+            Id = Guid.NewGuid().ToString(),
+            FileName = fileName,
+            FilePath = absolutePath,
+            Content = "ich mag schuhe",
+            FileType = Path.GetExtension(fileName).TrimStart('.'),
+            FileSizeBytes = new FileInfo(absolutePath).Length,
+            Created = DateTime.UtcNow,
+            Modified = DateTime.UtcNow
+        });
+        */
+        
+        
+        
+        _logger.LogInformation("File indexed: '{Path}", targetPath);
+        
         return OperationResult.Ok();
     }
     catch (Exception ex)
@@ -576,7 +601,7 @@ public class FileBrowserViewModel
             _ => OperationResult.Fail("Fehler beim Hochladen.")
         };
     }
-}
+    }
 
     public long GetMaxUploadSizeBytes()
     {

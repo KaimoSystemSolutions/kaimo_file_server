@@ -137,6 +137,12 @@ public class FileService : IFileService
 
         await _storage.WriteAsync(normalized, data, cancellationToken);
     }
+
+    public string ToAbsolutePath(string path)
+    {
+        var normalized = ShareRelativePath.Normalize(path);
+        return _storage.ToAbsolutePath(normalized);
+    }
     
     public async Task ArchiveAsync(List<string> sourcePaths, string targetPath, string format, UserContext user)
     {

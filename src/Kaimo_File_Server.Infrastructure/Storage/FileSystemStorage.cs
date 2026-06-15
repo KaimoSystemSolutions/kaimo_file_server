@@ -29,7 +29,7 @@ public class FileSystemStorage : IStorageEngine
 
     // ────────────────── Path Resolution ──────────────────
 
-    private string ToAbsolutePath(string shareRelativePath)
+    public string ToAbsolutePath(string shareRelativePath)
     {
         var normalized = ShareRelativePath.Normalize(shareRelativePath);
 
