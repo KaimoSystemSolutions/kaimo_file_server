@@ -1,6 +1,64 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
-  
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
   <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
     <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
     <xsd:element name="root" msdata:IsDataSet="true">
@@ -92,15 +150,12 @@
   <data name="Web_Folder_Name" xml:space="preserve">
     <value>Name</value>
   </data>
-  <!-- ========== FileBrowser: General ========== -->
   <data name="Web_Files" xml:space="preserve">
     <value>Files</value>
   </data>
   <data name="Web_Breadcrumb_Shares" xml:space="preserve">
     <value>Shares</value>
   </data>
-
-  <!-- ========== FileBrowser: Actions ========== -->
   <data name="Web_Action_Open" xml:space="preserve">
     <value>Open</value>
   </data>
@@ -113,8 +168,6 @@
   <data name="Web_Action_Permissions" xml:space="preserve">
     <value>Permissions</value>
   </data>
-
-  <!-- ========== FileBrowser: Buttons ========== -->
   <data name="Web_Button_Cancel" xml:space="preserve">
     <value>Cancel</value>
   </data>
@@ -124,29 +177,21 @@
   <data name="Web_Button_Close" xml:space="preserve">
     <value>Close</value>
   </data>
-
-  <!-- ========== FileBrowser: Selection Toolbar ========== -->
   <data name="Web_Selection_None" xml:space="preserve">
     <value>No selection</value>
   </data>
   <data name="Web_Selection_Count" xml:space="preserve">
     <value>{0} selected</value>
   </data>
-
-  <!-- ========== FileBrowser: Create Folder ========== -->
   <data name="Web_CreateFolder_Title" xml:space="preserve">
     <value>Create new folder</value>
   </data>
   <data name="Web_CreateFolder_Placeholder" xml:space="preserve">
     <value>Folder name…</value>
   </data>
-
-  <!-- ========== FileBrowser: Manage Permissions ========== -->
   <data name="Web_ManagePermissions" xml:space="preserve">
     <value>Manage permissions</value>
   </data>
-
-  <!-- ========== FileBrowser: Delete Confirm ========== -->
   <data name="Web_DeleteConfirm_Title" xml:space="preserve">
     <value>Confirm deletion</value>
   </data>
@@ -162,13 +207,9 @@
   <data name="Web_DeleteConfirm_FoldersWarning" xml:space="preserve">
     <value>All contents of contained folders will also be deleted.</value>
   </data>
-
-  <!-- ========== FileBrowser: Rename ========== -->
   <data name="Web_Rename_Placeholder" xml:space="preserve">
     <value>New name…</value>
   </data>
-
-  <!-- ========== FileBrowser: ACL ========== -->
   <data name="Web_Acl_ShareRoot" xml:space="preserve">
     <value>(Share root)</value>
   </data>
@@ -181,8 +222,6 @@
   <data name="Web_Acl_RulesPlural" xml:space="preserve">
     <value>{0} permission rules</value>
   </data>
-
-  <!-- ========== FileBrowser: Upload Toasts ========== -->
   <data name="Web_Upload_Progress" xml:space="preserve">
     <value>Uploading "{0}"…</value>
   </data>
@@ -201,13 +240,9 @@
   <data name="Web_Upload_PageLeft" xml:space="preserve">
     <value>"{0}" cancelled — page left.</value>
   </data>
-
-  <!-- ========== FileBrowser: Delete Toast ========== -->
   <data name="Web_Delete_Success" xml:space="preserve">
     <value>Deleted "{0}"</value>
   </data>
-
-  <!-- ========== FileBrowser: Archive/Unzip Toasts ========== -->
   <data name="Web_Archive_DefaultName" xml:space="preserve">
     <value>archive</value>
   </data>
@@ -229,8 +264,6 @@
   <data name="Web_Unzip_Error" xml:space="preserve">
     <value>Error extracting archive.</value>
   </data>
-
-  <!-- ========== ContextMenu ========== -->
   <data name="Context_Menu_Open" xml:space="preserve">
     <value>Open</value>
   </data>
@@ -258,7 +291,6 @@
   <data name="Context_Menu_Refresh" xml:space="preserve">
     <value>Refresh</value>
   </data>
-  <!-- ========== ShareBrowser ========== -->
   <data name="Web_ShareBrowser_PageTitle" xml:space="preserve">
     <value>Browse</value>
   </data>
@@ -279,7 +311,7 @@
   </data>
   <data name="Web_File_Loading" xml:space="preserve">
     <value>File is loading...</value>
-  </data><!-- ========== ShareList: General ========== -->
+  </data>
   <data name="Web_ShareList_Welcome" xml:space="preserve">
     <value>Welcome, {0}</value>
   </data>
@@ -292,8 +324,6 @@
   <data name="Web_ShareList_CreatePlaceholder" xml:space="preserve">
     <value>e.g. projects, backup, media</value>
   </data>
-
-  <!-- ========== ShareList: Labels ========== -->
   <data name="Web_ShareList_Label_Name" xml:space="preserve">
     <value>Name</value>
   </data>
@@ -312,8 +342,6 @@
   <data name="Web_ShareList_Label_Groups" xml:space="preserve">
     <value>Groups</value>
   </data>
-
-  <!-- ========== ShareList: Status & Actions ========== -->
   <data name="Web_ShareList_Status_Active" xml:space="preserve">
     <value>Active</value>
   </data>
@@ -326,8 +354,6 @@
   <data name="Web_ShareList_Action_Disable" xml:space="preserve">
     <value>Disable</value>
   </data>
-
-  <!-- ========== ShareList: Detail Panel ========== -->
   <data name="Web_ShareList_DetailSubtitle" xml:space="preserve">
     <value>Share settings</value>
   </data>
@@ -337,8 +363,6 @@
   <data name="Web_ShareList_Tab_Visibility" xml:space="preserve">
     <value>Visibility</value>
   </data>
-
-  <!-- ========== ShareList: Delete ========== -->
   <data name="Web_ShareList_DeleteShare" xml:space="preserve">
     <value>Delete share</value>
   </data>
@@ -348,10 +372,8 @@
   <data name="Web_ShareList_DeletePermanently" xml:space="preserve">
     <value>Delete permanently</value>
   </data>
-
-  <!-- ========== ShareList: Visibility Tab ========== -->
   <data name="Web_ShareList_VisibilityDescription" xml:space="preserve">
-    <value>Which users and groups can see this share in the overview. Without entries the share is visible to everyone.</value>
+    <value>Whether the share should be hidden from people with access.</value>
   </data>
   <data name="Web_ShareList_NoUsers" xml:space="preserve">
     <value>No users</value>
@@ -368,12 +390,9 @@
   <data name="Web_ShareList_VisibleToAll" xml:space="preserve">
     <value>Visible to all users.</value>
   </data>
-
-  <!-- ========== ShareList: ACL Tab ========== -->
   <data name="Web_ShareList_AclDescription" xml:space="preserve">
-    <value>NTFS-like permissions for files and folders within this share.</value>
+    <value>Customizable file and folder permissions.</value>
   </data>
-  <!-- ========== MainLayout: Navigation ========== -->
   <data name="Web_Nav_Shares" xml:space="preserve">
     <value>Shares</value>
   </data>
@@ -392,5 +411,4 @@
   <data name="Web_Nav_Logout" xml:space="preserve">
     <value>Log out</value>
   </data>
-  
 </root>
