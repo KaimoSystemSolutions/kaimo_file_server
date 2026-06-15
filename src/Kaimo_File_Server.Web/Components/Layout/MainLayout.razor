@@ -1,3 +1,4 @@
+@using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inherits LayoutComponentBase
 @inject ThemeService Theme
@@ -22,19 +23,19 @@
         <div class="sidebar-nav">
             <NavLink class="nav-item" href="/" Match="NavLinkMatch.All">
                 @Assets.SVG("folder.svg", new SvgOptions())
-                Shares
+                @Resources.Web_Nav_Shares
             </NavLink>
             <NavLink class="nav-item" href="/users" Match="NavLinkMatch.All">
                 @Assets.SVG("users.svg", new SvgOptions())
-                Benutzer
+                @Resources.Web_Nav_Users
             </NavLink>
             <NavLink class="nav-item" href="/departments" Match="NavLinkMatch.All">
                 @Assets.SVG("users.svg", new SvgOptions())
-                Departments
+                @Resources.Web_Nav_Departments
             </NavLink>
             <NavLink class="nav-item" href="/files" Match="NavLinkMatch.All">
                 @Assets.SVG("compass.svg", new SvgOptions())
-                Browse Files
+                @Resources.Web_Nav_BrowseFiles
             </NavLink>
         </div>
 
@@ -47,7 +48,7 @@
                 </div>
             }
             <div class="sidebar-actions">
-                <button class="theme-toggle" @onclick="ToggleTheme" title="Theme wechseln">
+                <button class="theme-toggle" @onclick="ToggleTheme" title="@Resources.Web_Nav_ToggleTheme">
                     @if (Theme.IsDark)
                     {
                         @Assets.SVG("sun.svg", new SvgOptions())
@@ -57,7 +58,7 @@
                         @Assets.SVG("moon.svg", new SvgOptions())
                     }
                 </button>
-                <button class="theme-toggle" @onclick="Logout" title="Abmelden">
+                <button class="theme-toggle" @onclick="Logout" title="@Resources.Web_Nav_Logout">
                     @Assets.SVG("logout.svg", new SvgOptions())
                 </button>
             </div>

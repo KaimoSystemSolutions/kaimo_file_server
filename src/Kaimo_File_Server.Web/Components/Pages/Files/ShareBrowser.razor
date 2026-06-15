@@ -1,22 +1,23 @@
 @page "/files"
+@using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject ShareBrowserViewModel VM
 @inject NavigationManager Nav
 @inject AssetProvider Assets
 
-<PageTitle>Kaimo Files – Browse</PageTitle>
+<PageTitle>Kaimo Files – @Resources.Web_ShareBrowser_PageTitle</PageTitle>
 
 <div class="page-header">
     <div>
-        <h1>Browse - Shares</h1>
+        <h1>@Resources.Web_ShareBrowser_Heading</h1>
     </div>
     <div style="display: flex; gap: 0.5rem;">
         @if (VM.CanManageShares)
         {
-            <button class="btn-icon" title="Share erstellen" @onclick="() => { VM.IsCreating = !VM.IsCreating; }">
+            <button class="btn-icon" title="@Resources.Web_ShareBrowser_CreateShare" @onclick="() => { VM.IsCreating = !VM.IsCreating; }">
                 <NavLink class="nav-item" href="/" Match="NavLinkMatch.All">
                     @Assets.SVG("folder.svg", new SvgOptions())
-                    Shares Verwalten
+                    @Resources.Web_ShareBrowser_ManageShares
                 </NavLink>
             </button>
         }
@@ -27,7 +28,7 @@
 {
     <div class="loading-state">
         <div class="spinner"></div>
-        <p>Lade Shares...</p>
+        <p>@Resources.Web_ShareBrowser_Loading</p>
     </div>
 }
 else if (VM.ErrorMessage is not null)
@@ -38,7 +39,7 @@ else if (!VM.Shares.Any())
 {
     <div class="empty-state">
         @Assets.SVG("folder.svg", new SvgOptions(Width: 64, Height: 64, Color: "var(--text-tertiary)"))
-        <p>Keine Shares verfügbar.</p>
+        <p>@Resources.Web_ShareBrowser_Empty</p>
     </div>
 }
 else

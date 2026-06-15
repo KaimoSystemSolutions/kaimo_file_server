@@ -16,11 +16,11 @@
 @inject FileUploadCoordinator UploadCoordinator
 @inject AssetProvider Assets
 
-<PageTitle>@(VM.CurrentShare?.Name ?? "Dateien") – Kaimo Files</PageTitle>
+<PageTitle>@(VM.CurrentShare?.Name ?? Resources.Web_Files) – Kaimo Files</PageTitle>
 
 <div class="page-header">
     <div class="breadcrumb-bar">
-        <a class="breadcrumb-link" href="/files">Shares</a>
+        <a class="breadcrumb-link" href="/files">@Resources.Web_Breadcrumb_Shares</a>
         <span class="breadcrumb-sep">/</span>
         <a class="breadcrumb-link" href="/files/@ShareName">@ShareName</a>
         @foreach (var (name, fullPath) in VM.Breadcrumbs)
@@ -30,14 +30,14 @@
         }
     </div>
     <div style="display: flex; gap: 0.5rem; align-items: center;">
-        <button class="btn-icon" title="Neuen Ordner erstellen"
+        <button class="btn-icon" title="@Resources.Web_CreateFolder_Title"
                 @onclick="ShowCreateFolderDialog"
                 @onkeydown="OnCreateFolderKeyDown">
             @Assets.SVG("folder.svg", new SvgOptions())
         </button>
         @if (_isAdmin)
         {
-            <button class="btn-icon" title="Berechtigungen verwalten"
+            <button class="btn-icon" title="@Resources.Web_ManagePermissions"
                     @onclick="ToggleAclPanel">
                 
                 @Assets.SVG("acl_panel.svg", new SvgOptions(Color: _showAclPanel ? "var(--accent)" : "currentColor"))
@@ -56,33 +56,33 @@
     <div class="toolbar-left">
         <span class="toolbar-count">
             @(_selectedItems.Count == 0
-                ? "Keine Auswahl"
-                : $"{_selectedItems.Count} ausgewählt")
+                ? Resources.Web_Selection_None
+                : string.Format(Resources.Web_Selection_Count, _selectedItems.Count))
         </span>
     </div>
     <div class="toolbar-actions">
-        <button class="toolbar-btn" title="Öffnen"
+        <button class="toolbar-btn" title="@Resources.Web_Action_Open"
                 disabled="@(!CanOpenSelection)" @onclick="OpenSelected">
             
             @Assets.SVG("arrow_right.svg", new SvgOptions(Width: 16, Height: 16))
-            <span>Öffnen</span>
+            <span>@Resources.Web_Action_Open</span>
         </button>
-        <button class="toolbar-btn" title="Umbenennen"
+        <button class="toolbar-btn" title="@Resources.Web_Action_Rename"
                 disabled="@(!CanRenameSelection)" @onclick="RenameSelected">
             @Assets.SVG("edit.svg", new SvgOptions(Width: 16, Height: 16))
-            <span>Umbenennen</span>
+            <span>@Resources.Web_Action_Rename</span>
         </button>
-        <button class="toolbar-btn toolbar-btn--danger" title="Löschen"
+        <button class="toolbar-btn toolbar-btn--danger" title="@Resources.Web_Action_Delete"
                 disabled="@(!CanDeleteSelection)" @onclick="DeleteSelected">
             
             @Assets.SVG("trash.svg", new SvgOptions(Width: 16, Height: 16))
-            <span>Löschen</span>
+            <span>@Resources.Web_Action_Delete</span>
         </button>
-        <button class="toolbar-btn" title="Berechtigungen"
+        <button class="toolbar-btn" title="@Resources.Web_Action_Permissions"
                 disabled="@(!CanAclSelection)" @onclick="AclSelected">
             
             @Assets.SVG("shield.svg", new SvgOptions(Width: 16, Height: 16, Style: "vertical-align: -2px; margin-right: 6px;"))
-            <span>Berechtigungen</span>
+            <span>@Resources.Web_Action_Permissions</span>
         </button>
     </div>
 </div>
@@ -92,8 +92,8 @@
 {
     <div class="modal-backdrop" @onkeydown="OnCreateFolderKeyDown" tabindex="0">
         <div class="modal-dialog" @onclick:stopPropagation="true">
-            <h3 class="modal-title">Neuen Ordner erstellen</h3>
-            <input class="modal-input" type="text" placeholder="Ordnername…"
+            <h3 class="modal-title">@Resources.Web_CreateFolder_Title</h3>
+            <input class="modal-input" type="text" placeholder="@Resources.Web_CreateFolder_Placeholder"
                    @bind="_newFolderName" @bind:event="oninput"
                    @onkeydown="OnCreateFolderKeyDown" />
             @if (_createFolderError is not null)
@@ -101,10 +101,10 @@
                 <div class="modal-error">@_createFolderError</div>
             }
             <div class="modal-actions">
-                <button class="btn btn-secondary" @onclick="CancelCreateFolder">Abbrechen</button>
+                <button class="btn btn-secondary" @onclick="CancelCreateFolder">@Resources.Web_Button_Cancel</button>
                 <button class="btn btn-primary" @onclick="ConfirmCreateFolder"
                         disabled="@string.IsNullOrWhiteSpace(_newFolderName)">
-                    Erstellen
+                    @Resources.Web_Button_Create
                 </button>
             </div>
         </div>
@@ -116,24 +116,24 @@
 {
     <div class="modal-backdrop" @onclick="CancelDelete" @onkeydown="OnDeleteKeyDown" tabindex="0" @ref="_deleteModalRef">
         <div class="modal-dialog" @onclick:stopPropagation="true">
-            <h3 class="modal-title">Löschen bestätigen</h3>
+            <h3 class="modal-title">@Resources.Web_DeleteConfirm_Title</h3>
             @if (_deleteTargets.Count == 1)
             {
                 <p class="modal-text">
-                    Möchten Sie <strong>„@_deleteTargets[0].Name"</strong> wirklich löschen?
+                    @((MarkupString)string.Format(Resources.Web_DeleteConfirm_Single, $"<strong>{System.Net.WebUtility.HtmlEncode(_deleteTargets[0].Name)}</strong>"))
                     @if (_deleteTargets[0].IsDirectory)
                     {
-                        <br /><span class="modal-warning">Alle Inhalte des Ordners werden ebenfalls gelöscht.</span>
+                        <br /><span class="modal-warning">@Resources.Web_DeleteConfirm_FolderWarning</span>
                     }
                 </p>
             }
             else
             {
                 <p class="modal-text">
-                    Möchten Sie <strong>@_deleteTargets.Count Elemente</strong> wirklich löschen?
+                    @((MarkupString)string.Format(Resources.Web_DeleteConfirm_Multiple, $"<strong>{_deleteTargets.Count}</strong>"))
                     @if (_deleteTargets.Any(t => t.IsDirectory))
                     {
-                        <br /><span class="modal-warning">Alle Inhalte enthaltener Ordner werden ebenfalls gelöscht.</span>
+                        <br /><span class="modal-warning">@Resources.Web_DeleteConfirm_FoldersWarning</span>
                     }
                 </p>
             }
@@ -142,8 +142,8 @@
                 <div class="modal-error">@_deleteError</div>
             }
             <div class="modal-actions">
-                <button class="btn btn-secondary" @onclick="CancelDelete">Abbrechen</button>
-                <button class="btn btn-danger" @onclick="ConfirmDelete">Löschen</button>
+                <button class="btn btn-secondary" @onclick="CancelDelete">@Resources.Web_Button_Cancel</button>
+                <button class="btn btn-danger" @onclick="ConfirmDelete">@Resources.Web_Action_Delete</button>
             </div>
         </div>
     </div>
@@ -170,7 +170,7 @@ else
                 <h3>
                     @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
                 </h3>
-                <span class="detail-subtitle">@(_aclPath == "" ? "(Share-Root)" : _aclPath)</span>
+                <span class="detail-subtitle">@(_aclPath == "" ? Resources.Web_Acl_ShareRoot : _aclPath)</span>
             </div>
             <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclPath}-{_showAclPanel}")"
                        Path="@_aclPath"
@@ -194,7 +194,7 @@ else
         @* -- Header (sortierbar) -- *@
         <div class="file-grid-header">
             <div class="col-name col-sortable" @onclick="@(() => OnHeaderClick("name"))">
-                <span class="col-header-text">Name</span>
+                <span class="col-header-text">@Resources.Web_Folder_Name</span>
                 @if (_sortColumn == "name")
                 {
                     <span class="sort-arrow @(_sortDirection == 1 ? "sort-arrow--desc" : "sort-arrow--asc")"></span>
@@ -205,7 +205,7 @@ else
                      @onclick:stopPropagation="true"></div>
             </div>
             <div class="col-size col-sortable" @onclick="@(() => OnHeaderClick("size"))">
-                <span class="col-header-text">Größe</span>
+                <span class="col-header-text">@Resources.Web_Folder_Size</span>
                 @if (_sortColumn == "size")
                 {
                     <span class="sort-arrow @(_sortDirection == 1 ? "sort-arrow--desc" : "sort-arrow--asc")"></span>
@@ -216,7 +216,7 @@ else
                      @onclick:stopPropagation="true"></div>
             </div>
             <div class="col-created col-sortable" @onclick="@(() => OnHeaderClick("created"))">
-                <span class="col-header-text">Erstellt</span>
+                <span class="col-header-text">@Resources.Web_Folder_Created</span>
                 @if (_sortColumn == "created")
                 {
                     <span class="sort-arrow @(_sortDirection == 1 ? "sort-arrow--desc" : "sort-arrow--asc")"></span>
@@ -227,7 +227,7 @@ else
                      @onclick:stopPropagation="true"></div>
             </div>
             <div class="col-modified col-sortable" @onclick="@(() => OnHeaderClick("modified"))">
-                <span class="col-header-text">Geändert</span>
+                <span class="col-header-text">@Resources.Web_Folder_Modified</span>
                 @if (_sortColumn == "modified")
                 {
                     <span class="sort-arrow @(_sortDirection == 1 ? "sort-arrow--desc" : "sort-arrow--asc")"></span>
@@ -238,7 +238,7 @@ else
                      @onclick:stopPropagation="true"></div>
             </div>
             <div class="col-lastaccess col-sortable" @onclick="@(() => OnHeaderClick("lastaccess"))">
-                <span class="col-header-text">Letzter Zugriff</span>
+                <span class="col-header-text">@Resources.Web_Folder_Last_Access</span>
             </div>
         </div>
 
@@ -285,7 +285,7 @@ else
                     @if (dirAclCount > 0)
                     {
                         <span class="acl-indicator"
-                              title="@dirAclCount Berechtigungsregel@(dirAclCount != 1 ? "n" : "")"
+                              title="@(dirAclCount != 1 ? string.Format(Resources.Web_Acl_RulesPlural, dirAclCount) : string.Format(Resources.Web_Acl_RulesSingular, dirAclCount))"
                               @onclick="() => OpenFolderAcl(dir)"
                               @onclick:stopPropagation="true">
                             @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
@@ -318,8 +318,8 @@ else
                 <div class="file-row-acl-expand-wrap">
                     <div class="file-row-acl-expand">
                         <div class="acl-panel-header" style="padding: 0 0 8px 0;">
-                            <span class="detail-subtitle">Berechtigungen für „@dir.Name"</span>
-                            <button class="btn-icon btn-icon--small" title="Schließen" @onclick="CloseFolderAcl">
+                            <span class="detail-subtitle">@string.Format(Resources.Web_Acl_PermissionsFor, dir.Name)</span>
+                            <button class="btn-icon btn-icon--small" title="@Resources.Web_Button_Close" @onclick="CloseFolderAcl">
                                 @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                             </button>
                         </div>
@@ -353,7 +353,7 @@ else
                     @if (fileAclCount > 0)
                     {
                         <span class="acl-indicator"
-                              title="@fileAclCount Berechtigungsregel@(fileAclCount != 1 ? "n" : "")"
+                              title="@(fileAclCount != 1 ? string.Format(Resources.Web_Acl_RulesPlural, fileAclCount) : string.Format(Resources.Web_Acl_RulesSingular, fileAclCount))"
                               @onclick="() => OpenFileAcl(file)"
                               @onclick:stopPropagation="true">
                             @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
@@ -373,8 +373,8 @@ else
                 <div class="file-row-acl-expand-wrap">
                     <div class="file-row-acl-expand">
                         <div class="acl-panel-header" style="padding: 0 0 8px 0;">
-                            <span class="detail-subtitle">Berechtigungen für „@file.Name"</span>
-                            <button class="btn-icon btn-icon--small" title="Schließen" @onclick="CloseFolderAcl">
+                            <span class="detail-subtitle">@string.Format(Resources.Web_Acl_PermissionsFor, file.Name)</span>
+                            <button class="btn-icon btn-icon--small" title="@Resources.Web_Button_Close" @onclick="CloseFolderAcl">
                                 @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                             </button>
                         </div>
@@ -389,7 +389,7 @@ else
         @if (!VM.Items.Any())
         {
             <div class="file-grid-empty">
-                <p>Dieser Ordner ist leer.</p>
+                <p>@Resources.Web_Folder_Empty</p>
             </div>
         }
     </div>
@@ -403,8 +403,9 @@ else
 {
     <div class="modal-backdrop" @onclick="CancelRename">
         <div class="modal-dialog" @onclick:stopPropagation="true">
-            <h3 class="modal-title">Umbenennen</h3>
-            <input class="modal-input" type="text" placeholder="Neuer Name…"
+            <h3 class="modal-title">@Resources.Web_Action_Rename</h3>
+            <input id="rename-input" class="modal-input" type="text"
+                   placeholder="@Resources.Web_Rename_Placeholder"
                    @bind="_renameNewName" @bind:event="oninput"
                    @onkeydown="OnRenameKeyDown" />
             @if (_renameError is not null)
@@ -412,10 +413,10 @@ else
                 <div class="modal-error">@_renameError</div>
             }
             <div class="modal-actions">
-                <button class="btn btn-secondary" @onclick="CancelRename">Abbrechen</button>
+                <button class="btn btn-secondary" @onclick="CancelRename">@Resources.Web_Button_Cancel</button>
                 <button class="btn btn-primary" @onclick="ConfirmRename"
                         disabled="@string.IsNullOrWhiteSpace(_renameNewName)">
-                    Umbenennen
+                    @Resources.Web_Action_Rename
                 </button>
             </div>
         </div>
@@ -565,13 +566,13 @@ else
             string? toastId = null;
     
             toastId = Toast.Show(
-                $"Uploading \"{file.Name}\"…",
+                string.Format(Resources.Web_Upload_Progress, file.Name),
                 ToastType.Progress,
                 onDismiss: () =>
                 {
                     cts.Cancel();
                     if (toastId is not null)
-                        Toast.Update(toastId, $"\"{file.Name}\" — Upload abgebrochen.", type: ToastType.Error);
+                        Toast.Update(toastId, string.Format(Resources.Web_Upload_Cancelled, file.Name), type: ToastType.Error);
                     return Task.CompletedTask;
                 });
     
@@ -582,7 +583,7 @@ else
             }
             catch (IOException)
             {
-                Toast.Update(toastId, $"\"{file.Name}\" ist zu groß (max. 1.1 GB).", type: ToastType.Error);
+                Toast.Update(toastId, string.Format(Resources.Web_Upload_TooLarge, file.Name), type: ToastType.Error);
                 continue;
             }
     
@@ -603,9 +604,9 @@ else
                     var result = await VM.UploadFileAsync(file.Name, progressStream, cts.Token);
     
                     if (result.Success)
-                        Toast.Update(toastId, $"\"{file.Name}\" hochgeladen.", type: ToastType.Success);
+                        Toast.Update(toastId, string.Format(Resources.Web_Upload_Success, file.Name), type: ToastType.Success);
                     else
-                        Toast.Update(toastId, result.Error ?? "Upload fehlgeschlagen.", type: ToastType.Error);
+                        Toast.Update(toastId, result.Error ?? Resources.Web_Upload_Failed, type: ToastType.Error);
                 }
             }
             catch (OperationCanceledException)
@@ -614,7 +615,7 @@ else
             }
             catch (JSException)
             {
-                Toast.Update(toastId, $"\"{file.Name}\" abgebrochen — Seite verlassen.", type: ToastType.Error);
+                Toast.Update(toastId, string.Format(Resources.Web_Upload_PageLeft, file.Name), type: ToastType.Error);
                 break;
             }
             finally
@@ -744,7 +745,7 @@ else
             await _filePreviewComponent.OpenFilePreview(item);
     }
 
-    internal void RenameSelected()
+    internal async Task RenameSelected()
     {
         if (_selectedItems.Count != 1) return;
         var item = _selectedItems.First();
@@ -752,6 +753,10 @@ else
         _renameNewName = item.Name;
         _renameError = null;
         _showRenameDialog = true;
+        
+        // Wait one frame so the input is actually in the DOM
+        await Task.Delay(50);
+        await JS.InvokeVoidAsync("selectFileName", "#rename-input");
     }
 
     internal async Task DeleteSelected()
@@ -782,21 +787,21 @@ else
         var itemList = items.ToList();
         var archiveName = itemList.Count == 1
             ? Path.GetFileNameWithoutExtension(itemList[0].Name) + format
-            : "archiv" + format;
+            : Resources.Web_Archive_DefaultName + format;
 
-        var toastId = Toast.Show($"Erstelle \"{archiveName}\"…", ToastType.Progress);
+        var toastId = Toast.Show(string.Format(Resources.Web_Archive_Progress, archiveName), ToastType.Progress);
 
         var result = await VM.ArchiveAsync(itemList, format);
 
         if (result.Success)
         {
-            Toast.Update(toastId, $"\"{archiveName}\" erstellt.", type: ToastType.Success);
+            Toast.Update(toastId, string.Format(Resources.Web_Archive_Success, archiveName), type: ToastType.Success);
             await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
             StateHasChanged();
         }
         else
         {
-            Toast.Update(toastId, result.Error ?? "Fehler beim Archivieren.", type: ToastType.Error);
+            Toast.Update(toastId, result.Error ?? Resources.Web_Archive_Error, type: ToastType.Error);
         }
     }
     
@@ -804,19 +809,19 @@ else
     
     public async Task UnzipFile(FileMetadata file)
     {
-        var toastId = Toast.Show($"Entpacke \"{file.Name}\"…", ToastType.Progress);
+        var toastId = Toast.Show(string.Format(Resources.Web_Unzip_Progress, file.Name), ToastType.Progress);
 
         var result = await VM.UnzipAsync(file);
 
         if (result.Success)
         {
-            Toast.Update(toastId, $"\"{file.Name}\" entpackt.", type: ToastType.Success);
+            Toast.Update(toastId, string.Format(Resources.Web_Unzip_Success, file.Name), type: ToastType.Success);
             await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
             StateHasChanged();
         }
         else
         {
-            Toast.Update(toastId, result.Error ?? "Fehler beim Entpacken.", type: ToastType.Error);
+            Toast.Update(toastId, result.Error ?? Resources.Web_Unzip_Error, type: ToastType.Error);
         }
     }
     
@@ -917,7 +922,7 @@ else
             DeleteSelected();
 
         if (e.Key == "F2" && _selectedItems.Count == 1)
-            RenameSelected();
+            await RenameSelected();
         
     }
     
@@ -950,7 +955,7 @@ else
             var result = await VM.DeleteAsync(target);
             if (!result.Success) { _deleteError = result.Error; return; }
 
-            Toast.Show($"Deleted \"{target.Name}\"", ToastType.Success);
+            Toast.Show(string.Format(Resources.Web_Delete_Success, target.Name), ToastType.Success);
         }
         _showDeleteConfirm = false;
         _deleteTargets.Clear();

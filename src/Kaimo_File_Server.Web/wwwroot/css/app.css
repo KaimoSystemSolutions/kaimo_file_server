@@ -1961,7 +1961,12 @@ html, body, #app {
     .user-list-selected:hover {
         background: var(--accent-selected) !important;
     }
-
+.user-cell-name,
+.user-cell-username,
+.user-cell-status {
+    flex: 1;
+    min-width: 0;
+}
 .user-cell-name {
     flex: 1;
     display: flex;
