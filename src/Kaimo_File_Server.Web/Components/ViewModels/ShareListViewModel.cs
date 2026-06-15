@@ -346,7 +346,7 @@ public partial class ShareListViewModel
         }
     }
 
-    // -- Toggle Share Enabled and Recycle Enabled --
+    // -- Toggle Share Enabled and Recycle Enabled and Share Hidden --
 
     public async Task<bool> ToggleShareEnabledAsync()
     {
@@ -410,6 +410,39 @@ public partial class ShareListViewModel
         {
             _logger.LogError(ex, "Fehler beim Ändern des Recycle-Status");
             EditErrorMessage = "Fehler beim Ändern des Status.";
+            return false;
+        }
+    }
+
+    public async Task<bool> ToggleShareHiddenAsync()
+    {
+        if (SelectedShare is null) return false;
+
+        EditErrorMessage = null;
+        EditSuccessMessage = null;
+
+        try
+        {
+            SelectedShare.IsShareHidden = !SelectedShare.IsShareHidden;
+            await _shareRepo.UpdateAsync(SelectedShare);
+
+            var status = SelectedShare.IsShareHidden ? "aktiviert" : "deaktiviert";
+            _logger.LogInformation("Share '{ShareName}' {Status}", SelectedShare.Name, status);
+            EditSuccessMessage = $"Share {status}.";
+
+            await LoadAsync();
+
+            // Re-select
+            var updated = Shares.FirstOrDefault(s => s.Id == SelectedShare.Id);
+            if (updated is not null)
+                SelectedShare = updated;
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Fehler beim Ändern der Share-Sichtbarkeit");
+            EditErrorMessage = "Fehler beim Ändern der Sichtbarkeit.";
             return false;
         }
     }

@@ -59,6 +59,14 @@
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
+
+@font-face {
+    font-family: 'Plus Jakarta Sans';
+    src: url('fonts/PlusJakartaSans-VariableFont_wght.ttf') format('truetype');
+    font-weight: 100 800;
+    font-display: swap;
+}
+
 /* -- Reset & Base -- */
 
 *, *::before, *::after {
@@ -77,141 +85,7 @@ html, body, #app {
     -webkit-font-smoothing: antialiased;
 }
 
-/* -- App Shell -- */
-
-.app-shell {
-    display: flex;
-    height: 100vh;
-    overflow: hidden;
-}
-
-/* -- Sidebar -- */
-
-.sidebar {
-    width: 240px;
-    min-width: 240px;
-    background: var(--bg-secondary);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    padding: 0;
-    overflow: hidden;
-}
-
-.sidebar-brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 20px 16px 16px;
-}
-
-.brand-text {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text-primary);
-    letter-spacing: -0.01em;
-}
-
-.sidebar-nav {
-    flex: 1;
-    padding: 4px 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.nav-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 12px;
-    border-radius: 6px;
-    color: var(--text-secondary);
-    text-decoration: none;
-    font-size: 13.5px;
-    font-weight: 500;
-    transition: background 0.15s, color 0.15s;
-}
-
-    .nav-item:hover {
-        background: var(--bg-hover);
-        color: var(--text-primary);
-    }
-
-    .nav-item.active {
-        background: var(--accent-selected);
-        color: var(--accent-strong, var(--accent));
-        font-weight: 600;
-    }
-
-/* -- Sidebar Footer -- */
-
-.sidebar-footer {
-    padding: 12px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.sidebar-user {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0 4px;
-}
-
-.sidebar-avatar {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background: var(--accent-selected);
-    color: var(--accent);
-    font-size: 11px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    letter-spacing: 0.02em;
-}
-
-.sidebar-username {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-primary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    min-width: 0;
-}
-
-.sidebar-actions {
-    display: flex;
-    gap: 4px;
-    justify-content: flex-end;
-}
-
-/* -- Theme Toggle & Icon Buttons -- */
-
-.theme-toggle {
-    width: 34px;
-    height: 34px;
-    border: none;
-    background: var(--bg-tertiary);
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: var(--text-secondary);
-    transition: background 0.15s, color 0.15s;
-}
-
-    .theme-toggle:hover {
-        background: var(--bg-hover);
-        color: var(--text-primary);
-    }
+/* -- Icon Buttons -- */
 
 .btn-icon {
     width: 34px;
@@ -1778,59 +1652,7 @@ html, body, #app {
 /* -- Responsive -- */
 
 @media (max-width: 768px) {
-    .app-shell {
-        flex-direction: column;
-    }
-
-    .sidebar {
-        width: 100%;
-        min-width: 100%;
-        flex-direction: row;
-        align-items: center;
-        padding: 0 8px;
-        border-right: none;
-        border-bottom: 1px solid var(--border);
-        height: 56px;
-        min-height: 56px;
-    }
-
-    .sidebar-brand {
-        padding: 0 8px 0 4px;
-    }
-
-    .brand-text {
-        font-size: 15px;
-    }
-
-    .sidebar-nav {
-        flex-direction: row;
-        padding: 0;
-        gap: 0;
-        flex: 1;
-        justify-content: center;
-    }
-
-    .nav-item {
-        padding: 8px 12px;
-        font-size: 13px;
-    }
-
-    .sidebar-footer {
-        flex-direction: row;
-        align-items: center;
-        padding: 0 4px;
-        border-top: none;
-        gap: 6px;
-    }
-
-    .sidebar-user {
-        display: none;
-    }
-
-    .sidebar-actions {
-        flex-direction: row;
-    }
-
+    
     .main {
         padding: 16px;
     }

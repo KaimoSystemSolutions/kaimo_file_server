@@ -150,100 +150,48 @@
   <data name="Web_Folder_Name" xml:space="preserve">
     <value>Name</value>
   </data>
-  <data name="Context_Menu_CompressTarGz" xml:space="preserve">
-    <value>Als .tar.gz komprimieren</value>
-  </data>
-  <data name="Context_Menu_CompressZip" xml:space="preserve">
-    <value>Als .zip komprimieren</value>
-  </data>
-  <data name="Context_Menu_Extract" xml:space="preserve">
-    <value>Extrahieren</value>
-  </data>
-  <data name="Context_Menu_NewFolder" xml:space="preserve">
-    <value>Neuer Ordner</value>
-  </data>
-  <data name="Context_Menu_Open" xml:space="preserve">
-    <value>Öffnen</value>
-  </data>
-  <data name="Context_Menu_Permissions" xml:space="preserve">
-    <value>Berechtigungen</value>
-  </data>
-  <data name="Context_Menu_Refresh" xml:space="preserve">
-    <value>Aktualisieren</value>
-  </data>
-  <data name="Context_Menu_SelectedItems" xml:space="preserve">
-    <value>{0} Elemente ausgewählt </value>
-  </data>
-  <data name="Web_Acl_PermissionsFor" xml:space="preserve">
-    <value>Berechtigungen für "{0}"</value>
-  </data>
-  <data name="Web_Acl_RulesPlural" xml:space="preserve">
-    <value>{0} Berechtigungsregeln</value>
-  </data>
-  <data name="Web_Acl_RulesSingular" xml:space="preserve">
-    <value>{0} Berechtigungsregel</value>
-  </data>
-  <data name="Web_Action_Delete" xml:space="preserve">
-    <value>Löschen</value>
-  </data>
-  <data name="Web_Action_Open" xml:space="preserve">
-    <value>Öffnen</value>
-  </data>
-  <data name="Web_Action_Permissions" xml:space="preserve">
-    <value>Berechtigungen</value>
-  </data>
-  <data name="Web_Action_Rename" xml:space="preserve">
-    <value>Umbenennen</value>
-  </data>
-  <data name="Web_Archive_DefaultName" xml:space="preserve">
-    <value>archiv</value>
-  </data>
-  <data name="Web_Archive_Error" xml:space="preserve">
-    <value>Fehler beim Erstellen eines archieves.</value>
-  </data>
-  <data name="Web_Archive_Progress" xml:space="preserve">
-    <value>Erstelle "{0}"...</value>
-  </data>
-  <data name="Web_Archive_Success" xml:space="preserve">
-    <value>"{0}" erstellt</value>
-  </data>
-  <data name="Web_Button_Cancel" xml:space="preserve">
-    <value>Abbrechen</value>
-  </data>
-  <data name="Web_Button_Close" xml:space="preserve">
-    <value>Schliesen</value>
-  </data>
-  <data name="Web_Button_Create" xml:space="preserve">
-    <value>Erstellen</value>
-  </data>
-  <data name="Web_CreateFolder_Placeholder" xml:space="preserve">
-    <value>Ordner name...</value>
-  </data>
-  <data name="Web_CreateFolder_Title" xml:space="preserve">
-    <value>Neuen Ordner erstellen</value>
-  </data>
-  <!-- ========== FileBrowser: General ========== -->
   <data name="Web_Files" xml:space="preserve">
     <value>Dateien</value>
   </data>
   <data name="Web_Breadcrumb_Shares" xml:space="preserve">
     <value>Freigaben</value>
   </data>
-
-  <!-- ========== FileBrowser: Selection Toolbar ========== -->
+  <data name="Web_Action_Open" xml:space="preserve">
+    <value>Öffnen</value>
+  </data>
+  <data name="Web_Action_Rename" xml:space="preserve">
+    <value>Umbenennen</value>
+  </data>
+  <data name="Web_Action_Delete" xml:space="preserve">
+    <value>Löschen</value>
+  </data>
+  <data name="Web_Action_Permissions" xml:space="preserve">
+    <value>Berechtigungen</value>
+  </data>
+  <data name="Web_Button_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="Web_Button_Create" xml:space="preserve">
+    <value>Erstellen</value>
+  </data>
+  <data name="Web_Button_Close" xml:space="preserve">
+    <value>Schliesen</value>
+  </data>
   <data name="Web_Selection_None" xml:space="preserve">
     <value>Keine Auswahl</value>
   </data>
   <data name="Web_Selection_Count" xml:space="preserve">
     <value>{0} ausgewählt</value>
   </data>
-
-  <!-- ========== FileBrowser: Manage Permissions ========== -->
+  <data name="Web_CreateFolder_Title" xml:space="preserve">
+    <value>Neuen Ordner erstellen</value>
+  </data>
+  <data name="Web_CreateFolder_Placeholder" xml:space="preserve">
+    <value>Ordner name...</value>
+  </data>
   <data name="Web_ManagePermissions" xml:space="preserve">
     <value>Berechtigungen verwalten</value>
   </data>
-
-  <!-- ========== FileBrowser: Delete Confirm ========== -->
   <data name="Web_DeleteConfirm_Title" xml:space="preserve">
     <value>Löschen bestätigen</value>
   </data>
@@ -259,18 +207,21 @@
   <data name="Web_DeleteConfirm_FoldersWarning" xml:space="preserve">
     <value>Alle Inhalte enthaltener Ordner werden ebenfalls gelöscht.</value>
   </data>
-
-  <!-- ========== FileBrowser: Rename ========== -->
   <data name="Web_Rename_Placeholder" xml:space="preserve">
     <value>Neuer Name…</value>
   </data>
-
-  <!-- ========== FileBrowser: ACL ========== -->
   <data name="Web_Acl_ShareRoot" xml:space="preserve">
     <value>(Share-Root)</value>
   </data>
-
-  <!-- ========== FileBrowser: Upload Toasts ========== -->
+  <data name="Web_Acl_PermissionsFor" xml:space="preserve">
+    <value>Berechtigungen für "{0}"</value>
+  </data>
+  <data name="Web_Acl_RulesSingular" xml:space="preserve">
+    <value>{0} Berechtigungsregel</value>
+  </data>
+  <data name="Web_Acl_RulesPlural" xml:space="preserve">
+    <value>{0} Berechtigungsregeln</value>
+  </data>
   <data name="Web_Upload_Progress" xml:space="preserve">
     <value>Lade „{0}" hoch…</value>
   </data>
@@ -289,13 +240,21 @@
   <data name="Web_Upload_PageLeft" xml:space="preserve">
     <value>„{0}" abgebrochen — Seite verlassen.</value>
   </data>
-
-  <!-- ========== FileBrowser: Delete Toast ========== -->
   <data name="Web_Delete_Success" xml:space="preserve">
     <value>„{0}" gelöscht.</value>
   </data>
-
-  <!-- ========== FileBrowser: Unzip Toasts ========== -->
+  <data name="Web_Archive_DefaultName" xml:space="preserve">
+    <value>archiv</value>
+  </data>
+  <data name="Web_Archive_Progress" xml:space="preserve">
+    <value>Erstelle "{0}"...</value>
+  </data>
+  <data name="Web_Archive_Success" xml:space="preserve">
+    <value>"{0}" erstellt</value>
+  </data>
+  <data name="Web_Archive_Error" xml:space="preserve">
+    <value>Fehler beim Erstellen eines archieves.</value>
+  </data>
   <data name="Web_Unzip_Progress" xml:space="preserve">
     <value>Entpacke „{0}"…</value>
   </data>
@@ -305,13 +264,33 @@
   <data name="Web_Unzip_Error" xml:space="preserve">
     <value>Fehler beim Entpacken.</value>
   </data>
-
-  <!-- ========== ContextMenu ========== -->
+  <data name="Context_Menu_Open" xml:space="preserve">
+    <value>Öffnen</value>
+  </data>
+  <data name="Context_Menu_Extract" xml:space="preserve">
+    <value>Extrahieren</value>
+  </data>
+  <data name="Context_Menu_CompressZip" xml:space="preserve">
+    <value>Als .zip komprimieren</value>
+  </data>
+  <data name="Context_Menu_CompressTarGz" xml:space="preserve">
+    <value>Als .tar.gz komprimieren</value>
+  </data>
+  <data name="Context_Menu_Permissions" xml:space="preserve">
+    <value>Berechtigungen</value>
+  </data>
+  <data name="Context_Menu_SelectedItems" xml:space="preserve">
+    <value>{0} Elemente ausgewählt </value>
+  </data>
   <data name="Context_Menu_General" xml:space="preserve">
     <value>Allgemein</value>
   </data>
-
-  <!-- ========== ShareBrowser ========== -->
+  <data name="Context_Menu_NewFolder" xml:space="preserve">
+    <value>Neuer Ordner</value>
+  </data>
+  <data name="Context_Menu_Refresh" xml:space="preserve">
+    <value>Aktualisieren</value>
+  </data>
   <data name="Web_ShareBrowser_PageTitle" xml:space="preserve">
     <value>Durchsuchen</value>
   </data>
@@ -333,7 +312,6 @@
   <data name="Web_File_Loading" xml:space="preserve">
     <value>Datei wird geladen…</value>
   </data>
-  <!-- ========== ShareList: General ========== -->
   <data name="Web_ShareList_Welcome" xml:space="preserve">
     <value>Willkommen, {0}</value>
   </data>
@@ -346,8 +324,6 @@
   <data name="Web_ShareList_CreatePlaceholder" xml:space="preserve">
     <value>z.B. projekte, backup, medien</value>
   </data>
-
-  <!-- ========== ShareList: Labels ========== -->
   <data name="Web_ShareList_Label_Name" xml:space="preserve">
     <value>Name</value>
   </data>
@@ -366,8 +342,6 @@
   <data name="Web_ShareList_Label_Groups" xml:space="preserve">
     <value>Gruppen</value>
   </data>
-
-  <!-- ========== ShareList: Status & Actions ========== -->
   <data name="Web_ShareList_Status_Active" xml:space="preserve">
     <value>Aktiv</value>
   </data>
@@ -380,8 +354,6 @@
   <data name="Web_ShareList_Action_Disable" xml:space="preserve">
     <value>Deaktivieren</value>
   </data>
-
-  <!-- ========== ShareList: Detail Panel ========== -->
   <data name="Web_ShareList_DetailSubtitle" xml:space="preserve">
     <value>Share-Einstellungen</value>
   </data>
@@ -391,8 +363,6 @@
   <data name="Web_ShareList_Tab_Visibility" xml:space="preserve">
     <value>Sichtbarkeit</value>
   </data>
-
-  <!-- ========== ShareList: Delete ========== -->
   <data name="Web_ShareList_DeleteShare" xml:space="preserve">
     <value>Share löschen</value>
   </data>
@@ -402,10 +372,8 @@
   <data name="Web_ShareList_DeletePermanently" xml:space="preserve">
     <value>Endgültig löschen</value>
   </data>
-
-  <!-- ========== ShareList: Visibility Tab ========== -->
   <data name="Web_ShareList_VisibilityDescription" xml:space="preserve">
-    <value>Welche Benutzer und Gruppen diesen Share in der Übersicht sehen. Ohne Einträge ist der Share für alle sichtbar.</value>
+    <value>Ob Share für Leute mit Zugriff versteckt sein soll.</value>
   </data>
   <data name="Web_ShareList_NoUsers" xml:space="preserve">
     <value>Keine Benutzer</value>
@@ -422,12 +390,9 @@
   <data name="Web_ShareList_VisibleToAll" xml:space="preserve">
     <value>Für alle Benutzer sichtbar.</value>
   </data>
-
-  <!-- ========== ShareList: ACL Tab ========== -->
   <data name="Web_ShareList_AclDescription" xml:space="preserve">
-    <value>NTFS-ähnliche Berechtigungen für Dateien und Ordner innerhalb dieses Shares.</value>
+    <value>Spezifisch anpassbare Datei- und Ordnerrechte.</value>
   </data>
-  <!-- ========== MainLayout: Navigation ========== -->
   <data name="Web_Nav_Shares" xml:space="preserve">
     <value>Shares</value>
   </data>
@@ -446,5 +411,4 @@
   <data name="Web_Nav_Logout" xml:space="preserve">
     <value>Abmelden</value>
   </data>
-  
 </root>

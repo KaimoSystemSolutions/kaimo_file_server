@@ -1,4 +1,5 @@
 @page "/"
+@using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Pages.Acl
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject ShareListViewModel VM
@@ -145,7 +146,7 @@ else
                     }
 
                     <div class="detail-section">
-                        <span class="detail-label">Name</span>
+                        <span class="detail-label">@Resources.Web_ShareList_Label_Name</span>
                         <div class="detail-rename-row">
                             <input class="edit-input"
                                    type="text"
@@ -155,7 +156,7 @@ else
                             <button class="btn-primary"
                                     @onclick="RenameShare"
                                     disabled="@(VM.EditShareName.Trim() == VM.SelectedShare.Name || VM.IsRenaming)">
-                                @(VM.IsRenaming ? "…" : "Umbenennen")
+                                @(VM.IsRenaming ? "…" : Resources.Web_Action_Rename)
                             </button>
                         </div>
                     </div>
@@ -169,10 +170,10 @@ else
                         <span class="detail-label">Status</span>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span class="detail-value">
-                                @(VM.SelectedShare.IsEnabled ? "Aktiv" : "Deaktiviert")
+                                @(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)
                             </span>
                             <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" @onclick="ToggleShareEnabled">
-                                @(VM.SelectedShare.IsEnabled ? "Deaktivieren" : "Aktivieren")
+                                @(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
                             </button>
                         </div>
                     </div>
@@ -181,10 +182,10 @@ else
                         <span class="detail-label">Papierkorb</span>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span class="detail-value">
-                                @(VM.SelectedShare.IsRecycleEnabled ? "Aktiv" : "Deaktiviert")
+                                @(VM.SelectedShare.IsRecycleEnabled ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)
                             </span>
                             <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" @onclick="ToggleRecycleEnabled">
-                                @(VM.SelectedShare.IsRecycleEnabled ? "Deaktivieren" : "Aktivieren")
+                                @(VM.SelectedShare.IsRecycleEnabled ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
                             </button>
                         </div>
                     </div>
@@ -193,16 +194,16 @@ else
                         @if (!VM.ShowDeleteConfirm)
                         {
                             <button class="btn-danger-outline" @onclick="() => VM.ShowDeleteConfirm = true">
-                                Share löschen
+                                @Resources.Web_ShareList_DeleteShare
                             </button>
                         }
                         else
                         {
                             <div class="confirm-delete">
-                                <p>Share „@VM.SelectedShare.Name" wirklich löschen? Dateien bleiben erhalten.</p>
+                                <p>@string.Format(Resources.Web_ShareList_DeleteConfirm, @VM.SelectedShare.Name)</p>
                                 <div style="display: flex; gap: 8px;">
-                                    <button class="btn-danger-outline" @onclick="DeleteShare">Endgültig löschen</button>
-                                    <button class="btn-secondary" @onclick="() => VM.ShowDeleteConfirm = false">Abbrechen</button>
+                                    <button class="btn-danger-outline" @onclick="DeleteShare">@Resources.Web_ShareList_DeletePermanently</button>
+                                    <button class="btn-secondary" @onclick="() => VM.ShowDeleteConfirm = false">@Resources.Web_Button_Cancel</button>
                                 </div>
                             </div>
                         }
@@ -219,8 +220,7 @@ else
 
                     <div class="detail-section">
                         <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
-                            Welche Benutzer und Gruppen diesen Share in der Übersicht sehen.
-                            Ohne Einträge ist der Share für alle sichtbar.
+                            @Resources.Web_ShareList_VisibilityDescription
                         </p>
 
                         @if (!_accessLoaded)
@@ -232,85 +232,18 @@ else
                         else
                         {
                             <div class="form-group" style="margin-bottom: 14px;">
-                                <label>Benutzer</label>
-                                <div class="multi-select @(_accessUsersOpen ? "open" : "")">
-                                    <div class="multi-select-display" @onclick="() => _accessUsersOpen = !_accessUsersOpen">
-                                        <span class="multi-select-text">
-                                            @{
-                                                var grantedUsers = VM.AllUsers.Where(u => VM.HasAccess(u.Id)).ToList();
-                                            }
-                                            @(grantedUsers.Any()
-                                                ? string.Join(", ", grantedUsers.Select(u => u.Name ?? u.Username))
-                                                : "Keine Benutzer")
+                                <label>@Resources.Web_ShareList_Tab_Visibility</label>
+                                <div class="detail-section">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="detail-value">
+                                            @(VM.SelectedShare.IsShareHidden ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)
                                         </span>
-                                        @Assets.SVG("chevron_down.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2, CssClass: "multi-select-chevron"))
+                                        <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" @onclick="ToggleShareHidden">
+                                            @(VM.SelectedShare.IsShareHidden ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
+                                        </button>
                                     </div>
-                                    @if (_accessUsersOpen)
-                                    {
-                                        <div class="multi-select-backdrop" @onclick="() => _accessUsersOpen = false"></div>
-                                        <div class="multi-select-dropdown">
-                                            @foreach (var u in VM.AllUsers)
-                                            {
-                                                var isChecked = VM.HasAccess(u.Id);
-                                                <label class="multi-select-option">
-                                                    <input type="checkbox" checked="@isChecked"
-                                                           @onchange="async (e) => await ToggleAccessPrincipal(u.Id, (bool)(e.Value ?? false))" />
-                                                    <span>@(u.Name ?? u.Username)</span>
-                                                    <span class="multi-select-hint">@u.Username</span>
-                                                </label>
-                                            }
-                                            @if (!VM.AllUsers.Any())
-                                            {
-                                                <span class="empty-hint">Keine Benutzer vorhanden</span>
-                                            }
-                                        </div>
-                                    }
                                 </div>
                             </div>
-
-                            <div class="form-group">
-                                <label>Gruppen</label>
-                                <div class="multi-select @(_accessGroupsOpen ? "open" : "")">
-                                    <div class="multi-select-display" @onclick="() => _accessGroupsOpen = !_accessGroupsOpen">
-                                        <span class="multi-select-text">
-                                            @{
-                                                var grantedGroups = VM.AllGroups.Where(g => VM.HasAccess(g.Id)).ToList();
-                                            }
-                                            @(grantedGroups.Any()
-                                                ? string.Join(", ", grantedGroups.Select(g => g.Name))
-                                                : "Keine Gruppen")
-                                        </span>
-                                        @Assets.SVG("chevron_down.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2, CssClass: "multi-select-chevron"))
-                                    </div>
-                                    @if (_accessGroupsOpen)
-                                    {
-                                        <div class="multi-select-backdrop" @onclick="() => _accessGroupsOpen = false"></div>
-                                        <div class="multi-select-dropdown">
-                                            @foreach (var g in VM.AllGroups)
-                                            {
-                                                var isChecked = VM.HasAccess(g.Id);
-                                                <label class="multi-select-option">
-                                                    <input type="checkbox" checked="@isChecked"
-                                                           @onchange="async (e) => await ToggleAccessPrincipal(g.Id, (bool)(e.Value ?? false))" />
-                                                    <span>@g.Name</span>
-                                                </label>
-                                            }
-                                            @if (!VM.AllGroups.Any())
-                                            {
-                                                <span class="empty-hint">Keine Gruppen vorhanden</span>
-                                            }
-                                        </div>
-                                    }
-                                </div>
-                            </div>
-
-                            @if (!grantedUsers.Any() && !grantedGroups.Any())
-                            {
-                                <div class="detail-info" style="margin-top: 14px;">
-                                    @Assets.SVG("info.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)"))
-                                    <span>Für alle Benutzer sichtbar.</span>
-                                </div>
-                            }
                         }
                     </div>
                 }
@@ -319,7 +252,7 @@ else
                 {
                     <div class="detail-section">
                         <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
-                            NTFS-ähnliche Berechtigungen für Dateien und Ordner innerhalb dieses Shares.
+                            @Resources.Web_ShareList_AclDescription
                         </p>
                         <AclEditor @key="@_aclEditorKey" Path="" ShareId="@VM.SelectedShare.Id" IsDirectory="true" />
                     </div>
@@ -424,6 +357,12 @@ else
     private async Task ToggleRecycleEnabled()
     {
         await VM.ToggleRecycleEnabledAsync();
+        StateHasChanged();
+    }
+
+    private async Task ToggleShareHidden()
+    {
+        await VM.ToggleShareHiddenAsync();
         StateHasChanged();
     }
 
