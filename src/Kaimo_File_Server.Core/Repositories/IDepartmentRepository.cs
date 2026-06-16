@@ -6,7 +6,7 @@ namespace Kaimo_File_Server.Core.Repositories
 {
     public interface IDepartmentRepository
     {
-        // ── CRUD ──
+        // -- CRUD --
         Task<Department?> GetByIdAsync(Guid id);
         Task<Department?> GetByNameAsync(string name);
         Task<List<Department>> GetAllAsync();
@@ -14,7 +14,7 @@ namespace Kaimo_File_Server.Core.Repositories
         Task UpdateAsync(Department department);
         Task DeleteAsync(Guid id);
 
-        // ── Hierarchy ──
+        // -- Hierarchy --
 
         /// <summary>
         /// Returns the direct children of a department.
@@ -40,7 +40,7 @@ namespace Kaimo_File_Server.Core.Repositories
         /// </summary>
         Task<List<Department>> GetDescendantsAsync(Guid departmentId);
 
-        // ── User ↔ Department (M:N — stays) ──
+        // -- User ↔ Department (M:N — stays) --
         Task<List<User>> GetUsersAsync(Guid departmentId);
         Task<List<Department>> GetDepartmentsForUserAsync(Guid userId);
         Task AddUserAsync(Guid departmentId, Guid userId);
@@ -53,7 +53,7 @@ namespace Kaimo_File_Server.Core.Repositories
         /// </summary>
         Task<bool> IsUserInDepartmentOrDescendantAsync(Guid userId, Guid departmentId);
 
-        // ── Group → Department (direct FK on Group) ──
+        // -- Group → Department (direct FK on Group) --
 
         /// <summary>
         /// Returns all groups that belong to the given department

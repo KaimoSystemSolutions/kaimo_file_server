@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Infrastructure.Repositories;
@@ -29,14 +30,14 @@ namespace Kaimo_File_Server.Infrastructure
             var connectionString = configuration.GetConnectionString("Default")
                 ?? "Host=kaimo_file_server_db;Database=kaimo_file_server;Username=kaimo_test_user;Password=change_me";
 
-            // ── EF Core ──
+            // -- EF Core --
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseNpgsql(connectionString));
 
             services.AddDbContextFactory<ApplicationDbContext>(options =>
                 options.UseNpgsql(connectionString), ServiceLifetime.Scoped);
 
-            // ── Repositories ──
+            // -- Repositories --
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<IShareRepository, ShareRepository>();
             services.AddScoped<IGroupRepository, GroupRepository>();
@@ -45,7 +46,7 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IScopedRoleAssignmentRepository, ScopedRoleAssignmentRepository>();
             services.AddScoped<IFileVersionRepository, FileVersionRepository>();
 
-            // ── Services (infrastructure-level) ──
+            // -- Services (infrastructure-level) --
             services.AddScoped<IDepartmentPermissionService, DepartmentPermissionService>();
             services.AddSingleton<IPasswordService, PasswordService>();
             services.AddScoped<IUserContextFactory, UserContextFactory>();
@@ -53,7 +54,7 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IAuthenticationLookup, AuthenticationLookup>();
             services.AddScoped<IManagementAuthService, ManagementAuthService>();
 
-            // ── Seeder ──
+            // -- Seeder --
             services.AddScoped<DatabaseSeeder>();
 
             return services;
@@ -69,18 +70,18 @@ namespace Kaimo_File_Server.Infrastructure
         public static IServiceCollection AddCoreServices(
             this IServiceCollection services, string storagePath)
         {
-            // ── ACL + Metadata ──
+            // -- ACL + Metadata --
             services.AddScoped<IAclRepository, AclRepository>();
             services.AddScoped<IFileMetadataRepository, FileMetadataRepository>();
 
-            // ── File Service Factory (creates per-share FileService instances) ──
+            // -- File Service Factory (creates per-share FileService instances) --
             services.AddSingleton<IFileServiceFactory, FileServiceFactory>();
 
-            // ── Root StorageEngine (share-agnostic, used by Web UI for raw I/O) ──
+            // -- Root StorageEngine (share-agnostic, used by Web UI for raw I/O) --
             services.AddSingleton<IStorageEngine>(sp =>
                 new FileSystemStorage(storagePath, Guid.Empty, sp));
 
-            // ── Versioning ──
+            // -- Versioning --
             var versionStoragePath = Path.Combine(storagePath, ".versions");
 
             services.AddScoped<IFileVersionService>(sp =>
@@ -90,7 +91,7 @@ namespace Kaimo_File_Server.Infrastructure
                     defaultMaxVersions: 64,
                     defaultMaxAge: TimeSpan.FromDays(90)));
 
-            // ── Share Lock Manager (in-memory, single instance) ──
+            // -- Share Lock Manager (in-memory, single instance) --
             services.AddSingleton<ShareLockManager>();
 
             return services;

@@ -27,7 +27,7 @@ public class FileSystemStorage : IStorageEngine
         Directory.CreateDirectory(_rootPath);
     }
 
-    // ────────────────── Path Resolution ──────────────────
+    // ------------------ Path Resolution ------------------
 
     public string ToAbsolutePath(string shareRelativePath)
     {
@@ -46,7 +46,7 @@ public class FileSystemStorage : IStorageEngine
         return full;
     }
 
-    // ────────────────── Read / Write / Delete ──────────────────
+    // ------------------ Read / Write / Delete ------------------
 
     public Task<Stream> ReadAsync(string path)
     {
@@ -218,7 +218,7 @@ public class FileSystemStorage : IStorageEngine
         return Task.CompletedTask;
     }
 
-    // ────────────────── Directory Size ──────────────────
+    // ------------------ Directory Size ------------------
 
     public Task<long> GetDirectorySizeAsync(string relativePath)
     {
@@ -252,7 +252,7 @@ public class FileSystemStorage : IStorageEngine
         return total;
     }
 
-    // ────────────────── Metadata ──────────────────
+    // ------------------ Metadata ------------------
 
     public async Task<FileMetadata> GetMetadataAsync(string path)
     {
@@ -314,7 +314,7 @@ public class FileSystemStorage : IStorageEngine
         }
     }
 
-    // ────────────────── Directory Listing ──────────────────
+    // ------------------ Directory Listing ------------------
 
     public Task<List<FileMetadata>> ListAsync(string directoryPath)
     {
@@ -365,7 +365,7 @@ public class FileSystemStorage : IStorageEngine
         return Task.FromResult(entries);
     }
 
-    // ────────────────── Directory Creation ──────────────────
+    // ------------------ Directory Creation ------------------
 
     public Task CreateDirectoryAsync(string path)
     {

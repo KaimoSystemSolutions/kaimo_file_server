@@ -1,7 +1,7 @@
 ﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 
-namespace Kaimo_File_Server.Core.Services
+namespace Kaimo_File_Server.Core.Services.File
 {
     /// <summary>
     /// Central abstraction for all file operations with permission checks.

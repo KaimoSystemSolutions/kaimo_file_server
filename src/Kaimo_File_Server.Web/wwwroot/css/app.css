@@ -2655,7 +2655,7 @@ html, body, #app {
     }
 }
 
-/* ── Form hint text (below dropdowns/inputs) ── */
+/* -- Form hint text (below dropdowns/inputs) -- */
 .form-hint {
     font-size: 11px;
     color: var(--text-tertiary);
@@ -2663,7 +2663,7 @@ html, body, #app {
     line-height: 1.4;
 }
 
-/* ── Inherited permission indicator ── */
+/* -- Inherited permission indicator -- */
 .inherited-hint {
     display: inline-flex;
     align-items: center;
@@ -2673,7 +2673,7 @@ html, body, #app {
     font-style: italic;
 }
 
-/* ── Permission tags (reused from role detail) ── */
+/* -- Permission tags (reused from role detail) -- */
 .permission-tags {
     display: flex;
     flex-wrap: wrap;
@@ -2690,7 +2690,7 @@ html, body, #app {
     border: 1px solid var(--border-subtle, rgba(128, 128, 128, 0.15));
 }
 
-/* ── Toggle row (used in edit forms) ── */
+/* -- Toggle row (used in edit forms) -- */
 .toggle-row {
     display: flex;
     align-items: center;

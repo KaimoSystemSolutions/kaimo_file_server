@@ -17,9 +17,9 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             _db = db;
         }
 
-        // ────────────────────────────────────────────
+        // --------------------------------------------
         //  CRUD
-        // ────────────────────────────────────────────
+        // --------------------------------------------
 
         /// <inheritdoc />
         public async Task<User?> GetByIdAsync(Guid id)
@@ -59,9 +59,9 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             }
         }
 
-        // ────────────────────────────────────────────
+        // --------------------------------------------
         //  Group / Role membership
-        // ────────────────────────────────────────────
+        // --------------------------------------------
 
         /// <inheritdoc />
         public async Task<List<Group>> GetGroupsForUserAsync(Guid userId)
@@ -101,9 +101,9 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             await _db.SaveChangesAsync();
         }
 
-        // ────────────────────────────────────────────
+        // --------------------------------------------
         //  Targeted property updates
-        // ────────────────────────────────────────────
+        // --------------------------------------------
 
         /// <inheritdoc />
         public async Task UpdateNameAsync(Guid userId, string newName)

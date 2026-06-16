@@ -1,4 +1,4 @@
-﻿namespace Kaimo_File_Server.Core.Services
+﻿namespace Kaimo_File_Server.Core.Services.File
 {
     public interface IFileServiceFactory
     {

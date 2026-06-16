@@ -41,7 +41,7 @@ public class ManagementAuthService : IManagementAuthService
         _shareRepo = shareRepo;
     }
 
-    // ── User Management ──
+    // -- User Management --
 
     public async Task<bool> CanManageUserAsync(
         UserContext actor, Guid targetUserId, ManagementPermission required)
@@ -97,7 +97,7 @@ public class ManagementAuthService : IManagementAuthService
         return false;
     }
 
-    // ── Group Management ──
+    // -- Group Management --
 
     public async Task<bool> CanManageGroupAsync(
         UserContext actor, Guid groupId, ManagementPermission required)
@@ -128,7 +128,7 @@ public class ManagementAuthService : IManagementAuthService
         return false;
     }
 
-    // ── Share Management ──
+    // -- Share Management --
 
     public async Task<bool> CanManageShareAsync(
         UserContext actor, Guid shareId, ManagementPermission required)
@@ -164,7 +164,7 @@ public class ManagementAuthService : IManagementAuthService
         return false;
     }
 
-    // ── Department Management ──
+    // -- Department Management --
 
     public async Task<bool> CanManageDepartmentAsync(
         UserContext actor, Guid departmentId, ManagementPermission required)
@@ -193,7 +193,7 @@ public class ManagementAuthService : IManagementAuthService
         return false;
     }
 
-    // ── Generic Checks ──
+    // -- Generic Checks --
 
     public async Task<bool> HasAnyPermissionAsync(
         UserContext actor, ManagementPermission required)
@@ -280,7 +280,7 @@ public class ManagementAuthService : IManagementAuthService
             : AuthorizedScopeResult.None();
     }
 
-    // ── Internals ──
+    // -- Internals --
 
     private static bool HasPermission(Role role, ManagementPermission required)
     {
@@ -319,7 +319,7 @@ public class ManagementAuthService : IManagementAuthService
     {
         var result = new List<(ScopedRoleAssignment, Role)>();
 
-        // ── 1. Direct role assignments → Global scope ──
+        // -- 1. Direct role assignments → Global scope --
         foreach (var role in actor.Roles)
         {
             if (role.ManagementPermissions == ManagementPermission.None)
@@ -331,7 +331,7 @@ public class ManagementAuthService : IManagementAuthService
             result.Add((synthetic, role));
         }
 
-        // ── 2. Scoped assignments from DB ──
+        // -- 2. Scoped assignments from DB --
         var groupIds = actor.Groups?.Select(g => g.Id) ?? Enumerable.Empty<Guid>();
         var assignments = await _assignmentRepo.GetEffectiveAssignmentsAsync(
             actor.User.Id, groupIds);

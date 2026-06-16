@@ -20,7 +20,7 @@ namespace Kaimo_File_Server.Core.Services;
 ///
 /// Example:
 ///   Department "Engineering" (DefaultFilePermission = Read|Write)
-///     └── Department "Backend" (DefaultFilePermission = null → inherits Read|Write)
+///     └-- Department "Backend" (DefaultFilePermission = null → inherits Read|Write)
 ///
 ///   Share "Docs" → DepartmentId = Engineering
 ///   User "Alice" → member of "Engineering" → gets Read|Write on "Docs"

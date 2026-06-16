@@ -8,9 +8,9 @@ namespace Kaimo_File_Server.Core.Repositories
     /// </summary>
     public interface IUserRepository
     {
-        // ────────────────────────────────────────────
+        // --------------------------------------------
         //  CRUD
-        // ────────────────────────────────────────────
+        // --------------------------------------------
 
         /// <summary>
         /// Retrieves a user by their unique identifier.
@@ -44,9 +44,9 @@ namespace Kaimo_File_Server.Core.Repositories
         /// </summary>
         Task DeleteAsync(Guid id);
 
-        // ────────────────────────────────────────────
+        // --------------------------------------------
         //  Group / Role membership
-        // ────────────────────────────────────────────
+        // --------------------------------------------
 
         /// <summary>Returns all groups the user belongs to.</summary>
         Task<List<Group>> GetGroupsForUserAsync(Guid userId);
@@ -66,9 +66,9 @@ namespace Kaimo_File_Server.Core.Repositories
         /// </summary>
         Task SetRolesForUserAsync(Guid userId, List<Guid> roleIds);
 
-        // ────────────────────────────────────────────
+        // --------------------------------------------
         //  Targeted property updates
-        // ────────────────────────────────────────────
+        // --------------------------------------------
 
         /// <summary>
         /// Updates only the user's display name.

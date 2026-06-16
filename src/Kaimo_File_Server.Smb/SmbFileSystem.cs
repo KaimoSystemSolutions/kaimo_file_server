@@ -1,6 +1,6 @@
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.File;
 using Microsoft.Extensions.DependencyInjection;
 using SMBLibrary;
 using SMBLibrary.Server;
@@ -26,7 +26,7 @@ public class SmbFileSystem : INTFileStore
         Directory.CreateDirectory(_root);
     }
 
-    // ────────────────── Per-session user context ──────────────────
+    // ------------------ Per-session user context ------------------
 
     private static readonly AsyncLocal<UserContext?> _sessionUser = new();
 
@@ -84,7 +84,7 @@ public class SmbFileSystem : INTFileStore
             "No authenticated user context. SetSessionUser must be called before filesystem operations.");
     }
 
-    // ────────────────── Path helpers ──────────────────
+    // ------------------ Path helpers ------------------
 
     private string ToAbsolutePath(string smbPath)
     {
@@ -115,7 +115,7 @@ public class SmbFileSystem : INTFileStore
         return ShareRelativePath.Normalize(relative);
     }
 
-    // ────────────────── Handle types ──────────────────
+    // ------------------ Handle types ------------------
 
     private sealed class FileHandle
     {
@@ -143,7 +143,7 @@ public class SmbFileSystem : INTFileStore
         public UserContext User { get; init; } = null!;
     }
 
-    // ────────────────── Permission wrappers ──────────────────
+    // ------------------ Permission wrappers ------------------
 
     private bool CanRead(string relativePath, UserContext user)
         => Task.Run(() => _fileService.CanReadAsync(relativePath, user)).GetAwaiter().GetResult();
@@ -1003,7 +1003,7 @@ public class SmbFileSystem : INTFileStore
         return result;
     }
 
-    // ────────────────── FileInformation builders ──────────────────
+    // ------------------ FileInformation builders ------------------
 
     private static FileInformation BuildSnapshotFileInfo(
         long size, DateTime timestamp, bool isDirectory, FileInformationClass cls)
@@ -1153,7 +1153,7 @@ public class SmbFileSystem : INTFileStore
         };
     }
 
-    // ────────────────── Directory entry builders ──────────────────
+    // ------------------ Directory entry builders ------------------
 
     private static QueryDirectoryFileInformation CreateDirEntryInfo(
         string name, DirectoryInfo dirInfo, FileInformationClass cls) => cls switch

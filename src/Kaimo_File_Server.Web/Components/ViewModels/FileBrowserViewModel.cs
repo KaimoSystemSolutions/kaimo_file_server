@@ -1,7 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 using Kaimo_File_Server.Infrastructure.Search;
 using Kaimo_File_Server.Web.Helpers;
+using Kaimo_File_Server.Core.Services.File;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 

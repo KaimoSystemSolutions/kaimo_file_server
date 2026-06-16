@@ -411,4 +411,7 @@
   <data name="Web_Nav_Logout" xml:space="preserve">
     <value>Log out</value>
   </data>
+  <data name="Web_Nav_Settings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
 </root>

@@ -30,7 +30,7 @@ public class AclEditorViewModel
         _logger = logger;
     }
 
-    // ────────────────── State ──────────────────
+    // ------------------ State ------------------
 
     public Guid ShareId { get; private set; }
     public Guid FileMetadataId { get; private set; }
@@ -50,7 +50,7 @@ public class AclEditorViewModel
     public List<Group> AllGroups { get; private set; } = [];
     public List<Role> AllRoles { get; private set; } = [];
 
-    // ────────────────── New Entry State ──────────────────
+    // ------------------ New Entry State ------------------
 
     public bool IsAddingEntry { get; set; }
     public string NewPrincipalType { get; set; } = "user";
@@ -59,11 +59,11 @@ public class AclEditorViewModel
     public FilePermission NewPermissions { get; set; } = FilePermission.None;
     public AclInheritance NewInheritance { get; set; } = AclInheritance.Everything;
 
-    // ────────────────── Edit State ──────────────────
+    // ------------------ Edit State ------------------
 
     public Guid? EditingEntryId { get; set; }
 
-    // ────────────────── Load ──────────────────
+    // ------------------ Load ------------------
 
     public async Task LoadAsync(string path, Guid shareId, bool isDirectory = true)
     {
@@ -164,7 +164,7 @@ public class AclEditorViewModel
         return false;
     }
 
-    // ────────────────── Add/Edit/Delete bleiben gleich ──────────────────
+    // ------------------ Add/Edit/Delete bleiben gleich ------------------
 
     public void StartAddEntry()
     {
@@ -292,7 +292,7 @@ public class AclEditorViewModel
         }
     }
 
-    // ────────────────── Display Helpers ──────────────────
+    // ------------------ Display Helpers ------------------
 
     public string GetPrincipalDisplayName(Guid principalId)
     {
@@ -326,7 +326,7 @@ public class AclEditorViewModel
         return "unknown";
     }
 
-    // ────────────────── Permission Helpers ──────────────────
+    // ------------------ Permission Helpers ------------------
 
     public bool HasPermission(FilePermission flags, FilePermission flag)
         => (flags & flag) != 0;

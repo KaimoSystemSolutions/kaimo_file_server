@@ -511,6 +511,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Settings ähnelt.
+        /// </summary>
+        public static string Web_Nav_Settings {
+            get {
+                return ResourceManager.GetString("Web_Nav_Settings", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Shares ähnelt.
         /// </summary>
         public static string Web_Nav_Shares {

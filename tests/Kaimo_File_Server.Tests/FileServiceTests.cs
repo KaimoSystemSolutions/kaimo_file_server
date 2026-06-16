@@ -1,7 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Security;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
 using Moq;
 using Xunit;

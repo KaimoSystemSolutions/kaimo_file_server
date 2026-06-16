@@ -41,7 +41,7 @@ else
         </div>
     </div>
 
-    @* ── Create Form ── *@
+    @* -- Create Form -- *@
     @if (VM.IsCreating)
     {
         <div class="create-form-card">
@@ -110,7 +110,7 @@ else
                         <div class="dept-tree-row @(isSelected ? "dept-tree-row--selected" : "")"
                              @onclick="() => Select(dept)">
 
-                            @* ── Guide lines: sit directly in row for align-items:stretch ── *@
+                            @* -- Guide lines: sit directly in row for align-items:stretch -- *@
                             @for (var col = 0; col < node.Depth; col++)
                             {
                                 @if (col < node.Depth - 1)
@@ -123,7 +123,7 @@ else
                                 }
                             }
 
-                            @* ── Content: toggle + icon + name + badge ── *@
+                            @* -- Content: toggle + icon + name + badge -- *@
                             <div class="dept-tree-row-content">
                                 @if (node.HasChildren)
                                 {
@@ -186,7 +186,7 @@ else
 
                 @if (VM.IsEditing)
                 {
-                    @* ──────── EDIT MODE ──────── *@
+                    @* -------- EDIT MODE -------- *@
                     <div class="detail-header">
                         <h3>Abteilung bearbeiten</h3>
                         <span class="detail-subtitle">@VM.Selected.Name</span>
@@ -215,7 +215,7 @@ else
                         </div>
                     </div>
 
-                    @* ── Default File Permission ── *@
+                    @* -- Default File Permission -- *@
                     <div class="detail-section" style="margin-top: 16px;">
                         <span class="detail-label">Standard-Dateiberechtigung</span>
                         <p class="form-hint" style="margin-bottom: 8px;">
@@ -253,7 +253,7 @@ else
                         }
                     </div>
 
-                    @* ── Members (M:N) ── *@
+                    @* -- Members (M:N) -- *@
                     <div class="detail-section" style="margin-top: 16px;">
                         <span class="detail-label">Mitglieder (Benutzer)</span>
                         <div class="multi-select @(membersOpen ? "open" : "")">
@@ -282,7 +282,7 @@ else
                         </div>
                     </div>
 
-                    @* ── Groups (direct FK) ── *@
+                    @* -- Groups (direct FK) -- *@
                     <div class="detail-section" style="margin-top: 16px;">
                         <span class="detail-label">Zugeordnete Gruppen</span>
                         <p class="form-hint" style="margin-bottom: 4px;">
@@ -315,7 +315,7 @@ else
                         </div>
                     </div>
 
-                    @* ── Shares (direct FK) ── *@
+                    @* -- Shares (direct FK) -- *@
                     <div class="detail-section" style="margin-top: 16px;">
                         <span class="detail-label">Zugeordnete Freigaben</span>
                         <p class="form-hint" style="margin-bottom: 4px;">
@@ -365,7 +365,7 @@ else
                 }
                 else
                 {
-                    @* ──────── VIEW MODE ──────── *@
+                    @* -------- VIEW MODE -------- *@
                     <div class="detail-header">
                         <h3>@VM.Selected.Name</h3>
                         <span class="detail-subtitle">
@@ -411,7 +411,7 @@ else
                             </span>
                         </div>
 
-                        @* ── Effective Permission ── *@
+                        @* -- Effective Permission -- *@
                         <div class="detail-field">
                             <span class="detail-field-label">Standard-Dateiberechtigung</span>
                             <span class="detail-field-value">

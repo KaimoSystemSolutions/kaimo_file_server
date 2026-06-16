@@ -70,7 +70,7 @@ public class UserListViewModel
     public string? SuccessMessage { get; private set; }
     public AdminTab ActiveTab { get; private set; } = AdminTab.Users;
 
-    // ── Actor Permissions ──
+    // -- Actor Permissions --
     public bool IsGlobalAdmin { get; private set; }
     public bool CanAccessPage { get; private set; }
     public bool CanCreateUsers { get; private set; }
@@ -86,21 +86,21 @@ public class UserListViewModel
     /// <summary>All departments for display purposes (group/user detail, selectors).</summary>
     public List<Department> AllDepartments { get; private set; } = [];
 
-    // ── Per-Selection Permissions ──
+    // -- Per-Selection Permissions --
     public bool CanEditSelectedUser { get; private set; }
     public bool CanDeleteSelectedUser { get; private set; }
     public bool CanResetPasswordForSelected { get; private set; }
 
-    // ── Selection ──
+    // -- Selection --
     public User? SelectedUser { get; set; }
     public Group? SelectedGroup { get; set; }
     public Role? SelectedRole { get; set; }
 
-    // ── Edit-Modus ──
+    // -- Edit-Modus --
     public bool IsEditing { get; private set; }
     public bool IsSaving { get; private set; }
 
-    // ── User-Edit ──
+    // -- User-Edit --
     public string EditUserName { get; set; } = "";
     public string EditUserDescription { get; set; } = "";
     public string EditUserEmail { get; set; } = "";
@@ -109,31 +109,31 @@ public class UserListViewModel
     public List<CheckboxItem<Group>> EditUserGroups { get; private set; } = [];
     public List<CheckboxItem<Role>> EditUserRoles { get; private set; } = [];
 
-    // ── User-Details ──
+    // -- User-Details --
     public List<Group> UserGroups { get; private set; } = [];
     public List<Role> UserRoles { get; private set; } = [];
     public List<Department> UserDepartments { get; private set; } = [];
     public List<ScopedAssignmentDisplayItem> UserScopedAssignments { get; private set; } = [];
 
-    // ── Group-Details ──
+    // -- Group-Details --
     public List<User> GroupMembers { get; private set; } = [];
 
-    // ── Role-Details ──
+    // -- Role-Details --
     public List<User> RoleMembers { get; private set; } = [];
     public List<ScopedAssignmentDisplayItem> RoleScopedAssignments { get; private set; } = [];
 
-    // ── Password-Change ──
+    // -- Password-Change --
     public string NewPassword { get; set; } = "";
     public string ConfirmPassword { get; set; } = "";
 
-    // ── Group-Edit ──
+    // -- Group-Edit --
     public List<CheckboxItem<User>> EditGroupMembers { get; private set; } = [];
 
-    // ── Role-Edit ──
+    // -- Role-Edit --
     public List<CheckboxItem<User>> EditRoleMembers { get; private set; } = [];
     public ManagementPermission EditRolePermissions { get; set; } = ManagementPermission.None;
 
-    // ── Create User ──
+    // -- Create User --
     public bool IsCreatingUser { get; set; }
     public string CreateUserName { get; set; } = "";
     public string CreateUserUsername { get; set; } = "";
@@ -144,19 +144,19 @@ public class UserListViewModel
     public bool CreateUserCanChangePassword { get; set; } = true;
     public Guid? CreateUserDepartmentId { get; set; }
 
-    // ── Create Group ──
+    // -- Create Group --
     public bool IsCreatingGroup { get; set; }
     public string CreateGroupName { get; set; } = "";
     public Guid CreateGroupDepartmentId { get; set; } = WellKnownDepartments.GlobalId;
 
-    // ── Create Role ──
+    // -- Create Role --
     public bool IsCreatingRole { get; set; }
     public string CreateRoleName { get; set; } = "";
 
-    // ── Delete Confirmation ──
+    // -- Delete Confirmation --
     public bool IsConfirmingDelete { get; set; }
 
-    // ── Scoped Assignment Creation ──
+    // -- Scoped Assignment Creation --
     public bool IsAddingAssignment { get; set; }
     public ScopeType NewAssignmentScopeType { get; set; } = ScopeType.Global;
     public Guid? NewAssignmentScopeId { get; set; }

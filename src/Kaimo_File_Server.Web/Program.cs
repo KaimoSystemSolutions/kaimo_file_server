@@ -2,10 +2,12 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure;
+using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Infrastructure.Search;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components;
 using Kaimo_File_Server.Web.Components.ViewModels;
+using Kaimo_File_Server.Web.Middleware;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
@@ -22,6 +24,9 @@ builder.Services.AddInfrastructure(builder.Configuration);
 var storagePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
 builder.Services.AddCoreServices(storagePath);
 
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IConfigRepository, ConfigRepository>();
+
 // ══════════════════════════════════════════
 //  Blazor + Auth
 // ══════════════════════════════════════════
@@ -32,7 +37,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorizationCore();
 
-// ── JWT ──
+// -- JWT --
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<JwtAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
@@ -57,6 +62,7 @@ builder.Services.AddSingleton<AssetProvider>();
 //  Do NOT re-register them here.
 // ══════════════════════════════════════════
 
+builder.Services.AddScoped<SettingsViewModel>();
 builder.Services.AddScoped<LoginViewModel>();
 builder.Services.AddScoped<ShareBrowserViewModel>();
 builder.Services.AddScoped<FileBrowserViewModel>();
@@ -120,5 +126,7 @@ app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.UseMiddleware<ConfigLocalizationMiddleware>();
 
 app.Run();

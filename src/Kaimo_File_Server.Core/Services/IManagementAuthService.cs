@@ -16,20 +16,20 @@ namespace Kaimo_File_Server.Core.Services;
 /// </summary>
 public interface IManagementAuthService
 {
-    // ── User Management ──
+    // -- User Management --
     Task<bool> CanManageUserAsync(UserContext actor, Guid targetUserId, ManagementPermission required);
     Task<bool> CanCreateUserInDepartmentAsync(UserContext actor, Guid departmentId);
 
-    // ── Group Management ──
+    // -- Group Management --
     Task<bool> CanManageGroupAsync(UserContext actor, Guid groupId, ManagementPermission required);
 
-    // ── Share Management ──
+    // -- Share Management --
     Task<bool> CanManageShareAsync(UserContext actor, Guid shareId, ManagementPermission required);
 
-    // ── Department Management ──
+    // -- Department Management --
     Task<bool> CanManageDepartmentAsync(UserContext actor, Guid departmentId, ManagementPermission required);
 
-    // ── Generic Checks ──
+    // -- Generic Checks --
 
     /// <summary>
     /// Returns true if the actor has the required permission at ANY scope.

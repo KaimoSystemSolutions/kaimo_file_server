@@ -1,6 +1,6 @@
 ﻿using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
-using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Smb.Security;
 using Microsoft.Extensions.DependencyInjection;
 using SMBLibrary;
@@ -23,7 +23,7 @@ namespace Kaimo_File_Server.Smb
         private FileSystemWatcher? _watcher;
         private int _debounce = 0;
 
-        // ── Runtime share tracking ──
+        // -- Runtime share tracking --
         // Reads happen on SMB worker threads (ABE), writes under _shareLock.
         private readonly ConcurrentDictionary<string, ShareEntry> _activeShares
             = new(StringComparer.OrdinalIgnoreCase);

@@ -1,6 +1,6 @@
 ﻿using Kaimo_File_Server.Core.Domain;
 
-namespace Kaimo_File_Server.Core.Services
+namespace Kaimo_File_Server.Core.Services.File
 {
     /// <summary>
     /// Business logic for file versioning.

@@ -51,7 +51,7 @@ else
         </div>
     </div>
 
-    @* ── Tabs ── *@
+    @* -- Tabs -- *@
     <div class="admin-tabs">
         @if (VM.CanCreateUsers || VM.AuthorizedDepartmentsForView.Any())
         {
@@ -79,7 +79,7 @@ else
         }
     </div>
 
-    @* ── Create User Form ── *@
+    @* -- Create User Form -- *@
     @if (VM.IsCreatingUser)
     {
         <div class="create-form-card">
@@ -156,7 +156,7 @@ else
         </div>
     }
 
-    @* ── Create Group Form (with Department selector) ── *@
+    @* -- Create Group Form (with Department selector) -- *@
     @if (VM.IsCreatingGroup)
     {
         <div class="create-form-card">
@@ -192,7 +192,7 @@ else
         </div>
     }
 
-    @* ── Create Role Form ── *@
+    @* -- Create Role Form -- *@
     @if (VM.IsCreatingRole)
     {
         <div class="create-form-card">
@@ -218,7 +218,7 @@ else
         </div>
     }
 
-    @* ── Main Content ── *@
+    @* -- Main Content -- *@
     @if (VM.ErrorMessage is not null && !VM.IsEditing && !VM.IsCreatingUser && !VM.IsCreatingGroup && !VM.IsCreatingRole)
     {
         <div class="error-banner">@VM.ErrorMessage</div>
@@ -358,7 +358,7 @@ else
                         <div class="success-banner">@VM.SuccessMessage</div>
                     }
 
-                    @* ──────────── USER DETAIL ──────────── *@
+                    @* ------------ USER DETAIL ------------ *@
                     @if (VM.SelectedUser is not null)
                     {
                         @if (VM.IsEditing)
@@ -607,7 +607,7 @@ else
                         }
                     }
 
-                    @* ──────────── GROUP DETAIL ──────────── *@
+                    @* ------------ GROUP DETAIL ------------ *@
                     else if (VM.SelectedGroup is not null)
                     {
                         @if (VM.IsEditing)
@@ -701,7 +701,7 @@ else
                         }
                     }
 
-                    @* ──────────── ROLE DETAIL ──────────── *@
+                    @* ------------ ROLE DETAIL ------------ *@
                     else if (VM.SelectedRole is not null)
                     {
                         @* Role detail remains unchanged — same as original *@
@@ -993,7 +993,7 @@ else
 @code {
     private bool groupsOpen, rolesOpen, membersOpen;
 
-    // ── Binding helpers ──
+    // -- Binding helpers --
 
     private string SelectedPrincipalIdString
     {
@@ -1035,7 +1035,7 @@ else
         set => VM.CreateGroupDepartmentId = Guid.TryParse(value, out var id) ? id : WellKnownDepartments.GlobalId;
     }
 
-    // ── Lifecycle ──
+    // -- Lifecycle --
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -1046,15 +1046,15 @@ else
         }
     }
 
-    // ── Tab switching ──
+    // -- Tab switching --
     private async Task SwitchTab(AdminTab tab) { CloseDropdowns(); await VM.SwitchTabAsync(tab); StateHasChanged(); }
 
-    // ── Selection ──
+    // -- Selection --
     private async Task SelectUser(User user) { CloseDropdowns(); await VM.SelectUserAsync(user); StateHasChanged(); }
     private async Task SelectGroup(Group group) { CloseDropdowns(); await VM.SelectGroupAsync(group); StateHasChanged(); }
     private async Task SelectRole(Role role) { CloseDropdowns(); await VM.SelectRoleAsync(role); StateHasChanged(); }
 
-    // ── Edit / Save / Create / Delete ──
+    // -- Edit / Save / Create / Delete --
     private async Task EditUser() { CloseDropdowns(); await VM.StartEditUserAsync(); StateHasChanged(); }
     private async Task EditGroup() { CloseDropdowns(); await VM.StartEditGroupAsync(); StateHasChanged(); }
     private async Task EditRole() { CloseDropdowns(); await VM.StartEditRoleAsync(); StateHasChanged(); }
@@ -1073,12 +1073,12 @@ else
 
     private void CancelEdit() { CloseDropdowns(); VM.CancelEdit(); StateHasChanged(); }
 
-    // ── Scoped Assignments ──
+    // -- Scoped Assignments --
     private async Task StartAddAssignment() { VM.StartAddAssignment(); await VM.LoadAssignmentFormDataAsync(); StateHasChanged(); }
     private async Task CreateAssignment() { await VM.CreateAssignmentAsync(); StateHasChanged(); }
     private async Task DeleteAssignment(Guid id) { await VM.DeleteAssignmentAsync(id); StateHasChanged(); }
 
-    // ── Helpers ──
+    // -- Helpers --
     private void CloseDropdowns() { groupsOpen = false; rolesOpen = false; membersOpen = false; }
     private async Task HandleCreateGroupKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") await CreateGroup(); }
     private async Task HandleCreateRoleKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") await CreateRole(); }

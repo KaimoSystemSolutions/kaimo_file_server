@@ -58,28 +58,28 @@ public class DepartmentViewModel
     public string? ErrorMessage { get; set; }
     public string? SuccessMessage { get; set; }
 
-    // ── Permissions ──
+    // -- Permissions --
     public bool CanAccessPage { get; private set; }
     public bool IsGlobalAdmin { get; private set; }
     public bool CanEdit { get; private set; }
     public bool CanDelete { get; private set; }
 
-    // ── Lists ──
+    // -- Lists --
     public List<Department> Departments { get; private set; } = [];
 
-    // ── Selection ──
+    // -- Selection --
     public Department? Selected { get; set; }
     public List<User> Members { get; private set; } = [];
     public List<Group> Groups { get; private set; } = [];
     public List<ShareDefinition> Shares { get; private set; } = [];
     public EffectivePermissionInfo? PermInfo { get; private set; }
 
-    // ── Create ──
+    // -- Create --
     public string CreateName { get; set; } = "";
     public string CreateDescription { get; set; } = "";
     public Guid? CreateParentId { get; set; }
 
-    // ── Edit ──
+    // -- Edit --
     public string EditName { get; set; } = "";
     public string EditDescription { get; set; } = "";
     public Guid? EditParentId { get; set; }
@@ -330,7 +330,7 @@ public class DepartmentViewModel
             IsSaving = true;
             ErrorMessage = null;
 
-            // ── Update department entity ──
+            // -- Update department entity --
             if (!string.IsNullOrWhiteSpace(EditName))
                 Selected.Name = EditName.Trim();
             Selected.Description = string.IsNullOrWhiteSpace(EditDescription) ? null : EditDescription.Trim();
@@ -341,7 +341,7 @@ public class DepartmentViewModel
 
             await _departmentRepo.UpdateAsync(Selected);
 
-            // ── Members diff (M:N via DepartmentUser) ──
+            // -- Members diff (M:N via DepartmentUser) --
             var desiredUserIds = EditMembers
                 .Where(m => m.IsChecked).Select(m => m.Item.Id).ToHashSet();
             var currentUserIds = Members.Select(u => u.Id).ToHashSet();
@@ -351,7 +351,7 @@ public class DepartmentViewModel
             foreach (var userId in currentUserIds.Except(desiredUserIds))
                 await _departmentRepo.RemoveUserAsync(Selected.Id, userId);
 
-            // ── Groups diff (direct FK: Group.DepartmentId) ──
+            // -- Groups diff (direct FK: Group.DepartmentId) --
             var desiredGroupIds = EditGroups
                 .Where(g => g.IsChecked).Select(g => g.Item.Id).ToHashSet();
 
@@ -378,7 +378,7 @@ public class DepartmentViewModel
                 }
             }
 
-            // ── Shares diff (direct FK: ShareDefinition.DepartmentId) ──
+            // -- Shares diff (direct FK: ShareDefinition.DepartmentId) --
             foreach (var item in EditShares)
             {
                 var share = item.Item;
@@ -397,7 +397,7 @@ public class DepartmentViewModel
                 }
             }
 
-            // ── Refresh ──
+            // -- Refresh --
             var refreshed = await _departmentRepo.GetByIdAsync(Selected.Id);
             if (refreshed != null) Selected = refreshed;
 

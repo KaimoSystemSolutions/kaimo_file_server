@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Infrastructure.Configuration;
 using Microsoft.EntityFrameworkCore;
 
 namespace Kaimo_File_Server.Infrastructure.Persistence
@@ -11,32 +12,32 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
-        // ── Identity ──
+        // -- Identity --
         public DbSet<User> Users { get; set; }
         public DbSet<Group> Groups { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<UserGroup> UserGroups { get; set; }
         public DbSet<UserRole> UserRoles { get; set; }
 
-        // ── Files & Shares ──
+        // -- Files & Shares --
         public DbSet<FileMetadata> FileMetadata { get; set; }
         public DbSet<AccessEntry> AccessEntries { get; set; }
         public DbSet<ShareDefinition> ShareDefinitions { get; set; }
         public DbSet<FileVersion> FileVersions { get; set; }
 
-        // ── Departments & Scoped Roles ──
+        // -- Departments & Scoped Roles --
         public DbSet<Department> Departments { get; set; }
         public DbSet<DepartmentUser> DepartmentUsers { get; set; }
         public DbSet<ScopedRoleAssignment> ScopedRoleAssignments { get; set; }
 
-        // NOTE: DepartmentGroup and DepartmentShare are REMOVED.
-        //       Group.DepartmentId and ShareDefinition.DepartmentId are direct FKs now.
+        // -- Configuration --
+        public DbSet<ConfigSetting> ConfigSettings { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // ── Identity base (TPC) ──
+            // -- Identity base (TPC) --
 
             modelBuilder.Entity<Identity>().UseTpcMappingStrategy();
             modelBuilder.Entity<Identity>(entity =>
@@ -92,7 +93,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasKey(e => new { e.UserId, e.RoleId });
             });
 
-            // ── Files & Shares ──
+            // -- Files & Shares --
 
             modelBuilder.Entity<FileMetadata>(entity =>
             {
@@ -153,7 +154,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(e => new { e.FilePath, e.ContentHash });
             });
 
-            // ── Departments ──
+            // -- Departments --
 
             modelBuilder.Entity<Department>(entity =>
             {
@@ -178,7 +179,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(e => e.UserId);
             });
 
-            // ── Scoped Role Assignments ──
+            // -- Scoped Role Assignments --
 
             modelBuilder.Entity<ScopedRoleAssignment>(entity =>
             {
@@ -193,6 +194,16 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(e => e.PrincipalId);
                 entity.HasIndex(e => new { e.ScopeType, e.ScopeId });
                 entity.HasIndex(e => e.RoleId);
+            });
+
+            // -- Configuration --
+
+            modelBuilder.Entity<ConfigSetting>(entity =>
+            {
+                entity.ToTable("config_settings");
+                entity.HasKey(e => e.Key);
+                entity.Property(e => e.Key).HasMaxLength(256);
+                entity.Property(e => e.Value).IsRequired();
             });
         }
     }

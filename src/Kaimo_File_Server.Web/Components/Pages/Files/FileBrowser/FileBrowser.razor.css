@@ -3,7 +3,7 @@
    File Table Grid, Column Sorting, ACL Indicators, Responsive
    ══════════════════════════════════════════════════════════ */
 
-/* ── File Table – CSS Grid (5 Spalten, ohne Actions) ───── */
+/* -- File Table – CSS Grid (5 Spalten, ohne Actions) ----- */
 
 .file-table-wrap {
     display: grid;
@@ -361,7 +361,7 @@
     }
 }
 
-/* ── Toolbar responsive ── */
+/* -- Toolbar responsive -- */
 
 @media (max-width: 600px) {
     .selection-toolbar {

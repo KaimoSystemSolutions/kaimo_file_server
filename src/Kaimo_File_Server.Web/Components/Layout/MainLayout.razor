@@ -39,7 +39,12 @@
             </NavLink>
         </div>
 
+
         <div class="sidebar-footer">
+            <NavLink class="nav-item" href="/settings" Match="NavLinkMatch.All">
+                @Assets.SVG("gear.svg", new SvgOptions())
+                @Resources.Web_Nav_Settings
+            </NavLink>
             @if (!string.IsNullOrEmpty(_displayName))
             {
                 <div class="sidebar-user">

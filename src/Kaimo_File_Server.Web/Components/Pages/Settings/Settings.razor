@@ -1,0 +1,119 @@
+﻿@page "/settings"
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject SettingsViewModel VM
+@inject NavigationManager Nav
+@inject AssetProvider Assets
+
+<PageTitle>@Resources.Web_Nav_Settings - Kaimo Files</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>@Resources.Web_Nav_Settings</h1>
+        <p class="subtitle">Globale Konfiguration</p>
+    </div>
+</div>
+
+@if (VM.IsLoading)
+{
+    <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Lade Einstellungen…</p>
+    </div>
+}
+else
+{
+    <div class="admin-content">
+        <div class="admin-detail" style="max-width: 640px;">
+
+            @* ── Tab Navigation ── *@
+            <div class="detail-tabs">
+                <button class="detail-tab @(_activeTab == SettingsTab.Language ? "detail-tab--active" : "")"
+                        @onclick="() => SwitchTab(SettingsTab.Language)">
+                    @Assets.SVG("globe.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                    Sprache
+                </button>
+
+                @* ── Add new tabs here ──
+                <button class="detail-tab @(_activeTab == SettingsTab.UserDefaults ? "detail-tab--active" : "")"
+                        @onclick="() => SwitchTab(SettingsTab.UserDefaults)">
+                    @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                    Benutzer-Defaults
+                </button>
+                *@
+            </div>
+
+            @* ── Messages ── *@
+            @if (VM.SuccessMessage is not null)
+            {
+                <div class="success-banner">@VM.SuccessMessage</div>
+            }
+            @if (VM.ErrorMessage is not null)
+            {
+                <div class="error-banner">@VM.ErrorMessage</div>
+            }
+
+            @* ── Tab: Language ── *@
+            @if (_activeTab == SettingsTab.Language)
+            {
+                <div class="detail-section">
+                    <span class="detail-label">Sprache der Anwendung</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
+                        Ändert die Sprache global für alle Benutzer.
+                    </p>
+
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <select class="edit-input" style="max-width: 240px;"
+                                @bind="VM.SelectedLanguage">
+                            @foreach (var lang in SettingsViewModel.AvailableLanguages)
+                            {
+                                <option value="@lang.Key">@lang.Value</option>
+                            }
+                        </select>
+
+                        <button class="btn-primary" @onclick="SaveLanguage">
+                            Speichern
+                        </button>
+                    </div>
+                </div>
+            }
+
+            @* ── Tab: Future tabs go here ── *@
+
+        </div>
+    </div>
+}
+
+@code {
+    private enum SettingsTab
+    {
+        Language,
+        // UserDefaults,
+        // GroupDefaults,
+        // Security,
+    }
+
+    private SettingsTab _activeTab = SettingsTab.Language;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await VM.LoadAsync();
+            StateHasChanged();
+        }
+    }
+
+    private void SwitchTab(SettingsTab tab)
+    {
+        _activeTab = tab;
+        VM.ClearMessages();
+        StateHasChanged();
+    }
+
+    private async Task SaveLanguage()
+    {
+        await VM.SaveLanguageAsync();
+        StateHasChanged();
+    }
+}

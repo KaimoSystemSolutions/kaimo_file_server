@@ -4,7 +4,7 @@ using Kaimo_File_Server.Core.Repositories;
 using System.IO.Compression;
 using System.Security.Cryptography;
 
-namespace Kaimo_File_Server.Core.Services;
+namespace Kaimo_File_Server.Core.Services.File;
 
 /// <summary>
 /// Core implementation of file versioning logic.
@@ -65,7 +65,7 @@ public class FileVersionService : IFileVersionService
         var blobFullPath = Path.Combine(_versionStorageRoot, blobRelativePath);
         long compressedSize;
 
-        if (!File.Exists(blobFullPath))
+        if (!System.IO.File.Exists(blobFullPath))
         {
             Directory.CreateDirectory(Path.GetDirectoryName(blobFullPath)!);
 
@@ -127,7 +127,7 @@ public class FileVersionService : IFileVersionService
                 $"No version found for '{normalizedPath}' at {snapshotTimestampUtc:O}");
 
         var blobFullPath = Path.Combine(_versionStorageRoot, version.StoragePath);
-        if (!File.Exists(blobFullPath))
+        if (!System.IO.File.Exists(blobFullPath))
             throw new FileNotFoundException(
                 $"Version blob missing: {version.StoragePath}");
 
@@ -182,7 +182,7 @@ public class FileVersionService : IFileVersionService
         return deleted;
     }
 
-    // ────────────────── Helpers ──────────────────
+    // ------------------ Helpers ------------------
 
     private static async Task<string> ComputeHashAsync(Stream stream)
     {

@@ -13,35 +13,35 @@
     {
         None = 0,
 
-        // ── User Management ──
+        // -- User Management --
         CreateUsers = 1L << 0,
         DeleteUsers = 1L << 1,
         EditUserProfiles = 1L << 2,
         ResetPasswords = 1L << 3,
         EnableDisableUsers = 1L << 4,
 
-        // ── Group Management ──
+        // -- Group Management --
         CreateGroups = 1L << 8,
         DeleteGroups = 1L << 9,
         ManageGroupMembers = 1L << 10,
 
-        // ── Role & Permission Assignment ──
+        // -- Role & Permission Assignment --
         AssignGroups = 1L << 16,  // assign users to groups (within scope)
         AssignRoles = 1L << 17,  // assign roles (only ≤ own permissions)
         AssignDepartments = 1L << 18,  // move users between departments
 
-        // ── Share Management ──
+        // -- Share Management --
         CreateShares = 1L << 24,
         DeleteShares = 1L << 25,
         EditShareSettings = 1L << 26,
         ManageShareAccess = 1L << 27,  // grant/revoke share-level access
         ManageShareAcls = 1L << 28,  // manage file/folder ACLs within shares
 
-        // ── Department Management ──
+        // -- Department Management --
         EditDepartment = 1L << 32,
         ViewDepartment = 1L << 33,
 
-        // ── Shortcuts ──
+        // -- Shortcuts --
         UserAdmin = CreateUsers | DeleteUsers | EditUserProfiles
                   | ResetPasswords | EnableDisableUsers,
 

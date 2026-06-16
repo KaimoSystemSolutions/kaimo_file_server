@@ -10,7 +10,7 @@
     overflow: hidden;
 }
 
-/* ── Row ── */
+/* -- Row -- */
 
 .dept-tree-row {
     display: flex;
@@ -43,7 +43,7 @@
     padding: 3px 0;
 }
 
-/* ── Guide columns ──
+/* -- Guide columns --
    Each guide is a 28px-wide column that stretches the full row height.
    Pseudo-elements extend ±8px to bridge sub-pixel gaps between rows.
    Parent overflow:hidden clips the excess cleanly. */
@@ -92,7 +92,7 @@
     border-bottom-left-radius: 8px;
 }
 
-/* ── Expand / Collapse toggle ── */
+/* -- Expand / Collapse toggle -- */
 
 .dept-tree-toggle {
     display: inline-flex;
@@ -126,7 +126,7 @@
     flex-shrink: 0;
 }
 
-/* ── Icon ── */
+/* -- Icon -- */
 
 .dept-tree-icon {
     display: inline-flex;
@@ -136,7 +136,7 @@
     margin-right: 10px;
 }
 
-/* ── Name ── */
+/* -- Name -- */
 
 .dept-tree-name {
     flex: 1;
@@ -153,7 +153,7 @@
     font-weight: 600;
 }
 
-/* ── Child count badge ── */
+/* -- Child count badge -- */
 
 .dept-tree-badge {
     display: inline-flex;

@@ -3,7 +3,9 @@ using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Infrastructure.Configuration;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Infrastructure.Persistence;
@@ -50,6 +52,7 @@ public class DatabaseSeeder
         await SeedGroupsAsync();
         await SeedDepartmentsAsync();
         await SeedTestUsersAsync();
+        await SeedConfigAsync();
     }
 
     // ══════════════════════════════════════════
@@ -174,8 +177,8 @@ public class DatabaseSeeder
     ///   Global (well-known, already seeded)
     ///
     ///   Entwicklung (Default: ReadAll | CreateWriteData)
-    ///   ├── Backend    (null → erbt von Entwicklung)
-    ///   └── Frontend   (null → erbt von Entwicklung)
+    ///   ├-- Backend    (null → erbt von Entwicklung)
+    ///   └-- Frontend   (null → erbt von Entwicklung)
     ///
     ///   Marketing (Default: ReadAll)
     ///
@@ -257,7 +260,7 @@ public class DatabaseSeeder
         LogTestUserSummary(users);
     }
 
-    // ── Lookups ──
+    // -- Lookups --
 
     private async Task<Dictionary<string, Role>> LoadRoleLookupAsync()
         => (await _db.Roles.ToListAsync()).ToDictionary(r => r.Name, StringComparer.OrdinalIgnoreCase);
@@ -268,7 +271,7 @@ public class DatabaseSeeder
     private async Task<Dictionary<string, Department>> LoadDepartmentLookupAsync()
         => (await _db.Departments.ToListAsync()).ToDictionary(d => d.Name, StringComparer.OrdinalIgnoreCase);
 
-    // ── Shares (with direct DepartmentId) ──
+    // -- Shares (with direct DepartmentId) --
 
     /// <summary>
     /// Creates shares with their department assignment set directly via DepartmentId.
@@ -285,7 +288,7 @@ public class DatabaseSeeder
             ["marketing-files"] = new ShareDefinition("marketing-files", "/data/storage/marketing-files", departments["Marketing"].Id),
         };
 
-    // ── Users ──
+    // -- Users --
 
     private Dictionary<string, User> CreateUsers()
     {
@@ -328,7 +331,7 @@ public class DatabaseSeeder
             isEnabled: isEnabled, canChangePassword: canChangePassword);
     }
 
-    // ── Group Assignments ──
+    // -- Group Assignments --
 
     private void AssignUsersToGroups(
         Dictionary<string, User> users,
@@ -352,7 +355,7 @@ public class DatabaseSeeder
         }
     }
 
-    // ── Role Assignments (direct → Global scope in ManagementAuthService) ──
+    // -- Role Assignments (direct → Global scope in ManagementAuthService) --
 
     private void AssignUsersToRoles(
         Dictionary<string, User> users,
@@ -376,7 +379,7 @@ public class DatabaseSeeder
         }
     }
 
-    // ── Share Access (visibility) ──
+    // -- Share Access (visibility) --
 
     private void AssignShareAccess(
         Dictionary<string, User> users,
@@ -401,7 +404,7 @@ public class DatabaseSeeder
 
     }
 
-    // ── Department → User (M:N stays) ──
+    // -- Department → User (M:N stays) --
 
     private void AssignUsersToDepartments(
         Dictionary<string, User> users,
@@ -418,7 +421,7 @@ public class DatabaseSeeder
             _db.DepartmentUsers.Add(new DepartmentUser(departments[dept].Id, users[user].Id));
     }
 
-    // ── Group → Department (direct FK on Group) ──
+    // -- Group → Department (direct FK on Group) --
 
     /// <summary>
     /// Sets the DepartmentId directly on each group entity.
@@ -446,7 +449,7 @@ public class DatabaseSeeder
         // (Admins, Guests, Everyone)
     }
 
-    // ── Scoped Role Assignments ──
+    // -- Scoped Role Assignments --
 
     /// <summary>
     /// Creates scoped role assignments for delegated administration:
@@ -479,7 +482,29 @@ public class DatabaseSeeder
                 groups["Backend-Team"].Id, roles["ShareManager"].Id, shares["backend-docs"].Id));
     }
 
-    // ── Logging ──
+    // -- Config --
+    private async Task SeedConfigAsync()
+    {
+        if (await _db.ConfigSettings.AnyAsync())
+            return;
+
+        _db.ConfigSettings.AddRange(
+            new ConfigSetting { Key = "app.language", Value = "de" },
+            new ConfigSetting { Key = "app.user.defaultRole", Value = "User" },
+            new ConfigSetting { Key = "app.user.isActiveOnCreation", Value = "true" },
+            new ConfigSetting { Key = "app.user.maxLoginAttempts", Value = "5" },
+            new ConfigSetting { Key = "app.user.passwordMinLength", Value = "8" },
+            new ConfigSetting { Key = "app.user.requireEmailVerification", Value = "true" },
+            new ConfigSetting { Key = "app.group.maxMembers", Value = "50" },
+            new ConfigSetting { Key = "app.group.defaultVisibility", Value = "Private" },
+            new ConfigSetting { Key = "app.group.allowSelfJoin", Value = "false" }
+        );
+
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Config-Einträge geseeded");
+    }
+
+    // -- Logging --
 
     private void LogTestUserSummary(Dictionary<string, User> users)
     {
@@ -569,7 +594,7 @@ public class DatabaseSeeder
         return cleaned;
     }
 
-    // ── Migration Helpers ──
+    // -- Migration Helpers --
 
     private async Task MigrateUserRolesAsync(HashSet<Guid> fromRoleIds, Guid toRoleId)
     {

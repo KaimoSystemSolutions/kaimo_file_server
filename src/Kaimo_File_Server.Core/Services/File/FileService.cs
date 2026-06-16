@@ -4,7 +4,7 @@ using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Storage;
 
-namespace Kaimo_File_Server.Core.Services;
+namespace Kaimo_File_Server.Core.Services.File;
 
 public class FileService : IFileService
 {
@@ -24,7 +24,7 @@ public class FileService : IFileService
         _shareId = shareId;
     }
 
-    // ────────────────── Directory Listing ──────────────────
+    // ------------------ Directory Listing ------------------
 
     public async Task<List<FileMetadata>> ListAsync(string directoryPath, UserContext user)
     {
@@ -53,7 +53,7 @@ public class FileService : IFileService
         return visible;
     }
 
-    // ────────────────── Batch Permission Check ──────────────────
+    // ------------------ Batch Permission Check ------------------
 
     public async Task<HashSet<string>> FilterReadablePathsAsync(
         IReadOnlyList<(string relativePath, bool isDirectory)> items,
@@ -79,7 +79,7 @@ public class FileService : IFileService
         return readable;
     }
 
-    // ────────────────── Permission Checks ──────────────────
+    // ------------------ Permission Checks ------------------
 
     public async Task<bool> CanReadAsync(string path, UserContext user)
     {
@@ -114,7 +114,7 @@ public class FileService : IFileService
         return await _acl.HasAccessAsync(user, _shareId, normalized, true, FilePermission.ListReadData);
     }
 
-    // ────────────────── Full Operations ──────────────────
+    // ------------------ Full Operations ------------------
 
     public async Task<Stream> ReadFileAsync(string path, UserContext user)
     {

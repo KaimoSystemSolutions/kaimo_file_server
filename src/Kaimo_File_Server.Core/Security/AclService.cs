@@ -178,7 +178,7 @@ public class AclService : IAclService
 
         var userPrincipalIds = CollectPrincipalIds(userContext);
 
-        // ── 1. Build per-item hierarchies, collect all unique paths ──
+        // -- 1. Build per-item hierarchies, collect all unique paths --
         var allPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var perItem = new List<(string normalized, bool isDir, List<string> hierarchy)>(items.Count);
 
@@ -192,20 +192,20 @@ public class AclService : IAclService
                 allPaths.Add(h);
         }
 
-        // ── 2. Single DB round trip for ACLs ──
+        // -- 2. Single DB round trip for ACLs --
         using var scope = _serviceProvider.CreateScope();
         var sp = scope.ServiceProvider;
 
         var aclRepo = sp.GetRequiredService<IAclRepository>();
         var allAcls = await aclRepo.GetAclsForPathsAsync(shareId, allPaths.ToList());
 
-        // ── 3. Resolve department default ONCE for the entire batch ──
+        // -- 3. Resolve department default ONCE for the entire batch --
         var deptDefault = await ResolveDepartmentDefaultAsync(userContext, shareId, sp);
 
-        // ── 4. Index ACLs for O(1) lookup ──
+        // -- 4. Index ACLs for O(1) lookup --
         var aclByPath = IndexAclsByPath(allAcls);
 
-        // ── 5. Evaluate each item in-memory ──
+        // -- 5. Evaluate each item in-memory --
         foreach (var (normalized, isDir, hierarchy) in perItem)
         {
             var effectiveAcl = ResolveEffectiveAclFromCache(
@@ -303,7 +303,7 @@ public class AclService : IAclService
         FilePermission permission,
         FilePermission departmentDefault)
     {
-        // ── Layer 1: Explicit Deny (highest priority) ──
+        // -- Layer 1: Explicit Deny (highest priority) --
         foreach (var entry in effectiveAcl)
         {
             if (entry.EntryType != AclEntryType.Deny) continue;
@@ -311,7 +311,7 @@ public class AclService : IAclService
             if ((entry.Permissions & permission) != 0) return false;
         }
 
-        // ── Layer 2: Explicit Allow ──
+        // -- Layer 2: Explicit Allow --
         foreach (var entry in effectiveAcl)
         {
             if (entry.EntryType != AclEntryType.Allow) continue;
@@ -319,7 +319,7 @@ public class AclService : IAclService
             if ((entry.Permissions & permission) != 0) return true;
         }
 
-        // ── Layer 3: Department Default (virtual allow) ──
+        // -- Layer 3: Department Default (virtual allow) --
         if ((departmentDefault & permission) != 0)
             return true;
 
