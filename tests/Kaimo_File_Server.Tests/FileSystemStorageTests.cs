@@ -589,4 +589,9 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
             throw; // unreachable
         }
     }
+
+    public string ToAbsolutePath(string shareRelativePath)
+    {
+        throw new NotImplementedException();
+    }
 }
