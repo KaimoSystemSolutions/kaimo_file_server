@@ -71,7 +71,26 @@
     </nav> 
     <InputFile id="global-file-input" OnChange="OnFilesSelected" style="display:none" multiple />
     <main class="main">
+        <div class="search-bar-container">
+            <div class="search-bar">
+                @Assets.SVG("compass.svg", new SvgOptions())
+                <input type="text"
+                       class="search-input"
+                       placeholder="@Resources.Web_Nav_BrowseFiles..."
+                       @bind="_searchQuery"
+                       @bind:event="oninput"
+                       @onkeydown="HandleSearchKeyDown" />
+                @if (!string.IsNullOrEmpty(_searchQuery))
+                {
+                    <button class="search-clear" @onclick="ClearSearch">
+                        ✕
+                    </button>
+                }
+            </div>
+        </div>
+        
         @Body
+        
     </main>
     <ToastContainer />
 </div>
@@ -79,12 +98,27 @@
 @code {
     private string _displayName = "";
     private string _initials = "";
-
+    private string _searchQuery = "";
+    
     private InputFile? _inputFile;
     private ElementReference _inputElement;
     
     [Inject] private IJSRuntime JS { get; set; } = default!;
 
+
+    private void HandleSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            Nav.NavigateTo($"/files?q={Uri.EscapeDataString(_searchQuery)}");
+        }
+    }
+
+    private void ClearSearch()
+    {
+        _searchQuery = "";
+    }
+    
     
     protected override void OnInitialized()
     {
