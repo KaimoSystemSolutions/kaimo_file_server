@@ -15,7 +15,7 @@ services:
     - "--mode=server"
     - "--frontend-port=57000"
     - "--backend-port=57200"
-    - "--roslyn-worker-port=57414"
+    - "--roslyn-worker-port=57404"
     - "--timeout=60"
     environment:
       DOTNET_USE_POLLING_FILE_WATCHER: "true"
@@ -23,16 +23,16 @@ services:
       RESHARPER_LOG_CONF: "/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
     image: "kaimofileserver:dev"
     ports:
-    - "127.0.0.1:57014:57000"
-    - "127.0.0.1:57214:57200"
-    - "127.0.0.1:57414:57414"
+    - "127.0.0.1:57004:57000"
+    - "127.0.0.1:57204:57200"
+    - "127.0.0.1:57404:57404"
     volumes:
     - "/media/boyfag/HDD/fileserver/src/Kaimo_File_Server.Host:/app:rw"
     - "/media/boyfag/HDD/fileserver:/src:rw"
     - "/home/boyfag/.nuget/packages:/home/app/.nuget/packages"
     - "/home/boyfag/.local/share/JetBrains/RiderRemoteDebugger/2026.1.2/Linux64:/opt/JetBrains/RiderDebuggerTools"
     - "/media/boyfag/HDD/Programs/Rider/bin/backend-log.xml:/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
-    - "/home/boyfag/.cache/JetBrains/Rider2026.1/log/DebuggerWorker/JetBrains.Debugger.Worker.2026_6_16_00_16_49:/var/opt/JetBrains/RiderDebuggerTools:rw"
+    - "/home/boyfag/.cache/JetBrains/Rider2026.1/log/DebuggerWorker/JetBrains.Debugger.Worker.2026_6_17_18_49_24:/var/opt/JetBrains/RiderDebuggerTools:rw"
     working_dir: "/app"
   kaimo_file_server.web:
     build:
@@ -49,7 +49,7 @@ services:
     - "--mode=server"
     - "--frontend-port=57000"
     - "--backend-port=57200"
-    - "--roslyn-worker-port=57415"
+    - "--roslyn-worker-port=57405"
     - "--timeout=60"
     environment:
       ASPNETCORE_STATICWEBASSETS: "/app/bin/Debug/net10.0/Kaimo_File_Server.Web.staticwebassets.runtime.CT.json"
@@ -58,14 +58,14 @@ services:
       RESHARPER_LOG_CONF: "/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
     image: "kaimofileserverweb:dev"
     ports:
-    - "127.0.0.1:57015:57000"
-    - "127.0.0.1:57215:57200"
-    - "127.0.0.1:57415:57415"
+    - "127.0.0.1:57005:57000"
+    - "127.0.0.1:57205:57200"
+    - "127.0.0.1:57405:57405"
     volumes:
     - "/media/boyfag/HDD/fileserver/src/Kaimo_File_Server.Web:/app:rw"
     - "/media/boyfag/HDD/fileserver:/src:rw"
     - "/home/boyfag/.nuget/packages:/home/app/.nuget/packages"
     - "/home/boyfag/.local/share/JetBrains/RiderRemoteDebugger/2026.1.2/Linux64:/opt/JetBrains/RiderDebuggerTools"
     - "/media/boyfag/HDD/Programs/Rider/bin/backend-log.xml:/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
-    - "/home/boyfag/.cache/JetBrains/Rider2026.1/log/DebuggerWorker/JetBrains.Debugger.Worker.2026_6_16_00_16_49:/var/opt/JetBrains/RiderDebuggerTools:rw"
+    - "/home/boyfag/.cache/JetBrains/Rider2026.1/log/DebuggerWorker/JetBrains.Debugger.Worker.2026_6_17_18_49_24:/var/opt/JetBrains/RiderDebuggerTools:rw"
     working_dir: "/app"
