@@ -33,26 +33,25 @@ public class FileService : IFileService
         _shareId = shareId;
     }
     
+
     public void OnFileCreated(string absolutePath)
     {
-        
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await _searchService.IndexDocumentIfNotExistsAsync(absolutePath);
-                _logger.LogInformation("File indexed: '{Path}", absolutePath);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Indexierung fehlgeschlagen für {Path}", absolutePath);
-            }
-        });
+        _searchService.onFileCreated(absolutePath);
+    }
+    
+    public void onDirectoryCreated(string absolutePath)
+    {
+        _searchService.onDirectoryCreated(absolutePath);
     }
 
-    public void onDirectoryCreated(string fullPath)
+    public void onFileDeleted(string absolutePath)
     {
-        throw new NotImplementedException();
+        _searchService.onFileDeleted(absolutePath);
+    }
+    
+    public void onDirectoryDeleted(string absolutePath)
+    {
+        _searchService.onDirectoryDeleted(absolutePath);
     }
 
     // ------------------ Directory Listing ------------------
@@ -250,7 +249,9 @@ public class FileService : IFileService
 
         var isAlreadyInRecycleBin = normalized.StartsWith(
             RecycleBinFolder, StringComparison.OrdinalIgnoreCase);
-
+        
+        onFileDeleted(ToAbsolutePath(path));
+        
         if (isRecycleEnabled && !isAlreadyInRecycleBin)
         {
             var recyclePath = ShareRelativePath.Combine(RecycleBinFolder, normalized);

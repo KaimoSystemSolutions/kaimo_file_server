@@ -37,9 +37,13 @@ namespace Kaimo_File_Server.Core.Services.File
         
         // ------------ Hooks ------------
 
-        void OnFileCreated(string fullPath);
+        void OnFileCreated(string absolutePath);
         
-        void onDirectoryCreated(string fullPath);
+        void onDirectoryCreated(string absolutePath);
+
+        void onFileDeleted(string absolutePath);
+
+        void onDirectoryDeleted(string absolutePath);
         
         /// <summary>
         /// Returns the subset of paths the user has ListReadData permission on.

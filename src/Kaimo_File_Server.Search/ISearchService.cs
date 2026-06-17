@@ -2,6 +2,13 @@ namespace Kaimo_File_Server.Search;
 
 public interface ISearchService
 {
+    Task onFileCreated(string absolutePath);
+    Task onFileDeleted(string absolutePath);
+    
+    Task onDirectoryCreated(string absolutePath);
+    Task onDirectoryDeleted(string absolutePath);
+    
+    
     Task InitializeAsync(CancellationToken ct = default);
     Task IndexDocumentIfNotExistsAsync(string absolutePath, CancellationToken ct = default);
     Task IndexManyAsync(IEnumerable<FileDocument> documents, CancellationToken ct = default);

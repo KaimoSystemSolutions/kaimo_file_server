@@ -449,9 +449,15 @@ public class SmbFileSystem : INTFileStore
                     return NTStatus.STATUS_ACCESS_DENIED;
 
                 if (h.IsDirectory && Directory.Exists(h.AbsolutePath))
+                {
                     Directory.Delete(h.AbsolutePath, true);
+                    _fileService.onFileDeleted(h.AbsolutePath);
+                }
                 else if (!h.IsDirectory && File.Exists(h.AbsolutePath))
+                {
                     File.Delete(h.AbsolutePath);
+                    _fileService.onDirectoryCreated(h.AbsolutePath);
+                }
             }
 
             return NTStatus.STATUS_SUCCESS;

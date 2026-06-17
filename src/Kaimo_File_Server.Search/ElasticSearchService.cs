@@ -25,7 +25,92 @@ public class ElasticSearchService : ISearchService
         _client = client;
         _logger = logger;
     }
-
+    
+    public async Task onFileCreated(string absolutePath)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await IndexDocumentIfNotExistsAsync(absolutePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Indexierung fehlgeschlagen für {Path}", absolutePath);
+            }
+        });
+    }
+    
+    public async Task onFileDeleted(string absolutePath)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var response = await _client.DeleteByQueryAsync<FileDocument>(IndexName, d => d
+                    .Query(q => q
+                        .Term(t => t
+                            .Field("filePath")
+                            .Value(absolutePath)
+                        )
+                    )
+                );
+    
+                if (response.Deleted == 0)
+                    _logger.LogWarning("Kein Dokument für Pfad '{Path}' gefunden", absolutePath);
+                else
+                    _logger.LogInformation("Dokument für '{Path}' aus Index entfernt", absolutePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Löschen fehlgeschlagen für {Path}", absolutePath);
+            }
+        });
+    }
+    
+    public Task onDirectoryCreated(string absolutePath)
+    {
+        _logger.LogDebug("Verzeichnis erstellt (keine Aktion): '{Path}'", absolutePath);
+        return Task.CompletedTask;
+    }
+    
+    public async Task onDirectoryDeleted(string absolutePath)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                string prefix = absolutePath.TrimEnd(Path.DirectorySeparatorChar)
+                                + Path.DirectorySeparatorChar;
+    
+                var response = await _client.DeleteByQueryAsync<FileDocument>(IndexName, d => d
+                    .Query(q => q
+                        .Bool(b => b
+                            .Should(
+                                s => s.Term(t => t.Field("filePath").Value(absolutePath)),
+                                s => s.Prefix(p => p.Field("filePath").Value(prefix))
+                            )
+                            .MinimumShouldMatch(1)
+                        )
+                    )
+                );
+    
+                if (!response.IsValidResponse)
+                    _logger.LogError("DeleteByQuery fehlgeschlagen für Verzeichnis '{Path}': {Error}",
+                        absolutePath, response.DebugInformation);
+                else
+                    _logger.LogInformation(
+                        "{Count} Dokument(e) für Verzeichnis '{Path}' aus Index entfernt",
+                        response.Deleted, absolutePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Löschen des Verzeichnisses fehlgeschlagen für {Path}", absolutePath);
+            }
+        });
+    }
+        
+        
     public async Task InitializeAsync(CancellationToken ct = default)
     {
         var exists = await _client.Indices.ExistsAsync(IndexName, ct);
