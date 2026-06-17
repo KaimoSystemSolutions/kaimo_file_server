@@ -459,4 +459,118 @@
   <data name="Web_Acl_Permission_FullAccess" xml:space="preserve">
     <value>Vollzugriff</value>
   </data>
+  <data name="Web_Acl_Inherited" xml:space="preserve">
+    <value>Geerbt</value>
+  </data>
+  <data name="Web_Acl_Allow" xml:space="preserve">
+    <value>Erlauben</value>
+  </data>
+  <data name="Web_Acl_Deny" xml:space="preserve">
+    <value>Verweigern</value>
+  </data>
+  <data name="Web_Acl_InheritedFrom" xml:space="preserve">
+    <value>Geerbt von {0}</value>
+  </data>
+  <data name="Web_Acl_Edit" xml:space="preserve">
+    <value>Bearbeiten</value>
+  </data>
+  <data name="Web_Acl_Remove" xml:space="preserve">
+    <value>Entfernen</value>
+  </data>
+  <data name="Web_Acl_Type" xml:space="preserve">
+    <value>Typ</value>
+  </data>
+  <data name="Web_Acl_SelectPlaceholder" xml:space="preserve">
+    <value>Auswählen</value>
+  </data>
+  <data name="Web_Acl_QuickSelect" xml:space="preserve">
+    <value>Schnellauswahl</value>
+  </data>
+  <data name="Web_Acl_DetailPermissions" xml:space="preserve">
+    <value>Einzelberechtigungen</value>
+  </data>
+  <data name="Web_Acl_None" xml:space="preserve">
+    <value>Keine</value>
+  </data>
+  <data name="Web_Acl_Button_Add" xml:space="preserve">
+    <value>Hinzufügen</value>
+  </data>
+  <data name="Web_Acl_Button_Save" xml:space="preserve">
+    <value>Speichern</value>
+  </data>
+  <data name="Web_Acl_Button_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="Web_Acl_Perm_TraverseExecute" xml:space="preserve">
+    <value>Durchsuchen/Ausführen</value>
+  </data>
+  <data name="Web_Acl_Perm_ListReadData" xml:space="preserve">
+    <value>Lesen/Auflisten</value>
+  </data>
+  <data name="Web_Acl_Perm_ReadAttributes" xml:space="preserve">
+    <value>Attribute lesen</value>
+  </data>
+  <data name="Web_Acl_Perm_ReadExtAttributes" xml:space="preserve">
+    <value>Erw. Attribute lesen</value>
+  </data>
+  <data name="Web_Acl_Perm_ReadPermissions" xml:space="preserve">
+    <value>Rechte lesen</value>
+  </data>
+  <data name="Web_Acl_Perm_CreateWriteData" xml:space="preserve">
+    <value>Erstellen/Schreiben</value>
+  </data>
+  <data name="Web_Acl_Perm_CreateAppendData" xml:space="preserve">
+    <value>Erstellen/Anhängen</value>
+  </data>
+  <data name="Web_Acl_Perm_WriteAttributes" xml:space="preserve">
+    <value>Attribute schreiben</value>
+  </data>
+  <data name="Web_Acl_Perm_WriteExtAttributes" xml:space="preserve">
+    <value>Erw. Attribute schreiben</value>
+  </data>
+  <data name="Web_Acl_Perm_DeleteSubItems" xml:space="preserve">
+    <value>Unterelemente löschen</value>
+  </data>
+  <data name="Web_Acl_Perm_Delete" xml:space="preserve">
+    <value>Löschen</value>
+  </data>
+  <data name="Web_Acl_Perm_ChangePermissions" xml:space="preserve">
+    <value>Rechte ändern</value>
+  </data>
+  <data name="Web_Acl_Perm_TakeOwnership" xml:space="preserve">
+    <value>Besitz übernehmen</value>
+  </data>
+  <data name="Web_Acl_Inherit_ThisFolder" xml:space="preserve">
+    <value>Dieser Ordner</value>
+  </data>
+  <data name="Web_Acl_Inherit_SubFolders" xml:space="preserve">
+    <value>Unterordner</value>
+  </data>
+  <data name="Web_Acl_Inherit_Files" xml:space="preserve">
+    <value>Dateien</value>
+  </data>
+  <data name="Web_Acl_Inherit_AllDescendants" xml:space="preserve">
+    <value>Alle Nachfahren (rekursiv)</value>
+  </data>
+  <data name="Web_Acl_Inherit_Everything" xml:space="preserve">
+    <value>Alles (rekursiv)</value>
+  </data>
+  <data name="Web_Acl_Inherit_ThisOnly" xml:space="preserve">
+    <value>Nur dieser Ordner</value>
+  </data>
+  <data name="Web_Acl_Inherit_ThisAndDirect" xml:space="preserve">
+    <value>Dieser Ordner + direkte Unterelemente</value>
+  </data>
+  <data name="Web_Acl_Error_NoPath" xml:space="preserve">
+    <value>Kein Pfad angegeben.</value>
+  </data>
+  <data name="Web_Acl_Error_NoShareId" xml:space="preserve">
+    <value>Keine Share-ID angegeben.</value>
+  </data>
+  <data name="Web_Acl_Error_LoadFailed" xml:space="preserve">
+    <value>Laden fehlgeschlagen (unbekannter Fehler).</value>
+  </data>
+  <data name="Web_Acl_Error_Exception" xml:space="preserve">
+    <value>Ausnahme</value>
+  </data>
 </root>
