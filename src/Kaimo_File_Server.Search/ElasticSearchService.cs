@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Elastic.Clients.Elasticsearch;
 using Elastic.Clients.Elasticsearch.IndexManagement;
 using Elastic.Clients.Elasticsearch.Mapping;
@@ -170,7 +172,7 @@ public class ElasticSearchService : ISearchService
     
         FileDocument document = new FileDocument
         {
-            Id = Guid.NewGuid().ToString(),
+            Id = GetStableId(absolutePath),
             FileName = fileName,
             FilePath = absolutePath,
             Content = "ich mag schuhe",
@@ -185,7 +187,7 @@ public class ElasticSearchService : ISearchService
         switch (existenceCheck)
         {
             case ExistsResult.ExactFileExists:
-                _logger.LogDebug("Dokument {Id} bereits indexiert, überspringe", document.Id);
+                _logger.LogInformation("Dokument {Id} bereits indexiert, überspringe", document.Id);
                 return;
 
             case ExistsResult.OldVersionExists:
@@ -208,6 +210,12 @@ public class ElasticSearchService : ISearchService
                 document.Id, response.DebugInformation);
     }
 
+    private static string GetStableId(string absolutePath)
+    {
+        var hash = MD5.HashData(Encoding.UTF8.GetBytes(absolutePath));
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+    
     public async Task IndexManyAsync(IEnumerable<FileDocument> documents, CancellationToken ct = default)
     {
         var response = await _client.BulkAsync(b => b

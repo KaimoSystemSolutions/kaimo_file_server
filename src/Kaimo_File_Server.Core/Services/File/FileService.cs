@@ -249,8 +249,13 @@ public class FileService : IFileService
 
         var isAlreadyInRecycleBin = normalized.StartsWith(
             RecycleBinFolder, StringComparison.OrdinalIgnoreCase);
+
+        var absolutePath = ToAbsolutePath(path);
         
-        onFileDeleted(ToAbsolutePath(path));
+        if(isDir)
+            onDirectoryDeleted(absolutePath);
+        else
+            onFileDeleted(absolutePath);
         
         if (isRecycleEnabled && !isAlreadyInRecycleBin)
         {

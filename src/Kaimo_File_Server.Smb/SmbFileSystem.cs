@@ -456,7 +456,7 @@ public class SmbFileSystem : INTFileStore
                 else if (!h.IsDirectory && File.Exists(h.AbsolutePath))
                 {
                     File.Delete(h.AbsolutePath);
-                    _fileService.onDirectoryCreated(h.AbsolutePath);
+                    _fileService.onDirectoryDeleted(h.AbsolutePath);
                 }
             }
 
