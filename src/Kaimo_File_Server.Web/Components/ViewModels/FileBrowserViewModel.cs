@@ -559,20 +559,7 @@ public class FileBrowserViewModel
 
         
         var absolutePath = _fileService.ToAbsolutePath(targetPath);
-        
-        await _searchService.IndexDocumentAsync(new FileDocument
-        {
-            Id = Guid.NewGuid().ToString(),
-            FileName = fileName,
-            FilePath = absolutePath,
-            Content = "ich mag schuhe",
-            FileType = Path.GetExtension(fileName).TrimStart('.'),
-            FileSizeBytes = new FileInfo(absolutePath).Length,
-            Created = DateTime.UtcNow,
-            Modified = DateTime.UtcNow
-        });
-        
-        _logger.LogInformation("File indexed: '{Path}", targetPath);
+        _fileService.OnFileCreated(absolutePath);
         
         return OperationResult.Ok();
     }

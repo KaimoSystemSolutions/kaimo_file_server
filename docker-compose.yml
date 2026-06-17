@@ -4,7 +4,7 @@ services:
     container_name: kaimo_file_server
     #user: root
     ports:
-      - 4445:445
+      - 445:445
     volumes: 
       - ./tests/data/storage:/data/storage
     depends_on:
@@ -69,7 +69,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 15
-    
+      
+      # Reserve Memory Addresses for files straight away. Elastic search loads up files on demand later on 
+      # sudo sysctl -w vm.max_map_count=262144
+      # echo "vm.max_map_count=262144" | sudo tee -a /etc/sysctl.conf
+      #  
+      # give permissions to folder:
+      # sudo chown -R 1000:1000 ./tests/data/elasticsearch
+  
+  
   adminer:
     image: adminer
     restart: always

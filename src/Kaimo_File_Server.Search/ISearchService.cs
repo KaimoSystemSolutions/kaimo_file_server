@@ -3,7 +3,7 @@ namespace Kaimo_File_Server.Search;
 public interface ISearchService
 {
     Task InitializeAsync(CancellationToken ct = default);
-    Task IndexDocumentAsync(FileDocument document, CancellationToken ct = default);
+    Task IndexDocumentIfNotExistsAsync(string absolutePath, CancellationToken ct = default);
     Task IndexManyAsync(IEnumerable<FileDocument> documents, CancellationToken ct = default);
     Task DeleteDocumentAsync(string id, CancellationToken ct = default);
     Task<SearchResult> SearchAsync(SearchRequest request, CancellationToken ct = default);

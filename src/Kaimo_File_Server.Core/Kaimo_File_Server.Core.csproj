@@ -44,4 +44,8 @@
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kaimo_File_Server.Search\Kaimo_File_Server.Search.csproj" />
+  </ItemGroup>
 </Project>

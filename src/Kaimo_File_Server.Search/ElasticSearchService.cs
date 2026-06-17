@@ -13,6 +13,13 @@ public class ElasticSearchService : ISearchService
     private readonly ElasticsearchClient _client;
     private readonly ILogger<ElasticSearchService> _logger;
 
+    private enum ExistsResult
+    {
+        ExactFileExists,
+        OldVersionExists,
+        DoesntExist
+    }
+    
     public ElasticSearchService(ElasticsearchClient client, ILogger<ElasticSearchService> logger)
     {
         _client = client;
@@ -48,8 +55,64 @@ public class ElasticSearchService : ISearchService
             _logger.LogInformation("Index '{Index}' erstellt", IndexName);
     }
 
-    public async Task IndexDocumentAsync(FileDocument document, CancellationToken ct = default)
+
+    private async Task<ExistsResult> CheckForDocumentsExistance(FileDocument document, CancellationToken ct = default)
     {
+            
+        var existing = await _client.GetAsync<FileDocument>(document.Id, g => g
+            .Index(IndexName));
+
+        if (!existing.Found)
+            return ExistsResult.DoesntExist;
+
+        var existingFile = existing.Source;
+
+        bool sameContent = document.Content.Equals(existingFile?.Content);
+        bool samePath = document.FilePath.Equals(existingFile?.FilePath) && document.FileName.Equals(existingFile.FileName);
+
+        if (samePath && sameContent)
+            return ExistsResult.ExactFileExists;
+        
+        if (samePath)
+            return ExistsResult.OldVersionExists;
+
+        return ExistsResult.DoesntExist;
+    }
+    
+    public async Task IndexDocumentIfNotExistsAsync(string absolutePath, CancellationToken ct = default)
+    {
+        string fileName = Path.GetFileName(absolutePath);
+    
+        FileDocument document = new FileDocument
+        {
+            Id = Guid.NewGuid().ToString(),
+            FileName = fileName,
+            FilePath = absolutePath,
+            Content = "ich mag schuhe",
+            FileType = Path.GetExtension(fileName).TrimStart('.'),
+            FileSizeBytes = new FileInfo(absolutePath).Length,
+            Created = DateTime.UtcNow,
+            Modified = DateTime.UtcNow
+        };
+        
+        ExistsResult existenceCheck = await CheckForDocumentsExistance(document, ct);
+
+        switch (existenceCheck)
+        {
+            case ExistsResult.ExactFileExists:
+                _logger.LogDebug("Dokument {Id} bereits indexiert, überspringe", document.Id);
+                return;
+
+            case ExistsResult.OldVersionExists:
+                _logger.LogInformation("Alte Version von {Id} gefunden, wird überschrieben", document.Id);
+                await _client.DeleteAsync<FileDocument>(document.Id, d => d.Index(IndexName), ct);
+                break;
+
+            case ExistsResult.DoesntExist:
+                _logger.LogInformation("Neues Dokument {Id} wird indexiert", document.Id);
+                break;
+        }
+        
         var response = await _client.IndexAsync(document, idx => idx
             .Index(IndexName)
             .Id(document.Id),

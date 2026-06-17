@@ -3,6 +3,8 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
+using Kaimo_File_Server.Search;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 
@@ -14,10 +16,13 @@ public class FileServiceTests
     private readonly Mock<IAclService> _aclMock = new();
     private readonly Guid _shareId = Guid.NewGuid();
     private readonly FileService _sut;
-
-    public FileServiceTests()
+    
+    private readonly ISearchService _searchService;
+    private readonly ILogger<FileService> _logger;
+    
+    public FileServiceTests(ISearchService searchService, ILogger<FileService> logger)
     {
-        _sut = new FileService(_storageMock.Object, _aclMock.Object, _shareId);
+        _sut = new FileService(_storageMock.Object, _aclMock.Object, searchService, logger, _shareId);
     }
 
     private static UserContext CreateContext()

@@ -268,6 +268,10 @@ public class SmbFileSystem : INTFileStore
             User = user,
             DeleteOnClose = (createOptions & CreateOptions.FILE_DELETE_ON_CLOSE) != 0
         };
+        
+        
+        _fileService.onDirectoryCreated(absolutePath);
+        
         return NTStatus.STATUS_SUCCESS;
     }
 
@@ -346,7 +350,6 @@ public class SmbFileSystem : INTFileStore
             _ => FileStatus.FILE_OPENED,
         };
         
-        
         handle = new FileHandle
         {
             Stream = fs,
@@ -355,6 +358,9 @@ public class SmbFileSystem : INTFileStore
             User = user,
             DeleteOnClose = (createOptions & CreateOptions.FILE_DELETE_ON_CLOSE) != 0
         };
+        
+        _fileService.OnFileCreated(absolutePath);
+        
         return NTStatus.STATUS_SUCCESS;
     }
 

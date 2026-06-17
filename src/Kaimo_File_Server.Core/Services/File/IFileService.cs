@@ -35,6 +35,12 @@ namespace Kaimo_File_Server.Core.Services.File
         Task UnzipAsync(string zipPath, string targetPath, UserContext user);
         Task ArchiveAsync(List<string> sourcePaths, string targetPath, string format, UserContext user);
         
+        // ------------ Hooks ------------
+
+        void OnFileCreated(string fullPath);
+        
+        void onDirectoryCreated(string fullPath);
+        
         /// <summary>
         /// Returns the subset of paths the user has ListReadData permission on.
         /// Single DB round trip via batch ACL evaluation.

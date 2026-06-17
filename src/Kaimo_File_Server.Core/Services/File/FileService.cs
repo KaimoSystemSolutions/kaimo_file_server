@@ -1,8 +1,11 @@
-﻿using Kaimo_File_Server.Core.Domain;
+﻿using Elastic.Clients.Elasticsearch;
+using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Storage;
+using Kaimo_File_Server.Search;
+using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Core.Services.File;
 
@@ -10,6 +13,8 @@ public class FileService : IFileService
 {
     private readonly IStorageEngine _storage;
     private readonly IAclService _acl;
+    private readonly ISearchService _searchService;
+    private readonly ILogger<FileService> _logger;
     private readonly Guid _shareId;
 
     private const string RecycleBinFolder = ".RECYCLE_BIN";
@@ -17,11 +22,37 @@ public class FileService : IFileService
     public FileService(
         IStorageEngine storage,
         IAclService acl,
+        ISearchService searchService,
+        ILogger<FileService> logger,
         Guid shareId)
     {
         _storage = storage;
         _acl = acl;
+        _searchService = searchService;
+        _logger = logger;
         _shareId = shareId;
+    }
+    
+    public void OnFileCreated(string absolutePath)
+    {
+        
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _searchService.IndexDocumentIfNotExistsAsync(absolutePath);
+                _logger.LogInformation("File indexed: '{Path}", absolutePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Indexierung fehlgeschlagen für {Path}", absolutePath);
+            }
+        });
+    }
+
+    public void onDirectoryCreated(string fullPath)
+    {
+        throw new NotImplementedException();
     }
 
     // ------------------ Directory Listing ------------------
@@ -136,6 +167,7 @@ public class FileService : IFileService
             throw new UnauthorizedAccessException($"Write denied for '{normalized}'");
 
         await _storage.WriteAsync(normalized, data, cancellationToken);
+        OnFileCreated(ToAbsolutePath(path));
     }
 
     public string ToAbsolutePath(string path)
@@ -205,6 +237,7 @@ public class FileService : IFileService
             throw new UnauthorizedAccessException($"Create denied for '{path}'");
 
         await _storage.CreateDirectory(ShareRelativePath.Normalize(path));
+        onDirectoryCreated(ToAbsolutePath(path));
     }
 
     public async Task DeleteFileAsync(string path, UserContext user, bool isRecycleEnabled)
