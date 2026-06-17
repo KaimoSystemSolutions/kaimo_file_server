@@ -34,9 +34,9 @@ public class FileService : IFileService
     }
     
 
-    public void OnFileCreated(string absolutePath)
+    public void OnFileCreated(string absolutePath, Task<Stream> fileData)
     {
-        _searchService.onFileCreated(absolutePath);
+        _searchService.onFileCreated(absolutePath, fileData);
     }
     
     public void onDirectoryCreated(string absolutePath)
@@ -166,7 +166,8 @@ public class FileService : IFileService
             throw new UnauthorizedAccessException($"Write denied for '{normalized}'");
 
         await _storage.WriteAsync(normalized, data, cancellationToken);
-        OnFileCreated(ToAbsolutePath(path));
+
+        OnFileCreated(ToAbsolutePath(path), _storage.ReadAsync(normalized));
     }
 
     public string ToAbsolutePath(string path)

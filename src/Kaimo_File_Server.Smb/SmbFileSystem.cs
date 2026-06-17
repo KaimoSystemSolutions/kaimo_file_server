@@ -359,7 +359,7 @@ public class SmbFileSystem : INTFileStore
             DeleteOnClose = (createOptions & CreateOptions.FILE_DELETE_ON_CLOSE) != 0
         };
         
-        _fileService.OnFileCreated(absolutePath);
+        _fileService.OnFileCreated(absolutePath, _fileService.ReadFileAsync(absolutePath, user));
         
         return NTStatus.STATUS_SUCCESS;
     }

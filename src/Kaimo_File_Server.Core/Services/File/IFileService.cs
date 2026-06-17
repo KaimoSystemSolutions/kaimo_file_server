@@ -37,7 +37,7 @@ namespace Kaimo_File_Server.Core.Services.File
         
         // ------------ Hooks ------------
 
-        void OnFileCreated(string absolutePath);
+        void OnFileCreated(string absolutePath, Task<Stream> fileData);
         
         void onDirectoryCreated(string absolutePath);
 

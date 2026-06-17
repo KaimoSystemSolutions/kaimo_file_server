@@ -28,13 +28,13 @@ public class ElasticSearchService : ISearchService
         _logger = logger;
     }
     
-    public async Task onFileCreated(string absolutePath)
+    public async Task onFileCreated(string absolutePath, Task<Stream> fileData, CancellationToken ct = default)
     {
         _ = Task.Run(async () =>
         {
             try
             {
-                await IndexDocumentIfNotExistsAsync(absolutePath);
+                await IndexDocumentIfNotExistsAsync(absolutePath, fileData);
             }
             catch (Exception ex)
             {
@@ -141,6 +141,27 @@ public class ElasticSearchService : ISearchService
         else
             _logger.LogInformation("Index '{Index}' erstellt", IndexName);
     }
+    
+    public async Task<List<FileDocument>> SearchByContentAsync(string searchText, CancellationToken ct = default)
+    {
+        var response = await _client.SearchAsync<FileDocument>(s => s
+            .Index(IndexName)
+            .Query(q => q
+                .Match(m => m
+                    .Field(f => f.Content)
+                    .Query(searchText)
+                )
+            ), ct);
+
+        if (!response.IsValidResponse)
+        {
+            _logger.LogError("Inhaltssuche fehlgeschlagen: {Error}", response.DebugInformation);
+            return new List<FileDocument>();
+        }
+
+        return response.Documents.ToList();
+    }
+    
 
 
     private async Task<ExistsResult> CheckForDocumentsExistance(FileDocument document, CancellationToken ct = default)
@@ -166,16 +187,18 @@ public class ElasticSearchService : ISearchService
         return ExistsResult.DoesntExist;
     }
     
-    public async Task IndexDocumentIfNotExistsAsync(string absolutePath, CancellationToken ct = default)
+    private async Task IndexDocumentIfNotExistsAsync(string absolutePath, Task<Stream> fileData, CancellationToken ct = default)
     {
         string fileName = Path.GetFileName(absolutePath);
-    
+
+        string content = await ContentProvider.GetContent(await fileData);
+        
         FileDocument document = new FileDocument
         {
             Id = GetStableId(absolutePath),
             FileName = fileName,
             FilePath = absolutePath,
-            Content = "ich mag schuhe",
+            Content = content,
             FileType = Path.GetExtension(fileName).TrimStart('.'),
             FileSizeBytes = new FileInfo(absolutePath).Length,
             Created = DateTime.UtcNow,
@@ -216,24 +239,6 @@ public class ElasticSearchService : ISearchService
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
     
-    public async Task IndexManyAsync(IEnumerable<FileDocument> documents, CancellationToken ct = default)
-    {
-        var response = await _client.BulkAsync(b => b
-            .Index(IndexName)
-            .IndexMany(documents),
-            ct);
-
-        if (response.Errors)
-            foreach (var item in response.ItemsWithErrors)
-                _logger.LogError("Bulk-Fehler für {Id}: {Error}", item.Id, item.Error?.Reason);
-    }
-
-    public async Task DeleteDocumentAsync(string id, CancellationToken ct = default)
-    {
-        await _client.DeleteAsync<FileDocument>(IndexName, id, ct);
-        
-    }
-
     public async Task<SearchResult> SearchAsync(SearchRequest request, CancellationToken ct = default)
     {
         var response = await _client.SearchAsync<FileDocument>(s => s
