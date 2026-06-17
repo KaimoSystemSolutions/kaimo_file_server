@@ -826,6 +826,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die ACL ähnelt.
+        /// </summary>
+        public static string Web_ShareList_Tab_ACL {
+            get {
+                return ResourceManager.GetString("Web_ShareList_Tab_ACL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die General ähnelt.
         /// </summary>
         public static string Web_ShareList_Tab_General {

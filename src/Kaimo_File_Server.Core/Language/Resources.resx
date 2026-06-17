@@ -414,4 +414,7 @@
   <data name="Web_Nav_Settings" xml:space="preserve">
     <value>Settings</value>
   </data>
+  <data name="Web_ShareList_Tab_ACL" xml:space="preserve">
+    <value>ACL</value>
+  </data>
 </root>

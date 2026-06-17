@@ -11,7 +11,7 @@
 <div class="page-header">
     <div>
         <h1>Shares</h1>
-        <p class="subtitle">Willkommen, @VM.CurrentUserName</p>
+        <p class="subtitle">@string.Format(Resources.Web_ShareList_Welcome, VM.CurrentUserName)</p>
     </div>
     <div style="display: flex; gap: 0.5rem;">
         @if (VM.CanCreateShare)
@@ -28,13 +28,13 @@
 @if (VM.IsCreating && VM.CanCreateShare)
 {
     <div class="create-form-card">
-        <h3>Neuen Share erstellen</h3>
+        <h3>@Resources.Web_ShareList_CreateTitle</h3>
         <div class="create-form-fields">
             <div class="form-group">
-                <label>Name</label>
+                <label>@Resources.Web_ShareList_Label_Name</label>
                 <input class="edit-input"
                        type="text"
-                       placeholder="z.B. projekte, backup, medien"
+                       placeholder=@Resources.Web_ShareList_CreatePlaceholder
                        @bind="VM.NewShareName"
                        @bind:event="oninput"
                        @onkeydown="HandleCreateKeyDown" />
@@ -45,8 +45,8 @@
             <div class="error-banner" style="margin-top: 12px; margin-bottom: 0;">@VM.CreateErrorMessage</div>
         }
         <div class="create-form-actions">
-            <button class="btn-primary" @onclick="CreateShare">Erstellen</button>
-            <button class="btn-secondary" @onclick="() => { VM.IsCreating = false; }">Abbrechen</button>
+            <button class="btn-primary" @onclick="CreateShare">@Resources.Web_Button_Create</button>
+            <button class="btn-secondary" @onclick="() => { VM.IsCreating = false; }">@Resources.Web_Button_Cancel</button>
         </div>
     </div>
 }
@@ -57,7 +57,7 @@
 {
     <div class="loading-state">
         <div class="spinner"></div>
-        <p>Lade Shares…</p>
+        <p>@Resources.Web_ShareBrowser_Loading</p>
     </div>
 }
 else if (VM.ErrorMessage is not null)
@@ -68,7 +68,7 @@ else if (!VM.Shares.Any())
 {
     <div class="empty-state">
         @Assets.SVG("folder.svg", new SvgOptions(Width: 64, Height: 64, Color: "var(--text-tertiary)"))
-        <p>Keine Shares verfügbar.</p>
+        <p>@Resources.Web_ShareBrowser_Empty</p>
     </div>
 }
 else
@@ -97,7 +97,7 @@ else
                             <span class="share-path">@share.Path</span>
                             @if (isDisabled)
                             {
-                                <span class="share-badge share-badge--disabled">Deaktiviert</span>
+                                <span class="share-badge share-badge--disabled">@Resources.Web_ShareList_Status_Disabled</span>
                             }
                         </div>
                     </div>
@@ -111,7 +111,7 @@ else
             <div class="admin-detail">
                 <div class="detail-header">
                     <h3>@VM.SelectedShare.Name</h3>
-                    <span class="detail-subtitle">Share-Einstellungen</span>
+                    <span class="detail-subtitle">@Resources.Web_ShareList_DetailSubtitle</span>
                 </div>
 
                 @* -- Tab-Navigation -- *@
@@ -119,17 +119,17 @@ else
                     <button class="detail-tab @(_activeTab == DetailTab.Settings ? "detail-tab--active" : "")"
                             @onclick="() => SwitchTab(DetailTab.Settings)">
                         @Assets.SVG("settings.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        Allgemein
+                        @Resources.Web_ShareList_Tab_General
                     </button>
                     <button class="detail-tab @(_activeTab == DetailTab.Access ? "detail-tab--active" : "")"
                             @onclick="() => SwitchTab(DetailTab.Access)">
                         @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        Sichtbarkeit
+                        @Resources.Web_ShareList_Tab_Visibility
                     </button>
                     <button class="detail-tab @(_activeTab == DetailTab.Acl ? "detail-tab--active" : "")"
                             @onclick="() => SwitchTab(DetailTab.Acl)">
                         @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        ACL
+                        @Resources.Web_ShareList_Tab_ACL
                     </button>
                 </div>
 
