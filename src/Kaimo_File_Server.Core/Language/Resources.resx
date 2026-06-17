@@ -417,4 +417,46 @@
   <data name="Web_ShareList_Tab_ACL" xml:space="preserve">
     <value>ACL</value>
   </data>
+  <data name="Web_ShareList_VisibilityHeader" xml:space="preserve">
+    <value>Hide Share</value>
+  </data>
+  <data name="Web_Acl_LoadingPermissions" xml:space="preserve">
+    <value>Loading Permissions…</value>
+  </data>
+  <data name="Web_Acl_Directly" xml:space="preserve">
+    <value>directly</value>
+  </data>
+  <data name="Web_Acl_Inheritance" xml:space="preserve">
+    <value>Inheritance</value>
+  </data>
+  <data name="Web_Acl_EmptyHint" xml:space="preserve">
+    <value>No permissions have been configured. Without ACL entries, all users with share access have full access.</value>
+  </data>
+  <data name="Web_Acl_AddPermission" xml:space="preserve">
+    <value>Add Permission</value>
+  </data>
+  <data name="Web_Acl_Button_User" xml:space="preserve">
+    <value>User</value>
+  </data>
+  <data name="Web_Acl_Button_Group" xml:space="preserve">
+    <value>Group</value>
+  </data>
+  <data name="Web_Acl_Button_Role" xml:space="preserve">
+    <value>Role</value>
+  </data>
+  <data name="Web_Acl_Action" xml:space="preserve">
+    <value>Action</value>
+  </data>
+  <data name="Web_Acl_Permission_Read" xml:space="preserve">
+    <value>Read</value>
+  </data>
+  <data name="Web_Acl_Permission_Write" xml:space="preserve">
+    <value>Write</value>
+  </data>
+  <data name="Web_Acl_Permission_Admin" xml:space="preserve">
+    <value>Admin</value>
+  </data>
+  <data name="Web_Acl_Permission_FullAccess" xml:space="preserve">
+    <value>Full Access</value>
+  </data>
 </root>

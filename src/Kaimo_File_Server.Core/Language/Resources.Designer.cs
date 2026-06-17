@@ -160,6 +160,123 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Action ähnelt.
+        /// </summary>
+        public static string Web_Acl_Action {
+            get {
+                return ResourceManager.GetString("Web_Acl_Action", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Add Permission ähnelt.
+        /// </summary>
+        public static string Web_Acl_AddPermission {
+            get {
+                return ResourceManager.GetString("Web_Acl_AddPermission", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Group ähnelt.
+        /// </summary>
+        public static string Web_Acl_Button_Group {
+            get {
+                return ResourceManager.GetString("Web_Acl_Button_Group", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Role ähnelt.
+        /// </summary>
+        public static string Web_Acl_Button_Role {
+            get {
+                return ResourceManager.GetString("Web_Acl_Button_Role", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die User ähnelt.
+        /// </summary>
+        public static string Web_Acl_Button_User {
+            get {
+                return ResourceManager.GetString("Web_Acl_Button_User", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die directly ähnelt.
+        /// </summary>
+        public static string Web_Acl_Directly {
+            get {
+                return ResourceManager.GetString("Web_Acl_Directly", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No permissions have been configured. Without ACL entries, all users with share access have full access. ähnelt.
+        /// </summary>
+        public static string Web_Acl_EmptyHint {
+            get {
+                return ResourceManager.GetString("Web_Acl_EmptyHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Inheritance ähnelt.
+        /// </summary>
+        public static string Web_Acl_Inheritance {
+            get {
+                return ResourceManager.GetString("Web_Acl_Inheritance", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Loading Permissions… ähnelt.
+        /// </summary>
+        public static string Web_Acl_LoadingPermissions {
+            get {
+                return ResourceManager.GetString("Web_Acl_LoadingPermissions", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Admin ähnelt.
+        /// </summary>
+        public static string Web_Acl_Permission_Admin {
+            get {
+                return ResourceManager.GetString("Web_Acl_Permission_Admin", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Full Access ähnelt.
+        /// </summary>
+        public static string Web_Acl_Permission_FullAccess {
+            get {
+                return ResourceManager.GetString("Web_Acl_Permission_FullAccess", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Read ähnelt.
+        /// </summary>
+        public static string Web_Acl_Permission_Read {
+            get {
+                return ResourceManager.GetString("Web_Acl_Permission_Read", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Write ähnelt.
+        /// </summary>
+        public static string Web_Acl_Permission_Write {
+            get {
+                return ResourceManager.GetString("Web_Acl_Permission_Write", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Permissions for &quot;{0}&quot; ähnelt.
         /// </summary>
         public static string Web_Acl_PermissionsFor {
@@ -858,6 +975,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_ShareList_VisibilityDescription {
             get {
                 return ResourceManager.GetString("Web_ShareList_VisibilityDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Hide Share ähnelt.
+        /// </summary>
+        public static string Web_ShareList_VisibilityHeader {
+            get {
+                return ResourceManager.GetString("Web_ShareList_VisibilityHeader", resourceCulture);
             }
         }
         
