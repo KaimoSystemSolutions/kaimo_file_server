@@ -211,7 +211,7 @@
     <value>New name…</value>
   </data>
   <data name="Web_Acl_ShareRoot" xml:space="preserve">
-    <value>(Share root)</value>
+    <value>(Share Root)</value>
   </data>
   <data name="Web_Acl_PermissionsFor" xml:space="preserve">
     <value>Permissions for "{0}"</value>
@@ -416,5 +416,161 @@
   </data>
   <data name="Web_ShareList_Tab_ACL" xml:space="preserve">
     <value>ACL</value>
+  </data>
+  <data name="Web_ShareList_VisibilityHeader" xml:space="preserve">
+    <value>Hide Share</value>
+  </data>
+  <data name="Web_Acl_LoadingPermissions" xml:space="preserve">
+    <value>Loading Permissions…</value>
+  </data>
+  <data name="Web_Acl_Directly" xml:space="preserve">
+    <value>directly</value>
+  </data>
+  <data name="Web_Acl_Inheritance" xml:space="preserve">
+    <value>Inheritance</value>
+  </data>
+  <data name="Web_Acl_EmptyHint" xml:space="preserve">
+    <value>No permissions have been configured. Without ACL entries, all users with share access have full access.</value>
+  </data>
+  <data name="Web_Acl_AddPermission" xml:space="preserve">
+    <value>Add Permission</value>
+  </data>
+  <data name="Web_Acl_Button_User" xml:space="preserve">
+    <value>User</value>
+  </data>
+  <data name="Web_Acl_Button_Group" xml:space="preserve">
+    <value>Group</value>
+  </data>
+  <data name="Web_Acl_Button_Role" xml:space="preserve">
+    <value>Role</value>
+  </data>
+  <data name="Web_Acl_Action" xml:space="preserve">
+    <value>Action</value>
+  </data>
+  <data name="Web_Acl_Permission_Read" xml:space="preserve">
+    <value>Read</value>
+  </data>
+  <data name="Web_Acl_Permission_Write" xml:space="preserve">
+    <value>Write</value>
+  </data>
+  <data name="Web_Acl_Permission_Admin" xml:space="preserve">
+    <value>Admin</value>
+  </data>
+  <data name="Web_Acl_Permission_FullAccess" xml:space="preserve">
+    <value>Full Access</value>
+  </data>
+  <data name="Web_Acl_Inherited" xml:space="preserve">
+    <value>Inherited</value>
+  </data>
+  <data name="Web_Acl_Allow" xml:space="preserve">
+    <value>Allow</value>
+  </data>
+  <data name="Web_Acl_Deny" xml:space="preserve">
+    <value>Deny</value>
+  </data>
+  <data name="Web_Acl_InheritedFrom" xml:space="preserve">
+    <value>Inherited from {0}</value>
+  </data>
+  <data name="Web_Acl_Edit" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="Web_Acl_Remove" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Web_Acl_Type" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="Web_Acl_SelectPlaceholder" xml:space="preserve">
+    <value>Select</value>
+  </data>
+  <data name="Web_Acl_QuickSelect" xml:space="preserve">
+    <value>Quick Select</value>
+  </data>
+  <data name="Web_Acl_DetailPermissions" xml:space="preserve">
+    <value>Individual Permissions</value>
+  </data>
+  <data name="Web_Acl_None" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="Web_Acl_Button_Add" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="Web_Acl_Button_Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Web_Acl_Button_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Web_Acl_Perm_TraverseExecute" xml:space="preserve">
+    <value>Traverse/Execute</value>
+  </data>
+  <data name="Web_Acl_Perm_ListReadData" xml:space="preserve">
+    <value>Read/List</value>
+  </data>
+  <data name="Web_Acl_Perm_ReadAttributes" xml:space="preserve">
+    <value>Read Attributes</value>
+  </data>
+  <data name="Web_Acl_Perm_ReadExtAttributes" xml:space="preserve">
+    <value>Read Ext. Attributes</value>
+  </data>
+  <data name="Web_Acl_Perm_ReadPermissions" xml:space="preserve">
+    <value>Read Permissions</value>
+  </data>
+  <data name="Web_Acl_Perm_CreateWriteData" xml:space="preserve">
+    <value>Create/Write</value>
+  </data>
+  <data name="Web_Acl_Perm_CreateAppendData" xml:space="preserve">
+    <value>Create/Append</value>
+  </data>
+  <data name="Web_Acl_Perm_WriteAttributes" xml:space="preserve">
+    <value>Write Attributes</value>
+  </data>
+  <data name="Web_Acl_Perm_WriteExtAttributes" xml:space="preserve">
+    <value>Write Ext. Attributes</value>
+  </data>
+  <data name="Web_Acl_Perm_DeleteSubItems" xml:space="preserve">
+    <value>Delete Sub-items</value>
+  </data>
+  <data name="Web_Acl_Perm_Delete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="Web_Acl_Perm_ChangePermissions" xml:space="preserve">
+    <value>Change Permissions</value>
+  </data>
+  <data name="Web_Acl_Perm_TakeOwnership" xml:space="preserve">
+    <value>Take Ownership</value>
+  </data>
+  <data name="Web_Acl_Inherit_ThisFolder" xml:space="preserve">
+    <value>This Folder</value>
+  </data>
+  <data name="Web_Acl_Inherit_SubFolders" xml:space="preserve">
+    <value>Subfolders</value>
+  </data>
+  <data name="Web_Acl_Inherit_Files" xml:space="preserve">
+    <value>Files</value>
+  </data>
+  <data name="Web_Acl_Inherit_AllDescendants" xml:space="preserve">
+    <value>All Descendants (recursive)</value>
+  </data>
+  <data name="Web_Acl_Inherit_Everything" xml:space="preserve">
+    <value>Everything (recursive)</value>
+  </data>
+  <data name="Web_Acl_Inherit_ThisOnly" xml:space="preserve">
+    <value>This Folder only</value>
+  </data>
+  <data name="Web_Acl_Inherit_ThisAndDirect" xml:space="preserve">
+    <value>This Folder + direct children</value>
+  </data>
+  <data name="Web_Acl_Error_NoPath" xml:space="preserve">
+    <value>No path specified.</value>
+  </data>
+  <data name="Web_Acl_Error_NoShareId" xml:space="preserve">
+    <value>No Share ID specified.</value>
+  </data>
+  <data name="Web_Acl_Error_LoadFailed" xml:space="preserve">
+    <value>Loading failed (unknown error).</value>
+  </data>
+  <data name="Web_Acl_Error_Exception" xml:space="preserve">
+    <value>Exception</value>
   </data>
 </root>

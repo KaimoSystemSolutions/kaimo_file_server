@@ -1,5 +1,6 @@
-﻿@using Kaimo_File_Server.Core.Security
-@using Kaimo_File_Server.Web.Components.ViewModels
+﻿@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Security
+@using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject AclEditorViewModel VM
 @inject AssetProvider Assets
@@ -10,7 +11,7 @@
     {
         <div class="loading-state" style="padding: 24px 0;">
             <div class="spinner"></div>
-            <p>Lade Berechtigungen…</p>
+            <p>@Resources.Web_Acl_LoadingPermissions</p>
         </div>
     }
     else if (_errorMessage is not null)
@@ -29,19 +30,19 @@
 
     @if (_loaded)
     {
-        @* -- Geerbte ACLs (readonly) -- *@
+        @* -- Inherited ACLs (readonly) -- *@
         @if (VM.InheritedEntries.Any())
         {
             <div class="acl-inherited-section">
                 <span class="detail-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-                    Geerbt
+                    @Resources.Web_Acl_Inherited
                 </span>
                 <div class="acl-list">
                     @foreach (var inherited in VM.InheritedEntries)
                     {
                         var entry = inherited.Entry;
                         var principalType = VM.GetPrincipalType(entry.PrincipalId);
-                        var sourceName = string.IsNullOrEmpty(inherited.SourcePath) ? "(Share-Root)" : inherited.SourcePath;
+                        var sourceName = string.IsNullOrEmpty(inherited.SourcePath) ? Resources.Web_Acl_ShareRoot : inherited.SourcePath;
 
                         <div class="acl-entry acl-entry--inherited @(entry.EntryType == AclEntryType.Deny ? "acl-entry--deny" : "acl-entry--allow")">
                             <div class="acl-entry-header">
@@ -49,20 +50,20 @@
                                     @(principalType switch
                                     {
                                         "group" => Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
-                                        "role"  => Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
-                                        _       => Assets.SVG("user.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
+                                        "role" => Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
+                                        _ => Assets.SVG("user.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
                                     })
                                     <span class="acl-entry-name">@VM.GetPrincipalDisplayName(entry.PrincipalId)</span>
                                     <span class="acl-entry-type-badge @(entry.EntryType == AclEntryType.Deny ? "badge--deny" : "badge--allow")">
-                                        @(entry.EntryType == AclEntryType.Allow ? "Allow" : "Deny")
+                                        @(entry.EntryType == AclEntryType.Allow ? Resources.Web_Acl_Allow : Resources.Web_Acl_Deny)
                                     </span>
-                                    <span class="acl-inherited-badge" title="Geerbt von @sourceName">
+                                    <span class="acl-inherited-badge" title="@string.Format(Resources.Web_Acl_InheritedFrom, sourceName)">
                                         ↑ @sourceName
                                     </span>
                                 </div>
                             </div>
                             <div class="acl-entry-details">
-                                <span class="acl-detail-label">Berechtigungen:</span>
+                                <span class="acl-detail-label">@Resources.Web_Action_Permissions:</span>
                                 <span class="acl-detail-value">@FormatPermissions(entry.Permissions)</span>
                             </div>
                         </div>
@@ -71,11 +72,11 @@
             </div>
         }
 
-        @* -- Eigene ACLs (editierbar) -- *@
+        @* -- Direct ACLs (editable) -- *@
         @if (VM.InheritedEntries.Any() || VM.Entries.Any())
         {
             <span class="detail-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 12px; display: block;">
-                Direkt
+                @Resources.Web_Acl_Directly
             </span>
         }
 
@@ -93,21 +94,21 @@
                                 @(principalType switch
                                 {
                                     "group" => Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
-                                    "role"  => Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
-                                    _       => Assets.SVG("user.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
+                                    "role" => Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
+                                    _ => Assets.SVG("user.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
                                 })
                                 <span class="acl-entry-name">@VM.GetPrincipalDisplayName(entry.PrincipalId)</span>
                                 <span class="acl-entry-type-badge @(entry.EntryType == AclEntryType.Deny ? "badge--deny" : "badge--allow")">
-                                    @(entry.EntryType == AclEntryType.Allow ? "Allow" : "Deny")
+                                    @(entry.EntryType == AclEntryType.Allow ? Resources.Web_Acl_Allow : Resources.Web_Acl_Deny)
                                 </span>
                             </div>
                             <div class="acl-entry-actions">
                                 @if (!isEditing)
                                 {
-                                    <button class="btn-icon btn-icon--small" title="Bearbeiten" @onclick="() => StartEdit(entry)">
+                                    <button class="btn-icon btn-icon--small" title="@Resources.Web_Acl_Edit" @onclick="() => StartEdit(entry)">
                                         @Assets.SVG("edit_box.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                                     </button>
-                                    <button class="btn-icon btn-icon--small btn-icon--danger" title="Entfernen" @onclick="() => DeleteEntry(entry.Id)">
+                                    <button class="btn-icon btn-icon--small btn-icon--danger" title="@Resources.Web_Acl_Remove" @onclick="() => DeleteEntry(entry.Id)">
                                         @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                                     </button>
                                 }
@@ -121,11 +122,11 @@
                         else
                         {
                             <div class="acl-entry-details">
-                                <span class="acl-detail-label">Berechtigungen:</span>
+                                <span class="acl-detail-label">@Resources.Web_Action_Permissions:</span>
                                 <span class="acl-detail-value">@FormatPermissions(entry.Permissions)</span>
                             </div>
                             <div class="acl-entry-details">
-                                <span class="acl-detail-label">Vererbung:</span>
+                                <span class="acl-detail-label">@Resources.Web_Acl_Inheritance:</span>
                                 <span class="acl-detail-value">@FormatInheritance(entry.Inheritance)</span>
                             </div>
                         }
@@ -135,27 +136,27 @@
         }
         else
         {
-            <p class="empty-hint">Keine Berechtigungen konfiguriert. Ohne ACL-Einträge haben alle Benutzer mit Share-Zugriff vollen Zugriff.</p>
+            <p class="empty-hint">@Resources.Web_Acl_EmptyHint</p>
         }
 
         @* -- Add Entry -- *@
         @if (VM.IsAddingEntry)
         {
             <div class="acl-add-form">
-                <h4>Berechtigung hinzufügen</h4>
+                <h4>@Resources.Web_Acl_AddPermission</h4>
                 <div class="acl-form">
                     <div class="acl-form-row">
-                        <span class="detail-label">Typ</span>
+                        <span class="detail-label">@Resources.Web_Acl_Type</span>
                         <div class="acl-type-tabs">
-                            <button class="acl-type-tab @(VM.NewPrincipalType == "user" ? "active" : "")" @onclick='() => SetPrincipalType("user")'>Benutzer</button>
-                            <button class="acl-type-tab @(VM.NewPrincipalType == "group" ? "active" : "")" @onclick='() => SetPrincipalType("group")'>Gruppe</button>
-                            <button class="acl-type-tab @(VM.NewPrincipalType == "role" ? "active" : "")" @onclick='() => SetPrincipalType("role")'>Rolle</button>
+                            <button class="acl-type-tab @(VM.NewPrincipalType == "user" ? "active" : "")" @onclick='() => SetPrincipalType("user")'>@Resources.Web_Acl_Button_User</button>
+                            <button class="acl-type-tab @(VM.NewPrincipalType == "group" ? "active" : "")" @onclick='() => SetPrincipalType("group")'>@Resources.Web_Acl_Button_Group</button>
+                            <button class="acl-type-tab @(VM.NewPrincipalType == "role" ? "active" : "")" @onclick='() => SetPrincipalType("role")'>@Resources.Web_Acl_Button_Role</button>
                         </div>
                     </div>
                     <div class="acl-form-row">
-                        <span class="detail-label">@(VM.NewPrincipalType == "user" ? "Benutzer" : VM.NewPrincipalType == "group" ? "Gruppe" : "Rolle")</span>
+                        <span class="detail-label">@(VM.NewPrincipalType == "user" ? Resources.Web_Acl_Button_User : VM.NewPrincipalType == "group" ? Resources.Web_Acl_Button_Group : Resources.Web_Acl_Button_Role)</span>
                         <select class="edit-input" @onchange="OnPrincipalSelected">
-                            <option value="">— Auswählen —</option>
+                            <option value="">— @Resources.Web_Acl_SelectPlaceholder —</option>
                             @if (VM.NewPrincipalType == "user")
                             {
                                 @foreach (var u in VM.AllUsers)
@@ -186,7 +187,7 @@
         else if (VM.EditingEntryId is null)
         {
             <button class="btn-secondary" style="margin-top: 12px;" @onclick="StartAdd">
-                + Berechtigung hinzufügen
+                + @Resources.Web_Acl_AddPermission
             </button>
         }
     }
@@ -198,61 +199,61 @@
     {
         <div class="acl-form" style="@(isAdd ? "" : "margin-top: 8px;")">
             <div class="acl-form-row">
-                <span class="detail-label">Aktion</span>
+                <span class="detail-label">@Resources.Web_Acl_Action</span>
                 <div class="acl-type-tabs">
-                    <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Allow ? "active acl-tab--allow" : "")" @onclick="() => SetEntryType(AclEntryType.Allow)">Allow</button>
-                    <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Deny ? "active acl-tab--deny" : "")" @onclick="() => SetEntryType(AclEntryType.Deny)">Deny</button>
+                    <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Allow ? "active acl-tab--allow" : "")" @onclick="() => SetEntryType(AclEntryType.Allow)">@Resources.Web_Acl_Allow</button>
+                    <button class="acl-type-tab @(VM.NewEntryType == AclEntryType.Deny ? "active acl-tab--deny" : "")" @onclick="() => SetEntryType(AclEntryType.Deny)">@Resources.Web_Acl_Deny</button>
                 </div>
             </div>
             <div class="acl-form-row">
-                <span class="detail-label">Schnellauswahl</span>
+                <span class="detail-label">@Resources.Web_Acl_QuickSelect</span>
                 <div class="acl-shortcut-row">
-                    <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.ReadAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.ReadAll)">Lesen</button>
-                    <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.WriteAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.WriteAll)">Schreiben</button>
-                    <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.AdminAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.AdminAll)">Admin</button>
-                    <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.FullControl) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.FullControl)">Vollzugriff</button>
+                    <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.ReadAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.ReadAll)">@Resources.Web_Acl_Permission_Read</button>
+                    <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.WriteAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.WriteAll)">@Resources.Web_Acl_Permission_Write</button>
+                    <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.AdminAll) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.AdminAll)">@Resources.Web_Acl_Permission_Admin</button>
+                    <button class="acl-shortcut @(VM.IsShortcutFullySet(VM.NewPermissions, FilePermission.FullControl) ? "acl-shortcut--active" : "")" @onclick="() => ToggleShortcut(FilePermission.FullControl)">@Resources.Web_Acl_Permission_FullAccess</button>
                 </div>
             </div>
 
-            @* -- Collapsible Einzelberechtigungen -- *@
+            @* -- Collapsible individual permissions -- *@
             <div class="acl-form-row">
                 <button class="acl-collapse-toggle" @onclick="() => _showDetailPerms = !_showDetailPerms">
                     @Assets.SVG("chevron_right.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-collapse-chevron" + (_showDetailPerms ? " acl-collapse-chevron--open" : "")))
-                    <span class="detail-label" style="margin-bottom: 0; cursor: pointer;">Einzelberechtigungen</span>
+                    <span class="detail-label" style="margin-bottom: 0; cursor: pointer;">@Resources.Web_Acl_DetailPermissions</span>
                 </button>
                 @if (_showDetailPerms)
                 {
                     <div class="acl-perm-grid">
-                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.TraverseExecute)" @onchange="() => TogglePerm(FilePermission.TraverseExecute)" /><span>Durchsuchen/Ausführen</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ListReadData)" @onchange="() => TogglePerm(FilePermission.ListReadData)" /><span>Lesen/Auflisten</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadAttributes)" @onchange="() => TogglePerm(FilePermission.ReadAttributes)" /><span>Attribute lesen</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadExtAttributes)" @onchange="() => TogglePerm(FilePermission.ReadExtAttributes)" /><span>Erw. Attribute lesen</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadPermissions)" @onchange="() => TogglePerm(FilePermission.ReadPermissions)" /><span>Rechte lesen</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.CreateWriteData)" @onchange="() => TogglePerm(FilePermission.CreateWriteData)" /><span>Erstellen/Schreiben</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.CreateAppendData)" @onchange="() => TogglePerm(FilePermission.CreateAppendData)" /><span>Erstellen/Anhängen</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.WriteAttributes)" @onchange="() => TogglePerm(FilePermission.WriteAttributes)" /><span>Attribute schreiben</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.WriteExtAttributes)" @onchange="() => TogglePerm(FilePermission.WriteExtAttributes)" /><span>Erw. Attr. schreiben</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.DeleteSubItems)" @onchange="() => TogglePerm(FilePermission.DeleteSubItems)" /><span>Unterelem. löschen</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.Delete)" @onchange="() => TogglePerm(FilePermission.Delete)" /><span>Löschen</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ChangePermissions)" @onchange="() => TogglePerm(FilePermission.ChangePermissions)" /><span>Rechte ändern</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.TakeOwnership)" @onchange="() => TogglePerm(FilePermission.TakeOwnership)" /><span>Besitz übernehmen</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.TraverseExecute)" @onchange="() => TogglePerm(FilePermission.TraverseExecute)" /><span>@Resources.Web_Acl_Perm_TraverseExecute</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ListReadData)" @onchange="() => TogglePerm(FilePermission.ListReadData)" /><span>@Resources.Web_Acl_Perm_ListReadData</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadAttributes)" @onchange="() => TogglePerm(FilePermission.ReadAttributes)" /><span>@Resources.Web_Acl_Perm_ReadAttributes</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadExtAttributes)" @onchange="() => TogglePerm(FilePermission.ReadExtAttributes)" /><span>@Resources.Web_Acl_Perm_ReadExtAttributes</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ReadPermissions)" @onchange="() => TogglePerm(FilePermission.ReadPermissions)" /><span>@Resources.Web_Acl_Perm_ReadPermissions</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.CreateWriteData)" @onchange="() => TogglePerm(FilePermission.CreateWriteData)" /><span>@Resources.Web_Acl_Perm_CreateWriteData</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.CreateAppendData)" @onchange="() => TogglePerm(FilePermission.CreateAppendData)" /><span>@Resources.Web_Acl_Perm_CreateAppendData</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.WriteAttributes)" @onchange="() => TogglePerm(FilePermission.WriteAttributes)" /><span>@Resources.Web_Acl_Perm_WriteAttributes</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.WriteExtAttributes)" @onchange="() => TogglePerm(FilePermission.WriteExtAttributes)" /><span>@Resources.Web_Acl_Perm_WriteExtAttributes</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.DeleteSubItems)" @onchange="() => TogglePerm(FilePermission.DeleteSubItems)" /><span>@Resources.Web_Acl_Perm_DeleteSubItems</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.Delete)" @onchange="() => TogglePerm(FilePermission.Delete)" /><span>@Resources.Web_Acl_Perm_Delete</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.ChangePermissions)" @onchange="() => TogglePerm(FilePermission.ChangePermissions)" /><span>@Resources.Web_Acl_Perm_ChangePermissions</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@VM.HasPermission(VM.NewPermissions, FilePermission.TakeOwnership)" @onchange="() => TogglePerm(FilePermission.TakeOwnership)" /><span>@Resources.Web_Acl_Perm_TakeOwnership</span></label>
                     </div>
                 }
             </div>
 
-            @* -- Collapsible Vererbung -- *@
+            @* -- Collapsible inheritance -- *@
             <div class="acl-form-row">
                 <button class="acl-collapse-toggle" @onclick="() => _showInheritance = !_showInheritance">
                     @Assets.SVG("chevron_right.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-collapse-chevron" + (_showInheritance ? " acl-collapse-chevron--open" : "")))
-                    <span class="detail-label" style="margin-bottom: 0; cursor: pointer;">Vererbung</span>
+                    <span class="detail-label" style="margin-bottom: 0; cursor: pointer;">@Resources.Web_Acl_Inheritance</span>
                 </button>
                 @if (_showInheritance)
                 {
                     <div class="acl-perm-grid">
-                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.ThisFolder) != 0)" @onchange="() => ToggleInheritance(AclInheritance.ThisFolder)" /><span>Dieser Ordner</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.SubFolders) != 0)" @onchange="() => ToggleInheritance(AclInheritance.SubFolders)" /><span>Unterordner</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.SubFiles) != 0)" @onchange="() => ToggleInheritance(AclInheritance.SubFiles)" /><span>Dateien</span></label>
-                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.AllDescendants) != 0)" @onchange="() => ToggleInheritance(AclInheritance.AllDescendants)" /><span>Alle Nachfahren (rekursiv)</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.ThisFolder) != 0)" @onchange="() => ToggleInheritance(AclInheritance.ThisFolder)" /><span>@Resources.Web_Acl_Inherit_ThisFolder</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.SubFolders) != 0)" @onchange="() => ToggleInheritance(AclInheritance.SubFolders)" /><span>@Resources.Web_Acl_Inherit_SubFolders</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.SubFiles) != 0)" @onchange="() => ToggleInheritance(AclInheritance.SubFiles)" /><span>@Resources.Web_Acl_Inherit_Files</span></label>
+                        <label class="acl-checkbox"><input type="checkbox" checked="@((VM.NewInheritance & AclInheritance.AllDescendants) != 0)" @onchange="() => ToggleInheritance(AclInheritance.AllDescendants)" /><span>@Resources.Web_Acl_Inherit_AllDescendants</span></label>
                     </div>
                 }
             </div>
@@ -260,13 +261,13 @@
             <div class="acl-form-actions">
                 @if (isAdd)
                 {
-                    <button class="btn-primary" @onclick="AddEntry">Hinzufügen</button>
-                    <button class="btn-secondary" @onclick="CancelAdd">Abbrechen</button>
+                    <button class="btn-primary" @onclick="AddEntry">@Resources.Web_Acl_Button_Add</button>
+                    <button class="btn-secondary" @onclick="CancelAdd">@Resources.Web_Acl_Button_Cancel</button>
                 }
                 else
                 {
-                    <button class="btn-primary" @onclick="SaveEdit">Speichern</button>
-                    <button class="btn-secondary" @onclick="CancelEdit">Abbrechen</button>
+                    <button class="btn-primary" @onclick="SaveEdit">@Resources.Web_Acl_Button_Save</button>
+                    <button class="btn-secondary" @onclick="CancelEdit">@Resources.Web_Acl_Button_Cancel</button>
                 }
             </div>
         </div>
@@ -294,7 +295,6 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        // Reload wenn sich Path oder ShareId ändern
         if (_loaded)
         {
             var normalizedNew = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Normalize(Path);
@@ -308,10 +308,10 @@
     private async Task LoadDataAsync()
     {
         Console.WriteLine($"[AclEditor] LoadDataAsync called! Path='{Path}', ShareId={ShareId}");
-    
+
         if (Path is null)
         {
-            _errorMessage = "Kein Pfad angegeben.";
+            _errorMessage = Resources.Web_Acl_Error_NoPath;
             Console.WriteLine("[AclEditor] Path is null, aborting");
             StateHasChanged();
             return;
@@ -319,7 +319,7 @@
 
         if (ShareId == Guid.Empty)
         {
-            _errorMessage = "Keine Share-ID angegeben.";
+            _errorMessage = Resources.Web_Acl_Error_NoShareId;
             Console.WriteLine($"[AclEditor] ShareId is empty, aborting");
             StateHasChanged();
             return;
@@ -343,13 +343,13 @@
             }
             else
             {
-                _errorMessage = VM.ErrorMessage ?? "Laden fehlgeschlagen (unbekannter Fehler).";
+                _errorMessage = VM.ErrorMessage ?? Resources.Web_Acl_Error_LoadFailed;
                 Console.WriteLine($"[AclEditor] Load failed: {_errorMessage}");
             }
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Exception: {ex.Message}";
+            _errorMessage = $"{Resources.Web_Acl_Error_Exception}: {ex.Message}";
             Console.WriteLine($"[AclEditor] Exception: {ex}");
         }
         finally
@@ -420,30 +420,30 @@
 
     private string FormatPermissions(FilePermission p)
     {
-        if (p == FilePermission.FullControl) return "Vollzugriff";
-        if (p == FilePermission.ReadAll) return "Lesen";
-        if (p == FilePermission.WriteAll) return "Schreiben";
-        if (p == (FilePermission.ReadAll | FilePermission.WriteAll)) return "Lesen + Schreiben";
+        if (p == FilePermission.FullControl) return Resources.Web_Acl_Permission_FullAccess;
+        if (p == FilePermission.ReadAll) return Resources.Web_Acl_Permission_Read;
+        if (p == FilePermission.WriteAll) return Resources.Web_Acl_Permission_Write;
+        if (p == (FilePermission.ReadAll | FilePermission.WriteAll)) return $"{Resources.Web_Acl_Permission_Read} + {Resources.Web_Acl_Permission_Write}";
         var parts = new List<string>();
-        if ((p & FilePermission.ReadAll) == FilePermission.ReadAll) parts.Add("Lesen");
-        else { if ((p & FilePermission.ListReadData) != 0) parts.Add("Lesen/Auflisten"); if ((p & FilePermission.ReadAttributes) != 0) parts.Add("Attribute lesen"); if ((p & FilePermission.TraverseExecute) != 0) parts.Add("Durchsuchen"); }
-        if ((p & FilePermission.WriteAll) == FilePermission.WriteAll) parts.Add("Schreiben");
-        else { if ((p & FilePermission.CreateWriteData) != 0) parts.Add("Erstellen/Schreiben"); if ((p & FilePermission.Delete) != 0) parts.Add("Löschen"); if ((p & FilePermission.DeleteSubItems) != 0) parts.Add("Unterelemente löschen"); }
-        if ((p & FilePermission.AdminAll) == FilePermission.AdminAll) parts.Add("Administration");
-        else { if ((p & FilePermission.ChangePermissions) != 0) parts.Add("Rechte ändern"); if ((p & FilePermission.TakeOwnership) != 0) parts.Add("Besitz übernehmen"); }
-        return parts.Count > 0 ? string.Join(", ", parts) : "Keine";
+        if ((p & FilePermission.ReadAll) == FilePermission.ReadAll) parts.Add(Resources.Web_Acl_Permission_Read);
+        else { if ((p & FilePermission.ListReadData) != 0) parts.Add(Resources.Web_Acl_Perm_ListReadData); if ((p & FilePermission.ReadAttributes) != 0) parts.Add(Resources.Web_Acl_Perm_ReadAttributes); if ((p & FilePermission.TraverseExecute) != 0) parts.Add(Resources.Web_Acl_Perm_TraverseExecute); }
+        if ((p & FilePermission.WriteAll) == FilePermission.WriteAll) parts.Add(Resources.Web_Acl_Permission_Write);
+        else { if ((p & FilePermission.CreateWriteData) != 0) parts.Add(Resources.Web_Acl_Perm_CreateWriteData); if ((p & FilePermission.Delete) != 0) parts.Add(Resources.Web_Acl_Perm_Delete); if ((p & FilePermission.DeleteSubItems) != 0) parts.Add(Resources.Web_Acl_Perm_DeleteSubItems); }
+        if ((p & FilePermission.AdminAll) == FilePermission.AdminAll) parts.Add(Resources.Web_Acl_Permission_Admin);
+        else { if ((p & FilePermission.ChangePermissions) != 0) parts.Add(Resources.Web_Acl_Perm_ChangePermissions); if ((p & FilePermission.TakeOwnership) != 0) parts.Add(Resources.Web_Acl_Perm_TakeOwnership); }
+        return parts.Count > 0 ? string.Join(", ", parts) : Resources.Web_Acl_None;
     }
 
     private string FormatInheritance(AclInheritance i)
     {
-        if (i == AclInheritance.Everything) return "Alles (rekursiv)";
-        if (i == AclInheritance.ThisOnly) return "Nur dieser Ordner";
-        if (i == AclInheritance.ThisAndDirect) return "Dieser Ordner + direkte Unterelemente";
+        if (i == AclInheritance.Everything) return Resources.Web_Acl_Inherit_Everything;
+        if (i == AclInheritance.ThisOnly) return Resources.Web_Acl_Inherit_ThisOnly;
+        if (i == AclInheritance.ThisAndDirect) return Resources.Web_Acl_Inherit_ThisAndDirect;
         var parts = new List<string>();
-        if ((i & AclInheritance.ThisFolder) != 0) parts.Add("Dieser Ordner");
-        if ((i & AclInheritance.SubFolders) != 0) parts.Add("Unterordner");
-        if ((i & AclInheritance.SubFiles) != 0) parts.Add("Dateien");
-        if ((i & AclInheritance.AllDescendants) != 0) parts.Add("Alle Nachfahren");
-        return parts.Count > 0 ? string.Join(", ", parts) : "Keine";
+        if ((i & AclInheritance.ThisFolder) != 0) parts.Add(Resources.Web_Acl_Inherit_ThisFolder);
+        if ((i & AclInheritance.SubFolders) != 0) parts.Add(Resources.Web_Acl_Inherit_SubFolders);
+        if ((i & AclInheritance.SubFiles) != 0) parts.Add(Resources.Web_Acl_Inherit_Files);
+        if ((i & AclInheritance.AllDescendants) != 0) parts.Add(Resources.Web_Acl_Inherit_AllDescendants);
+        return parts.Count > 0 ? string.Join(", ", parts) : Resources.Web_Acl_None;
     }
 }

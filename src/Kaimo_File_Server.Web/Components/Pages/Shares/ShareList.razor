@@ -162,12 +162,12 @@ else
                     </div>
 
                     <div class="detail-section">
-                        <span class="detail-label">Pfad</span>
+                        <span class="detail-label">@Resources.Web_ShareList_Label_Path</span>
                         <span class="detail-value">@VM.SelectedShare.Path</span>
                     </div>
 
                     <div class="detail-section">
-                        <span class="detail-label">Status</span>
+                        <span class="detail-label">@Resources.Web_ShareList_Label_Status</span>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span class="detail-value">
                                 @(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)
@@ -179,7 +179,7 @@ else
                     </div>
 
                     <div class="detail-section">
-                        <span class="detail-label">Papierkorb</span>
+                        <span class="detail-label">@Resources.Web_ShareList_Label_RecycleBin</span>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span class="detail-value">
                                 @(VM.SelectedShare.IsRecycleEnabled ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)
@@ -232,7 +232,7 @@ else
                         else
                         {
                             <div class="form-group" style="margin-bottom: 14px;">
-                                <label>@Resources.Web_ShareList_Tab_Visibility</label>
+                                <label>@Resources.Web_ShareList_VisibilityHeader</label>
                                 <div class="detail-section">
                                     <div style="display: flex; align-items: center; gap: 8px;">
                                         <span class="detail-value">
