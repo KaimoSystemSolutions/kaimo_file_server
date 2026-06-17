@@ -4,7 +4,7 @@ using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Microsoft.Extensions.Logging;
 
-namespace Kaimo_File_Server.Infrastructure.Search;
+namespace Kaimo_File_Server.Search;
 
 public class ElasticSearchService : ISearchService
 {

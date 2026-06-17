@@ -63,6 +63,7 @@ public class FileSystemStorage : IStorageEngine
 
         await using var file = new FileStream(
             fullPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, 4096, true);
+        
         await data.CopyToAsync(file, cancellationToken);
     }
 

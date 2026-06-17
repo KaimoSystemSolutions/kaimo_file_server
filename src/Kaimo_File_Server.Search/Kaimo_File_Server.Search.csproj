@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UserSecretsId>dotnet-Kaimo_File_server.Search-1ae611b7-ea46-4731-8b6c-34f544d867a0</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Elastic.Clients.Elasticsearch" Version="8.17.0" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+    </ItemGroup>
+</Project>

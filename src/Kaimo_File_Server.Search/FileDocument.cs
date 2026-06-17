@@ -1,4 +1,4 @@
-namespace Kaimo_File_Server.Infrastructure.Search;
+namespace Kaimo_File_Server.Search;
 
 public class FileDocument
 {

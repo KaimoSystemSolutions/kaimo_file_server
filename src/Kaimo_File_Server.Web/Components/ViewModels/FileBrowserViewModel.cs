@@ -6,9 +6,9 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
-using Kaimo_File_Server.Infrastructure.Search;
 using Kaimo_File_Server.Web.Helpers;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Search;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -571,9 +571,6 @@ public class FileBrowserViewModel
             Created = DateTime.UtcNow,
             Modified = DateTime.UtcNow
         });
-        
-        
-        
         
         _logger.LogInformation("File indexed: '{Path}", targetPath);
         

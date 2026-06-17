@@ -180,6 +180,8 @@ public class SmbFileSystem : INTFileStore
         handle = null!;
         fileStatus = FileStatus.FILE_DOES_NOT_EXIST;
 
+        Console.WriteLine("Tried to create file");
+        
         try
         {
             var user = RequireSessionUser(securityContext);
@@ -343,7 +345,8 @@ public class SmbFileSystem : INTFileStore
             (_, false) => FileStatus.FILE_CREATED,
             _ => FileStatus.FILE_OPENED,
         };
-
+        
+        
         handle = new FileHandle
         {
             Stream = fs,
