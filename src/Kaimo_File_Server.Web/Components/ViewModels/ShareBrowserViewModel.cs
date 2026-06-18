@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Storage;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
@@ -71,6 +72,8 @@ public partial class ShareBrowserViewModel
             if (userId is not null && Guid.TryParse(userId, out var uid))
             {
                 var accessible = new List<ShareDefinition>();
+
+                
                 foreach (var share in allShares)
                 {
                     //if (await _accessRepo.HasAccessAsync(share.Name, uid))

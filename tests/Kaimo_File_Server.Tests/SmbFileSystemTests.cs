@@ -178,22 +178,19 @@ public class SmbFileSystemTests : IDisposable
     }
 
     [Fact]
-    public void NoSessionUser_ThrowsInvalidOperation()
+    public void NoSessionUser_ReturnsAccessDenied()
     {
-        var ex = Task.Run(() =>
+        var status = Task.Run(() =>
         {
-            SmbFileSystem.SetSessionUser(null!);
-            return Record.Exception(() =>
-            {
-                _sut.CreateFile(out var h, out var fs, "noaccess.txt",
-                    AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
-                    CreateDisposition.FILE_CREATE, CreateOptions.FILE_NON_DIRECTORY_FILE,
-                    CreateSecurityContext());
-            });
+            // Fresh thread → AsyncLocal is null
+            // null SecurityContext → cache lookup also fails
+            return _sut.CreateFile(out var h, out var fs, "noaccess.txt",
+                AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
+                CreateDisposition.FILE_CREATE, CreateOptions.FILE_NON_DIRECTORY_FILE,
+                null!);
         }).GetAwaiter().GetResult();
 
-        Assert.NotNull(ex);
-        Assert.IsType<InvalidOperationException>(ex);
+        Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, status);
     }
 
     // ═══════════════════════════════════════════════════════════

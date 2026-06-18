@@ -19,4 +19,9 @@
     <ItemGroup>
       <ProjectReference Include="..\Kaimo_File_Server.Core\Kaimo_File_Server.Core.csproj" />
     </ItemGroup>
+
+	<ItemGroup>
+		<Content Update="appsettings.json" CopyToPublishDirectory="Never" CopyToOutputDirectory="Never" />
+		<Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" CopyToOutputDirectory="Never" />
+	</ItemGroup>
 </Project>
