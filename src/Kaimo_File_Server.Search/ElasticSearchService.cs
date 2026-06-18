@@ -1,9 +1,12 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using Elastic.Clients.Elasticsearch;
+using Elastic.Clients.Elasticsearch.Core.Search;
 using Elastic.Clients.Elasticsearch.IndexManagement;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
+using Kaimo_File_Server.Core.Storage;
 using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Search;
@@ -14,6 +17,7 @@ public class ElasticSearchService : ISearchService
 
     private readonly ElasticsearchClient _client;
     private readonly ILogger<ElasticSearchService> _logger;
+    private readonly IStorageEngine _storage;
 
     private enum ExistsResult
     {
@@ -22,10 +26,11 @@ public class ElasticSearchService : ISearchService
         DoesntExist
     }
     
-    public ElasticSearchService(ElasticsearchClient client, ILogger<ElasticSearchService> logger)
+    public ElasticSearchService(ElasticsearchClient client, ILogger<ElasticSearchService> logger, IStorageEngine storage)
     {
         _client = client;
         _logger = logger;
+        _storage = storage;
     }
     
     public async Task onFileCreated(string absolutePath, Task<Stream> fileData, CancellationToken ct = default)
@@ -121,19 +126,7 @@ public class ElasticSearchService : ISearchService
 
         var response = await _client.Indices.CreateAsync(IndexName, c => c
             .Mappings(m => m
-                .Properties(new Properties
-                {
-                    { "id",            new KeywordProperty() },
-                    { "fileName",      new TextProperty { Analyzer = "standard" } },
-                    { "filePath",      new KeywordProperty() },
-                    { "content",       new TextProperty { Analyzer = "standard" } },
-                    { "fileType",      new KeywordProperty() },
-                    { "fileSizeBytes", new LongNumberProperty() },
-                    { "created",       new DateProperty() },
-                    { "modified",      new DateProperty() },
-                    { "author",        new KeywordProperty() },
-                    { "tags",          new KeywordProperty() },
-                })
+                .Properties(getProperties())
             ), ct);
 
         if (!response.IsValidResponse)
@@ -142,14 +135,30 @@ public class ElasticSearchService : ISearchService
             _logger.LogInformation("Index '{Index}' erstellt", IndexName);
     }
     
-    public async Task<List<FileDocument>> SearchByContentAsync(string searchText, CancellationToken ct = default)
+    public async Task<List<FileDocument>> SearchAsync(string searchText, CancellationToken ct = default)
     {
         var response = await _client.SearchAsync<FileDocument>(s => s
             .Index(IndexName)
             .Query(q => q
-                .Match(m => m
-                    .Field(f => f.Content)
+                .MultiMatch(mm => mm
                     .Query(searchText)
+                    .Fields(new[] { "content", "fileName" })
+                    .Fuzziness(new Fuzziness("AUTO"))
+                )
+            )
+            .Highlight(h => h
+                .Fields(f => f
+                    .Add("content", hf => hf
+                        .NumberOfFragments(1)
+                        .FragmentSize(100)
+                        .PreTags(ImmutableList.Create("<mark>"))
+                        .PostTags(ImmutableList.Create("</mark>"))
+                    )
+                    .Add("fileName", hf => hf
+                        .NumberOfFragments(1)
+                        .PreTags(ImmutableList.Create("<mark>"))
+                        .PostTags(ImmutableList.Create("</mark>"))
+                    )
                 )
             ), ct);
 
@@ -159,7 +168,22 @@ public class ElasticSearchService : ISearchService
             return new List<FileDocument>();
         }
 
-        return response.Documents.ToList();
+        var results = new List<FileDocument>();
+        foreach (var hit in response.Hits)
+        {
+            var doc = hit.Source!;
+            if (hit.Highlight?.TryGetValue("fileName", out var nameFragments) == true && nameFragments.Any())
+            {
+                doc.HighlightSnippet = nameFragments.First();
+            }
+            else if (hit.Highlight?.TryGetValue("content", out var fragments) == true && fragments.Any())
+            {
+                doc.HighlightSnippet = fragments.First();
+            }
+            results.Add(doc);
+        }
+
+        return results;
     }
     
 
@@ -176,7 +200,7 @@ public class ElasticSearchService : ISearchService
         var existingFile = existing.Source;
 
         bool sameContent = document.Content.Equals(existingFile?.Content);
-        bool samePath = document.FilePath.Equals(existingFile?.FilePath) && document.FileName.Equals(existingFile.FileName);
+        bool samePath = document.AbsolutePath.Equals(existingFile?.AbsolutePath) && document.FileName.Equals(existingFile.FileName);
 
         if (samePath && sameContent)
             return ExistsResult.ExactFileExists;
@@ -190,14 +214,21 @@ public class ElasticSearchService : ISearchService
     private async Task IndexDocumentIfNotExistsAsync(string absolutePath, Task<Stream> fileData, CancellationToken ct = default)
     {
         string fileName = Path.GetFileName(absolutePath);
-
+        
         string content = await ContentProvider.GetContent(await fileData);
+
+        string rootPath = _storage.getRootPath();
+        string relativePath = Path.GetRelativePath(rootPath, absolutePath);
+        string shareName = relativePath.Split(Path.DirectorySeparatorChar)[0];
+        string sharePath = Path.GetRelativePath(Path.Combine(rootPath, shareName), absolutePath);
         
         FileDocument document = new FileDocument
         {
             Id = GetStableId(absolutePath),
             FileName = fileName,
-            FilePath = absolutePath,
+            ShareName = shareName,
+            AbsolutePath = absolutePath,
+            SharePath = sharePath,
             Content = content,
             FileType = Path.GetExtension(fileName).TrimStart('.'),
             FileSizeBytes = new FileInfo(absolutePath).Length,
@@ -306,5 +337,25 @@ public class ElasticSearchService : ISearchService
             if (filters.Count > 0)
                 b.Filter(filters.ToArray());
         });
+    }
+    
+    
+    private static Properties getProperties()
+    {
+        return new Properties
+        {
+            { "id",            new KeywordProperty() },
+            { "fileName",      new TextProperty { Analyzer = "standard" } },
+            { "shareName",     new KeywordProperty() },
+            { "absolutePath",  new KeywordProperty() },
+            { "sharePath",     new KeywordProperty() },
+            { "content",       new TextProperty { Analyzer = "standard" } },
+            { "fileType",      new KeywordProperty() },
+            { "fileSizeBytes", new LongNumberProperty() },
+            { "created",       new DateProperty() },
+            { "modified",      new DateProperty() },
+            { "author",        new KeywordProperty() },
+            { "tags",          new KeywordProperty() },
+        };
     }
 }

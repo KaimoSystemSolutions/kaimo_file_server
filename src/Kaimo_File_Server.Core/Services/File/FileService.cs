@@ -1,5 +1,4 @@
-﻿using Elastic.Clients.Elasticsearch;
-using Kaimo_File_Server.Core.Domain;
+﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;

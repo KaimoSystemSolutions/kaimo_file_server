@@ -506,9 +506,12 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
 {
     private readonly object _inner;
     private readonly Type _type;
+    private readonly string _rootPath;
 
     public FileSystemStorageTestable(string rootPath)
     {
+        this._rootPath = rootPath;
+        
         _type = typeof(Kaimo_File_Server.Infrastructure.ServiceCollectionExtensions)
             .Assembly
             .GetType("Kaimo_File_Server.Infrastructure.Storage.FileSystemStorage")!;
@@ -520,6 +523,9 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
             | System.Reflection.BindingFlags.Public,
             null, [rootPath, Guid.Empty, (IServiceProvider?)null], null)!;
     }
+
+    public string getRootPath()
+        => _rootPath;
 
     public Task<Stream> ReadAsync(string path)
         => Invoke<Stream>("ReadAsync", path);

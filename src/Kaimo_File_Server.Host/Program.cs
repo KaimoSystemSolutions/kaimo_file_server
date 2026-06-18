@@ -14,8 +14,6 @@ builder.Services.AddCoreServices(storagePath);
 // -- SMB Transport --
 builder.Services.AddSmb(builder.Configuration);
 
-// -- Search -- 
-builder.Services.AddElasticSearch(builder.Configuration);
 
 var host = builder.Build();
 await host.InitializeDatabaseAsync();

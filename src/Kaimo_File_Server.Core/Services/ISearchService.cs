@@ -7,7 +7,7 @@ public interface ISearchService
     
     Task onDirectoryCreated(string absolutePath);
     Task onDirectoryDeleted(string absolutePath);
-    
+    Task<List<FileDocument>> SearchAsync(string searchText, CancellationToken ct = default);
     
     Task InitializeAsync(CancellationToken ct = default);
 }
