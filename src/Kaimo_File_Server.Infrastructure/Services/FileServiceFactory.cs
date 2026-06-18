@@ -13,22 +13,20 @@ namespace Kaimo_File_Server.Infrastructure.Services
         private readonly IServiceProvider _serviceProvider;
 
         private readonly ISearchService _searchService;
-        private readonly ILogger<FileService> _logger;
         
-        public FileServiceFactory(IServiceProvider serviceProvider, ISearchService searchService, ILogger<FileService> logger)
+        public FileServiceFactory(IServiceProvider serviceProvider, ISearchService searchService)
         {
             _serviceProvider = serviceProvider
                 ?? throw new ArgumentNullException(nameof(serviceProvider));
 
             _searchService = searchService;
-            _logger = logger;
         }
 
         public IFileService CreateForShare(Guid shareId, string sharePath)
         {
             var storage = new FileSystemStorage(sharePath, shareId, _serviceProvider);
             var aclService = new AclService(_serviceProvider);
-            return new FileService(storage, aclService, _searchService, _logger, shareId);
+            return new FileService(storage, aclService, _searchService, shareId);
         }
     }
 }

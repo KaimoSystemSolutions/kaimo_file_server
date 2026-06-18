@@ -20,9 +20,9 @@ public class FileServiceTests
     private readonly ISearchService _searchService;
     private readonly ILogger<FileService> _logger;
     
-    public FileServiceTests(ISearchService searchService, ILogger<FileService> logger)
+    public FileServiceTests()
     {
-        _sut = new FileService(_storageMock.Object, _aclMock.Object, searchService, logger, _shareId);
+        _sut = new FileService(_storageMock.Object, _aclMock.Object, null, _shareId);
     }
 
     private static UserContext CreateContext()
