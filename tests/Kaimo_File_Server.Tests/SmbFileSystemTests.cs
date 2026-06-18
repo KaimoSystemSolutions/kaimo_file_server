@@ -180,17 +180,23 @@ public class SmbFileSystemTests : IDisposable
     [Fact]
     public void NoSessionUser_ReturnsAccessDenied()
     {
-        var status = Task.Run(() =>
+        ExecutionContext.SuppressFlow();
+        try
         {
-            // Fresh thread → AsyncLocal is null
-            // null SecurityContext → cache lookup also fails
-            return _sut.CreateFile(out var h, out var fs, "noaccess.txt",
-                AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
-                CreateDisposition.FILE_CREATE, CreateOptions.FILE_NON_DIRECTORY_FILE,
-                null!);
-        }).GetAwaiter().GetResult();
+            var status = Task.Run(() =>
+            {
+                return _sut.CreateFile(out var h, out var fs, "noaccess.txt",
+                    AccessMask.GENERIC_WRITE, FileAttributes.Normal, ShareAccess.Read,
+                    CreateDisposition.FILE_CREATE, CreateOptions.FILE_NON_DIRECTORY_FILE,
+                    null!);
+            }).GetAwaiter().GetResult();
 
-        Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, status);
+            Assert.Equal(NTStatus.STATUS_ACCESS_DENIED, status);
+        }
+        finally
+        {
+            ExecutionContext.RestoreFlow();
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
