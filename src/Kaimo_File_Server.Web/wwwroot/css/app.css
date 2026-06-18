@@ -2792,6 +2792,10 @@ html, body, #app {
     max-height: 360px;
     overflow-y: auto;
     z-index: 101;
+    
+   
+    margin-left: -1px;
+    margin-right: -1px;
 }
 
 .search-result-item {

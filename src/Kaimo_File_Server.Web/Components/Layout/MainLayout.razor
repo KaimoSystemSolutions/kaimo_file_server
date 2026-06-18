@@ -75,10 +75,10 @@
     <main class="main">
         <div class="search-bar-container">
             <div class="search-bar @(_searchResults.Any() ? "has-results" : "")">
-                @Assets.SVG("compass.svg", new SvgOptions())
+                @Assets.SVG("search.svg", new SvgOptions())
                 <input type="text"
                        class="search-input"
-                       placeholder="@Resources.Web_Nav_BrowseFiles..."
+                       placeholder="@Resources.Web_Search_Placeholder..."
                        @bind="_searchQuery"
                        @bind:event="oninput"
                        @bind:after="OnSearchInputChanged"
@@ -116,7 +116,7 @@
                 {
                     <div class="search-dropdown">
                         <div class="search-result-item searching">
-                            <span>Searching...</span>
+                            <span>@Resources.Web_Search_Searching</span>
                         </div>
                     </div>
                 }
@@ -124,7 +124,7 @@
                 {
                     <div class="search-dropdown">
                         <div class="search-result-item no-results">
-                            <span>No results found</span>
+                            <span>@Resources.Web_Search_NoResults</span>
                         </div>
                     </div>
                 }
@@ -195,9 +195,12 @@
         _searchResults.Clear();
 
         var folderPath = Path.GetDirectoryName(result.SharePath);
-        
-        Nav.NavigateTo($"/files/{result.ShareName}/{Uri.EscapeDataString(folderPath)}");
-        //Nav.NavigateTo($"/files?path={Uri.EscapeDataString(result.AbsolutePath)}");
+
+        var url = string.IsNullOrEmpty(folderPath)
+            ? $"/files/{result.ShareName}?select={Uri.EscapeDataString(result.FileName)}"
+            : $"/files/{result.ShareName}/{folderPath}?select={Uri.EscapeDataString(result.FileName)}";
+
+        Nav.NavigateTo(url);
     }
     
     private void HandleSearchKeyDown(KeyboardEventArgs e)

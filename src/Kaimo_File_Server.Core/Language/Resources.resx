@@ -573,4 +573,23 @@
   <data name="Web_Acl_Error_Exception" xml:space="preserve">
     <value>Exception</value>
   </data>
+  <data name="Web_Search_Placeholder" xml:space="preserve">
+  <value>Search files</value>
+  </data>
+    <data name="Web_Search_Searching" xml:space="preserve">
+    <value>Searching...</value>
+  </data>
+    <data name="Web_Search_NoResults" xml:space="preserve">
+    <value>No results found</value>
+  </data>
+  <data name="Web_Search_Placeholder" xml:space="preserve">
+  <value>Dateien durchsuchen</value>
+  </data>
+    <data name="Web_Search_Searching" xml:space="preserve">
+    <value>Suche läuft...</value>
+  </data>
+    <data name="Web_Search_NoResults" xml:space="preserve">
+    <value>Keine Ergebnisse gefunden</value>
+  </data>
+  
 </root>

@@ -837,7 +837,7 @@ else
         _selectedItems.Clear();
         _sortColumn = null;
         _sortDirection = 0;
-        
+
         _contextMenuComponent?.CloseContextMenu();
 
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
@@ -845,6 +845,17 @@ else
         await LoadAclCounts();
         VM.OnStateChanged -= OnVmStateChanged;
         VM.OnStateChanged += OnVmStateChanged;
+
+        // Auto-select from search
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var selectName = query["select"];
+        if (!string.IsNullOrEmpty(selectName))
+        {
+            var item = FindShareItem(selectName);
+            if (item is not null)
+                _selectedItems.Add(item);
+        }
     }
 
     private void OnVmStateChanged() => InvokeAsync(StateHasChanged);
