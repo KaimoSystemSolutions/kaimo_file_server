@@ -7,9 +7,11 @@ using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Infrastructure.Repositories;
 using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Infrastructure.Storage;
+using Kaimo_File_Server.Search;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace Kaimo_File_Server.Infrastructure
@@ -70,6 +72,9 @@ namespace Kaimo_File_Server.Infrastructure
         public static IServiceCollection AddCoreServices(
             this IServiceCollection services, string storagePath)
         {
+            // Disabled search
+            services.TryAddSingleton<ISearchService, NoOpSearchService>();
+            
             // -- ACL + Metadata --
             services.AddScoped<IAclRepository, AclRepository>();
             services.AddScoped<IFileMetadataRepository, FileMetadataRepository>();

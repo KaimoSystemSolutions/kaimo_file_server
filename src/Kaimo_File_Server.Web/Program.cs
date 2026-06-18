@@ -20,6 +20,15 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
+
+
+// ══════════════════════════════════════════
+//  Elastic Search
+//  -> needs to replace the NoOPSearch engine in core, before core is loaded
+// ══════════════════════════════════════════
+
+builder.Services.AddElasticSearch(builder.Configuration);
+
 var storagePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
 builder.Services.AddCoreServices(storagePath);
 
@@ -90,11 +99,6 @@ builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo("/data/storage/.dp-keys"))
     .SetApplicationName("KaimoFiles");
 
-// ══════════════════════════════════════════
-//  Elastic Search
-// ══════════════════════════════════════════
-
-builder.Services.AddElasticSearch(builder.Configuration);
 
 // ══════════════════════════════════════════
 //  Build & configure pipeline

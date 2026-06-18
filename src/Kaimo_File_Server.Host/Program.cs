@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Infrastructure;
+using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Smb;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -12,6 +13,7 @@ builder.Services.AddCoreServices(storagePath);
 
 // -- SMB Transport --
 builder.Services.AddSmb(builder.Configuration);
+
 
 var host = builder.Build();
 await host.InitializeDatabaseAsync();

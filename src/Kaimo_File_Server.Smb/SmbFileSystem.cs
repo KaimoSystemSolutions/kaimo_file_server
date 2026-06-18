@@ -357,6 +357,10 @@ public class SmbFileSystem : INTFileStore
             User = user,
             DeleteOnClose = (createOptions & CreateOptions.FILE_DELETE_ON_CLOSE) != 0
         };
+        
+        
+        _fileService.onDirectoryCreated(absolutePath);
+        
         return NTStatus.STATUS_SUCCESS;
     }
 
@@ -435,6 +439,8 @@ public class SmbFileSystem : INTFileStore
             _ => FileStatus.FILE_OPENED,
         };
 
+        
+        
         handle = new FileHandle
         {
             Stream = fs,
@@ -443,6 +449,9 @@ public class SmbFileSystem : INTFileStore
             User = user,
             DeleteOnClose = (createOptions & CreateOptions.FILE_DELETE_ON_CLOSE) != 0
         };
+        
+        _fileService.OnFileCreated(absolutePath, _fileService.ReadFileAsync(absolutePath, user));
+        
         return NTStatus.STATUS_SUCCESS;
     }
 
@@ -531,9 +540,15 @@ public class SmbFileSystem : INTFileStore
                     return NTStatus.STATUS_ACCESS_DENIED;
 
                 if (h.IsDirectory && Directory.Exists(h.AbsolutePath))
+                {
                     Directory.Delete(h.AbsolutePath, true);
+                    _fileService.onFileDeleted(h.AbsolutePath);
+                }
                 else if (!h.IsDirectory && File.Exists(h.AbsolutePath))
+                {
                     File.Delete(h.AbsolutePath);
+                    _fileService.onDirectoryDeleted(h.AbsolutePath);
+                }
             }
 
             return NTStatus.STATUS_SUCCESS;

@@ -21,6 +21,7 @@ public class AssetProvider
         "polyline",
         "polygon",
         "rect",
+        "text"
     };
     
     private readonly IWebHostEnvironment _env;

@@ -1,4 +1,5 @@
 @using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Search
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inherits LayoutComponentBase
 @inject ThemeService Theme
@@ -7,6 +8,7 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject FileUploadCoordinator UploadCoordinator
 @inject AssetProvider Assets 
+@inject ISearchService SearchService
 
 <div class="app-shell" data-theme="@Theme.Current">
     <nav class="sidebar">
@@ -71,7 +73,65 @@
     </nav> 
     <InputFile id="global-file-input" OnChange="OnFilesSelected" style="display:none" multiple />
     <main class="main">
+        <div class="search-bar-container">
+            <div class="search-bar @(_searchResults.Any() ? "has-results" : "")">
+                @Assets.SVG("search.svg", new SvgOptions())
+                <input type="text"
+                       class="search-input"
+                       placeholder="@Resources.Web_Search_Placeholder..."
+                       @bind="_searchQuery"
+                       @bind:event="oninput"
+                       @bind:after="OnSearchInputChanged"
+                       @onkeydown="HandleSearchKeyDown"
+                       @onfocusin="() => _dropdownVisible = _searchResults.Any()"
+                       @onfocusout="HideDropdownDelayed" />
+                @if (!string.IsNullOrEmpty(_searchQuery))
+                {
+                    <button class="search-clear" @onclick="ClearSearch">✕</button>
+                }
+        
+                @if (_dropdownVisible && _searchResults.Any())
+                {
+                    <div class="search-dropdown">
+                        @foreach (var group in _searchResults.GroupBy(r => r.ShareName))
+                        {
+                            <div class="search-group-header">@group.Key</div>
+                            @foreach (var result in group)
+                            {
+                                <div class="search-result-item" @onmousedown="() => NavigateToResult(result)">
+                                    @Assets.SVG(FileHelper.GetIcon(result.FileName), new SvgOptions())
+                                    <div class="search-result-info">
+                                        <span class="search-result-name">@result.FileName <span class="search-result-path">— @result.SharePath</span></span>
+                                        @if (!string.IsNullOrEmpty(result.HighlightSnippet))
+                                        {
+                                            <span class="search-result-snippet">@((MarkupString)result.HighlightSnippet)</span>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+                else if (_dropdownVisible && _isSearching)
+                {
+                    <div class="search-dropdown">
+                        <div class="search-result-item searching">
+                            <span>@Resources.Web_Search_Searching</span>
+                        </div>
+                    </div>
+                }
+                else if (_dropdownVisible && _searchQuery.Length >= 2 && !_searchResults.Any() && !_isSearching)
+                {
+                    <div class="search-dropdown">
+                        <div class="search-result-item no-results">
+                            <span>@Resources.Web_Search_NoResults</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
         @Body
+        
     </main>
     <ToastContainer />
 </div>
@@ -79,12 +139,93 @@
 @code {
     private string _displayName = "";
     private string _initials = "";
-
+    private string _searchQuery = "";
+    
     private InputFile? _inputFile;
     private ElementReference _inputElement;
     
+    private List<FileDocument> _searchResults = new();
+    private bool _dropdownVisible;
+    private bool _isSearching;
+    private CancellationTokenSource? _searchCts;
+
+    
     [Inject] private IJSRuntime JS { get; set; } = default!;
 
+
+    private async Task OnSearchInputChanged()
+    {
+        if (_searchQuery.Length < 2)
+        {
+            _searchResults.Clear();
+            _dropdownVisible = false;
+            return;
+        }
+
+        // Cancel previous search
+        _searchCts?.Cancel();
+        _searchCts = new CancellationTokenSource();
+        var token = _searchCts.Token;
+
+        _isSearching = true;
+        _dropdownVisible = true;
+
+        try
+        {
+            // Debounce: wait 250ms before firing
+            await Task.Delay(250, token);
+
+            var results = await SearchService.SearchAsync(_searchQuery, token);
+            if (!token.IsCancellationRequested)
+            {
+                _searchResults = results.Take(8).ToList();
+                _isSearching = false;
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // Expected when typing fast — previous search gets cancelled
+        }
+    }
+
+    private void NavigateToResult(FileDocument result)
+    {
+        _dropdownVisible = false;
+        _searchQuery = "";
+        _searchResults.Clear();
+
+        var folderPath = Path.GetDirectoryName(result.SharePath);
+
+        var url = string.IsNullOrEmpty(folderPath)
+            ? $"/files/{result.ShareName}?select={Uri.EscapeDataString(result.FileName)}"
+            : $"/files/{result.ShareName}/{folderPath}?select={Uri.EscapeDataString(result.FileName)}";
+
+        Nav.NavigateTo(url);
+    }
+    
+    private void HandleSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            //Nav.NavigateTo($"/files?q={Uri.EscapeDataString(_searchQuery)}");
+        }
+    }
+
+    private async Task HideDropdownDelayed()
+    {
+        // Small delay so @onmousedown on results fires before we hide
+        await Task.Delay(200);
+        _dropdownVisible = false;
+        StateHasChanged();
+    }
+
+    private void ClearSearch()
+    {
+        _searchQuery = "";
+        _searchResults.Clear();
+        _dropdownVisible = false;
+    }
+    
     
     protected override void OnInitialized()
     {
