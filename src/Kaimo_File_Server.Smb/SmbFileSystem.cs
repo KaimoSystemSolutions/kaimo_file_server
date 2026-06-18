@@ -4,6 +4,7 @@ using Kaimo_File_Server.Core.Services.File;
 using Microsoft.Extensions.DependencyInjection;
 using SMBLibrary;
 using SMBLibrary.Server;
+using System.Collections.Concurrent;
 using FileAttributes = SMBLibrary.FileAttributes;
 
 namespace Kaimo_File_Server.Smb;
@@ -26,65 +27,146 @@ public class SmbFileSystem : INTFileStore
         Directory.CreateDirectory(_root);
     }
 
-    // ------------------ Per-session user context ------------------
+    // ═══════════════════════ PER-SESSION USER CONTEXT ═══════════════════════
+    //
+    // Architecture:
+    //   1. AsyncLocal          – flows along the async call chain. Works when
+    //                            SMBLibrary calls INTFileStore on the same thread
+    //                            as OnBeforeCommand. Sole mechanism for the
+    //                            parameterless ABE delegate.
+    //
+    //   2. Fallback cache      – ConcurrentDictionary<username, (UserContext, tick)>.
+    //                            Used when AsyncLocal is empty (thread hop).
+    //                            LRU-evicted so we never nuke active sessions.
+    //
+    //   3. SecurityContext     – passed by SMBLibrary into CreateFile.
+    //                            Always preferred when available.
+    //
+    //   4. FileHandle.User     – set once in CreateFile, carried through every
+    //                            subsequent Read/Write/Close/SetInfo call.
+    //                            This is the AUTHORITATIVE source for all
+    //                            post-CreateFile operations.
+    //
+    // Rule: after CreateFile, NEVER rely on AsyncLocal or the cache —
+    //       always read from the handle.
 
     private static readonly AsyncLocal<UserContext?> _sessionUser = new();
 
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, UserContext>
-        _userContextFallback = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, CachedUser> _userCache
+        = new(StringComparer.OrdinalIgnoreCase);
 
-    private const int MaxCachedUsers = 256;
+    private const int MaxCachedUsers = 512;
+    private const int EvictionBatchSize = 64; // remove oldest N when full
 
-    public static void SetSessionUser(UserContext user)
+    private sealed class CachedUser
     {
-        _sessionUser.Value = user;
-
-        var name = user?.User?.Username;
-        if (!string.IsNullOrEmpty(name))
-        {
-            if (_userContextFallback.Count >= MaxCachedUsers)
-                _userContextFallback.Clear();
-
-            _userContextFallback[name] = user;
-        }
+        public UserContext Context { get; set; } = null!;
+        public long LastAccessTick;
     }
 
-    public static void RestoreSessionFromFallback(string username)
+    /// <summary>
+    /// Stores the user in AsyncLocal (for the current call chain)
+    /// AND in the global fallback cache (for cross-thread lookup).
+    /// Called by SmbServer.OnBeforeCommand and OnAccessRequested.
+    /// </summary>
+    public static void SetSessionUser(UserContext user)
+    {
+        if (user?.User?.Username == null)
+            return;
+
+        _sessionUser.Value = user;
+
+        var name = user.User.Username;
+        _userCache.AddOrUpdate(
+            name,
+            _ =>
+            {
+                EvictIfNeeded();
+                return new CachedUser { Context = user, LastAccessTick = Environment.TickCount64 };
+            },
+            (_, existing) =>
+            {
+                existing.Context = user;
+                existing.LastAccessTick = Environment.TickCount64;
+                return existing;
+            });
+    }
+
+    /// <summary>
+    /// Tries to restore AsyncLocal from the cache. No-op if AsyncLocal
+    /// already has a value. Safe to call with null username.
+    /// </summary>
+    public static void RestoreSessionFromFallback(string? username)
     {
         if (_sessionUser.Value != null)
             return;
 
-        if (username != null && _userContextFallback.TryGetValue(username, out var cached))
-            _sessionUser.Value = cached;
+        if (username != null && _userCache.TryGetValue(username, out var cached))
+        {
+            cached.LastAccessTick = Environment.TickCount64;
+            _sessionUser.Value = cached.Context;
+        }
     }
 
     /// <summary>
-    /// Returns the current session user, or null if none is set.
-    /// Used by SmbServer for ABE filtering during share enumeration,
-    /// where throwing on missing context would be wrong.
+    /// Returns the current session user from AsyncLocal, or null.
+    /// Used by SmbServer for ABE filtering where throwing would be wrong.
     /// </summary>
     public static UserContext? GetSessionUserOrDefault()
     {
         return _sessionUser.Value;
     }
 
-    private UserContext RequireSessionUser(SecurityContext? securityContext = null)
+    /// <summary>
+    /// Resolves the user for the current operation. Tries in order:
+    ///   1. The handle's stored user (if provided)
+    ///   2. AsyncLocal (same-thread flow from OnBeforeCommand)
+    ///   3. Fallback cache via SecurityContext.UserName
+    /// Throws if none works — this is a hard error, not a soft deny.
+    /// </summary>
+    private static UserContext RequireUser(
+        FileHandle? fileHandle = null,
+        SecurityContext? securityContext = null)
     {
+        // 1. Handle is authoritative after CreateFile
+        if (fileHandle?.User != null)
+            return fileHandle.User;
+
+        // 2. AsyncLocal (same-thread flow)
         if (_sessionUser.Value != null)
             return _sessionUser.Value;
 
-        if (securityContext?.UserName != null &&
-            _userContextFallback.TryGetValue(securityContext.UserName, out var cached))
+        // 3. Cache lookup via SMBLibrary SecurityContext
+        if (securityContext?.UserName != null
+            && _userCache.TryGetValue(securityContext.UserName, out var cached))
         {
-            _sessionUser.Value = cached;
-            return cached;
+            cached.LastAccessTick = Environment.TickCount64;
+            _sessionUser.Value = cached.Context; // populate AsyncLocal for remainder of call
+            return cached.Context;
         }
 
         throw new InvalidOperationException(
-            "No authenticated user context. SetSessionUser must be called before filesystem operations.");
+            "No authenticated user context available. " +
+            "SetSessionUser must be called before filesystem operations.");
     }
 
-    // ------------------ Path helpers ------------------
+    private static void EvictIfNeeded()
+    {
+        if (_userCache.Count < MaxCachedUsers)
+            return;
+
+        // Find the N oldest entries and remove them
+        var oldest = _userCache
+            .OrderBy(kv => kv.Value.LastAccessTick)
+            .Take(EvictionBatchSize)
+            .Select(kv => kv.Key)
+            .ToList();
+
+        foreach (var key in oldest)
+            _userCache.TryRemove(key, out _);
+    }
+
+    // ═══════════════════════ PATH HELPERS ═══════════════════════
 
     private string ToAbsolutePath(string smbPath)
     {
@@ -115,7 +197,7 @@ public class SmbFileSystem : INTFileStore
         return ShareRelativePath.Normalize(relative);
     }
 
-    // ------------------ Handle types ------------------
+    // ═══════════════════════ HANDLE TYPES ═══════════════════════
 
     private sealed class FileHandle
     {
@@ -143,7 +225,11 @@ public class SmbFileSystem : INTFileStore
         public UserContext User { get; init; } = null!;
     }
 
-    // ------------------ Permission wrappers ------------------
+    // ═══════════════════════ PERMISSION WRAPPERS ═══════════════════════
+    //
+    // All async permission calls are wrapped in Task.Run to prevent
+    // deadlocks when the underlying code captures a SynchronizationContext.
+    // This is unavoidable because INTFileStore is a synchronous interface.
 
     private bool CanRead(string relativePath, UserContext user)
         => Task.Run(() => _fileService.CanReadAsync(relativePath, user)).GetAwaiter().GetResult();
@@ -165,9 +251,7 @@ public class SmbFileSystem : INTFileStore
         => Task.Run(() => _fileService.FilterReadablePathsAsync(items, user)).GetAwaiter().GetResult();
 
     private bool EnsureShareAccess(UserContext user)
-    {
-        return CanList("", user);
-    }
+        => CanList("", user);
 
     // ═══════════════════════ CREATE ═══════════════════════
 
@@ -180,11 +264,10 @@ public class SmbFileSystem : INTFileStore
         handle = null!;
         fileStatus = FileStatus.FILE_DOES_NOT_EXIST;
 
-        Console.WriteLine("Tried to create file");
-        
         try
         {
-            var user = RequireSessionUser(securityContext);
+            // SecurityContext is the primary source here — no handle exists yet
+            var user = RequireUser(securityContext: securityContext);
 
             if (!EnsureShareAccess(user))
                 return NTStatus.STATUS_ACCESS_DENIED;
@@ -205,10 +288,16 @@ public class SmbFileSystem : INTFileStore
             return CreateRegularFile(out handle, out fileStatus, absolutePath, relativePath,
                 createDisposition, createOptions, desiredAccess, shareAccess, user);
         }
-        catch (InvalidOperationException) { throw; }
+        catch (InvalidOperationException ex)
+        {
+            Console.WriteLine($"[CreateFile ERROR] No user context for '{path}': {ex.Message}");
+            return NTStatus.STATUS_ACCESS_DENIED;
+        }
         catch (UnauthorizedAccessException) { return NTStatus.STATUS_ACCESS_DENIED; }
         catch (IOException ex) when (ex.HResult == unchecked((int)0x80070020))
-        { return NTStatus.STATUS_SHARING_VIOLATION; }
+        {
+            return NTStatus.STATUS_SHARING_VIOLATION;
+        }
         catch (Exception ex)
         {
             Console.WriteLine($"[CreateFile ERROR] {path}: {ex.Message}");
@@ -345,8 +434,7 @@ public class SmbFileSystem : INTFileStore
             (_, false) => FileStatus.FILE_CREATED,
             _ => FileStatus.FILE_OPENED,
         };
-        
-        
+
         handle = new FileHandle
         {
             Stream = fs,
@@ -464,7 +552,7 @@ public class SmbFileSystem : INTFileStore
             h.Stream.Position = 0;
 
             var relativePath = ToShareRelativePath(h.AbsolutePath);
-            var userId = h.User?.User?.Id.ToString();
+            var userId = h.User.User.Id.ToString();
 
             var version = Task.Run(() =>
                 versionService.CreateVersionAsync(relativePath, h.Stream, userId))
@@ -562,6 +650,7 @@ public class SmbFileSystem : INTFileStore
         var h = handle as FileHandle;
         if (h == null || !h.IsDirectory) return NTStatus.STATUS_INVALID_HANDLE;
 
+        // User comes from the handle — never from AsyncLocal
         string dirRelativePath = ToShareRelativePath(h.AbsolutePath);
         if (!CanList(dirRelativePath, h.User))
             return NTStatus.STATUS_ACCESS_DENIED;
@@ -719,14 +808,27 @@ public class SmbFileSystem : INTFileStore
 
             if (information is FileEndOfFileInformation eofInfo)
             {
+                // Truncating/extending a file is a write operation
+                string relativePath = ToShareRelativePath(h.AbsolutePath);
+                if (!CanWrite(relativePath, h.User))
+                    return NTStatus.STATUS_ACCESS_DENIED;
+
                 h.Stream?.SetLength(eofInfo.EndOfFile);
+                h.WasDirty = true;
                 return NTStatus.STATUS_SUCCESS;
             }
 
             if (information is FileAllocationInformation allocInfo)
             {
                 if (h.Stream != null && h.Stream.Length > allocInfo.AllocationSize)
+                {
+                    string relativePath = ToShareRelativePath(h.AbsolutePath);
+                    if (!CanWrite(relativePath, h.User))
+                        return NTStatus.STATUS_ACCESS_DENIED;
+
                     h.Stream.SetLength(allocInfo.AllocationSize);
+                    h.WasDirty = true;
+                }
                 return NTStatus.STATUS_SUCCESS;
             }
 
@@ -759,7 +861,7 @@ public class SmbFileSystem : INTFileStore
                 return NTStatus.STATUS_OBJECT_NAME_COLLISION;
             Directory.Move(h.AbsolutePath, newAbsPath);
             h.AbsolutePath = newAbsPath;
-            UpdateAclPathsOnRename(oldRelativePath, newRelativePath);
+            UpdateAclPathsOnRename(oldRelativePath, newRelativePath, h.User);
             return NTStatus.STATUS_SUCCESS;
         }
 
@@ -784,7 +886,7 @@ public class SmbFileSystem : INTFileStore
             File.Move(oldPath, newAbsPath);
             h.AbsolutePath = newAbsPath;
             h.Stream = new FileStream(newAbsPath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
-            UpdateAclPathsOnRename(oldRelativePath, newRelativePath);
+            UpdateAclPathsOnRename(oldRelativePath, newRelativePath, h.User);
             return NTStatus.STATUS_SUCCESS;
         }
         catch (Exception)
@@ -800,22 +902,32 @@ public class SmbFileSystem : INTFileStore
         }
     }
 
-    private void UpdateAclPathsOnRename(string oldRelativePath, string newRelativePath)
+    /// <summary>
+    /// Updates ACL paths after a rename. Takes the user explicitly
+    /// from the handle — never from AsyncLocal.
+    /// </summary>
+    private void UpdateAclPathsOnRename(string oldRelativePath, string newRelativePath, UserContext user)
     {
         try
         {
-            Task.Run(() => _fileService.RenameAsync(oldRelativePath, newRelativePath,
-                RequireSessionUser())).GetAwaiter().GetResult();
+            Task.Run(() => _fileService.RenameAsync(oldRelativePath, newRelativePath, user))
+                .GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
             Console.WriteLine(
-                $"[ACL Rename] Failed to update ACL paths '{oldRelativePath}' → '{newRelativePath}': {ex.Message}");
+                $"[ACL Rename] Failed to update ACL paths '{oldRelativePath}' -> '{newRelativePath}': {ex.Message}");
         }
     }
 
-    private static NTStatus HandleSetBasicInfo(FileHandle h, FileBasicInformation basicInfo)
+    private NTStatus HandleSetBasicInfo(FileHandle h, FileBasicInformation basicInfo)
     {
+        // No extra CanWrite check here. Permissions were validated when the
+        // handle was opened in CreateFile. Explorer sets timestamps immediately
+        // after creating a file — if we check CanWrite on the new file itself,
+        // it fails because ACLs are typically on the parent, not the new file.
+        // This matches NTFS behavior: access is checked at open, not per-operation.
+
         if (h.IsDirectory)
         {
             var d = new DirectoryInfo(h.AbsolutePath);
@@ -896,7 +1008,17 @@ public class SmbFileSystem : INTFileStore
     public NTStatus GetSecurityInformation(
         out SecurityDescriptor result, object handle,
         SecurityInformation securityInformation)
-    { result = new SecurityDescriptor(); return NTStatus.STATUS_SUCCESS; }
+    {
+        // NOTE: Returning an empty descriptor tells clients "no ACLs".
+        // Windows Explorer may show "Full Control" for everyone even though
+        // our CanWrite/CanDelete checks enforce real permissions server-side.
+        // This is cosmetic — operations still fail with ACCESS_DENIED when
+        // the user lacks permission. Building a real descriptor from our
+        // ACL model would require mapping UserContext → SID, which SMBLibrary
+        // doesn't support out of the box.
+        result = new SecurityDescriptor();
+        return NTStatus.STATUS_SUCCESS;
+    }
 
     public NTStatus SetSecurityInformation(
         object handle, SecurityInformation securityInformation,
@@ -1006,7 +1128,7 @@ public class SmbFileSystem : INTFileStore
         return result;
     }
 
-    // ------------------ FileInformation builders ------------------
+    // ═══════════════════════ FILE INFORMATION BUILDERS ═══════════════════════
 
     private static FileInformation BuildSnapshotFileInfo(
         long size, DateTime timestamp, bool isDirectory, FileInformationClass cls)
@@ -1156,7 +1278,7 @@ public class SmbFileSystem : INTFileStore
         };
     }
 
-    // ------------------ Directory entry builders ------------------
+    // ═══════════════════════ DIRECTORY ENTRY BUILDERS ═══════════════════════
 
     private static QueryDirectoryFileInformation CreateDirEntryInfo(
         string name, DirectoryInfo dirInfo, FileInformationClass cls) => cls switch

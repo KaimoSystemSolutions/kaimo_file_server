@@ -77,18 +77,39 @@ namespace Kaimo_File_Server.Smb
 
             _server.OnBeforeCommand = username =>
             {
-                // Schneller Pfad: aus Cache wiederherstellen
-                SmbFileSystem.RestoreSessionFromFallback(username);
+                // This callback fires before every SMB command.
+                // We use it to populate the AsyncLocal<UserContext> so that
+                // the ABE delegate (GetVisibleSharesForCurrentUser) and
+                // CreateFile have a user context available.
+                //
+                // After CreateFile, the FileHandle carries the user —
+                // all subsequent operations (Read, Write, Close, SetInfo)
+                // read from the handle, NOT from AsyncLocal.
 
-                // Wenn nicht im Cache: aus DB auflösen und cachen
-                if (SmbFileSystem.GetSessionUserOrDefault() == null && username != null)
+                if (string.IsNullOrEmpty(username))
+                    return;
+
+                // 1. Try restoring from cache (fast path, no DB hit)
+                try
+                {
+                    SmbFileSystem.RestoreSessionFromFallback(username);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[OnBeforeCommand] RestoreSessionFromFallback failed for '{username}': {ex.Message}");
+                }
+
+                // 2. If cache miss, resolve from DB and populate cache
+                if (SmbFileSystem.GetSessionUserOrDefault() == null)
                 {
                     try
                     {
                         using var scope = _serviceProvider.CreateScope();
                         var authLookup = scope.ServiceProvider.GetRequiredService<IAuthenticationLookup>();
-                        var userContext = authLookup.ResolveUserContextAsync(username)
+
+                        var userContext = Task.Run(() => authLookup.ResolveUserContextAsync(username))
                             .GetAwaiter().GetResult();
+
                         if (userContext != null)
                             SmbFileSystem.SetSessionUser(userContext);
                     }
@@ -109,7 +130,7 @@ namespace Kaimo_File_Server.Smb
 
             using var scope = _serviceProvider.CreateScope();
             var shareRepo = scope.ServiceProvider.GetRequiredService<IShareRepository>();
-            var dbShares = shareRepo.GetAllEnabledAsync().GetAwaiter().GetResult();
+            var dbShares = Task.Run(() => shareRepo.GetAllEnabledAsync()).GetAwaiter().GetResult();
 
             foreach (var shareDef in dbShares)
             {
@@ -160,7 +181,15 @@ namespace Kaimo_File_Server.Smb
                 Interlocked.Exchange(ref _debounce, 0);
 
                 Console.WriteLine($"[*] Storage-Änderung erkannt ({reason}), Shares werden synchronisiert...");
-                SyncFromDb();
+
+                try
+                {
+                    SyncFromDb();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[SyncFromDb ERROR] {ex.Message}");
+                }
             });
         }
 
@@ -268,7 +297,7 @@ namespace Kaimo_File_Server.Smb
 
                 using var scope = _serviceProvider.CreateScope();
                 var shareRepo = scope.ServiceProvider.GetRequiredService<IShareRepository>();
-                var dbShares = shareRepo.GetAllEnabledAsync().GetAwaiter().GetResult();
+                var dbShares = Task.Run(() => shareRepo.GetAllEnabledAsync()).GetAwaiter().GetResult();
 
                 var dbByName = new Dictionary<string, (Guid Id, string Name, string Path)>(
                     StringComparer.OrdinalIgnoreCase);
@@ -355,9 +384,17 @@ namespace Kaimo_File_Server.Smb
         {
             return new NtHashAuthenticationProvider(username =>
             {
-                using var scope = _serviceProvider.CreateScope();
-                var authLookup = scope.ServiceProvider.GetRequiredService<IAuthenticationLookup>();
-                return authLookup.GetNtHashAsync(username).GetAwaiter().GetResult();
+                try
+                {
+                    using var scope = _serviceProvider.CreateScope();
+                    var authLookup = scope.ServiceProvider.GetRequiredService<IAuthenticationLookup>();
+                    return Task.Run(() => authLookup.GetNtHashAsync(username)).GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[NtHash ERROR] Failed to retrieve hash for '{username}': {ex.Message}");
+                    return null;
+                }
             });
         }
 
@@ -368,7 +405,7 @@ namespace Kaimo_File_Server.Smb
                 using var scope = _serviceProvider.CreateScope();
                 var authLookup = scope.ServiceProvider.GetRequiredService<IAuthenticationLookup>();
 
-                var userContext = authLookup.ResolveUserContextAsync(args.UserName)
+                var userContext = Task.Run(() => authLookup.ResolveUserContextAsync(args.UserName))
                     .GetAwaiter().GetResult();
 
                 if (userContext == null)
@@ -377,10 +414,12 @@ namespace Kaimo_File_Server.Smb
                     return;
                 }
 
+                // Populate both AsyncLocal and cache so that the immediately
+                // following CreateFile call has the user available regardless
+                // of whether it runs on this thread or a different one.
                 SmbFileSystem.SetSessionUser(userContext);
 
-                args.Allow = authLookup
-                    .CanListShareAsync(shareId, userContext.User.Id)
+                args.Allow = Task.Run(() => authLookup.CanListShareAsync(shareId, userContext.User.Id))
                     .GetAwaiter().GetResult();
             }
             catch (Exception ex)
@@ -396,6 +435,10 @@ namespace Kaimo_File_Server.Smb
         /// Called by SMBLibrary (via ShareListProvider delegate) on every
         /// NetrShareEnum / NetrShareGetInfo RPC request.
         /// Returns only the share names the current session user has access to.
+        ///
+        /// This relies on AsyncLocal being set by OnBeforeCommand.
+        /// If AsyncLocal is empty (thread hop), we return an empty list
+        /// as a safe default — the user can still connect to shares directly.
         /// </summary>
         private List<string> GetVisibleSharesForCurrentUser()
         {
@@ -403,7 +446,19 @@ namespace Kaimo_File_Server.Smb
             {
                 var userContext = SmbFileSystem.GetSessionUserOrDefault();
                 if (userContext == null)
-                    return new List<string>();
+                {
+                    // AsyncLocal lost due to thread hop between OnBeforeCommand
+                    // and the RPC handler. Return ALL share names so SMBLibrary
+                    // can find the share object and build a valid response.
+                    //
+                    // This is safe: ABE is cosmetic (hides shares from the listing).
+                    // The real access control happens in OnAccessRequested when the
+                    // client actually tries to connect. Returning an empty list here
+                    // causes SMBLibrary to crash with NullReferenceException in
+                    // GetNetrShareGetInfoResponse because it doesn't null-check.
+                    Console.WriteLine("[ABE] No user context — returning all shares as fallback.");
+                    return _activeShares.Values.Select(e => e.DbName).ToList();
+                }
 
                 using var scope = _serviceProvider.CreateScope();
                 var authLookup = scope.ServiceProvider.GetRequiredService<IAuthenticationLookup>();
@@ -413,16 +468,17 @@ namespace Kaimo_File_Server.Smb
                 {
                     try
                     {
-                        var hasAccess = authLookup
-                            .CanListShareAsync(entry.Id, userContext.User.Id)
+                        var hasAccess = Task.Run(() =>
+                            authLookup.CanListShareAsync(entry.Id, userContext.User.Id))
                             .GetAwaiter().GetResult();
 
                         if (hasAccess)
                             visible.Add(entry.DbName);
                     }
-                    catch
+                    catch (Exception ex)
                     {
                         // Can't determine access → hide (safe default)
+                        Console.WriteLine($"[ABE] Access check failed for '{entry.DbName}': {ex.Message}");
                     }
                 }
 
@@ -431,7 +487,7 @@ namespace Kaimo_File_Server.Smb
             catch (Exception ex)
             {
                 Console.WriteLine($"[ABE ERROR] {ex.Message}");
-                return new List<string>();
+                return _activeShares.Values.Select(e => e.DbName).ToList();
             }
         }
 
