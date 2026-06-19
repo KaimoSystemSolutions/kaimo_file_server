@@ -60,6 +60,12 @@ services:
       discovery.type: single-node
       xpack.security.enabled: "false"
       ES_JAVA_OPTS: "-Xms2g -Xmx2g"
+      # Dev-Maschine: Festplatte darf voller werden, bevor ES das Zuweisen von
+      # Shards blockiert. Standard ist 85/90/95% -> bei einer fast vollen C:
+      # bleibt sonst jeder Shard "unassigned" und der Cluster wird rot.
+      cluster.routing.allocation.disk.watermark.low: "95%"
+      cluster.routing.allocation.disk.watermark.high: "97%"
+      cluster.routing.allocation.disk.watermark.flood_stage: "98%"
     volumes:
       - ./tests/data/elasticsearch:/usr/share/elasticsearch/data
     ports:

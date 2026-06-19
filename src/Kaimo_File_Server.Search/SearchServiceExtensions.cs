@@ -14,7 +14,7 @@ public static class SearchServiceExtensions
         var url = configuration["Elasticsearch:Url"] ?? "http://elasticsearch:9200";
 
         var settings = new ElasticsearchClientSettings(new Uri(url))
-            .DefaultIndex("kaimo-files");
+            .DefaultIndex("kaimo-files-v2");
             
         var client = new ElasticsearchClient(settings);
 

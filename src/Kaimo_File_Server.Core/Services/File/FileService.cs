@@ -76,11 +76,18 @@ public class FileService : IFileService
                         User, _owner._shareId, newRel, isDir, FilePermission.Delete))
                 throw new UnauthorizedAccessException($"Rename (overwrite) denied for '{newRel}'");
 
+            var oldAbs = _handle.AbsolutePath;
             var newAbs = _owner._storage.ToAbsolutePath(newRel);
             await _handle.MoveAsync(newAbs, newRel, replaceExisting, ct);
 
             // Keep the ACL records aligned with the new path.
             await _owner._acl.RenameAclPathAsync(_owner._shareId, oldRel, newRel);
+
+            // Keep the search index aligned with the new path.
+            if (isDir)
+                _owner.onDirectoryRenamed(oldAbs, newAbs);
+            else
+                _owner.onFileRenamed(oldAbs, newAbs);
 
             RelativePath = newRel;
         }
@@ -232,6 +239,16 @@ public class FileService : IFileService
     public void onDirectoryDeleted(string absolutePath)
     {
         _searchService?.onDirectoryDeleted(absolutePath);
+    }
+
+    public void onFileRenamed(string oldAbsolutePath, string newAbsolutePath)
+    {
+        _searchService?.onFileRenamed(oldAbsolutePath, newAbsolutePath);
+    }
+
+    public void onDirectoryRenamed(string oldAbsolutePath, string newAbsolutePath)
+    {
+        _searchService?.onDirectoryRenamed(oldAbsolutePath, newAbsolutePath);
     }
 
     // ------------------ Directory Listing ------------------
@@ -473,15 +490,22 @@ public class FileService : IFileService
         if (!await _acl.HasAccessAsync(user, _shareId, newNormalized, isDir, FilePermission.CreateWriteData))
             throw new UnauthorizedAccessException($"Rename (create) denied for '{newNormalized}'");
 
+        // Capture absolute paths up front — the mapping is a pure string
+        // transform, so it is valid before and after the physical move.
+        var oldAbs = ToAbsolutePath(oldNormalized);
+        var newAbs = ToAbsolutePath(newNormalized);
+
         if (isDir)
         {
             await _storage.RenameDirectoryAsync(oldNormalized, newNormalized);
             await _acl.RenameAclPathAsync(_shareId, oldNormalized, newNormalized);
+            onDirectoryRenamed(oldAbs, newAbs);
         }
         else
         {
             await _storage.RenameFileAsync(oldNormalized, newNormalized);
             await _acl.RenameAclPathAsync(_shareId, oldNormalized, newNormalized);
+            onFileRenamed(oldAbs, newAbs);
         }
     }
 

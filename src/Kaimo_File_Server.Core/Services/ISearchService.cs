@@ -1,14 +1,35 @@
+using Kaimo_File_Server.Core.Domain.Identity;
+
 namespace Kaimo_File_Server.Search;
 
 public interface ISearchService
 {
     Task onFileCreated(string absolutePath, Task<Stream> fileData, CancellationToken ct = default);
     Task onFileDeleted(string absolutePath);
-    
+
     Task onDirectoryCreated(string absolutePath);
     Task onDirectoryDeleted(string absolutePath);
-    Task<List<FileDocument>> SearchAsync(string searchText, CancellationToken ct = default);
-    
+
+    /// <summary>
+    /// Updates the index after a file has been renamed/moved. The stable id of a
+    /// document is derived from its absolute path, so the document is re-indexed
+    /// under the new id and the old entry is removed.
+    /// </summary>
+    Task onFileRenamed(string oldAbsolutePath, string newAbsolutePath);
+
+    /// <summary>
+    /// Updates the index after a directory has been renamed/moved. Every indexed
+    /// document below the old path gets its paths/id rewritten to the new location.
+    /// </summary>
+    Task onDirectoryRenamed(string oldAbsolutePath, string newAbsolutePath);
+
+    /// <summary>
+    /// Searches the index and returns ONLY the documents the given user is allowed
+    /// to read (ListReadData). The ACL check is mandatory and performed before any
+    /// result leaves the service — never expose raw hits to the UI.
+    /// </summary>
+    Task<List<FileDocument>> SearchAsync(string searchText, UserContext user, CancellationToken ct = default);
+
     Task InitializeAsync(CancellationToken ct = default);
 }
 

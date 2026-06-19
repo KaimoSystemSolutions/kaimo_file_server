@@ -1,4 +1,5 @@
 @using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Repositories
 @using Kaimo_File_Server.Search
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inherits LayoutComponentBase
@@ -7,8 +8,9 @@
 @inject JwtAuthenticationStateProvider AuthState
 @inject AuthenticationStateProvider AuthStateProvider
 @inject FileUploadCoordinator UploadCoordinator
-@inject AssetProvider Assets 
+@inject AssetProvider Assets
 @inject ISearchService SearchService
+@inject IUserContextFactory UserContextFactory
 
 <div class="app-shell" data-theme="@Theme.Current">
     <nav class="sidebar">
@@ -175,7 +177,24 @@
             // Debounce: wait 250ms before firing
             await Task.Delay(250, token);
 
-            var results = await SearchService.SearchAsync(_searchQuery, token);
+            // SECURITY: search results must be scoped to what THIS user may read.
+            // Resolve the user context and let the search service enforce ACLs;
+            // without a user there must be no results.
+            var state = await AuthStateProvider.GetAuthenticationStateAsync();
+            var username = state.User.Identity?.Name;
+
+            var userContext = string.IsNullOrEmpty(username)
+                ? null
+                : await UserContextFactory.CreateByUsernameAsync(username);
+
+            if (userContext is null)
+            {
+                _searchResults.Clear();
+                _isSearching = false;
+                return;
+            }
+
+            var results = await SearchService.SearchAsync(_searchQuery, userContext, token);
             if (!token.IsCancellationRequested)
             {
                 _searchResults = results.Take(8).ToList();
