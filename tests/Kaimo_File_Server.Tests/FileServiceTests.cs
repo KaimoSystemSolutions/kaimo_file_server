@@ -16,10 +16,7 @@ public class FileServiceTests
     private readonly Mock<IAclService> _aclMock = new();
     private readonly Guid _shareId = Guid.NewGuid();
     private readonly FileService _sut;
-    
-    private readonly ISearchService _searchService;
-    private readonly ILogger<FileService> _logger;
-    
+
     public FileServiceTests()
     {
         _sut = new FileService(_storageMock.Object, _aclMock.Object, null, _shareId);
@@ -341,8 +338,8 @@ public class FileServiceTests
         // Allow visible.txt, deny hidden.txt
         _aclMock
             .Setup(a => a.HasAccessBatchAsync(
-                ctx, _shareId, It.IsAny<List<(string, bool)>>(), FilePermission.ListReadData))
-            .ReturnsAsync((UserContext _, Guid _, List<(string Path, bool IsDir)> entries, FilePermission _) =>
+                ctx, _shareId, It.IsAny<IReadOnlyList<(string, bool)>>(), FilePermission.ListReadData))
+            .ReturnsAsync((UserContext _, Guid _, IReadOnlyList<(string Path, bool IsDir)> entries, FilePermission _) =>
                 entries.ToDictionary(e => e.Path, e => e.Path.Contains("visible")));
 
         var result = await _sut.ListAsync("dir", ctx);

@@ -569,6 +569,18 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
     public Task<long> GetDirectorySizeAsync(string relativePath)
         => Invoke<long>("GetDirectorySizeAsync", relativePath);
 
+    public Task<bool> ExistsAsync(string path)
+        => Invoke<bool>("ExistsAsync", path);
+
+    public Task<Kaimo_File_Server.Core.Storage.IStorageHandle> OpenAsync(
+        string path,
+        Kaimo_File_Server.Core.Storage.OpenMode mode,
+        Kaimo_File_Server.Core.Storage.AccessIntent intent,
+        Kaimo_File_Server.Core.Storage.ShareIntent share,
+        CancellationToken ct = default)
+        => Invoke<Kaimo_File_Server.Core.Storage.IStorageHandle>(
+            "OpenAsync", path, mode, intent, share, ct);
+
     // -- Helpers that unwrap TargetInvocationException from reflection --
 
     private async Task Invoke(string method, params object[] args)
