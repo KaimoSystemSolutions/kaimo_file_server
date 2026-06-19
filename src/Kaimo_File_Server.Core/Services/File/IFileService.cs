@@ -1,5 +1,6 @@
 ﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Storage;
 
 namespace Kaimo_File_Server.Core.Services.File
 {
@@ -54,5 +55,21 @@ namespace Kaimo_File_Server.Core.Services.File
         Task<HashSet<string>> FilterReadablePathsAsync(
             IReadOnlyList<(string relativePath, bool isDirectory)> items,
             UserContext user);
+
+        Task<FileOpenResult> OpenAsync(
+            string path,
+            OpenMode mode,
+            AccessIntent intent,
+            ShareIntent share,
+            UserContext user,
+            CancellationToken ct = default);
+
+        Task<IFileSession> OpenSnapshotAsync(
+            string realPath,
+            DateTime snapshotTimestampUtc,
+            UserContext user,
+            CancellationToken ct = default);
+
+        Task<List<DateTime>> GetSnapshotTimestampsAsync(UserContext user);
     }
 }

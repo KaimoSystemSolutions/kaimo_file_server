@@ -24,5 +24,14 @@ namespace Kaimo_File_Server.Core.Storage
         /// Returns 0 if the directory doesn't exist or is empty.
         /// </summary>
         Task<long> GetDirectorySizeAsync(string directoryPath);
+
+        Task<IStorageHandle> OpenAsync(
+            string path,
+            OpenMode mode,
+            AccessIntent intent,
+            ShareIntent share,
+            CancellationToken ct = default);
+
+        Task<bool> ExistsAsync(string path);
     }
 }

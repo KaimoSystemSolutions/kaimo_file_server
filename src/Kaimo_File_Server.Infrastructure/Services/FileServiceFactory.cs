@@ -26,7 +26,12 @@ namespace Kaimo_File_Server.Infrastructure.Services
         {
             var storage = new FileSystemStorage(sharePath, shareId, _serviceProvider);
             var aclService = new AclService(_serviceProvider);
-            return new FileService(storage, aclService, _searchService, shareId);
+
+            // Versioning depends on a scoped DbContext, but the FileService lives
+            // for the whole process — wrap it so each call gets its own DI scope.
+            var versionService = new ScopedFileVersionService(_serviceProvider);
+
+            return new FileService(storage, aclService, _searchService, shareId, versionService);
         }
     }
 }

@@ -77,46 +77,20 @@ namespace Kaimo_File_Server.Smb
 
             _server.OnBeforeCommand = username =>
             {
-                // This callback fires before every SMB command.
-                // We use it to populate the AsyncLocal<UserContext> so that
-                // the ABE delegate (GetVisibleSharesForCurrentUser) and
-                // CreateFile have a user context available.
-                //
-                // After CreateFile, the FileHandle carries the user —
-                // all subsequent operations (Read, Write, Close, SetInfo)
-                // read from the handle, NOT from AsyncLocal.
+                if (string.IsNullOrEmpty(username)) return;
+                if (SmbFileSystem.LookupUser(username) != null) return;
 
-                if (string.IsNullOrEmpty(username))
-                    return;
-
-                // 1. Try restoring from cache (fast path, no DB hit)
                 try
                 {
-                    SmbFileSystem.RestoreSessionFromFallback(username);
+                    using var scope = _serviceProvider.CreateScope();
+                    var authLookup = scope.ServiceProvider.GetRequiredService<IAuthenticationLookup>();
+                    var userContext = Task.Run(() => authLookup.ResolveUserContextAsync(username))
+                                          .GetAwaiter().GetResult();
+                    if (userContext != null) SmbFileSystem.RegisterUser(userContext);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[OnBeforeCommand] RestoreSessionFromFallback failed for '{username}': {ex.Message}");
-                }
-
-                // 2. If cache miss, resolve from DB and populate cache
-                if (SmbFileSystem.GetSessionUserOrDefault() == null)
-                {
-                    try
-                    {
-                        using var scope = _serviceProvider.CreateScope();
-                        var authLookup = scope.ServiceProvider.GetRequiredService<IAuthenticationLookup>();
-
-                        var userContext = Task.Run(() => authLookup.ResolveUserContextAsync(username))
-                            .GetAwaiter().GetResult();
-
-                        if (userContext != null)
-                            SmbFileSystem.SetSessionUser(userContext);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[OnBeforeCommand] Failed to resolve '{username}': {ex.Message}");
-                    }
+                    Console.WriteLine($"[OnBeforeCommand] resolve failed: {ex.Message}");
                 }
             };
 
@@ -369,12 +343,20 @@ namespace Kaimo_File_Server.Smb
             Directory.CreateDirectory(path);
 
             var fileService = _fileServiceFactory.CreateForShare(shareId, path);
-            var fileSystem = new SmbFileSystem(path, name, fileService, _serviceProvider);
+            var fileSystem = new SmbFileSystem(name, fileService);
+
+            // Snapshot timestamps still come from your version service.
+            // We provide them through a delegate so SmbFileSystem doesn't need DI.
+            fileSystem.SnapshotProvider = () =>
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var versionService = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
+                return Task.Run(() => versionService.GetSnapshotTimestampsAsync())
+                           .GetAwaiter().GetResult();
+            };
 
             var share = new FileSystemShare(name, fileSystem);
-            share.AccessRequested += (sender, args) =>
-                OnAccessRequested(shareId, args);
-
+            share.AccessRequested += (sender, args) => OnAccessRequested(shareId, args);
             return share;
         }
 
@@ -417,7 +399,7 @@ namespace Kaimo_File_Server.Smb
                 // Populate both AsyncLocal and cache so that the immediately
                 // following CreateFile call has the user available regardless
                 // of whether it runs on this thread or a different one.
-                SmbFileSystem.SetSessionUser(userContext);
+                SmbFileSystem.RegisterUser(userContext);
 
                 args.Allow = Task.Run(() => authLookup.CanListShareAsync(shareId, userContext.User.Id))
                     .GetAwaiter().GetResult();
@@ -444,7 +426,8 @@ namespace Kaimo_File_Server.Smb
         {
             try
             {
-                var userContext = SmbFileSystem.GetSessionUserOrDefault();
+                
+                var userContext = SmbFileSystem.LookupUser(null);
                 if (userContext == null)
                 {
                     // AsyncLocal lost due to thread hop between OnBeforeCommand

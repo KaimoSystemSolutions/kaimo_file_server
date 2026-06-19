@@ -1,9 +1,8 @@
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Services.File;
-using Microsoft.Extensions.DependencyInjection;
+using Kaimo_File_Server.Core.Storage;
 using SMBLibrary;
-using SMBLibrary.Server;
 using System.Collections.Concurrent;
 using FileAttributes = SMBLibrary.FileAttributes;
 
@@ -11,247 +10,56 @@ namespace Kaimo_File_Server.Smb;
 
 public class SmbFileSystem : INTFileStore
 {
-    private readonly string _root;
     private readonly string _shareName;
     private readonly IFileService _fileService;
-    private readonly IServiceProvider? _serviceProvider;
 
-    public SmbFileSystem(
-        string rootPath, string shareName, IFileService fileService,
-        IServiceProvider? serviceProvider = null)
+    public SmbFileSystem(string shareName, IFileService fileService)
     {
-        _root = rootPath;
         _shareName = shareName;
         _fileService = fileService;
-        _serviceProvider = serviceProvider;
-        Directory.CreateDirectory(_root);
     }
 
-    // ═══════════════════════ PER-SESSION USER CONTEXT ═══════════════════════
+    // ═══════════════════════ USER CACHE (only for ABE) ═══════════════════════
     //
-    // Architecture:
-    //   1. AsyncLocal          – flows along the async call chain. Works when
-    //                            SMBLibrary calls INTFileStore on the same thread
-    //                            as OnBeforeCommand. Sole mechanism for the
-    //                            parameterless ABE delegate.
-    //
-    //   2. Fallback cache      – ConcurrentDictionary<username, (UserContext, tick)>.
-    //                            Used when AsyncLocal is empty (thread hop).
-    //                            LRU-evicted so we never nuke active sessions.
-    //
-    //   3. SecurityContext     – passed by SMBLibrary into CreateFile.
-    //                            Always preferred when available.
-    //
-    //   4. FileHandle.User     – set once in CreateFile, carried through every
-    //                            subsequent Read/Write/Close/SetInfo call.
-    //                            This is the AUTHORITATIVE source for all
-    //                            post-CreateFile operations.
-    //
-    // Rule: after CreateFile, NEVER rely on AsyncLocal or the cache —
-    //       always read from the handle.
+    // User context flows through IFileSession for ALL operations after CreateFile.
+    // The only place we still need a username→UserContext lookup is the ABE
+    // share enumeration (no handle exists there). One cache, no AsyncLocal.
 
-    private static readonly AsyncLocal<UserContext?> _sessionUser = new();
-
-    private static readonly ConcurrentDictionary<string, CachedUser> _userCache
+    private static readonly ConcurrentDictionary<string, UserContext> _userCache
         = new(StringComparer.OrdinalIgnoreCase);
 
-    private const int MaxCachedUsers = 512;
-    private const int EvictionBatchSize = 64; // remove oldest N when full
-
-    private sealed class CachedUser
+    public static void RegisterUser(UserContext user)
     {
-        public UserContext Context { get; set; } = null!;
-        public long LastAccessTick;
+        if (user?.User?.Username != null)
+            _userCache[user.User.Username] = user;
     }
 
-    /// <summary>
-    /// Stores the user in AsyncLocal (for the current call chain)
-    /// AND in the global fallback cache (for cross-thread lookup).
-    /// Called by SmbServer.OnBeforeCommand and OnAccessRequested.
-    /// </summary>
-    public static void SetSessionUser(UserContext user)
+    public static UserContext? LookupUser(string? username)
+        => username != null && _userCache.TryGetValue(username, out var u) ? u : null;
+
+    // ═══════════════════════ HANDLE ═══════════════════════
+
+    private sealed class SmbHandle
     {
-        if (user?.User?.Username == null)
-            return;
-
-        _sessionUser.Value = user;
-
-        var name = user.User.Username;
-        _userCache.AddOrUpdate(
-            name,
-            _ =>
-            {
-                EvictIfNeeded();
-                return new CachedUser { Context = user, LastAccessTick = Environment.TickCount64 };
-            },
-            (_, existing) =>
-            {
-                existing.Context = user;
-                existing.LastAccessTick = Environment.TickCount64;
-                return existing;
-            });
+        public IFileSession Session { get; init; } = null!;
+        public bool IsDirectory => Session.IsDirectory;
+        public string RelativePath => Session.RelativePath;
     }
 
-    /// <summary>
-    /// Tries to restore AsyncLocal from the cache. No-op if AsyncLocal
-    /// already has a value. Safe to call with null username.
-    /// </summary>
-    public static void RestoreSessionFromFallback(string? username)
-    {
-        if (_sessionUser.Value != null)
-            return;
+    // ═══════════════════════ SYNC BRIDGE ═══════════════════════
+    //
+    // INTFileStore is synchronous. Until SMBLibrary itself goes async,
+    // everything bridges here. ONE place, not 20.
 
-        if (username != null && _userCache.TryGetValue(username, out var cached))
-        {
-            cached.LastAccessTick = Environment.TickCount64;
-            _sessionUser.Value = cached.Context;
-        }
-    }
-
-    /// <summary>
-    /// Returns the current session user from AsyncLocal, or null.
-    /// Used by SmbServer for ABE filtering where throwing would be wrong.
-    /// </summary>
-    public static UserContext? GetSessionUserOrDefault()
-    {
-        return _sessionUser.Value;
-    }
-
-    /// <summary>
-    /// Resolves the user for the current operation. Tries in order:
-    ///   1. The handle's stored user (if provided)
-    ///   2. AsyncLocal (same-thread flow from OnBeforeCommand)
-    ///   3. Fallback cache via SecurityContext.UserName
-    /// Throws if none works — this is a hard error, not a soft deny.
-    /// </summary>
-    private static UserContext RequireUser(
-        FileHandle? fileHandle = null,
-        SecurityContext? securityContext = null)
-    {
-        // 1. Handle is authoritative after CreateFile
-        if (fileHandle?.User != null)
-            return fileHandle.User;
-
-        // 2. AsyncLocal (same-thread flow)
-        if (_sessionUser.Value != null)
-            return _sessionUser.Value;
-
-        // 3. Cache lookup via SMBLibrary SecurityContext
-        if (securityContext?.UserName != null
-            && _userCache.TryGetValue(securityContext.UserName, out var cached))
-        {
-            cached.LastAccessTick = Environment.TickCount64;
-            _sessionUser.Value = cached.Context; // populate AsyncLocal for remainder of call
-            return cached.Context;
-        }
-
-        throw new InvalidOperationException(
-            "No authenticated user context available. " +
-            "SetSessionUser must be called before filesystem operations.");
-    }
-
-    private static void EvictIfNeeded()
-    {
-        if (_userCache.Count < MaxCachedUsers)
-            return;
-
-        // Find the N oldest entries and remove them
-        var oldest = _userCache
-            .OrderBy(kv => kv.Value.LastAccessTick)
-            .Take(EvictionBatchSize)
-            .Select(kv => kv.Key)
-            .ToList();
-
-        foreach (var key in oldest)
-            _userCache.TryRemove(key, out _);
-    }
+    private static T Sync<T>(Func<Task<T>> f) => Task.Run(f).GetAwaiter().GetResult();
+    private static T Sync<T>(Func<ValueTask<T>> f) => Task.Run(async () => await f()).GetAwaiter().GetResult();
+    private static void Sync(Func<Task> f) => Task.Run(f).GetAwaiter().GetResult();
+    private static void Sync(Func<ValueTask> f) => Task.Run(async () => await f()).GetAwaiter().GetResult();
 
     // ═══════════════════════ PATH HELPERS ═══════════════════════
 
-    private string ToAbsolutePath(string smbPath)
-    {
-        var cleaned = smbPath
-            .Replace('\\', Path.DirectorySeparatorChar)
-            .TrimStart(Path.DirectorySeparatorChar);
-
-        var root = Path.GetFullPath(_root)
-            .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        var full = Path.GetFullPath(Path.Combine(root, cleaned));
-
-        if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-            throw new UnauthorizedAccessException("Path traversal detected");
-
-        return full;
-    }
-
-    private string ToShareRelativePath(string absolutePath)
-    {
-        var root = Path.GetFullPath(_root)
-            .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
-        var full = Path.GetFullPath(absolutePath);
-
-        if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-            return ShareRelativePath.Normalize(absolutePath);
-
-        var relative = full[root.Length..];
-        return ShareRelativePath.Normalize(relative);
-    }
-
-    // ═══════════════════════ HANDLE TYPES ═══════════════════════
-
-    private sealed class FileHandle
-    {
-        public FileStream? Stream;
-        public string AbsolutePath = "";
-        public bool IsDirectory;
-        public bool DeleteOnClose;
-        public UserContext User { get; init; } = null!;
-        public bool WasDirty { get; set; }
-    }
-
-    private sealed class SnapshotFileHandle
-    {
-        public Stream Stream { get; init; } = null!;
-        public string RelativePath { get; init; } = "";
-        public DateTime SnapshotTimestamp { get; init; }
-        public UserContext User { get; init; } = null!;
-        public long Size { get; init; }
-    }
-
-    private sealed class SnapshotDirectoryHandle
-    {
-        public string AbsolutePath { get; init; } = "";
-        public DateTime SnapshotTimestamp { get; init; }
-        public UserContext User { get; init; } = null!;
-    }
-
-    // ═══════════════════════ PERMISSION WRAPPERS ═══════════════════════
-    //
-    // All async permission calls are wrapped in Task.Run to prevent
-    // deadlocks when the underlying code captures a SynchronizationContext.
-    // This is unavoidable because INTFileStore is a synchronous interface.
-
-    private bool CanRead(string relativePath, UserContext user)
-        => Task.Run(() => _fileService.CanReadAsync(relativePath, user)).GetAwaiter().GetResult();
-
-    private bool CanWrite(string relativePath, UserContext user)
-        => Task.Run(() => _fileService.CanWriteAsync(relativePath, user)).GetAwaiter().GetResult();
-
-    private bool CanCreate(string relativePath, UserContext user)
-        => Task.Run(() => _fileService.CanCreateAsync(relativePath, user)).GetAwaiter().GetResult();
-
-    private bool CanDelete(string relativePath, UserContext user)
-        => Task.Run(() => _fileService.CanDeleteAsync(relativePath, user)).GetAwaiter().GetResult();
-
-    private bool CanList(string relativePath, UserContext user)
-        => Task.Run(() => _fileService.CanListAsync(relativePath, user)).GetAwaiter().GetResult();
-
-    private HashSet<string> FilterReadablePaths(
-        IReadOnlyList<(string relativePath, bool isDirectory)> items, UserContext user)
-        => Task.Run(() => _fileService.FilterReadablePathsAsync(items, user)).GetAwaiter().GetResult();
-
-    private bool EnsureShareAccess(UserContext user)
-        => CanList("", user);
+    private static string ToShareRelative(string smbPath)
+        => ShareRelativePath.Normalize(smbPath);
 
     // ═══════════════════════ CREATE ═══════════════════════
 
@@ -266,38 +74,60 @@ public class SmbFileSystem : INTFileStore
 
         try
         {
-            // SecurityContext is the primary source here — no handle exists yet
-            var user = RequireUser(securityContext: securityContext);
+            var user = LookupUser(securityContext?.UserName)
+                ?? throw new UnauthorizedAccessException("No user context available.");
 
-            if (!EnsureShareAccess(user))
-                return NTStatus.STATUS_ACCESS_DENIED;
+            // Snapshot path? Route through FileService.OpenSnapshotAsync.
+            if (SmbSnapshotHandler.IsSnapshotPath(path))
+                return CreateSnapshotHandle(out handle, out fileStatus, path, user);
 
-            if (SmbSnapshotHandler.IsSnapshotPath(path) && _serviceProvider != null)
-                return OpenSnapshotFile(out handle, out fileStatus, path, user);
+            var relativePath = ToShareRelative(path);
+            var mode = MapDisposition(createDisposition);
+            var intent = MapIntent(desiredAccess, createOptions);
+            var share = MapShare(shareAccess);
+            var deleteOnClose = (createOptions & CreateOptions.FILE_DELETE_ON_CLOSE) != 0;
+            var wantsDirectory = (createOptions & CreateOptions.FILE_DIRECTORY_FILE) != 0;
 
-            string absolutePath = ToAbsolutePath(path);
-            string relativePath = ToShareRelativePath(absolutePath);
-            bool isDirectory = (createOptions & CreateOptions.FILE_DIRECTORY_FILE) != 0;
-            if (!isDirectory && Directory.Exists(absolutePath))
-                isDirectory = true;
+            // Directory creation/open goes through a dedicated path: the storage
+            // engine decides file-vs-directory from what already exists on disk,
+            // so a brand-new directory must be created explicitly (ACL-checked)
+            // before we can open a handle to it.
+            if (wantsDirectory)
+                return CreateDirectoryHandle(out handle, out fileStatus,
+                    relativePath, createDisposition, share, deleteOnClose, user);
 
-            if (isDirectory)
-                return CreateDirectory(out handle, out fileStatus, absolutePath, relativePath,
-                    createDisposition, createOptions, user);
+            var result = Sync(() => _fileService.OpenAsync(relativePath, mode, intent, share, user));
 
-            return CreateRegularFile(out handle, out fileStatus, absolutePath, relativePath,
-                createDisposition, createOptions, desiredAccess, shareAccess, user);
-        }
-        catch (InvalidOperationException ex)
-        {
-            Console.WriteLine($"[CreateFile ERROR] No user context for '{path}': {ex.Message}");
-            return NTStatus.STATUS_ACCESS_DENIED;
+            // Delete-on-close requires the Delete permission — it is NOT implied
+            // by the read/write access used to open the handle.
+            if (deleteOnClose)
+            {
+                if (!Sync(() => _fileService.CanDeleteAsync(relativePath, user)))
+                {
+                    Sync(() => result.Session.DisposeAsync());
+                    return NTStatus.STATUS_ACCESS_DENIED;
+                }
+                result.Session.MarkDeleteOnClose();
+            }
+
+            fileStatus = result.Status switch
+            {
+                FileOpenStatus.Created => FileStatus.FILE_CREATED,
+                FileOpenStatus.Overwritten => FileStatus.FILE_OVERWRITTEN,
+                FileOpenStatus.Superseded => FileStatus.FILE_SUPERSEDED,
+                _ => FileStatus.FILE_OPENED
+            };
+
+            handle = new SmbHandle { Session = result.Session };
+            return NTStatus.STATUS_SUCCESS;
         }
         catch (UnauthorizedAccessException) { return NTStatus.STATUS_ACCESS_DENIED; }
+        catch (FileNotFoundException) { return NTStatus.STATUS_OBJECT_NAME_NOT_FOUND; }
+        catch (DirectoryNotFoundException) { return NTStatus.STATUS_OBJECT_PATH_NOT_FOUND; }
         catch (IOException ex) when (ex.HResult == unchecked((int)0x80070020))
-        {
-            return NTStatus.STATUS_SHARING_VIOLATION;
-        }
+        { return NTStatus.STATUS_SHARING_VIOLATION; }
+        catch (IOException) when (createDisposition == CreateDisposition.FILE_CREATE)
+        { return NTStatus.STATUS_OBJECT_NAME_COLLISION; }
         catch (Exception ex)
         {
             Console.WriteLine($"[CreateFile ERROR] {path}: {ex.Message}");
@@ -305,180 +135,144 @@ public class SmbFileSystem : INTFileStore
         }
     }
 
-    private NTStatus CreateDirectory(
-        out object handle, out FileStatus fileStatus,
-        string absolutePath, string relativePath,
-        CreateDisposition createDisposition, CreateOptions createOptions,
-        UserContext user)
+    private NTStatus CreateSnapshotHandle(
+        out object handle, out FileStatus fileStatus, string path, UserContext user)
     {
         handle = null!;
         fileStatus = FileStatus.FILE_DOES_NOT_EXIST;
 
-        switch (createDisposition)
-        {
-            case CreateDisposition.FILE_CREATE:
-                if (Directory.Exists(absolutePath))
-                { fileStatus = FileStatus.FILE_EXISTS; return NTStatus.STATUS_OBJECT_NAME_COLLISION; }
-                if (!CanCreate(relativePath, user))
-                    return NTStatus.STATUS_ACCESS_DENIED;
-                Directory.CreateDirectory(absolutePath);
-                fileStatus = FileStatus.FILE_CREATED;
-                break;
+        var info = SmbSnapshotHandler.ParseSnapshotPath(path);
+        if (info == null) return NTStatus.STATUS_OBJECT_NAME_NOT_FOUND;
 
-            case CreateDisposition.FILE_OPEN:
-                if (!Directory.Exists(absolutePath))
-                { fileStatus = FileStatus.FILE_DOES_NOT_EXIST; return NTStatus.STATUS_OBJECT_PATH_NOT_FOUND; }
-                if (!CanRead(relativePath, user))
-                    return NTStatus.STATUS_ACCESS_DENIED;
+        // Snapshot root → treat as directory open on live root
+        if (string.IsNullOrEmpty(info.RealPath))
+        {
+            try
+            {
+                var dirResult = Sync(() => _fileService.OpenAsync(
+                    "", OpenMode.Open, AccessIntent.Read, ShareIntent.Read, user));
+                handle = new SmbHandle { Session = dirResult.Session };
                 fileStatus = FileStatus.FILE_OPENED;
-                break;
-
-            default:
-                if (!Directory.Exists(absolutePath))
-                {
-                    if (!CanCreate(relativePath, user))
-                        return NTStatus.STATUS_ACCESS_DENIED;
-                    Directory.CreateDirectory(absolutePath);
-                    fileStatus = FileStatus.FILE_CREATED;
-                }
-                else
-                {
-                    if (!CanRead(relativePath, user))
-                        return NTStatus.STATUS_ACCESS_DENIED;
-                    fileStatus = FileStatus.FILE_OPENED;
-                }
-                break;
+                return NTStatus.STATUS_SUCCESS;
+            }
+            catch (UnauthorizedAccessException) { return NTStatus.STATUS_ACCESS_DENIED; }
         }
 
-        handle = new FileHandle
+        try
         {
-            AbsolutePath = absolutePath,
-            IsDirectory = true,
-            User = user,
-            DeleteOnClose = (createOptions & CreateOptions.FILE_DELETE_ON_CLOSE) != 0
-        };
-        
-        
-        _fileService.onDirectoryCreated(absolutePath);
-        
-        return NTStatus.STATUS_SUCCESS;
+            var session = Sync(() => _fileService.OpenSnapshotAsync(
+                info.RealPath, info.SnapshotTimestamp, user));
+            handle = new SmbHandle { Session = session };
+            fileStatus = FileStatus.FILE_OPENED;
+            return NTStatus.STATUS_SUCCESS;
+        }
+        catch (UnauthorizedAccessException) { return NTStatus.STATUS_ACCESS_DENIED; }
+        catch (FileNotFoundException) { return NTStatus.STATUS_OBJECT_NAME_NOT_FOUND; }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Snapshot ERROR] {path}: {ex.Message}");
+            return NTStatus.STATUS_OBJECT_NAME_NOT_FOUND;
+        }
     }
 
-    private NTStatus CreateRegularFile(
+    private NTStatus CreateDirectoryHandle(
         out object handle, out FileStatus fileStatus,
-        string absolutePath, string relativePath,
-        CreateDisposition createDisposition, CreateOptions createOptions,
-        AccessMask desiredAccess, ShareAccess shareAccess, UserContext user)
+        string relativePath, CreateDisposition disposition,
+        ShareIntent share, bool deleteOnClose, UserContext user)
     {
         handle = null!;
         fileStatus = FileStatus.FILE_DOES_NOT_EXIST;
 
-        string? parentDir = Path.GetDirectoryName(absolutePath);
-        if (parentDir != null && !Directory.Exists(parentDir))
-            return NTStatus.STATUS_OBJECT_PATH_NOT_FOUND;
+        bool mustNotExistIfPresent = disposition == CreateDisposition.FILE_CREATE;
+        bool canCreate = disposition is CreateDisposition.FILE_CREATE
+            or CreateDisposition.FILE_OPEN_IF
+            or CreateDisposition.FILE_OVERWRITE_IF
+            or CreateDisposition.FILE_SUPERSEDE;
 
-        bool exists = File.Exists(absolutePath);
-
-        switch (createDisposition)
+        // Try opening an already-existing directory first (ACL-checked: ListReadData).
+        bool exists = true;
+        FileOpenResult? existing = null;
+        try
         {
-            case CreateDisposition.FILE_OPEN:
-            case CreateDisposition.FILE_OVERWRITE:
-                if (!exists) return NTStatus.STATUS_OBJECT_NAME_NOT_FOUND;
-                break;
-            case CreateDisposition.FILE_CREATE:
-                if (exists) { fileStatus = FileStatus.FILE_EXISTS; return NTStatus.STATUS_OBJECT_NAME_COLLISION; }
-                break;
+            existing = Sync(() => _fileService.OpenAsync(
+                relativePath, OpenMode.Open, AccessIntent.Read, share, user));
+        }
+        catch (FileNotFoundException) { exists = false; }
+        catch (DirectoryNotFoundException) { exists = false; }
+        catch (UnauthorizedAccessException) { return NTStatus.STATUS_ACCESS_DENIED; }
+
+        if (exists && existing != null)
+        {
+            if (!existing.Session.IsDirectory)
+            {
+                // A file already occupies this name — not a directory.
+                Sync(() => existing.Session.DisposeAsync());
+                return NTStatus.STATUS_OBJECT_NAME_COLLISION;
+            }
+
+            if (mustNotExistIfPresent)
+            {
+                Sync(() => existing.Session.DisposeAsync());
+                return NTStatus.STATUS_OBJECT_NAME_COLLISION;
+            }
+
+            if (deleteOnClose)
+            {
+                if (!Sync(() => _fileService.CanDeleteAsync(relativePath, user)))
+                {
+                    Sync(() => existing.Session.DisposeAsync());
+                    return NTStatus.STATUS_ACCESS_DENIED;
+                }
+                existing.Session.MarkDeleteOnClose();
+            }
+
+            handle = new SmbHandle { Session = existing.Session };
+            fileStatus = FileStatus.FILE_OPENED;
+            return NTStatus.STATUS_SUCCESS;
         }
 
-        FileAccess fileAccess = MapFileAccess(desiredAccess);
-        bool requestsWrite = createDisposition != CreateDisposition.FILE_OPEN
-            || fileAccess is FileAccess.Write or FileAccess.ReadWrite;
+        // Directory does not exist.
+        if (!canCreate)
+            return NTStatus.STATUS_OBJECT_NAME_NOT_FOUND;
 
-        if (!exists)
+        // Create it (ACL-checked: CreateWriteData on the parent).
+        try
         {
-            if (!CanCreate(relativePath, user))
+            Sync(() => _fileService.CreateDirectoryAsync(relativePath, user));
+        }
+        catch (UnauthorizedAccessException) { return NTStatus.STATUS_ACCESS_DENIED; }
+        catch (IOException) { return NTStatus.STATUS_OBJECT_NAME_COLLISION; }
+
+        var opened = Sync(() => _fileService.OpenAsync(
+            relativePath, OpenMode.Open, AccessIntent.Read, share, user));
+
+        if (deleteOnClose)
+        {
+            if (!Sync(() => _fileService.CanDeleteAsync(relativePath, user)))
+            {
+                Sync(() => opened.Session.DisposeAsync());
                 return NTStatus.STATUS_ACCESS_DENIED;
-        }
-        else if (requestsWrite)
-        {
-            if (!CanWrite(relativePath, user))
-                return NTStatus.STATUS_ACCESS_DENIED;
-        }
-        else
-        {
-            if (!CanRead(relativePath, user))
-                return NTStatus.STATUS_ACCESS_DENIED;
+            }
+            opened.Session.MarkDeleteOnClose();
         }
 
-        if ((createOptions & CreateOptions.FILE_DELETE_ON_CLOSE) != 0)
-        {
-            if (!CanDelete(relativePath, user))
-                return NTStatus.STATUS_ACCESS_DENIED;
-        }
-
-        FileMode mode = createDisposition switch
-        {
-            CreateDisposition.FILE_CREATE => FileMode.CreateNew,
-            CreateDisposition.FILE_OPEN => FileMode.Open,
-            CreateDisposition.FILE_OPEN_IF => FileMode.OpenOrCreate,
-            CreateDisposition.FILE_OVERWRITE => FileMode.Truncate,
-            CreateDisposition.FILE_OVERWRITE_IF => FileMode.Create,
-            CreateDisposition.FILE_SUPERSEDE => FileMode.Create,
-            _ => FileMode.OpenOrCreate
-        };
-
-        FileShare fileShare = MapFileShare(shareAccess);
-        var fs = new FileStream(absolutePath, mode, fileAccess, fileShare);
-
-        fileStatus = (createDisposition, exists) switch
-        {
-            (CreateDisposition.FILE_SUPERSEDE, true) => FileStatus.FILE_SUPERSEDED,
-            (CreateDisposition.FILE_OVERWRITE, true) => FileStatus.FILE_OVERWRITTEN,
-            (CreateDisposition.FILE_OVERWRITE_IF, true) => FileStatus.FILE_OVERWRITTEN,
-            (_, false) => FileStatus.FILE_CREATED,
-            _ => FileStatus.FILE_OPENED,
-        };
-
-        
-        
-        handle = new FileHandle
-        {
-            Stream = fs,
-            AbsolutePath = absolutePath,
-            IsDirectory = false,
-            User = user,
-            DeleteOnClose = (createOptions & CreateOptions.FILE_DELETE_ON_CLOSE) != 0
-        };
-        
-        _fileService.OnFileCreated(absolutePath, _fileService.ReadFileAsync(absolutePath, user));
-        
+        handle = new SmbHandle { Session = opened.Session };
+        fileStatus = FileStatus.FILE_CREATED;
         return NTStatus.STATUS_SUCCESS;
     }
 
-    // ═══════════════════════ READ / WRITE ═══════════════════════
+    // ═══════════════════════ READ / WRITE / FLUSH / CLOSE ═══════════════════════
 
     public NTStatus ReadFile(out byte[] data, object handle, long offset, int maxCount)
     {
         data = null!;
+        if (handle is not SmbHandle h || h.IsDirectory) return NTStatus.STATUS_INVALID_HANDLE;
 
-        if (handle is SnapshotFileHandle sfh)
-            return ReadFromStream(out data, sfh.Stream, offset, maxCount);
-
-        var h = handle as FileHandle;
-        if (h == null || h.IsDirectory) return NTStatus.STATUS_INVALID_HANDLE;
-        if (h.Stream == null) return NTStatus.STATUS_FILE_CLOSED;
-
-        return ReadFromStream(out data, h.Stream, offset, maxCount);
-    }
-
-    private static NTStatus ReadFromStream(out byte[] data, Stream stream, long offset, int maxCount)
-    {
-        data = null!;
         try
         {
-            stream.Position = offset;
-            byte[] buffer = new byte[maxCount];
-            int read = stream.Read(buffer, 0, maxCount);
+            var buffer = new byte[maxCount];
+            var read = Sync(() => h.Session.ReadAsync(offset, buffer, default));
+
             if (read == 0) { data = Array.Empty<byte>(); return NTStatus.STATUS_END_OF_FILE; }
             if (read < maxCount) Array.Resize(ref buffer, read);
             data = buffer;
@@ -491,240 +285,68 @@ public class SmbFileSystem : INTFileStore
     public NTStatus WriteFile(out int numberOfBytesWritten, object handle, long offset, byte[] data)
     {
         numberOfBytesWritten = 0;
-
-        if (handle is SnapshotFileHandle)
-            return NTStatus.STATUS_ACCESS_DENIED;
-
-        var h = handle as FileHandle;
-        if (h == null || h.IsDirectory) return NTStatus.STATUS_INVALID_HANDLE;
-        if (h.Stream == null) return NTStatus.STATUS_FILE_CLOSED;
+        if (handle is not SmbHandle h || h.IsDirectory) return NTStatus.STATUS_INVALID_HANDLE;
+        if (h.Session.IsReadOnly) return NTStatus.STATUS_ACCESS_DENIED;
 
         try
         {
-            h.Stream.Position = offset;
-            h.Stream.Write(data, 0, data.Length);
-            h.Stream.Flush();
+            Sync(() => h.Session.WriteAsync(offset, data, default));
             numberOfBytesWritten = data.Length;
-            h.WasDirty = true;
             return NTStatus.STATUS_SUCCESS;
         }
         catch (UnauthorizedAccessException) { return NTStatus.STATUS_ACCESS_DENIED; }
         catch (ObjectDisposedException) { return NTStatus.STATUS_FILE_CLOSED; }
-        catch (IOException) { return NTStatus.STATUS_DATA_ERROR; }
-    }
-
-    // ═══════════════════════ CLOSE ═══════════════════════
-
-    public NTStatus CloseFile(object handle)
-    {
-        if (handle is SnapshotFileHandle sfh)
-        { sfh.Stream?.Dispose(); return NTStatus.STATUS_SUCCESS; }
-
-        if (handle is SnapshotDirectoryHandle)
-            return NTStatus.STATUS_SUCCESS;
-
-        var h = handle as FileHandle;
-        if (h == null) return NTStatus.STATUS_INVALID_HANDLE;
-
-        try
-        {
-            if (_serviceProvider != null && !h.IsDirectory && h.WasDirty && h.Stream is { CanRead: true })
-                CreateVersionOnClose(h);
-
-            h.Stream?.Dispose();
-
-            if (h.DeleteOnClose)
-            {
-                string relativePath = ToShareRelativePath(h.AbsolutePath);
-                if (!CanDelete(relativePath, h.User))
-                    return NTStatus.STATUS_ACCESS_DENIED;
-
-                if (h.IsDirectory && Directory.Exists(h.AbsolutePath))
-                {
-                    Directory.Delete(h.AbsolutePath, true);
-                    _fileService.onFileDeleted(h.AbsolutePath);
-                }
-                else if (!h.IsDirectory && File.Exists(h.AbsolutePath))
-                {
-                    File.Delete(h.AbsolutePath);
-                    _fileService.onDirectoryDeleted(h.AbsolutePath);
-                }
-            }
-
-            return NTStatus.STATUS_SUCCESS;
-        }
-        catch { return NTStatus.STATUS_ACCESS_DENIED; }
-    }
-
-    private void CreateVersionOnClose(FileHandle h)
-    {
-        try
-        {
-            using var scope = _serviceProvider!.CreateScope();
-            var versionService = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
-
-            h.Stream!.Flush(true);
-            h.Stream.Position = 0;
-
-            var relativePath = ToShareRelativePath(h.AbsolutePath);
-            var userId = h.User.User.Id.ToString();
-
-            var version = Task.Run(() =>
-                versionService.CreateVersionAsync(relativePath, h.Stream, userId))
-                .GetAwaiter().GetResult();
-
-            if (version != null)
-                Console.WriteLine(
-                    $"[Versioning] Created v{version.VersionNumber} for '{relativePath}' " +
-                    $"at {version.SnapshotTimestampUtc:O}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Versioning] Failed for '{h.AbsolutePath}': {ex.Message}");
-        }
+        catch { return NTStatus.STATUS_DATA_ERROR; }
     }
 
     public NTStatus FlushFileBuffers(object handle)
     {
-        var h = handle as FileHandle;
-        if (h?.Stream == null) return NTStatus.STATUS_INVALID_HANDLE;
-        try { h.Stream.Flush(true); return NTStatus.STATUS_SUCCESS; }
+        if (handle is not SmbHandle h) return NTStatus.STATUS_INVALID_HANDLE;
+        try { Sync(() => h.Session.FlushAsync(default)); return NTStatus.STATUS_SUCCESS; }
         catch { return NTStatus.STATUS_DATA_ERROR; }
     }
 
-    // ═══════════════════════ SNAPSHOT ACCESS ═══════════════════════
-
-    private NTStatus OpenSnapshotFile(
-        out object handle, out FileStatus fileStatus,
-        string path, UserContext user)
+    public NTStatus CloseFile(object handle)
     {
-        handle = null!;
-        fileStatus = FileStatus.FILE_DOES_NOT_EXIST;
-
-        var snapshotInfo = SmbSnapshotHandler.ParseSnapshotPath(path);
-        if (snapshotInfo == null)
-            return NTStatus.STATUS_OBJECT_NAME_NOT_FOUND;
-
+        if (handle is not SmbHandle h) return NTStatus.STATUS_INVALID_HANDLE;
         try
         {
-            var relativePath = ShareRelativePath.Normalize(snapshotInfo.RealPath);
-
-            if (string.IsNullOrEmpty(relativePath))
-            {
-                handle = new SnapshotDirectoryHandle
-                {
-                    AbsolutePath = _root,
-                    SnapshotTimestamp = snapshotInfo.SnapshotTimestamp,
-                    User = user
-                };
-                fileStatus = FileStatus.FILE_OPENED;
-                return NTStatus.STATUS_SUCCESS;
-            }
-
-            if (!CanRead(relativePath, user))
-                return NTStatus.STATUS_ACCESS_DENIED;
-
-            using var scope = _serviceProvider!.CreateScope();
-            var versionService = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
-
-            var stream = Task.Run(() =>
-                versionService.ReadVersionAsync(relativePath, snapshotInfo.SnapshotTimestamp))
-                .GetAwaiter().GetResult();
-
-            handle = new SnapshotFileHandle
-            {
-                Stream = stream,
-                RelativePath = relativePath,
-                SnapshotTimestamp = snapshotInfo.SnapshotTimestamp,
-                User = user,
-                Size = stream.Length
-            };
-
-            fileStatus = FileStatus.FILE_OPENED;
+            Sync(() => h.Session.DisposeAsync());
             return NTStatus.STATUS_SUCCESS;
         }
-        catch (FileNotFoundException) { return NTStatus.STATUS_OBJECT_NAME_NOT_FOUND; }
         catch (Exception ex)
         {
-            Console.WriteLine($"[OpenSnapshotFile ERROR] {path}: {ex.Message}");
-            return NTStatus.STATUS_OBJECT_NAME_NOT_FOUND;
+            Console.WriteLine($"[CloseFile ERROR] {ex.Message}");
+            return NTStatus.STATUS_ACCESS_DENIED;
         }
     }
 
-    // ═══════════════════════ DIRECTORY LISTING ═══════════════════════
+    // ═══════════════════════ QUERY DIRECTORY ═══════════════════════
 
     public NTStatus QueryDirectory(
         out List<QueryDirectoryFileInformation> result,
         object handle, string fileName, FileInformationClass informationClass)
     {
-        result = new List<QueryDirectoryFileInformation>();
-
-        if (handle is SnapshotDirectoryHandle sdh)
-            return QueryDirectoryImpl(out result, sdh.AbsolutePath, fileName, informationClass, sdh.User);
-
-        var h = handle as FileHandle;
-        if (h == null || !h.IsDirectory) return NTStatus.STATUS_INVALID_HANDLE;
-
-        // User comes from the handle — never from AsyncLocal
-        string dirRelativePath = ToShareRelativePath(h.AbsolutePath);
-        if (!CanList(dirRelativePath, h.User))
-            return NTStatus.STATUS_ACCESS_DENIED;
-
-        return QueryDirectoryImpl(out result, h.AbsolutePath, fileName, informationClass, h.User);
-    }
-
-    private NTStatus QueryDirectoryImpl(
-        out List<QueryDirectoryFileInformation> result,
-        string absoluteDirPath, string fileName, FileInformationClass informationClass,
-        UserContext user)
-    {
-        result = new List<QueryDirectoryFileInformation>();
+        result = new();
+        if (handle is not SmbHandle h || !h.IsDirectory) return NTStatus.STATUS_INVALID_HANDLE;
 
         try
         {
-            var dirInfo = new DirectoryInfo(absoluteDirPath);
-            if (!dirInfo.Exists) return NTStatus.STATUS_NO_SUCH_FILE;
-
-            string pattern = string.IsNullOrEmpty(fileName) ? "*" : fileName;
+            var items = Sync(() => _fileService.ListAsync(h.RelativePath, h.Session.User));
+            var pattern = string.IsNullOrEmpty(fileName) ? "*" : fileName;
             bool isWildcard = pattern is "*" or "*.*";
 
             if (isWildcard)
             {
-                result.Add(CreateDirEntryInfo(".", dirInfo, informationClass));
-                result.Add(CreateDirEntryInfo("..", dirInfo.Parent ?? dirInfo, informationClass));
+                result.Add(BuildEntry(".", h.RelativePath, isDirectory: true, informationClass));
+                result.Add(BuildEntry("..", ShareRelativePath.GetParent(h.RelativePath),
+                                      isDirectory: true, informationClass));
             }
 
-            string dirRelativePath = ToShareRelativePath(absoluteDirPath);
-
-            var candidates = new List<(FileSystemInfo info, string name, bool isDir, string relativePath)>();
-
-            foreach (var sub in dirInfo.GetDirectories())
+            foreach (var item in items)
             {
-                if (!MatchesPattern(sub.Name, pattern)) continue;
-                var rel = ShareRelativePath.Combine(dirRelativePath, sub.Name);
-                candidates.Add((sub, sub.Name, true, rel));
-            }
-
-            foreach (var file in dirInfo.GetFiles())
-            {
-                if (!MatchesPattern(file.Name, pattern)) continue;
-                var rel = ShareRelativePath.Combine(dirRelativePath, file.Name);
-                candidates.Add((file, file.Name, false, rel));
-            }
-
-            if (candidates.Count > 0)
-            {
-                var itemsToCheck = candidates
-                    .Select(c => (c.relativePath, c.isDir))
-                    .ToList();
-
-                var readable = FilterReadablePaths(itemsToCheck, user);
-
-                foreach (var (info, name, isDir, relativePath) in candidates)
-                {
-                    if (readable.Contains(relativePath))
-                        result.Add(CreateEntryInfo(name, info, isDir, informationClass));
-                }
+                if (!MatchesPattern(item.Name, pattern)) continue;
+                result.Add(BuildEntryFromMetadata(item, informationClass));
             }
 
             return result.Count == 0 ? NTStatus.STATUS_NO_SUCH_FILE : NTStatus.STATUS_SUCCESS;
@@ -737,117 +359,50 @@ public class SmbFileSystem : INTFileStore
         }
     }
 
-    private static bool MatchesPattern(string name, string pattern)
-    {
-        if (pattern is "*" or "*.*") return true;
-        string regexPattern = "^" +
-            System.Text.RegularExpressions.Regex.Escape(pattern)
-                .Replace("\\*", ".*").Replace("\\?", ".") + "$";
-        return System.Text.RegularExpressions.Regex.IsMatch(
-            name, regexPattern,
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-    }
-
-    // ═══════════════════════ FILE INFO ═══════════════════════
-
-    public NTStatus GetFileInformation(
-        out FileInformation result, object handle,
-        FileInformationClass informationClass)
-    {
-        result = null!;
-
-        if (handle is SnapshotFileHandle sfh)
-        {
-            result = BuildSnapshotFileInfo(sfh.Size, sfh.SnapshotTimestamp, false, informationClass);
-            return NTStatus.STATUS_SUCCESS;
-        }
-
-        if (handle is SnapshotDirectoryHandle sdh)
-        {
-            result = BuildSnapshotFileInfo(0, sdh.SnapshotTimestamp, true, informationClass);
-            return NTStatus.STATUS_SUCCESS;
-        }
-
-        var h = handle as FileHandle;
-        if (h == null) return NTStatus.STATUS_INVALID_HANDLE;
-
-        try
-        {
-            if (h.IsDirectory)
-            {
-                var d = new DirectoryInfo(h.AbsolutePath);
-                if (!d.Exists) return NTStatus.STATUS_OBJECT_NAME_NOT_FOUND;
-                result = BuildDirectoryInfo(d, h.DeleteOnClose, informationClass);
-            }
-            else
-            {
-                var f = new FileInfo(h.AbsolutePath);
-                if (!f.Exists) return NTStatus.STATUS_OBJECT_NAME_NOT_FOUND;
-                result = BuildFileInfo(f, h.DeleteOnClose, informationClass);
-            }
-            return NTStatus.STATUS_SUCCESS;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[GetFileInformation ERROR] {ex.Message}");
-            return NTStatus.STATUS_DATA_ERROR;
-        }
-    }
-
     // ═══════════════════════ SET FILE INFO ═══════════════════════
 
     public NTStatus SetFileInformation(object handle, FileInformation information)
     {
-        var h = handle as FileHandle;
-        if (h == null) return NTStatus.STATUS_INVALID_HANDLE;
+        if (handle is not SmbHandle h) return NTStatus.STATUS_INVALID_HANDLE;
 
         try
         {
-            if (information is FileDispositionInformation disposition)
+            switch (information)
             {
-                if (disposition.DeletePending)
-                {
-                    string relativePath = ToShareRelativePath(h.AbsolutePath);
-                    if (!CanDelete(relativePath, h.User))
-                        return NTStatus.STATUS_ACCESS_DENIED;
-                }
-                h.DeleteOnClose = disposition.DeletePending;
-                return NTStatus.STATUS_SUCCESS;
+                case FileDispositionInformation disp:
+                    if (disp.DeletePending)
+                    {
+                        // Marking a handle for deletion requires the Delete
+                        // permission — independent of how the handle was opened.
+                        if (!Sync(() => _fileService.CanDeleteAsync(h.RelativePath, h.Session.User)))
+                            return NTStatus.STATUS_ACCESS_DENIED;
+                        h.Session.MarkDeleteOnClose();
+                    }
+                    return NTStatus.STATUS_SUCCESS;
+
+                case FileRenameInformationType2 rename:
+                    return HandleRename(h, rename);
+
+                case FileBasicInformation basic:
+                    Sync(() => h.Session.SetTimesAsync(new FileTimes(
+                        basic.CreationTime.Time, basic.LastWriteTime.Time, basic.LastAccessTime.Time),
+                        default));
+                    return NTStatus.STATUS_SUCCESS;
+
+                case FileEndOfFileInformation eof:
+                    Sync(() => h.Session.SetLengthAsync(eof.EndOfFile, default));
+                    return NTStatus.STATUS_SUCCESS;
+
+                case FileAllocationInformation alloc when h.Session.Length > alloc.AllocationSize:
+                    Sync(() => h.Session.SetLengthAsync(alloc.AllocationSize, default));
+                    return NTStatus.STATUS_SUCCESS;
+
+                case FileAllocationInformation:
+                    return NTStatus.STATUS_SUCCESS;
+
+                default:
+                    return NTStatus.STATUS_NOT_SUPPORTED;
             }
-
-            if (information is FileRenameInformationType2 rename)
-                return HandleRename(h, rename);
-
-            if (information is FileBasicInformation basicInfo)
-                return HandleSetBasicInfo(h, basicInfo);
-
-            if (information is FileEndOfFileInformation eofInfo)
-            {
-                // Truncating/extending a file is a write operation
-                string relativePath = ToShareRelativePath(h.AbsolutePath);
-                if (!CanWrite(relativePath, h.User))
-                    return NTStatus.STATUS_ACCESS_DENIED;
-
-                h.Stream?.SetLength(eofInfo.EndOfFile);
-                h.WasDirty = true;
-                return NTStatus.STATUS_SUCCESS;
-            }
-
-            if (information is FileAllocationInformation allocInfo)
-            {
-                if (h.Stream != null && h.Stream.Length > allocInfo.AllocationSize)
-                {
-                    string relativePath = ToShareRelativePath(h.AbsolutePath);
-                    if (!CanWrite(relativePath, h.User))
-                        return NTStatus.STATUS_ACCESS_DENIED;
-
-                    h.Stream.SetLength(allocInfo.AllocationSize);
-                    h.WasDirty = true;
-                }
-                return NTStatus.STATUS_SUCCESS;
-            }
-
-            return NTStatus.STATUS_NOT_SUPPORTED;
         }
         catch (UnauthorizedAccessException) { return NTStatus.STATUS_ACCESS_DENIED; }
         catch (IOException) { return NTStatus.STATUS_SHARING_VIOLATION; }
@@ -858,119 +413,101 @@ public class SmbFileSystem : INTFileStore
         }
     }
 
-    private NTStatus HandleRename(FileHandle h, FileRenameInformationType2 rename)
+    private NTStatus HandleRename(SmbHandle h, FileRenameInformationType2 rename)
     {
-        string newAbsPath = ToAbsolutePath(rename.FileName);
-        string oldRelativePath = ToShareRelativePath(h.AbsolutePath);
-        string newRelativePath = ToShareRelativePath(newAbsPath);
-
-        if (!CanDelete(oldRelativePath, h.User))
-            return NTStatus.STATUS_ACCESS_DENIED;
-
-        if (!CanCreate(newRelativePath, h.User))
-            return NTStatus.STATUS_ACCESS_DENIED;
-
-        if (h.IsDirectory)
+        var newRelative = ToShareRelative(rename.FileName);
+        try
         {
-            if (Directory.Exists(newAbsPath))
-                return NTStatus.STATUS_OBJECT_NAME_COLLISION;
-            Directory.Move(h.AbsolutePath, newAbsPath);
-            h.AbsolutePath = newAbsPath;
-            UpdateAclPathsOnRename(oldRelativePath, newRelativePath, h.User);
+            // The session renames in place (close → move → reopen at storage level),
+            // so this SMB handle stays valid for any follow-up requests. ACL checks
+            // (Delete on source, Create on target) happen inside RenameAsync.
+            Sync(() => h.Session.FlushAsync(default));
+            Sync(() => h.Session.RenameAsync(newRelative, rename.ReplaceIfExists, default));
             return NTStatus.STATUS_SUCCESS;
         }
+        catch (UnauthorizedAccessException) { return NTStatus.STATUS_ACCESS_DENIED; }
+        catch (IOException) { return NTStatus.STATUS_OBJECT_NAME_COLLISION; }
+    }
 
-        if (File.Exists(newAbsPath) && !rename.ReplaceIfExists)
-            return NTStatus.STATUS_OBJECT_NAME_COLLISION;
+    // ═══════════════════════ GET FILE INFO ═══════════════════════
 
-        if (File.Exists(newAbsPath) && rename.ReplaceIfExists)
-        {
-            if (!CanDelete(newRelativePath, h.User))
-                return NTStatus.STATUS_ACCESS_DENIED;
-        }
-
-        var oldPath = h.AbsolutePath;
-        h.Stream?.Dispose();
-        h.Stream = null;
+    public NTStatus GetFileInformation(
+        out FileInformation result, object handle, FileInformationClass informationClass)
+    {
+        result = null!;
+        if (handle is not SmbHandle h) return NTStatus.STATUS_INVALID_HANDLE;
 
         try
         {
-            if (File.Exists(newAbsPath) && rename.ReplaceIfExists)
-                File.Delete(newAbsPath);
+            var meta = Sync(() => _fileService.GetMetadataAsync(h.RelativePath, h.Session.User));
 
-            File.Move(oldPath, newAbsPath);
-            h.AbsolutePath = newAbsPath;
-            h.Stream = new FileStream(newAbsPath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
-            UpdateAclPathsOnRename(oldRelativePath, newRelativePath, h.User);
+            // The open handle is authoritative for the current size — on-disk
+            // metadata can lag behind an in-progress write until it is flushed.
+            if (!h.IsDirectory) meta.Size = h.Session.Length;
+
+            result = BuildFileInformation(meta, informationClass, h.Session.IsReadOnly);
             return NTStatus.STATUS_SUCCESS;
         }
-        catch (Exception)
+        catch (UnauthorizedAccessException) { return NTStatus.STATUS_ACCESS_DENIED; }
+        catch (Exception ex)
         {
-            try
-            {
-                if (File.Exists(oldPath))
-                    h.Stream = new FileStream(oldPath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
-            }
-            catch { /* Stream bleibt null — CloseFile handled das */ }
-
-            return NTStatus.STATUS_ACCESS_DENIED;
+            Console.WriteLine($"[GetFileInformation ERROR] {ex.Message}");
+            return NTStatus.STATUS_DATA_ERROR;
         }
     }
 
-    /// <summary>
-    /// Updates ACL paths after a rename. Takes the user explicitly
-    /// from the handle — never from AsyncLocal.
-    /// </summary>
-    private void UpdateAclPathsOnRename(string oldRelativePath, string newRelativePath, UserContext user)
+    // ═══════════════════════ IOCTL (SNAPSHOTS) ═══════════════════════
+
+    public NTStatus DeviceIOControl(object handle, uint ctlCode, byte[] input, out byte[] output, int maxOutputLength)
     {
+        output = null!;
+        if (ctlCode != SmbSnapshotHandler.FSCTL_SRV_ENUMERATE_SNAPSHOTS)
+            return NTStatus.STATUS_NOT_SUPPORTED;
+
+        if (handle is not SmbHandle h)
+            return NTStatus.STATUS_INVALID_HANDLE;
+
         try
         {
-            Task.Run(() => _fileService.RenameAsync(oldRelativePath, newRelativePath, user))
-                .GetAwaiter().GetResult();
+            var timestamps = Sync(() => _fileService.GetSnapshotTimestampsAsync(h.Session.User));
+            output = SmbSnapshotHandler.BuildEnumerateSnapshotsResponse(timestamps);
+            if (output.Length > maxOutputLength) Array.Resize(ref output, maxOutputLength);
+            return NTStatus.STATUS_SUCCESS;
         }
         catch (Exception ex)
         {
-            Console.WriteLine(
-                $"[ACL Rename] Failed to update ACL paths '{oldRelativePath}' -> '{newRelativePath}': {ex.Message}");
+            Console.WriteLine($"[IOCTL ENUMERATE_SNAPSHOTS ERROR] {ex.Message}");
+            return NTStatus.STATUS_NOT_SUPPORTED;
         }
     }
 
-    private NTStatus HandleSetBasicInfo(FileHandle h, FileBasicInformation basicInfo)
+    /// <summary>Set by SmbServer at construction so we don't pull a ServiceProvider through.</summary>
+    public Func<List<DateTime>>? SnapshotProvider { get; set; }
+
+    // ═══════════════════════ STUBS ═══════════════════════
+
+    public NTStatus Cancel(object ioRequest) => NTStatus.STATUS_SUCCESS;
+    public NTStatus LockFile(object h, long o, long l, bool excl) => NTStatus.STATUS_SUCCESS;
+    public NTStatus UnlockFile(object h, long o, long l) => NTStatus.STATUS_SUCCESS;
+    public NTStatus NotifyChange(out object req, object h, NotifyChangeFilter f, bool tree,
+        int sz, OnNotifyChangeCompleted cb, object ctx)
+    { req = null!; return NTStatus.STATUS_NOT_SUPPORTED; }
+    public NTStatus SetFileSystemInformation(FileSystemInformation info) => NTStatus.STATUS_NOT_SUPPORTED;
+
+    public NTStatus GetSecurityInformation(out SecurityDescriptor d, object h, SecurityInformation i)
+    { d = new SecurityDescriptor(); return NTStatus.STATUS_SUCCESS; }
+    public NTStatus SetSecurityInformation(object h, SecurityInformation i, SecurityDescriptor d)
+        => NTStatus.STATUS_SUCCESS;
+
+    public NTStatus GetFileSystemInformation(out FileSystemInformation r, FileSystemInformationClass cls)
     {
-        // No extra CanWrite check here. Permissions were validated when the
-        // handle was opened in CreateFile. Explorer sets timestamps immediately
-        // after creating a file — if we check CanWrite on the new file itself,
-        // it fails because ACLs are typically on the parent, not the new file.
-        // This matches NTFS behavior: access is checked at open, not per-operation.
-
-        if (h.IsDirectory)
-        {
-            var d = new DirectoryInfo(h.AbsolutePath);
-            if (basicInfo.CreationTime.Time is { } ct && ct > DateTime.MinValue) d.CreationTimeUtc = ct;
-            if (basicInfo.LastWriteTime.Time is { } wt && wt > DateTime.MinValue) d.LastWriteTimeUtc = wt;
-            if (basicInfo.LastAccessTime.Time is { } at && at > DateTime.MinValue) d.LastAccessTimeUtc = at;
-        }
-        else
-        {
-            var f = new FileInfo(h.AbsolutePath);
-            if (basicInfo.CreationTime.Time is { } ct && ct > DateTime.MinValue) f.CreationTimeUtc = ct;
-            if (basicInfo.LastWriteTime.Time is { } wt && wt > DateTime.MinValue) f.LastWriteTimeUtc = wt;
-            if (basicInfo.LastAccessTime.Time is { } at && at > DateTime.MinValue) f.LastAccessTimeUtc = at;
-        }
-        return NTStatus.STATUS_SUCCESS;
-    }
-
-    // ═══════════════════════ FILESYSTEM INFO ═══════════════════════
-
-    public NTStatus GetFileSystemInformation(
-        out FileSystemInformation result,
-        FileSystemInformationClass informationClass)
-    {
-        result = null!;
+        r = null!;
         try
         {
-            var driveInfo = new DriveInfo(Path.GetPathRoot(_root) ?? _root);
-            result = informationClass switch
+            var shareRoot = _fileService.ToAbsolutePath("");
+            var driveInfo = new DriveInfo(Path.GetPathRoot(shareRoot) ?? shareRoot);
+
+            r = cls switch
             {
                 FileSystemInformationClass.FileFsVolumeInformation =>
                     new FileFsVolumeInformation { VolumeLabel = "KaimoSMB", VolumeSerialNumber = 0x12345678 },
@@ -1000,7 +537,8 @@ public class SmbFileSystem : INTFileStore
                 FileSystemInformationClass.FileFsAttributeInformation =>
                     new FileFsAttributeInformation
                     {
-                        FileSystemAttributes = FileSystemAttributes.UnicodeOnDisk | FileSystemAttributes.CasePreservedNames,
+                        FileSystemAttributes = FileSystemAttributes.UnicodeOnDisk
+                                             | FileSystemAttributes.CasePreservedNames,
                         MaximumComponentNameLength = 255,
                         FileSystemName = "NTFS"
                     },
@@ -1008,160 +546,166 @@ public class SmbFileSystem : INTFileStore
                 _ => null!
             };
 
-            return result != null ? NTStatus.STATUS_SUCCESS : NTStatus.STATUS_INVALID_PARAMETER;
+            return r != null ? NTStatus.STATUS_SUCCESS : NTStatus.STATUS_INVALID_PARAMETER;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[GetFileSystemInformation ERROR] {ex.Message}");
-            result = new FileFsVolumeInformation { VolumeLabel = "KaimoSMB" };
+            r = new FileFsVolumeInformation { VolumeLabel = "KaimoSMB" };
             return NTStatus.STATUS_SUCCESS;
         }
     }
 
-    // ═══════════════════════ SECURITY ═══════════════════════
+    // ═══════════════════════ MAPPING / BUILDERS ═══════════════════════
 
-    public NTStatus GetSecurityInformation(
-        out SecurityDescriptor result, object handle,
-        SecurityInformation securityInformation)
+    private static OpenMode MapDisposition(CreateDisposition d) => d switch
     {
-        // NOTE: Returning an empty descriptor tells clients "no ACLs".
-        // Windows Explorer may show "Full Control" for everyone even though
-        // our CanWrite/CanDelete checks enforce real permissions server-side.
-        // This is cosmetic — operations still fail with ACCESS_DENIED when
-        // the user lacks permission. Building a real descriptor from our
-        // ACL model would require mapping UserContext → SID, which SMBLibrary
-        // doesn't support out of the box.
-        result = new SecurityDescriptor();
-        return NTStatus.STATUS_SUCCESS;
+        CreateDisposition.FILE_CREATE => OpenMode.Create,
+        CreateDisposition.FILE_OPEN => OpenMode.Open,
+        CreateDisposition.FILE_OPEN_IF => OpenMode.OpenOrCreate,
+        CreateDisposition.FILE_OVERWRITE => OpenMode.Truncate,
+        CreateDisposition.FILE_OVERWRITE_IF => OpenMode.CreateOrTruncate,
+        CreateDisposition.FILE_SUPERSEDE => OpenMode.Supersede,
+        _ => OpenMode.OpenOrCreate
+    };
+
+    private static AccessIntent MapIntent(AccessMask access, CreateOptions opts)
+    {
+        bool read = (access & (AccessMask.GENERIC_READ | AccessMask.GENERIC_ALL
+                    | (AccessMask)FileAccessMask.FILE_READ_DATA)) != 0;
+        bool write = (access & (AccessMask.GENERIC_WRITE | AccessMask.GENERIC_ALL
+                    | (AccessMask)FileAccessMask.FILE_WRITE_DATA
+                    | (AccessMask)FileAccessMask.FILE_APPEND_DATA)) != 0;
+        if (read && write) return AccessIntent.ReadWrite;
+        if (write) return AccessIntent.Write;
+        return AccessIntent.Read;
     }
 
-    public NTStatus SetSecurityInformation(
-        object handle, SecurityInformation securityInformation,
-        SecurityDescriptor securityDescriptor)
-        => NTStatus.STATUS_SUCCESS;
-
-    // ═══════════════════════ IOCTL ═══════════════════════
-
-    public NTStatus DeviceIOControl(
-        object handle, uint ctlCode, byte[] input,
-        out byte[] output, int maxOutputLength)
+    private static ShareIntent MapShare(ShareAccess s)
     {
-        output = null!;
-
-        if (ctlCode == SmbSnapshotHandler.FSCTL_SRV_ENUMERATE_SNAPSHOTS)
-            return HandleEnumerateSnapshots(out output, maxOutputLength);
-
-        return NTStatus.STATUS_NOT_SUPPORTED;
+        var r = ShareIntent.None;
+        if ((s & ShareAccess.Read) != 0) r |= ShareIntent.Read;
+        if ((s & ShareAccess.Write) != 0) r |= ShareIntent.Write;
+        if ((s & ShareAccess.Delete) != 0) r |= ShareIntent.Delete;
+        return r;
     }
 
-    private NTStatus HandleEnumerateSnapshots(out byte[] output, int maxOutputLength)
+    private static bool MatchesPattern(string name, string pattern)
     {
-        output = null!;
-
-        if (_serviceProvider == null)
-            return NTStatus.STATUS_NOT_SUPPORTED;
-
-        try
-        {
-            using var scope = _serviceProvider.CreateScope();
-            var versionService = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
-
-            var timestamps = Task.Run(() =>
-                versionService.GetSnapshotTimestampsAsync())
-                .GetAwaiter().GetResult();
-
-            if (maxOutputLength < 16)
-                return NTStatus.STATUS_BUFFER_TOO_SMALL;
-
-            if (maxOutputLength < 32)
-            {
-                output = new byte[12];
-                var fullResponse = SmbSnapshotHandler.BuildEnumerateSnapshotsResponse(timestamps);
-                var snapshotArraySize = BitConverter.ToUInt32(fullResponse, 8);
-                BitConverter.GetBytes((uint)timestamps.Count).CopyTo(output, 0);
-                BitConverter.GetBytes((uint)0).CopyTo(output, 4);
-                BitConverter.GetBytes(snapshotArraySize).CopyTo(output, 8);
-                return NTStatus.STATUS_SUCCESS;
-            }
-
-            output = SmbSnapshotHandler.BuildEnumerateSnapshotsResponse(timestamps);
-            if (output.Length > maxOutputLength)
-                Array.Resize(ref output, maxOutputLength);
-
-            return NTStatus.STATUS_SUCCESS;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[IOCTL ENUMERATE_SNAPSHOTS ERROR] {ex.Message}");
-            return NTStatus.STATUS_NOT_SUPPORTED;
-        }
+        if (pattern is "*" or "*.*") return true;
+        var regex = "^" + System.Text.RegularExpressions.Regex.Escape(pattern)
+            .Replace("\\*", ".*").Replace("\\?", ".") + "$";
+        return System.Text.RegularExpressions.Regex.IsMatch(
+            name, regex, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 
-    // ═══════════════════════ STUBS ═══════════════════════
+    // ───── Directory-entry builders (QueryDirectory) ─────
 
-    public NTStatus Cancel(object ioRequest) => NTStatus.STATUS_SUCCESS;
-
-    public NTStatus LockFile(object handle, long byteOffset, long length, bool exclusiveLock)
-        => NTStatus.STATUS_SUCCESS;
-
-    public NTStatus UnlockFile(object handle, long byteOffset, long length)
-        => NTStatus.STATUS_SUCCESS;
-
-    public NTStatus NotifyChange(
-        out object ioRequest, object handle,
-        NotifyChangeFilter completionFilter, bool watchTree, int outputBufferSize,
-        OnNotifyChangeCompleted onNotifyChangeCompleted, object context)
-    { ioRequest = null!; return NTStatus.STATUS_NOT_SUPPORTED; }
-
-    public NTStatus SetFileSystemInformation(FileSystemInformation information)
-        => NTStatus.STATUS_NOT_SUPPORTED;
-
-    // ═══════════════════════ HELPERS ═══════════════════════
-
-    private static FileAccess MapFileAccess(AccessMask desiredAccess)
+    /// <summary>
+    /// Synthetic entry used only for the "." and ".." pseudo-directories.
+    /// We don't have FileMetadata for these, so we emit a plain directory
+    /// entry with the current time — Windows ignores their timestamps.
+    /// </summary>
+    private static QueryDirectoryFileInformation BuildEntry(
+        string name, string relativePath, bool isDirectory, FileInformationClass cls)
     {
-        bool read = (desiredAccess & (AccessMask.GENERIC_READ | AccessMask.GENERIC_ALL
-            | (AccessMask)FileAccessMask.FILE_READ_DATA
-            | (AccessMask)FileAccessMask.FILE_READ_ATTRIBUTES
-            | (AccessMask)FileAccessMask.FILE_READ_EA)) != 0;
-        bool write = (desiredAccess & (AccessMask.GENERIC_WRITE | AccessMask.GENERIC_ALL
-            | (AccessMask)FileAccessMask.FILE_WRITE_DATA
-            | (AccessMask)FileAccessMask.FILE_APPEND_DATA
-            | (AccessMask)FileAccessMask.FILE_WRITE_ATTRIBUTES
-            | (AccessMask)FileAccessMask.FILE_WRITE_EA)) != 0;
-        if (read && write) return FileAccess.ReadWrite;
-        if (write) return FileAccess.ReadWrite;
-        return FileAccess.Read;
+        var now = DateTime.UtcNow;
+        var attrs = isDirectory ? FileAttributes.Directory : FileAttributes.Normal;
+        return BuildDirEntry(name, name, attrs, now, now, now, 0, 0, cls);
     }
 
-    private static FileShare MapFileShare(ShareAccess shareAccess)
+    private static QueryDirectoryFileInformation BuildEntryFromMetadata(
+        Core.Domain.FileMetadata meta, FileInformationClass cls)
     {
-        FileShare result = FileShare.None;
-        if ((shareAccess & ShareAccess.Read) != 0) result |= FileShare.Read;
-        if ((shareAccess & ShareAccess.Write) != 0) result |= FileShare.Write;
-        if ((shareAccess & ShareAccess.Delete) != 0) result |= FileShare.Delete;
-        return result;
-    }
-
-    // ═══════════════════════ FILE INFORMATION BUILDERS ═══════════════════════
-
-    private static FileInformation BuildSnapshotFileInfo(
-        long size, DateTime timestamp, bool isDirectory, FileInformationClass cls)
-    {
-        var attrs = isDirectory
-            ? FileAttributes.Directory | FileAttributes.ReadOnly
-            : FileAttributes.Normal | FileAttributes.ReadOnly;
-
+        var attrs = meta.IsDirectory ? FileAttributes.Directory : FileAttributes.Normal;
+        long size = meta.IsDirectory ? 0 : meta.Size;
         long alloc = RoundUpAllocation(size);
+        var created = meta.CreatedAt;
+        var modified = meta.ModifiedAt;
+        var accessed = meta.LastAccessedAt ?? meta.ModifiedAt;
+        var shortName = GenerateShortName(meta.Name);
+
+        return BuildDirEntry(meta.Name, shortName, attrs, created, modified, accessed,
+            size, alloc, cls);
+    }
+
+    private static QueryDirectoryFileInformation BuildDirEntry(
+        string name, string shortName, FileAttributes attrs,
+        DateTime created, DateTime modified, DateTime accessed,
+        long endOfFile, long allocation, FileInformationClass cls) => cls switch
+    {
+        FileInformationClass.FileDirectoryInformation => new FileDirectoryInformation
+        {
+            FileName = name,
+            CreationTime = created,
+            LastAccessTime = accessed,
+            LastWriteTime = modified,
+            ChangeTime = modified,
+            EndOfFile = endOfFile,
+            AllocationSize = allocation,
+            FileAttributes = attrs
+        },
+        FileInformationClass.FileBothDirectoryInformation => new FileBothDirectoryInformation
+        {
+            FileName = name,
+            ShortName = shortName,
+            CreationTime = created,
+            LastAccessTime = accessed,
+            LastWriteTime = modified,
+            ChangeTime = modified,
+            EndOfFile = endOfFile,
+            AllocationSize = allocation,
+            FileAttributes = attrs,
+            EaSize = 0
+        },
+        FileInformationClass.FileIdBothDirectoryInformation => new FileIdBothDirectoryInformation
+        {
+            FileName = name,
+            ShortName = shortName,
+            CreationTime = created,
+            LastAccessTime = accessed,
+            LastWriteTime = modified,
+            ChangeTime = modified,
+            EndOfFile = endOfFile,
+            AllocationSize = allocation,
+            FileAttributes = attrs,
+            EaSize = 0,
+            FileId = 0
+        },
+        FileInformationClass.FileNamesInformation => new FileNamesInformation { FileName = name },
+        _ => new FileDirectoryInformation
+        {
+            FileName = name,
+            CreationTime = created,
+            LastAccessTime = accessed,
+            LastWriteTime = modified,
+            ChangeTime = modified,
+            EndOfFile = endOfFile,
+            AllocationSize = allocation,
+            FileAttributes = attrs
+        }
+    };
+
+    // ───── Single-handle info builder (GetFileInformation) ─────
+
+    private static FileInformation BuildFileInformation(
+        Core.Domain.FileMetadata meta, FileInformationClass cls, bool readOnly)
+    {
+        var attrs = meta.IsDirectory ? FileAttributes.Directory : FileAttributes.Normal;
+        long size = meta.IsDirectory ? 0 : meta.Size;
+        long alloc = RoundUpAllocation(size);
+        var created = meta.CreatedAt;
+        var modified = meta.ModifiedAt;
+        var accessed = meta.LastAccessedAt ?? meta.ModifiedAt;
 
         return cls switch
         {
             FileInformationClass.FileBasicInformation => new FileBasicInformation
             {
-                CreationTime = timestamp,
-                LastWriteTime = timestamp,
-                LastAccessTime = timestamp,
-                ChangeTime = timestamp,
+                CreationTime = created,
+                LastWriteTime = modified,
+                LastAccessTime = accessed,
+                ChangeTime = modified,
                 FileAttributes = attrs
             },
             FileInformationClass.FileStandardInformation => new FileStandardInformation
@@ -1170,14 +714,14 @@ public class SmbFileSystem : INTFileStore
                 EndOfFile = size,
                 NumberOfLinks = 1,
                 DeletePending = false,
-                Directory = isDirectory
+                Directory = meta.IsDirectory
             },
             FileInformationClass.FileNetworkOpenInformation => new FileNetworkOpenInformation
             {
-                CreationTime = timestamp,
-                LastWriteTime = timestamp,
-                LastAccessTime = timestamp,
-                ChangeTime = timestamp,
+                CreationTime = created,
+                LastWriteTime = modified,
+                LastAccessTime = accessed,
+                ChangeTime = modified,
                 AllocationSize = alloc,
                 EndOfFile = size,
                 FileAttributes = attrs
@@ -1188,229 +732,25 @@ public class SmbFileSystem : INTFileStore
                 new FileEaInformation { EaSize = 0 },
             FileInformationClass.FileAttributeTagInformation =>
                 new FileAttributeTagInformation { FileAttributes = attrs, ReparsePointTag = 0 },
-            FileInformationClass.FileStreamInformation when !isDirectory =>
+            FileInformationClass.FileStreamInformation when !meta.IsDirectory =>
                 CreateFileStreamInfo(size, alloc),
             _ => new FileBasicInformation
             {
-                CreationTime = timestamp,
-                LastWriteTime = timestamp,
-                LastAccessTime = timestamp,
-                ChangeTime = timestamp,
+                CreationTime = created,
+                LastWriteTime = modified,
+                LastAccessTime = accessed,
+                ChangeTime = modified,
                 FileAttributes = attrs
             }
         };
     }
 
-    private static FileInformation BuildDirectoryInfo(
-        DirectoryInfo d, bool deletePending, FileInformationClass cls) => cls switch
-        {
-            FileInformationClass.FileBasicInformation => new FileBasicInformation
-            {
-                CreationTime = d.CreationTimeUtc,
-                LastWriteTime = d.LastWriteTimeUtc,
-                LastAccessTime = d.LastAccessTimeUtc,
-                ChangeTime = d.LastWriteTimeUtc,
-                FileAttributes = FileAttributes.Directory
-            },
-            FileInformationClass.FileStandardInformation => new FileStandardInformation
-            {
-                AllocationSize = 0,
-                EndOfFile = 0,
-                NumberOfLinks = 1,
-                DeletePending = deletePending,
-                Directory = true
-            },
-            FileInformationClass.FileInternalInformation => new FileInternalInformation { IndexNumber = 0 },
-            FileInformationClass.FileEaInformation => new FileEaInformation { EaSize = 0 },
-            FileInformationClass.FileNetworkOpenInformation => new FileNetworkOpenInformation
-            {
-                CreationTime = d.CreationTimeUtc,
-                LastWriteTime = d.LastWriteTimeUtc,
-                LastAccessTime = d.LastAccessTimeUtc,
-                ChangeTime = d.LastWriteTimeUtc,
-                AllocationSize = 0,
-                EndOfFile = 0,
-                FileAttributes = FileAttributes.Directory
-            },
-            FileInformationClass.FileAttributeTagInformation =>
-                new FileAttributeTagInformation { FileAttributes = FileAttributes.Directory, ReparsePointTag = 0 },
-            _ => new FileBasicInformation
-            {
-                CreationTime = d.CreationTimeUtc,
-                LastWriteTime = d.LastWriteTimeUtc,
-                LastAccessTime = d.LastAccessTimeUtc,
-                ChangeTime = d.LastWriteTimeUtc,
-                FileAttributes = FileAttributes.Directory
-            }
-        };
+    // ───── Builder helpers ─────
 
-    private static FileInformation BuildFileInfo(
-        FileInfo f, bool deletePending, FileInformationClass cls)
+    private static long RoundUpAllocation(long size)
     {
-        long size = f.Length;
-        long alloc = RoundUpAllocation(size);
-        return cls switch
-        {
-            FileInformationClass.FileBasicInformation => new FileBasicInformation
-            {
-                CreationTime = f.CreationTimeUtc,
-                LastWriteTime = f.LastWriteTimeUtc,
-                LastAccessTime = f.LastAccessTimeUtc,
-                ChangeTime = f.LastWriteTimeUtc,
-                FileAttributes = FileAttributes.Normal
-            },
-            FileInformationClass.FileStandardInformation => new FileStandardInformation
-            {
-                AllocationSize = alloc,
-                EndOfFile = size,
-                NumberOfLinks = 1,
-                DeletePending = deletePending,
-                Directory = false
-            },
-            FileInformationClass.FileInternalInformation => new FileInternalInformation { IndexNumber = 0 },
-            FileInformationClass.FileEaInformation => new FileEaInformation { EaSize = 0 },
-            FileInformationClass.FileNetworkOpenInformation => new FileNetworkOpenInformation
-            {
-                CreationTime = f.CreationTimeUtc,
-                LastWriteTime = f.LastWriteTimeUtc,
-                LastAccessTime = f.LastAccessTimeUtc,
-                ChangeTime = f.LastWriteTimeUtc,
-                AllocationSize = alloc,
-                EndOfFile = size,
-                FileAttributes = FileAttributes.Normal
-            },
-            FileInformationClass.FileAttributeTagInformation =>
-                new FileAttributeTagInformation { FileAttributes = FileAttributes.Normal, ReparsePointTag = 0 },
-            FileInformationClass.FileStreamInformation => CreateFileStreamInfo(size, alloc),
-            _ => new FileBasicInformation
-            {
-                CreationTime = f.CreationTimeUtc,
-                LastWriteTime = f.LastWriteTimeUtc,
-                LastAccessTime = f.LastAccessTimeUtc,
-                ChangeTime = f.LastWriteTimeUtc,
-                FileAttributes = FileAttributes.Normal
-            }
-        };
-    }
-
-    // ═══════════════════════ DIRECTORY ENTRY BUILDERS ═══════════════════════
-
-    private static QueryDirectoryFileInformation CreateDirEntryInfo(
-        string name, DirectoryInfo dirInfo, FileInformationClass cls) => cls switch
-        {
-            FileInformationClass.FileDirectoryInformation => new FileDirectoryInformation
-            {
-                FileName = name,
-                CreationTime = dirInfo.CreationTimeUtc,
-                LastAccessTime = dirInfo.LastAccessTimeUtc,
-                LastWriteTime = dirInfo.LastWriteTimeUtc,
-                ChangeTime = dirInfo.LastWriteTimeUtc,
-                EndOfFile = 0,
-                AllocationSize = 0,
-                FileAttributes = FileAttributes.Directory
-            },
-            FileInformationClass.FileBothDirectoryInformation => new FileBothDirectoryInformation
-            {
-                FileName = name,
-                ShortName = name,
-                CreationTime = dirInfo.CreationTimeUtc,
-                LastAccessTime = dirInfo.LastAccessTimeUtc,
-                LastWriteTime = dirInfo.LastWriteTimeUtc,
-                ChangeTime = dirInfo.LastWriteTimeUtc,
-                EndOfFile = 0,
-                AllocationSize = 0,
-                FileAttributes = FileAttributes.Directory,
-                EaSize = 0
-            },
-            FileInformationClass.FileIdBothDirectoryInformation => new FileIdBothDirectoryInformation
-            {
-                FileName = name,
-                ShortName = name,
-                CreationTime = dirInfo.CreationTimeUtc,
-                LastAccessTime = dirInfo.LastAccessTimeUtc,
-                LastWriteTime = dirInfo.LastWriteTimeUtc,
-                ChangeTime = dirInfo.LastWriteTimeUtc,
-                EndOfFile = 0,
-                AllocationSize = 0,
-                FileAttributes = FileAttributes.Directory,
-                EaSize = 0,
-                FileId = 0
-            },
-            FileInformationClass.FileNamesInformation => new FileNamesInformation { FileName = name },
-            _ => new FileDirectoryInformation
-            {
-                FileName = name,
-                CreationTime = dirInfo.CreationTimeUtc,
-                LastAccessTime = dirInfo.LastAccessTimeUtc,
-                LastWriteTime = dirInfo.LastWriteTimeUtc,
-                ChangeTime = dirInfo.LastWriteTimeUtc,
-                EndOfFile = 0,
-                AllocationSize = 0,
-                FileAttributes = FileAttributes.Directory
-            }
-        };
-
-    private static QueryDirectoryFileInformation CreateEntryInfo(
-        string name, FileSystemInfo info, bool isDirectory, FileInformationClass cls)
-    {
-        var attrs = isDirectory ? FileAttributes.Directory : FileAttributes.Normal;
-        long size = isDirectory ? 0 : ((FileInfo)info).Length;
-        long alloc = RoundUpAllocation(size);
-        string shortName = GenerateShortName(name);
-
-        return cls switch
-        {
-            FileInformationClass.FileDirectoryInformation => new FileDirectoryInformation
-            {
-                FileName = name,
-                CreationTime = info.CreationTimeUtc,
-                LastAccessTime = info.LastAccessTimeUtc,
-                LastWriteTime = info.LastWriteTimeUtc,
-                ChangeTime = info.LastWriteTimeUtc,
-                EndOfFile = size,
-                AllocationSize = alloc,
-                FileAttributes = attrs
-            },
-            FileInformationClass.FileBothDirectoryInformation => new FileBothDirectoryInformation
-            {
-                FileName = name,
-                ShortName = shortName,
-                CreationTime = info.CreationTimeUtc,
-                LastAccessTime = info.LastAccessTimeUtc,
-                LastWriteTime = info.LastWriteTimeUtc,
-                ChangeTime = info.LastWriteTimeUtc,
-                EndOfFile = size,
-                AllocationSize = alloc,
-                FileAttributes = attrs,
-                EaSize = 0
-            },
-            FileInformationClass.FileIdBothDirectoryInformation => new FileIdBothDirectoryInformation
-            {
-                FileName = name,
-                ShortName = shortName,
-                CreationTime = info.CreationTimeUtc,
-                LastAccessTime = info.LastAccessTimeUtc,
-                LastWriteTime = info.LastWriteTimeUtc,
-                ChangeTime = info.LastWriteTimeUtc,
-                EndOfFile = size,
-                AllocationSize = alloc,
-                FileAttributes = attrs,
-                EaSize = 0,
-                FileId = 0
-            },
-            FileInformationClass.FileNamesInformation => new FileNamesInformation { FileName = name },
-            _ => new FileDirectoryInformation
-            {
-                FileName = name,
-                CreationTime = info.CreationTimeUtc,
-                LastAccessTime = info.LastAccessTimeUtc,
-                LastWriteTime = info.LastWriteTimeUtc,
-                ChangeTime = info.LastWriteTimeUtc,
-                EndOfFile = size,
-                AllocationSize = alloc,
-                FileAttributes = attrs
-            }
-        };
+        const long clusterSize = 4096;
+        return size == 0 ? 0 : ((size + clusterSize - 1) / clusterSize) * clusterSize;
     }
 
     private static string GenerateShortName(string name)
@@ -1421,12 +761,6 @@ public class SmbFileSystem : INTFileStore
         if (ext.Length > 4) ext = ext[..4];
         int baseLen = Math.Min(baseName.Length, 6);
         return baseName[..baseLen].ToUpperInvariant() + "~1" + ext.ToUpperInvariant();
-    }
-
-    private static long RoundUpAllocation(long size)
-    {
-        const long clusterSize = 4096;
-        return size == 0 ? 0 : ((size + clusterSize - 1) / clusterSize) * clusterSize;
     }
 
     private static FileStreamInformation CreateFileStreamInfo(long fileSize, long allocSize)
