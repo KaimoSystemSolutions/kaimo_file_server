@@ -1970,5 +1970,47 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Tab_RolesCount", resourceCulture);
             }
         }
+
+        public static string Web_Settings_PwPolicy_TooShort {
+            get {
+                return ResourceManager.GetString("Web_Settings_PwPolicy_TooShort", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_PwPolicy_NeedUpper {
+            get {
+                return ResourceManager.GetString("Web_Settings_PwPolicy_NeedUpper", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_PwPolicy_NeedLower {
+            get {
+                return ResourceManager.GetString("Web_Settings_PwPolicy_NeedLower", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_PwPolicy_NeedDigit {
+            get {
+                return ResourceManager.GetString("Web_Settings_PwPolicy_NeedDigit", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_PwPolicy_NeedSpecial {
+            get {
+                return ResourceManager.GetString("Web_Settings_PwPolicy_NeedSpecial", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_PwPolicySaved {
+            get {
+                return ResourceManager.GetString("Web_Settings_PwPolicySaved", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_PwPolicySaveFailed {
+            get {
+                return ResourceManager.GetString("Web_Settings_PwPolicySaveFailed", resourceCulture);
+            }
+        }
     }
 }

@@ -1,4 +1,5 @@
 @page "/settings"
+@using System.Globalization
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject SettingsViewModel VM
@@ -44,6 +45,30 @@ else
                             @onclick="() => SwitchTab(SettingsTab.ContextMenu)">
                         @Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                         @Resources.Web_Settings_ContextMenu
+                    </button>
+
+                    <button class="detail-tab @(_activeTab == SettingsTab.PasswordPolicy ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(SettingsTab.PasswordPolicy)">
+                        @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        Passwort
+                    </button>
+
+                    <button class="detail-tab @(_activeTab == SettingsTab.Network ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(SettingsTab.Network)">
+                        @Assets.SVG("compass.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        IP
+                    </button>
+
+                    <button class="detail-tab @(_activeTab == SettingsTab.Storage ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(SettingsTab.Storage)">
+                        @Assets.SVG("folder.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        Speicher
+                    </button>
+
+                    <button class="detail-tab @(_activeTab == SettingsTab.Memory ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(SettingsTab.Memory)">
+                        @Assets.SVG("gear.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        RAM
                     </button>
                 }
 
@@ -180,6 +205,180 @@ else
                 </div>
             }
 
+            @* ── Tab: Password Policy ── *@
+            @if (_activeTab == SettingsTab.PasswordPolicy && VM.CanManageSettings)
+            {
+                <div class="detail-section">
+                    <span class="detail-label">Passwort-Anforderungen</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 16px;">
+                        Diese Regeln gelten global beim Anlegen und Ändern von Benutzerpasswörtern.
+                    </p>
+
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                        <label style="font-size: 13px; min-width: 200px;">Mindestlänge</label>
+                        <input type="number" min="1" max="128" class="edit-input" style="max-width: 100px;"
+                               @bind="VM.PwPolicy.MinLength" />
+                    </div>
+
+                    <label class="pw-rule">
+                        <input type="checkbox" @bind="VM.PwPolicy.RequireUppercase" />
+                        <span>Großbuchstabe erforderlich (A–Z)</span>
+                    </label>
+                    <label class="pw-rule">
+                        <input type="checkbox" @bind="VM.PwPolicy.RequireLowercase" />
+                        <span>Kleinbuchstabe erforderlich (a–z)</span>
+                    </label>
+                    <label class="pw-rule">
+                        <input type="checkbox" @bind="VM.PwPolicy.RequireDigit" />
+                        <span>Ziffer erforderlich (0–9)</span>
+                    </label>
+                    <label class="pw-rule">
+                        <input type="checkbox" @bind="VM.PwPolicy.RequireSpecial" />
+                        <span>Sonderzeichen erforderlich (z. B. ! ? # $)</span>
+                    </label>
+
+                    <div style="margin-top: 16px;">
+                        <button class="btn-primary" @onclick="SavePasswordPolicy">Speichern</button>
+                    </div>
+                </div>
+            }
+
+            @* ── Tab: Network / IP ── *@
+            @if (_activeTab == SettingsTab.Network && VM.CanManageSettings)
+            {
+                <div class="detail-section">
+                    <span class="detail-label">IP-Adressen</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 16px;">
+                        Netzwerkadressen, unter denen dieser Server erreichbar ist.
+                    </p>
+
+                    <div class="info-row">
+                        <span class="info-key">Hostname</span>
+                        <span class="info-val">@VM.HostName</span>
+                    </div>
+
+                    @if (VM.NetworkAddresses.Count == 0)
+                    {
+                        <p style="font-size: 13px; color: var(--text-tertiary); margin-top: 12px;">
+                            Keine Netzwerkadressen gefunden.
+                        </p>
+                    }
+                    else
+                    {
+                        @foreach (var addr in VM.NetworkAddresses)
+                        {
+                            <div class="info-row">
+                                <span class="info-key">
+                                    @addr.Address
+                                    <span style="font-size: 11px; color: var(--text-tertiary);">@addr.InterfaceName</span>
+                                </span>
+                                <span style="font-size: 11px; font-weight: 700; color: var(--accent);">@addr.Family</span>
+                            </div>
+                        }
+                    }
+
+                    <div style="margin-top: 16px;">
+                        <button class="btn-icon" title="Aktualisieren" @onclick="RefreshSystemInfo">
+                            @Assets.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                        </button>
+                    </div>
+                </div>
+            }
+
+            @* ── Tab: Storage ── *@
+            @if (_activeTab == SettingsTab.Storage && VM.CanManageSettings)
+            {
+                <div class="detail-section">
+                    <span class="detail-label">Gesamtspeicherauslastung</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 16px;">
+                        Auslastung des Laufwerks, auf dem die Dateien gespeichert werden.
+                    </p>
+
+                    @if (VM.StorageUsage is { Available: true } s)
+                    {
+                        <div class="usage-bar">
+                            <div class="usage-bar-fill" style="width: @Pct(s.UsedPercent)%;"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin: 6px 0 16px;">
+                            <span style="color: var(--text-secondary);">@VM.FormatBytes(s.UsedBytes) belegt (@Pct(s.UsedPercent) %)</span>
+                            <span style="color: var(--text-tertiary);">@VM.FormatBytes(s.FreeBytes) frei</span>
+                        </div>
+
+                        <div class="info-row">
+                            <span class="info-key">Laufwerk</span>
+                            <span class="info-val">@s.DriveName</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">Gesamt</span>
+                            <span class="info-val">@VM.FormatBytes(s.TotalBytes)</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">Speicherpfad</span>
+                            <span class="info-val">@s.StoragePath</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <p style="font-size: 13px; color: var(--text-tertiary);">
+                            Speicherinformationen sind nicht verfügbar.
+                        </p>
+                    }
+
+                    <div style="margin-top: 16px;">
+                        <button class="btn-icon" title="Aktualisieren" @onclick="RefreshSystemInfo">
+                            @Assets.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                        </button>
+                    </div>
+                </div>
+            }
+
+            @* ── Tab: Memory / RAM ── *@
+            @if (_activeTab == SettingsTab.Memory && VM.CanManageSettings)
+            {
+                <div class="detail-section">
+                    <span class="detail-label">Aktuelle RAM-Auslastung</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 16px;">
+                        Speicherverbrauch des laufenden Kaimo-Files-Prozesses.
+                    </p>
+
+                    @if (VM.MemoryUsage is { } m)
+                    {
+                        <div class="usage-bar">
+                            <div class="usage-bar-fill" style="width: @Pct(m.WorkingSetPercent)%;"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin: 6px 0 16px;">
+                            <span style="color: var(--text-secondary);">@VM.FormatBytes(m.WorkingSetBytes) belegt</span>
+                            <span style="color: var(--text-tertiary);">@VM.FormatBytes(m.TotalAvailableBytes) verfügbar</span>
+                        </div>
+
+                        <div class="info-row">
+                            <span class="info-key">Arbeitsspeicher (Working Set)</span>
+                            <span class="info-val">@VM.FormatBytes(m.WorkingSetBytes)</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">Privater Speicher</span>
+                            <span class="info-val">@VM.FormatBytes(m.PrivateBytes)</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">.NET-Heap (verwaltet)</span>
+                            <span class="info-val">@VM.FormatBytes(m.ManagedHeapBytes)</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <p style="font-size: 13px; color: var(--text-tertiary);">
+                            Speicherinformationen sind nicht verfügbar.
+                        </p>
+                    }
+
+                    <div style="margin-top: 16px;">
+                        <button class="btn-icon" title="Aktualisieren" @onclick="RefreshSystemInfo">
+                            @Assets.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                        </button>
+                    </div>
+                </div>
+            }
+
         </div>
     </div>
 }
@@ -189,10 +388,17 @@ else
     {
         Language,
         ContextMenu,
+        PasswordPolicy,
+        Network,
+        Storage,
+        Memory,
         DataServices,
     }
 
     private SettingsTab _activeTab = SettingsTab.Language;
+
+    /// <summary>Formats a percentage with an invariant '.' separator for inline CSS widths.</summary>
+    private static string Pct(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -224,6 +430,18 @@ else
     private async Task SaveDataServices()
     {
         await VM.SaveDataServicesAsync();
+        StateHasChanged();
+    }
+
+    private async Task SavePasswordPolicy()
+    {
+        await VM.SavePasswordPolicyAsync();
+        StateHasChanged();
+    }
+
+    private void RefreshSystemInfo()
+    {
+        VM.RefreshSystemInfo();
         StateHasChanged();
     }
 

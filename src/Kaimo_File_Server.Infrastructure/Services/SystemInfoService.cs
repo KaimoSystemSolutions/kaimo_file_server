@@ -1,0 +1,108 @@
+using System.Diagnostics;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
+using Kaimo_File_Server.Core.Services;
+
+namespace Kaimo_File_Server.Infrastructure.Services;
+
+/// <summary>
+/// Gathers live host/runtime information by querying the OS and the current
+/// process. Stateless and cheap; registered as a singleton with the configured
+/// storage root so the storage tab reports the data drive's usage.
+/// </summary>
+public class SystemInfoService : ISystemInfoService
+{
+    private readonly string _storagePath;
+
+    public SystemInfoService(string storagePath)
+    {
+        _storagePath = storagePath;
+    }
+
+    public string HostName
+    {
+        get
+        {
+            try { return Dns.GetHostName(); }
+            catch { return Environment.MachineName; }
+        }
+    }
+
+    public IReadOnlyList<NetworkAddressInfo> GetNetworkAddresses()
+    {
+        var result = new List<NetworkAddressInfo>();
+
+        try
+        {
+            foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (nic.OperationalStatus != OperationalStatus.Up) continue;
+                if (nic.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
+
+                foreach (var unicast in nic.GetIPProperties().UnicastAddresses)
+                {
+                    var family = unicast.Address.AddressFamily;
+                    if (family != AddressFamily.InterNetwork &&
+                        family != AddressFamily.InterNetworkV6) continue;
+                    if (IPAddress.IsLoopback(unicast.Address)) continue;
+
+                    var label = family == AddressFamily.InterNetwork ? "IPv4" : "IPv6";
+                    result.Add(new NetworkAddressInfo(nic.Name, unicast.Address.ToString(), label));
+                }
+            }
+        }
+        catch
+        {
+            // Network enumeration can fail in locked-down containers — return what we have.
+        }
+
+        // IPv4 first, then by interface name, for a stable, readable list.
+        return result
+            .OrderByDescending(a => a.Family == "IPv4")
+            .ThenBy(a => a.InterfaceName)
+            .ToList();
+    }
+
+    public StorageUsageInfo GetStorageUsage()
+    {
+        try
+        {
+            // Fall back to the application's own location when the configured
+            // storage path doesn't exist yet (e.g. on a dev machine).
+            var probe = Directory.Exists(_storagePath) ? _storagePath : AppContext.BaseDirectory;
+            var root = Path.GetPathRoot(Path.GetFullPath(probe));
+            if (string.IsNullOrEmpty(root)) root = probe;
+
+            var drive = new DriveInfo(root);
+            var total = drive.TotalSize;
+            var free = drive.TotalFreeSpace;
+
+            return new StorageUsageInfo(
+                StoragePath: _storagePath,
+                DriveName: drive.Name,
+                TotalBytes: total,
+                UsedBytes: total - free,
+                FreeBytes: free,
+                Available: true);
+        }
+        catch
+        {
+            return new StorageUsageInfo(_storagePath, "—", 0, 0, 0, Available: false);
+        }
+    }
+
+    public MemoryUsageInfo GetMemoryUsage()
+    {
+        using var process = Process.GetCurrentProcess();
+        process.Refresh();
+
+        var gc = GC.GetGCMemoryInfo();
+
+        return new MemoryUsageInfo(
+            WorkingSetBytes: process.WorkingSet64,
+            PrivateBytes: process.PrivateMemorySize64,
+            ManagedHeapBytes: GC.GetTotalMemory(forceFullCollection: false),
+            TotalAvailableBytes: gc.TotalAvailableMemoryBytes);
+    }
+}

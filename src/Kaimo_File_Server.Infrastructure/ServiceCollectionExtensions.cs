@@ -74,7 +74,10 @@ namespace Kaimo_File_Server.Infrastructure
         {
             // Disabled search
             services.TryAddSingleton<ISearchService, NoOpSearchService>();
-            
+
+            // -- System info (IP / storage / RAM for the settings page) --
+            services.AddSingleton<ISystemInfoService>(_ => new SystemInfoService(storagePath));
+
             // -- ACL + Metadata --
             services.AddScoped<IAclRepository, AclRepository>();
             services.AddScoped<IFileMetadataRepository, FileMetadataRepository>();

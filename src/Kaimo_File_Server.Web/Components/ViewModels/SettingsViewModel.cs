@@ -16,6 +16,7 @@ public class SettingsViewModel
     private readonly IManagementAuthService _mgmtAuth;
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authState;
+    private readonly ISystemInfoService _sysInfo;
     private readonly ILogger<SettingsViewModel> _logger;
 
     public SettingsViewModel(
@@ -23,12 +24,14 @@ public class SettingsViewModel
         IManagementAuthService mgmtAuth,
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authState,
+        ISystemInfoService sysInfo,
         ILogger<SettingsViewModel> logger)
     {
         _config = config;
         _mgmtAuth = mgmtAuth;
         _userContextFactory = userContextFactory;
         _authState = authState;
+        _sysInfo = sysInfo;
         _logger = logger;
     }
 
@@ -67,6 +70,18 @@ public class SettingsViewModel
     /// <summary>Last status the SMB host reported back, or "Unbekannt".</summary>
     public string SmbStatus { get; private set; } = "Unbekannt";
 
+    // ── Password Policy ──
+
+    /// <summary>Globally enforced password requirements (working copy).</summary>
+    public PasswordPolicy PwPolicy { get; private set; } = PasswordPolicy.Default();
+
+    // ── System Info (IP / Storage / RAM) ──
+
+    public string HostName { get; private set; } = "";
+    public IReadOnlyList<NetworkAddressInfo> NetworkAddresses { get; private set; } = [];
+    public StorageUsageInfo? StorageUsage { get; private set; }
+    public MemoryUsageInfo? MemoryUsage { get; private set; }
+
     // ── Load ──
 
     public async Task LoadAsync()
@@ -83,6 +98,9 @@ public class SettingsViewModel
                 SelectedLanguage = await _config.GetStringAsync("app.language", "de");
                 CtxConfig = await _config.GetAsync(
                     ContextMenuConfig.ConfigKey, ContextMenuConfig.Default());
+                PwPolicy = await _config.GetAsync(
+                    PasswordPolicy.ConfigKey, PasswordPolicy.Default());
+                RefreshSystemInfo();
             }
 
             if (CanManageDataServices)
@@ -195,6 +213,64 @@ public class SettingsViewModel
     {
         if (!CanManageDataServices) return;
         SmbStatus = await _config.GetFreshAsync(DataServiceKeys.StatusKey("smb"), "Unbekannt");
+    }
+
+    // ── Save Password Policy ──
+
+    public async Task<bool> SavePasswordPolicyAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!CanManageSettings)
+        {
+            ErrorMessage = Resources.Web_Settings_NoPermissionChange;
+            return false;
+        }
+
+        // Guard against a nonsensical minimum that would lock everyone out of
+        // creating passwords; clamp to a sane range.
+        PwPolicy.MinLength = Math.Clamp(PwPolicy.MinLength, 1, 128);
+
+        try
+        {
+            await _config.SetAsync(PasswordPolicy.ConfigKey, PwPolicy);
+            _logger.LogInformation("Password policy saved (MinLength={Min})", PwPolicy.MinLength);
+            SuccessMessage = Resources.Web_Settings_PwPolicySaved;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save password policy");
+            ErrorMessage = Resources.Web_Settings_PwPolicySaveFailed;
+            return false;
+        }
+    }
+
+    // ── System Info (IP / Storage / RAM) ──
+
+    /// <summary>Re-samples host network, storage and memory information.</summary>
+    public void RefreshSystemInfo()
+    {
+        if (!CanManageSettings) return;
+        HostName = _sysInfo.HostName;
+        NetworkAddresses = _sysInfo.GetNetworkAddresses();
+        StorageUsage = _sysInfo.GetStorageUsage();
+        MemoryUsage = _sysInfo.GetMemoryUsage();
+    }
+
+    /// <summary>Formats a byte count as a human-readable size (e.g. "1.4 GB").</summary>
+    public string FormatBytes(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB", "TB", "PB"];
+        double size = bytes;
+        int unit = 0;
+        while (size >= 1024 && unit < units.Length - 1)
+        {
+            size /= 1024;
+            unit++;
+        }
+        return $"{size:0.#} {units[unit]}";
     }
 
     // ── Context Menu (per-scope layout) ──

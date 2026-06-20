@@ -921,6 +921,27 @@
   <data name="Web_Settings_CtxScope_Multi" xml:space="preserve">
     <value>Mehrfachauswahl</value>
   </data>
+  <data name="Web_Settings_PwPolicy_TooShort" xml:space="preserve">
+    <value>Das Passwort muss mindestens {0} Zeichen lang sein.</value>
+  </data>
+  <data name="Web_Settings_PwPolicy_NeedUpper" xml:space="preserve">
+    <value>Das Passwort muss mindestens einen Großbuchstaben enthalten.</value>
+  </data>
+  <data name="Web_Settings_PwPolicy_NeedLower" xml:space="preserve">
+    <value>Das Passwort muss mindestens einen Kleinbuchstaben enthalten.</value>
+  </data>
+  <data name="Web_Settings_PwPolicy_NeedDigit" xml:space="preserve">
+    <value>Das Passwort muss mindestens eine Ziffer enthalten.</value>
+  </data>
+  <data name="Web_Settings_PwPolicy_NeedSpecial" xml:space="preserve">
+    <value>Das Passwort muss mindestens ein Sonderzeichen enthalten.</value>
+  </data>
+  <data name="Web_Settings_PwPolicySaved" xml:space="preserve">
+    <value>Passwort-Anforderungen gespeichert.</value>
+  </data>
+  <data name="Web_Settings_PwPolicySaveFailed" xml:space="preserve">
+    <value>Fehler beim Speichern der Passwort-Anforderungen.</value>
+  </data>
   <data name="Web_Validation_NameEmpty" xml:space="preserve">
     <value>Name darf nicht leer sein.</value>
   </data>

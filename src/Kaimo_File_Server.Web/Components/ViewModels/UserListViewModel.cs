@@ -8,6 +8,7 @@ using Kaimo_File_Server.Core.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
 using Kaimo_File_Server.Core.Language;
+using Kaimo_File_Server.Infrastructure.Configuration;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -26,6 +27,7 @@ public class UserListViewModel
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<UserListViewModel> _logger;
     private readonly IShareRepository _shareRepo;
+    private readonly IConfigRepository _config;
 
     public UserListViewModel(
         IUserRepository userRepo,
@@ -38,7 +40,8 @@ public class UserListViewModel
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authState,
         ILogger<UserListViewModel> logger,
-        IShareRepository shareRepo)
+        IShareRepository shareRepo,
+        IConfigRepository config)
     {
         _userRepo = userRepo;
         _groupRepo = groupRepo;
@@ -51,7 +54,12 @@ public class UserListViewModel
         _authState = authState;
         _logger = logger;
         _shareRepo = shareRepo;
+        _config = config;
     }
+
+    /// <summary>Loads the globally configured password requirements.</summary>
+    private Task<PasswordPolicy> GetPasswordPolicyAsync()
+        => _config.GetAsync(PasswordPolicy.ConfigKey, PasswordPolicy.Default());
 
     // ══════════════════════════════════════════
     //  Actor Context
@@ -539,7 +547,8 @@ public class UserListViewModel
                 if (!await _mgmtAuth.CanManageUserAsync(
                         _actorContext, SelectedUser.Id, ManagementPermission.ResetPasswords))
                 { ErrorMessage = Resources.Web_User_NoPermissionPasswordReset; return; }
-                if (NewPassword.Length < 6) { ErrorMessage = Resources.Web_User_PasswordMinLength; return; }
+                var pwError = (await GetPasswordPolicyAsync()).Validate(NewPassword);
+                if (pwError is not null) { ErrorMessage = pwError; return; }
                 if (NewPassword != ConfirmPassword) { ErrorMessage = Resources.Web_User_PasswordsDoNotMatch; return; }
                 await _userRepo.UpdatePasswordAsync(SelectedUser.Id,
                     _passwordService.HashPassword(NewPassword),
@@ -798,8 +807,10 @@ public class UserListViewModel
 
         if (string.IsNullOrWhiteSpace(CreateUserUsername)) { ErrorMessage = Resources.Web_User_NameRequired; return; }
         if (string.IsNullOrWhiteSpace(CreateUserName)) { ErrorMessage = Resources.Web_Error_NameRequired; return; }
-        if (string.IsNullOrWhiteSpace(CreateUserPassword) || CreateUserPassword.Length < 6)
+        if (string.IsNullOrWhiteSpace(CreateUserPassword))
         { ErrorMessage = Resources.Web_User_PasswordMinLength; return; }
+        var createPwError = (await GetPasswordPolicyAsync()).Validate(CreateUserPassword);
+        if (createPwError is not null) { ErrorMessage = createPwError; return; }
         if (CreateUserDepartmentId is null) { ErrorMessage = Resources.Web_Dept_SelectDepartment; return; }
 
         if (!await _mgmtAuth.CanCreateUserInDepartmentAsync(_actorContext, CreateUserDepartmentId.Value))
