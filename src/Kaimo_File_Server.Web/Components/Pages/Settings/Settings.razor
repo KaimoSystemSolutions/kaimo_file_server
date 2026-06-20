@@ -29,7 +29,7 @@ else if (!VM.CanAccessPage)
 else
 {
     <div class="admin-content">
-        <div class="admin-detail" style="max-width: 640px;">
+        <div class="admin-detail" style="max-width: 720px;">
 
             @* ── Tab Navigation ── *@
             <div class="detail-tabs">
@@ -249,36 +249,58 @@ else
                 <div class="detail-section">
                     <span class="detail-label">IP-Adressen</span>
                     <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 16px;">
-                        Netzwerkadressen, unter denen dieser Server erreichbar ist.
+                        Adressen, unter denen dieser Server erreichbar ist.
                     </p>
 
-                    <div class="info-row">
-                        <span class="info-key">Hostname</span>
-                        <span class="info-val">@VM.HostName</span>
+                    <div class="stat-hero">
+                        <span class="stat-hero-value">
+                            @(VM.PublicIpLoading ? "…" : (VM.PublicIp ?? "—"))
+                        </span>
+                        <span class="stat-hero-unit">
+                            @(VM.PublicIpLoading
+                                ? "globale IP wird ermittelt"
+                                : VM.PublicIp is not null ? "globale (öffentliche) IP" : "globale IP nicht verfügbar")
+                        </span>
                     </div>
 
+                    <div class="info-card">
+                        <div class="info-row">
+                            <span class="info-key">Hostname</span>
+                            <span class="info-val">@VM.HostName</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">Globale IP</span>
+                            <span class="info-val @(VM.PublicIp is null ? "is-muted" : "")">
+                                @(VM.PublicIpLoading ? "wird ermittelt…" : (VM.PublicIp ?? "nicht verfügbar"))
+                            </span>
+                        </div>
+                    </div>
+
+                    <span class="detail-label" style="display: block; margin-top: 20px;">Lokale Adressen</span>
                     @if (VM.NetworkAddresses.Count == 0)
                     {
-                        <p style="font-size: 13px; color: var(--text-tertiary); margin-top: 12px;">
-                            Keine Netzwerkadressen gefunden.
+                        <p style="font-size: 13px; color: var(--text-tertiary); margin-top: 8px;">
+                            Keine lokalen Netzwerkadressen gefunden.
                         </p>
                     }
                     else
                     {
-                        @foreach (var addr in VM.NetworkAddresses)
-                        {
-                            <div class="info-row">
-                                <span class="info-key">
-                                    @addr.Address
-                                    <span style="font-size: 11px; color: var(--text-tertiary);">@addr.InterfaceName</span>
-                                </span>
-                                <span style="font-size: 11px; font-weight: 700; color: var(--accent);">@addr.Family</span>
-                            </div>
-                        }
+                        <div class="info-card">
+                            @foreach (var addr in VM.NetworkAddresses)
+                            {
+                                <div class="info-row">
+                                    <span class="info-key">
+                                        @addr.Address
+                                        <span style="font-size: 11px; color: var(--text-tertiary);">@addr.InterfaceName</span>
+                                    </span>
+                                    <span class="info-badge">@addr.Family</span>
+                                </div>
+                            }
+                        </div>
                     }
 
                     <div style="margin-top: 16px;">
-                        <button class="btn-icon" title="Aktualisieren" @onclick="RefreshSystemInfo">
+                        <button class="btn-icon" title="Aktualisieren" @onclick="RefreshNetwork">
                             @Assets.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
                         </button>
                     </div>
@@ -296,25 +318,33 @@ else
 
                     @if (VM.StorageUsage is { Available: true } s)
                     {
-                        <div class="usage-bar">
-                            <div class="usage-bar-fill" style="width: @Pct(s.UsedPercent)%;"></div>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin: 6px 0 16px;">
-                            <span style="color: var(--text-secondary);">@VM.FormatBytes(s.UsedBytes) belegt (@Pct(s.UsedPercent) %)</span>
-                            <span style="color: var(--text-tertiary);">@VM.FormatBytes(s.FreeBytes) frei</span>
+                        <div class="stat-hero">
+                            <span class="stat-hero-value">@Pct(s.UsedPercent) %</span>
+                            <span class="stat-hero-unit">belegt · @VM.FormatBytes(s.UsedBytes) von @VM.FormatBytes(s.TotalBytes)</span>
                         </div>
 
-                        <div class="info-row">
-                            <span class="info-key">Laufwerk</span>
-                            <span class="info-val">@s.DriveName</span>
+                        <div class="usage-bar">
+                            <div class="usage-bar-fill @(s.UsedPercent >= 90 ? "is-critical" : "")"
+                                 style="width: @Pct(s.UsedPercent)%;"></div>
                         </div>
-                        <div class="info-row">
-                            <span class="info-key">Gesamt</span>
-                            <span class="info-val">@VM.FormatBytes(s.TotalBytes)</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-key">Speicherpfad</span>
-                            <span class="info-val">@s.StoragePath</span>
+
+                        <div class="info-card">
+                            <div class="info-row">
+                                <span class="info-key">Frei</span>
+                                <span class="info-val">@VM.FormatBytes(s.FreeBytes)</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-key">Gesamt</span>
+                                <span class="info-val">@VM.FormatBytes(s.TotalBytes)</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-key">Laufwerk</span>
+                                <span class="info-val">@s.DriveName</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-key">Speicherpfad</span>
+                                <span class="info-val is-muted">@s.StoragePath</span>
+                            </div>
                         </div>
                     }
                     else
@@ -343,25 +373,29 @@ else
 
                     @if (VM.MemoryUsage is { } m)
                     {
-                        <div class="usage-bar">
-                            <div class="usage-bar-fill" style="width: @Pct(m.WorkingSetPercent)%;"></div>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; font-size: 12px; margin: 6px 0 16px;">
-                            <span style="color: var(--text-secondary);">@VM.FormatBytes(m.WorkingSetBytes) belegt</span>
-                            <span style="color: var(--text-tertiary);">@VM.FormatBytes(m.TotalAvailableBytes) verfügbar</span>
+                        <div class="stat-hero">
+                            <span class="stat-hero-value">@VM.FormatBytes(m.WorkingSetBytes)</span>
+                            <span class="stat-hero-unit">Arbeitsspeicher · @Pct(m.WorkingSetPercent) % von @VM.FormatBytes(m.TotalAvailableBytes)</span>
                         </div>
 
-                        <div class="info-row">
-                            <span class="info-key">Arbeitsspeicher (Working Set)</span>
-                            <span class="info-val">@VM.FormatBytes(m.WorkingSetBytes)</span>
+                        <div class="usage-bar">
+                            <div class="usage-bar-fill @(m.WorkingSetPercent >= 90 ? "is-critical" : "")"
+                                 style="width: @Pct(m.WorkingSetPercent)%;"></div>
                         </div>
-                        <div class="info-row">
-                            <span class="info-key">Privater Speicher</span>
-                            <span class="info-val">@VM.FormatBytes(m.PrivateBytes)</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-key">.NET-Heap (verwaltet)</span>
-                            <span class="info-val">@VM.FormatBytes(m.ManagedHeapBytes)</span>
+
+                        <div class="info-card">
+                            <div class="info-row">
+                                <span class="info-key">Privater Speicher</span>
+                                <span class="info-val">@VM.FormatBytes(m.PrivateBytes)</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-key">.NET-Heap (verwaltet)</span>
+                                <span class="info-val">@VM.FormatBytes(m.ManagedHeapBytes)</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-key">Verfügbar</span>
+                                <span class="info-val">@VM.FormatBytes(m.TotalAvailableBytes)</span>
+                            </div>
                         </div>
                     }
                     else
@@ -414,10 +448,15 @@ else
         }
     }
 
-    private void SwitchTab(SettingsTab tab)
+    private async Task SwitchTab(SettingsTab tab)
     {
         _activeTab = tab;
         VM.ClearMessages();
+
+        // The public IP needs an outbound call — resolve it lazily when the tab opens.
+        if (tab == SettingsTab.Network)
+            await VM.LoadPublicIpAsync();
+
         StateHasChanged();
     }
 
@@ -442,6 +481,13 @@ else
     private void RefreshSystemInfo()
     {
         VM.RefreshSystemInfo();
+        StateHasChanged();
+    }
+
+    private async Task RefreshNetwork()
+    {
+        VM.RefreshSystemInfo();
+        await VM.LoadPublicIpAsync(force: true);
         StateHasChanged();
     }
 

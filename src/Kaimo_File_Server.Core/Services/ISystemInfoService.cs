@@ -13,6 +13,13 @@ public interface ISystemInfoService
     /// <summary>All non-loopback IPv4/IPv6 addresses of the host's active interfaces.</summary>
     IReadOnlyList<NetworkAddressInfo> GetNetworkAddresses();
 
+    /// <summary>
+    /// The server's public/global IP as seen from the internet, or <c>null</c> when
+    /// it can't be determined (no outbound access / service unreachable). Requires an
+    /// outbound HTTPS call, so this is intentionally separate from the local lookups.
+    /// </summary>
+    Task<string?> GetPublicIpAsync(CancellationToken ct = default);
+
     /// <summary>Total/used/free space of the drive that hosts the storage root.</summary>
     StorageUsageInfo GetStorageUsage();
 

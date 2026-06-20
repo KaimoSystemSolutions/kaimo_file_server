@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using Kaimo_File_Server.Core.Services;
@@ -14,6 +15,13 @@ namespace Kaimo_File_Server.Infrastructure.Services;
 public class SystemInfoService : ISystemInfoService
 {
     private readonly string _storagePath;
+
+    // Shared, short-timeout client for the public-IP lookup. Static so the
+    // singleton service doesn't churn sockets.
+    private static readonly HttpClient PublicIpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(4),
+    };
 
     public SystemInfoService(string storagePath)
     {
@@ -62,6 +70,20 @@ public class SystemInfoService : ISystemInfoService
             .OrderByDescending(a => a.Family == "IPv4")
             .ThenBy(a => a.InterfaceName)
             .ToList();
+    }
+
+    public async Task<string?> GetPublicIpAsync(CancellationToken ct = default)
+    {
+        // Plain-text echo endpoint that simply returns the caller's public IP.
+        try
+        {
+            var ip = (await PublicIpClient.GetStringAsync("https://api.ipify.org", ct)).Trim();
+            return string.IsNullOrWhiteSpace(ip) ? null : ip;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public StorageUsageInfo GetStorageUsage()

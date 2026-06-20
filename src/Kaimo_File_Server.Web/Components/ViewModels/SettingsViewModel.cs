@@ -82,6 +82,12 @@ public class SettingsViewModel
     public StorageUsageInfo? StorageUsage { get; private set; }
     public MemoryUsageInfo? MemoryUsage { get; private set; }
 
+    /// <summary>The server's public IP, once resolved. Null = not (yet) resolved.</summary>
+    public string? PublicIp { get; private set; }
+
+    /// <summary>True while the public IP is being fetched from the echo service.</summary>
+    public bool PublicIpLoading { get; private set; }
+
     // ── Load ──
 
     public async Task LoadAsync()
@@ -249,7 +255,7 @@ public class SettingsViewModel
 
     // ── System Info (IP / Storage / RAM) ──
 
-    /// <summary>Re-samples host network, storage and memory information.</summary>
+    /// <summary>Re-samples host network, storage and memory information (local, instant).</summary>
     public void RefreshSystemInfo()
     {
         if (!CanManageSettings) return;
@@ -257,6 +263,28 @@ public class SettingsViewModel
         NetworkAddresses = _sysInfo.GetNetworkAddresses();
         StorageUsage = _sysInfo.GetStorageUsage();
         MemoryUsage = _sysInfo.GetMemoryUsage();
+    }
+
+    /// <summary>
+    /// Resolves the server's public IP via an outbound call. No-op if already
+    /// resolved unless <paramref name="force"/> is set. Sets <see cref="PublicIpLoading"/>
+    /// across the await so the UI can show a spinner.
+    /// </summary>
+    public async Task LoadPublicIpAsync(bool force = false)
+    {
+        if (!CanManageSettings) return;
+        if (PublicIp is not null && !force) return;
+
+        PublicIpLoading = true;
+        PublicIp = null;
+        try
+        {
+            PublicIp = await _sysInfo.GetPublicIpAsync();
+        }
+        finally
+        {
+            PublicIpLoading = false;
+        }
     }
 
     /// <summary>Formats a byte count as a human-readable size (e.g. "1.4 GB").</summary>
