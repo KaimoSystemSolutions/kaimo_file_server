@@ -55,6 +55,26 @@ public class ConfigRepository : IConfigRepository
         return result;
     }
 
+    /// <summary>Reads straight from the store, bypassing the cache, then refreshes it.</summary>
+    public async Task<T> GetFreshAsync<T>(string key, T fallback)
+    {
+        var cacheKey = $"cfg:{key}";
+
+        var setting = await _db.ConfigSettings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Key == key);
+
+        if (setting is null)
+        {
+            _cache.Remove(cacheKey);
+            return fallback;
+        }
+
+        var result = Deserialize<T>(setting.Value);
+        _cache.Set(cacheKey, result, CacheTtl);
+        return result;
+    }
+
     // ── Write ──────────────────────────────────
 
     /// <summary>Sets a single config value. Creates or updates.</summary>

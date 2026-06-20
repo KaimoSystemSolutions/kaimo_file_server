@@ -1,4 +1,4 @@
-﻿@page "/settings"
+@page "/settings"
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject SettingsViewModel VM
@@ -21,6 +21,10 @@
         <p>Lade Einstellungen…</p>
     </div>
 }
+else if (!VM.CanAccessPage)
+{
+    <div class="error-banner">Keine Berechtigung. Sie haben keine Rechte für die globalen Einstellungen.</div>
+}
 else
 {
     <div class="admin-content">
@@ -28,19 +32,23 @@ else
 
             @* ── Tab Navigation ── *@
             <div class="detail-tabs">
-                <button class="detail-tab @(_activeTab == SettingsTab.Language ? "detail-tab--active" : "")"
-                        @onclick="() => SwitchTab(SettingsTab.Language)">
-                    @Assets.SVG("globe.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                    Sprache
-                </button>
+                @if (VM.CanManageSettings)
+                {
+                    <button class="detail-tab @(_activeTab == SettingsTab.Language ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(SettingsTab.Language)">
+                        @Assets.SVG("globe.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        Sprache
+                    </button>
+                }
 
-                @* ── Add new tabs here ──
-                <button class="detail-tab @(_activeTab == SettingsTab.UserDefaults ? "detail-tab--active" : "")"
-                        @onclick="() => SwitchTab(SettingsTab.UserDefaults)">
-                    @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                    Benutzer-Defaults
-                </button>
-                *@
+                @if (VM.CanManageDataServices)
+                {
+                    <button class="detail-tab @(_activeTab == SettingsTab.DataServices ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(SettingsTab.DataServices)">
+                        @Assets.SVG("archive.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        Datendienste
+                    </button>
+                }
             </div>
 
             @* ── Messages ── *@
@@ -54,7 +62,7 @@ else
             }
 
             @* ── Tab: Language ── *@
-            @if (_activeTab == SettingsTab.Language)
+            @if (_activeTab == SettingsTab.Language && VM.CanManageSettings)
             {
                 <div class="detail-section">
                     <span class="detail-label">Sprache der Anwendung</span>
@@ -78,7 +86,39 @@ else
                 </div>
             }
 
-            @* ── Tab: Future tabs go here ── *@
+            @* ── Tab: Data Services ── *@
+            @if (_activeTab == SettingsTab.DataServices && VM.CanManageDataServices)
+            {
+                <div class="detail-section">
+                    <span class="detail-label">Datendienste</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
+                        Aktiviert oder deaktiviert die Freigabe-Protokolle. Änderungen werden vom
+                        Dienst innerhalb weniger Sekunden übernommen – ein Neustart ist nicht nötig.
+                    </p>
+
+                    <div class="service-row">
+                        <div class="service-info">
+                            <span class="service-name">SMB / CIFS</span>
+                            <span class="service-status service-status--@VM.SmbStatus.ToLowerInvariant()">
+                                @StatusLabel(VM.SmbStatus)
+                            </span>
+                        </div>
+                        <label class="toggle-switch" title="SMB aktivieren/deaktivieren">
+                            <input type="checkbox" @bind="VM.SmbEnabled" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 16px;">
+                        <button class="btn-primary" @onclick="SaveDataServices">
+                            Speichern
+                        </button>
+                        <button class="btn-icon" title="Status aktualisieren" @onclick="RefreshStatus">
+                            @Assets.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                        </button>
+                    </div>
+                </div>
+            }
 
         </div>
     </div>
@@ -88,9 +128,7 @@ else
     private enum SettingsTab
     {
         Language,
-        // UserDefaults,
-        // GroupDefaults,
-        // Security,
+        DataServices,
     }
 
     private SettingsTab _activeTab = SettingsTab.Language;
@@ -100,6 +138,11 @@ else
         if (firstRender)
         {
             await VM.LoadAsync();
+
+            // Default to the first tab the user is actually allowed to see.
+            if (!VM.CanManageSettings && VM.CanManageDataServices)
+                _activeTab = SettingsTab.DataServices;
+
             StateHasChanged();
         }
     }
@@ -116,4 +159,26 @@ else
         await VM.SaveLanguageAsync();
         StateHasChanged();
     }
+
+    private async Task SaveDataServices()
+    {
+        await VM.SaveDataServicesAsync();
+        StateHasChanged();
+    }
+
+    private async Task RefreshStatus()
+    {
+        await VM.RefreshDataServiceStatusAsync();
+        StateHasChanged();
+    }
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "Running" => "Läuft",
+        "Stopped" => "Gestoppt",
+        "Starting" => "Startet…",
+        "Stopping" => "Stoppt…",
+        "Faulted" => "Fehler",
+        _ => "Unbekannt",
+    };
 }

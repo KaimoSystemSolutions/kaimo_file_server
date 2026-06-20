@@ -41,6 +41,10 @@
         EditDepartment = 1L << 32,
         ViewDepartment = 1L << 33,
 
+        // -- System / Global Settings --
+        ManageSystemSettings = 1L << 40,  // global settings, e.g. application language
+        ManageDataServices = 1L << 41,  // start/stop data services (SMB, future NFS/FTP)
+
         // -- Shortcuts --
         UserAdmin = CreateUsers | DeleteUsers | EditUserProfiles
                   | ResetPasswords | EnableDisableUsers,
@@ -54,8 +58,11 @@
                         | ManageShareAccess | ManageShareAcls
                         | EditDepartment | ViewDepartment,
 
+        SystemAdmin = ManageSystemSettings | ManageDataServices,
+
         FullAdmin = UserAdmin | GroupAdmin | ShareAdmin
                   | AssignGroups | AssignRoles | AssignDepartments
                   | EditDepartment | ViewDepartment
+                  | SystemAdmin
     }
 }

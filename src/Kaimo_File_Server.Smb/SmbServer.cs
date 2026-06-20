@@ -49,22 +49,68 @@ namespace Kaimo_File_Server.Smb
 
         // ═══════════════════════ LIFECYCLE ═══════════════════════
 
+        /// <summary>True while the underlying SMB server is up and accepting connections.</summary>
+        public bool IsRunning
+        {
+            get { lock (_shareLock) { return _server != null; } }
+        }
+
+        /// <summary>
+        /// Back-compat entry point: starts the server and tears it down when the
+        /// token is cancelled. New callers should prefer <see cref="Start"/> /
+        /// <see cref="Stop"/> directly (e.g. the data-service reconciler).
+        /// </summary>
         public Task StartAsync(CancellationToken token)
         {
-            StartServer();
-            StartWatcher();
-
-            token.Register(() =>
-            {
-                lock (_shareLock)
-                {
-                    _watcher?.Dispose();
-                    _server?.Stop();
-                    Console.WriteLine("[*] SMB server gestoppt.");
-                }
-            });
-
+            Start();
+            token.Register(() => Stop());
             return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Starts the SMB server and the storage watcher. Idempotent — calling it
+        /// while already running is a no-op. A fresh <see cref="SMBServer"/> instance
+        /// is created on every start so the server can be stopped and started again.
+        /// </summary>
+        public void Start()
+        {
+            lock (_shareLock)
+            {
+                if (_server != null)
+                {
+                    Console.WriteLine("[~] SMB server läuft bereits, Start übersprungen.");
+                    return;
+                }
+
+                StartServer();
+                StartWatcher();
+            }
+        }
+
+        /// <summary>
+        /// Stops the SMB server and the storage watcher. Idempotent — calling it
+        /// while already stopped is a no-op. Active tree connections are dropped.
+        /// After a stop the server can be restarted via <see cref="Start"/>.
+        /// </summary>
+        public void Stop()
+        {
+            lock (_shareLock)
+            {
+                if (_server == null)
+                {
+                    Console.WriteLine("[~] SMB server läuft nicht, Stop übersprungen.");
+                    return;
+                }
+
+                _watcher?.Dispose();
+                _watcher = null;
+
+                _server.Stop();
+                _server = null;
+                _activeShares.Clear();
+
+                Console.WriteLine("[*] SMB server gestoppt.");
+            }
         }
 
         private void StartServer()
@@ -494,8 +540,7 @@ namespace Kaimo_File_Server.Smb
 
         public void Dispose()
         {
-            _watcher?.Dispose();
-            _server?.Stop();
+            Stop();
         }
     }
 }

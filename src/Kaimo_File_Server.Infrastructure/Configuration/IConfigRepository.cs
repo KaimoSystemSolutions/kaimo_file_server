@@ -11,6 +11,15 @@ public interface IConfigRepository
     // Generic getter (for complex types / JSON objects)
     Task<T> GetAsync<T>(string key, T fallback);
 
+    /// <summary>
+    /// Like <see cref="GetAsync{T}"/> but ignores any cached value and reads
+    /// straight from the store, then refreshes the cache. Use this for values
+    /// that another process may have changed — e.g. the data-service reconciler
+    /// polling a flag the Web UI wrote, where the local cache would otherwise
+    /// hide the change for up to the cache TTL.
+    /// </summary>
+    Task<T> GetFreshAsync<T>(string key, T fallback);
+
     // Write
     Task SetAsync<T>(string key, T value);
     Task SetManyAsync(Dictionary<string, object> values);

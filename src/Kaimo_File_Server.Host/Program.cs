@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Infrastructure;
+using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Smb;
 
@@ -11,14 +12,18 @@ builder.Services.AddInfrastructure(builder.Configuration);
 var storagePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
 builder.Services.AddCoreServices(storagePath);
 
-// -- SMB Transport --
+// -- Config store (desired-state flags for data services, shared with the Web UI) --
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IConfigRepository, ConfigRepository>();
+
+// -- SMB Transport (registered as an IManagedDataService) --
 builder.Services.AddSmb(builder.Configuration);
+
+// -- Reconciler: drives Start/Stop of all managed data services from config flags --
+builder.Services.AddHostedService<Kaimo_File_Server.Host.DataServiceReconciler>();
 
 
 var host = builder.Build();
 await host.InitializeDatabaseAsync();
-
-var smbServer = host.Services.GetRequiredService<SmbServer>();
-await smbServer.StartAsync(CancellationToken.None);
 
 host.Run();
