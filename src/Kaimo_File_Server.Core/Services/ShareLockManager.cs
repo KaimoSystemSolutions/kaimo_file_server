@@ -3,9 +3,9 @@
 namespace Kaimo_File_Server.Core.Services
 {
     /// <summary>
-    /// In-Memory Lock pro Share-Name.
-    /// Verhindert parallele Dateioperationen während Umbenennungen oder Löschungen.
-    /// Für Single-Instance-Deployments.
+    /// In-memory lock per share name.
+    /// Prevents concurrent file operations while renames or deletions are in progress.
+    /// Intended for single-instance deployments.
     /// </summary>
     public class ShareLockManager
     {

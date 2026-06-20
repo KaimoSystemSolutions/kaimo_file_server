@@ -74,7 +74,7 @@ public class ElasticSearchService : ISearchService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Indexierung fehlgeschlagen für {Path}", absolutePath);
+                _logger.LogError(ex, "Indexing failed for {Path}", absolutePath);
             }
         });
     }
@@ -95,20 +95,20 @@ public class ElasticSearchService : ISearchService
                 );
 
                 if (response.Deleted == 0)
-                    _logger.LogWarning("Kein Dokument für Pfad '{Path}' gefunden", absolutePath);
+                    _logger.LogWarning("No document found for path '{Path}'", absolutePath);
                 else
-                    _logger.LogInformation("Dokument für '{Path}' aus Index entfernt", absolutePath);
+                    _logger.LogInformation("Removed document for '{Path}' from the index", absolutePath);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Löschen fehlgeschlagen für {Path}", absolutePath);
+                _logger.LogError(ex, "Deletion failed for {Path}", absolutePath);
             }
         });
     }
 
     public Task onDirectoryCreated(string absolutePath)
     {
-        _logger.LogDebug("Verzeichnis erstellt (keine Aktion): '{Path}'", absolutePath);
+        _logger.LogDebug("Directory created (no action): '{Path}'", absolutePath);
         return Task.CompletedTask;
     }
 
@@ -134,7 +134,7 @@ public class ElasticSearchService : ISearchService
                 );
 
                 if (!response.IsValidResponse)
-                    _logger.LogError("DeleteByQuery fehlgeschlagen für Verzeichnis '{Path}': {Error}",
+                    _logger.LogError("DeleteByQuery failed for directory '{Path}': {Error}",
                         absolutePath, response.DebugInformation);
                 else
                     _logger.LogInformation(
@@ -143,7 +143,7 @@ public class ElasticSearchService : ISearchService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Löschen des Verzeichnisses fehlgeschlagen für {Path}", absolutePath);
+                _logger.LogError(ex, "Deleting the directory failed for {Path}", absolutePath);
             }
         });
     }
@@ -172,12 +172,12 @@ public class ElasticSearchService : ISearchService
                 var updated = BuildRenamedDocument(existing.Source, newAbsolutePath);
                 await ReplaceDocumentAsync(oldId, updated);
 
-                _logger.LogInformation("Index aktualisiert (Datei): '{Old}' -> '{New}'",
+                _logger.LogInformation("Index updated (file): '{Old}' -> '{New}'",
                     oldAbsolutePath, newAbsolutePath);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Index-Umbenennung fehlgeschlagen für Datei '{Old}'", oldAbsolutePath);
+                _logger.LogError(ex, "Index rename failed for file '{Old}'", oldAbsolutePath);
             }
         });
         return Task.CompletedTask;
@@ -251,7 +251,7 @@ public class ElasticSearchService : ISearchService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Index-Umbenennung fehlgeschlagen für Verzeichnis '{Old}'",
+                _logger.LogError(ex, "Index rename failed for directory '{Old}'",
                     oldAbsolutePath);
             }
         });
@@ -299,7 +299,7 @@ public class ElasticSearchService : ISearchService
 
         if (!indexResp.IsValidResponse)
         {
-            _logger.LogError("Reindex fehlgeschlagen für {Id}: {Error}",
+            _logger.LogError("Reindex failed for {Id}: {Error}",
                 updated.Id, indexResp.DebugInformation);
             return;
         }
@@ -378,9 +378,9 @@ public class ElasticSearchService : ISearchService
         var response = await _client.Indices.CreateAsync(createRequest, ct);
 
         if (!response.IsValidResponse)
-            _logger.LogError("Index konnte nicht erstellt werden: {Error}", response.DebugInformation);
+            _logger.LogError("Index could not be created: {Error}", response.DebugInformation);
         else
-            _logger.LogInformation("Index '{Index}' erstellt", IndexName);
+            _logger.LogInformation("Index '{Index}' created", IndexName);
     }
 
     /// <summary>
@@ -498,7 +498,7 @@ public class ElasticSearchService : ISearchService
 
         if (!response.IsValidResponse)
         {
-            _logger.LogError("Inhaltssuche fehlgeschlagen: {Error}", response.DebugInformation);
+            _logger.LogError("Content search failed: {Error}", response.DebugInformation);
             return new List<FileDocument>();
         }
 
@@ -633,16 +633,16 @@ public class ElasticSearchService : ISearchService
         switch (existenceCheck)
         {
             case ExistsResult.ExactFileExists:
-                _logger.LogInformation("Dokument {Id} bereits indexiert, überspringe", document.Id);
+                _logger.LogInformation("Document {Id} already indexed, skipping", document.Id);
                 return;
 
             case ExistsResult.OldVersionExists:
-                _logger.LogInformation("Alte Version von {Id} gefunden, wird überschrieben", document.Id);
+                _logger.LogInformation("Found older version of {Id}, overwriting it", document.Id);
                 await _client.DeleteAsync<FileDocument>(document.Id, d => d.Index(IndexName), ct);
                 break;
 
             case ExistsResult.DoesntExist:
-                _logger.LogInformation("Neues Dokument {Id} wird indexiert", document.Id);
+                _logger.LogInformation("Indexing new document {Id}", document.Id);
                 break;
         }
 
@@ -652,7 +652,7 @@ public class ElasticSearchService : ISearchService
             ct);
 
         if (!response.IsValidResponse)
-            _logger.LogError("Indexierung fehlgeschlagen für {Id}: {Error}",
+            _logger.LogError("Indexing failed for {Id}: {Error}",
                 document.Id, response.DebugInformation);
     }
 
@@ -673,7 +673,7 @@ public class ElasticSearchService : ISearchService
 
         if (!response.IsValidResponse)
         {
-            _logger.LogError("Suche fehlgeschlagen: {Error}", response.DebugInformation);
+            _logger.LogError("Search failed: {Error}", response.DebugInformation);
             return new SearchResult();
         }
 

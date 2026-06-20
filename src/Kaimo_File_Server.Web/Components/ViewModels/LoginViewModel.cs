@@ -2,6 +2,7 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.Extensions.Logging;
+using Kaimo_File_Server.Core.Language;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -49,33 +50,33 @@ public class LoginViewModel
 
             if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password))
             {
-                ErrorMessage = "Benutzername und Passwort erforderlich.";
+                ErrorMessage = Resources.Web_Login_CredentialsRequired;
                 return false;
             }
 
             var user = await _userRepo.GetByUsernameAsync(Username.Trim());
             if (user is null)
             {
-                ErrorMessage = "Benutzername oder Passwort falsch.";
+                ErrorMessage = Resources.Web_Login_InvalidCredentials;
                 return false;
             }
 
             if (!_passwordService.VerifyPassword(Password, user.PasswordHash))
             {
-                ErrorMessage = "Benutzername oder Passwort falsch.";
+                ErrorMessage = Resources.Web_Login_InvalidCredentials;
                 return false;
             }
 
             if (!user.IsEnabled)
             {
                 _logger.LogWarning("Login abgelehnt – Konto deaktiviert: {Username}", user.Username);
-                ErrorMessage = "Dieses Konto ist deaktiviert.";
+                ErrorMessage = Resources.Web_Login_AccountDisabled;
                 return false;
             }
 
-            _logger.LogInformation("Login erfolgreich für Benutzer {Username}", user.Username);
+            _logger.LogInformation("Login successful for user {Username}", user.Username);
 
-            _logger.LogInformation("Login erfolgreich für Benutzer {Username}", user.Username);
+            _logger.LogInformation("Login successful for user {Username}", user.Username);
 
             var userContext = await _userContextFactory.CreateAsync(user);
             var roleNames = userContext.Roles.Select(r => r.Name);
@@ -90,8 +91,8 @@ public class LoginViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Login fehlgeschlagen für Benutzer {Username}", Username);
-            ErrorMessage = "Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.";
+            _logger.LogError(ex, "Login failed for user {Username}", Username);
+            ErrorMessage = Resources.Web_Login_Failed;
             return false;
         }
         finally

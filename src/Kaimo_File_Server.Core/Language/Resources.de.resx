@@ -582,4 +582,442 @@
   <data name="Web_Search_NoResults" xml:space="preserve">
     <value>Keine Dateien gefunden</value>
   </data>
+  <data name="Web_Login_Failed" xml:space="preserve">
+    <value>Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.</value>
+  </data>
+  <data name="Web_Login_InvalidCredentials" xml:space="preserve">
+    <value>Benutzername oder Passwort falsch.</value>
+  </data>
+  <data name="Web_Login_CredentialsRequired" xml:space="preserve">
+    <value>Benutzername und Passwort erforderlich.</value>
+  </data>
+  <data name="Web_Login_AccountDisabled" xml:space="preserve">
+    <value>Dieses Konto ist deaktiviert.</value>
+  </data>
+  <data name="Web_Error_NotAuthenticated" xml:space="preserve">
+    <value>Nicht authentifiziert.</value>
+  </data>
+  <data name="Web_Error_NotLoggedIn" xml:space="preserve">
+    <value>Nicht angemeldet.</value>
+  </data>
+  <data name="Web_Error_NoPermission" xml:space="preserve">
+    <value>Keine Berechtigung.</value>
+  </data>
+  <data name="Web_Error_AccessDenied" xml:space="preserve">
+    <value>Zugriff verweigert.</value>
+  </data>
+  <data name="Web_Error_NoManagementPermission" xml:space="preserve">
+    <value>Keine Berechtigung für die Verwaltung.</value>
+  </data>
+  <data name="Web_Error_InvalidPath" xml:space="preserve">
+    <value>Ungültiger Pfad.</value>
+  </data>
+  <data name="Web_Folder_NameRequired" xml:space="preserve">
+    <value>Bitte einen Ordnernamen eingeben.</value>
+  </data>
+  <data name="Web_Rename_NameRequired" xml:space="preserve">
+    <value>Bitte einen neuen Namen eingeben.</value>
+  </data>
+  <data name="Web_Rename_Unchanged" xml:space="preserve">
+    <value>Der Name ist unverändert.</value>
+  </data>
+  <data name="Web_FileName_Missing" xml:space="preserve">
+    <value>Dateiname fehlt.</value>
+  </data>
+  <data name="Web_Name_InvalidChars" xml:space="preserve">
+    <value>Der Name enthält ungültige Zeichen.  Fehler: </value>
+  </data>
+  <data name="Web_FileName_InvalidChars" xml:space="preserve">
+    <value>Der Dateiname enthält ungültige Zeichen. Fehler: </value>
+  </data>
+  <data name="Web_Error_FileOrFolderNotFound" xml:space="preserve">
+    <value>Datei oder Ordner nicht gefunden.</value>
+  </data>
+  <data name="Web_Error_ItemExists" xml:space="preserve">
+    <value>Ein Element mit diesem Namen existiert bereits.</value>
+  </data>
+  <data name="Web_Error_FolderExists" xml:space="preserve">
+    <value>Ein Ordner mit diesem Namen existiert bereits.</value>
+  </data>
+  <data name="Web_Error_FileExists" xml:space="preserve">
+    <value>Eine Datei mit diesem Namen existiert bereits.</value>
+  </data>
+  <data name="Web_Error_NotValidZip" xml:space="preserve">
+    <value>Die Datei ist kein gültiges ZIP-Archiv.</value>
+  </data>
+  <data name="Web_Error_CreateFolderFailed" xml:space="preserve">
+    <value>Fehler beim Erstellen des Ordners.</value>
+  </data>
+  <data name="Web_Error_DeleteFailed" xml:space="preserve">
+    <value>Fehler beim Löschen.</value>
+  </data>
+  <data name="Web_Error_RenameFailed" xml:space="preserve">
+    <value>Fehler beim Umbenennen.</value>
+  </data>
+  <data name="Web_Error_RenameFailedCheckLogs" xml:space="preserve">
+    <value>Fehler beim Umbenennen. Bitte prüfe die Logs.</value>
+  </data>
+  <data name="Web_Error_UploadFailed" xml:space="preserve">
+    <value>Fehler beim Hochladen.</value>
+  </data>
+  <data name="Web_Error_ArchiveFailed" xml:space="preserve">
+    <value>Fehler beim Archivieren.</value>
+  </data>
+  <data name="Web_Error_ExtractFailed" xml:space="preserve">
+    <value>Fehler beim Entpacken.</value>
+  </data>
+  <data name="Web_Upload_Aborted" xml:space="preserve">
+    <value>Upload abgebrochen.</value>
+  </data>
+  <data name="Web_Error_ShareInUse" xml:space="preserve">
+    <value>Share ist gerade in Benutzung. Bitte versuche es erneut.</value>
+  </data>
+  <data name="Web_Error_ShareDisabled" xml:space="preserve">
+    <value>Share ist deaktiviert.</value>
+  </data>
+  <data name="Web_Error_ShareNotFound" xml:space="preserve">
+    <value>Share nicht gefunden.</value>
+  </data>
+  <data name="Web_Error_NoShareLoaded" xml:space="preserve">
+    <value>Kein Share geladen.</value>
+  </data>
+  <data name="Web_Error_LoadFilesFailed" xml:space="preserve">
+    <value>Fehler beim Laden der Dateien.</value>
+  </data>
+  <data name="Web_Error_ShareExists" xml:space="preserve">
+    <value>Ein Share mit diesem Namen existiert bereits.</value>
+  </data>
+  <data name="Web_Error_CreateShareFailed" xml:space="preserve">
+    <value>Fehler beim Erstellen des Shares.</value>
+  </data>
+  <data name="Web_Error_LoadSharesFailed" xml:space="preserve">
+    <value>Fehler beim Laden der Shares.</value>
+  </data>
+  <data name="Web_Error_ChangeVisibilityFailed" xml:space="preserve">
+    <value>Fehler beim Ändern der Sichtbarkeit.</value>
+  </data>
+  <data name="Web_Error_ChangeStatusFailed" xml:space="preserve">
+    <value>Fehler beim Ändern des Status.</value>
+  </data>
+  <data name="Web_Acl_LoadPermissionsFailed" xml:space="preserve">
+    <value>Fehler beim Laden der Berechtigungen.</value>
+  </data>
+  <data name="Web_Acl_Added" xml:space="preserve">
+    <value>Berechtigung hinzugefügt.</value>
+  </data>
+  <data name="Web_Acl_Updated" xml:space="preserve">
+    <value>Berechtigung aktualisiert.</value>
+  </data>
+  <data name="Web_Acl_Removed" xml:space="preserve">
+    <value>Berechtigung entfernt.</value>
+  </data>
+  <data name="Web_Acl_SelectAtLeastOnePermission" xml:space="preserve">
+    <value>Bitte mindestens eine Berechtigung auswählen.</value>
+  </data>
+  <data name="Web_Error_SelectUserOrGroup" xml:space="preserve">
+    <value>Bitte einen Benutzer oder eine Gruppe auswählen.</value>
+  </data>
+  <data name="Web_Error_AddFailed" xml:space="preserve">
+    <value>Fehler beim Hinzufügen.</value>
+  </data>
+  <data name="Web_Error_SaveFailed" xml:space="preserve">
+    <value>Fehler beim Speichern.</value>
+  </data>
+  <data name="Web_Error_RemoveFailed" xml:space="preserve">
+    <value>Fehler beim Entfernen.</value>
+  </data>
+  <data name="Web_Error_CreateFailed" xml:space="preserve">
+    <value>Fehler beim Erstellen.</value>
+  </data>
+  <data name="Web_Error_LoadFailedGeneric" xml:space="preserve">
+    <value>Fehler beim Laden.</value>
+  </data>
+  <data name="Web_Error_EntryNotFound" xml:space="preserve">
+    <value>Eintrag nicht gefunden.</value>
+  </data>
+  <data name="Web_Error_NameRequired" xml:space="preserve">
+    <value>Name erforderlich.</value>
+  </data>
+  <data name="Web_ChangesSaved" xml:space="preserve">
+    <value>Änderungen gespeichert.</value>
+  </data>
+  <data name="Web_Dept_Created" xml:space="preserve">
+    <value>Abteilung erstellt.</value>
+  </data>
+  <data name="Web_Dept_Deleted" xml:space="preserve">
+    <value>Abteilung gelöscht.</value>
+  </data>
+  <data name="Web_Dept_Saved" xml:space="preserve">
+    <value>Abteilung gespeichert.</value>
+  </data>
+  <data name="Web_Dept_NameRequired" xml:space="preserve">
+    <value>Abteilungsname erforderlich.</value>
+  </data>
+  <data name="Web_Dept_SelectDepartment" xml:space="preserve">
+    <value>Bitte eine Abteilung auswählen.</value>
+  </data>
+  <data name="Web_Dept_CannotDeleteGlobal" xml:space="preserve">
+    <value>Die Global-Abteilung kann nicht gelöscht werden.</value>
+  </data>
+  <data name="Web_Dept_NoPermissionInDept" xml:space="preserve">
+    <value>Keine Berechtigung in dieser Abteilung.</value>
+  </data>
+  <data name="Web_Dept_NoPermissionEdit" xml:space="preserve">
+    <value>Keine Berechtigung, diese Abteilung zu bearbeiten.</value>
+  </data>
+  <data name="Web_User_Created" xml:space="preserve">
+    <value>Benutzer erstellt.</value>
+  </data>
+  <data name="Web_User_Deleted" xml:space="preserve">
+    <value>Benutzer gelöscht.</value>
+  </data>
+  <data name="Web_User_NameTaken" xml:space="preserve">
+    <value>Benutzername bereits vergeben.</value>
+  </data>
+  <data name="Web_User_NameRequired" xml:space="preserve">
+    <value>Benutzername erforderlich.</value>
+  </data>
+  <data name="Web_User_NoPermissionEdit" xml:space="preserve">
+    <value>Keine Berechtigung, diesen Benutzer zu bearbeiten.</value>
+  </data>
+  <data name="Web_User_NoPermissionPasswordReset" xml:space="preserve">
+    <value>Keine Berechtigung für Passwort-Reset.</value>
+  </data>
+  <data name="Web_User_PasswordMinLength" xml:space="preserve">
+    <value>Passwort muss mindestens 6 Zeichen lang sein.</value>
+  </data>
+  <data name="Web_User_PasswordsDoNotMatch" xml:space="preserve">
+    <value>Passwörter stimmen nicht überein.</value>
+  </data>
+  <data name="Web_Group_Created" xml:space="preserve">
+    <value>Gruppe erstellt.</value>
+  </data>
+  <data name="Web_Group_Deleted" xml:space="preserve">
+    <value>Gruppe gelöscht.</value>
+  </data>
+  <data name="Web_Group_NameRequired" xml:space="preserve">
+    <value>Gruppenname erforderlich.</value>
+  </data>
+  <data name="Web_Role_Created" xml:space="preserve">
+    <value>Rolle erstellt.</value>
+  </data>
+  <data name="Web_Role_Deleted" xml:space="preserve">
+    <value>Rolle gelöscht.</value>
+  </data>
+  <data name="Web_Role_Saved" xml:space="preserve">
+    <value>Rolle gespeichert.</value>
+  </data>
+  <data name="Web_Role_NameRequired" xml:space="preserve">
+    <value>Rollenname erforderlich.</value>
+  </data>
+  <data name="Web_Scope_SelectScope" xml:space="preserve">
+    <value>Bitte einen Geltungsbereich auswählen.</value>
+  </data>
+  <data name="Web_Error_LoadAccessRightsFailed" xml:space="preserve">
+    <value>Fehler beim Laden der Zugriffsrechte.</value>
+  </data>
+  <data name="Web_Error_GrantAccessFailed" xml:space="preserve">
+    <value>Fehler beim Gewähren des Zugriffs.</value>
+  </data>
+  <data name="Web_Error_RevokeAccessFailed" xml:space="preserve">
+    <value>Fehler beim Entziehen des Zugriffs.</value>
+  </data>
+  <data name="Web_Error_CreateAssignmentFailed" xml:space="preserve">
+    <value>Fehler beim Erstellen der Zuweisung.</value>
+  </data>
+  <data name="Web_Error_DeleteAssignmentFailed" xml:space="preserve">
+    <value>Fehler beim Löschen der Zuweisung.</value>
+  </data>
+  <data name="Web_Assignment_Removed" xml:space="preserve">
+    <value>Zuweisung entfernt.</value>
+  </data>
+  <data name="Web_Assignment_Created" xml:space="preserve">
+    <value>Zuweisung erstellt.</value>
+  </data>
+  <data name="Web_Members_Saved" xml:space="preserve">
+    <value>Mitglieder gespeichert.</value>
+  </data>
+  <data name="Web_Settings_LoadFailed" xml:space="preserve">
+    <value>Fehler beim Laden der Einstellungen.</value>
+  </data>
+  <data name="Web_Settings_NoPermissionChange" xml:space="preserve">
+    <value>Keine Berechtigung zum Ändern der Einstellungen.</value>
+  </data>
+  <data name="Web_Settings_LanguageSaved" xml:space="preserve">
+    <value>Sprache gespeichert. Die Änderung wird beim nächsten Seitenaufruf wirksam.</value>
+  </data>
+  <data name="Web_Settings_LanguageSaveFailed" xml:space="preserve">
+    <value>Fehler beim Speichern der Sprache.</value>
+  </data>
+  <data name="Web_Settings_NoPermissionDataServices" xml:space="preserve">
+    <value>Keine Berechtigung zum Verwalten der Datendienste.</value>
+  </data>
+  <data name="Web_Settings_DataServiceSaveFailed" xml:space="preserve">
+    <value>Fehler beim Speichern der Datendienst-Einstellung.</value>
+  </data>
+  <data name="Web_Settings_SmbEnabled" xml:space="preserve">
+    <value>SMB wird aktiviert. Die Änderung wird vom Dienst innerhalb weniger Sekunden übernommen.</value>
+  </data>
+  <data name="Web_Settings_SmbDisabled" xml:space="preserve">
+    <value>SMB wird deaktiviert. Die Änderung wird vom Dienst innerhalb weniger Sekunden übernommen.</value>
+  </data>
+  <data name="Web_Validation_NameEmpty" xml:space="preserve">
+    <value>Name darf nicht leer sein.</value>
+  </data>
+  <data name="Web_ShareName_MaxLength" xml:space="preserve">
+    <value>Name darf maximal 64 Zeichen lang sein.</value>
+  </data>
+  <data name="Web_ShareName_AllowedChars" xml:space="preserve">
+    <value>Nur Buchstaben, Zahlen, Bindestriche, Unterstriche und Punkte erlaubt.</value>
+  </data>
+  <data name="Web_ShareName_NoLeadingTrailingDot" xml:space="preserve">
+    <value>Name darf nicht mit einem Punkt beginnen oder enden.</value>
+  </data>
+  <data name="Web_Share_RenamedTo" xml:space="preserve">
+    <value>Share umbenannt zu '{0}'.</value>
+  </data>
+  <data name="Web_Share_RecycleEnabled" xml:space="preserve">
+    <value>Papierkorb für Share aktiviert.</value>
+  </data>
+  <data name="Web_Share_RecycleDisabled" xml:space="preserve">
+    <value>Papierkorb für Share deaktiviert.</value>
+  </data>
+  <data name="Web_Error_ArchiveExists" xml:space="preserve">
+    <value>Ein Archiv mit dem Namen "{0}" existiert bereits.</value>
+  </data>
+  <data name="Web_Validation_NameWhitespace" xml:space="preserve">
+    <value>Name darf nicht nur aus Leerzeichen bestehen.</value>
+  </data>
+  <data name="Web_Validation_NameTooLong" xml:space="preserve">
+    <value>Name überschreitet die maximale Länge von {0} Zeichen ({1}).</value>
+  </data>
+  <data name="Web_Validation_InvalidChars" xml:space="preserve">
+    <value>Ungültige Zeichen: {0}</value>
+  </data>
+  <data name="Web_Validation_NameEndsWithDot" xml:space="preserve">
+    <value>Name darf nicht mit einem Punkt enden.</value>
+  </data>
+  <data name="Web_Validation_NameEndsWithSpace" xml:space="preserve">
+    <value>Name darf nicht mit einem Leerzeichen enden.</value>
+  </data>
+  <data name="Web_Validation_ReservedName" xml:space="preserve">
+    <value>'{0}' ist ein reservierter Windows-Gerätename.</value>
+  </data>
+  <data name="Web_DeptPerm_Read" xml:space="preserve">
+    <value>Lesen</value>
+  </data>
+  <data name="Web_DeptPerm_ReadDesc" xml:space="preserve">
+    <value>Dateien und Verzeichnisse auflisten, lesen, Attribute lesen</value>
+  </data>
+  <data name="Web_DeptPerm_Write" xml:space="preserve">
+    <value>Schreiben</value>
+  </data>
+  <data name="Web_DeptPerm_WriteDesc" xml:space="preserve">
+    <value>Dateien erstellen, bearbeiten, Attribute schreiben</value>
+  </data>
+  <data name="Web_DeptPerm_Delete" xml:space="preserve">
+    <value>Löschen</value>
+  </data>
+  <data name="Web_DeptPerm_DeleteDesc" xml:space="preserve">
+    <value>Dateien und Unterordner löschen</value>
+  </data>
+  <data name="Web_DeptPerm_Admin" xml:space="preserve">
+    <value>Administration</value>
+  </data>
+  <data name="Web_DeptPerm_AdminDesc" xml:space="preserve">
+    <value>Berechtigungen ändern, Besitz übernehmen</value>
+  </data>
+  <data name="Web_PermGroup_UserMgmt" xml:space="preserve">
+    <value>Benutzerverwaltung</value>
+  </data>
+  <data name="Web_PermGroup_GroupMgmt" xml:space="preserve">
+    <value>Gruppenverwaltung</value>
+  </data>
+  <data name="Web_PermGroup_AssignDelegation" xml:space="preserve">
+    <value>Zuweisung &amp; Delegation</value>
+  </data>
+  <data name="Web_PermGroup_ShareMgmt" xml:space="preserve">
+    <value>Freigabenverwaltung</value>
+  </data>
+  <data name="Web_PermGroup_DeptMgmt" xml:space="preserve">
+    <value>Abteilungsverwaltung</value>
+  </data>
+  <data name="Web_PermGroup_SystemMgmt" xml:space="preserve">
+    <value>Systemverwaltung</value>
+  </data>
+  <data name="Web_Perm_CreateUsers" xml:space="preserve">
+    <value>Benutzer erstellen</value>
+  </data>
+  <data name="Web_Perm_DeleteUsers" xml:space="preserve">
+    <value>Benutzer löschen</value>
+  </data>
+  <data name="Web_Perm_EditProfiles" xml:space="preserve">
+    <value>Profile bearbeiten</value>
+  </data>
+  <data name="Web_Perm_ResetPasswords" xml:space="preserve">
+    <value>Passwörter zurücksetzen</value>
+  </data>
+  <data name="Web_Perm_EnableDisable" xml:space="preserve">
+    <value>Aktivieren/Deaktivieren</value>
+  </data>
+  <data name="Web_Perm_CreateGroups" xml:space="preserve">
+    <value>Gruppen erstellen</value>
+  </data>
+  <data name="Web_Perm_DeleteGroups" xml:space="preserve">
+    <value>Gruppen löschen</value>
+  </data>
+  <data name="Web_Perm_ManageMembers" xml:space="preserve">
+    <value>Mitglieder verwalten</value>
+  </data>
+  <data name="Web_Perm_AssignGroups" xml:space="preserve">
+    <value>Gruppen zuweisen</value>
+  </data>
+  <data name="Web_Perm_AssignRoles" xml:space="preserve">
+    <value>Rollen zuweisen</value>
+  </data>
+  <data name="Web_Perm_AssignDepartments" xml:space="preserve">
+    <value>Abteilungen zuweisen</value>
+  </data>
+  <data name="Web_Perm_CreateShares" xml:space="preserve">
+    <value>Freigaben erstellen</value>
+  </data>
+  <data name="Web_Perm_DeleteShares" xml:space="preserve">
+    <value>Freigaben löschen</value>
+  </data>
+  <data name="Web_Perm_EditSettings" xml:space="preserve">
+    <value>Einstellungen bearbeiten</value>
+  </data>
+  <data name="Web_Perm_ManageAccess" xml:space="preserve">
+    <value>Zugriff verwalten</value>
+  </data>
+  <data name="Web_Perm_ManageAcls" xml:space="preserve">
+    <value>ACLs verwalten</value>
+  </data>
+  <data name="Web_Perm_EditDepartment" xml:space="preserve">
+    <value>Abteilung bearbeiten</value>
+  </data>
+  <data name="Web_Perm_ViewDepartment" xml:space="preserve">
+    <value>Abteilung anzeigen</value>
+  </data>
+  <data name="Web_Perm_ManageSystemSettings" xml:space="preserve">
+    <value>Systemeinstellungen verwalten</value>
+  </data>
+  <data name="Web_Perm_ManageDataServices" xml:space="preserve">
+    <value>Datendienste verwalten</value>
+  </data>
+  <data name="Web_Share_Enabled" xml:space="preserve">
+    <value>Share aktiviert.</value>
+  </data>
+  <data name="Web_Share_Disabled" xml:space="preserve">
+    <value>Share deaktiviert.</value>
+  </data>
+  <data name="Web_Tab_UsersCount" xml:space="preserve">
+    <value>{0} Benutzer</value>
+  </data>
+  <data name="Web_Tab_GroupsCount" xml:space="preserve">
+    <value>{0} Gruppen</value>
+  </data>
+  <data name="Web_Tab_RolesCount" xml:space="preserve">
+    <value>{0} Rollen</value>
+  </data>
 </root>

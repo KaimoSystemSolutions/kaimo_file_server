@@ -3,8 +3,8 @@
 namespace Kaimo_File_Server.Web.Services;
 
 /// <summary>
-/// Zentralisiert die Theme-Logik (localStorage lesen/schreiben, data-theme setzen).
-/// Ersetzt die duplizierte Logik in MainLayout und EmptyLayout.
+/// Centralizes the theme logic (read/write localStorage, set data-theme).
+/// Replaces the duplicated logic in MainLayout and EmptyLayout.
 /// </summary>
 public class ThemeService
 {
@@ -32,7 +32,7 @@ public class ThemeService
         }
         catch
         {
-            // JS Interop evtl. noch nicht verfügbar
+            // JS interop may not be available yet
         }
     }
 
@@ -46,7 +46,7 @@ public class ThemeService
         }
         catch
         {
-            // Fallback: bleibt im aktuellen State
+            // Fallback: stay in the current state
         }
     }
 }

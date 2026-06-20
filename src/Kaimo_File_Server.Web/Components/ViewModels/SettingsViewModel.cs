@@ -5,6 +5,7 @@ using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Microsoft.AspNetCore.Components.Authorization;
+using Kaimo_File_Server.Core.Language;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -91,7 +92,7 @@ public class SettingsViewModel
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to load settings");
-            ErrorMessage = "Fehler beim Laden der Einstellungen.";
+            ErrorMessage = Resources.Web_Settings_LoadFailed;
         }
         finally
         {
@@ -133,7 +134,7 @@ public class SettingsViewModel
 
         if (!CanManageSettings)
         {
-            ErrorMessage = "Keine Berechtigung zum Ändern der Einstellungen.";
+            ErrorMessage = Resources.Web_Settings_NoPermissionChange;
             return false;
         }
 
@@ -142,13 +143,13 @@ public class SettingsViewModel
             await _config.SetAsync("app.language", SelectedLanguage);
 
             _logger.LogInformation("Language changed to '{Lang}'", SelectedLanguage);
-            SuccessMessage = "Sprache gespeichert. Die Änderung wird beim nächsten Seitenaufruf wirksam.";
+            SuccessMessage = Resources.Web_Settings_LanguageSaved;
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to save language setting");
-            ErrorMessage = "Fehler beim Speichern der Sprache.";
+            ErrorMessage = Resources.Web_Settings_LanguageSaveFailed;
             return false;
         }
     }
@@ -162,7 +163,7 @@ public class SettingsViewModel
 
         if (!CanManageDataServices)
         {
-            ErrorMessage = "Keine Berechtigung zum Verwalten der Datendienste.";
+            ErrorMessage = Resources.Web_Settings_NoPermissionDataServices;
             return false;
         }
 
@@ -172,14 +173,14 @@ public class SettingsViewModel
 
             _logger.LogInformation("SMB service desired state set to {Enabled}", SmbEnabled);
             SuccessMessage = SmbEnabled
-                ? "SMB wird aktiviert. Die Änderung wird vom Dienst innerhalb weniger Sekunden übernommen."
-                : "SMB wird deaktiviert. Die Änderung wird vom Dienst innerhalb weniger Sekunden übernommen.";
+                ? Resources.Web_Settings_SmbEnabled
+                : Resources.Web_Settings_SmbDisabled;
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to save data service setting");
-            ErrorMessage = "Fehler beim Speichern der Datendienst-Einstellung.";
+            ErrorMessage = Resources.Web_Settings_DataServiceSaveFailed;
             return false;
         }
     }

@@ -7,6 +7,7 @@ using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
+using Kaimo_File_Server.Core.Language;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -171,9 +172,9 @@ public class UserListViewModel
 
     public string TabSubtitle => ActiveTab switch
     {
-        AdminTab.Users => $"{Users.Count} Benutzer",
-        AdminTab.Groups => $"{Groups.Count} Gruppen",
-        AdminTab.Roles => $"{Roles.Count} Rollen",
+        AdminTab.Users => string.Format(Resources.Web_Tab_UsersCount, Users.Count),
+        AdminTab.Groups => string.Format(Resources.Web_Tab_GroupsCount, Groups.Count),
+        AdminTab.Roles => string.Format(Resources.Web_Tab_RolesCount, Roles.Count),
         _ => ""
     };
 
@@ -190,45 +191,48 @@ public class UserListViewModel
         else EditRolePermissions &= ~flag;
     }
 
-    public static readonly List<PermissionGroup> PermissionGroups =
+    // Built on each access so the labels resolve against the current UI culture
+    // (CurrentUICulture is set per request, so a static-readonly list would freeze
+    // the language captured at type-load time).
+    public static List<PermissionGroup> PermissionGroups =>
     [
-        new("Benutzerverwaltung",
+        new(Resources.Web_PermGroup_UserMgmt,
         [
-            new(ManagementPermission.CreateUsers, "Benutzer erstellen"),
-            new(ManagementPermission.DeleteUsers, "Benutzer löschen"),
-            new(ManagementPermission.EditUserProfiles, "Profile bearbeiten"),
-            new(ManagementPermission.ResetPasswords, "Passwörter zurücksetzen"),
-            new(ManagementPermission.EnableDisableUsers, "Aktivieren/Deaktivieren"),
+            new(ManagementPermission.CreateUsers, Resources.Web_Perm_CreateUsers),
+            new(ManagementPermission.DeleteUsers, Resources.Web_Perm_DeleteUsers),
+            new(ManagementPermission.EditUserProfiles, Resources.Web_Perm_EditProfiles),
+            new(ManagementPermission.ResetPasswords, Resources.Web_Perm_ResetPasswords),
+            new(ManagementPermission.EnableDisableUsers, Resources.Web_Perm_EnableDisable),
         ]),
-        new("Gruppenverwaltung",
+        new(Resources.Web_PermGroup_GroupMgmt,
         [
-            new(ManagementPermission.CreateGroups, "Gruppen erstellen"),
-            new(ManagementPermission.DeleteGroups, "Gruppen löschen"),
-            new(ManagementPermission.ManageGroupMembers, "Mitglieder verwalten"),
+            new(ManagementPermission.CreateGroups, Resources.Web_Perm_CreateGroups),
+            new(ManagementPermission.DeleteGroups, Resources.Web_Perm_DeleteGroups),
+            new(ManagementPermission.ManageGroupMembers, Resources.Web_Perm_ManageMembers),
         ]),
-        new("Zuweisung & Delegation",
+        new(Resources.Web_PermGroup_AssignDelegation,
         [
-            new(ManagementPermission.AssignGroups, "Gruppen zuweisen"),
-            new(ManagementPermission.AssignRoles, "Rollen zuweisen"),
-            new(ManagementPermission.AssignDepartments, "Abteilungen zuweisen"),
+            new(ManagementPermission.AssignGroups, Resources.Web_Perm_AssignGroups),
+            new(ManagementPermission.AssignRoles, Resources.Web_Perm_AssignRoles),
+            new(ManagementPermission.AssignDepartments, Resources.Web_Perm_AssignDepartments),
         ]),
-        new("Freigabenverwaltung",
+        new(Resources.Web_PermGroup_ShareMgmt,
         [
-            new(ManagementPermission.CreateShares, "Freigaben erstellen"),
-            new(ManagementPermission.DeleteShares, "Freigaben löschen"),
-            new(ManagementPermission.EditShareSettings, "Einstellungen bearbeiten"),
-            new(ManagementPermission.ManageShareAccess, "Zugriff verwalten"),
-            new(ManagementPermission.ManageShareAcls, "ACLs verwalten"),
+            new(ManagementPermission.CreateShares, Resources.Web_Perm_CreateShares),
+            new(ManagementPermission.DeleteShares, Resources.Web_Perm_DeleteShares),
+            new(ManagementPermission.EditShareSettings, Resources.Web_Perm_EditSettings),
+            new(ManagementPermission.ManageShareAccess, Resources.Web_Perm_ManageAccess),
+            new(ManagementPermission.ManageShareAcls, Resources.Web_Perm_ManageAcls),
         ]),
-        new("Abteilungsverwaltung",
+        new(Resources.Web_PermGroup_DeptMgmt,
         [
-            new(ManagementPermission.EditDepartment, "Abteilung bearbeiten"),
-            new(ManagementPermission.ViewDepartment, "Abteilung anzeigen"),
+            new(ManagementPermission.EditDepartment, Resources.Web_Perm_EditDepartment),
+            new(ManagementPermission.ViewDepartment, Resources.Web_Perm_ViewDepartment),
         ]),
-        new("Systemverwaltung",
+        new(Resources.Web_PermGroup_SystemMgmt,
         [
-            new(ManagementPermission.ManageSystemSettings, "Systemeinstellungen verwalten"),
-            new(ManagementPermission.ManageDataServices, "Datendienste verwalten"),
+            new(ManagementPermission.ManageSystemSettings, Resources.Web_Perm_ManageSystemSettings),
+            new(ManagementPermission.ManageDataServices, Resources.Web_Perm_ManageDataServices),
         ]),
     ];
 
@@ -271,7 +275,7 @@ public class UserListViewModel
             if (_actorContext == null)
             {
                 CanAccessPage = false;
-                ErrorMessage = "Nicht angemeldet.";
+                ErrorMessage = Resources.Web_Error_NotLoggedIn;
                 return;
             }
 
@@ -281,7 +285,7 @@ public class UserListViewModel
 
             if (!CanAccessPage)
             {
-                ErrorMessage = "Keine Berechtigung für die Verwaltung.";
+                ErrorMessage = Resources.Web_Error_NoManagementPermission;
                 return;
             }
 
@@ -289,8 +293,8 @@ public class UserListViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Laden der Benutzerverwaltung");
-            ErrorMessage = "Fehler beim Laden.";
+            _logger.LogError(ex, "Error loading the user management");
+            ErrorMessage = Resources.Web_Error_LoadFailedGeneric;
         }
         finally { IsLoading = false; }
     }
@@ -404,8 +408,8 @@ public class UserListViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Tab-Wechsel zu {Tab}", tab);
-            ErrorMessage = "Fehler beim Laden.";
+            _logger.LogError(ex, "Error switching to tab {Tab}", tab);
+            ErrorMessage = Resources.Web_Error_LoadFailedGeneric;
         }
         finally { IsLoading = false; }
     }
@@ -482,7 +486,7 @@ public class UserListViewModel
         if (!await _mgmtAuth.CanManageUserAsync(
                 _actorContext, SelectedUser.Id, ManagementPermission.EditUserProfiles))
         {
-            ErrorMessage = "Keine Berechtigung, diesen Benutzer zu bearbeiten.";
+            ErrorMessage = Resources.Web_User_NoPermissionEdit;
             return;
         }
 
@@ -514,7 +518,7 @@ public class UserListViewModel
         if (!await _mgmtAuth.CanManageUserAsync(
                 _actorContext, SelectedUser.Id, ManagementPermission.EditUserProfiles))
         {
-            ErrorMessage = "Keine Berechtigung.";
+            ErrorMessage = Resources.Web_Error_NoPermission;
             return;
         }
 
@@ -534,9 +538,9 @@ public class UserListViewModel
             {
                 if (!await _mgmtAuth.CanManageUserAsync(
                         _actorContext, SelectedUser.Id, ManagementPermission.ResetPasswords))
-                { ErrorMessage = "Keine Berechtigung für Passwort-Reset."; return; }
-                if (NewPassword.Length < 6) { ErrorMessage = "Passwort muss mindestens 6 Zeichen lang sein."; return; }
-                if (NewPassword != ConfirmPassword) { ErrorMessage = "Passwörter stimmen nicht überein."; return; }
+                { ErrorMessage = Resources.Web_User_NoPermissionPasswordReset; return; }
+                if (NewPassword.Length < 6) { ErrorMessage = Resources.Web_User_PasswordMinLength; return; }
+                if (NewPassword != ConfirmPassword) { ErrorMessage = Resources.Web_User_PasswordsDoNotMatch; return; }
                 await _userRepo.UpdatePasswordAsync(SelectedUser.Id,
                     _passwordService.HashPassword(NewPassword),
                     _passwordService.ComputeNtHash(NewPassword));
@@ -563,12 +567,12 @@ public class UserListViewModel
 
             IsEditing = false;
             NewPassword = ""; ConfirmPassword = "";
-            SuccessMessage = "Änderungen gespeichert.";
+            SuccessMessage = Resources.Web_ChangesSaved;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Speichern von Benutzer {UserId}", SelectedUser.Id);
-            ErrorMessage = "Fehler beim Speichern.";
+            _logger.LogError(ex, "Error saving user {UserId}", SelectedUser.Id);
+            ErrorMessage = Resources.Web_Error_SaveFailed;
         }
         finally { IsSaving = false; }
     }
@@ -584,7 +588,7 @@ public class UserListViewModel
         if (!await _mgmtAuth.CanManageGroupAsync(
                 _actorContext, SelectedGroup.Id, ManagementPermission.ManageGroupMembers))
         {
-            ErrorMessage = "Keine Berechtigung.";
+            ErrorMessage = Resources.Web_Error_NoPermission;
             return;
         }
 
@@ -604,7 +608,7 @@ public class UserListViewModel
         if (!await _mgmtAuth.CanManageGroupAsync(
                 _actorContext, SelectedGroup.Id, ManagementPermission.ManageGroupMembers))
         {
-            ErrorMessage = "Keine Berechtigung.";
+            ErrorMessage = Resources.Web_Error_NoPermission;
             return;
         }
 
@@ -618,12 +622,12 @@ public class UserListViewModel
             GroupMembers = (await _groupRepo.GetMembersAsync(SelectedGroup.Id)).OrderBy(u => u.Name).ToList();
 
             IsEditing = false;
-            SuccessMessage = "Mitglieder gespeichert.";
+            SuccessMessage = Resources.Web_Members_Saved;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Speichern der Gruppe {GroupId}", SelectedGroup.Id);
-            ErrorMessage = "Fehler beim Speichern.";
+            _logger.LogError(ex, "Error saving group {GroupId}", SelectedGroup.Id);
+            ErrorMessage = Resources.Web_Error_SaveFailed;
         }
         finally { IsSaving = false; }
     }
@@ -638,7 +642,7 @@ public class UserListViewModel
 
         if (!await _mgmtAuth.HasAnyPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
         {
-            ErrorMessage = "Keine Berechtigung.";
+            ErrorMessage = Resources.Web_Error_NoPermission;
             return;
         }
 
@@ -676,12 +680,12 @@ public class UserListViewModel
             await LoadRoleScopedAssignmentsAsync(SelectedRole.Id);
 
             IsEditing = false;
-            SuccessMessage = "Rolle gespeichert.";
+            SuccessMessage = Resources.Web_Role_Saved;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Speichern der Rolle {RoleId}", SelectedRole.Id);
-            ErrorMessage = "Fehler beim Speichern.";
+            _logger.LogError(ex, "Error saving role {RoleId}", SelectedRole.Id);
+            ErrorMessage = Resources.Web_Error_SaveFailed;
         }
         finally { IsSaving = false; }
     }
@@ -717,11 +721,11 @@ public class UserListViewModel
         if (SelectedRole is null || _actorContext is null) return;
 
         if (NewAssignmentPrincipalId is null)
-        { ErrorMessage = "Bitte einen Benutzer oder eine Gruppe auswählen."; return; }
+        { ErrorMessage = Resources.Web_Error_SelectUserOrGroup; return; }
         if (NewAssignmentScopeType != ScopeType.Global && NewAssignmentScopeId is null)
-        { ErrorMessage = "Bitte einen Geltungsbereich auswählen."; return; }
+        { ErrorMessage = Resources.Web_Scope_SelectScope; return; }
         if (!await _mgmtAuth.HasAnyPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
-        { ErrorMessage = "Keine Berechtigung."; return; }
+        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
         {
@@ -736,12 +740,12 @@ public class UserListViewModel
 
             IsAddingAssignment = false;
             await LoadRoleScopedAssignmentsAsync(SelectedRole.Id);
-            SuccessMessage = "Zuweisung erstellt.";
+            SuccessMessage = Resources.Web_Assignment_Created;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Erstellen der Zuweisung");
-            ErrorMessage = "Fehler beim Erstellen der Zuweisung.";
+            _logger.LogError(ex, "Error creating the assignment");
+            ErrorMessage = Resources.Web_Error_CreateAssignmentFailed;
         }
         finally { IsSaving = false; }
     }
@@ -750,7 +754,7 @@ public class UserListViewModel
     {
         if (_actorContext is null) return;
         if (!await _mgmtAuth.HasAnyPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
-        { ErrorMessage = "Keine Berechtigung."; return; }
+        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
         {
@@ -760,12 +764,12 @@ public class UserListViewModel
 
             if (SelectedRole is not null) await LoadRoleScopedAssignmentsAsync(SelectedRole.Id);
             if (SelectedUser is not null) await LoadUserScopedAssignmentsAsync(SelectedUser.Id);
-            SuccessMessage = "Zuweisung entfernt.";
+            SuccessMessage = Resources.Web_Assignment_Removed;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Löschen der Zuweisung {Id}", assignmentId);
-            ErrorMessage = "Fehler beim Löschen der Zuweisung.";
+            _logger.LogError(ex, "Error deleting assignment {Id}", assignmentId);
+            ErrorMessage = Resources.Web_Error_DeleteAssignmentFailed;
         }
         finally { IsSaving = false; }
     }
@@ -776,7 +780,7 @@ public class UserListViewModel
 
     public void StartCreateUser()
     {
-        if (!CanCreateUsers) { ErrorMessage = "Keine Berechtigung."; return; }
+        if (!CanCreateUsers) { ErrorMessage = Resources.Web_Error_NoPermission; return; }
         CancelEdit();
         SelectedUser = null; SelectedGroup = null; SelectedRole = null;
         IsCreatingUser = true; IsCreatingGroup = false; IsCreatingRole = false;
@@ -792,21 +796,21 @@ public class UserListViewModel
         if (_actorContext == null) return;
         ErrorMessage = null;
 
-        if (string.IsNullOrWhiteSpace(CreateUserUsername)) { ErrorMessage = "Benutzername erforderlich."; return; }
-        if (string.IsNullOrWhiteSpace(CreateUserName)) { ErrorMessage = "Name erforderlich."; return; }
+        if (string.IsNullOrWhiteSpace(CreateUserUsername)) { ErrorMessage = Resources.Web_User_NameRequired; return; }
+        if (string.IsNullOrWhiteSpace(CreateUserName)) { ErrorMessage = Resources.Web_Error_NameRequired; return; }
         if (string.IsNullOrWhiteSpace(CreateUserPassword) || CreateUserPassword.Length < 6)
-        { ErrorMessage = "Passwort muss mindestens 6 Zeichen lang sein."; return; }
-        if (CreateUserDepartmentId is null) { ErrorMessage = "Bitte eine Abteilung auswählen."; return; }
+        { ErrorMessage = Resources.Web_User_PasswordMinLength; return; }
+        if (CreateUserDepartmentId is null) { ErrorMessage = Resources.Web_Dept_SelectDepartment; return; }
 
         if (!await _mgmtAuth.CanCreateUserInDepartmentAsync(_actorContext, CreateUserDepartmentId.Value))
-        { ErrorMessage = "Keine Berechtigung in dieser Abteilung."; return; }
+        { ErrorMessage = Resources.Web_Dept_NoPermissionInDept; return; }
 
         try
         {
             IsSaving = true;
 
             var existing = await _userRepo.GetByUsernameAsync(CreateUserUsername.Trim());
-            if (existing is not null) { ErrorMessage = "Benutzername bereits vergeben."; return; }
+            if (existing is not null) { ErrorMessage = Resources.Web_User_NameTaken; return; }
 
             var user = new User(
                 Guid.NewGuid(), CreateUserName.Trim(), CreateUserUsername.Trim(),
@@ -820,12 +824,12 @@ public class UserListViewModel
 
             IsCreatingUser = false;
             await LoadTabDataAsync();
-            SuccessMessage = "Benutzer erstellt.";
+            SuccessMessage = Resources.Web_User_Created;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Erstellen des Benutzers");
-            ErrorMessage = "Fehler beim Erstellen.";
+            _logger.LogError(ex, "Error creating the user");
+            ErrorMessage = Resources.Web_Error_CreateFailed;
         }
         finally { IsSaving = false; }
     }
@@ -836,7 +840,7 @@ public class UserListViewModel
 
     public void StartCreateGroup()
     {
-        if (!CanManageGroups) { ErrorMessage = "Keine Berechtigung."; return; }
+        if (!CanManageGroups) { ErrorMessage = Resources.Web_Error_NoPermission; return; }
         CancelEdit();
         SelectedUser = null; SelectedGroup = null; SelectedRole = null;
         IsCreatingGroup = true; IsCreatingUser = false; IsCreatingRole = false;
@@ -848,11 +852,11 @@ public class UserListViewModel
     public async Task CreateGroupAsync()
     {
         ErrorMessage = null;
-        if (string.IsNullOrWhiteSpace(CreateGroupName)) { ErrorMessage = "Gruppenname erforderlich."; return; }
+        if (string.IsNullOrWhiteSpace(CreateGroupName)) { ErrorMessage = Resources.Web_Group_NameRequired; return; }
         if (_actorContext is null) return;
 
         if (!await _mgmtAuth.HasAnyPermissionAsync(_actorContext, ManagementPermission.CreateGroups))
-        { ErrorMessage = "Keine Berechtigung."; return; }
+        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
         {
@@ -861,12 +865,12 @@ public class UserListViewModel
             await _groupRepo.CreateAsync(group);
             IsCreatingGroup = false; CreateGroupName = "";
             await LoadTabDataAsync();
-            SuccessMessage = "Gruppe erstellt.";
+            SuccessMessage = Resources.Web_Group_Created;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Erstellen der Gruppe");
-            ErrorMessage = "Fehler beim Erstellen.";
+            _logger.LogError(ex, "Error creating the group");
+            ErrorMessage = Resources.Web_Error_CreateFailed;
         }
         finally { IsSaving = false; }
     }
@@ -877,7 +881,7 @@ public class UserListViewModel
 
     public void StartCreateRole()
     {
-        if (!CanManageRoles) { ErrorMessage = "Keine Berechtigung."; return; }
+        if (!CanManageRoles) { ErrorMessage = Resources.Web_Error_NoPermission; return; }
         CancelEdit();
         SelectedUser = null; SelectedGroup = null; SelectedRole = null;
         IsCreatingRole = true; IsCreatingUser = false; IsCreatingGroup = false;
@@ -888,11 +892,11 @@ public class UserListViewModel
     public async Task CreateRoleAsync()
     {
         ErrorMessage = null;
-        if (string.IsNullOrWhiteSpace(CreateRoleName)) { ErrorMessage = "Rollenname erforderlich."; return; }
+        if (string.IsNullOrWhiteSpace(CreateRoleName)) { ErrorMessage = Resources.Web_Role_NameRequired; return; }
         if (_actorContext is null) return;
 
         if (!await _mgmtAuth.HasAnyPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
-        { ErrorMessage = "Keine Berechtigung."; return; }
+        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
         {
@@ -901,12 +905,12 @@ public class UserListViewModel
             await _roleRepo.CreateAsync(role);
             IsCreatingRole = false; CreateRoleName = "";
             await LoadTabDataAsync();
-            SuccessMessage = "Rolle erstellt.";
+            SuccessMessage = Resources.Web_Role_Created;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Erstellen der Rolle");
-            ErrorMessage = "Fehler beim Erstellen.";
+            _logger.LogError(ex, "Error creating the role");
+            ErrorMessage = Resources.Web_Error_CreateFailed;
         }
         finally { IsSaving = false; }
     }
@@ -923,7 +927,7 @@ public class UserListViewModel
     {
         if (SelectedUser is null || _actorContext is null) return;
         if (!await _mgmtAuth.CanManageUserAsync(_actorContext, SelectedUser.Id, ManagementPermission.DeleteUsers))
-        { ErrorMessage = "Keine Berechtigung."; return; }
+        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
         {
@@ -931,12 +935,12 @@ public class UserListViewModel
             await _userRepo.DeleteAsync(SelectedUser.Id);
             SelectedUser = null; IsConfirmingDelete = false;
             await LoadTabDataAsync();
-            SuccessMessage = "Benutzer gelöscht.";
+            SuccessMessage = Resources.Web_User_Deleted;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Löschen");
-            ErrorMessage = "Fehler beim Löschen.";
+            _logger.LogError(ex, "Error deleting");
+            ErrorMessage = Resources.Web_Error_DeleteFailed;
         }
         finally { IsSaving = false; }
     }
@@ -945,7 +949,7 @@ public class UserListViewModel
     {
         if (SelectedGroup is null || _actorContext is null) return;
         if (!await _mgmtAuth.CanManageGroupAsync(_actorContext, SelectedGroup.Id, ManagementPermission.DeleteGroups))
-        { ErrorMessage = "Keine Berechtigung."; return; }
+        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
         {
@@ -953,12 +957,12 @@ public class UserListViewModel
             await _groupRepo.DeleteAsync(SelectedGroup.Id);
             SelectedGroup = null; IsConfirmingDelete = false;
             await LoadTabDataAsync();
-            SuccessMessage = "Gruppe gelöscht.";
+            SuccessMessage = Resources.Web_Group_Deleted;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Löschen");
-            ErrorMessage = "Fehler beim Löschen.";
+            _logger.LogError(ex, "Error deleting");
+            ErrorMessage = Resources.Web_Error_DeleteFailed;
         }
         finally { IsSaving = false; }
     }
@@ -967,7 +971,7 @@ public class UserListViewModel
     {
         if (SelectedRole is null || _actorContext is null) return;
         if (!await _mgmtAuth.HasAnyPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
-        { ErrorMessage = "Keine Berechtigung."; return; }
+        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
         {
@@ -976,12 +980,12 @@ public class UserListViewModel
             SelectedRole = null; RoleMembers = []; RoleScopedAssignments = [];
             IsConfirmingDelete = false;
             await LoadTabDataAsync();
-            SuccessMessage = "Rolle gelöscht.";
+            SuccessMessage = Resources.Web_Role_Deleted;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Löschen");
-            ErrorMessage = "Fehler beim Löschen.";
+            _logger.LogError(ex, "Error deleting");
+            ErrorMessage = Resources.Web_Error_DeleteFailed;
         }
         finally { IsSaving = false; }
     }

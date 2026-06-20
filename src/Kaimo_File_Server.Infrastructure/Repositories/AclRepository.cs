@@ -43,8 +43,8 @@ public class AclRepository : IAclRepository
         var oldNormalized = ShareRelativePath.Normalize(oldRelativePath);
         var newNormalized = ShareRelativePath.Normalize(newRelativePath);
 
-        // Exakter Treffer (Datei oder Ordner selbst)
-        // + alle Kindpfade (beginnen mit oldPath + "/")
+        // Exact match (the file or folder itself)
+        // + all child paths (those starting with oldPath + "/")
         var prefix = oldNormalized + "/";
 
         var affected = await _db.FileMetadata
@@ -60,7 +60,7 @@ public class AclRepository : IAclRepository
             }
             else
             {
-                // Kind: alten Prefix durch neuen ersetzen
+                // Child: replace the old prefix with the new one
                 meta.Path = newNormalized + meta.Path.Substring(oldNormalized.Length);
             }
         }

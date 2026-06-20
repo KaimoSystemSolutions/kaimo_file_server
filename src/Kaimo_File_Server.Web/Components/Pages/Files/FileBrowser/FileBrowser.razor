@@ -51,7 +51,7 @@
     </div>
 </div>
 
-@* -- Toolbar für selektierte Einträge -- *@
+@* -- Toolbar for selected items -- *@
 <div class="selection-toolbar @(_selectedItems.Count == 0 ? "selection-toolbar--inactive" : "")">
     <div class="toolbar-left">
         <span class="toolbar-count">
@@ -111,7 +111,7 @@
     </div>
 }
 
-@* -- Dialog: Löschen bestätigen -- *@
+@* -- Dialog: confirm deletion -- *@
 @if (_showDeleteConfirm)
 {
     <div class="modal-backdrop" @onclick="CancelDelete" @onkeydown="OnDeleteKeyDown" tabindex="0" @ref="_deleteModalRef">
@@ -331,7 +331,7 @@ else
             }
         }
 
-        @* -- Dateien -- *@
+        @* -- Files -- *@
         @foreach (var file in SortedFiles)
         {
             var isSelected = _selectedItems.Contains(file);
@@ -395,7 +395,7 @@ else
     </div>
 }
 
-@* -- Kontextmenü (Rechtsklick) -- *@
+@* -- Context menu (right-click) -- *@
 <ContextMenu @ref="_contextMenuComponent" FileBrowser="this" FilePreviewComponent="_filePreviewComponent" />
 
 @* -- Dialog: Umbenennen -- *@

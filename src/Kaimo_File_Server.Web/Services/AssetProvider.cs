@@ -46,7 +46,7 @@ public class AssetProvider
 
         var svg = File.ReadAllText(fullPath);
 
-        // Nur width/height überschreiben, viewBox bleibt
+        // Only override width/height, the viewBox stays untouched
         svg = Regex.Replace(svg, @"(?<=\bwidth="")\d+(?="")", width.ToString());
         svg = Regex.Replace(svg, @"(?<=\bheight="")\d+(?="")", height.ToString());
 

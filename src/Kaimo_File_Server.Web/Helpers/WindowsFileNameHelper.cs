@@ -3,16 +3,17 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Kaimo_File_Server.Core.Language;
 
 /// <summary>
-/// Plattformunabhängige Helper-Klasse zur Validierung und Bereinigung
-/// von Datei- und Ordnernamen nach Windows-NTFS-Regeln.
+/// Platform-independent helper for validating and sanitizing file and folder
+/// names according to Windows NTFS rules.
 /// </summary>
 public static class WindowsFileNameHelper
 {
     /// <summary>
-    /// Zeichen, die in Windows-Datei- und Ordnernamen verboten sind.
-    /// Direkt aus der .NET-Runtime-Quelle (Path.Windows.cs).
+    /// Characters that are forbidden in Windows file and folder names.
+    /// Taken directly from the .NET runtime source (Path.Windows.cs).
     /// </summary>
     private static readonly char[] InvalidFileNameChars =
     [
@@ -24,8 +25,8 @@ public static class WindowsFileNameHelper
     ];
 
     /// <summary>
-    /// Zeichen, die in Windows-Pfaden verboten sind (weniger restriktiv als Dateinamen).
-    /// Direkt aus der .NET-Runtime-Quelle (Path.Windows.cs).
+    /// Characters that are forbidden in Windows paths (less restrictive than file names).
+    /// Taken directly from the .NET runtime source (Path.Windows.cs).
     /// </summary>
     private static readonly char[] InvalidPathChars =
     [
@@ -37,7 +38,7 @@ public static class WindowsFileNameHelper
     ];
 
     /// <summary>
-    /// Reservierte Gerätenamen unter Windows (case-insensitive).
+    /// Reserved device names under Windows (case-insensitive).
     /// </summary>
     private static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -47,12 +48,12 @@ public static class WindowsFileNameHelper
     };
 
     /// <summary>
-    /// Maximale Länge eines einzelnen Datei-/Ordnernamens unter Windows.
+    /// Maximum length of a single file/folder name under Windows.
     /// </summary>
     public const int MaxNameLength = 255;
 
     /// <summary>
-    /// Prüft, ob ein Datei- oder Ordnername unter Windows gültig ist.
+    /// Checks whether a file or folder name is valid under Windows.
     /// </summary>
     public static bool IsValid(string name)
     {
@@ -60,15 +61,15 @@ public static class WindowsFileNameHelper
     }
 
     /// <summary>
-    /// Prüft, ob ein kompletter Pfad unter Windows gültig ist.
-    /// Validiert den Pfad selbst mit InvalidPathChars und jedes Segment als Dateinamen.
+    /// Checks whether a complete path is valid under Windows.
+    /// Validates the path itself against InvalidPathChars and each segment as a file name.
     /// </summary>
     public static bool IsValidPath(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
             return false;
 
-        // Pfad darf keine InvalidPathChars enthalten
+        // The path must not contain any InvalidPathChars
         if (path.Any(c => InvalidPathChars.Contains(c)))
             return false;
 
@@ -78,7 +79,7 @@ public static class WindowsFileNameHelper
         {
             var part = parts[i];
 
-            // Laufwerksbuchstabe überspringen
+            // Skip the drive letter
             if (i == 0 && part.Length == 2 && char.IsLetter(part[0]) && part[1] == ':')
                 continue;
 
@@ -90,8 +91,8 @@ public static class WindowsFileNameHelper
     }
 
     /// <summary>
-    /// Gibt eine Liste aller Validierungsfehler für den Namen zurück.
-    /// Leere Liste = gültig.
+    /// Returns a list of all validation errors for the name.
+    /// An empty list means the name is valid.
     /// </summary>
     public static List<string> GetValidationErrors(string name)
     {
@@ -99,67 +100,67 @@ public static class WindowsFileNameHelper
 
         if (string.IsNullOrEmpty(name))
         {
-            errors.Add("Name darf nicht leer sein.");
+            errors.Add(Resources.Web_Validation_NameEmpty);
             return errors;
         }
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            errors.Add("Name darf nicht nur aus Leerzeichen bestehen.");
+            errors.Add(Resources.Web_Validation_NameWhitespace);
             return errors;
         }
 
         if (name.Length > MaxNameLength)
-            errors.Add($"Name überschreitet die maximale Länge von {MaxNameLength} Zeichen ({name.Length}).");
+            errors.Add(string.Format(Resources.Web_Validation_NameTooLong, MaxNameLength, name.Length));
 
         var found = name.Where(c => InvalidFileNameChars.Contains(c)).Distinct().ToList();
         if (found.Count > 0)
         {
             var display = string.Join(", ", found.Select(FormatChar));
-            errors.Add($"Ungültige Zeichen: {display}");
+            errors.Add(string.Format(Resources.Web_Validation_InvalidChars, display));
         }
 
         if (name.EndsWith('.'))
-            errors.Add("Name darf nicht mit einem Punkt enden.");
+            errors.Add(Resources.Web_Validation_NameEndsWithDot);
 
         if (name.EndsWith(' '))
-            errors.Add("Name darf nicht mit einem Leerzeichen enden.");
+            errors.Add(Resources.Web_Validation_NameEndsWithSpace);
 
         var baseName = Path.GetFileNameWithoutExtension(name);
         if (ReservedNames.Contains(baseName))
-            errors.Add($"'{baseName}' ist ein reservierter Windows-Gerätename.");
+            errors.Add(string.Format(Resources.Web_Validation_ReservedName, baseName));
 
         return errors;
     }
 
     /// <summary>
-    /// Bereinigt einen Namen, sodass er unter Windows gültig ist.
-    /// Ungültige Zeichen werden durch <paramref name="replacement"/> ersetzt.
+    /// Sanitizes a name so that it is valid under Windows.
+    /// Invalid characters are replaced with <paramref name="replacement"/>.
     /// </summary>
-    /// <param name="name">Der zu bereinigende Name.</param>
-    /// <param name="replacement">Ersatzzeichen für ungültige Zeichen (Standard: '_').</param>
-    /// <param name="maxLength">Maximale Länge des Ergebnisses (Standard: 255).</param>
+    /// <param name="name">The name to sanitize.</param>
+    /// <param name="replacement">Replacement character for invalid characters (default: '_').</param>
+    /// <param name="maxLength">Maximum length of the result (default: 255).</param>
     public static string Sanitize(string name, char replacement = '_', int maxLength = MaxNameLength)
     {
         if (string.IsNullOrWhiteSpace(name))
             return "_";
 
-        // Ungültige Zeichen ersetzen
+        // Replace invalid characters
         var sanitized = new string(name.Select(c =>
             InvalidFileNameChars.Contains(c) ? replacement : c
         ).ToArray());
 
-        // Mehrfache Replacement-Zeichen zusammenfassen
+        // Collapse runs of replacement characters into a single one
         if (replacement != '\0')
         {
             var pattern = Regex.Escape(replacement.ToString()) + "{2,}";
             sanitized = Regex.Replace(sanitized, pattern, replacement.ToString());
         }
 
-        // Trailing dots und spaces entfernen
+        // Remove trailing dots and spaces
         sanitized = sanitized.TrimEnd('.', ' ');
 
-        // Reservierte Namen behandeln: Unterstrich anhängen
+        // Handle reserved names by appending an underscore
         var baseName = Path.GetFileNameWithoutExtension(sanitized);
         if (ReservedNames.Contains(baseName))
         {
@@ -167,7 +168,7 @@ public static class WindowsFileNameHelper
             sanitized = baseName + "_" + ext;
         }
 
-        // Auf maximale Länge kürzen (Extension beibehalten)
+        // Truncate to the maximum length (keeping the extension)
         if (sanitized.Length > maxLength)
         {
             var ext = Path.GetExtension(sanitized);
@@ -179,21 +180,21 @@ public static class WindowsFileNameHelper
     }
 
     /// <summary>
-    /// Bereinigt einen kompletten Pfad (jedes Segment einzeln mit InvalidFileNameChars,
-    /// zusätzlich InvalidPathChars auf Pfad-Ebene).
-    /// Laufwerksbuchstaben (z.B. "C:") bleiben erhalten.
+    /// Sanitizes a complete path (each segment individually with InvalidFileNameChars,
+    /// plus InvalidPathChars at the path level).
+    /// Drive letters (e.g. "C:") are preserved.
     /// </summary>
     public static string SanitizePath(string path, char replacement = '_')
     {
         if (string.IsNullOrWhiteSpace(path))
             return "_";
 
-        // Zuerst InvalidPathChars auf Gesamtpfad-Ebene ersetzen
+        // First replace InvalidPathChars across the whole path
         var cleaned = new string(path.Select(c =>
             InvalidPathChars.Contains(c) ? replacement : c
         ).ToArray());
 
-        // Pfad-Separatoren normalisieren
+        // Normalize path separators
         var parts = cleaned.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
         var result = new List<string>();
 
@@ -201,21 +202,21 @@ public static class WindowsFileNameHelper
         {
             var part = parts[i];
 
-            // Laufwerksbuchstabe beibehalten (z.B. "C:")
+            // Preserve the drive letter (e.g. "C:")
             if (i == 0 && part.Length == 2 && char.IsLetter(part[0]) && part[1] == ':')
             {
                 result.Add(part);
                 continue;
             }
 
-            // Jedes Segment mit den strengeren InvalidFileNameChars bereinigen
+            // Sanitize each segment with the stricter InvalidFileNameChars
             result.Add(Sanitize(part, replacement));
         }
 
         var separator = Path.DirectorySeparatorChar.ToString();
         var joined = string.Join(separator, result);
 
-        // Ursprünglichen Root-Separator beibehalten
+        // Preserve the original root separator
         if (path.StartsWith("/") || path.StartsWith("\\"))
             joined = separator + joined;
 
@@ -223,7 +224,7 @@ public static class WindowsFileNameHelper
     }
 
     /// <summary>
-    /// Formatiert ein Zeichen für die Fehlerausgabe.
+    /// Formats a character for display in error output.
     /// </summary>
     private static string FormatChar(char c)
     {

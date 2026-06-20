@@ -11,6 +11,7 @@ using System.Security.Claims;
 using Kaimo_File_Server.Web.Helpers;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Search;
+using Kaimo_File_Server.Core.Language;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -116,7 +117,7 @@ public class FileBrowserViewModel
             CurrentShare = await _shareRepo.GetByNameAsync(shareName);
             if (CurrentShare is null)
             {
-                ErrorMessage = "Share nicht gefunden.";
+                ErrorMessage = Resources.Web_Error_ShareNotFound;
                 Items = [];
                 return;
             }
@@ -135,7 +136,7 @@ public class FileBrowserViewModel
 
             if (CurrentPath.Contains("..") || CurrentPath.Contains('\0'))
             {
-                ErrorMessage = "Ungültiger Pfad.";
+                ErrorMessage = Resources.Web_Error_InvalidPath;
                 Items = [];
                 return;
             }
@@ -143,7 +144,7 @@ public class FileBrowserViewModel
             var userContext = await GetCurrentUserContextAsync();
             if (userContext is null)
             {
-                ErrorMessage = "Nicht authentifiziert.";
+                ErrorMessage = Resources.Web_Error_NotAuthenticated;
                 Items = [];
                 return;
             }
@@ -155,7 +156,7 @@ public class FileBrowserViewModel
                 && !await _mgmtAuth.CanManageShareAsync(
                         userContext, CurrentShare.Id, ManagementPermission.EditShareSettings))
             {
-                ErrorMessage = "Share ist deaktiviert.";
+                ErrorMessage = Resources.Web_Error_ShareDisabled;
                 Items = [];
                 return;
             }
@@ -172,12 +173,12 @@ public class FileBrowserViewModel
         }
         catch (UnauthorizedAccessException)
         {
-            ErrorMessage = "Zugriff verweigert.";
+            ErrorMessage = Resources.Web_Error_AccessDenied;
             Items = [];
         }
         catch (Exception ex)
         {
-            ErrorMessage = "Fehler beim Laden der Dateien.";
+            ErrorMessage = Resources.Web_Error_LoadFilesFailed;
             _logger.LogError(ex, "Error loading share {ShareName} path {SubPath}", shareName, subPath);
             Items = [];
         }
@@ -191,23 +192,23 @@ public class FileBrowserViewModel
     public async Task<OperationResult> CreateFolderAsync(string folderName)
     {
         if (_fileService is null || CurrentShare is null)
-            return OperationResult.Fail("Kein Share geladen.");
+            return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
 
         if (string.IsNullOrWhiteSpace(folderName))
-            return OperationResult.Fail("Bitte einen Ordnernamen eingeben.");
+            return OperationResult.Fail(Resources.Web_Folder_NameRequired);
 
         // File- / Directoryname Validation
         if (!WindowsFileNameHelper.IsValid(folderName))
         {
             var errors = WindowsFileNameHelper.GetValidationErrors(folderName);
-            return OperationResult.Fail("Der Name enthält ungültige Zeichen.  Fehler: " + string.Join(", ", errors));
+            return OperationResult.Fail(Resources.Web_Name_InvalidChars + string.Join(", ", errors));
         }
 
         try
         {
             var userContext = await GetCurrentUserContextAsync();
             if (userContext is null)
-                return OperationResult.Fail("Nicht authentifiziert.");
+                return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
 
             var targetPath = string.IsNullOrEmpty(CurrentPath)
                 ? folderName
@@ -223,16 +224,16 @@ public class FileBrowserViewModel
         }
         catch (UnauthorizedAccessException)
         {
-            return OperationResult.Fail("Zugriff verweigert.");
+            return OperationResult.Fail(Resources.Web_Error_AccessDenied);
         }
         catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
         {
-            return OperationResult.Fail("Ein Element mit diesem Namen existiert bereits.");
+            return OperationResult.Fail(Resources.Web_Error_ItemExists);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating folder '{FolderName}'", folderName);
-            return OperationResult.Fail("Fehler beim Erstellen des Ordners.");
+            return OperationResult.Fail(Resources.Web_Error_CreateFolderFailed);
         }
     }
 
@@ -240,13 +241,13 @@ public class FileBrowserViewModel
     public async Task<OperationResult> DeleteAsync(FileMetadata item)
     {
         if (_fileService is null || CurrentShare is null)
-            return OperationResult.Fail("Kein Share geladen.");
+            return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
 
         try
         {
             var userContext = await GetCurrentUserContextAsync();
             if (userContext is null)
-                return OperationResult.Fail("Nicht authentifiziert.");
+                return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
 
             // Build relative path within the share
             var relativePath = item.Path;
@@ -263,16 +264,16 @@ public class FileBrowserViewModel
         }
         catch (UnauthorizedAccessException)
         {
-            return OperationResult.Fail("Zugriff verweigert.");
+            return OperationResult.Fail(Resources.Web_Error_AccessDenied);
         }
         catch (FileNotFoundException)
         {
-            return OperationResult.Fail("Datei oder Ordner nicht gefunden.");
+            return OperationResult.Fail(Resources.Web_Error_FileOrFolderNotFound);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting '{Path}'", item.Path);
-            return OperationResult.Fail("Fehler beim Löschen.");
+            return OperationResult.Fail(Resources.Web_Error_DeleteFailed);
         }
     }
 
@@ -280,23 +281,23 @@ public class FileBrowserViewModel
     public async Task<OperationResult> RenameAsync(FileMetadata item, string newName)
     {
         if (_fileService is null || CurrentShare is null)
-            return OperationResult.Fail("Kein Share geladen.");
+            return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
 
         if (string.IsNullOrWhiteSpace(newName))
-            return OperationResult.Fail("Bitte einen neuen Namen eingeben.");
+            return OperationResult.Fail(Resources.Web_Rename_NameRequired);
 
         if (!WindowsFileNameHelper.IsValid(newName))
         {
             var errors = WindowsFileNameHelper.GetValidationErrors(newName);
             return OperationResult.Fail(
-                "Der Name enthält ungültige Zeichen.  Fehler: " + string.Join(", ", errors));
+                Resources.Web_Name_InvalidChars + string.Join(", ", errors));
         }
 
         try
         {
             var userContext = await GetCurrentUserContextAsync();
             if (userContext is null)
-                return OperationResult.Fail("Nicht authentifiziert.");
+                return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
 
             var relativePath = item.Path;
             if (relativePath.StartsWith(CurrentShare.Path))
@@ -318,16 +319,16 @@ public class FileBrowserViewModel
         }
         catch (UnauthorizedAccessException)
         {
-            return OperationResult.Fail("Zugriff verweigert.");
+            return OperationResult.Fail(Resources.Web_Error_AccessDenied);
         }
         catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
         {
-            return OperationResult.Fail("Ein Element mit diesem Namen existiert bereits.");
+            return OperationResult.Fail(Resources.Web_Error_ItemExists);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error renaming '{Path}' to '{NewName}'", item.Path, newName);
-            return OperationResult.Fail("Fehler beim Umbenennen.");
+            return OperationResult.Fail(Resources.Web_Error_RenameFailed);
         }
     }
 
@@ -417,7 +418,7 @@ public class FileBrowserViewModel
         }
     }
 
-    /// <summary>Holt die berechnete Größe, falls schon da.</summary>
+    /// <summary>Returns the computed size if it has already been calculated.</summary>
     public long? GetDirectorySize(FileMetadata dir)
     {
         if (!dir.IsDirectory || CurrentShare is null) return dir.Size;
@@ -453,13 +454,13 @@ public class FileBrowserViewModel
     public async Task<OperationResult> ArchiveAsync(List<FileMetadata> items, string format)
     {
         if (_fileService is null || CurrentShare is null)
-            return OperationResult.Fail("Kein Share geladen.");
+            return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
 
         try
         {
             var userContext = await GetCurrentUserContextAsync();
             if (userContext is null)
-                return OperationResult.Fail("Nicht authentifiziert.");
+                return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
 
             var relativePaths = items.Select(item =>
             {
@@ -486,29 +487,29 @@ public class FileBrowserViewModel
         }
         catch (UnauthorizedAccessException)
         {
-            return OperationResult.Fail("Zugriff verweigert.");
+            return OperationResult.Fail(Resources.Web_Error_AccessDenied);
         }
         catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
         {
-            return OperationResult.Fail($"Ein Archiv mit dem Namen \"archiv{format}\" existiert bereits.");
+            return OperationResult.Fail(string.Format(Resources.Web_Error_ArchiveExists, $"archiv{format}"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error archiving {Count} items", items.Count);
-            return OperationResult.Fail("Fehler beim Archivieren.");
+            return OperationResult.Fail(Resources.Web_Error_ArchiveFailed);
         }
     }
     
     public async Task<OperationResult> UnzipAsync(FileMetadata file)
     {
         if (_fileService is null || CurrentShare is null)
-            return OperationResult.Fail("Kein Share geladen.");
+            return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
 
         try
         {
             var userContext = await GetCurrentUserContextAsync();
             if (userContext is null)
-                return OperationResult.Fail("Nicht authentifiziert.");
+                return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
 
             var relativePath = file.Path;
             if (relativePath.StartsWith(CurrentShare.Path))
@@ -528,20 +529,20 @@ public class FileBrowserViewModel
         }
         catch (UnauthorizedAccessException)
         {
-            return OperationResult.Fail("Zugriff verweigert.");
+            return OperationResult.Fail(Resources.Web_Error_AccessDenied);
         }
         catch (InvalidDataException)
         {
-            return OperationResult.Fail("Die Datei ist kein gültiges ZIP-Archiv.");
+            return OperationResult.Fail(Resources.Web_Error_NotValidZip);
         }
         catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
         {
-            return OperationResult.Fail("Ein Ordner mit diesem Namen existiert bereits.");
+            return OperationResult.Fail(Resources.Web_Error_FolderExists);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error unzipping '{Path}'", file.Path);
-            return OperationResult.Fail("Fehler beim Entpacken.");
+            return OperationResult.Fail(Resources.Web_Error_ExtractFailed);
         }
     }
 
@@ -549,20 +550,20 @@ public class FileBrowserViewModel
     {
         
     if (_fileService is null || CurrentShare is null)
-        return OperationResult.Fail("Kein Share geladen.");
+        return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
 
     if (string.IsNullOrWhiteSpace(fileName))
-        return OperationResult.Fail("Dateiname fehlt.");
+        return OperationResult.Fail(Resources.Web_FileName_Missing);
 
     if (!WindowsFileNameHelper.IsValid(fileName))
     {
         var errors = WindowsFileNameHelper.GetValidationErrors(fileName);
-        return OperationResult.Fail("Der Dateiname enthält ungültige Zeichen. Fehler: " + string.Join(", ", errors));
+        return OperationResult.Fail(Resources.Web_FileName_InvalidChars + string.Join(", ", errors));
     }
 
     var userContext = await GetCurrentUserContextAsync();
     if (userContext is null)
-        return OperationResult.Fail("Nicht authentifiziert.");
+        return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
 
     var targetPath = string.IsNullOrEmpty(CurrentPath)
         ? fileName
@@ -592,11 +593,11 @@ public class FileBrowserViewModel
 
         return ex switch
         {
-            OperationCanceledException => OperationResult.Fail("Upload abgebrochen."),
-            UnauthorizedAccessException => OperationResult.Fail("Zugriff verweigert."),
+            OperationCanceledException => OperationResult.Fail(Resources.Web_Upload_Aborted),
+            UnauthorizedAccessException => OperationResult.Fail(Resources.Web_Error_AccessDenied),
             IOException ioEx when ioEx.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase)
-                => OperationResult.Fail("Eine Datei mit diesem Namen existiert bereits."),
-            _ => OperationResult.Fail("Fehler beim Hochladen.")
+                => OperationResult.Fail(Resources.Web_Error_FileExists),
+            _ => OperationResult.Fail(Resources.Web_Error_UploadFailed)
         };
     }
     }

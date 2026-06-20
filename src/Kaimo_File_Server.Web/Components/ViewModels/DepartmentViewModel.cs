@@ -7,6 +7,7 @@ using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
+using Kaimo_File_Server.Core.Language;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -91,19 +92,22 @@ public class DepartmentViewModel
     public List<Department> AvailableParents { get; private set; } = [];
 
     // ══════════════════════════════════════════
-    //  FilePermission Display (replaces DepartmentPermissionDisplay)
+    //  FilePermission display metadata for the department default-permission UI
     // ══════════════════════════════════════════
 
-    public static readonly List<DeptPermFlag> PermFlags =
+    // Built on each access so the labels resolve against the current UI culture
+    // (CurrentUICulture is set per request, so a static-readonly list would freeze
+    // the language captured at type-load time).
+    public static List<DeptPermFlag> PermFlags =>
     [
-        new("Lesen", "Dateien und Verzeichnisse auflisten, lesen, Attribute lesen",
+        new(Resources.Web_DeptPerm_Read, Resources.Web_DeptPerm_ReadDesc,
             FilePermission.ReadAll),
-        new("Schreiben", "Dateien erstellen, bearbeiten, Attribute schreiben",
+        new(Resources.Web_DeptPerm_Write, Resources.Web_DeptPerm_WriteDesc,
             FilePermission.CreateWriteData | FilePermission.CreateAppendData
             | FilePermission.WriteAttributes | FilePermission.WriteExtAttributes),
-        new("Löschen", "Dateien und Unterordner löschen",
+        new(Resources.Web_DeptPerm_Delete, Resources.Web_DeptPerm_DeleteDesc,
             FilePermission.Delete | FilePermission.DeleteSubItems),
-        new("Administration", "Berechtigungen ändern, Besitz übernehmen",
+        new(Resources.Web_DeptPerm_Admin, Resources.Web_DeptPerm_AdminDesc,
             FilePermission.AdminAll),
     ];
 
@@ -131,7 +135,7 @@ public class DepartmentViewModel
             if (_actorContext == null)
             {
                 CanAccessPage = false;
-                ErrorMessage = "Nicht angemeldet.";
+                ErrorMessage = Resources.Web_Error_NotLoggedIn;
                 return;
             }
 
@@ -142,8 +146,8 @@ public class DepartmentViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Laden der Abteilungsverwaltung");
-            ErrorMessage = "Fehler beim Laden.";
+            _logger.LogError(ex, "Error loading the department management");
+            ErrorMessage = Resources.Web_Error_LoadFailedGeneric;
         }
         finally { IsLoading = false; }
     }
@@ -273,7 +277,7 @@ public class DepartmentViewModel
         if (!await _mgmtAuth.CanManageDepartmentAsync(
                 _actorContext, Selected.Id, ManagementPermission.EditDepartment))
         {
-            ErrorMessage = "Keine Berechtigung, diese Abteilung zu bearbeiten.";
+            ErrorMessage = Resources.Web_Dept_NoPermissionEdit;
             return;
         }
 
@@ -321,7 +325,7 @@ public class DepartmentViewModel
         if (!await _mgmtAuth.CanManageDepartmentAsync(
                 _actorContext, Selected.Id, ManagementPermission.EditDepartment))
         {
-            ErrorMessage = "Keine Berechtigung.";
+            ErrorMessage = Resources.Web_Error_NoPermission;
             return;
         }
 
@@ -397,12 +401,12 @@ public class DepartmentViewModel
             await LoadDepartmentsAsync();
 
             IsEditing = false;
-            SuccessMessage = "Abteilung gespeichert.";
+            SuccessMessage = Resources.Web_Dept_Saved;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Speichern der Abteilung {Id}", Selected.Id);
-            ErrorMessage = "Fehler beim Speichern.";
+            _logger.LogError(ex, "Error saving department {Id}", Selected.Id);
+            ErrorMessage = Resources.Web_Error_SaveFailed;
         }
         finally { IsSaving = false; }
     }
@@ -413,7 +417,7 @@ public class DepartmentViewModel
 
     public void StartCreate()
     {
-        if (!CanEdit) { ErrorMessage = "Keine Berechtigung."; return; }
+        if (!CanEdit) { ErrorMessage = Resources.Web_Error_NoPermission; return; }
         CancelEdit();
         Selected = null;
         IsCreating = true;
@@ -427,12 +431,12 @@ public class DepartmentViewModel
     {
         ErrorMessage = null;
         if (string.IsNullOrWhiteSpace(CreateName))
-        { ErrorMessage = "Abteilungsname erforderlich."; return; }
+        { ErrorMessage = Resources.Web_Dept_NameRequired; return; }
         if (_actorContext is null) return;
 
         if (!await _mgmtAuth.HasAnyPermissionAsync(
                 _actorContext, ManagementPermission.EditDepartment))
-        { ErrorMessage = "Keine Berechtigung."; return; }
+        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
         {
@@ -446,12 +450,12 @@ public class DepartmentViewModel
             IsCreating = false;
             CreateName = ""; CreateDescription = "";
             await LoadDepartmentsAsync();
-            SuccessMessage = "Abteilung erstellt.";
+            SuccessMessage = Resources.Web_Dept_Created;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Erstellen der Abteilung");
-            ErrorMessage = "Fehler beim Erstellen.";
+            _logger.LogError(ex, "Error creating the department");
+            ErrorMessage = Resources.Web_Error_CreateFailed;
         }
         finally { IsSaving = false; }
     }
@@ -472,13 +476,13 @@ public class DepartmentViewModel
 
         if (Selected.Id == WellKnownDepartments.GlobalId)
         {
-            ErrorMessage = "Die Global-Abteilung kann nicht gelöscht werden.";
+            ErrorMessage = Resources.Web_Dept_CannotDeleteGlobal;
             return;
         }
 
         if (!await _mgmtAuth.CanManageDepartmentAsync(
                 _actorContext, Selected.Id, ManagementPermission.EditDepartment))
-        { ErrorMessage = "Keine Berechtigung."; return; }
+        { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
         {
@@ -506,12 +510,12 @@ public class DepartmentViewModel
             PermInfo = null;
             IsConfirmingDelete = false;
             await LoadDepartmentsAsync();
-            SuccessMessage = "Abteilung gelöscht.";
+            SuccessMessage = Resources.Web_Dept_Deleted;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Löschen der Abteilung");
-            ErrorMessage = "Fehler beim Löschen.";
+            _logger.LogError(ex, "Error deleting the department");
+            ErrorMessage = Resources.Web_Error_DeleteFailed;
         }
         finally { IsSaving = false; }
     }

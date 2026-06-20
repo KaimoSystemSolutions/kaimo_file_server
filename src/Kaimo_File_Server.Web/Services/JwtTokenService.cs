@@ -13,7 +13,7 @@ public class JwtTokenService
     private readonly int _expirationHours;
     private readonly ILogger<JwtTokenService> _logger;
 
-    private const int MinSecretLength = 32; // 256 Bit Minimum für HMAC-SHA256
+    private const int MinSecretLength = 32; // 256-bit minimum for HMAC-SHA256
 
     public JwtTokenService(IConfiguration config, ILogger<JwtTokenService> logger)
     {
@@ -57,7 +57,7 @@ public class JwtTokenService
         );
 
         var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
-        _logger.LogDebug("Token generiert für {Username}, gültig bis {Expires}",
+        _logger.LogDebug("Token generated for {Username}, valid until {Expires}",
             username, token.ValidTo);
         return tokenString;
     }
@@ -71,7 +71,7 @@ public class JwtTokenService
 
             if (!handler.CanReadToken(token))
             {
-                _logger.LogWarning("Token kann nicht gelesen werden");
+                _logger.LogWarning("Token cannot be read");
                 return null;
             }
 
@@ -90,12 +90,12 @@ public class JwtTokenService
         }
         catch (SecurityTokenExpiredException)
         {
-            _logger.LogInformation("Token abgelaufen");
+            _logger.LogInformation("Token expired");
             return null;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Token-Validierung fehlgeschlagen: {Error}", ex.Message);
+            _logger.LogWarning("Token validation failed: {Error}", ex.Message);
             return null;
         }
     }

@@ -11,7 +11,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public ApplicationDbContext CreateDbContext(string[] args)
         {
             var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-            // Connection String ist egal — wird nur für die Migration-Generierung gebraucht
+            // The connection string is irrelevant here — it is only used for generating migrations.
             optionsBuilder.UseNpgsql("Host=localhost;Database=dummy");
             return new ApplicationDbContext(optionsBuilder.Options);
         }

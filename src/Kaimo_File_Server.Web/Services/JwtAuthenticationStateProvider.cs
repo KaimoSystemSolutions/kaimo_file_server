@@ -6,8 +6,8 @@ using Microsoft.JSInterop;
 namespace Kaimo_File_Server.Web.Services;
 
 /// <summary>
-/// Blazor AuthenticationStateProvider der den JWT-Token direkt aus
-/// localStorage (via IJSRuntime) liest und validiert.
+/// Blazor AuthenticationStateProvider that reads and validates the JWT token
+/// directly from localStorage (via IJSRuntime).
 /// </summary>
 public class JwtAuthenticationStateProvider : AuthenticationStateProvider
 {
@@ -41,7 +41,7 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
 
             if (string.IsNullOrEmpty(token))
             {
-                _logger.LogDebug("Kein Token im localStorage gefunden");
+                _logger.LogDebug("No token found in localStorage");
                 return _anonymous;
             }
 
@@ -49,23 +49,23 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
 
             if (principal is null)
             {
-                _logger.LogInformation("Token ungültig oder abgelaufen, wird entfernt");
+                _logger.LogInformation("Token invalid or expired, removing it");
                 try { await _js.InvokeVoidAsync("localStorage.removeItem", "auth_token"); } catch { }
                 return _anonymous;
             }
 
-            _logger.LogDebug("Token gültig für: {Username}", principal.Identity?.Name);
+            _logger.LogDebug("Token valid for: {Username}", principal.Identity?.Name);
             _cachedPrincipal = principal;
             return new AuthenticationState(principal);
         }
         catch (InvalidOperationException)
         {
-            // JS Interop nicht verfügbar (sollte mit prerender: false nicht passieren)
+            // JS interop not available (should not happen with prerender: false)
             return _anonymous;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unerwarteter Fehler beim Laden des Auth-State");
+            _logger.LogError(ex, "Unexpected error while loading the auth state");
             return _anonymous;
         }
     }
@@ -77,7 +77,7 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
         var principal = _jwtService.ValidateToken(token);
         if (principal is not null)
         {
-            _logger.LogInformation("Login erfolgreich für: {Username}", principal.Identity?.Name);
+            _logger.LogInformation("Login successful for: {Username}", principal.Identity?.Name);
             _cachedPrincipal = principal;
             NotifyAuthenticationStateChanged(
                 Task.FromResult(new AuthenticationState(principal)));
@@ -91,7 +91,7 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
 
     public async Task LogoutAsync()
     {
-        _logger.LogInformation("Logout durchgeführt");
+        _logger.LogInformation("Logout performed");
         try { await _js.InvokeVoidAsync("localStorage.removeItem", "auth_token"); } catch { }
         _cachedPrincipal = null;
         NotifyAuthenticationStateChanged(Task.FromResult(_anonymous));

@@ -7,6 +7,7 @@ using Kaimo_File_Server.Core.Storage;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
+using Kaimo_File_Server.Core.Language;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -178,8 +179,8 @@ public partial class ShareListViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Laden der Shares");
-            ErrorMessage = "Fehler beim Laden der Shares.";
+            _logger.LogError(ex, "Error loading the shares");
+            ErrorMessage = Resources.Web_Error_LoadSharesFailed;
             Shares = [];
         }
         finally
@@ -195,16 +196,16 @@ public partial class ShareListViewModel
         error = null;
 
         if (string.IsNullOrEmpty(name))
-        { error = "Name darf nicht leer sein."; return false; }
+        { error = Resources.Web_Validation_NameEmpty; return false; }
 
         if (name.Length > 64)
-        { error = "Name darf maximal 64 Zeichen lang sein."; return false; }
+        { error = Resources.Web_ShareName_MaxLength; return false; }
 
         if (!SafeShareNameRegex().IsMatch(name))
-        { error = "Nur Buchstaben, Zahlen, Bindestriche, Unterstriche und Punkte erlaubt."; return false; }
+        { error = Resources.Web_ShareName_AllowedChars; return false; }
 
         if (name.StartsWith('.') || name.EndsWith('.'))
-        { error = "Name darf nicht mit einem Punkt beginnen oder enden."; return false; }
+        { error = Resources.Web_ShareName_NoLeadingTrailingDot; return false; }
 
         return true;
     }
@@ -225,7 +226,7 @@ public partial class ShareListViewModel
         {
             var existing = await _shareRepo.GetByNameAsync(name);
             if (existing is not null)
-            { CreateErrorMessage = "Ein Share mit diesem Namen existiert bereits."; return false; }
+            { CreateErrorMessage = Resources.Web_Error_ShareExists; return false; }
 
             var share = new ShareDefinition(name, BuildSharePath(name));
             await _shareRepo.CreateAsync(share);
@@ -240,7 +241,7 @@ public partial class ShareListViewModel
             if (user is not null)
             {
 
-                // Root-FileMetadata für den Share anlegen + Owner-ACL
+                // Create the root FileMetadata for the share + owner ACL
                 var rootMeta = new FileMetadata
                 {
                     Id = Guid.NewGuid(),
@@ -265,7 +266,7 @@ public partial class ShareListViewModel
                 //await _accessRepo.EnsureShareRootAclAsync(share.Id, user.Id);
             }
 
-            _logger.LogInformation("Share '{ShareName}' erstellt", name);
+            _logger.LogInformation("Share '{ShareName}' created", name);
 
             NewShareName = "";
             IsCreating = false;
@@ -274,8 +275,8 @@ public partial class ShareListViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Erstellen des Shares '{ShareName}'", name);
-            CreateErrorMessage = "Fehler beim Erstellen des Shares.";
+            _logger.LogError(ex, "Error creating share '{ShareName}'", name);
+            CreateErrorMessage = Resources.Web_Error_CreateShareFailed;
             return false;
         }
     }
@@ -321,14 +322,14 @@ public partial class ShareListViewModel
         var oldName = SelectedShare.Name;
 
         if (newName == oldName)
-        { EditErrorMessage = "Der Name ist unverändert."; return false; }
+        { EditErrorMessage = Resources.Web_Rename_Unchanged; return false; }
 
         if (!ValidateShareName(newName, out var error))
         { EditErrorMessage = error; return false; }
 
         var existingNew = await _shareRepo.GetByNameAsync(newName);
         if (existingNew is not null)
-        { EditErrorMessage = "Ein Share mit diesem Namen existiert bereits."; return false; }
+        { EditErrorMessage = Resources.Web_Error_ShareExists; return false; }
 
         var shareLock = _lockManager.GetLock(oldName);
 
@@ -338,7 +339,7 @@ public partial class ShareListViewModel
             // Lock holen – wartet bis alle laufenden Ops fertig sind
             if (!await shareLock.WaitAsync(TimeSpan.FromSeconds(30)))
             {
-                EditErrorMessage = "Share ist gerade in Benutzung. Bitte versuche es erneut.";
+                EditErrorMessage = Resources.Web_Error_ShareInUse;
                 return false;
             }
 
@@ -359,9 +360,9 @@ public partial class ShareListViewModel
                 // 4. Lock-Key umbenennen
                 _lockManager.RenameLock(oldName, newName);
 
-                _logger.LogInformation("Share '{OldName}' umbenannt zu '{NewName}'", oldName, newName);
+                _logger.LogInformation("Share '{OldName}' renamed to '{NewName}'", oldName, newName);
 
-                EditSuccessMessage = $"Share umbenannt zu '{newName}'.";
+                EditSuccessMessage = string.Format(Resources.Web_Share_RenamedTo, newName);
                 EditShareName = newName;
                 await LoadAsync();
 
@@ -379,8 +380,8 @@ public partial class ShareListViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Umbenennen des Shares '{OldName}' -> '{NewName}'", oldName, newName);
-            EditErrorMessage = "Fehler beim Umbenennen. Bitte prüfe die Logs.";
+            _logger.LogError(ex, "Error renaming share '{OldName}' -> '{NewName}'", oldName, newName);
+            EditErrorMessage = Resources.Web_Error_RenameFailedCheckLogs;
             return false;
         }
         finally
@@ -403,9 +404,11 @@ public partial class ShareListViewModel
             SelectedShare.IsEnabled = !SelectedShare.IsEnabled;
             await _shareRepo.UpdateAsync(SelectedShare);
 
-            var status = SelectedShare.IsEnabled ? "aktiviert" : "deaktiviert";
-            _logger.LogInformation("Share '{ShareName}' {Status}", SelectedShare.Name, status);
-            EditSuccessMessage = $"Share {status}.";
+            _logger.LogInformation("Share '{ShareName}' {Status}",
+                SelectedShare.Name, SelectedShare.IsEnabled ? "enabled" : "disabled");
+            EditSuccessMessage = SelectedShare.IsEnabled
+                ? Resources.Web_Share_Enabled
+                : Resources.Web_Share_Disabled;
 
             await LoadAsync();
 
@@ -418,8 +421,8 @@ public partial class ShareListViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Ändern des Share-Status");
-            EditErrorMessage = "Fehler beim Ändern des Status.";
+            _logger.LogError(ex, "Error changing the share status");
+            EditErrorMessage = Resources.Web_Error_ChangeStatusFailed;
             return false;
         }
     }
@@ -436,9 +439,11 @@ public partial class ShareListViewModel
             SelectedShare.IsRecycleEnabled = !SelectedShare.IsRecycleEnabled;
             await _shareRepo.UpdateAsync(SelectedShare);
 
-            var status = SelectedShare.IsRecycleEnabled ? "aktiviert" : "deaktiviert";
-            _logger.LogInformation("Papierkorb für Share '{ShareName}' {Status}", SelectedShare.Name, status);
-            EditSuccessMessage = $"Papierkorb für Share {status}.";
+            _logger.LogInformation("Recycle bin for share '{ShareName}' {Status}",
+                SelectedShare.Name, SelectedShare.IsRecycleEnabled ? "enabled" : "disabled");
+            EditSuccessMessage = SelectedShare.IsRecycleEnabled
+                ? Resources.Web_Share_RecycleEnabled
+                : Resources.Web_Share_RecycleDisabled;
 
             await LoadAsync();
 
@@ -451,8 +456,8 @@ public partial class ShareListViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Ändern des Recycle-Status");
-            EditErrorMessage = "Fehler beim Ändern des Status.";
+            _logger.LogError(ex, "Error changing the recycle bin status");
+            EditErrorMessage = Resources.Web_Error_ChangeStatusFailed;
             return false;
         }
     }
@@ -469,9 +474,11 @@ public partial class ShareListViewModel
             SelectedShare.IsShareHidden = !SelectedShare.IsShareHidden;
             await _shareRepo.UpdateAsync(SelectedShare);
 
-            var status = SelectedShare.IsShareHidden ? "aktiviert" : "deaktiviert";
-            _logger.LogInformation("Share '{ShareName}' {Status}", SelectedShare.Name, status);
-            EditSuccessMessage = $"Share {status}.";
+            _logger.LogInformation("Share '{ShareName}' visibility {Status}",
+                SelectedShare.Name, SelectedShare.IsShareHidden ? "hidden" : "visible");
+            EditSuccessMessage = SelectedShare.IsShareHidden
+                ? Resources.Web_Share_Enabled
+                : Resources.Web_Share_Disabled;
 
             await LoadAsync();
 
@@ -484,8 +491,8 @@ public partial class ShareListViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Ändern der Share-Sichtbarkeit");
-            EditErrorMessage = "Fehler beim Ändern der Sichtbarkeit.";
+            _logger.LogError(ex, "Error changing the share visibility");
+            EditErrorMessage = Resources.Web_Error_ChangeVisibilityFailed;
             return false;
         }
     }
@@ -504,7 +511,7 @@ public partial class ShareListViewModel
             await _shareRepo.DeleteAsync(SelectedShare.Id);
             _lockManager.RemoveLock(name);
 
-            _logger.LogInformation("Share '{ShareName}' gelöscht", name);
+            _logger.LogInformation("Share '{ShareName}' deleted", name);
 
             DeselectShare();
             await LoadAsync();
@@ -512,8 +519,8 @@ public partial class ShareListViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Löschen des Shares");
-            EditErrorMessage = "Fehler beim Löschen.";
+            _logger.LogError(ex, "Error deleting the share");
+            EditErrorMessage = Resources.Web_Error_DeleteFailed;
             return false;
         }
     }
@@ -534,8 +541,8 @@ public partial class ShareListViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Laden der Zugriffsrechte");
-            AccessErrorMessage = "Fehler beim Laden der Zugriffsrechte.";
+            _logger.LogError(ex, "Error loading the access rights");
+            AccessErrorMessage = Resources.Web_Error_LoadAccessRightsFailed;
         }
     }
 
@@ -550,8 +557,8 @@ public partial class ShareListViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Gewähren des Zugriffs");
-            AccessErrorMessage = "Fehler beim Gewähren des Zugriffs.";
+            _logger.LogError(ex, "Error granting access");
+            AccessErrorMessage = Resources.Web_Error_GrantAccessFailed;
         }
     }
 
@@ -566,8 +573,8 @@ public partial class ShareListViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Entziehen des Zugriffs");
-            AccessErrorMessage = "Fehler beim Entziehen des Zugriffs.";
+            _logger.LogError(ex, "Error revoking access");
+            AccessErrorMessage = Resources.Web_Error_RevokeAccessFailed;
         }
     }
 

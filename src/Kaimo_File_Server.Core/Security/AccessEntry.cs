@@ -6,8 +6,8 @@ namespace Kaimo_File_Server.Core.Security
     {
         public Guid Id { get; set; }
         public Guid FileMetadataId { get; set; }
-        public Guid PrincipalId { get; set; }          // User oder Gruppe
-        public AclEntryType EntryType { get; set; }     // Allow oder Deny
+        public Guid PrincipalId { get; set; }          // User, group or role
+        public AclEntryType EntryType { get; set; }     // Allow or Deny
         public FilePermission Permissions { get; set; }
         public AclInheritance Inheritance { get; set; }
 

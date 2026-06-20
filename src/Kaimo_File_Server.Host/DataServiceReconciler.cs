@@ -49,7 +49,7 @@ namespace Kaimo_File_Server.Host
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Reconcile-Durchlauf fehlgeschlagen.");
+                    _logger.LogError(ex, "Reconcile run failed.");
                 }
 
                 try

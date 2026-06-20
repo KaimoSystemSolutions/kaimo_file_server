@@ -6,6 +6,7 @@ using Kaimo_File_Server.Core.Storage;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
+using Kaimo_File_Server.Core.Language;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -124,8 +125,8 @@ public partial class ShareBrowserViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Fehler beim Laden der Shares");
-            ErrorMessage = "Fehler beim Laden der Shares.";
+            _logger.LogError(ex, "Error loading the shares");
+            ErrorMessage = Resources.Web_Error_LoadSharesFailed;
             Shares = [];
         }
         finally

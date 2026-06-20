@@ -177,8 +177,8 @@ public class DatabaseSeeder
     ///   Global (well-known, already seeded)
     ///
     ///   Entwicklung (Default: ReadAll | CreateWriteData)
-    ///   ├-- Backend    (null → erbt von Entwicklung)
-    ///   └-- Frontend   (null → erbt von Entwicklung)
+    ///   ├-- Backend    (null → inherits from Entwicklung)
+    ///   └-- Frontend   (null → inherits from Entwicklung)
     ///
     ///   Marketing (Default: ReadAll)
     ///
@@ -232,7 +232,7 @@ public class DatabaseSeeder
     {
         if (await _db.Users.AnyAsync())
         {
-            _logger.LogDebug("Users bereits vorhanden — überspringe Test-User");
+            _logger.LogDebug("Users already present - skipping test users");
             return;
         }
 
@@ -508,7 +508,7 @@ public class DatabaseSeeder
         );
 
         await _db.SaveChangesAsync();
-        _logger.LogInformation("Config-Einträge geseeded");
+        _logger.LogInformation("Config entries seeded");
     }
 
     // -- Logging --

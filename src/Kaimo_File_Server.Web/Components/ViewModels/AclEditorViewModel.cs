@@ -40,10 +40,10 @@ public class AclEditorViewModel
     public string? ErrorMessage { get; private set; }
     public string? SuccessMessage { get; private set; }
 
-    /// <summary>Eigene ACLs dieses Pfads (editierbar)</summary>
+    /// <summary>This path's own ACLs (editable)</summary>
     public List<AccessEntry> Entries { get; private set; } = [];
 
-    /// <summary>Geerbte ACLs von übergeordneten Pfaden (readonly)</summary>
+    /// <summary>ACLs inherited from parent paths (read-only)</summary>
     public List<InheritedAclEntry> InheritedEntries { get; private set; } = [];
 
     public List<User> AllUsers { get; private set; } = [];
@@ -80,16 +80,16 @@ public class AclEditorViewModel
                 "AclEditor loading: raw='{RawPath}' → normalized='{NormalizedPath}', shareId={ShareId}",
                 path, NormalizedPath, shareId);
 
-            // Eigenen FileMetadata laden/erstellen
+            // Load or create this path's own FileMetadata
             var meta = await _metaRepo.GetOrCreateAsync(
                 NormalizedPath, isDirectory, Guid.Empty, shareId);
 
             FileMetadataId = meta.Id;
 
-            // Eigene ACLs laden
+            // Load this path's own ACLs
             Entries = await _aclRepo.GetByFileMetadataIdAsync(meta.Id);
 
-            // Geerbte ACLs von Eltern-Pfaden laden
+            // Load ACLs inherited from parent paths
             InheritedEntries = await LoadInheritedAclsAsync(shareId, isDirectory);
 
             AllUsers = (await _userRepo.GetAllAsync()).ToList();
@@ -105,7 +105,7 @@ public class AclEditorViewModel
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error loading ACL for '{Path}'", path);
-            ErrorMessage = "Fehler beim Laden der Berechtigungen.";
+            ErrorMessage = Resources.Web_Acl_LoadPermissionsFailed;
         }
     }
 
@@ -113,7 +113,7 @@ public class AclEditorViewModel
     {
         var hierarchy = ShareRelativePath.BuildHierarchy(NormalizedPath);
 
-        // Nur Eltern-Pfade, nicht den aktuellen Pfad selbst
+        // Only parent paths, not the current path itself
         var parentPaths = hierarchy.Where(p => p != NormalizedPath).ToList();
 
         if (parentPaths.Count == 0)
@@ -211,14 +211,14 @@ public class AclEditorViewModel
             await _aclRepo.AddAsync(entry);
             Entries = await _aclRepo.GetByFileMetadataIdAsync(FileMetadataId);
 
-            SuccessMessage = "Berechtigung hinzugefügt.";
+            SuccessMessage = Resources.Web_Acl_Added;
             IsAddingEntry = false;
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error adding ACL entry");
-            ErrorMessage = "Fehler beim Hinzufügen.";
+            ErrorMessage = Resources.Web_Error_AddFailed;
             return false;
         }
     }
@@ -245,13 +245,13 @@ public class AclEditorViewModel
         SuccessMessage = null;
 
         if (NewPermissions == FilePermission.None)
-        { ErrorMessage = "Bitte mindestens eine Berechtigung auswählen."; return false; }
+        { ErrorMessage = Resources.Web_Acl_SelectAtLeastOnePermission; return false; }
 
         try
         {
             var entry = Entries.FirstOrDefault(e => e.Id == EditingEntryId.Value);
             if (entry is null)
-            { ErrorMessage = "Eintrag nicht gefunden."; return false; }
+            { ErrorMessage = Resources.Web_Error_EntryNotFound; return false; }
 
             entry.EntryType = NewEntryType;
             entry.Permissions = NewPermissions;
@@ -260,14 +260,14 @@ public class AclEditorViewModel
             await _aclRepo.UpdateAsync(entry);
             Entries = await _aclRepo.GetByFileMetadataIdAsync(FileMetadataId);
 
-            SuccessMessage = "Berechtigung aktualisiert.";
+            SuccessMessage = Resources.Web_Acl_Updated;
             EditingEntryId = null;
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating ACL entry");
-            ErrorMessage = "Fehler beim Speichern.";
+            ErrorMessage = Resources.Web_Error_SaveFailed;
             return false;
         }
     }
@@ -281,13 +281,13 @@ public class AclEditorViewModel
         {
             await _aclRepo.DeleteAsync(entryId);
             Entries = await _aclRepo.GetByFileMetadataIdAsync(FileMetadataId);
-            SuccessMessage = "Berechtigung entfernt.";
+            SuccessMessage = Resources.Web_Acl_Removed;
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting ACL entry");
-            ErrorMessage = "Fehler beim Entfernen.";
+            ErrorMessage = Resources.Web_Error_RemoveFailed;
             return false;
         }
     }
@@ -346,7 +346,7 @@ public class AclEditorViewModel
 }
 
 /// <summary>
-/// Wrapper für geerbte ACL-Einträge mit Quellpfad-Info
+/// Wrapper for inherited ACL entries, carrying the source path they came from.
 /// </summary>
 public class InheritedAclEntry
 {
