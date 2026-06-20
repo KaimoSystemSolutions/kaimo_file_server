@@ -352,9 +352,6 @@ public class DepartmentViewModel
                 await _departmentRepo.RemoveUserAsync(Selected.Id, userId);
 
             // -- Groups diff (direct FK: Group.DepartmentId) --
-            var desiredGroupIds = EditGroups
-                .Where(g => g.IsChecked).Select(g => g.Item.Id).ToHashSet();
-
             foreach (var item in EditGroups)
             {
                 var group = item.Item;
@@ -364,17 +361,12 @@ public class DepartmentViewModel
                 if (shouldBelong && !currentlyBelongs)
                 {
                     group.DepartmentId = Selected.Id;
-                    var fresh = await _groupRepo.GetByIdAsync(group.Id);
-                    if (fresh != null)
-                    {
-                        fresh.DepartmentId = Selected.Id;
-                        // GroupRepo needs an UpdateAsync or we save via DbContext
-                        // For now: update through the repo pattern
-                    }
+                    await _groupRepo.UpdateAsync(group);
                 }
                 else if (!shouldBelong && currentlyBelongs)
                 {
                     group.DepartmentId = WellKnownDepartments.GlobalId;
+                    await _groupRepo.UpdateAsync(group);
                 }
             }
 
@@ -497,7 +489,7 @@ public class DepartmentViewModel
             foreach (var group in deptGroups)
             {
                 group.DepartmentId = WellKnownDepartments.GlobalId;
-                // Save via group repo or dbcontext
+                await _groupRepo.UpdateAsync(group);
             }
 
             var deptShares = await _departmentRepo.GetSharesAsync(Selected.Id);

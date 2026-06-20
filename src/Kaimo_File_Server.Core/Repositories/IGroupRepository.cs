@@ -24,6 +24,11 @@ namespace Kaimo_File_Server.Core.Repositories
         Task<Group> CreateAsync(Group group);
 
         /// <summary>
+        /// Persists changes to an existing group (e.g. its <see cref="Group.DepartmentId"/>).
+        /// </summary>
+        Task UpdateAsync(Group group);
+
+        /// <summary>
         /// Deletes a group by its identifier.
         /// Implementations should cascade-delete related membership rows.
         /// </summary>

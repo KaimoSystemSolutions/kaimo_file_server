@@ -199,7 +199,10 @@ public class ManagementAuthService : IManagementAuthService
         UserContext actor, ManagementPermission required)
     {
         var assignments = await GetEffectiveAssignmentsAsync(actor);
-        return assignments.Any(a => HasPermission(a.Role, required));
+        // "Any" semantics: a single overlapping bit is enough. When the caller
+        // passes a combined flag (e.g. CreateGroups | ManageGroupMembers), the
+        // actor only needs ONE of those permissions — not all of them.
+        return assignments.Any(a => HasAnyOverlap(a.Role, required));
     }
 
     public async Task<bool> HasGlobalPermissionAsync(
@@ -282,9 +285,25 @@ public class ManagementAuthService : IManagementAuthService
 
     // -- Internals --
 
+    /// <summary>
+    /// ALL-bits check: the role must hold every bit in <paramref name="required"/>.
+    /// Used where a combined flag expresses a conjunction, e.g.
+    /// <see cref="ManagementPermission.FullAdmin"/> for the global-admin check.
+    /// </summary>
     private static bool HasPermission(Role role, ManagementPermission required)
     {
         return (role.ManagementPermissions & required) == required;
+    }
+
+    /// <summary>
+    /// ANY-bit check: the role holds at least one bit of <paramref name="required"/>.
+    /// Used for "can the actor do any of these things" gates, where a combined
+    /// flag expresses a disjunction (e.g. CreateGroups | ManageGroupMembers).
+    /// For single-bit arguments this is identical to <see cref="HasPermission"/>.
+    /// </summary>
+    private static bool HasAnyOverlap(Role role, ManagementPermission required)
+    {
+        return (role.ManagementPermissions & required) != 0;
     }
 
     /// <summary>

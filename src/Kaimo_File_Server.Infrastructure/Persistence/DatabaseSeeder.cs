@@ -194,8 +194,15 @@ public class DatabaseSeeder
         if (await _db.Departments.CountAsync() > 1)
             return;
 
+        // "Schreiben" in the UI = the full write bit set (CreateWriteData |
+        // CreateAppendData | WriteAttributes | WriteExtAttributes). Seeding only
+        // CreateWriteData would make the UI show "Schreiben" as unchecked.
+        const FilePermission writeGroup =
+            FilePermission.CreateWriteData | FilePermission.CreateAppendData |
+            FilePermission.WriteAttributes | FilePermission.WriteExtAttributes;
+
         var entwicklung = new Department("Entwicklung", "Software-Entwicklung")
-        { DefaultFilePermission = (long)(FilePermission.ReadAll | FilePermission.CreateWriteData) };
+        { DefaultFilePermission = (long)(FilePermission.ReadAll | writeGroup) };
 
         var marketing = new Department("Marketing", "Marketing & Kommunikation")
         { DefaultFilePermission = (long)FilePermission.ReadAll };

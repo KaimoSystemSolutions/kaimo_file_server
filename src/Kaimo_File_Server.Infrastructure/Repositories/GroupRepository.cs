@@ -34,6 +34,13 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         }
 
         /// <inheritdoc />
+        public async Task UpdateAsync(Group group)
+        {
+            _db.Groups.Update(group);
+            await _db.SaveChangesAsync();
+        }
+
+        /// <inheritdoc />
         public async Task DeleteAsync(Guid id)
         {
             var group = await _db.Groups.FindAsync(id);
