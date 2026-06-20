@@ -240,14 +240,38 @@ public class AclService : IAclService
         if (share == null)
             return FilePermission.None;
 
-        // Check if user is a member of the share's department
-        if (userContext.Departments == null ||
-            !userContext.Departments.Any(d => d.Id == share.DepartmentId))
+        var deptRepo = sp.GetRequiredService<IDepartmentRepository>();
+
+        // Membership is hierarchy-aware: a member of a sub-department also belongs
+        // to the parent organisation, so they get access to shares owned by the
+        // share's department OR any ancestor of their own department.
+        // Equivalent: the user is a member of the share's department or of any
+        // DESCENDANT of it.
+        if (!await IsMemberOfDepartmentOrDescendantAsync(userContext, share.DepartmentId, deptRepo))
             return FilePermission.None;
 
-        // Walk the department hierarchy to find the effective default
-        var deptRepo = sp.GetRequiredService<IDepartmentRepository>();
+        // The permission VALUE always comes from the SHARE's department (walking
+        // up for inheritance). So a share owned by a parent department applies the
+        // parent's default even to sub-department members, while a share owned by
+        // the sub-department applies the sub-department's own default (or inherits).
         return await ResolveEffectiveDeptPermissionAsync(share.DepartmentId, deptRepo);
+    }
+
+    /// <summary>
+    /// True if any of the user's departments is the share's department itself
+    /// or a descendant of it (hierarchy-aware membership).
+    /// </summary>
+    private static async Task<bool> IsMemberOfDepartmentOrDescendantAsync(
+        UserContext userContext, Guid shareDepartmentId, IDepartmentRepository deptRepo)
+    {
+        if (userContext.Departments == null || userContext.Departments.Count == 0)
+            return false;
+
+        if (userContext.Departments.Any(d => d.Id == shareDepartmentId))
+            return true;
+
+        var descendants = await deptRepo.GetDescendantIdsAsync(shareDepartmentId);
+        return userContext.Departments.Any(d => descendants.Contains(d.Id));
     }
 
     /// <summary>

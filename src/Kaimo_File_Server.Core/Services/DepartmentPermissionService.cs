@@ -14,9 +14,10 @@ namespace Kaimo_File_Server.Core.Services;
 ///      (which may be inherited from a parent department)
 ///   4. If no match → 0 (no department-based access)
 ///
-/// The hierarchy only affects the PERMISSION VALUE inheritance,
-/// not the membership check. A user must be a direct member of
-/// the share's department to get department-based file access.
+/// Membership is HIERARCHY-AWARE: a member of a sub-department also belongs to
+/// the parent organisation, so they get access to shares owned by the share's
+/// department or any ancestor of their own department. The PERMISSION VALUE
+/// still comes from the share's department (walking up for inheritance).
 ///
 /// Example:
 ///   Department "Engineering" (DefaultFilePermission = Read|Write)
@@ -24,8 +25,8 @@ namespace Kaimo_File_Server.Core.Services;
 ///
 ///   Share "Docs" → DepartmentId = Engineering
 ///   User "Alice" → member of "Engineering" → gets Read|Write on "Docs"
-///   User "Bob"   → member of "Backend"     → gets nothing on "Docs"
-///                   (Bob is NOT a direct member of Engineering)
+///   User "Bob"   → member of "Backend"     → ALSO gets Read|Write on "Docs"
+///                   (Backend is a descendant of Engineering)
 /// </summary>
 public class DepartmentPermissionService : IDepartmentPermissionService
 {
@@ -106,8 +107,9 @@ public class DepartmentPermissionService : IDepartmentPermissionService
         var share = await _shareRepo.GetByIdAsync(shareId);
         if (share == null) return 0;
 
-        // 2. Check if user is a direct member of that department
-        if (!await _departmentRepo.IsUserInDepartmentAsync(userId, share.DepartmentId))
+        // 2. Check membership hierarchy-aware: a member of a sub-department of
+        //    the share's department also qualifies.
+        if (!await _departmentRepo.IsUserInDepartmentOrDescendantAsync(userId, share.DepartmentId))
             return 0;
 
         // 3. Resolve effective default (with hierarchy inheritance for the VALUE)
