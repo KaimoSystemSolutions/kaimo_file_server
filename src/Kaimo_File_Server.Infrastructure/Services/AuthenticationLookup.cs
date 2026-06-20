@@ -49,19 +49,33 @@ namespace Kaimo_File_Server.Infrastructure.Services
             if (share is null)
                 return false;
 
-            // If a share is hidden, it should not be visible to anyone, even if they have permissions to access it.
+            // If a share is hidden, it should not be visible in any listing,
+            // even if the principal has the permissions to access it directly.
             if (share.IsShareHidden)
                 return false;
 
-            var user = await _contextFactory.CreateByUserIdAsync(principalId);
-            if (user is null) 
+            return await HasRootListAccessAsync(shareID, principalId);
+        }
+
+        public async Task<bool> CanAccessShareAsync(Guid shareID, Guid principalId)
+        {
+            ShareDefinition? share = await _shareRepo.GetByIdAsync(shareID);
+            if (share is null)
                 return false;
 
-            // If user has access to list the share, they should be able to see it in the share list.
-            if ( await _aclService.HasAccessAsync(user, shareID, "", true, FilePermission.ListReadData))
-                return true;
+            // Connect/access path intentionally ignores IsShareHidden: a hidden
+            // share stays reachable via its direct path as long as the ACL allows.
+            return await HasRootListAccessAsync(shareID, principalId);
+        }
 
-            return false;
+        private async Task<bool> HasRootListAccessAsync(Guid shareID, Guid principalId)
+        {
+            var user = await _contextFactory.CreateByUserIdAsync(principalId);
+            if (user is null)
+                return false;
+
+            return await _aclService.HasAccessAsync(
+                user, shareID, "", true, FilePermission.ListReadData);
         }
     }
 }

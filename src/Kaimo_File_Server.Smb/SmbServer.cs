@@ -33,6 +33,7 @@ namespace Kaimo_File_Server.Smb
             public Guid Id { get; init; }
             public string DbName { get; init; } = "";
             public string Path { get; init; } = "";
+            public bool IsHidden { get; init; }
             public FileSystemShare Share { get; init; } = null!;
         }
 
@@ -116,6 +117,7 @@ namespace Kaimo_File_Server.Smb
                     Id = shareDef.Id,
                     DbName = shareDef.Name,
                     Path = shareDef.Path,
+                    IsHidden = shareDef.IsShareHidden,
                     Share = fsShare
                 };
 
@@ -273,10 +275,10 @@ namespace Kaimo_File_Server.Smb
                 var shareRepo = scope.ServiceProvider.GetRequiredService<IShareRepository>();
                 var dbShares = Task.Run(() => shareRepo.GetAllEnabledAsync()).GetAwaiter().GetResult();
 
-                var dbByName = new Dictionary<string, (Guid Id, string Name, string Path)>(
+                var dbByName = new Dictionary<string, (Guid Id, string Name, string Path, bool IsHidden)>(
                     StringComparer.OrdinalIgnoreCase);
                 foreach (var s in dbShares)
-                    dbByName[s.Name] = (s.Id, s.Name, s.Path);
+                    dbByName[s.Name] = (s.Id, s.Name, s.Path, s.IsShareHidden);
 
                 // Remove shares no longer in DB
                 foreach (var active in _activeShares.Values.ToList())
@@ -290,12 +292,13 @@ namespace Kaimo_File_Server.Smb
                 }
 
                 // Add new or update changed shares
-                foreach (var (id, name, path) in dbByName.Values)
+                foreach (var (id, name, path, isHidden) in dbByName.Values)
                 {
                     if (_activeShares.TryGetValue(name, out var existing))
                     {
-                        // Path changed → replace
-                        if (!string.Equals(existing.Path, path, StringComparison.OrdinalIgnoreCase))
+                        // Path or hidden-flag changed → replace
+                        if (!string.Equals(existing.Path, path, StringComparison.OrdinalIgnoreCase)
+                            || existing.IsHidden != isHidden)
                         {
                             _activeShares.TryRemove(name, out _);
                             _server.RemoveShare(name);
@@ -308,10 +311,11 @@ namespace Kaimo_File_Server.Smb
                                 Id = id,
                                 DbName = name,
                                 Path = path,
+                                IsHidden = isHidden,
                                 Share = fsShare
                             };
 
-                            Console.WriteLine($"[~] Share '{name}' Pfad aktualisiert -> {path}");
+                            Console.WriteLine($"[~] Share '{name}' aktualisiert -> {path}");
                         }
                     }
                     else
@@ -325,6 +329,7 @@ namespace Kaimo_File_Server.Smb
                             Id = id,
                             DbName = name,
                             Path = path,
+                            IsHidden = isHidden,
                             Share = fsShare
                         };
 
@@ -401,7 +406,9 @@ namespace Kaimo_File_Server.Smb
                 // of whether it runs on this thread or a different one.
                 SmbFileSystem.RegisterUser(userContext);
 
-                args.Allow = Task.Run(() => authLookup.CanListShareAsync(shareId, userContext.User.Id))
+                // Connect-time check: ACL only, NOT the hidden flag — a hidden share
+                // must stay reachable via its direct \\server\share path.
+                args.Allow = Task.Run(() => authLookup.CanAccessShareAsync(shareId, userContext.User.Id))
                     .GetAwaiter().GetResult();
             }
             catch (Exception ex)
@@ -439,8 +446,14 @@ namespace Kaimo_File_Server.Smb
                     // client actually tries to connect. Returning an empty list here
                     // causes SMBLibrary to crash with NullReferenceException in
                     // GetNetrShareGetInfoResponse because it doesn't null-check.
-                    Console.WriteLine("[ABE] No user context — returning all shares as fallback.");
-                    return _activeShares.Values.Select(e => e.DbName).ToList();
+                    //
+                    // Hidden shares are still filtered out even in this fallback so
+                    // the hidden flag is never leaked through an enumeration.
+                    Console.WriteLine("[ABE] No user context — returning non-hidden shares as fallback.");
+                    return _activeShares.Values
+                        .Where(e => !e.IsHidden)
+                        .Select(e => e.DbName)
+                        .ToList();
                 }
 
                 using var scope = _serviceProvider.CreateScope();
@@ -470,7 +483,10 @@ namespace Kaimo_File_Server.Smb
             catch (Exception ex)
             {
                 Console.WriteLine($"[ABE ERROR] {ex.Message}");
-                return _activeShares.Values.Select(e => e.DbName).ToList();
+                return _activeShares.Values
+                    .Where(e => !e.IsHidden)
+                    .Select(e => e.DbName)
+                    .ToList();
             }
         }
 

@@ -53,6 +53,16 @@ public interface IManagementAuthService
     /// <summary>
     /// Returns the set of share IDs the actor can manage for the given permission.
     /// Returns Unrestricted if the actor has Global scope.
+    /// Uses ALL-bits semantics: the role must hold every bit in <paramref name="required"/>.
     /// </summary>
     Task<AuthorizedScopeResult> GetAuthorizedShareIdsAsync(UserContext actor, ManagementPermission required);
+
+    /// <summary>
+    /// Like <see cref="GetAuthorizedShareIdsAsync"/> but with ANY-bit semantics:
+    /// the actor qualifies for a share if their role holds AT LEAST ONE of the bits
+    /// in <paramref name="anyOf"/>. Pass a combined mask such as
+    /// <see cref="ManagementPermission.ShareAdmin"/> to mean "any share-management right".
+    /// Returns Unrestricted if the actor has Global scope.
+    /// </summary>
+    Task<AuthorizedScopeResult> GetAuthorizedShareIdsAnyAsync(UserContext actor, ManagementPermission anyOf);
 }

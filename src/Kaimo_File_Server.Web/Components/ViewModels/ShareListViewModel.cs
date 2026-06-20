@@ -16,7 +16,9 @@ public partial class ShareListViewModel
     private readonly IUserRepository _userRepo;
     private readonly IGroupRepository _groupRepo;
     private readonly IAclRepository _aclRepo;
-    private readonly IDepartmentPermissionService _departmentPermissionService;
+    private readonly IAclService _aclService;
+    private readonly IManagementAuthService _mgmtAuth;
+    private readonly IUserContextFactory _userContextFactory;
     private readonly IStorageEngine _storage;
     private readonly ShareLockManager _lockManager;
     private readonly AuthenticationStateProvider _authState;
@@ -28,6 +30,9 @@ public partial class ShareListViewModel
         IUserRepository userRepo,
         IGroupRepository groupRepo,
         IAclRepository aclRepo,
+        IAclService aclService,
+        IManagementAuthService mgmtAuth,
+        IUserContextFactory userContextFactory,
         IStorageEngine storage,
         ShareLockManager lockManager,
         AuthenticationStateProvider authState,
@@ -38,6 +43,9 @@ public partial class ShareListViewModel
         _userRepo = userRepo;
         _groupRepo = groupRepo;
         _aclRepo = aclRepo;
+        _aclService = aclService;
+        _mgmtAuth = mgmtAuth;
+        _userContextFactory = userContextFactory;
         _storage = storage;
         _lockManager = lockManager;
         _authState = authState;
@@ -76,8 +84,23 @@ public partial class ShareListViewModel
     // -- Computed --
 
     public string CurrentUserName { get; private set; } = "";
+
+    /// <summary>True if the actor may manage at least one share (any scope).</summary>
     public bool IsAdmin { get; private set; }
     public bool CanCreateShare { get; private set; }
+
+    // Management scope for the current actor (resolved in LoadAsync).
+    // _manageAllShares == true  → unrestricted (Global) admin.
+    // otherwise _manageableShareIds holds the in-scope share IDs.
+    private bool _manageAllShares;
+    private HashSet<Guid> _manageableShareIds = new();
+
+    /// <summary>
+    /// Whether the current actor may open the management panel for a specific share.
+    /// A share the actor only sees via ACL (normal user view) is NOT manageable.
+    /// </summary>
+    public bool CanManageShare(Guid shareId)
+        => _manageAllShares || _manageableShareIds.Contains(shareId);
 
     [GeneratedRegex(@"^[a-zA-Z0-9\-_.]+$")]
     private static partial Regex SafeShareNameRegex();
@@ -96,39 +119,62 @@ public partial class ShareListViewModel
                            ?? state.User.Identity?.Name
                            ?? "";
 
-            IsAdmin = state.User.IsInRole("Administrator")
-                   || state.User.IsInRole("ShareManager");
-            CanCreateShare = IsAdmin;
+            var username = state.User.Identity?.Name;
+            var actor = string.IsNullOrEmpty(username)
+                ? null
+                : await _userContextFactory.CreateByUsernameAsync(username);
 
-            var userId = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            // Admins sehen alle Shares (auch deaktivierte), normale User nur aktivierte
-            var allShares = IsAdmin
-                ? await _shareRepo.GetAllAsync()
-                : await _shareRepo.GetAllEnabledAsync();
-
-            if (userId is not null && Guid.TryParse(userId, out var uid))
+            if (actor is null)
             {
-                if (IsAdmin)
-                {
-                    // Admins sehen alles
-                    Shares = allShares;
-                }
-                else
-                {
-                    var accessible = new List<ShareDefinition>();
-                    foreach (var share in allShares)
-                    {
-                        
-                        accessible.Add(share);
-                    }
-                    Shares = accessible;
-                }
+                // No resolvable user → show nothing (default deny).
+                IsAdmin = false;
+                CanCreateShare = false;
+                _manageAllShares = false;
+                _manageableShareIds = new();
+                Shares = [];
+                return;
             }
-            else
+
+            // -- Resolve management scope (any share-management right) --
+            // Global scope → unrestricted; otherwise limited to the actor's
+            // department(s) + descendants. These shares are shown to the manager
+            // regardless of ACL, hidden, or enabled state.
+            var mgmtScope = await _mgmtAuth.GetAuthorizedShareIdsAnyAsync(
+                actor, ManagementPermission.ShareAdmin);
+
+            _manageAllShares = mgmtScope.IsUnrestricted;
+            _manageableShareIds = mgmtScope.IsUnrestricted
+                ? new HashSet<Guid>()
+                : mgmtScope.ScopeIds.ToHashSet();
+
+            IsAdmin = _manageAllShares || _manageableShareIds.Count > 0;
+            CanCreateShare = await _mgmtAuth.HasAnyPermissionAsync(
+                actor, ManagementPermission.CreateShares);
+
+            // Load every share, then filter per actor.
+            var allShares = await _shareRepo.GetAllAsync();
+            var visible = new List<ShareDefinition>(allShares.Count);
+
+            foreach (var share in allShares)
             {
-                Shares = allShares;
+                // (A) Management view: in scope → always visible (incl. hidden/disabled).
+                if (_manageAllShares || _manageableShareIds.Contains(share.Id))
+                {
+                    visible.Add(share);
+                    continue;
+                }
+
+                // (B) Normal user view: must be enabled, not hidden, and the actor
+                //     needs ListReadData on the share root.
+                if (!share.IsEnabled || share.IsShareHidden)
+                    continue;
+
+                if (await _aclService.HasAccessAsync(
+                        actor, share.Id, "", true, FilePermission.ListReadData))
+                    visible.Add(share);
             }
+
+            Shares = visible;
         }
         catch (Exception ex)
         {

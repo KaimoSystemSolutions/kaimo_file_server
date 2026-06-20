@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Storage;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
@@ -11,17 +12,26 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 public partial class ShareBrowserViewModel
 {
     private readonly IShareRepository _shareRepo;
+    private readonly IAclService _aclService;
+    private readonly IManagementAuthService _mgmtAuth;
+    private readonly IUserContextFactory _userContextFactory;
     private readonly IStorageEngine _storage;
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<ShareBrowserViewModel> _logger;
 
     public ShareBrowserViewModel(
         IShareRepository shareRepo,
+        IAclService aclService,
+        IManagementAuthService mgmtAuth,
+        IUserContextFactory userContextFactory,
         IStorageEngine storage,
         AuthenticationStateProvider authState,
         ILogger<ShareBrowserViewModel> logger)
     {
         _shareRepo = shareRepo;
+        _aclService = aclService;
+        _mgmtAuth = mgmtAuth;
+        _userContextFactory = userContextFactory;
         _storage = storage;
         _authState = authState;
         _logger = logger;
@@ -62,29 +72,55 @@ public partial class ShareBrowserViewModel
                            ?? state.User.Identity?.Name
                            ?? "";
 
-            IsAdmin = state.User.IsInRole("Administrator")
-                   || state.User.IsInRole("ShareManager");
-            CanManageShares = IsAdmin;
+            var username = state.User.Identity?.Name;
+            var actor = string.IsNullOrEmpty(username)
+                ? null
+                : await _userContextFactory.CreateByUsernameAsync(username);
 
-            var userId = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var allShares = await _shareRepo.GetAllEnabledAsync();
-
-            if (userId is not null && Guid.TryParse(userId, out var uid))
+            if (actor is null)
             {
-                var accessible = new List<ShareDefinition>();
+                IsAdmin = false;
+                CanManageShares = false;
+                Shares = [];
+                return;
+            }
 
-                
-                foreach (var share in allShares)
+            // Management scope (any share-management right). Global → unrestricted,
+            // otherwise limited to the actor's department(s) + descendants.
+            var mgmtScope = await _mgmtAuth.GetAuthorizedShareIdsAnyAsync(
+                actor, ManagementPermission.ShareAdmin);
+
+            var manageAll = mgmtScope.IsUnrestricted;
+            var manageableShareIds = mgmtScope.IsUnrestricted
+                ? new HashSet<Guid>()
+                : mgmtScope.ScopeIds.ToHashSet();
+
+            IsAdmin = manageAll || manageableShareIds.Count > 0;
+            CanManageShares = await _mgmtAuth.HasAnyPermissionAsync(
+                actor, ManagementPermission.CreateShares);
+
+            var allShares = await _shareRepo.GetAllAsync();
+            var visible = new List<ShareDefinition>(allShares.Count);
+
+            foreach (var share in allShares)
+            {
+                // (A) Management view: in scope → always visible (incl. hidden/disabled).
+                if (manageAll || manageableShareIds.Contains(share.Id))
                 {
-                    //if (await _accessRepo.HasAccessAsync(share.Name, uid))
-                        accessible.Add(share);
+                    visible.Add(share);
+                    continue;
                 }
-                Shares = accessible;
+
+                // (B) Normal user view: enabled, not hidden, ListReadData on root.
+                if (!share.IsEnabled || share.IsShareHidden)
+                    continue;
+
+                if (await _aclService.HasAccessAsync(
+                        actor, share.Id, "", true, FilePermission.ListReadData))
+                    visible.Add(share);
             }
-            else
-            {
-                Shares = allShares;
-            }
+
+            Shares = visible;
         }
         catch (Exception ex)
         {

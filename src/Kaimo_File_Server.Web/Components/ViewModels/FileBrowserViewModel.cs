@@ -1,6 +1,8 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -27,6 +29,7 @@ public class FileBrowserViewModel
     private readonly IShareRepository _shareRepo;
     private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
     private readonly IUserContextFactory _userContextFactory;
+    private readonly IManagementAuthService _mgmtAuth;
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<FileBrowserViewModel> _logger;
 
@@ -39,6 +42,7 @@ public class FileBrowserViewModel
         IShareRepository shareRepo,
         IDbContextFactory<ApplicationDbContext> dbFactory,
         IUserContextFactory userContextFactory,
+        IManagementAuthService mgmtAuth,
         AuthenticationStateProvider authState,
         ILogger<FileBrowserViewModel> logger,
         ISearchService searchService)
@@ -47,6 +51,7 @@ public class FileBrowserViewModel
         _shareRepo = shareRepo;
         _dbFactory = dbFactory;
         _userContextFactory = userContextFactory;
+        _mgmtAuth = mgmtAuth;
         _authState = authState;
         _logger = logger;
         _searchService = searchService;
@@ -139,6 +144,18 @@ public class FileBrowserViewModel
             if (userContext is null)
             {
                 ErrorMessage = "Nicht authentifiziert.";
+                Items = [];
+                return;
+            }
+
+            // Disabled shares reject all access — except for managers of the share,
+            // who may still browse them (e.g. to inspect before re-enabling).
+            // Hidden shares stay reachable here: ACL enforcement happens in ListAsync.
+            if (!CurrentShare.IsEnabled
+                && !await _mgmtAuth.CanManageShareAsync(
+                        userContext, CurrentShare.Id, ManagementPermission.EditShareSettings))
+            {
+                ErrorMessage = "Share ist deaktiviert.";
                 Items = [];
                 return;
             }

@@ -23,8 +23,17 @@ namespace Kaimo_File_Server.Core.Security
         Task<UserContext?> ResolveUserContextAsync(string username);
 
         /// <summary>
-        /// Checks whether a principal (user or group) can list a specific share.
+        /// Checks whether a principal (user or group) can SEE a share in a listing.
+        /// Returns false for hidden shares — use this for share enumeration (ABE).
         /// </summary>
         Task<bool> CanListShareAsync(Guid shareID, Guid principalId);
+
+        /// <summary>
+        /// Checks whether a principal (user or group) may CONNECT to / access a share.
+        /// Unlike <see cref="CanListShareAsync"/> this does NOT consider the hidden
+        /// flag: a hidden share stays reachable via its direct path/link as long as
+        /// the principal holds the required ACL on the share root.
+        /// </summary>
+        Task<bool> CanAccessShareAsync(Guid shareID, Guid principalId);
     }
 }

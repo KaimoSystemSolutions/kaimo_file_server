@@ -106,7 +106,7 @@ else
         </div>
 
         @* -- Detail Panel mit Tabs -- *@
-        @if (VM.SelectedShare is not null && VM.IsAdmin)
+        @if (VM.SelectedShare is not null && VM.CanManageShare(VM.SelectedShare.Id))
         {
             <div class="admin-detail">
                 <div class="detail-header">
@@ -283,7 +283,7 @@ else
 
     private void HandleCardClick(ShareDefinition share)
     {
-        if (VM.IsAdmin)
+        if (VM.CanManageShare(share.Id))
         {
             _activeTab = DetailTab.Settings;
             _accessLoaded = false;

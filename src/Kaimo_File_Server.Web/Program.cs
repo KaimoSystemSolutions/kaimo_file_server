@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure;
@@ -85,6 +86,9 @@ builder.Services.AddScoped<ShareListViewModel>(sp =>
         sp.GetRequiredService<IUserRepository>(),
         sp.GetRequiredService<IGroupRepository>(),
         sp.GetRequiredService<IAclRepository>(),
+        sp.GetRequiredService<IAclService>(),
+        sp.GetRequiredService<IManagementAuthService>(),
+        sp.GetRequiredService<IUserContextFactory>(),
         sp.GetRequiredService<IStorageEngine>(),
         sp.GetRequiredService<ShareLockManager>(),
         sp.GetRequiredService<AuthenticationStateProvider>(),
