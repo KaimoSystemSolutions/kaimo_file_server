@@ -5,10 +5,12 @@ services:
     #user: root
     ports:
       - 4445:445
-    volumes: 
+    volumes:
       - ./tests/data/storage:/data/storage
     depends_on:
       kaimo_file_server_db:
+        condition: service_healthy
+      elasticsearch:
         condition: service_healthy
     build:
       context: .

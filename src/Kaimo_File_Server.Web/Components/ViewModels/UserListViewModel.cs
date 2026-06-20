@@ -225,6 +225,11 @@ public class UserListViewModel
             new(ManagementPermission.EditDepartment, "Abteilung bearbeiten"),
             new(ManagementPermission.ViewDepartment, "Abteilung anzeigen"),
         ]),
+        new("Systemverwaltung",
+        [
+            new(ManagementPermission.ManageSystemSettings, "Systemeinstellungen verwalten"),
+            new(ManagementPermission.ManageDataServices, "Datendienste verwalten"),
+        ]),
     ];
 
     public static readonly List<PermissionPreset> PermissionPresets =
@@ -233,6 +238,7 @@ public class UserListViewModel
         new("GroupAdmin", ManagementPermission.GroupAdmin),
         new("ShareAdmin", ManagementPermission.ShareAdmin),
         new("DepartmentAdmin", ManagementPermission.DepartmentAdmin),
+        new("SystemAdmin", ManagementPermission.SystemAdmin),
         new("FullAdmin", ManagementPermission.FullAdmin),
     ];
 
