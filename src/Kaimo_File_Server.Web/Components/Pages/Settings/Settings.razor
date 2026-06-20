@@ -39,6 +39,12 @@ else
                         @Assets.SVG("globe.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                         Sprache
                     </button>
+
+                    <button class="detail-tab @(_activeTab == SettingsTab.ContextMenu ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(SettingsTab.ContextMenu)">
+                        @Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        @Resources.Web_Settings_ContextMenu
+                    </button>
                 }
 
                 @if (VM.CanManageDataServices)
@@ -86,6 +92,60 @@ else
                 </div>
             }
 
+            @* ── Tab: Context Menu ── *@
+            @if (_activeTab == SettingsTab.ContextMenu && VM.CanManageSettings)
+            {
+                <div class="detail-section">
+                    <span class="detail-label">@Resources.Web_Settings_ContextMenu</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
+                        @Resources.Web_Settings_ContextMenu_Desc
+                    </p>
+
+                    @* Category selector *@
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                        <select class="edit-input" style="max-width: 260px;"
+                                @bind="SelectedScopeProxy">
+                            @foreach (var scope in SettingsViewModel.ContextScopes)
+                            {
+                                <option value="@scope">@ScopeName(scope)</option>
+                            }
+                        </select>
+                    </div>
+
+                    @* Single checkbox list: tick = in menu, arrows = reorder *@
+                    <div class="ctx-list">
+                        @foreach (var cmd in VM.ScopeCommandsOrdered)
+                        {
+                            var assigned = VM.IsAssigned(cmd.Id);
+                            <div class="ctx-item @(assigned ? "" : "ctx-item--off")">
+                                <label class="ctx-item-label">
+                                    <input type="checkbox" checked="@assigned"
+                                           @onchange="() => VM.ToggleCommand(cmd.Id)" />
+                                    @Assets.SVG(cmd.Icon, new SvgOptions(Width: 14, Height: 14))
+                                    <span>@cmd.DisplayLabel</span>
+                                </label>
+                                <span class="ctx-item-actions">
+                                    <button class="btn-icon btn-icon--small" title="@Resources.Web_Settings_CtxMoveUp"
+                                            disabled="@(!assigned)" @onclick="() => VM.MoveUp(cmd.Id)">↑</button>
+                                    <button class="btn-icon btn-icon--small" title="@Resources.Web_Settings_CtxMoveDown"
+                                            disabled="@(!assigned)" @onclick="() => VM.MoveDown(cmd.Id)">↓</button>
+                                </span>
+                            </div>
+                        }
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 16px;">
+                        <button class="btn-primary" @onclick="SaveContextMenu">
+                            Speichern
+                        </button>
+                        <button class="btn-icon" title="@Resources.Web_Settings_CtxReset"
+                                @onclick="ResetContextMenu">
+                            @Assets.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                        </button>
+                    </div>
+                </div>
+            }
+
             @* ── Tab: Data Services ── *@
             @if (_activeTab == SettingsTab.DataServices && VM.CanManageDataServices)
             {
@@ -128,6 +188,7 @@ else
     private enum SettingsTab
     {
         Language,
+        ContextMenu,
         DataServices,
     }
 
@@ -165,6 +226,43 @@ else
         await VM.SaveDataServicesAsync();
         StateHasChanged();
     }
+
+    private ContextMenuScope SelectedScopeProxy
+    {
+        get => VM.SelectedScope;
+        set
+        {
+            VM.SelectScope(value);
+            VM.ClearMessages();
+        }
+    }
+
+    private async Task SaveContextMenu()
+    {
+        await VM.SaveContextMenuAsync();
+        StateHasChanged();
+    }
+
+    private void ResetContextMenu()
+    {
+        VM.ResetScopeToDefault();
+        VM.ClearMessages();
+        StateHasChanged();
+    }
+
+    private static string ScopeName(ContextMenuScope scope) => scope switch
+    {
+        ContextMenuScope.Background => Resources.Web_Settings_CtxScope_Background,
+        ContextMenuScope.Folder => Resources.Web_Settings_CtxScope_Folder,
+        ContextMenuScope.Archive => Resources.Web_Settings_CtxScope_Archive,
+        ContextMenuScope.Image => Resources.Web_Settings_CtxScope_Image,
+        ContextMenuScope.Video => Resources.Web_Settings_CtxScope_Video,
+        ContextMenuScope.Audio => Resources.Web_Settings_CtxScope_Audio,
+        ContextMenuScope.Document => Resources.Web_Settings_CtxScope_Document,
+        ContextMenuScope.OtherFile => Resources.Web_Settings_CtxScope_OtherFile,
+        ContextMenuScope.MultiSelection => Resources.Web_Settings_CtxScope_Multi,
+        _ => scope.ToString(),
+    };
 
     private async Task RefreshStatus()
     {

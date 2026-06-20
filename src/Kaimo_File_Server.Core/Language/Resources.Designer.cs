@@ -1532,7 +1532,127 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Settings_SmbDisabled", resourceCulture);
             }
         }
-        
+
+        public static string Web_Settings_ContextMenu {
+            get {
+                return ResourceManager.GetString("Web_Settings_ContextMenu", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_ContextMenu_Desc {
+            get {
+                return ResourceManager.GetString("Web_Settings_ContextMenu_Desc", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxAvailable {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxAvailable", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxAssigned {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxAssigned", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxAdd {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxAdd", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxRemove {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxRemove", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxMoveUp {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxMoveUp", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxMoveDown {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxMoveDown", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxReset {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxReset", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxSaved {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxSaved", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxSaveFailed {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxSaveFailed", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxScope_Background {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Background", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxScope_Folder {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Folder", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxScope_Archive {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Archive", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxScope_Image {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Image", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxScope_Video {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Video", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxScope_Audio {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Audio", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxScope_Document {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Document", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxScope_OtherFile {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_OtherFile", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_CtxScope_Multi {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Multi", resourceCulture);
+            }
+        }
+
         public static string Web_Validation_NameEmpty {
             get {
                 return ResourceManager.GetString("Web_Validation_NameEmpty", resourceCulture);

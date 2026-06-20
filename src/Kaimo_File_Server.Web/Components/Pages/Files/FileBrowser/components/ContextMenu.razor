@@ -1,6 +1,8 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Infrastructure.Configuration
 @inject AssetProvider Assets
+@inject IConfigRepository Config
 
 
 @if (_showContextMenu)
@@ -40,155 +42,145 @@
     private bool _showContextMenu;
     private double _contextMenuX;
     private double _contextMenuY;
-    
-    
+
+    // Globally configured, per-scope menu layout (Settings → Kontextmenü).
+    // Reloaded on every right-click (see ReloadMenuConfig) so a saved change
+    // takes effect immediately. Not loaded in OnInitializedAsync on purpose:
+    // that would race with the FileBrowser's own use of the scoped DbContext.
+    private ContextMenuConfig _menuConfig = ContextMenuConfig.Default();
+
     private List<ContextMenuItem> BuildContextMenuItems()
     {
         var builder = new ContextMenuBuilder();
 
         HashSet<FileMetadata> selectedItems = FileBrowser.getSelectedItems();
-        int selectedItemsCount = selectedItems.Count;
-        
-        // empty selection
-        if (selectedItemsCount == 0)
+        var scope = ContextMenuScopeResolver.ResolveScope(selectedItems);
+
+        // Top header: target name (single) / "n selected" (multi) / none (background).
+        if (scope == ContextMenuScope.MultiSelection)
+            builder.AddHeader(string.Format(Resources.Context_Menu_SelectedItems, selectedItems.Count));
+        else if (scope != ContextMenuScope.Background)
+            builder.AddHeader(FileBrowser.getFirstSelectedItem().Name);
+
+        var target = scope is ContextMenuScope.Background or ContextMenuScope.MultiSelection
+            ? null
+            : FileBrowser.getFirstSelectedItem();
+
+        var generalGroupStarted = false;
+        var emittedAny = false;
+
+        foreach (var id in _menuConfig.ForScope(scope))
         {
-            builder = addGeneralItems(builder);
-            return builder.Build();
-        }
-        
-        if (selectedItemsCount == 1)
-        {
-            var target = FileBrowser.getFirstSelectedItem();
-            
-            builder.AddHeader(target.Name);
+            var command = ContextCommandCatalog.ById(id);
+            if (command is null || !command.IsValidFor(scope)) continue;
+            if (!PassesRuntimeGuard(id, scope, selectedItems)) continue;
 
-            builder.AddIf(target.IsDirectory,
-                Resources.Context_Menu_Open, "arrow_right.svg", () => { ContextNavigateTo(target); return Task.CompletedTask; });
-
-            builder.AddIf(!target.IsDirectory,
-                Resources.Context_Menu_Open, "arrow_right.svg", async () => {
-                    _showContextMenu = false; await FilePreviewComponent.OpenFilePreview(target); 
-                });
-            
-            builder.AddIf(FileHelper.IsArchive(target.Name),
-                Resources.Context_Menu_Extract, "file_zip.svg", async () =>
-                {
-                    _showContextMenu = false; 
-                    await FileBrowser.UnzipFile(target!);
-                });
-            
-            builder.AddIf(!target.IsDirectory && !FileHelper.IsArchive(target.Name),
-                Resources.Context_Menu_CompressZip, "archive.svg", async () =>
-                {
-                    CloseContextMenu();
-                    await FileBrowser.ArchiveFiles(new[] { target }, ".zip");
-                });
-
-            builder.AddIf(!target.IsDirectory && !FileHelper.IsArchive(target.Name),
-                Resources.Context_Menu_CompressTarGz, "archive.svg", async () =>
-                {
-                    CloseContextMenu();
-                    await FileBrowser.ArchiveFiles(new[] { target }, ".tar.gz");
-                });
-            
-            builder.AddIf(target.IsDirectory,
-                Resources.Context_Menu_CompressZip, "archive.svg", async () =>
-                {
-                    CloseContextMenu();
-                    await FileBrowser.ArchiveFiles(new[] { target }, ".zip");
-                });
-
-            builder.AddIf(target.IsDirectory,
-                Resources.Context_Menu_CompressTarGz, "archive.svg", async () =>
-                {
-                    CloseContextMenu();
-                    await FileBrowser.ArchiveFiles(new[] { target }, ".tar.gz");
-                });
-
-            builder.Add(Resources.Context_Menu_Rename, "edit.svg", () => { ContextRename(target); return Task.CompletedTask; });
-
-            builder.Add(Resources.Context_Menu_Delete, "trash.svg", async () => { await ContextDelete(target); },
-                isDanger: true);
-
-            builder.AddIf(FileBrowser.CurrentUserIsAdmin(),
-                Resources.Context_Menu_Permissions, "shield.svg", () => { ContextAcl(target); return Task.CompletedTask; },
-                iconOptions: new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"));
-
-            builder.AddSeparator();
-            builder = addGeneralItems(builder);
-            return builder.Build();
-
-        }
-
-        // if multiple items
-        
-        builder.AddHeader(string.Format(Resources.Context_Menu_SelectedItems, selectedItemsCount));
-
-        var allFilesAreArchives = selectedItems.All(file => !file.IsDirectory && FileHelper.IsArchive(file.Name));
-
-        if (allFilesAreArchives)
-            builder.Add(Resources.Context_Menu_Extract, "file_zip.svg", async () =>
-                {
-                    _showContextMenu = false; 
-                    
-                    foreach (var selectedItem in selectedItems)
-                        await FileBrowser.UnzipFile(selectedItem);
-                    
-                });
-        
-        builder.Add(Resources.Context_Menu_CompressZip, "archive.svg", async () =>
-        {
-            CloseContextMenu();
-            await FileBrowser.ArchiveFiles(selectedItems, ".zip");
-        });
-
-        builder.Add(Resources.Context_Menu_CompressTarGz, "archive.svg", async () =>
-        {
-            CloseContextMenu();
-            await FileBrowser.ArchiveFiles(selectedItems, ".tar.gz");
-        });
-        
-        
-        builder.Add(Resources.Context_Menu_Delete, "trash.svg", async () =>
+            // The "general" commands (new folder / refresh) render as a trailing
+            // group, separated and headed like the previous hard-coded menu.
+            if (ContextCommandCatalog.GeneralIds.Contains(id) && !generalGroupStarted)
             {
-                foreach (var selectedItem in selectedItems)
-                    await ContextDelete(selectedItem);
-                
-            },
-            isDanger: true);
+                if (emittedAny) builder.AddSeparator();
+                builder.AddHeader(Resources.Context_Menu_General);
+                generalGroupStarted = true;
+            }
 
-        builder.AddSeparator();
-        builder = addGeneralItems(builder);
+            builder.Add(command.DisplayLabel, command.Icon,
+                BuildAction(id, scope, target, selectedItems),
+                isDanger: command.IsDanger,
+                iconOptions: command.ResolvedIconOptions);
+            emittedAny = true;
+        }
+
         return builder.Build();
     }
 
-    private ContextMenuBuilder addGeneralItems(ContextMenuBuilder builder)
+    /// <summary>Extra conditions that the scope alone can't express.</summary>
+    private bool PassesRuntimeGuard(string id, ContextMenuScope scope, HashSet<FileMetadata> selected)
+        => id switch
+        {
+            // Permissions stay admin-only regardless of configuration.
+            "permissions" => FileBrowser.CurrentUserIsAdmin(),
+            // Bulk extract only makes sense when every selected item is an archive.
+            "extract" when scope == ContextMenuScope.MultiSelection
+                => selected.All(f => !f.IsDirectory && FileHelper.IsArchive(f.Name)),
+            _ => true,
+        };
+
+    /// <summary>Maps a command id (+ current target) to its concrete action.</summary>
+    private Func<Task> BuildAction(string id, ContextMenuScope scope,
+        FileMetadata? target, HashSet<FileMetadata> selected) => id switch
     {
-        builder.AddHeader(Resources.Context_Menu_General);
-        builder.Add(Resources.Context_Menu_NewFolder, "folder.svg", async () => { ContextNewFolder(); });
-        builder.Add(Resources.Context_Menu_Refresh, "refresh.svg", async () => { await ContextRefresh(); });
-        return builder; 
-    }
-    
-    public void OnItemContextMenu(MouseEventArgs e, FileMetadata? item = null)
+        "open" when target is { IsDirectory: true }
+            => () => { ContextNavigateTo(target); return Task.CompletedTask; },
+        "open"
+            => async () => { _showContextMenu = false; await FilePreviewComponent.OpenFilePreview(target!); },
+
+        "extract" when scope == ContextMenuScope.MultiSelection
+            => async () =>
+            {
+                _showContextMenu = false;
+                foreach (var item in selected) await FileBrowser.UnzipFile(item);
+            },
+        "extract"
+            => async () => { _showContextMenu = false; await FileBrowser.UnzipFile(target!); },
+
+        "compress.zip" => async () =>
+        {
+            CloseContextMenu();
+            await FileBrowser.ArchiveFiles(CompressTargets(scope, target, selected), ".zip");
+        },
+        "compress.targz" => async () =>
+        {
+            CloseContextMenu();
+            await FileBrowser.ArchiveFiles(CompressTargets(scope, target, selected), ".tar.gz");
+        },
+
+        "rename" => () => { ContextRename(target!); return Task.CompletedTask; },
+
+        "delete" when scope == ContextMenuScope.MultiSelection
+            => async () => { foreach (var item in selected) await ContextDelete(item); },
+        "delete"
+            => async () => { await ContextDelete(target!); },
+
+        "permissions" => () => { ContextAcl(target!); return Task.CompletedTask; },
+
+        "newfolder" => () => { ContextNewFolder(); return Task.CompletedTask; },
+        "refresh" => async () => { await ContextRefresh(); },
+
+        _ => () => Task.CompletedTask,
+    };
+
+    private static IEnumerable<FileMetadata> CompressTargets(ContextMenuScope scope,
+        FileMetadata? target, HashSet<FileMetadata> selected)
+        => scope == ContextMenuScope.MultiSelection ? selected : new[] { target! };
+
+    public async Task OnItemContextMenu(MouseEventArgs e, FileMetadata? item = null)
     {
-        
         if (item is not null && !FileBrowser.SelectedItemsContain(item))
         {
             FileBrowser.ClearSelection();
             FileBrowser.AddItemToSelection(item);
         }
-        
+
+        await ReloadMenuConfig();
         _contextMenuX = e.ClientX;
         _contextMenuY = e.ClientY;
         _showContextMenu = true;
     }
 
-    private void OnBackgroundContextMenu(MouseEventArgs e)
+    private async Task OnBackgroundContextMenu(MouseEventArgs e)
     {
+        await ReloadMenuConfig();
         _contextMenuX = e.ClientX;
         _contextMenuY = e.ClientY;
         _showContextMenu = true;
+    }
+
+    // Re-read the layout on every open so an admin's saved change in
+    // Settings → Kontextmenü takes effect immediately (cache is cleared on save).
+    private async Task ReloadMenuConfig()
+    {
+        _menuConfig = await Config.GetAsync(ContextMenuConfig.ConfigKey, ContextMenuConfig.Default());
     }
 
     public void CloseContextMenu()

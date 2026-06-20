@@ -861,6 +861,66 @@
   <data name="Web_Settings_SmbDisabled" xml:space="preserve">
     <value>SMB wird deaktiviert. Die Änderung wird vom Dienst innerhalb weniger Sekunden übernommen.</value>
   </data>
+  <data name="Web_Settings_ContextMenu" xml:space="preserve">
+    <value>Kontextmenü</value>
+  </data>
+  <data name="Web_Settings_ContextMenu_Desc" xml:space="preserve">
+    <value>Stellen Sie das Rechtsklick-Menü je Kategorie selbst zusammen. Änderungen gelten global für alle Benutzer und werden beim nächsten Öffnen des Dateibrowsers wirksam.</value>
+  </data>
+  <data name="Web_Settings_CtxAvailable" xml:space="preserve">
+    <value>Verfügbar</value>
+  </data>
+  <data name="Web_Settings_CtxAssigned" xml:space="preserve">
+    <value>Im Menü</value>
+  </data>
+  <data name="Web_Settings_CtxAdd" xml:space="preserve">
+    <value>Zum Menü hinzufügen</value>
+  </data>
+  <data name="Web_Settings_CtxRemove" xml:space="preserve">
+    <value>Aus Menü entfernen</value>
+  </data>
+  <data name="Web_Settings_CtxMoveUp" xml:space="preserve">
+    <value>Nach oben</value>
+  </data>
+  <data name="Web_Settings_CtxMoveDown" xml:space="preserve">
+    <value>Nach unten</value>
+  </data>
+  <data name="Web_Settings_CtxReset" xml:space="preserve">
+    <value>Kategorie auf Standard zurücksetzen</value>
+  </data>
+  <data name="Web_Settings_CtxSaved" xml:space="preserve">
+    <value>Kontextmenü gespeichert.</value>
+  </data>
+  <data name="Web_Settings_CtxSaveFailed" xml:space="preserve">
+    <value>Fehler beim Speichern des Kontextmenüs.</value>
+  </data>
+  <data name="Web_Settings_CtxScope_Background" xml:space="preserve">
+    <value>Leerer Bereich</value>
+  </data>
+  <data name="Web_Settings_CtxScope_Folder" xml:space="preserve">
+    <value>Ordner</value>
+  </data>
+  <data name="Web_Settings_CtxScope_Archive" xml:space="preserve">
+    <value>Archiv</value>
+  </data>
+  <data name="Web_Settings_CtxScope_Image" xml:space="preserve">
+    <value>Bild</value>
+  </data>
+  <data name="Web_Settings_CtxScope_Video" xml:space="preserve">
+    <value>Video</value>
+  </data>
+  <data name="Web_Settings_CtxScope_Audio" xml:space="preserve">
+    <value>Audio</value>
+  </data>
+  <data name="Web_Settings_CtxScope_Document" xml:space="preserve">
+    <value>Dokument</value>
+  </data>
+  <data name="Web_Settings_CtxScope_OtherFile" xml:space="preserve">
+    <value>Sonstige Datei</value>
+  </data>
+  <data name="Web_Settings_CtxScope_Multi" xml:space="preserve">
+    <value>Mehrfachauswahl</value>
+  </data>
   <data name="Web_Validation_NameEmpty" xml:space="preserve">
     <value>Name darf nicht leer sein.</value>
   </data>

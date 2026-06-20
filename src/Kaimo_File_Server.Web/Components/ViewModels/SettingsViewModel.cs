@@ -6,6 +6,7 @@ using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Microsoft.AspNetCore.Components.Authorization;
 using Kaimo_File_Server.Core.Language;
+using Kaimo_File_Server.Web.DynamicHelpers;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -78,7 +79,11 @@ public class SettingsViewModel
             await LoadPermissionsAsync();
 
             if (CanManageSettings)
+            {
                 SelectedLanguage = await _config.GetStringAsync("app.language", "de");
+                CtxConfig = await _config.GetAsync(
+                    ContextMenuConfig.ConfigKey, ContextMenuConfig.Default());
+            }
 
             if (CanManageDataServices)
             {
@@ -190,6 +195,130 @@ public class SettingsViewModel
     {
         if (!CanManageDataServices) return;
         SmbStatus = await _config.GetFreshAsync(DataServiceKeys.StatusKey("smb"), "Unbekannt");
+    }
+
+    // ── Context Menu (per-scope layout) ──
+
+    /// <summary>The globally configured, per-scope context-menu layout (working copy).</summary>
+    public ContextMenuConfig CtxConfig { get; private set; } = ContextMenuConfig.Default();
+
+    /// <summary>The category currently being edited in the GUI.</summary>
+    public ContextMenuScope SelectedScope { get; private set; } = ContextMenuScope.Folder;
+
+    /// <summary>All editable categories.</summary>
+    public static IReadOnlyList<ContextMenuScope> ContextScopes { get; } = Enum.GetValues<ContextMenuScope>();
+
+    /// <summary>Commands assigned to the selected scope, in order.</summary>
+    public IReadOnlyList<ContextCommand> AssignedCommands =>
+        WorkingList()
+            .Select(ContextCommandCatalog.ById)
+            .Where(c => c is not null)
+            .Select(c => c!)
+            .ToList();
+
+    /// <summary>Valid commands for the selected scope that are not yet assigned.</summary>
+    public IReadOnlyList<ContextCommand> AvailableCommands
+    {
+        get
+        {
+            var assigned = WorkingList();
+            return ContextCommandCatalog.ForScope(SelectedScope)
+                .Where(c => !assigned.Contains(c.Id))
+                .ToList();
+        }
+    }
+
+    /// <summary>
+    /// All valid commands for the selected scope: assigned ones first (in their
+    /// configured order), then the remaining unassigned ones. Drives the single
+    /// checkbox list in the builder GUI.
+    /// </summary>
+    public IReadOnlyList<ContextCommand> ScopeCommandsOrdered
+    {
+        get
+        {
+            var assigned = AssignedCommands;
+            var assignedIds = assigned.Select(c => c.Id).ToHashSet();
+            var rest = ContextCommandCatalog.ForScope(SelectedScope)
+                .Where(c => !assignedIds.Contains(c.Id));
+            return assigned.Concat(rest).ToList();
+        }
+    }
+
+    /// <summary>True if the command is currently part of the selected scope's menu.</summary>
+    public bool IsAssigned(string id) => WorkingList().Contains(id);
+
+    public void SelectScope(ContextMenuScope scope) => SelectedScope = scope;
+
+    /// <summary>Adds the command if absent, removes it if present.</summary>
+    public void ToggleCommand(string id)
+    {
+        var list = WorkingList();
+        if (list.Contains(id)) list.Remove(id);
+        else list.Add(id);
+    }
+
+    public void AddCommand(string id)
+    {
+        var list = WorkingList();
+        if (!list.Contains(id)) list.Add(id);
+    }
+
+    public void RemoveCommand(string id) => WorkingList().Remove(id);
+
+    public void MoveUp(string id)
+    {
+        var list = WorkingList();
+        var i = list.IndexOf(id);
+        if (i > 0) (list[i - 1], list[i]) = (list[i], list[i - 1]);
+    }
+
+    public void MoveDown(string id)
+    {
+        var list = WorkingList();
+        var i = list.IndexOf(id);
+        if (i >= 0 && i < list.Count - 1) (list[i + 1], list[i]) = (list[i], list[i + 1]);
+    }
+
+    public void ResetScopeToDefault()
+        => CtxConfig.SetScope(SelectedScope, ContextMenuConfig.DefaultForScope(SelectedScope));
+
+    public async Task<bool> SaveContextMenuAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!CanManageSettings)
+        {
+            ErrorMessage = Resources.Web_Settings_NoPermissionChange;
+            return false;
+        }
+
+        try
+        {
+            await _config.SetAsync(ContextMenuConfig.ConfigKey, CtxConfig);
+            _logger.LogInformation("Context menu layout saved");
+            SuccessMessage = Resources.Web_Settings_CtxSaved;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save context menu layout");
+            ErrorMessage = Resources.Web_Settings_CtxSaveFailed;
+            return false;
+        }
+    }
+
+    /// <summary>Mutable, guaranteed-present command list for the selected scope.</summary>
+    private List<string> WorkingList()
+    {
+        var key = SelectedScope.ToString();
+        if (!CtxConfig.Menus.TryGetValue(key, out var list) || list is null)
+        {
+            list = ContextMenuConfig.DefaultForScope(SelectedScope);
+            CtxConfig.Menus[key] = list;
+        }
+        return list;
     }
 
     /// <summary>Clears transient messages (call on tab switch).</summary>

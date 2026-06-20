@@ -82,3 +82,53 @@
     .toggle-switch input:checked + .toggle-slider::before {
         transform: translateX(18px);
     }
+
+/* -- Context-menu builder (single checkbox list) -- */
+
+.ctx-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+}
+
+.ctx-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+}
+
+.ctx-item--off {
+    opacity: 0.55;
+}
+
+.ctx-item-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+    .ctx-item-label input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+
+.ctx-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
