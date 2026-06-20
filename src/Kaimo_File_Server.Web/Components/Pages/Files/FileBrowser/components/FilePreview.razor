@@ -1,5 +1,6 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Helpers
 @inject AssetProvider Assets
 @inject FileBrowserViewModel VM
 @inject IJSRuntime JS
@@ -11,9 +12,17 @@
         <div class="preview-dialog" @onclick:stopPropagation="true">
             <div class="preview-header">
                 <span class="preview-title">@_previewFileName</span>
-                <button class="btn-icon" title="Schließen" @onclick="CloseFilePreview">
-                    @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                </button>
+                <div class="preview-actions">
+                    @if (!string.IsNullOrEmpty(_downloadUrl))
+                    {
+                        <a class="btn-icon" href="@_downloadUrl" download="@_previewFileName" title="Herunterladen">
+                            @Assets.SVG("download.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        </a>
+                    }
+                    <button class="btn-icon" title="Schließen" @onclick="CloseFilePreview">
+                        @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                    </button>
+                </div>
             </div>
             @if (_previewLoading)
             {
@@ -22,15 +31,53 @@
                     <span class="preview-loading-text">@Resources.Web_File_Loading</span>
                 </div>
             }
-            else if (_previewIsImage)
+            else if (_previewKind == PreviewKind.Image)
             {
                 <div class="preview-image-container">
-                    <img class="preview-image" src="@_previewUrl" alt="@_previewFileName" />
+                    <img class="preview-image" src="@_displayUrl" alt="@_previewFileName" />
                 </div>
+            }
+            else if (_previewKind == PreviewKind.Video)
+            {
+                <div class="preview-media-container">
+                    <video class="preview-media" src="@_displayUrl" controls autoplay></video>
+                </div>
+            }
+            else if (_previewKind == PreviewKind.Audio)
+            {
+                <div class="preview-media-container">
+                    <audio class="preview-audio" src="@_displayUrl" controls autoplay></audio>
+                </div>
+            }
+            else if (_previewKind == PreviewKind.Pdf)
+            {
+                <iframe class="preview-frame" src="@_displayUrl"></iframe>
+            }
+            else if (_previewKind == PreviewKind.Text || _previewKind == PreviewKind.Docx)
+            {
+                @* Generated, self-contained HTML — sandbox blocks any script execution. *@
+                <iframe class="preview-frame" src="@_displayUrl" sandbox="allow-same-origin"></iframe>
             }
             else
             {
-                <iframe class="preview-frame" src="@_previewUrl"></iframe>
+                <div class="preview-fallback">
+                    @Assets.SVG(FileHelper.GetIcon(_previewFileName), new SvgOptions(Width: 64, Height: 64, StrokeWidth: 1.5f, Color: "var(--text-tertiary)"))
+                    <span class="preview-fallback-name">@_previewFileName</span>
+                    <span class="preview-fallback-hint">
+                        Für diesen Dateityp ist keine Vorschau verfügbar.
+                    </span>
+                    @if (_previewSize > 0)
+                    {
+                        <span class="preview-fallback-size">@FormatHelper.FormatFileSize(_previewSize)</span>
+                    }
+                    @if (!string.IsNullOrEmpty(_downloadUrl))
+                    {
+                        <a class="btn-primary preview-fallback-download" href="@_downloadUrl" download="@_previewFileName">
+                            @Assets.SVG("download.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                            Herunterladen
+                        </a>
+                    }
+                </div>
             }
         </div>
     </div>
@@ -39,31 +86,38 @@
 
 @code {
 
-    private string _previewUrl = "";
+    private string _displayUrl = "";
+    private string _downloadUrl = "";
     private string _previewFileName = "";
-    private bool _previewIsImage;
+    private long _previewSize;
+    private PreviewKind _previewKind = PreviewKind.Unsupported;
     private bool _previewLoading;
     private bool _showFilePreview;
 
     public async Task CloseFilePreview()
     {
-        if (!string.IsNullOrEmpty(_previewUrl))
-            await JS.InvokeVoidAsync("filePreview.revokeBlob", _previewUrl);
+        await RevokeUrlsAsync();
 
         _showFilePreview = false;
-        _previewUrl = "";
+        _displayUrl = "";
+        _downloadUrl = "";
     }
-    
-    
+
+
     public async Task OpenFilePreview(FileMetadata file)
     {
+        // Revoke any blobs left over from a previously opened preview.
+        await RevokeUrlsAsync();
+
         _previewFileName = file.Name;
-        _previewIsImage = false;
-        _previewUrl = "";
+        _previewSize = file.Size;
+        _displayUrl = "";
+        _downloadUrl = "";
+        _previewKind = PreviewKind.Unsupported;
         _previewLoading = true;
         _showFilePreview = true;
         StateHasChanged();
-        
+
         var result = await VM.ReadFileForPreviewAsync(file);
         if (result is null)
         {
@@ -73,16 +127,36 @@
             return;
         }
 
-        var (data, contentType) = result.Value;
+        var (data, contentType, kind) = result.Value;
+        _previewKind = kind;
 
-        _previewUrl = await JS.InvokeAsync<string>(
-            "filePreview.showBlob", data, contentType);
+        var urls = await JS.InvokeAsync<PreviewUrls>(
+            "filePreview.preparePreview", data, contentType, kind.ToString());
 
-        _previewIsImage = contentType.StartsWith("image/");
+        _downloadUrl = urls.DownloadUrl ?? "";
+        _displayUrl = urls.DisplayUrl ?? "";
+
+        // No inline content produced (e.g. docx conversion failed) -> download fallback.
+        if (string.IsNullOrEmpty(_displayUrl))
+            _previewKind = PreviewKind.Unsupported;
+
         _previewLoading = false;
         StateHasChanged();
     }
 
-    
+    private async Task RevokeUrlsAsync()
+    {
+        if (!string.IsNullOrEmpty(_displayUrl))
+            await JS.InvokeVoidAsync("filePreview.revokeBlob", _displayUrl);
 
+        // Display and download URLs are the same blob for media/pdf — avoid a double revoke.
+        if (!string.IsNullOrEmpty(_downloadUrl) && _downloadUrl != _displayUrl)
+            await JS.InvokeVoidAsync("filePreview.revokeBlob", _downloadUrl);
+    }
+
+    private sealed record PreviewUrls
+    {
+        public string? DisplayUrl { get; init; }
+        public string? DownloadUrl { get; init; }
+    }
 }

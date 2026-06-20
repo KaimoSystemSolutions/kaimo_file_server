@@ -1,5 +1,23 @@
 namespace Kaimo_File_Server.Web.Helpers;
 
+/// <summary>
+/// How a file should be rendered in the inline preview dialog.
+/// Anything that maps to <see cref="Unsupported"/> gets the download fallback.
+/// </summary>
+public enum PreviewKind
+{
+    Image,
+    Pdf,
+    Video,
+    Audio,
+    /// <summary>Plain text / source code — rendered as escaped, preformatted text.</summary>
+    Text,
+    /// <summary>Word .docx — converted to HTML client-side via mammoth.js.</summary>
+    Docx,
+    /// <summary>No inline preview available (e.g. pptx, xlsx, binaries) — download only.</summary>
+    Unsupported,
+}
+
 public class FileHelper
 {
     private static readonly Dictionary<string, string> IconMap = new(StringComparer.OrdinalIgnoreCase)
@@ -130,6 +148,43 @@ public class FileHelper
         [".bz2"]  = "application/x-bzip2",
     };
 
+    /// <summary>
+    /// Extensions that are plain text / source code and can be shown as escaped
+    /// preformatted text — even when the browser has no native viewer for them.
+    /// </summary>
+    private static readonly HashSet<string> TextPreviewExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Plain text & data
+        ".txt", ".text", ".md", ".markdown", ".rst", ".log", ".csv", ".tsv", ".rtf",
+        // Config / data formats
+        ".json", ".json5", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf", ".config",
+        ".properties", ".env", ".editorconfig", ".gitignore", ".gitattributes", ".dockerignore",
+        ".resx", ".plist", ".csv",
+        // Markup / web / project files
+        ".html", ".htm", ".xml", ".xaml", ".axaml", ".xsd", ".xsl", ".xslt",
+        ".csproj", ".vbproj", ".fsproj", ".props", ".targets", ".sln", ".slnx",
+        ".css", ".scss", ".sass", ".less",
+        // Shell / scripts
+        ".sh", ".bash", ".zsh", ".fish", ".ps1", ".psm1", ".psd1", ".bat", ".cmd",
+        // Source code
+        ".cs", ".vb", ".fs", ".fsx", ".razor", ".cshtml", ".vbhtml",
+        ".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx",
+        ".py", ".pyw", ".rb", ".php", ".pl", ".pm", ".lua", ".r",
+        ".java", ".kt", ".kts", ".scala", ".groovy", ".gradle",
+        ".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx", ".m", ".mm",
+        ".go", ".rs", ".swift", ".dart",
+        ".sql", ".graphql", ".gql", ".cmake",
+    };
+
+    /// <summary>
+    /// Extensionless files (by exact name) that are still plain text.
+    /// </summary>
+    private static readonly HashSet<string> TextPreviewNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "dockerfile", "makefile", "readme", "license", "licence", "changelog",
+        ".gitignore", ".gitattributes", ".dockerignore", ".editorconfig", ".env",
+    };
+
     private static readonly HashSet<string> ArchiveFileEndings = new()
     {
 
@@ -151,6 +206,36 @@ public class FileHelper
 
     public static bool IsArchive(string fileName)
         => ArchiveFileEndings.Contains(getExt(fileName));
+
+    /// <summary>True if the file can be shown as escaped, preformatted text.</summary>
+    public static bool IsTextPreviewable(string fileName)
+    {
+        var ext = getExt(fileName);
+        if (!string.IsNullOrEmpty(ext))
+            return TextPreviewExtensions.Contains(ext);
+
+        // Extensionless files (Dockerfile, Makefile, LICENSE, dotfiles …)
+        return TextPreviewNames.Contains(Path.GetFileName(fileName));
+    }
+
+    /// <summary>
+    /// Decides how a file should be rendered in the preview dialog. Media types
+    /// are derived from the content type; source/text files fall back to the text
+    /// renderer; .docx is handled client-side; everything else is download-only.
+    /// </summary>
+    public static PreviewKind GetPreviewKind(string fileName)
+    {
+        var contentType = GetContentType(fileName);
+
+        if (contentType.StartsWith("image/")) return PreviewKind.Image;
+        if (contentType == "application/pdf") return PreviewKind.Pdf;
+        if (contentType.StartsWith("video/")) return PreviewKind.Video;
+        if (contentType.StartsWith("audio/")) return PreviewKind.Audio;
+        if (getExt(fileName) == ".docx") return PreviewKind.Docx;
+        if (IsTextPreviewable(fileName)) return PreviewKind.Text;
+
+        return PreviewKind.Unsupported;
+    }
 
     private static string getExt(string fileName)
     {

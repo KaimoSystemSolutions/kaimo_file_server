@@ -429,7 +429,7 @@ public class FileBrowserViewModel
         return DirectorySizes.TryGetValue(relativePath, out var size) ? size : null;
     }
     
-    public async Task<(byte[] Data, string ContentType)?> ReadFileForPreviewAsync(FileMetadata file)
+    public async Task<(byte[] Data, string ContentType, PreviewKind Kind)?> ReadFileForPreviewAsync(FileMetadata file)
     {
         if (_fileService is null || CurrentShare is null) return null;
 
@@ -445,8 +445,9 @@ public class FileBrowserViewModel
         await stream.CopyToAsync(ms);
 
         var contentType = FileHelper.GetContentType(file.Name);
+        var kind = FileHelper.GetPreviewKind(file.Name);
 
-        return (ms.ToArray(), contentType);
+        return (ms.ToArray(), contentType, kind);
     }
     
     public async Task<OperationResult> ArchiveAsync(List<FileMetadata> items, string format)
