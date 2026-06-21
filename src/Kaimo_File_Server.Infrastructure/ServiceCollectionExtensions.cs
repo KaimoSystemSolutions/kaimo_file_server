@@ -56,6 +56,9 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IAuthenticationLookup, AuthenticationLookup>();
             services.AddScoped<IManagementAuthService, ManagementAuthService>();
 
+            // -- Search engine config flag (cross-process, read by the search router) --
+            services.AddSingleton<ISearchConfigStore, Configuration.SearchConfigStore>();
+
             // -- Seeder --
             services.AddScoped<DatabaseSeeder>();
 

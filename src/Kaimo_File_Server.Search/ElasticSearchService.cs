@@ -8,11 +8,7 @@ using Elastic.Clients.Elasticsearch.IndexManagement;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Kaimo_File_Server.Core.Domain.Identity;
-using Kaimo_File_Server.Core.Helpers;
-using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Storage;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Search;
@@ -43,7 +39,7 @@ public class ElasticSearchService : ISearchService
     private readonly ElasticsearchClient _client;
     private readonly ILogger<ElasticSearchService> _logger;
     private readonly IStorageEngine _storage;
-    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly SearchAclFilter _aclFilter;
 
     private enum ExistsResult
     {
@@ -56,12 +52,12 @@ public class ElasticSearchService : ISearchService
         ElasticsearchClient client,
         ILogger<ElasticSearchService> logger,
         IStorageEngine storage,
-        IServiceScopeFactory scopeFactory)
+        SearchAclFilter aclFilter)
     {
         _client = client;
         _logger = logger;
         _storage = storage;
-        _scopeFactory = scopeFactory;
+        _aclFilter = aclFilter;
     }
 
     public async Task onFileCreated(string absolutePath, Task<Stream> fileData, CancellationToken ct = default)
@@ -439,7 +435,7 @@ public class ElasticSearchService : ISearchService
             return raw;
 
         // SECURITY: every hit must pass an ACL check before it is exposed.
-        return await FilterByAclAsync(raw, user, ct);
+        return await _aclFilter.FilterAsync(raw, user, ct);
     }
 
     /// <summary>
@@ -518,55 +514,6 @@ public class ElasticSearchService : ISearchService
         }
 
         return results;
-    }
-
-    /// <summary>
-    /// Keeps only the documents the user has <see cref="FilePermission.ListReadData"/>
-    /// on. Hits are grouped per share and evaluated with a single batched ACL query
-    /// per share. Anything whose share cannot be resolved (or is disabled) is denied.
-    /// </summary>
-    private async Task<List<FileDocument>> FilterByAclAsync(
-        List<FileDocument> docs, UserContext user, CancellationToken ct)
-    {
-        using var scope = _scopeFactory.CreateScope();
-        var sp = scope.ServiceProvider;
-        var shareRepo = sp.GetRequiredService<IShareRepository>();
-        var acl = sp.GetRequiredService<IAclService>();
-
-        var allowed = new List<FileDocument>(docs.Count);
-
-        foreach (var group in docs.GroupBy(d => d.ShareName, StringComparer.OrdinalIgnoreCase))
-        {
-            ct.ThrowIfCancellationRequested();
-
-            var share = await shareRepo.GetByNameAsync(group.Key);
-            if (share is null || !share.IsEnabled)
-            {
-                // Fail closed: can't verify the share → don't reveal its files.
-                _logger.LogDebug(
-                    "Suchtreffer für nicht auflösbaren/deaktivierten Share '{Share}' verworfen", group.Key);
-                continue;
-            }
-
-            var groupDocs = group.ToList();
-
-            var items = groupDocs
-                .Select(d => (ShareRelativePath.Normalize(d.SharePath), false))
-                .Distinct()
-                .ToList();
-
-            var accessMap = await acl.HasAccessBatchAsync(
-                user, share.Id, items, FilePermission.ListReadData);
-
-            foreach (var d in groupDocs)
-            {
-                var norm = ShareRelativePath.Normalize(d.SharePath);
-                if (accessMap.TryGetValue(norm, out var ok) && ok)
-                    allowed.Add(d);
-            }
-        }
-
-        return allowed;
     }
 
     // ══════════════════════════════════════════
@@ -654,6 +601,68 @@ public class ElasticSearchService : ISearchService
         if (!response.IsValidResponse)
             _logger.LogError("Indexing failed for {Id}: {Error}",
                 document.Id, response.DebugInformation);
+    }
+
+    /// <summary>
+    /// Re-indexes every file currently on disk under the storage root. Used to
+    /// catch up files that arrived while indexing was off, or were added out of
+    /// band (e.g. directly on the volume). Already-indexed, unchanged files are
+    /// skipped by the existing dedupe check, so a reindex is cheap to repeat.
+    /// Hidden/system folders (".versions", ".dp-keys", recycle bin, …) are skipped.
+    /// </summary>
+    public async Task ReindexAllAsync(
+        IProgress<(int done, int total)>? progress, CancellationToken ct = default)
+    {
+        // Ensure the index exists with the correct (n-gram) mapping before writing.
+        await InitializeAsync(ct);
+
+        string rootPath = _storage.getRootPath();
+        if (!Directory.Exists(rootPath))
+            return;
+
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.System
+        };
+
+        var files = Directory.EnumerateFiles(rootPath, "*", options)
+            .Where(p => !IsHiddenRelative(rootPath, p))
+            .ToList();
+
+        int total = files.Count;
+        int done = 0;
+        progress?.Report((0, total));
+
+        foreach (var absolutePath in files)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                Task<Stream> data = Task.FromResult<Stream>(new FileStream(
+                    absolutePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true));
+                await IndexDocumentIfNotExistsAsync(absolutePath, data, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Reindex: indexing failed for '{Path}'", absolutePath);
+            }
+
+            done++;
+            if (done % 25 == 0 || done == total)
+                progress?.Report((done, total));
+        }
+
+        _logger.LogInformation("Reindex abgeschlossen: {Done}/{Total} Dateien", done, total);
+    }
+
+    private static bool IsHiddenRelative(string rootPath, string absolutePath)
+    {
+        var relativePath = Path.GetRelativePath(rootPath, absolutePath);
+        foreach (var segment in relativePath.Split(Path.DirectorySeparatorChar))
+            if (segment.StartsWith('.')) return true;
+        return false;
     }
 
     private static string GetStableId(string absolutePath)

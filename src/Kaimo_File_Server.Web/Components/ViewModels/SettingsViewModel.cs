@@ -6,6 +6,7 @@ using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Microsoft.AspNetCore.Components.Authorization;
 using Kaimo_File_Server.Core.Language;
+using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.DynamicHelpers;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
@@ -17,6 +18,7 @@ public class SettingsViewModel
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authState;
     private readonly ISystemInfoService _sysInfo;
+    private readonly ISearchAdminService _searchAdmin;
     private readonly ILogger<SettingsViewModel> _logger;
 
     public SettingsViewModel(
@@ -25,6 +27,7 @@ public class SettingsViewModel
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authState,
         ISystemInfoService sysInfo,
+        ISearchAdminService searchAdmin,
         ILogger<SettingsViewModel> logger)
     {
         _config = config;
@@ -32,6 +35,7 @@ public class SettingsViewModel
         _userContextFactory = userContextFactory;
         _authState = authState;
         _sysInfo = sysInfo;
+        _searchAdmin = searchAdmin;
         _logger = logger;
     }
 
@@ -70,6 +74,21 @@ public class SettingsViewModel
     /// <summary>Last status the SMB host reported back, or "Unbekannt".</summary>
     public string SmbStatus { get; private set; } = "Unbekannt";
 
+    // ── Search engine (Elasticsearch) ──
+
+    /// <summary>Desired state of Elasticsearch (config flag). When off, the
+    /// filename fallback is used and nothing is indexed on write.</summary>
+    public bool SearchEsEnabled { get; set; } = true;
+
+    /// <summary>Whether Elasticsearch answered a ping (container present/reachable).</summary>
+    public bool SearchEsReachable { get; private set; }
+
+    /// <summary>True if ES is both enabled and reachable → actually in use.</summary>
+    public bool SearchEsEffective { get; private set; }
+
+    /// <summary>Progress of the last/running manual reindex.</summary>
+    public ReindexProgress ReindexProgress { get; private set; } = ReindexProgress.Idle;
+
     // ── Password Policy ──
 
     /// <summary>Globally enforced password requirements (working copy).</summary>
@@ -107,6 +126,7 @@ public class SettingsViewModel
                 PwPolicy = await _config.GetAsync(
                     PasswordPolicy.ConfigKey, PasswordPolicy.Default());
                 RefreshSystemInfo();
+                await LoadSearchStateAsync();
             }
 
             if (CanManageDataServices)
@@ -250,6 +270,95 @@ public class SettingsViewModel
             _logger.LogError(ex, "Failed to save password policy");
             ErrorMessage = Resources.Web_Settings_PwPolicySaveFailed;
             return false;
+        }
+    }
+
+    // ── Search engine (Elasticsearch) ──
+
+    /// <summary>Reads the desired flag + live reachability of Elasticsearch.</summary>
+    public async Task LoadSearchStateAsync()
+    {
+        if (!CanManageSettings) return;
+        try
+        {
+            var state = await _searchAdmin.GetStateAsync();
+            SearchEsEnabled = state.Enabled;
+            SearchEsReachable = state.Reachable;
+            SearchEsEffective = state.Effective;
+            ReindexProgress = _searchAdmin.GetReindexProgress();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load search engine state");
+        }
+    }
+
+    /// <summary>Re-reads only the reindex progress (cheap, in-memory).</summary>
+    public Task RefreshReindexProgressAsync()
+    {
+        if (CanManageSettings)
+            ReindexProgress = _searchAdmin.GetReindexProgress();
+        return Task.CompletedTask;
+    }
+
+    public async Task<bool> SaveSearchAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!CanManageSettings)
+        {
+            ErrorMessage = Resources.Web_Settings_NoPermissionChange;
+            return false;
+        }
+
+        try
+        {
+            await _searchAdmin.SetElasticEnabledAsync(SearchEsEnabled);
+            await LoadSearchStateAsync();
+
+            _logger.LogInformation("Elasticsearch desired state set to {Enabled}", SearchEsEnabled);
+            SuccessMessage = SearchEsEnabled
+                ? "Elasticsearch aktiviert. Wird verwendet, sobald der Container erreichbar ist."
+                : "Elasticsearch deaktiviert. Es wird die Dateinamen-Suche verwendet und nicht mehr indexiert.";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save search engine setting");
+            ErrorMessage = "Such-Einstellung konnte nicht gespeichert werden.";
+            return false;
+        }
+    }
+
+    /// <summary>Triggers a manual full reindex of all files on disk.</summary>
+    public async Task StartReindexAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!CanManageSettings)
+        {
+            ErrorMessage = Resources.Web_Settings_NoPermissionChange;
+            return;
+        }
+
+        try
+        {
+            var started = await _searchAdmin.TryStartReindexAsync();
+            ReindexProgress = _searchAdmin.GetReindexProgress();
+
+            if (started)
+                SuccessMessage = "Indexierung gestartet. Der Fortschritt wird unten angezeigt.";
+            else if (ReindexProgress.Running)
+                ErrorMessage = "Es läuft bereits eine Indexierung.";
+            else
+                ErrorMessage = "Indexierung nicht möglich: Elasticsearch ist deaktiviert oder nicht erreichbar.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to start reindex");
+            ErrorMessage = "Indexierung konnte nicht gestartet werden.";
         }
     }
 

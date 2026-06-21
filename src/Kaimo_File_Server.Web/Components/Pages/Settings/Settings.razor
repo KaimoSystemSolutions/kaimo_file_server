@@ -70,6 +70,12 @@ else
                         @Assets.SVG("gear.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                         RAM
                     </button>
+
+                    <button class="detail-tab @(_activeTab == SettingsTab.Search ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(SettingsTab.Search)">
+                        @Assets.SVG("search.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        Suche
+                    </button>
                 }
 
                 @if (VM.CanManageDataServices)
@@ -413,6 +419,100 @@ else
                 </div>
             }
 
+            @* ── Tab: Search (Elasticsearch) ── *@
+            @if (_activeTab == SettingsTab.Search && VM.CanManageSettings)
+            {
+                <div class="detail-section">
+                    <span class="detail-label">Volltext-Suche (Elasticsearch)</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
+                        Ist Elasticsearch aktiviert und erreichbar, werden Dateiinhalte indexiert und
+                        durchsuchbar. Andernfalls – oder wenn der Container nicht gestartet wurde – wird
+                        automatisch eine einfache Suche nach Dateinamen verwendet.
+                    </p>
+
+                    <div class="service-row">
+                        <div class="service-info">
+                            <span class="service-name">Elasticsearch</span>
+                            <span class="service-status service-status--@(VM.SearchEsEffective ? "running" : "stopped")">
+                                @SearchStatusLabel()
+                            </span>
+                        </div>
+                        <label class="toggle-switch" title="Elasticsearch aktivieren/deaktivieren">
+                            <input type="checkbox" @bind="VM.SearchEsEnabled" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="info-row">
+                            <span class="info-key">Gewünscht</span>
+                            <span class="info-val">@(VM.SearchEsEnabled ? "Aktiviert" : "Deaktiviert")</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">Container erreichbar</span>
+                            <span class="info-val @(VM.SearchEsReachable ? "" : "is-muted")">
+                                @(VM.SearchEsReachable ? "Ja" : "Nein")
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">Aktiver Modus</span>
+                            <span class="info-val">
+                                @(VM.SearchEsEffective ? "Elasticsearch (Volltext)" : "Dateinamen-Suche")
+                            </span>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 16px;">
+                        <button class="btn-primary" @onclick="SaveSearch">
+                            Speichern
+                        </button>
+                        <button class="btn-icon" title="Status aktualisieren" @onclick="RefreshSearch">
+                            @Assets.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                        </button>
+                    </div>
+
+                    <span class="detail-label" style="display: block; margin-top: 24px;">Manuelle Indexierung</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
+                        Indexiert alle Dateien neu – z. B. wenn Dateien auf anderem Wege hinzugekommen sind
+                        oder Elasticsearch zuvor deaktiviert war. Bereits indexierte, unveränderte Dateien
+                        werden übersprungen.
+                    </p>
+
+                    @if (VM.ReindexProgress.Running)
+                    {
+                        <div class="usage-bar">
+                            <div class="usage-bar-fill" style="width: @VM.ReindexProgress.Percent%;"></div>
+                        </div>
+                        <p style="font-size: 13px; color: var(--text-tertiary); margin-top: 8px;">
+                            Indexiere… @VM.ReindexProgress.Done / @VM.ReindexProgress.Total (@VM.ReindexProgress.Percent %)
+                        </p>
+                    }
+                    else if (VM.ReindexProgress.FinishedAt is not null)
+                    {
+                        <p style="font-size: 13px; color: var(--text-tertiary);">
+                            @if (VM.ReindexProgress.Error is null)
+                            {
+                                <text>Letzter Lauf abgeschlossen: @VM.ReindexProgress.Done / @VM.ReindexProgress.Total Dateien.</text>
+                            }
+                            else
+                            {
+                                <text>Letzter Lauf mit Fehler beendet: @VM.ReindexProgress.Error</text>
+                            }
+                        </p>
+                    }
+
+                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
+                        <button class="btn-primary" disabled="@(!VM.SearchEsEffective || VM.ReindexProgress.Running)"
+                                @onclick="StartReindex">
+                            Indexierung starten
+                        </button>
+                        <button class="btn-icon" title="Fortschritt aktualisieren" @onclick="RefreshSearch">
+                            @Assets.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                        </button>
+                    </div>
+                </div>
+            }
+
         </div>
     </div>
 }
@@ -427,6 +527,7 @@ else
         Storage,
         Memory,
         DataServices,
+        Search,
     }
 
     private SettingsTab _activeTab = SettingsTab.Language;
@@ -456,6 +557,10 @@ else
         // The public IP needs an outbound call — resolve it lazily when the tab opens.
         if (tab == SettingsTab.Network)
             await VM.LoadPublicIpAsync();
+
+        // Re-probe Elasticsearch reachability + reindex progress when the tab opens.
+        if (tab == SettingsTab.Search)
+            await VM.LoadSearchStateAsync();
 
         StateHasChanged();
     }
@@ -532,6 +637,31 @@ else
     {
         await VM.RefreshDataServiceStatusAsync();
         StateHasChanged();
+    }
+
+    private async Task SaveSearch()
+    {
+        await VM.SaveSearchAsync();
+        StateHasChanged();
+    }
+
+    private async Task RefreshSearch()
+    {
+        await VM.LoadSearchStateAsync();
+        StateHasChanged();
+    }
+
+    private async Task StartReindex()
+    {
+        await VM.StartReindexAsync();
+        StateHasChanged();
+    }
+
+    private string SearchStatusLabel()
+    {
+        if (VM.SearchEsEffective) return "Aktiv";
+        if (VM.SearchEsEnabled && !VM.SearchEsReachable) return "Nicht erreichbar";
+        return "Dateinamen-Modus";
     }
 
     private static string StatusLabel(string status) => status switch

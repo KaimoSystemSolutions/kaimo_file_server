@@ -110,13 +110,15 @@ builder.Services.AddDataProtection()
 
 var app = builder.Build();
 
-var search = app.Services.GetRequiredService<ISearchService>();
-await search.InitializeAsync();
-
 // BUG FIX: DB was never initialized in the Web project.
 // Without this, tables and seed data are missing when Web starts
 // independently of the Host project.
+// Must run BEFORE search init: the search router reads its on/off flag from the
+// config table, which only exists once migrations have run.
 await app.InitializeDatabaseAsync();
+
+var search = app.Services.GetRequiredService<ISearchService>();
+await search.InitializeAsync();
 
 if (app.Environment.IsDevelopment())
 {
