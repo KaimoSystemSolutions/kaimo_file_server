@@ -594,6 +594,9 @@
   <data name="Web_Login_AccountDisabled" xml:space="preserve">
     <value>Dieses Konto ist deaktiviert.</value>
   </data>
+  <data name="Web_Login_TooManyAttempts" xml:space="preserve">
+    <value>Zu viele fehlgeschlagene Versuche. Bitte versuche es in {0} Minute(n) erneut.</value>
+  </data>
   <data name="Web_Error_NotAuthenticated" xml:space="preserve">
     <value>Nicht authentifiziert.</value>
   </data>

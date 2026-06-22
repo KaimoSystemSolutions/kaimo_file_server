@@ -15,6 +15,23 @@ public class JwtTokenService
 
     private const int MinSecretLength = 32; // 256-bit minimum for HMAC-SHA256
 
+    /// <summary>
+    /// Secrets that have shipped in source control / documentation and are
+    /// therefore public knowledge. Since forging a valid token requires nothing
+    /// more than the signing secret, a well-known value is equivalent to having
+    /// no authentication at all — we refuse to start with one. Compared
+    /// case-insensitively and trimmed so trivial variations are caught too.
+    /// </summary>
+    private static readonly HashSet<string> ForbiddenSecrets = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "KaimoFileServer_SuperSecret_Key_ChangeThis_Min32Chars!!",
+        "changethis",
+        "change_me",
+        "changeme",
+        "secret",
+        "supersecret",
+    };
+
     public JwtTokenService(IConfiguration config, ILogger<JwtTokenService> logger)
     {
         _logger = logger;
@@ -27,6 +44,14 @@ public class JwtTokenService
             throw new InvalidOperationException(
                 $"Jwt:Secret muss mindestens {MinSecretLength} Zeichen lang sein (aktuell: {_secret.Length}). " +
                 "Ein kürzerer Secret ist unsicher für HMAC-SHA256.");
+        }
+
+        if (ForbiddenSecrets.Contains(_secret.Trim()))
+        {
+            throw new InvalidOperationException(
+                "Jwt:Secret ist ein bekannter Default-/Beispielwert und gilt als kompromittiert. " +
+                "Bitte ein zufälliges, geheimes Secret (>= 32 Zeichen) über Umgebungsvariable " +
+                "(Jwt__Secret) oder User-Secrets setzen — niemals im Repository ablegen.");
         }
 
         _logger.LogInformation("JWT initialisiert: Issuer={Issuer}, Expiration={Hours}h", _issuer, _expirationHours);
@@ -82,7 +107,12 @@ public class JwtTokenService
                 ValidateAudience = true,
                 ValidAudience = _issuer,
                 ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
                 IssuerSigningKey = key,
+                // Pin the algorithm so a token cannot be presented with a
+                // different/forged "alg" header (e.g. "none" or an asymmetric
+                // algorithm) to sidestep HMAC verification.
+                ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
                 ClockSkew = TimeSpan.FromMinutes(2)
             }, out _);
 

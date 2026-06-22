@@ -594,6 +594,9 @@
   <data name="Web_Login_AccountDisabled" xml:space="preserve">
     <value>This account is disabled.</value>
   </data>
+  <data name="Web_Login_TooManyAttempts" xml:space="preserve">
+    <value>Too many failed attempts. Please try again in {0} minute(s).</value>
+  </data>
   <data name="Web_Error_NotAuthenticated" xml:space="preserve">
     <value>Not authenticated.</value>
   </data>

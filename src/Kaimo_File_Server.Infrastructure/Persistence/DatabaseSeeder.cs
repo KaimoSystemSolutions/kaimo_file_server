@@ -5,8 +5,10 @@ using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Security.Cryptography;
 
 namespace Kaimo_File_Server.Infrastructure.Persistence;
 
@@ -29,16 +31,27 @@ public class DatabaseSeeder
     private readonly ApplicationDbContext _db;
     private readonly IPasswordService _passwordService;
     private readonly ILogger<DatabaseSeeder> _logger;
+    private readonly IConfiguration _configuration;
 
     public DatabaseSeeder(
         ApplicationDbContext db,
         IPasswordService passwordService,
-        ILogger<DatabaseSeeder> logger)
+        ILogger<DatabaseSeeder> logger,
+        IConfiguration configuration)
     {
         _db = db;
         _passwordService = passwordService;
         _logger = logger;
+        _configuration = configuration;
     }
+
+    /// <summary>
+    /// Whether to seed the demo/test users (admin1234, marco/1234, …). These
+    /// are convenient for local development but are a security liability in
+    /// production, so they are OFF unless explicitly enabled via
+    /// <c>Seed:DemoData=true</c> (set in appsettings.Development.json).
+    /// </summary>
+    private bool SeedDemoData => _configuration.GetValue("Seed:DemoData", false);
 
     // ══════════════════════════════════════════
     //  Main Entry Point
@@ -51,8 +64,83 @@ public class DatabaseSeeder
         await SeedRolesAsync();
         await SeedGroupsAsync();
         await SeedDepartmentsAsync();
-        await SeedTestUsersAsync();
+
+        if (SeedDemoData)
+            await SeedTestUsersAsync();
+        else
+            await SeedBootstrapAdminAsync();
+
         await SeedConfigAsync();
+    }
+
+    // ══════════════════════════════════════════
+    //  Bootstrap admin (production / non-demo)
+    // ══════════════════════════════════════════
+
+    /// <summary>
+    /// Ensures a single administrator account exists so a fresh production
+    /// system is reachable — WITHOUT shipping a publicly known password.
+    ///
+    /// The password is taken from <c>Seed:AdminPassword</c> (env/secret) if
+    /// present; otherwise a strong random one is generated and logged exactly
+    /// once at startup. There is intentionally no hard-coded fallback.
+    /// </summary>
+    private async Task SeedBootstrapAdminAsync()
+    {
+        if (await _db.Users.AnyAsync())
+        {
+            _logger.LogDebug("Users already present – skipping bootstrap admin");
+            return;
+        }
+
+        var roles = await LoadRoleLookupAsync();
+        if (!roles.TryGetValue("Administrator", out var adminRole))
+        {
+            _logger.LogWarning("Administrator role missing – cannot seed bootstrap admin");
+            return;
+        }
+
+        var configuredPassword = _configuration["Seed:AdminPassword"];
+        var generated = string.IsNullOrWhiteSpace(configuredPassword);
+        var password = generated ? GenerateStrongPassword() : configuredPassword!;
+
+        var admin = MakeUser(
+            "Administrator", "admin", password,
+            "Built-in administrator account", "admin@kaimo.local");
+
+        _db.Users.Add(admin);
+        await _db.SaveChangesAsync();
+
+        _db.UserRoles.Add(new UserRole(admin.Id, adminRole.Id));
+        _db.ScopedRoleAssignments.Add(
+            ScopedRoleAssignment.Global(admin.Id, adminRole.Id));
+        await _db.SaveChangesAsync();
+
+        if (generated)
+        {
+            _logger.LogWarning(
+                "==================================================================\n" +
+                " Bootstrap-Admin angelegt – Benutzer 'admin'.\n" +
+                " Generiertes Einmal-Passwort: {Password}\n" +
+                " Bitte umgehend ändern. Dieses Passwort wird NICHT erneut angezeigt.\n" +
+                "==================================================================",
+                password);
+        }
+        else
+        {
+            _logger.LogInformation("Bootstrap-Admin 'admin' mit konfiguriertem Passwort angelegt.");
+        }
+    }
+
+    /// <summary>
+    /// Cryptographically strong, URL-safe random password (~24 chars).
+    /// </summary>
+    private static string GenerateStrongPassword()
+    {
+        Span<byte> bytes = stackalloc byte[18];
+        RandomNumberGenerator.Fill(bytes);
+        return Convert.ToBase64String(bytes)
+            .Replace('+', 'A').Replace('/', 'B').Replace('=', 'C');
     }
 
     // ══════════════════════════════════════════
@@ -317,9 +405,13 @@ public class DatabaseSeeder
             "Lisa Müller", "lisa.mueller", "1234",
             "Marketing-Leiterin", "lisa.mueller@kaimo.local");
 
+        // The guest account is DISABLED and gets a random password rather than
+        // an empty one. An enabled account with an empty password would let
+        // anyone authenticate (notably over SMB/NTLM with a blank password).
         users["guest"] = MakeUser(
-            "Guest", "guest", "",
+            "Guest", "guest", GenerateStrongPassword(),
             "Built-in guest account", "",
+            isEnabled: false,
             canChangePassword: false);
 
         return users;
@@ -500,6 +592,7 @@ public class DatabaseSeeder
             new ConfigSetting { Key = "app.user.defaultRole", Value = "User" },
             new ConfigSetting { Key = "app.user.isActiveOnCreation", Value = "true" },
             new ConfigSetting { Key = "app.user.maxLoginAttempts", Value = "5" },
+            new ConfigSetting { Key = "app.user.lockoutMinutes", Value = "15" },
             new ConfigSetting { Key = "app.user.passwordMinLength", Value = "8" },
             new ConfigSetting { Key = "app.user.requireEmailVerification", Value = "true" },
             new ConfigSetting { Key = "app.group.maxMembers", Value = "50" },
@@ -521,7 +614,7 @@ public class DatabaseSeeder
               marco.hanisch / 1234      → DepartmentAdmin Entwicklung (+ Backend, Frontend)
               anna.weber / 1234         → Backend-Mitglied, Default: Read|Write (geerbt)
               lisa.mueller / 1234       → DepartmentAdmin Marketing, Default: Read
-              guest / (leer)            → Gast-Konto
+              guest                     → deaktiviert (kein Login)
             """);
     }
 

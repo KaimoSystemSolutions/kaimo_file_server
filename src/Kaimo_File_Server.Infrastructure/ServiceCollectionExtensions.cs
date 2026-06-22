@@ -56,6 +56,12 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IAuthenticationLookup, AuthenticationLookup>();
             services.AddScoped<IManagementAuthService, ManagementAuthService>();
 
+            // -- Login: brute-force throttle (singleton, in-memory counters) +
+            //    credential authentication with enumeration resistance --
+            services.TryAddSingleton(TimeProvider.System);
+            services.AddSingleton<ILoginThrottle, LoginThrottle>();
+            services.AddScoped<ILoginService, CredentialLoginService>();
+
             // -- Search engine config flag (cross-process, read by the search router) --
             services.AddSingleton<ISearchConfigStore, Configuration.SearchConfigStore>();
 

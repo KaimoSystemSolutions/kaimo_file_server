@@ -120,18 +120,31 @@ public static class ShareRelativePath
     /// <summary>
     /// Validates that a path contains no dangerous patterns.
     /// Returns false for path traversal attempts or invalid characters.
+    ///
+    /// The traversal check is SEGMENT-based, not a naive substring match:
+    /// a ".." is only rejected when it is a whole path segment. This keeps
+    /// legitimate names such as "report..final.txt" or "..gitignore" valid
+    /// while still rejecting "../", "a/../b", "sub/.." etc.
     /// </summary>
     public static bool IsValid(string? path)
     {
         if (path is null)
             return true; // null normalizes to "", which is valid (root)
 
-        var normalized = Normalize(path);
+        // Reject NUL bytes anywhere (checked on the raw input — Normalize
+        // does not strip them).
+        if (path.IndexOf('\0') >= 0)
+            return false;
 
-        if (normalized.Contains(".."))
-            return false;
-        if (normalized.Contains('\0'))
-            return false;
+        var normalized = Normalize(path);
+        if (normalized.Length == 0)
+            return true;
+
+        foreach (var segment in normalized.Split('/'))
+        {
+            if (segment == "..")
+                return false;
+        }
 
         return true;
     }

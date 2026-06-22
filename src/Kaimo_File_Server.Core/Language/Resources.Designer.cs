@@ -998,6 +998,12 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Login_AccountDisabled", resourceCulture);
             }
         }
+
+        public static string Web_Login_TooManyAttempts {
+            get {
+                return ResourceManager.GetString("Web_Login_TooManyAttempts", resourceCulture);
+            }
+        }
         
         public static string Web_Error_NotAuthenticated {
             get {

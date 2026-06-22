@@ -1,4 +1,3 @@
-using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.Extensions.Logging;
@@ -8,24 +7,18 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 
 public class LoginViewModel
 {
-    private readonly IUserRepository _userRepo;
-    private readonly IUserContextFactory _userContextFactory;
-    private readonly IPasswordService _passwordService;
+    private readonly ILoginService _loginService;
     private readonly JwtTokenService _jwtService;
     private readonly JwtAuthenticationStateProvider _authState;
     private readonly ILogger<LoginViewModel> _logger;
 
     public LoginViewModel(
-        IUserRepository userRepo,
-        IUserContextFactory userContextFactory,
-        IPasswordService passwordService,
+        ILoginService loginService,
         JwtTokenService jwtService,
         JwtAuthenticationStateProvider authState,
         ILogger<LoginViewModel> logger)
     {
-        _userRepo = userRepo;
-        _userContextFactory = userContextFactory;
-        _passwordService = passwordService;
+        _loginService = loginService;
         _jwtService = jwtService;
         _authState = authState;
         _logger = logger;
@@ -54,40 +47,44 @@ public class LoginViewModel
                 return false;
             }
 
-            var user = await _userRepo.GetByUsernameAsync(Username.Trim());
-            if (user is null)
+            // Credential verification, brute-force lockout, and enumeration
+            // resistance all live in the login service — the view model only
+            // maps the outcome to UI state.
+            var result = await _loginService.AuthenticateAsync(Username, Password);
+
+            switch (result.Outcome)
             {
-                ErrorMessage = Resources.Web_Login_InvalidCredentials;
-                return false;
+                case LoginOutcome.Success:
+                    var context = result.UserContext!;
+                    _logger.LogInformation("Login successful for user {Username}", context.User.Username);
+
+                    var roleNames = context.Roles.Select(r => r.Name);
+                    var token = _jwtService.GenerateToken(
+                        context.User.Id, context.User.Username, context.User.Name, roleNames);
+                    await _authState.StoreTokenInLocalStorageAsync(token);
+
+                    // Remove the password from memory immediately.
+                    Password = "";
+                    IsAuthenticated = true;
+                    return true;
+
+                case LoginOutcome.AccountDisabled:
+                    _logger.LogWarning("Login abgelehnt – Konto deaktiviert: {Username}", Username);
+                    ErrorMessage = Resources.Web_Login_AccountDisabled;
+                    return false;
+
+                case LoginOutcome.LockedOut:
+                    var minutes = Math.Max(1, (int)Math.Ceiling(result.RetryAfter.TotalMinutes));
+                    _logger.LogWarning(
+                        "Login gesperrt (Brute-Force-Schutz) für {Username}, erneut in {Minutes} min",
+                        Username, minutes);
+                    ErrorMessage = string.Format(Resources.Web_Login_TooManyAttempts, minutes);
+                    return false;
+
+                default: // InvalidCredentials
+                    ErrorMessage = Resources.Web_Login_InvalidCredentials;
+                    return false;
             }
-
-            if (!_passwordService.VerifyPassword(Password, user.PasswordHash))
-            {
-                ErrorMessage = Resources.Web_Login_InvalidCredentials;
-                return false;
-            }
-
-            if (!user.IsEnabled)
-            {
-                _logger.LogWarning("Login abgelehnt – Konto deaktiviert: {Username}", user.Username);
-                ErrorMessage = Resources.Web_Login_AccountDisabled;
-                return false;
-            }
-
-            _logger.LogInformation("Login successful for user {Username}", user.Username);
-
-            _logger.LogInformation("Login successful for user {Username}", user.Username);
-
-            var userContext = await _userContextFactory.CreateAsync(user);
-            var roleNames = userContext.Roles.Select(r => r.Name);
-
-            var token = _jwtService.GenerateToken(user.Id, user.Username, user.Name, roleNames);
-            await _authState.StoreTokenInLocalStorageAsync(token);
-
-            // Passwort sofort aus dem Speicher entfernen
-            Password = "";
-            IsAuthenticated = true;
-            return true;
         }
         catch (Exception ex)
         {
