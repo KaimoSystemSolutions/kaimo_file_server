@@ -574,12 +574,12 @@
     <value>Exception</value>
   </data>
   <data name="Web_Search_Placeholder" xml:space="preserve">
-  <value>Search files</value>
+    <value>Search files</value>
   </data>
-    <data name="Web_Search_Searching" xml:space="preserve">
+  <data name="Web_Search_Searching" xml:space="preserve">
     <value>Searching...</value>
   </data>
-    <data name="Web_Search_NoResults" xml:space="preserve">
+  <data name="Web_Search_NoResults" xml:space="preserve">
     <value>No results found</value>
   </data>
   <data name="Web_Login_Failed" xml:space="preserve">
@@ -849,6 +849,9 @@
   <data name="Web_Settings_LanguageSaved" xml:space="preserve">
     <value>Language saved. The change takes effect on the next page load.</value>
   </data>
+  <data name="Web_Settings_Language_Detail" xml:space="preserve">
+    <value>Systemwide language</value>
+  </data>
   <data name="Web_Settings_LanguageSaveFailed" xml:space="preserve">
     <value>Error saving the language.</value>
   </data>
@@ -864,7 +867,7 @@
   <data name="Web_Settings_SmbDisabled" xml:space="preserve">
     <value>SMB is being disabled. The change is applied by the service within a few seconds.</value>
   </data>
-  <data name="Web_Settings_ContextMenu" xml:space="preserve">
+  <data name="Web_Settings_Tab_ContextMenu" xml:space="preserve">
     <value>Context menu</value>
   </data>
   <data name="Web_Settings_ContextMenu_Desc" xml:space="preserve">
@@ -1103,5 +1106,32 @@
   </data>
   <data name="Web_Tab_RolesCount" xml:space="preserve">
     <value>{0} roles</value>
+  </data>
+  <data name="Web_Settings_Tab_Language" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="Web_Settings_Tab_Password" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Web_Settings_Tab_Storage" xml:space="preserve">
+    <value>Storage</value>
+  </data>
+  <data name="Web_Settings_Tab_Fileservices" xml:space="preserve">
+    <value>File Services</value>
+  </data>
+  <data name="Web_Settings_Tab_Search" xml:space="preserve">
+    <value>Suche</value>
+  </data>
+  <data name="Web_Settings_Tab_Ram" xml:space="preserve">
+    <value>RAM</value>
+  </data>
+  <data name="Web_Settings_Tab_IP_Address" xml:space="preserve">
+    <value>IP-Address</value>
+  </data>
+  <data name="Web_Settings_ContextMenu_Detail" xml:space="preserve">
+    <value>Context Menu</value>
+  </data>
+  <data name="Web_Settings_Button_Save" xml:space="preserve">
+    <value>Save</value>
   </data>
 </root>

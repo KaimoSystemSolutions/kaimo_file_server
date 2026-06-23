@@ -24,7 +24,7 @@
 }
 else if (!VM.CanAccessPage)
 {
-    <div class="error-banner">Keine Berechtigung. Sie haben keine Rechte für die globalen Einstellungen.</div>
+    <div class="error-banner">@Resources.Web_Error_NoPermission Sie haben keine Rechte für die globalen Einstellungen.</div>
 }
 else
 {
@@ -38,43 +38,43 @@ else
                     <button class="detail-tab @(_activeTab == SettingsTab.Language ? "detail-tab--active" : "")"
                             @onclick="() => SwitchTab(SettingsTab.Language)">
                         @Assets.SVG("globe.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        Sprache
+                        @Resources.Web_Settings_Tab_Language
                     </button>
 
                     <button class="detail-tab @(_activeTab == SettingsTab.ContextMenu ? "detail-tab--active" : "")"
                             @onclick="() => SwitchTab(SettingsTab.ContextMenu)">
                         @Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        @Resources.Web_Settings_ContextMenu
+                        @Resources.Web_Settings_Tab_ContextMenu
                     </button>
 
                     <button class="detail-tab @(_activeTab == SettingsTab.PasswordPolicy ? "detail-tab--active" : "")"
                             @onclick="() => SwitchTab(SettingsTab.PasswordPolicy)">
                         @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        Passwort
+                        @Resources.Web_Settings_Tab_Password
                     </button>
 
                     <button class="detail-tab @(_activeTab == SettingsTab.Network ? "detail-tab--active" : "")"
                             @onclick="() => SwitchTab(SettingsTab.Network)">
                         @Assets.SVG("compass.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        IP
+                        @Resources.Web_Settings_Tab_IP_Address
                     </button>
 
                     <button class="detail-tab @(_activeTab == SettingsTab.Storage ? "detail-tab--active" : "")"
                             @onclick="() => SwitchTab(SettingsTab.Storage)">
                         @Assets.SVG("folder.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        Speicher
+                        @Resources.Web_Settings_Tab_Storage
                     </button>
 
                     <button class="detail-tab @(_activeTab == SettingsTab.Memory ? "detail-tab--active" : "")"
                             @onclick="() => SwitchTab(SettingsTab.Memory)">
                         @Assets.SVG("gear.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        RAM
+                        @Resources.Web_Settings_Tab_Ram
                     </button>
 
                     <button class="detail-tab @(_activeTab == SettingsTab.Search ? "detail-tab--active" : "")"
                             @onclick="() => SwitchTab(SettingsTab.Search)">
                         @Assets.SVG("search.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        Suche
+                        @Resources.Web_Settings_Tab_Search
                     </button>
                 }
 
@@ -83,7 +83,7 @@ else
                     <button class="detail-tab @(_activeTab == SettingsTab.DataServices ? "detail-tab--active" : "")"
                             @onclick="() => SwitchTab(SettingsTab.DataServices)">
                         @Assets.SVG("archive.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        Datendienste
+                        @Resources.Web_Settings_Tab_Fileservices
                     </button>
                 }
             </div>
@@ -102,10 +102,7 @@ else
             @if (_activeTab == SettingsTab.Language && VM.CanManageSettings)
             {
                 <div class="detail-section">
-                    <span class="detail-label">Sprache der Anwendung</span>
-                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
-                        Ändert die Sprache global für alle Benutzer.
-                    </p>
+                    <span class="detail-label">@Resources.Web_Settings_Language_Detail</span>
 
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <select class="edit-input" style="max-width: 240px;"
@@ -117,7 +114,7 @@ else
                         </select>
 
                         <button class="btn-primary" @onclick="SaveLanguage">
-                            Speichern
+                            @Resources.Web_Settings_Button_Save
                         </button>
                     </div>
                 </div>
@@ -127,7 +124,7 @@ else
             @if (_activeTab == SettingsTab.ContextMenu && VM.CanManageSettings)
             {
                 <div class="detail-section">
-                    <span class="detail-label">@Resources.Web_Settings_ContextMenu</span>
+                    <span class="detail-label">@Resources.Web_Settings_ContextMenu_Detail</span>
                     <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
                         @Resources.Web_Settings_ContextMenu_Desc
                     </p>
@@ -167,7 +164,7 @@ else
 
                     <div style="display: flex; align-items: center; gap: 8px; margin-top: 16px;">
                         <button class="btn-primary" @onclick="SaveContextMenu">
-                            Speichern
+                            @Resources.Web_Settings_Button_Save
                         </button>
                         <button class="btn-icon" title="@Resources.Web_Settings_CtxReset"
                                 @onclick="ResetContextMenu">
@@ -202,7 +199,7 @@ else
 
                     <div style="display: flex; align-items: center; gap: 8px; margin-top: 16px;">
                         <button class="btn-primary" @onclick="SaveDataServices">
-                            Speichern
+                            @Resources.Web_Settings_Button_Save
                         </button>
                         <button class="btn-icon" title="Status aktualisieren" @onclick="RefreshStatus">
                             @Assets.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
@@ -244,7 +241,7 @@ else
                     </label>
 
                     <div style="margin-top: 16px;">
-                        <button class="btn-primary" @onclick="SavePasswordPolicy">Speichern</button>
+                        <button class="btn-primary" @onclick="SavePasswordPolicy">@Resources.Web_Settings_Button_Save</button>
                     </div>
                 </div>
             }
@@ -464,7 +461,7 @@ else
 
                     <div style="display: flex; align-items: center; gap: 8px; margin-top: 16px;">
                         <button class="btn-primary" @onclick="SaveSearch">
-                            Speichern
+                            @Resources.Web_Settings_Button_Save
                         </button>
                         <button class="btn-icon" title="Status aktualisieren" @onclick="RefreshSearch">
                             @Assets.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))

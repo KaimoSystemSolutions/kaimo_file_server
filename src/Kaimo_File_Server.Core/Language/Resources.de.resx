@@ -573,11 +573,11 @@
   <data name="Web_Acl_Error_Exception" xml:space="preserve">
     <value>Ausnahme</value>
   </data>
-  <data name="Web_Search_Searching" xml:space="preserve">
-    <value>Suche...</value>
-  </data>
   <data name="Web_Search_Placeholder" xml:space="preserve">
     <value>Suche nach Dateien</value>
+  </data>
+  <data name="Web_Search_Searching" xml:space="preserve">
+    <value>Suche...</value>
   </data>
   <data name="Web_Search_NoResults" xml:space="preserve">
     <value>Keine Dateien gefunden</value>
@@ -849,6 +849,9 @@
   <data name="Web_Settings_LanguageSaved" xml:space="preserve">
     <value>Sprache gespeichert. Die Änderung wird beim nächsten Seitenaufruf wirksam.</value>
   </data>
+  <data name="Web_Settings_Language_Detail" xml:space="preserve">
+    <value>Globale Sprache</value>
+  </data>
   <data name="Web_Settings_LanguageSaveFailed" xml:space="preserve">
     <value>Fehler beim Speichern der Sprache.</value>
   </data>
@@ -864,7 +867,7 @@
   <data name="Web_Settings_SmbDisabled" xml:space="preserve">
     <value>SMB wird deaktiviert. Die Änderung wird vom Dienst innerhalb weniger Sekunden übernommen.</value>
   </data>
-  <data name="Web_Settings_ContextMenu" xml:space="preserve">
+  <data name="Web_Settings_Tab_ContextMenu" xml:space="preserve">
     <value>Kontextmenü</value>
   </data>
   <data name="Web_Settings_ContextMenu_Desc" xml:space="preserve">
@@ -1103,5 +1106,32 @@
   </data>
   <data name="Web_Tab_RolesCount" xml:space="preserve">
     <value>{0} Rollen</value>
+  </data>
+  <data name="Web_Settings_Tab_Language" xml:space="preserve">
+    <value>Sprache</value>
+  </data>
+  <data name="Web_Settings_Tab_Password" xml:space="preserve">
+    <value>Passwort</value>
+  </data>
+  <data name="Web_Settings_Tab_Storage" xml:space="preserve">
+    <value>Speicher</value>
+  </data>
+  <data name="Web_Settings_Tab_Fileservices" xml:space="preserve">
+    <value>Dateidienste</value>
+  </data>
+  <data name="Web_Settings_Tab_Search" xml:space="preserve">
+    <value>Suche</value>
+  </data>
+  <data name="Web_Settings_Tab_Ram" xml:space="preserve">
+    <value>Arbeitsspeicher</value>
+  </data>
+  <data name="Web_Settings_Tab_IP_Address" xml:space="preserve">
+    <value>IP Adresse</value>
+  </data>
+  <data name="Web_Settings_ContextMenu_Detail" xml:space="preserve">
+    <value>Kontext Menü</value>
+  </data>
+  <data name="Web_Settings_Button_Save" xml:space="preserve">
+    <value>Speichern</value>
   </data>
 </root>
