@@ -52,6 +52,12 @@ except ImportError:
 
 SMB2_DIALECTS_OFFERED = [0x0202, 0x0210, 0x0300, 0x0302, 0x0311]
 
+# Capabilities, die dieser Client im NEGOTIATE-Request anbietet. LARGE_MTU (0x04) signalisiert
+# dem Server, dass wir grosse Frames empfangen koennen. Ohne dieses Bit deckelt ein
+# MS-SMB2-konformer Server (so wie diese Lib) Read/Write/Transact auf 64 KiB — der Test
+# wuerde dann nicht die echte Obergrenze des Servers anzeigen, sondern nur den 64-KiB-Default.
+CLIENT_CAPABILITIES = 0x04  # SMB2_GLOBAL_CAP_LARGE_MTU
+
 DIALECT_NAMES = {
     0x0202: "SMB 2.0.2", 0x0210: "SMB 2.1", 0x0300: "SMB 3.0",
     0x0302: "SMB 3.0.2", 0x0311: "SMB 3.1.1",
@@ -174,7 +180,7 @@ def build_smb2_negotiate() -> bytes:
 
     body = struct.pack(
         "<HHHHI16sIHH",
-        36, len(dialects), 0x0001, 0, 0, client_guid, neg_ctx_offset, 2, 0,
+        36, len(dialects), 0x0001, 0, CLIENT_CAPABILITIES, client_guid, neg_ctx_offset, 2, 0,
     )
     body += struct.pack("<" + "H" * len(dialects), *dialects)
     body += b"\x00" * pad + ctx1 + ctx2

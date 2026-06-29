@@ -1,30 +1,33 @@
-﻿using Kaimo_File_Server.Core.Repositories;
-using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services.File;
-using Kaimo_File_Server.Smb.Security;
 using Microsoft.Extensions.DependencyInjection;
-using SMBLibrary;
-using SMBLibrary.Authentication.GSSAPI;
-using SMBLibrary.Authentication.NTLM;
-using SMBLibrary.Server;
-using SMBLibrary.Services;
+using Smb.Auth.Ntlm;
 using System.Collections.Concurrent;
 using System.Net;
+using LibSmbServer = Smb.Host.SmbServer;
+using SmbServerBuilder = Smb.Host.SmbServerBuilder;
 
 namespace Kaimo_File_Server.Smb
 {
+    /// <summary>
+    /// Hosts the self-written SMB-2/3 server (<see cref="Smb.Host.SmbServer"/>) for the Kaimo file
+    /// server. Loads shares from the database, watches the storage directory, and reconciles shares at
+    /// runtime — without a server restart. Authentication, per-user/per-path ACLs, ABE and snapshots are
+    /// provided through the Kaimo bridge types (<see cref="KaimoIdentityBackend"/>,
+    /// <see cref="KaimoSharePolicy"/>, <see cref="KaimoFileStore"/>).
+    /// </summary>
     public class SmbServer : IDisposable
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly IFileServiceFactory _fileServiceFactory;
         private readonly string _storagePath;
         private readonly object _shareLock = new();
-        private SMBServer? _server;
+
+        private LibSmbServer? _server;
         private FileSystemWatcher? _watcher;
         private int _debounce = 0;
 
-        // -- Runtime share tracking --
-        // Reads happen on SMB worker threads (ABE), writes under _shareLock.
+        // -- Runtime share tracking (name → entry), used to diff against the DB in SyncFromDb. --
         private readonly ConcurrentDictionary<string, ShareEntry> _activeShares
             = new(StringComparer.OrdinalIgnoreCase);
 
@@ -34,7 +37,6 @@ namespace Kaimo_File_Server.Smb
             public string DbName { get; init; } = "";
             public string Path { get; init; } = "";
             public bool IsHidden { get; init; }
-            public FileSystemShare Share { get; init; } = null!;
         }
 
         public SmbServer(
@@ -56,9 +58,8 @@ namespace Kaimo_File_Server.Smb
         }
 
         /// <summary>
-        /// Back-compat entry point: starts the server and tears it down when the
-        /// token is cancelled. New callers should prefer <see cref="Start"/> /
-        /// <see cref="Stop"/> directly (e.g. the data-service reconciler).
+        /// Back-compat entry point: starts the server and tears it down when the token is cancelled.
+        /// New callers should prefer <see cref="Start"/> / <see cref="Stop"/> directly.
         /// </summary>
         public Task StartAsync(CancellationToken token)
         {
@@ -68,9 +69,8 @@ namespace Kaimo_File_Server.Smb
         }
 
         /// <summary>
-        /// Starts the SMB server and the storage watcher. Idempotent — calling it
-        /// while already running is a no-op. A fresh <see cref="SMBServer"/> instance
-        /// is created on every start so the server can be stopped and started again.
+        /// Starts the SMB server and the storage watcher. Idempotent. A fresh server instance is
+        /// created on every start so it can be stopped and started again.
         /// </summary>
         public void Start()
         {
@@ -88,8 +88,7 @@ namespace Kaimo_File_Server.Smb
         }
 
         /// <summary>
-        /// Stops the SMB server and the storage watcher. Idempotent — calling it
-        /// while already stopped is a no-op. Active tree connections are dropped.
+        /// Stops the SMB server and the storage watcher. Idempotent. Active connections are dropped.
         /// After a stop the server can be restarted via <see cref="Start"/>.
         /// </summary>
         public void Stop()
@@ -105,7 +104,7 @@ namespace Kaimo_File_Server.Smb
                 _watcher?.Dispose();
                 _watcher = null;
 
-                _server.Stop();
+                SmbSync.Run(() => _server.DisposeAsync()); // StopAsync + dispose
                 _server = null;
                 _activeShares.Clear();
 
@@ -115,62 +114,61 @@ namespace Kaimo_File_Server.Smb
 
         private void StartServer()
         {
-            var shares = LoadSharesFromDb();
-
-            _server = new SMBServer(
-                shares,
-                new GSSProvider(CreateAuthProvider()),
-                new ShareListProvider(GetVisibleSharesForCurrentUser));
-
-            _server.OnBeforeCommand = username =>
+            var backend = new KaimoIdentityBackend(_serviceProvider);
+            var policy = new KaimoSharePolicy(_serviceProvider);
+            var ntlmOptions = new NtlmServerOptions
             {
-                if (string.IsNullOrEmpty(username)) return;
-                if (SmbFileSystem.LookupUser(username) != null) return;
-
-                try
-                {
-                    using var scope = _serviceProvider.CreateScope();
-                    var authLookup = scope.ServiceProvider.GetRequiredService<IAuthenticationLookup>();
-                    var userContext = Task.Run(() => authLookup.ResolveUserContextAsync(username))
-                                          .GetAwaiter().GetResult();
-                    if (userContext != null) SmbFileSystem.RegisterUser(userContext);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[OnBeforeCommand] resolve failed: {ex.Message}");
-                }
+                NetbiosDomainName = "WORKGROUP",
+                NetbiosComputerName = Environment.MachineName.ToUpperInvariant(),
             };
 
-            _server.Start(IPAddress.Any, SMBTransportType.DirectTCPTransport);
-            Console.WriteLine($"[+] SMB server gestartet mit {shares.Count} Shares (ABE aktiv)");
+            SmbServerBuilder builder = SmbServerBuilder.Create()
+                .WithEndpoint(IPAddress.Any, 445)
+                .WithServerName(Environment.MachineName)
+                .UseAuthentication(new NtlmSpnegoNegotiator(backend, ntlmOptions))
+                .UseShareAuthorization(policy)
+                .WithLogger(msg => Console.WriteLine($"[smb] {msg}"));
+
+            foreach (KaimoShare share in LoadSharesFromDb())
+                builder.AddShare(share);
+
+            _server = builder.Build();
+            try
+            {
+                SmbSync.Run(() => _server.StartAsync());
+            }
+            catch
+            {
+                SmbSync.Run(() => _server.DisposeAsync());
+                _server = null;
+                throw;
+            }
+
+            Console.WriteLine($"[+] SMB server gestartet mit {_activeShares.Count} Shares (ABE aktiv)");
         }
 
-        private SMBShareCollection LoadSharesFromDb()
+        private List<KaimoShare> LoadSharesFromDb()
         {
-            var collection = new SMBShareCollection();
+            var shares = new List<KaimoShare>();
 
             using var scope = _serviceProvider.CreateScope();
             var shareRepo = scope.ServiceProvider.GetRequiredService<IShareRepository>();
-            var dbShares = Task.Run(() => shareRepo.GetAllEnabledAsync()).GetAwaiter().GetResult();
+            var dbShares = SmbSync.Run(() => shareRepo.GetAllEnabledAsync());
 
-            foreach (var shareDef in dbShares)
+            foreach (var def in dbShares)
             {
-                var fsShare = CreateFileSystemShare(shareDef.Id, shareDef.Name, shareDef.Path);
-                collection.Add(fsShare);
-
-                _activeShares[shareDef.Name] = new ShareEntry
+                shares.Add(CreateShare(def.Id, def.Name, def.Path, def.IsShareHidden));
+                _activeShares[def.Name] = new ShareEntry
                 {
-                    Id = shareDef.Id,
-                    DbName = shareDef.Name,
-                    Path = shareDef.Path,
-                    IsHidden = shareDef.IsShareHidden,
-                    Share = fsShare
+                    Id = def.Id,
+                    DbName = def.Name,
+                    Path = def.Path,
+                    IsHidden = def.IsShareHidden,
                 };
-
-                Console.WriteLine($"[+] Share '{shareDef.Name}' ({shareDef.Id}) -> {shareDef.Path}");
+                Console.WriteLine($"[+] Share '{def.Name}' ({def.Id}) -> {def.Path}");
             }
 
-            return collection;
+            return shares;
         }
 
         // ═══════════════════════ FILE SYSTEM WATCHER ═══════════════════════
@@ -217,14 +215,11 @@ namespace Kaimo_File_Server.Smb
 
         // ═══════════════════════ DYNAMIC SHARE MANAGEMENT ═══════════════════════
         //
-        // All mutations go through _shareLock so operations complete atomically.
-        // Call these from API controllers, background services, or SignalR hubs.
-        // No server restart — existing SMB connections stay alive.
+        // All mutations go through _shareLock so operations complete atomically. No server restart —
+        // existing SMB connections stay alive; only new tree connects see the change.
 
-        /// <summary>
-        /// Adds a new share at runtime. Immediately accessible for new tree connects.
-        /// </summary>
-        public void AddShare(Guid shareId, string name, string path)
+        /// <summary>Adds a new share at runtime. Immediately accessible for new tree connects.</summary>
+        public void AddShare(Guid shareId, string name, string path, bool isHidden = false)
         {
             lock (_shareLock)
             {
@@ -237,24 +232,16 @@ namespace Kaimo_File_Server.Smb
                     return;
                 }
 
-                var fsShare = CreateFileSystemShare(shareId, name, path);
-                _server.AddShare(fsShare);
-
-                _activeShares[name] = new ShareEntry
-                {
-                    Id = shareId,
-                    DbName = name,
-                    Path = path,
-                    Share = fsShare
-                };
+                _server.AddShare(CreateShare(shareId, name, path, isHidden));
+                _activeShares[name] = new ShareEntry { Id = shareId, DbName = name, Path = path, IsHidden = isHidden };
 
                 Console.WriteLine($"[+] Share '{name}' ({shareId}) -> {path} [live hinzugefügt]");
             }
         }
 
         /// <summary>
-        /// Removes a share at runtime. Active tree connections remain functional
-        /// until the client disconnects — only new tree connects are blocked.
+        /// Removes a share at runtime. Active tree connections remain functional until the client
+        /// disconnects — only new tree connects are blocked.
         /// </summary>
         public bool RemoveShare(string name)
         {
@@ -276,11 +263,10 @@ namespace Kaimo_File_Server.Smb
         }
 
         /// <summary>
-        /// Updates an existing share (path changed, renamed, etc.).
-        /// Internally removes the old and adds the new share.
-        /// Active connections to the old share remain until the client disconnects.
+        /// Updates an existing share (path changed, renamed, etc.). Internally removes the old and adds
+        /// the new share. Active connections to the old share remain until the client disconnects.
         /// </summary>
-        public void UpdateShare(string oldName, Guid shareId, string newName, string newPath)
+        public void UpdateShare(string oldName, Guid shareId, string newName, string newPath, bool isHidden = false)
         {
             lock (_shareLock)
             {
@@ -290,25 +276,16 @@ namespace Kaimo_File_Server.Smb
                 if (_activeShares.TryRemove(oldName, out _))
                     _server.RemoveShare(oldName);
 
-                var fsShare = CreateFileSystemShare(shareId, newName, newPath);
-                _server.AddShare(fsShare);
-
-                _activeShares[newName] = new ShareEntry
-                {
-                    Id = shareId,
-                    DbName = newName,
-                    Path = newPath,
-                    Share = fsShare
-                };
+                _server.AddShare(CreateShare(shareId, newName, newPath, isHidden));
+                _activeShares[newName] = new ShareEntry { Id = shareId, DbName = newName, Path = newPath, IsHidden = isHidden };
 
                 Console.WriteLine($"[~] Share aktualisiert: '{oldName}' -> '{newName}' ({shareId}) -> {newPath}");
             }
         }
 
         /// <summary>
-        /// Full resync with the database. Adds new shares, removes deleted ones,
-        /// updates changed ones. No server restart, no connection interruption.
-        /// All changes happen atomically under a single lock.
+        /// Full resync with the database. Adds new shares, removes deleted ones, replaces changed ones.
+        /// No server restart, no connection interruption. All changes happen atomically under one lock.
         /// </summary>
         public void SyncFromDb()
         {
@@ -319,7 +296,7 @@ namespace Kaimo_File_Server.Smb
 
                 using var scope = _serviceProvider.CreateScope();
                 var shareRepo = scope.ServiceProvider.GetRequiredService<IShareRepository>();
-                var dbShares = Task.Run(() => shareRepo.GetAllEnabledAsync()).GetAwaiter().GetResult();
+                var dbShares = SmbSync.Run(() => shareRepo.GetAllEnabledAsync());
 
                 var dbByName = new Dictionary<string, (Guid Id, string Name, string Path, bool IsHidden)>(
                     StringComparer.OrdinalIgnoreCase);
@@ -337,7 +314,7 @@ namespace Kaimo_File_Server.Smb
                     }
                 }
 
-                // Add new or update changed shares
+                // Add new or replace changed shares
                 foreach (var (id, name, path, isHidden) in dbByName.Values)
                 {
                     if (_activeShares.TryGetValue(name, out var existing))
@@ -349,36 +326,16 @@ namespace Kaimo_File_Server.Smb
                             _activeShares.TryRemove(name, out _);
                             _server.RemoveShare(name);
 
-                            var fsShare = CreateFileSystemShare(id, name, path);
-                            _server.AddShare(fsShare);
-
-                            _activeShares[name] = new ShareEntry
-                            {
-                                Id = id,
-                                DbName = name,
-                                Path = path,
-                                IsHidden = isHidden,
-                                Share = fsShare
-                            };
+                            _server.AddShare(CreateShare(id, name, path, isHidden));
+                            _activeShares[name] = new ShareEntry { Id = id, DbName = name, Path = path, IsHidden = isHidden };
 
                             Console.WriteLine($"[~] Share '{name}' aktualisiert -> {path}");
                         }
                     }
                     else
                     {
-                        // New share
-                        var fsShare = CreateFileSystemShare(id, name, path);
-                        _server.AddShare(fsShare);
-
-                        _activeShares[name] = new ShareEntry
-                        {
-                            Id = id,
-                            DbName = name,
-                            Path = path,
-                            IsHidden = isHidden,
-                            Share = fsShare
-                        };
-
+                        _server.AddShare(CreateShare(id, name, path, isHidden));
+                        _activeShares[name] = new ShareEntry { Id = id, DbName = name, Path = path, IsHidden = isHidden };
                         Console.WriteLine($"[+] Share '{name}' ({id}) -> {path} [sync hinzugefügt]");
                     }
                 }
@@ -389,158 +346,22 @@ namespace Kaimo_File_Server.Smb
 
         // ═══════════════════════ SHARE FACTORY ═══════════════════════
 
-        private FileSystemShare CreateFileSystemShare(Guid shareId, string name, string path)
+        private KaimoShare CreateShare(Guid shareId, string name, string path, bool isHidden)
         {
             Directory.CreateDirectory(path);
 
             var fileService = _fileServiceFactory.CreateForShare(shareId, path);
-            var fileSystem = new SmbFileSystem(name, fileService);
-
-            // Snapshot timestamps still come from your version service.
-            // We provide them through a delegate so SmbFileSystem doesn't need DI.
-            fileSystem.SnapshotProvider = () =>
+            return new KaimoShare
             {
-                using var scope = _serviceProvider.CreateScope();
-                var versionService = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
-                return Task.Run(() => versionService.GetSnapshotTimestampsAsync())
-                           .GetAwaiter().GetResult();
+                Name = name,
+                ShareId = shareId,
+                IsHidden = isHidden,
+                FileStore = new KaimoFileStore(shareId, fileService),
             };
-
-            var share = new FileSystemShare(name, fileSystem);
-            share.AccessRequested += (sender, args) => OnAccessRequested(shareId, args);
-            return share;
-        }
-
-        // ═══════════════════════ AUTH ═══════════════════════
-
-        private NtHashAuthenticationProvider CreateAuthProvider()
-        {
-            return new NtHashAuthenticationProvider(username =>
-            {
-                try
-                {
-                    using var scope = _serviceProvider.CreateScope();
-                    var authLookup = scope.ServiceProvider.GetRequiredService<IAuthenticationLookup>();
-                    return Task.Run(() => authLookup.GetNtHashAsync(username)).GetAwaiter().GetResult();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[NtHash ERROR] Failed to retrieve hash for '{username}': {ex.Message}");
-                    return null;
-                }
-            });
-        }
-
-        private void OnAccessRequested(Guid shareId, AccessRequestArgs args)
-        {
-            try
-            {
-                using var scope = _serviceProvider.CreateScope();
-                var authLookup = scope.ServiceProvider.GetRequiredService<IAuthenticationLookup>();
-
-                var userContext = Task.Run(() => authLookup.ResolveUserContextAsync(args.UserName))
-                    .GetAwaiter().GetResult();
-
-                if (userContext == null)
-                {
-                    args.Allow = false;
-                    return;
-                }
-
-                // Populate both AsyncLocal and cache so that the immediately
-                // following CreateFile call has the user available regardless
-                // of whether it runs on this thread or a different one.
-                SmbFileSystem.RegisterUser(userContext);
-
-                // Connect-time check: ACL only, NOT the hidden flag — a hidden share
-                // must stay reachable via its direct \\server\share path.
-                args.Allow = Task.Run(() => authLookup.CanAccessShareAsync(shareId, userContext.User.Id))
-                    .GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[ShareAccess ERROR] {args.UserName} -> {shareId}: {ex.Message}");
-                args.Allow = false;
-            }
-        }
-
-        // ═══════════════════════ ABE ═══════════════════════
-
-        /// <summary>
-        /// Called by SMBLibrary (via ShareListProvider delegate) on every
-        /// NetrShareEnum / NetrShareGetInfo RPC request.
-        /// Returns only the share names the current session user has access to.
-        ///
-        /// This relies on AsyncLocal being set by OnBeforeCommand.
-        /// If AsyncLocal is empty (thread hop), we return an empty list
-        /// as a safe default — the user can still connect to shares directly.
-        /// </summary>
-        private List<string> GetVisibleSharesForCurrentUser()
-        {
-            try
-            {
-                
-                var userContext = SmbFileSystem.LookupUser(null);
-                if (userContext == null)
-                {
-                    // AsyncLocal lost due to thread hop between OnBeforeCommand
-                    // and the RPC handler. Return ALL share names so SMBLibrary
-                    // can find the share object and build a valid response.
-                    //
-                    // This is safe: ABE is cosmetic (hides shares from the listing).
-                    // The real access control happens in OnAccessRequested when the
-                    // client actually tries to connect. Returning an empty list here
-                    // causes SMBLibrary to crash with NullReferenceException in
-                    // GetNetrShareGetInfoResponse because it doesn't null-check.
-                    //
-                    // Hidden shares are still filtered out even in this fallback so
-                    // the hidden flag is never leaked through an enumeration.
-                    Console.WriteLine("[ABE] No user context — returning non-hidden shares as fallback.");
-                    return _activeShares.Values
-                        .Where(e => !e.IsHidden)
-                        .Select(e => e.DbName)
-                        .ToList();
-                }
-
-                using var scope = _serviceProvider.CreateScope();
-                var authLookup = scope.ServiceProvider.GetRequiredService<IAuthenticationLookup>();
-
-                var visible = new List<string>();
-                foreach (var entry in _activeShares.Values)
-                {
-                    try
-                    {
-                        var hasAccess = Task.Run(() =>
-                            authLookup.CanListShareAsync(entry.Id, userContext.User.Id))
-                            .GetAwaiter().GetResult();
-
-                        if (hasAccess)
-                            visible.Add(entry.DbName);
-                    }
-                    catch (Exception ex)
-                    {
-                        // Can't determine access → hide (safe default)
-                        Console.WriteLine($"[ABE] Access check failed for '{entry.DbName}': {ex.Message}");
-                    }
-                }
-
-                return visible;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[ABE ERROR] {ex.Message}");
-                return _activeShares.Values
-                    .Where(e => !e.IsHidden)
-                    .Select(e => e.DbName)
-                    .ToList();
-            }
         }
 
         // ═══════════════════════ DISPOSE ═══════════════════════
 
-        public void Dispose()
-        {
-            Stop();
-        }
+        public void Dispose() => Stop();
     }
 }

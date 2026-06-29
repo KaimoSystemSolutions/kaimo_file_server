@@ -1,8 +1,8 @@
 {
   "ip": "127.0.0.1",
   "port": 4445,
-  "username": "marco.hanisch",
-  "password": "1234",
+  "username": "demo",
+  "password": "demo123",
   "domain": "",
   "test_share": "",
   "test_all_shares": true,

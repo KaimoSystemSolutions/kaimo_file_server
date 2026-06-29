@@ -8,11 +8,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="kaimoSystemSolutions-SMBLibrary" Version="1.5.7.4" />
+    <ProjectReference Include="..\Kaimo_File_Server.Core\Kaimo_File_Server.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Kaimo_File_Server.Core\Kaimo_File_Server.Core.csproj" />
+    <!-- Expose the internal SMB bridge types (KaimoFileStore, KaimoFileHandle, …) to the test project. -->
+    <InternalsVisibleTo Include="Kaimo_File_Server.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SMB-Server" Version="1.0.2" />
   </ItemGroup>
 
 </Project>
