@@ -81,6 +81,20 @@ public class CredentialLoginServiceTests
         Assert.Equal(LoginOutcome.InvalidCredentials, wrongPw.Outcome);
     }
 
+    [Fact]
+    public async Task EmptyPassword_IsRejected_WithoutProbingTheRepository()
+    {
+        ArrangeExistingUser();
+
+        var result = await _sut.AuthenticateAsync(Username, "");
+
+        // No login without a password — even for an otherwise valid, enabled user.
+        Assert.Equal(LoginOutcome.InvalidCredentials, result.Outcome);
+        // Rejected before any user/hash lookup.
+        _users.Verify(r => r.GetByUsernameAsync(It.IsAny<string>()), Times.Never);
+        _passwords.Verify(p => p.VerifyPassword(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
     // ─────────────── Happy path ───────────────
 
     [Fact]

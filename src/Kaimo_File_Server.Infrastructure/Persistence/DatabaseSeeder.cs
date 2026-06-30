@@ -228,7 +228,7 @@ public class DatabaseSeeder
 
     private static readonly string[] DefaultGroups =
     [
-        "Admins", "Developers", "Guests", "Everyone",
+        "Admins", "Developers", "Everyone",
         "Backend-Team", "Frontend-Team", "Marketing-Team"
     ];
 
@@ -405,15 +405,7 @@ public class DatabaseSeeder
             "Lisa Müller", "lisa.mueller", "1234",
             "Marketing-Leiterin", "lisa.mueller@kaimo.local");
 
-        // The guest account is DISABLED and gets a random password rather than
-        // an empty one. An enabled account with an empty password would let
-        // anyone authenticate (notably over SMB/NTLM with a blank password).
-        users["guest"] = MakeUser(
-            "Guest", "guest", GenerateStrongPassword(),
-            "Built-in guest account", "",
-            isEnabled: false,
-            canChangePassword: false);
-
+        // No guest/anonymous account: only real, password-protected users exist.
         return users;
     }
 
@@ -442,7 +434,6 @@ public class DatabaseSeeder
             ("marco", ["Developers", "Everyone"]),
             ("anna",  ["Backend-Team", "Developers", "Everyone"]),
             ("lisa",  ["Marketing-Team", "Everyone"]),
-            ("guest", ["Guests", "Everyone"]),
         };
 
         foreach (var (userKey, groupNames) in assignments)
@@ -466,7 +457,6 @@ public class DatabaseSeeder
             ("marco", ["User"]),
             ("anna",  ["User"]),
             ("lisa",  ["User"]),
-            ("guest", ["User"]),
         };
 
         foreach (var (userKey, roleNames) in assignments)
@@ -545,7 +535,7 @@ public class DatabaseSeeder
         }
 
         // Groups not listed here keep their default: Global
-        // (Admins, Guests, Everyone)
+        // (Admins, Everyone)
     }
 
     // -- Scoped Role Assignments --
@@ -614,7 +604,6 @@ public class DatabaseSeeder
               marco.hanisch / 1234      → DepartmentAdmin Entwicklung (+ Backend, Frontend)
               anna.weber / 1234         → Backend-Mitglied, Default: Read|Write (geerbt)
               lisa.mueller / 1234       → DepartmentAdmin Marketing, Default: Read
-              guest                     → deaktiviert (kein Login)
             """);
     }
 

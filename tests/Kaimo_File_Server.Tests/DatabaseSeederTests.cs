@@ -131,26 +131,23 @@ public class DatabaseSeederTests : IDisposable
     }
 
     [Fact]
-    public async Task SeedAsync_DemoData_GuestIsDisabled()
+    public async Task SeedAsync_DemoData_DoesNotSeedGuest()
     {
         await SeedAsync(("Seed:DemoData", "true"));
 
-        var guest = await _db.Users.SingleOrDefaultAsync(u => u.Username == "guest");
-        Assert.NotNull(guest);
-        Assert.False(guest!.IsEnabled, "Guest account must never be enabled.");
+        // There is no guest/anonymous account in any mode — only real, password-protected users.
+        Assert.False(await _db.Users.AnyAsync(u => u.Username == "guest"));
     }
 
     // ─────────────── Idempotency ───────────────
 
     [Fact]
-    public async Task SeedAsync_RunTwice_DoesNotDuplicateOrEnableGuest()
+    public async Task SeedAsync_RunTwice_DoesNotDuplicate()
     {
         await SeedAsync(("Seed:DemoData", "true"));
         await SeedAsync(("Seed:DemoData", "true"));
 
         Assert.Equal(1, await _db.Users.CountAsync(u => u.Username == "admin"));
-        var guest = await _db.Users.SingleOrDefaultAsync(u => u.Username == "guest");
-        if (guest is not null)
-            Assert.False(guest.IsEnabled);
+        Assert.False(await _db.Users.AnyAsync(u => u.Username == "guest"));
     }
 }

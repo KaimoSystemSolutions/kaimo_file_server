@@ -59,6 +59,17 @@ public sealed class CredentialLoginService : ILoginService
 
         var policy = await ResolvePolicyAsync();
 
+        // No login without a password. An empty password is universally invalid and reveals
+        // nothing about whether the user exists, so reject it before any DB lookup but still
+        // count it as a failed attempt toward lockout.
+        if (password.Length == 0)
+        {
+            var emptyPwFailure = _throttle.RegisterFailure(key, policy);
+            return emptyPwFailure.IsLockedOut
+                ? LoginResult.LockedOut(emptyPwFailure.RetryAfter)
+                : LoginResult.InvalidCredentials;
+        }
+
         var user = await _users.GetByUsernameAsync(trimmed);
 
         // 2. Always verify against *some* hash so timing is independent of
