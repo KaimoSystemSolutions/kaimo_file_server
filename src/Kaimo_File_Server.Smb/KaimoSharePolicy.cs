@@ -2,6 +2,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Security;
 using Microsoft.Extensions.DependencyInjection;
 using Smb.Auth;
+using Smb.FileSystem;
 using Smb.Server.Authorization;
 
 namespace Kaimo_File_Server.Smb;
@@ -22,6 +23,7 @@ internal sealed class KaimoSharePolicy : IShareAccessPolicy
 
     public bool IsVisible(ShareAccessContext context)
     {
+        // IPC$ (and any other non-Kaimo share) is never listed in the share enumeration.
         if (context.Share is not KaimoShare share)
             return false;
 
@@ -45,7 +47,18 @@ internal sealed class KaimoSharePolicy : IShareAccessPolicy
     public ShareAccessResult AuthorizeConnect(ShareAccessContext context)
     {
         if (context.Share is not KaimoShare share)
+        {
+            // The library auto-registers a built-in IPC$ pipe share (Share.CreateIpc()) that hosts
+            // the srvsvc named pipe used for share enumeration (NetrShareEnum). It is not a KaimoShare
+            // and carries no ACL — grant it to any authenticated user so enumeration works (the share
+            // list itself is still ABE-filtered via IsVisible/GetVisibleShares); reject anonymous.
+            if (IsIpcShare(context.Share))
+                return context.Identity.IsAnonymous
+                    ? ShareAccessResult.Deny()
+                    : ShareAccessResult.Grant(SmbAccessMask.ReadWrite);
+
             return ShareAccessResult.Deny();
+        }
 
         UserContext? user = ResolveUser(context.Identity);
         if (user == null)
@@ -66,6 +79,15 @@ internal sealed class KaimoSharePolicy : IShareAccessPolicy
             return ShareAccessResult.Deny();
         }
     }
+
+    /// <summary>
+    /// True for the library's built-in inter-process pipe share (IPC$), which hosts the srvsvc
+    /// endpoint for share enumeration. Matched by pipe type + reserved name rather than by reference
+    /// so it stays robust against the library re-creating the instance.
+    /// </summary>
+    private static bool IsIpcShare(IShare s)
+        => s.Type == ShareType.Pipe
+           && string.Equals(s.Name, "IPC$", StringComparison.OrdinalIgnoreCase);
 
     private UserContext? ResolveUser(SecurityIdentity identity)
     {
