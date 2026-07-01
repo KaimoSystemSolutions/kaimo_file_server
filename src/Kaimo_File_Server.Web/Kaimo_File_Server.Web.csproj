@@ -21,6 +21,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<!-- Expose internal members (e.g. JwtAuthenticationStateProvider revalidation seam) to tests. -->
+		<InternalsVisibleTo Include="Kaimo_File_Server.Tests" />
+	</ItemGroup>
+
+	<ItemGroup>
 	  <None Include="wwwroot\js\columnResize.js" />
 	</ItemGroup>
 	
