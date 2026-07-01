@@ -114,6 +114,10 @@ namespace Kaimo_File_Server.Smb
 
         private void StartServer()
         {
+            // Wire the user registry to DI so cached SMB identities expire and get re-resolved
+            // (picking up revoked permissions / disabled accounts) instead of living forever.
+            KaimoUserRegistry.Initialize(_serviceProvider);
+
             var backend = new KaimoIdentityBackend(_serviceProvider);
             var policy = new KaimoSharePolicy(_serviceProvider);
             var ntlmOptions = new NtlmServerOptions

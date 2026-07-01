@@ -94,22 +94,9 @@ internal sealed class KaimoSharePolicy : IShareAccessPolicy
         if (identity.IsAnonymous || string.IsNullOrEmpty(identity.UserName))
             return null;
 
-        UserContext? cached = KaimoUserRegistry.Lookup(identity.UserName);
-        if (cached != null)
-            return cached;
-
-        // Fallback: enumeration may reach us before any file op cached the context.
-        try
-        {
-            using var scope = _services.CreateScope();
-            var auth = scope.ServiceProvider.GetRequiredService<IAuthenticationLookup>();
-            UserContext? ctx = SmbSync.Run(() => auth.ResolveUserContextAsync(identity.UserName));
-            if (ctx != null) KaimoUserRegistry.Register(ctx);
-            return ctx;
-        }
-        catch
-        {
-            return null;
-        }
+        // The registry owns caching AND re-resolution (TTL-based refresh, eviction of
+        // disabled/deleted accounts), so a plain lookup covers the enumeration-before-first-op
+        // case that used to need a separate fallback here.
+        return KaimoUserRegistry.Lookup(identity.UserName);
     }
 }

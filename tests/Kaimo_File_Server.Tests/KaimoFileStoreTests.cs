@@ -21,6 +21,7 @@ namespace Kaimo_File_Server.Tests;
 /// runtime: the username via the ambient <see cref="SmbCaller"/>, resolved to a full
 /// <see cref="UserContext"/> through <see cref="KaimoUserRegistry"/>.
 /// </summary>
+[Collection("KaimoUserRegistrySerial")]
 public class KaimoFileStoreTests
 {
     private readonly Mock<IFileService> _fileService = new();
@@ -32,6 +33,10 @@ public class KaimoFileStoreTests
     {
         var user = new User(Guid.NewGuid(), "Test User", Username, "hash", "nthash");
         _user = new UserContext(user, [], [], []);
+
+        // Isolate from any static registry state left by other tests: real clock, long TTL, no DI
+        // (fresh entries are served from cache without needing re-resolution).
+        KaimoUserRegistry.ResetForTests(TimeSpan.FromMinutes(5), () => DateTime.UtcNow, null);
 
         // The store resolves the caller (username) to this context through the registry.
         KaimoUserRegistry.Register(_user);
