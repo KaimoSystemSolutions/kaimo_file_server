@@ -94,6 +94,17 @@ public class SettingsViewModel
     /// <summary>Globally enforced password requirements (working copy).</summary>
     public PasswordPolicy PwPolicy { get; private set; } = PasswordPolicy.Default();
 
+    // ── Session Security ──
+
+    /// <summary>
+    /// How often (seconds) an active web session re-checks the account's enabled state, so a
+    /// disabled/removed user is signed out within this window (working copy).
+    /// </summary>
+    public int SessionRevalidationSeconds { get; set; } = SessionSecuritySettings.DefaultRevalidationSeconds;
+
+    public static int MinSessionRevalidationSeconds => SessionSecuritySettings.MinRevalidationSeconds;
+    public static int MaxSessionRevalidationSeconds => SessionSecuritySettings.MaxRevalidationSeconds;
+
     // ── System Info (IP / Storage / RAM) ──
 
     public string HostName { get; private set; } = "";
@@ -125,6 +136,9 @@ public class SettingsViewModel
                     ContextMenuConfig.ConfigKey, ContextMenuConfig.Default());
                 PwPolicy = await _config.GetAsync(
                     PasswordPolicy.ConfigKey, PasswordPolicy.Default());
+                SessionRevalidationSeconds = await _config.GetIntAsync(
+                    SessionSecuritySettings.RevalidationSecondsKey,
+                    SessionSecuritySettings.DefaultRevalidationSeconds);
                 RefreshSystemInfo();
                 await LoadSearchStateAsync();
             }
@@ -269,6 +283,40 @@ public class SettingsViewModel
         {
             _logger.LogError(ex, "Failed to save password policy");
             ErrorMessage = Resources.Web_Settings_PwPolicySaveFailed;
+            return false;
+        }
+    }
+
+    // ── Save Session Security ──
+
+    public async Task<bool> SaveSessionSecurityAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!CanManageSettings)
+        {
+            ErrorMessage = Resources.Web_Settings_NoPermissionChange;
+            return false;
+        }
+
+        // Clamp so a nonsensical value can neither hammer the DB nor make the check meaningless.
+        SessionRevalidationSeconds =
+            SessionSecuritySettings.ClampRevalidationSeconds(SessionRevalidationSeconds);
+
+        try
+        {
+            await _config.SetAsync(
+                SessionSecuritySettings.RevalidationSecondsKey, SessionRevalidationSeconds);
+            _logger.LogInformation(
+                "Session revalidation interval set to {Seconds}s", SessionRevalidationSeconds);
+            SuccessMessage = $"Sitzungsprüfung gespeichert (alle {SessionRevalidationSeconds}s).";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save session security setting");
+            ErrorMessage = "Sitzungs-Einstellung konnte nicht gespeichert werden.";
             return false;
         }
     }

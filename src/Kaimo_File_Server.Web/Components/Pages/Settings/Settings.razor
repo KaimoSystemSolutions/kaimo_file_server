@@ -244,6 +244,30 @@ else
                         <button class="btn-primary" @onclick="SavePasswordPolicy">@Resources.Web_Settings_Button_Save</button>
                     </div>
                 </div>
+
+                <div class="detail-section">
+                    <span class="detail-label">Sitzungssicherheit</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 16px;">
+                        Wie oft eine aktive Sitzung prüft, ob das Konto noch aktiv ist. Wird ein Benutzer
+                        deaktiviert, verliert er seine Sitzung innerhalb dieses Intervalls.
+                    </p>
+
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <label style="font-size: 13px; min-width: 200px;">Prüfintervall (Sekunden)</label>
+                        <input type="number"
+                               min="@SettingsViewModel.MinSessionRevalidationSeconds"
+                               max="@SettingsViewModel.MaxSessionRevalidationSeconds"
+                               class="edit-input" style="max-width: 100px;"
+                               @bind="VM.SessionRevalidationSeconds" />
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 16px;">
+                        Erlaubt: @SettingsViewModel.MinSessionRevalidationSeconds–@SettingsViewModel.MaxSessionRevalidationSeconds Sekunden.
+                    </p>
+
+                    <div style="margin-top: 16px;">
+                        <button class="btn-primary" @onclick="SaveSessionSecurity">@Resources.Web_Settings_Button_Save</button>
+                    </div>
+                </div>
             }
 
             @* ── Tab: Network / IP ── *@
@@ -577,6 +601,12 @@ else
     private async Task SavePasswordPolicy()
     {
         await VM.SavePasswordPolicyAsync();
+        StateHasChanged();
+    }
+
+    private async Task SaveSessionSecurity()
+    {
+        await VM.SaveSessionSecurityAsync();
         StateHasChanged();
     }
 

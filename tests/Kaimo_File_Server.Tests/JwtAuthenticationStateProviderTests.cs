@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +25,7 @@ public class JwtAuthenticationStateProviderTests
 
     private User? _dbUser;
     private bool _dbThrows;
+    private int? _configuredSeconds;
 
     private JwtAuthenticationStateProvider CreateProvider(bool enabled)
     {
@@ -46,6 +49,14 @@ public class JwtAuthenticationStateProviderTests
 
         var services = new ServiceCollection();
         services.AddScoped(_ => repo.Object);
+        if (_configuredSeconds is not null)
+        {
+            var configRepo = new Mock<IConfigRepository>();
+            configRepo.Setup(c => c.GetIntAsync(
+                    SessionSecuritySettings.RevalidationSecondsKey, It.IsAny<int>()))
+                .Returns(() => Task.FromResult(_configuredSeconds!.Value));
+            services.AddScoped(_ => configRepo.Object);
+        }
         var scopeFactory = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
 
         var js = new Mock<IJSRuntime>();
@@ -172,5 +183,37 @@ public class JwtAuthenticationStateProviderTests
         await f.RevalidateOnceAsync(); // never established a session
 
         Assert.False(notified);
+    }
+
+    // ─────────────── Configurable interval ───────────────
+
+    [Fact]
+    public async Task ReadRevalidationIntervalAsync_UsesConfiguredValue()
+    {
+        _configuredSeconds = 90;
+        using var f = CreateProvider(enabled: true);
+
+        Assert.Equal(TimeSpan.FromSeconds(90), await f.ReadRevalidationIntervalAsync());
+    }
+
+    [Theory]
+    [InlineData(1, SessionSecuritySettings.MinRevalidationSeconds)]     // below min → clamped up
+    [InlineData(999999, SessionSecuritySettings.MaxRevalidationSeconds)] // above max → clamped down
+    public async Task ReadRevalidationIntervalAsync_ClampsOutOfRangeValues(int configured, int expected)
+    {
+        _configuredSeconds = configured;
+        using var f = CreateProvider(enabled: true);
+
+        Assert.Equal(TimeSpan.FromSeconds(expected), await f.ReadRevalidationIntervalAsync());
+    }
+
+    [Fact]
+    public async Task ReadRevalidationIntervalAsync_NoConfigStore_FallsBackToDefault()
+    {
+        _configuredSeconds = null; // no IConfigRepository registered in the scope
+        using var f = CreateProvider(enabled: true);
+        f.RevalidationInterval = TimeSpan.FromSeconds(42);
+
+        Assert.Equal(TimeSpan.FromSeconds(42), await f.ReadRevalidationIntervalAsync());
     }
 }

@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Infrastructure.Configuration;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -33,8 +35,13 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider, IDisp
     private ClaimsPrincipal? _cachedPrincipal;
     private CancellationTokenSource? _revalidationCts;
 
-    /// <summary>How often an active session's account status is re-checked against the database.</summary>
-    internal TimeSpan RevalidationInterval { get; set; } = TimeSpan.FromSeconds(30);
+    /// <summary>
+    /// Fallback interval used when the configured value cannot be read (e.g. no config store
+    /// available). The effective interval is read from configuration each tick, so an admin can
+    /// change it on the settings page and existing sessions pick it up within one cycle.
+    /// </summary>
+    internal TimeSpan RevalidationInterval { get; set; } =
+        TimeSpan.FromSeconds(SessionSecuritySettings.DefaultRevalidationSeconds);
 
     public JwtAuthenticationStateProvider(
         IJSRuntime js,
@@ -215,9 +222,20 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider, IDisp
     {
         try
         {
-            using var timer = new PeriodicTimer(RevalidationInterval);
+            var period = await ReadRevalidationIntervalAsync();
+            using var timer = new PeriodicTimer(period);
             while (await timer.WaitForNextTickAsync(ct))
+            {
                 await RevalidateOnceAsync();
+
+                // Pick up an admin's change to the configured interval for the next cycle.
+                var next = await ReadRevalidationIntervalAsync();
+                if (next != period)
+                {
+                    period = next;
+                    timer.Period = next;
+                }
+            }
         }
         catch (OperationCanceledException)
         {
@@ -226,6 +244,31 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider, IDisp
         catch (Exception ex)
         {
             _logger.LogError(ex, "Session revalidation loop terminated unexpectedly");
+        }
+    }
+
+    /// <summary>
+    /// Reads the configured revalidation interval (clamped to a sane range). Falls back to
+    /// <see cref="RevalidationInterval"/> if no config store is available or the read fails.
+    /// </summary>
+    internal async Task<TimeSpan> ReadRevalidationIntervalAsync()
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var config = scope.ServiceProvider.GetService<IConfigRepository>();
+            if (config is null)
+                return RevalidationInterval;
+
+            int seconds = await config.GetIntAsync(
+                SessionSecuritySettings.RevalidationSecondsKey,
+                (int)RevalidationInterval.TotalSeconds);
+
+            return TimeSpan.FromSeconds(SessionSecuritySettings.ClampRevalidationSeconds(seconds));
+        }
+        catch
+        {
+            return RevalidationInterval;
         }
     }
 
