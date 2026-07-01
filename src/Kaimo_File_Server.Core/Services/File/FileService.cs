@@ -541,14 +541,23 @@ public class FileService : IFileService
             if (!await _acl.HasAccessAsync(user, _shareId, parent, true, FilePermission.CreateWriteData))
                 throw new UnauthorizedAccessException($"Create denied for '{normalized}'");
         }
-        else if (wantsWrite)
-        {
-            if (!await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.CreateWriteData))
-                throw new UnauthorizedAccessException($"Write denied for '{normalized}'");
-        }
         else
         {
-            if (!await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.ListReadData))
+            // Enforce EACH requested access independently. A ReadWrite open must satisfy both
+            // permissions, and an explicit read-Deny must still block reads even when the client
+            // also asks for write. Previously a write intent skipped the read check entirely,
+            // which let a write-only (or explicitly read-denied) user read file contents by
+            // opening the file with ReadWrite intent — an ACL bypass.
+            if (wantsWrite
+                && !await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.CreateWriteData))
+                throw new UnauthorizedAccessException($"Write denied for '{normalized}'");
+
+            // Any open that is not write-only reads the entry (delete-only opens map to Read
+            // intent too), so require read unless this is a pure write open.
+            bool wantsRead = (intent & AccessIntent.Read) != 0 || !wantsWrite;
+
+            if (wantsRead
+                && !await _acl.HasAccessAsync(user, _shareId, normalized, isDir, FilePermission.ListReadData))
                 throw new UnauthorizedAccessException($"Read denied for '{normalized}'");
         }
 

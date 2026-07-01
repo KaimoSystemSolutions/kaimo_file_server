@@ -359,6 +359,74 @@ public class FileServiceTests
             () => _sut.ListAsync("dir", ctx));
     }
 
+    // ═══════════════════ OpenAsync — per-intent ACL enforcement ═══════════════════
+
+    private void SetupExistingFile()
+    {
+        _storageMock.Setup(s => s.ExistsAsync(It.IsAny<string>())).ReturnsAsync(true);
+        _storageMock.Setup(s => s.IsDirectoryAsync(It.IsAny<string>())).ReturnsAsync(false);
+        _storageMock
+            .Setup(s => s.OpenAsync(
+                It.IsAny<string>(), It.IsAny<OpenMode>(), It.IsAny<AccessIntent>(),
+                It.IsAny<ShareIntent>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Mock.Of<IStorageHandle>(h => h.IsDirectory == false));
+    }
+
+    [Fact]
+    public async Task OpenAsync_ReadWrite_WithWriteButNoRead_IsDenied()
+    {
+        // Regression: a user with write permission but WITHOUT read permission must not be
+        // able to open a file ReadWrite (which would grant readable content). Write intent
+        // used to skip the read check entirely.
+        var ctx = CreateContext();
+        SetupExistingFile();
+        AllowAccess(FilePermission.CreateWriteData);
+        DenyAccess(FilePermission.ListReadData);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => _sut.OpenAsync("/secret.txt", OpenMode.Open, AccessIntent.ReadWrite, ShareIntent.Read, ctx));
+    }
+
+    [Fact]
+    public async Task OpenAsync_ReadWrite_WithBothPermissions_Succeeds()
+    {
+        var ctx = CreateContext();
+        SetupExistingFile();
+        AllowAccess(FilePermission.CreateWriteData);
+        AllowAccess(FilePermission.ListReadData);
+
+        var result = await _sut.OpenAsync(
+            "/doc.txt", OpenMode.Open, AccessIntent.ReadWrite, ShareIntent.Read, ctx);
+
+        Assert.NotNull(result.Session);
+    }
+
+    [Fact]
+    public async Task OpenAsync_WriteOnly_WithWriteButNoRead_Succeeds()
+    {
+        // A pure write ("drop box") open must NOT require read permission.
+        var ctx = CreateContext();
+        SetupExistingFile();
+        AllowAccess(FilePermission.CreateWriteData);
+        DenyAccess(FilePermission.ListReadData);
+
+        var result = await _sut.OpenAsync(
+            "/upload.txt", OpenMode.Open, AccessIntent.Write, ShareIntent.Write, ctx);
+
+        Assert.NotNull(result.Session);
+    }
+
+    [Fact]
+    public async Task OpenAsync_ReadOnly_WithoutReadPermission_IsDenied()
+    {
+        var ctx = CreateContext();
+        SetupExistingFile();
+        DenyAccess(FilePermission.ListReadData);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => _sut.OpenAsync("/doc.txt", OpenMode.Open, AccessIntent.Read, ShareIntent.Read, ctx));
+    }
+
     // ═══════════════════ Directory operations ═══════════════════
 
     [Fact]
