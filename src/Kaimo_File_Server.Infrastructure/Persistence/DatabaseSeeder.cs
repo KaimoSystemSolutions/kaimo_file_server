@@ -30,17 +30,20 @@ public class DatabaseSeeder
 {
     private readonly ApplicationDbContext _db;
     private readonly IPasswordService _passwordService;
+    private readonly INtHashProtector _ntHashProtector;
     private readonly ILogger<DatabaseSeeder> _logger;
     private readonly IConfiguration _configuration;
 
     public DatabaseSeeder(
         ApplicationDbContext db,
         IPasswordService passwordService,
+        INtHashProtector ntHashProtector,
         ILogger<DatabaseSeeder> logger,
         IConfiguration configuration)
     {
         _db = db;
         _passwordService = passwordService;
+        _ntHashProtector = ntHashProtector;
         _logger = logger;
         _configuration = configuration;
     }
@@ -417,7 +420,7 @@ public class DatabaseSeeder
         return new User(
             Guid.NewGuid(), name, username,
             _passwordService.HashPassword(password),
-            _passwordService.ComputeNtHash(password),
+            _ntHashProtector.Protect(_passwordService.ComputeNtHash(password)),
             description: description, email: email,
             isEnabled: isEnabled, canChangePassword: canChangePassword);
     }

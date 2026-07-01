@@ -51,6 +51,8 @@ namespace Kaimo_File_Server.Infrastructure
             // -- Services (infrastructure-level) --
             services.AddScoped<IDepartmentPermissionService, DepartmentPermissionService>();
             services.AddSingleton<IPasswordService, PasswordService>();
+            // NT hash encryption at rest (fails closed if NtHash:EncryptionKey is missing).
+            services.AddSingleton<INtHashProtector, Security.AesGcmNtHashProtector>();
             services.AddScoped<IUserContextFactory, UserContextFactory>();
             services.AddScoped<IAclService, AclService>();
             services.AddScoped<IAuthenticationLookup, AuthenticationLookup>();

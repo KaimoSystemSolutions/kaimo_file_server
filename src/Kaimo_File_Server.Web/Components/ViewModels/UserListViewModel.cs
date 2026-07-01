@@ -22,6 +22,7 @@ public class UserListViewModel
     private readonly IDepartmentRepository _departmentRepo;
     private readonly IScopedRoleAssignmentRepository _assignmentRepo;
     private readonly IPasswordService _passwordService;
+    private readonly INtHashProtector _ntHashProtector;
     private readonly IManagementAuthService _mgmtAuth;
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authState;
@@ -36,6 +37,7 @@ public class UserListViewModel
         IDepartmentRepository departmentRepo,
         IScopedRoleAssignmentRepository assignmentRepo,
         IPasswordService passwordService,
+        INtHashProtector ntHashProtector,
         IManagementAuthService mgmtAuth,
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authState,
@@ -49,6 +51,7 @@ public class UserListViewModel
         _departmentRepo = departmentRepo;
         _assignmentRepo = assignmentRepo;
         _passwordService = passwordService;
+        _ntHashProtector = ntHashProtector;
         _mgmtAuth = mgmtAuth;
         _userContextFactory = userContextFactory;
         _authState = authState;
@@ -552,7 +555,7 @@ public class UserListViewModel
                 if (NewPassword != ConfirmPassword) { ErrorMessage = Resources.Web_User_PasswordsDoNotMatch; return; }
                 await _userRepo.UpdatePasswordAsync(SelectedUser.Id,
                     _passwordService.HashPassword(NewPassword),
-                    _passwordService.ComputeNtHash(NewPassword));
+                    _ntHashProtector.Protect(_passwordService.ComputeNtHash(NewPassword)));
             }
 
             var selectedGroupIds = EditUserGroups.Where(g => g.IsChecked).Select(g => g.Item.Id).ToList();
@@ -826,7 +829,7 @@ public class UserListViewModel
             var user = new User(
                 Guid.NewGuid(), CreateUserName.Trim(), CreateUserUsername.Trim(),
                 _passwordService.HashPassword(CreateUserPassword),
-                _passwordService.ComputeNtHash(CreateUserPassword),
+                _ntHashProtector.Protect(_passwordService.ComputeNtHash(CreateUserPassword)),
                 description: CreateUserDescription.Trim(), email: CreateUserEmail.Trim(),
                 isEnabled: CreateUserIsEnabled, canChangePassword: CreateUserCanChangePassword);
 

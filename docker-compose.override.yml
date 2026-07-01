@@ -2,6 +2,9 @@ services:
   kaimo_file_server.host:
     environment:
       - DOTNET_ENVIRONMENT=Development
+      # Dev-only key. MUST match the web service (host reads, web writes). Set a real, random
+      # NtHash__EncryptionKey via env in production.
+      - NtHash__EncryptionKey=DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey
     volumes:
       - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
       - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
@@ -9,6 +12,9 @@ services:
   kaimo_file_server.web:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      # Dev-only key. MUST match the host service (host reads, web writes). Set a real, random
+      # NtHash__EncryptionKey via env in production.
+      - NtHash__EncryptionKey=DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey
     volumes:
       - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
       - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro

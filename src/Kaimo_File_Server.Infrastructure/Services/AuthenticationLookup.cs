@@ -16,6 +16,7 @@ namespace Kaimo_File_Server.Infrastructure.Services
         private readonly IShareRepository _shareRepo;
         private readonly IAclService _aclService;
         private readonly IUserContextFactory _contextFactory;
+        private readonly INtHashProtector _ntHashProtector;
 
         /// <summary>
         /// NT hash of the empty password (MD4 of an empty UTF-16LE string, the well-known
@@ -29,12 +30,14 @@ namespace Kaimo_File_Server.Infrastructure.Services
             IShareRepository shareRepo,
             IAclService aclService,
             IUserContextFactory contextFactory,
-            IPasswordService passwordService)
+            IPasswordService passwordService,
+            INtHashProtector ntHashProtector)
         {
             _userRepo = userRepo;
             _shareRepo = shareRepo;
             _aclService = aclService;
             _contextFactory = contextFactory;
+            _ntHashProtector = ntHashProtector;
             _emptyPasswordNtHash = passwordService.ComputeNtHash(string.Empty);
         }
 
@@ -46,13 +49,16 @@ namespace Kaimo_File_Server.Infrastructure.Services
             // Disabled accounts must never authenticate, regardless of correct credentials.
             if (!user.IsEnabled) return null;
 
+            // Decrypt the at-rest NT hash (legacy plaintext rows pass through unchanged).
+            string ntHashHex = _ntHashProtector.Unprotect(user.NtHash);
+
             // No login without a password: refuse the well-known empty-password NT hash so an
             // account that ended up with a blank password can never authenticate over SMB/NTLM
             // (a blank-password NTLM bind would otherwise match and succeed).
-            if (string.Equals(user.NtHash, _emptyPasswordNtHash, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(ntHashHex, _emptyPasswordNtHash, StringComparison.OrdinalIgnoreCase))
                 return null;
 
-            return Convert.FromHexString(user.NtHash);
+            return Convert.FromHexString(ntHashHex);
         }
 
         public async Task<UserContext?> ResolveUserContextAsync(string username)

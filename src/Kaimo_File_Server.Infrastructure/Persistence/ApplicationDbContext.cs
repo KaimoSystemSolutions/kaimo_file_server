@@ -51,7 +51,9 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.ToTable("users");
                 entity.Property(e => e.Username).IsRequired().HasMaxLength(100);
                 entity.HasIndex(e => e.Username).IsUnique();
-                entity.Property(e => e.NtHash).IsRequired().HasMaxLength(64);
+                // Wide enough for the encrypted form ("enc:" + Base64(nonce|tag|ciphertext)), while
+                // still holding legacy 32-char plaintext hex.
+                entity.Property(e => e.NtHash).IsRequired().HasMaxLength(256);
                 entity.Property(e => e.Description).HasMaxLength(500);
                 entity.Property(e => e.Email).HasMaxLength(254);
                 entity.Property(e => e.IsEnabled).IsRequired().HasDefaultValue(true);

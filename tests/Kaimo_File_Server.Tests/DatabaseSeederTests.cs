@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Persistence;
+using Kaimo_File_Server.Infrastructure.Security;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -25,6 +26,11 @@ public class DatabaseSeederTests : IDisposable
     private readonly SqliteConnection _connection;
     private readonly ApplicationDbContext _db;
     private readonly PasswordService _passwords = new();
+    private readonly AesGcmNtHashProtector _ntHashProtector =
+        new(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+                { ["NtHash:EncryptionKey"] = "unit-test-nt-hash-key" })
+            .Build());
 
     public DatabaseSeederTests()
     {
@@ -52,7 +58,7 @@ public class DatabaseSeederTests : IDisposable
             .Build();
 
         var seeder = new DatabaseSeeder(
-            _db, _passwords, NullLogger<DatabaseSeeder>.Instance, cfg);
+            _db, _passwords, _ntHashProtector, NullLogger<DatabaseSeeder>.Instance, cfg);
 
         await seeder.SeedAsync();
     }
