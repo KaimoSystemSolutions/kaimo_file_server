@@ -98,8 +98,8 @@
     private bool PassesRuntimeGuard(string id, ContextMenuScope scope, HashSet<FileMetadata> selected)
         => id switch
         {
-            // Permissions stay admin-only regardless of configuration.
-            "permissions" => FileBrowser.CurrentUserIsAdmin(),
+            // Permissions stay manager-only regardless of configuration.
+            "permissions" => FileBrowser.CanManageAcls(),
             // Bulk extract only makes sense when every selected item is an archive.
             "extract" when scope == ContextMenuScope.MultiSelection
                 => selected.All(f => !f.IsDirectory && FileHelper.IsArchive(f.Name)),

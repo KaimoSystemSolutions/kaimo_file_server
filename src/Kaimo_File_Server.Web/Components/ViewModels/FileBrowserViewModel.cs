@@ -70,6 +70,15 @@ public class FileBrowserViewModel
     public bool IsLoading { get; private set; }
     public string? ErrorMessage { get; private set; }
 
+    /// <summary>
+    /// Whether the current user may manage ACLs on the loaded share. This is a
+    /// SCOPED decision (<see cref="ManagementPermission.ManageShareAcls"/> on this
+    /// specific share) — not a coarse global-role check — so a department- or
+    /// share-scoped manager only sees the ACL UI for shares in their scope.
+    /// Drives the ACL panel, badges and permission actions in the view.
+    /// </summary>
+    public bool CanManageAcls { get; private set; }
+
     // -- Computed --
 
     public IEnumerable<FileMetadata> Directories
@@ -113,6 +122,7 @@ public class FileBrowserViewModel
         {
             IsLoading = true;
             ErrorMessage = null;
+            CanManageAcls = false;
 
             CurrentShare = await _shareRepo.GetByNameAsync(shareName);
             if (CurrentShare is null)
@@ -148,6 +158,11 @@ public class FileBrowserViewModel
                 Items = [];
                 return;
             }
+
+            // Scoped ACL-management right for THIS share, resolved once per load and
+            // reused by the view. Same authority source the ACL editor enforces on write.
+            CanManageAcls = await _mgmtAuth.CanManageShareAsync(
+                userContext, CurrentShare.Id, ManagementPermission.ManageShareAcls);
 
             // Disabled shares reject all access — except for managers of the share,
             // who may still browse them (e.g. to inspect before re-enabling).
@@ -344,7 +359,10 @@ public class FileBrowserViewModel
     public async Task LoadAclCountsAsync()
     {
         AclCounts.Clear();
-        if (CurrentShare is null) return;
+
+        // Counts are only ever rendered for ACL managers; skip the DB query entirely
+        // for everyone else instead of computing data the view will not show.
+        if (CurrentShare is null || !CanManageAcls) return;
 
         var paths = new List<string> { CurrentPath ?? "" };
 

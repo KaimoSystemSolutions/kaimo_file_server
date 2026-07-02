@@ -2,7 +2,9 @@
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Language;
+using Microsoft.AspNetCore.Components.Authorization;
 using System.Runtime.Versioning;
 
 public class AclEditorViewModel
@@ -12,6 +14,9 @@ public class AclEditorViewModel
     private readonly IUserRepository _userRepo;
     private readonly IGroupRepository _groupRepo;
     private readonly IRoleRepository _roleRepo;
+    private readonly IManagementAuthService _mgmtAuth;
+    private readonly IUserContextFactory _userContextFactory;
+    private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<AclEditorViewModel> _logger;
 
     public AclEditorViewModel(
@@ -20,6 +25,9 @@ public class AclEditorViewModel
         IUserRepository userRepo,
         IGroupRepository groupRepo,
         IRoleRepository roleRepo,
+        IManagementAuthService mgmtAuth,
+        IUserContextFactory userContextFactory,
+        AuthenticationStateProvider authState,
         ILogger<AclEditorViewModel> logger)
     {
         _aclRepo = aclRepo;
@@ -27,7 +35,30 @@ public class AclEditorViewModel
         _userRepo = userRepo;
         _groupRepo = groupRepo;
         _roleRepo = roleRepo;
+        _mgmtAuth = mgmtAuth;
+        _userContextFactory = userContextFactory;
+        _authState = authState;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Server-side authorization gate for ACL management. The UI merely *hides* the
+    /// editor from non-managers — this is the actual enforcement, and it is scoped:
+    /// the current user must hold <see cref="ManagementPermission.ManageShareAcls"/>
+    /// on THIS share (globally, via its department, or a direct share assignment).
+    /// Every load and mutation goes through here so the data layer never trusts the UI.
+    /// </summary>
+    private async Task<bool> CanManageAclsAsync()
+    {
+        var state = await _authState.GetAuthenticationStateAsync();
+        var username = state.User.Identity?.Name;
+        if (string.IsNullOrEmpty(username)) return false;
+
+        var actor = await _userContextFactory.CreateByUsernameAsync(username);
+        if (actor is null) return false;
+
+        return await _mgmtAuth.CanManageShareAsync(
+            actor, ShareId, ManagementPermission.ManageShareAcls);
     }
 
     // ------------------ State ------------------
@@ -75,6 +106,18 @@ public class AclEditorViewModel
         {
             ShareId = shareId;
             NormalizedPath = ShareRelativePath.Normalize(path);
+
+            // Authorization first — never load (and thus never disclose) ACLs for a
+            // share the user is not allowed to manage. IsLoaded stays false, so the
+            // editor shows an error banner instead of any permission data.
+            if (!await CanManageAclsAsync())
+            {
+                _logger.LogWarning(
+                    "Unauthorized ACL load blocked: path='{Path}', shareId={ShareId}",
+                    path, shareId);
+                ErrorMessage = Resources.Web_Error_AccessDenied;
+                return;
+            }
 
             _logger.LogDebug(
                 "AclEditor loading: raw='{RawPath}' → normalized='{NormalizedPath}', shareId={ShareId}",
@@ -186,6 +229,9 @@ public class AclEditorViewModel
         ErrorMessage = null;
         SuccessMessage = null;
 
+        if (!await CanManageAclsAsync())
+        { ErrorMessage = Resources.Web_Error_AccessDenied; return false; }
+
         if (NewPrincipalId is null)
         { ErrorMessage = Resources.Web_Error_PrincipalNotSelected; return false; }
 
@@ -244,6 +290,9 @@ public class AclEditorViewModel
         ErrorMessage = null;
         SuccessMessage = null;
 
+        if (!await CanManageAclsAsync())
+        { ErrorMessage = Resources.Web_Error_AccessDenied; return false; }
+
         if (NewPermissions == FilePermission.None)
         { ErrorMessage = Resources.Web_Acl_SelectAtLeastOnePermission; return false; }
 
@@ -276,6 +325,9 @@ public class AclEditorViewModel
     {
         ErrorMessage = null;
         SuccessMessage = null;
+
+        if (!await CanManageAclsAsync())
+        { ErrorMessage = Resources.Web_Error_AccessDenied; return false; }
 
         try
         {

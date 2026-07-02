@@ -10,7 +10,6 @@
 @implements IDisposable
 @inject FileBrowserViewModel VM
 @inject NavigationManager Nav
-@inject AuthenticationStateProvider AuthStateProvider
 @inject IJSRuntime JS
 @inject ToastService Toast
 @inject FileUploadCoordinator UploadCoordinator
@@ -35,7 +34,7 @@
                 @onkeydown="OnCreateFolderKeyDown">
             @Assets.SVG("folder.svg", new SvgOptions())
         </button>
-        @if (_isAdmin)
+        @if (CanManageAcls())
         {
             <button class="btn-icon" title="@Resources.Web_ManagePermissions"
                     @onclick="ToggleAclPanel">
@@ -163,7 +162,7 @@ else if (VM.ErrorMessage is not null)
 else
 {
     @* -- ACL Panel (Slide-Down) Root -- *@
-    @if (_showAclPanel && _isAdmin)
+    @if (_showAclPanel && CanManageAcls())
     {
         <div class="acl-panel">
             <div class="acl-panel-header">
@@ -262,7 +261,7 @@ else
         @foreach (var dir in SortedDirectories)
         {
             var isSelected = _selectedItems.Contains(dir);
-            var dirAclCount = _isAdmin ? GetAclCount(GetDirAclPath(dir)) : 0;
+            var dirAclCount = CanManageAcls() ? GetAclCount(GetDirAclPath(dir)) : 0;
 
             <div class="file-grid-row file-row-dir @(isSelected ? "file-row--selected" : "")"
                  @onclick="(e) => OnItemClick(e, dir)"
@@ -335,7 +334,7 @@ else
         @foreach (var file in SortedFiles)
         {
             var isSelected = _selectedItems.Contains(file);
-            var fileAclCount = _isAdmin ? GetAclCount(GetFileAclPath(file)) : 0;
+            var fileAclCount = CanManageAcls() ? GetAclCount(GetFileAclPath(file)) : 0;
 
             <div class="file-grid-row @(isSelected ? "file-row--selected" : "")"
                  @onclick="(e) => OnItemClick(e, file)"
@@ -633,7 +632,6 @@ else
     // ========== State ==========
 
     private Dictionary<string, int> _aclCounts = new();
-    private bool _isAdmin;
     private bool _showAclPanel;
     private string _aclPath = "";
     private bool _showFolderAcl;
@@ -663,7 +661,7 @@ else
     private bool CanOpenSelection => _selectedItems.Count == 1;
     private bool CanRenameSelection => _selectedItems.Count == 1;
     private bool CanDeleteSelection => _selectedItems.Count > 0;
-    private bool CanAclSelection => _isAdmin && _selectedItems.Count == 1;
+    private bool CanAclSelection => CanManageAcls() && _selectedItems.Count == 1;
 
     // ========== Selection ==========
 
@@ -869,15 +867,6 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            var state = await AuthStateProvider.GetAuthenticationStateAsync();
-            _isAdmin = state.User.IsInRole("Administrator")
-                    || state.User.IsInRole("ShareManager");
-
-            StateHasChanged();
-        }
-
         if (!_jsInitialized && _fileDropZone.Id is not null)
         {
             _jsInitialized = true;
@@ -1082,7 +1071,12 @@ else
             Nav.NavigateTo($"/files/{ShareName}/{VM.ParentPath}");
     }
 
-    public bool CurrentUserIsAdmin()
-        => _isAdmin;
+    /// <summary>
+    /// Scoped ACL-management right for the current share, resolved server-side by
+    /// the view model (ManagementPermission.ManageShareAcls on this share). Gates the
+    /// ACL panel, badges and permission actions — and the context-menu entry.
+    /// </summary>
+    public bool CanManageAcls()
+        => VM.CanManageAcls;
 
 }
