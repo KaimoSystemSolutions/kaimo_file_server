@@ -43,89 +43,35 @@ public class ManagementAuthService : IManagementAuthService
 
     // -- User Management --
 
-    public async Task<bool> CanManageUserAsync(
+    public Task<bool> CanManageUserAsync(
         UserContext actor, Guid targetUserId, ManagementPermission required)
-    {
-        var assignments = await GetEffectiveAssignmentsAsync(actor);
+        // User ↔ Department is M:N, so membership is checked via the repo rather
+        // than a stored DepartmentId. Only Department scope can grant user management.
+        => AnyGrantAsync(actor, required, assignment =>
+            assignment.ScopeType == ScopeType.Department
+                ? _departmentRepo.IsUserInDepartmentOrDescendantAsync(targetUserId, assignment.ScopeId)
+                : Task.FromResult(false));
 
-        foreach (var (assignment, role) in assignments)
-        {
-            if (!HasPermission(role, required))
-                continue;
-
-            switch (assignment.ScopeType)
-            {
-                case ScopeType.Global:
-                    return true;
-
-                case ScopeType.Department:
-                    // User ↔ Department is still M:N, so the repo method remains
-                    if (await _departmentRepo.IsUserInDepartmentOrDescendantAsync(
-                            targetUserId, assignment.ScopeId))
-                        return true;
-                    break;
-            }
-        }
-
-        return false;
-    }
-
-    public async Task<bool> CanCreateUserInDepartmentAsync(
+    public Task<bool> CanCreateUserInDepartmentAsync(
         UserContext actor, Guid departmentId)
-    {
-        var assignments = await GetEffectiveAssignmentsAsync(actor);
-
-        foreach (var (assignment, role) in assignments)
-        {
-            if (!HasPermission(role, ManagementPermission.CreateUsers))
-                continue;
-
-            if (assignment.ScopeType == ScopeType.Global)
-                return true;
-
-            if (assignment.ScopeType == ScopeType.Department)
-            {
-                if (assignment.ScopeId == departmentId)
-                    return true;
-
-                var descendants = await _departmentRepo.GetDescendantIdsAsync(assignment.ScopeId);
-                if (descendants.Contains(departmentId))
-                    return true;
-            }
-        }
-
-        return false;
-    }
+        => AnyGrantAsync(actor, ManagementPermission.CreateUsers, assignment =>
+            assignment.ScopeType == ScopeType.Department
+                ? IsDepartmentInScopeAsync(departmentId, assignment.ScopeId)
+                : Task.FromResult(false));
 
     // -- Group Management --
 
     public async Task<bool> CanManageGroupAsync(
         UserContext actor, Guid groupId, ManagementPermission required)
     {
-        var assignments = await GetEffectiveAssignmentsAsync(actor);
-
         // Load group once to read its DepartmentId (direct FK)
         var group = await _groupRepo.GetByIdAsync(groupId);
         if (group == null) return false;
 
-        foreach (var (assignment, role) in assignments)
-        {
-            if (!HasPermission(role, required))
-                continue;
-
-            switch (assignment.ScopeType)
-            {
-                case ScopeType.Global:
-                    return true;
-
-                case ScopeType.Department:
-                    if (await IsDepartmentInScopeAsync(group.DepartmentId, assignment.ScopeId))
-                        return true;
-                    break;
-            }
-        }
-
-        return false;
+        return await AnyGrantAsync(actor, required, assignment =>
+            assignment.ScopeType == ScopeType.Department
+                ? IsDepartmentInScopeAsync(group.DepartmentId, assignment.ScopeId)
+                : Task.FromResult(false));
     }
 
     // -- Share Management --
@@ -133,65 +79,26 @@ public class ManagementAuthService : IManagementAuthService
     public async Task<bool> CanManageShareAsync(
         UserContext actor, Guid shareId, ManagementPermission required)
     {
-        var assignments = await GetEffectiveAssignmentsAsync(actor);
-
         // Load share once to read its DepartmentId (direct FK)
         var share = await _shareRepo.GetByIdAsync(shareId);
         if (share == null) return false;
 
-        foreach (var (assignment, role) in assignments)
+        return await AnyGrantAsync(actor, required, assignment => assignment.ScopeType switch
         {
-            if (!HasPermission(role, required))
-                continue;
-
-            switch (assignment.ScopeType)
-            {
-                case ScopeType.Global:
-                    return true;
-
-                case ScopeType.Department:
-                    if (await IsDepartmentInScopeAsync(share.DepartmentId, assignment.ScopeId))
-                        return true;
-                    break;
-
-                case ScopeType.Share:
-                    if (assignment.ScopeId == shareId)
-                        return true;
-                    break;
-            }
-        }
-
-        return false;
+            ScopeType.Department => IsDepartmentInScopeAsync(share.DepartmentId, assignment.ScopeId),
+            ScopeType.Share => Task.FromResult(assignment.ScopeId == shareId),
+            _ => Task.FromResult(false)
+        });
     }
 
     // -- Department Management --
 
-    public async Task<bool> CanManageDepartmentAsync(
+    public Task<bool> CanManageDepartmentAsync(
         UserContext actor, Guid departmentId, ManagementPermission required)
-    {
-        var assignments = await GetEffectiveAssignmentsAsync(actor);
-
-        foreach (var (assignment, role) in assignments)
-        {
-            if (!HasPermission(role, required))
-                continue;
-
-            if (assignment.ScopeType == ScopeType.Global)
-                return true;
-
-            if (assignment.ScopeType == ScopeType.Department)
-            {
-                if (assignment.ScopeId == departmentId)
-                    return true;
-
-                var descendants = await _departmentRepo.GetDescendantIdsAsync(assignment.ScopeId);
-                if (descendants.Contains(departmentId))
-                    return true;
-            }
-        }
-
-        return false;
-    }
+        => AnyGrantAsync(actor, required, assignment =>
+            assignment.ScopeType == ScopeType.Department
+                ? IsDepartmentInScopeAsync(departmentId, assignment.ScopeId)
+                : Task.FromResult(false));
 
     // -- Generic Checks --
 
@@ -316,6 +223,35 @@ public class ManagementAuthService : IManagementAuthService
     private static bool HasAnyOverlap(Role role, ManagementPermission required)
     {
         return (role.ManagementPermissions & required) != 0;
+    }
+
+    /// <summary>
+    /// Shared evaluation for all "can the actor do X here?" checks. Walks the actor's
+    /// effective assignments, keeps only those whose role holds every bit of
+    /// <paramref name="required"/>, then grants if any is Global-scoped or if
+    /// <paramref name="scopeGrants"/> accepts its (non-global) scope. Centralises the
+    /// permission filter and the Global short-circuit so each caller only supplies the
+    /// resource-specific scope rule.
+    /// </summary>
+    private async Task<bool> AnyGrantAsync(
+        UserContext actor, ManagementPermission required,
+        Func<ScopedRoleAssignment, Task<bool>> scopeGrants)
+    {
+        var assignments = await GetEffectiveAssignmentsAsync(actor);
+
+        foreach (var (assignment, role) in assignments)
+        {
+            if (!HasPermission(role, required))
+                continue;
+
+            if (assignment.ScopeType == ScopeType.Global)
+                return true;
+
+            if (await scopeGrants(assignment))
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>
