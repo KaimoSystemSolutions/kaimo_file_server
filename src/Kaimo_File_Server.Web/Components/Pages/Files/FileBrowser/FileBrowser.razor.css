@@ -6,9 +6,13 @@
 /* -- File Table – CSS Grid (5 Spalten, ohne Actions) ----- */
 
 .file-table-wrap {
-    display: grid;
+    /* Shared column track definition. Header and every data row read this variable,
+       so header + virtualized rows stay column-aligned. The resize JS and the
+       responsive breakpoints below override --grid-cols instead of a single grid. */
+    --grid-cols: 1fr 90px 140px 140px 140px;
+    display: flex;
+    flex-direction: column;
     position: relative;
-    grid-template-columns: 1fr 90px 140px 140px 140px;
     border: 1px solid var(--border);
     border-radius: 8px;
     background: var(--bg-secondary);
@@ -19,7 +23,8 @@
 /* --- Header Row --- */
 
 .file-grid-header {
-    display: contents;
+    display: grid;
+    grid-template-columns: var(--grid-cols);
 }
 
     .file-grid-header > div {
@@ -83,7 +88,8 @@
 /* --- Data Rows --- */
 
 .file-grid-row {
-    display: contents;
+    display: grid;
+    grid-template-columns: var(--grid-cols);
 }
 
     .file-grid-row > div {
@@ -304,7 +310,7 @@
 /* < 1024px: "Letzter Zugriff" ausblenden → 4 Spalten */
 @media (max-width: 1024px) {
     .file-table-wrap {
-        grid-template-columns: 1fr 90px 140px 140px !important;
+        --grid-cols: 1fr 90px 140px 140px !important;
     }
 
     .col-lastaccess {
@@ -315,7 +321,7 @@
 /* < 800px: "Erstellt" auch ausblenden → 3 Spalten */
 @media (max-width: 800px) {
     .file-table-wrap {
-        grid-template-columns: 1fr 90px 140px !important;
+        --grid-cols: 1fr 90px 140px !important;
     }
 
     .col-created,
@@ -327,7 +333,7 @@
 /* < 600px: "Geändert" auch ausblenden → 2 Spalten */
 @media (max-width: 600px) {
     .file-table-wrap {
-        grid-template-columns: 1fr 90px !important;
+        --grid-cols: 1fr 90px !important;
     }
 
     .col-created,
@@ -340,7 +346,7 @@
 /* < 420px: "Größe" auch ausblenden → nur Name */
 @media (max-width: 420px) {
     .file-table-wrap {
-        grid-template-columns: 1fr !important;
+        --grid-cols: 1fr !important;
     }
 
     .col-size,

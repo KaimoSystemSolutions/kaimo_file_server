@@ -10,7 +10,6 @@
 @implements IDisposable
 @inject FileBrowserViewModel VM
 @inject NavigationManager Nav
-@inject AuthenticationStateProvider AuthStateProvider
 @inject IJSRuntime JS
 @inject ToastService Toast
 @inject FileUploadCoordinator UploadCoordinator
@@ -35,7 +34,7 @@
                 @onkeydown="OnCreateFolderKeyDown">
             @Assets.SVG("folder.svg", new SvgOptions())
         </button>
-        @if (_isAdmin)
+        @if (CanManageAcls())
         {
             <button class="btn-icon" title="@Resources.Web_ManagePermissions"
                     @onclick="ToggleAclPanel">
@@ -163,7 +162,7 @@ else if (VM.ErrorMessage is not null)
 else
 {
     @* -- ACL Panel (Slide-Down) Root -- *@
-    @if (_showAclPanel && _isAdmin)
+    @if (_showAclPanel && CanManageAcls())
     {
         <div class="acl-panel">
             <div class="acl-panel-header">
@@ -185,7 +184,7 @@ else
        Name-Spalte (1fr) nimmt den Rest.
        ══════════════════════════════════════════════════ *@
     <div class="file-table-wrap" id="file-drop-zone" @ref="_fileDropZone" @onkeydown="OnKeyDownItemList" tabindex="0"
-         style="grid-template-columns: @GridColumns; padding-bottom: @GetTableExtraPaddingPx()px"
+         style="--grid-cols: @GridColumns; padding-bottom: @GetTableExtraPaddingPx()px"
          @oncontextmenu="(e) => _contextMenuComponent.OnItemContextMenu(e)"
          @oncontextmenu:preventDefault="true"
          @oncontextmenu:stopPropagation="true"
@@ -258,133 +257,88 @@ else
             </div>
         }
 
-        @* -- Ordner -- *@
-        @foreach (var dir in SortedDirectories)
-        {
-            var isSelected = _selectedItems.Contains(dir);
-            var dirAclCount = _isAdmin ? GetAclCount(GetDirAclPath(dir)) : 0;
-
-            <div class="file-grid-row file-row-dir @(isSelected ? "file-row--selected" : "")"
-                 @onclick="(e) => OnItemClick(e, dir)"
+        @* -- Entries (Ordner zuerst, dann Dateien) — virtualisiert -- *@
+        <Virtualize Items="SortedEntries" Context="entry" ItemSize="ItemHeightPx" OverscanCount="8">
+            @{
+                var isSelected = _selectedItems.Contains(entry);
+                var aclPath = entry.IsDirectory ? GetDirAclPath(entry) : GetFileAclPath(entry);
+                var aclCount = CanManageAcls() ? GetAclCount(aclPath) : 0;
+            }
+            <div class="file-grid-row @(entry.IsDirectory ? "file-row-dir" : "") @(isSelected ? "file-row--selected" : "")"
+                 @onclick="(e) => OnItemClick(e, entry)"
                  @onclick:stopPropagation="true"
-                 @ondblclick="() => NavigateTo(dir)"
-                 @oncontextmenu="(e) => _contextMenuComponent.OnItemContextMenu(e, dir)"
+                 @ondblclick="() => OnItemActivate(entry)"
+                 @oncontextmenu="(e) => _contextMenuComponent.OnItemContextMenu(e, entry)"
                  @oncontextmenu:preventDefault="true"
                  @oncontextmenu:stopPropagation="true">
 
                 <div class="col-name">
-                    @if (dir.Name == ".RECYCLE_BIN")
+                    @if (entry.IsDirectory && entry.Name == ".RECYCLE_BIN")
                     {
-                        Assets.SVG("trash.svg", new SvgOptions(Width: 20, Height: 20, CssClass: "file-icon"));
+                        @Assets.SVG("trash.svg", new SvgOptions(Width: 20, Height: 20, CssClass: "file-icon"))
+                    }
+                    else if (entry.IsDirectory)
+                    {
+                        @Assets.SVG("folder.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)", CssClass: "file-icon"))
                     }
                     else
                     {
-                        
-                        @Assets.SVG("folder.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)", CssClass: "file-icon"))                    }
-                    <span>@dir.Name</span>
-                    @if (dirAclCount > 0)
+                        @Assets.SVG(FileHelper.GetIcon(entry.Name), new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)", CssClass: "file-icon"))
+                    }
+                    <span>@entry.Name</span>
+                    @if (aclCount > 0)
                     {
                         <span class="acl-indicator"
-                              title="@(dirAclCount != 1 ? string.Format(Resources.Web_Acl_RulesPlural, dirAclCount) : string.Format(Resources.Web_Acl_RulesSingular, dirAclCount))"
-                              @onclick="() => OpenFolderAcl(dir)"
+                              title="@(aclCount != 1 ? string.Format(Resources.Web_Acl_RulesPlural, aclCount) : string.Format(Resources.Web_Acl_RulesSingular, aclCount))"
+                              @onclick="() => OpenEntryAcl(entry)"
                               @onclick:stopPropagation="true">
                             @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
-                            <span class="acl-indicator-count">@dirAclCount</span>
+                            <span class="acl-indicator-count">@aclCount</span>
                         </span>
                     }
                 </div>
 
                 <div class="col-size">
-                    @{
-                        var dirSize = VM.GetDirectorySize(dir);
-                    }
-                    @if (dirSize.HasValue)
+                    @if (entry.IsDirectory)
                     {
-                        @FormatHelper.FormatFileSize(dirSize.Value)
+                        var dirSize = VM.GetDirectorySize(entry);
+                        if (dirSize.HasValue)
+                        {
+                            @FormatHelper.FormatFileSize(dirSize.Value)
+                        }
+                        else
+                        {
+                            <span class="size-loading">…</span>
+                        }
                     }
                     else
                     {
-                        <span class="size-loading">…</span>
+                        @FormatHelper.FormatFileSize(entry.Size)
                     }
                 </div>
 
-                <div class="col-created">@dir.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                <div class="col-modified">@dir.ModifiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                <div class="col-lastaccess">@(dir.LastAccessedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</div>
+                <div class="col-created">@entry.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                <div class="col-modified">@entry.ModifiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                <div class="col-lastaccess">@(entry.LastAccessedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</div>
             </div>
 
-            @if (_showFolderAcl && _aclFolderPath == GetDirAclPath(dir))
+            @if (_showFolderAcl && _aclFolderPath == aclPath)
             {
                 <div class="file-row-acl-expand-wrap">
                     <div class="file-row-acl-expand">
                         <div class="acl-panel-header" style="padding: 0 0 8px 0;">
-                            <span class="detail-subtitle">@string.Format(Resources.Web_Acl_PermissionsFor, dir.Name)</span>
+                            <span class="detail-subtitle">@string.Format(Resources.Web_Acl_PermissionsFor, entry.Name)</span>
                             <button class="btn-icon btn-icon--small" title="@Resources.Web_Button_Close" @onclick="CloseFolderAcl">
                                 @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                             </button>
                         </div>
                         <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
                                    Path="@_aclFolderPath" ShareId="@VM.CurrentShare.Id"
-                                   IsDirectory="true" OnChanged="LoadAclCounts" />
+                                   IsDirectory="@entry.IsDirectory" OnChanged="LoadAclCounts" />
                     </div>
                 </div>
             }
-        }
-
-        @* -- Files -- *@
-        @foreach (var file in SortedFiles)
-        {
-            var isSelected = _selectedItems.Contains(file);
-            var fileAclCount = _isAdmin ? GetAclCount(GetFileAclPath(file)) : 0;
-
-            <div class="file-grid-row @(isSelected ? "file-row--selected" : "")"
-                 @onclick="(e) => OnItemClick(e, file)"
-                 @onclick:stopPropagation="true"
-                 @ondblclick="() => _filePreviewComponent.OpenFilePreview(file)"
-                 @oncontextmenu="(e) => _contextMenuComponent.OnItemContextMenu(e, file)"
-                 @oncontextmenu:preventDefault="true"
-                 @oncontextmenu:stopPropagation="true">
-
-                <div class="col-name" >
-                    
-                    @Assets.SVG(FileHelper.GetIcon(file.Name), new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)", CssClass: "file-icon"))
-                    
-                    <span>@file.Name</span>
-                    @if (fileAclCount > 0)
-                    {
-                        <span class="acl-indicator"
-                              title="@(fileAclCount != 1 ? string.Format(Resources.Web_Acl_RulesPlural, fileAclCount) : string.Format(Resources.Web_Acl_RulesSingular, fileAclCount))"
-                              @onclick="() => OpenFileAcl(file)"
-                              @onclick:stopPropagation="true">
-                            @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
-                            <span class="acl-indicator-count">@fileAclCount</span>
-                        </span>
-                    }
-                </div>
-
-                <div class="col-size">@FormatHelper.FormatFileSize(file.Size)</div>
-                <div class="col-created">@file.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                <div class="col-modified">@file.ModifiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                <div class="col-lastaccess">@(file.LastAccessedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</div>
-            </div>
-
-            @if (_showFolderAcl && _aclFolderPath == GetFileAclPath(file))
-            {
-                <div class="file-row-acl-expand-wrap">
-                    <div class="file-row-acl-expand">
-                        <div class="acl-panel-header" style="padding: 0 0 8px 0;">
-                            <span class="detail-subtitle">@string.Format(Resources.Web_Acl_PermissionsFor, file.Name)</span>
-                            <button class="btn-icon btn-icon--small" title="@Resources.Web_Button_Close" @onclick="CloseFolderAcl">
-                                @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                            </button>
-                        </div>
-                        <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
-                                   Path="@_aclFolderPath" ShareId="@VM.CurrentShare.Id"
-                                   IsDirectory="false" OnChanged="LoadAclCounts" />
-                    </div>
-                </div>
-            }
-        }
+        </Virtualize>
 
         @if (!VM.Items.Any())
         {
@@ -525,6 +479,10 @@ else
     private IEnumerable<FileMetadata> SortedDirectories => ApplySort(VM.Directories);
     private IEnumerable<FileMetadata> SortedFiles => ApplySort(VM.Files);
 
+    // Single sequence for <Virtualize>: directories first (each group sorted), then files.
+    // Materialized because Virtualize needs an indexable collection.
+    private List<FileMetadata> SortedEntries => SortedDirectories.Concat(SortedFiles).ToList();
+
     private IEnumerable<FileMetadata> ApplySort(IEnumerable<FileMetadata> items)
     {
         if (_sortColumn is null || _sortDirection == 0)
@@ -622,18 +580,18 @@ else
             {
                 cts.Dispose();
             }
-            
-            await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
-            StateHasChanged();
         }
-        
+
+        // Refresh once after the whole batch — not per file — so an N-file upload
+        // triggers a single re-list instead of N full reloads.
+        await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
+        StateHasChanged();
     }
 
 
     // ========== State ==========
 
     private Dictionary<string, int> _aclCounts = new();
-    private bool _isAdmin;
     private bool _showAclPanel;
     private string _aclPath = "";
     private bool _showFolderAcl;
@@ -663,7 +621,7 @@ else
     private bool CanOpenSelection => _selectedItems.Count == 1;
     private bool CanRenameSelection => _selectedItems.Count == 1;
     private bool CanDeleteSelection => _selectedItems.Count > 0;
-    private bool CanAclSelection => _isAdmin && _selectedItems.Count == 1;
+    private bool CanAclSelection => CanManageAcls() && _selectedItems.Count == 1;
 
     // ========== Selection ==========
 
@@ -869,15 +827,6 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            var state = await AuthStateProvider.GetAuthenticationStateAsync();
-            _isAdmin = state.User.IsInRole("Administrator")
-                    || state.User.IsInRole("ShareManager");
-
-            StateHasChanged();
-        }
-
         if (!_jsInitialized && _fileDropZone.Id is not null)
         {
             _jsInitialized = true;
@@ -1066,6 +1015,24 @@ else
 
     // ========== Navigation ==========
 
+    /// <summary>Double-click / open: navigate into a folder or preview a file.</summary>
+    private async Task OnItemActivate(FileMetadata entry)
+    {
+        if (entry.IsDirectory)
+            NavigateTo(entry);
+        else
+            await _filePreviewComponent.OpenFilePreview(entry);
+    }
+
+    /// <summary>Open the inline ACL editor for a directory or a file.</summary>
+    private void OpenEntryAcl(FileMetadata entry)
+    {
+        if (entry.IsDirectory)
+            OpenFolderAcl(entry);
+        else
+            OpenFileAcl(entry);
+    }
+
     internal void NavigateTo(FileMetadata dir)
     {
         var relativePath = dir.Path;
@@ -1082,7 +1049,12 @@ else
             Nav.NavigateTo($"/files/{ShareName}/{VM.ParentPath}");
     }
 
-    public bool CurrentUserIsAdmin()
-        => _isAdmin;
+    /// <summary>
+    /// Scoped ACL-management right for the current share, resolved server-side by
+    /// the view model (ManagementPermission.ManageShareAcls on this share). Gates the
+    /// ACL panel, badges and permission actions — and the context-menu entry.
+    /// </summary>
+    public bool CanManageAcls()
+        => VM.CanManageAcls;
 
 }

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
@@ -25,7 +26,11 @@ public record OperationResult(bool Success, string? Error = null)
 public class FileBrowserViewModel
 {
     private long MaxUploadSizeBytes => 1100L * 1024 * 1024; // 1.1 GB
-    
+
+    // Inline preview buffers the whole file into a server-side byte[]; cap it so a
+    // huge file can never blow up server memory. Larger files fall back to download.
+    private long MaxPreviewSizeBytes => 25L * 1024 * 1024; // 25 MB
+
     private readonly IFileServiceFactory _fileServiceFactory;
     private readonly IShareRepository _shareRepo;
     private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
@@ -61,14 +66,32 @@ public class FileBrowserViewModel
     // -- State --
 
     public event Action? OnStateChanged;
-    public Dictionary<string, long> DirectorySizes { get; private set; } = new();
+
+    // Written from a background task (bounded parallelism) while the render thread
+    // reads it — hence concurrent, not a plain Dictionary, to avoid torn reads.
+    public ConcurrentDictionary<string, long> DirectorySizes { get; private set; } = new();
     private CancellationTokenSource? _sizeCts;
+
+    // Directory-size calculation walks the disk per folder; cap the fan-out and
+    // coalesce UI refreshes so a folder with many sub-directories doesn't trigger
+    // one full re-render per sub-directory.
+    private const int MaxConcurrentSizeCalculations = 4;
+    private static readonly TimeSpan SizeUpdateThrottle = TimeSpan.FromMilliseconds(150);
     public Dictionary<string, int> AclCounts { get; private set; } = new();
     public ShareDefinition? CurrentShare { get; private set; }
     public List<FileMetadata> Items { get; private set; } = [];
     public string CurrentPath { get; private set; } = "";
     public bool IsLoading { get; private set; }
     public string? ErrorMessage { get; private set; }
+
+    /// <summary>
+    /// Whether the current user may manage ACLs on the loaded share. This is a
+    /// SCOPED decision (<see cref="ManagementPermission.ManageShareAcls"/> on this
+    /// specific share) — not a coarse global-role check — so a department- or
+    /// share-scoped manager only sees the ACL UI for shares in their scope.
+    /// Drives the ACL panel, badges and permission actions in the view.
+    /// </summary>
+    public bool CanManageAcls { get; private set; }
 
     // -- Computed --
 
@@ -113,6 +136,7 @@ public class FileBrowserViewModel
         {
             IsLoading = true;
             ErrorMessage = null;
+            CanManageAcls = false;
 
             CurrentShare = await _shareRepo.GetByNameAsync(shareName);
             if (CurrentShare is null)
@@ -148,6 +172,11 @@ public class FileBrowserViewModel
                 Items = [];
                 return;
             }
+
+            // Scoped ACL-management right for THIS share, resolved once per load and
+            // reused by the view. Same authority source the ACL editor enforces on write.
+            CanManageAcls = await _mgmtAuth.CanManageShareAsync(
+                userContext, CurrentShare.Id, ManagementPermission.ManageShareAcls);
 
             // Disabled shares reject all access — except for managers of the share,
             // who may still browse them (e.g. to inspect before re-enabling).
@@ -344,7 +373,10 @@ public class FileBrowserViewModel
     public async Task LoadAclCountsAsync()
     {
         AclCounts.Clear();
-        if (CurrentShare is null) return;
+
+        // Counts are only ever rendered for ACL managers; skip the DB query entirely
+        // for everyone else instead of computing data the view will not show.
+        if (CurrentShare is null || !CanManageAcls) return;
 
         var paths = new List<string> { CurrentPath ?? "" };
 
@@ -380,10 +412,17 @@ public class FileBrowserViewModel
         return AclCounts.TryGetValue(path, out var count) ? count : 0;
     }
 
-    private async Task LoadDirectorySizesInBackgroundAsync()
+    /// <summary>
+    /// Computes directory sizes off the render path. Sizes are calculated with bounded
+    /// parallelism and pushed to the UI on a throttled cadence (plus one final update),
+    /// instead of one full re-render per sub-directory. Any in-flight run is cancelled
+    /// first, e.g. when the user quickly switches folders or navigates away.
+    /// </summary>
+    internal async Task LoadDirectorySizesInBackgroundAsync()
     {
-        // Vorherigen Lauf abbrechen (z.B. bei schnellem Ordnerwechsel)
+        // Cancel and replace the previous run (fast folder switches).
         _sizeCts?.Cancel();
+        _sizeCts?.Dispose();
         _sizeCts = new CancellationTokenSource();
         var ct = _sizeCts.Token;
 
@@ -395,27 +434,63 @@ public class FileBrowserViewModel
         if (userContext is null) return;
 
         var dirs = Items.Where(f => f.IsDirectory).ToList();
+        if (dirs.Count == 0) return;
 
-        foreach (var dir in dirs)
+        // Throttle timestamp shared across worker threads; guarded with Interlocked
+        // so the compare-and-set is race-free and DateTime never tears.
+        long lastPushTicks = 0;
+
+        try
         {
-            if (ct.IsCancellationRequested) return;
+            await Parallel.ForEachAsync(
+                dirs,
+                new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = MaxConcurrentSizeCalculations,
+                    CancellationToken = ct
+                },
+                async (dir, token) =>
+                {
+                    try
+                    {
+                        var relativePath = dir.Path;
+                        if (relativePath.StartsWith(CurrentShare.Path))
+                            relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
 
-            try
-            {
-                var relativePath = dir.Path;
-                if (relativePath.StartsWith(CurrentShare.Path))
-                    relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
+                        var size = await _fileService.GetDirectorySizeAsync(relativePath, userContext);
+                        DirectorySizes[relativePath] = size;
 
-                var size = await _fileService.GetDirectorySizeAsync(relativePath, userContext);
-
-                DirectorySizes[relativePath] = size;
-                OnStateChanged?.Invoke(); // UI updaten nach jedem Ordner
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Could not calculate size for '{Path}'", dir.Path);
-            }
+                        PushThrottledStateChange(ref lastPushTicks);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logger.LogWarning(ex, "Could not calculate size for '{Path}'", dir.Path);
+                    }
+                });
         }
+        catch (OperationCanceledException)
+        {
+            return; // superseded by a newer load — drop this run silently
+        }
+
+        // Final update so the last batch of results is rendered even if the
+        // throttle window swallowed the trailing push.
+        if (!ct.IsCancellationRequested)
+            OnStateChanged?.Invoke();
+    }
+
+    /// <summary>Raises <see cref="OnStateChanged"/> at most once per throttle window.</summary>
+    private void PushThrottledStateChange(ref long lastPushTicks)
+    {
+        var now = DateTime.UtcNow.Ticks;
+        var previous = Interlocked.Read(ref lastPushTicks);
+
+        if (now - previous < SizeUpdateThrottle.Ticks)
+            return;
+
+        // Only the thread that wins the swap pushes, so bursts collapse to one update.
+        if (Interlocked.CompareExchange(ref lastPushTicks, now, previous) == previous)
+            OnStateChanged?.Invoke();
     }
 
     /// <summary>Returns the computed size if it has already been calculated.</summary>
@@ -434,6 +509,10 @@ public class FileBrowserViewModel
     {
         if (_fileService is null || CurrentShare is null) return null;
 
+        // Never buffer an oversized file into memory — the caller shows a download
+        // fallback for anything above the cap.
+        if (file.Size > MaxPreviewSizeBytes) return null;
+
         var userContext = await GetCurrentUserContextAsync();
         if (userContext is null) return null;
 
@@ -441,7 +520,7 @@ public class FileBrowserViewModel
         if (relativePath.StartsWith(CurrentShare.Path))
             relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
 
-        var stream = await _fileService.ReadFileAsync(relativePath, userContext);
+        await using var stream = await _fileService.ReadFileAsync(relativePath, userContext);
         using var ms = new MemoryStream();
         await stream.CopyToAsync(ms);
 
@@ -450,6 +529,9 @@ public class FileBrowserViewModel
 
         return (ms.ToArray(), contentType, kind);
     }
+
+    /// <summary>Maximum file size that can be previewed inline; larger files download instead.</summary>
+    public long GetMaxPreviewSizeBytes() => MaxPreviewSizeBytes;
     
     public async Task<OperationResult> ArchiveAsync(List<FileMetadata> items, string format)
     {
