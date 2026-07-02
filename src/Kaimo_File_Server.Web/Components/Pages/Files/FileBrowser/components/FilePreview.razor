@@ -64,7 +64,9 @@
                     @Assets.SVG(FileHelper.GetIcon(_previewFileName), new SvgOptions(Width: 64, Height: 64, StrokeWidth: 1.5f, Color: "var(--text-tertiary)"))
                     <span class="preview-fallback-name">@_previewFileName</span>
                     <span class="preview-fallback-hint">
-                        Für diesen Dateityp ist keine Vorschau verfügbar.
+                        @(_previewTooLarge
+                            ? $"Die Datei ist zu groß für die Vorschau (max. {FormatHelper.FormatFileSize(VM.GetMaxPreviewSizeBytes())})."
+                            : "Für diesen Dateityp ist keine Vorschau verfügbar.")
                     </span>
                     @if (_previewSize > 0)
                     {
@@ -92,6 +94,7 @@
     private long _previewSize;
     private PreviewKind _previewKind = PreviewKind.Unsupported;
     private bool _previewLoading;
+    private bool _previewTooLarge;
     private bool _showFilePreview;
 
     public async Task CloseFilePreview()
@@ -114,8 +117,20 @@
         _displayUrl = "";
         _downloadUrl = "";
         _previewKind = PreviewKind.Unsupported;
-        _previewLoading = true;
+        _previewTooLarge = false;
         _showFilePreview = true;
+
+        // Files above the inline-preview cap are never buffered into memory — show the
+        // download fallback directly instead of spinning and then silently closing.
+        if (file.Size > VM.GetMaxPreviewSizeBytes())
+        {
+            _previewTooLarge = true;
+            _previewLoading = false;
+            StateHasChanged();
+            return;
+        }
+
+        _previewLoading = true;
         StateHasChanged();
 
         var result = await VM.ReadFileForPreviewAsync(file);

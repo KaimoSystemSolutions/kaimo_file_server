@@ -621,11 +621,12 @@ else
             {
                 cts.Dispose();
             }
-            
-            await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
-            StateHasChanged();
         }
-        
+
+        // Refresh once after the whole batch — not per file — so an N-file upload
+        // triggers a single re-list instead of N full reloads.
+        await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
+        StateHasChanged();
     }
 
 
