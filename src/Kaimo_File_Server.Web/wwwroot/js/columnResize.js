@@ -64,7 +64,9 @@ window.columnResize = {
             var parts = allWidths.map(function (w) {
                 return Math.round(w) + 'px';
             });
-            wrap.style.gridTemplateColumns = parts.join(' ');
+            // Header + all data rows read this variable, so updating it once resizes
+            // the whole (now per-row) grid in lockstep.
+            wrap.style.setProperty('--grid-cols', parts.join(' '));
         };
 
         columnResize._onMouseUp = function () {
