@@ -5,7 +5,7 @@ namespace Kaimo_File_Server.Infrastructure.Configuration;
 
 /// <summary>
 /// Implements <see cref="ISmbConfigStore"/> over <see cref="IConfigRepository"/>.
-/// Reads use <see cref="IConfigRepository.GetFreshAsync"/> because the flags are
+/// Reads use <see cref="IConfigRepository.GetFreshAsync"/> because the settings are
 /// written in the Web process but read in the SMB host process — a cached value
 /// would hide the change for up to the cache TTL. Mirrors <see cref="SearchConfigStore"/>.
 /// </summary>
@@ -18,15 +18,19 @@ public sealed class SmbConfigStore : ISmbConfigStore
         _scopeFactory = scopeFactory;
     }
 
-    public async Task<SmbDialectConfig> GetDialectConfigAsync()
+    public async Task<SmbProtocolSettings> GetProtocolSettingsAsync()
     {
         using var scope = _scopeFactory.CreateScope();
         var config = scope.ServiceProvider.GetRequiredService<IConfigRepository>();
 
-        // Default true → backward compatible with the previously hard-coded
-        // enableSMB2 = enableSMB3 = true behaviour.
-        bool smb2 = await config.GetFreshAsync(SmbConfigKeys.Smb2EnabledKey, true);
-        bool smb3 = await config.GetFreshAsync(SmbConfigKeys.Smb3EnabledKey, true);
-        return new SmbDialectConfig(smb2, smb3);
+        // Fallback = library-default settings → backward compatible with the
+        // previously hard-coded dialect range / signing behaviour.
+        var settings = await config.GetFreshAsync(
+            SmbProtocolSettings.ConfigKey, SmbProtocolSettings.Default());
+
+        // A hand-edited or partially-deserialized object could carry an inverted
+        // range; guarantee the host always receives a sane one.
+        settings.Normalize();
+        return settings;
     }
 }

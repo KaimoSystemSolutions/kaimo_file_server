@@ -1,0 +1,276 @@
+using System.Security.Claims;
+using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Infrastructure.Configuration;
+using Kaimo_File_Server.Search;
+using Kaimo_File_Server.Web.Components.ViewModels;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using Xunit;
+
+namespace Kaimo_File_Server.Tests;
+
+/// <summary>
+/// Covers the SMB protocol/security settings surface: the <see cref="SmbProtocolSettings"/>
+/// config model (defaults + range normalization) and the <see cref="SettingsViewModel"/>
+/// load/save behaviour for those settings, including permission gating and range repair.
+/// </summary>
+public class SettingsViewModelSmbTests
+{
+    // ─────────────────────────── SmbProtocolSettings model ───────────────────────────
+
+    [Fact]
+    public void Default_ReproducesLibrarySecureDefaults()
+    {
+        var s = SmbProtocolSettings.Default();
+
+        Assert.Equal(SmbProtocolVersion.Smb202, s.MinVersion);
+        Assert.Equal(SmbProtocolVersion.Smb311, s.MaxVersion);
+        Assert.True(s.RequireSigning);
+        Assert.False(s.RequireEncryption);
+    }
+
+    [Fact]
+    public void Normalize_InvertedRange_RaisesMaxToMin()
+    {
+        var s = new SmbProtocolSettings
+        {
+            MinVersion = SmbProtocolVersion.Smb311,
+            MaxVersion = SmbProtocolVersion.Smb202,
+        };
+
+        s.Normalize();
+
+        Assert.Equal(SmbProtocolVersion.Smb311, s.MinVersion);
+        Assert.Equal(SmbProtocolVersion.Smb311, s.MaxVersion);
+    }
+
+    [Fact]
+    public void Normalize_ValidRange_LeavesUntouched()
+    {
+        var s = new SmbProtocolSettings
+        {
+            MinVersion = SmbProtocolVersion.Smb210,
+            MaxVersion = SmbProtocolVersion.Smb302,
+        };
+
+        s.Normalize();
+
+        Assert.Equal(SmbProtocolVersion.Smb210, s.MinVersion);
+        Assert.Equal(SmbProtocolVersion.Smb302, s.MaxVersion);
+    }
+
+    [Fact]
+    public void Normalize_EqualMinAndMax_IsAllowed()
+    {
+        var s = new SmbProtocolSettings
+        {
+            MinVersion = SmbProtocolVersion.Smb300,
+            MaxVersion = SmbProtocolVersion.Smb300,
+        };
+
+        s.Normalize();
+
+        Assert.Equal(SmbProtocolVersion.Smb300, s.MinVersion);
+        Assert.Equal(SmbProtocolVersion.Smb300, s.MaxVersion);
+    }
+
+    // ─────────────────────────── SettingsViewModel: load ───────────────────────────
+
+    [Fact]
+    public async Task LoadAsync_WithDataServicePermission_LoadsProtocolSettings()
+    {
+        var stored = new SmbProtocolSettings
+        {
+            MinVersion = SmbProtocolVersion.Smb210,
+            MaxVersion = SmbProtocolVersion.Smb311,
+            RequireSigning = false,
+            RequireEncryption = true,
+        };
+        var h = new Harness(canManageDataServices: true, storedProtocol: stored);
+
+        await h.Vm.LoadAsync();
+
+        Assert.True(h.Vm.CanManageDataServices);
+        Assert.Equal(SmbProtocolVersion.Smb210, h.Vm.SmbProtocol.MinVersion);
+        Assert.Equal(SmbProtocolVersion.Smb311, h.Vm.SmbProtocol.MaxVersion);
+        Assert.False(h.Vm.SmbProtocol.RequireSigning);
+        Assert.True(h.Vm.SmbProtocol.RequireEncryption);
+    }
+
+    [Fact]
+    public async Task LoadAsync_InvertedStoredRange_IsNormalized()
+    {
+        var stored = new SmbProtocolSettings
+        {
+            MinVersion = SmbProtocolVersion.Smb311,
+            MaxVersion = SmbProtocolVersion.Smb202,
+        };
+        var h = new Harness(canManageDataServices: true, storedProtocol: stored);
+
+        await h.Vm.LoadAsync();
+
+        // Max was raised to Min so at least one dialect is negotiable.
+        Assert.Equal(SmbProtocolVersion.Smb311, h.Vm.SmbProtocol.MinVersion);
+        Assert.Equal(SmbProtocolVersion.Smb311, h.Vm.SmbProtocol.MaxVersion);
+    }
+
+    [Fact]
+    public async Task LoadAsync_WithoutDataServicePermission_DoesNotReadProtocolSettings()
+    {
+        var h = new Harness(canManageDataServices: false);
+
+        await h.Vm.LoadAsync();
+
+        Assert.False(h.Vm.CanManageDataServices);
+        h.Config.Verify(
+            c => c.GetAsync(SmbProtocolSettings.ConfigKey, It.IsAny<SmbProtocolSettings>()),
+            Times.Never);
+    }
+
+    // ─────────────────────────── SettingsViewModel: save ───────────────────────────
+
+    [Fact]
+    public async Task SaveSmbProtocolAsync_Persists_UnderProtocolKey()
+    {
+        var h = new Harness(canManageDataServices: true);
+        await h.Vm.LoadAsync();
+
+        h.Vm.SmbProtocol.MinVersion = SmbProtocolVersion.Smb300;
+        h.Vm.SmbProtocol.MaxVersion = SmbProtocolVersion.Smb311;
+        h.Vm.SmbProtocol.RequireEncryption = true;
+
+        var ok = await h.Vm.SaveSmbProtocolAsync();
+
+        Assert.True(ok);
+        Assert.NotNull(h.SavedProtocol);
+        Assert.Equal(SmbProtocolVersion.Smb300, h.SavedProtocol!.MinVersion);
+        Assert.Equal(SmbProtocolVersion.Smb311, h.SavedProtocol.MaxVersion);
+        Assert.True(h.SavedProtocol.RequireEncryption);
+        Assert.NotNull(h.Vm.SuccessMessage);
+        Assert.Null(h.Vm.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task SaveSmbProtocolAsync_InvertedRange_IsNormalizedBeforeWrite()
+    {
+        var h = new Harness(canManageDataServices: true);
+        await h.Vm.LoadAsync();
+
+        h.Vm.SmbProtocol.MinVersion = SmbProtocolVersion.Smb311;
+        h.Vm.SmbProtocol.MaxVersion = SmbProtocolVersion.Smb202;
+
+        var ok = await h.Vm.SaveSmbProtocolAsync();
+
+        Assert.True(ok);
+        Assert.NotNull(h.SavedProtocol);
+        Assert.Equal(SmbProtocolVersion.Smb311, h.SavedProtocol!.MinVersion);
+        Assert.Equal(SmbProtocolVersion.Smb311, h.SavedProtocol.MaxVersion);
+    }
+
+    [Fact]
+    public async Task SaveSmbProtocolAsync_WithoutPermission_FailsAndDoesNotWrite()
+    {
+        var h = new Harness(canManageDataServices: false);
+        await h.Vm.LoadAsync();
+
+        var ok = await h.Vm.SaveSmbProtocolAsync();
+
+        Assert.False(ok);
+        Assert.NotNull(h.Vm.ErrorMessage);
+        h.Config.Verify(
+            c => c.SetAsync(SmbProtocolSettings.ConfigKey, It.IsAny<SmbProtocolSettings>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task SaveSmbProtocolAsync_WhenStoreThrows_ReportsError()
+    {
+        var h = new Harness(canManageDataServices: true);
+        await h.Vm.LoadAsync();
+        h.Config
+            .Setup(c => c.SetAsync(SmbProtocolSettings.ConfigKey, It.IsAny<SmbProtocolSettings>()))
+            .ThrowsAsync(new InvalidOperationException("db down"));
+
+        var ok = await h.Vm.SaveSmbProtocolAsync();
+
+        Assert.False(ok);
+        Assert.NotNull(h.Vm.ErrorMessage);
+        Assert.Null(h.Vm.SuccessMessage);
+    }
+
+    // ─────────────────────────── Test harness ───────────────────────────
+
+    private sealed class Harness
+    {
+        public Mock<IConfigRepository> Config { get; } = new();
+        public SettingsViewModel Vm { get; }
+
+        /// <summary>The <see cref="SmbProtocolSettings"/> captured on the last SetAsync write.</summary>
+        public SmbProtocolSettings? SavedProtocol { get; private set; }
+
+        public Harness(bool canManageDataServices, SmbProtocolSettings? storedProtocol = null)
+        {
+            storedProtocol ??= SmbProtocolSettings.Default();
+
+            Config.Setup(c => c.GetBoolAsync(It.IsAny<string>(), It.IsAny<bool>()))
+                .ReturnsAsync(true);
+            Config.Setup(c => c.GetAsync(SmbProtocolSettings.ConfigKey, It.IsAny<SmbProtocolSettings>()))
+                .ReturnsAsync(storedProtocol);
+            Config.Setup(c => c.GetFreshAsync(It.IsAny<string>(), It.IsAny<string>()))
+                .ReturnsAsync("Running");
+            Config.Setup(c => c.SetAsync(SmbProtocolSettings.ConfigKey, It.IsAny<SmbProtocolSettings>()))
+                .Callback<string, SmbProtocolSettings>((_, v) => SavedProtocol = v)
+                .Returns(Task.CompletedTask);
+
+            var actor = MakeActor();
+            var userFactory = new Mock<IUserContextFactory>();
+            userFactory.Setup(f => f.CreateByUsernameAsync(It.IsAny<string>()))
+                .ReturnsAsync(actor);
+
+            var mgmt = new Mock<IManagementAuthService>();
+            mgmt.Setup(m => m.HasGlobalPermissionAsync(
+                    It.IsAny<UserContext>(), ManagementPermission.ManageDataServices))
+                .ReturnsAsync(canManageDataServices);
+            // Keep the global-settings branch out of these tests so we only
+            // need to mock the data-service path.
+            mgmt.Setup(m => m.HasGlobalPermissionAsync(
+                    It.IsAny<UserContext>(), ManagementPermission.ManageSystemSettings))
+                .ReturnsAsync(false);
+
+            Vm = new SettingsViewModel(
+                Config.Object,
+                mgmt.Object,
+                userFactory.Object,
+                new StubAuthProvider("admin"),
+                Mock.Of<ISystemInfoService>(),
+                Mock.Of<ISearchAdminService>(),
+                NullLogger<SettingsViewModel>.Instance);
+        }
+
+        private static UserContext MakeActor()
+        {
+            var user = new User(Guid.NewGuid(), "Admin", "admin", "pw-hash", "nt-hash");
+            return new UserContext(user, new HashSet<Group>(), new HashSet<Role>(), new HashSet<string>());
+        }
+    }
+
+    private sealed class StubAuthProvider : AuthenticationStateProvider
+    {
+        private readonly AuthenticationState _state;
+
+        public StubAuthProvider(string username)
+        {
+            var identity = new ClaimsIdentity(
+                new[] { new Claim(ClaimTypes.Name, username) }, authenticationType: "test");
+            _state = new AuthenticationState(new ClaimsPrincipal(identity));
+        }
+
+        public override Task<AuthenticationState> GetAuthenticationStateAsync()
+            => Task.FromResult(_state);
+    }
+}

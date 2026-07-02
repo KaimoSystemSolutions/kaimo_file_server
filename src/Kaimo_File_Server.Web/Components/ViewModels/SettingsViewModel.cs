@@ -74,6 +74,23 @@ public class SettingsViewModel
     /// <summary>Last status the SMB host reported back, or "Unbekannt".</summary>
     public string SmbStatus { get; private set; } = "Unbekannt";
 
+    /// <summary>
+    /// SMB protocol/security options (dialect range, signing, encryption) —
+    /// working copy edited on the Datendienste tab. Applied by the SMB host on
+    /// the next (re)start of the service.
+    /// </summary>
+    public SmbProtocolSettings SmbProtocol { get; private set; } = SmbProtocolSettings.Default();
+
+    /// <summary>All selectable SMB dialects with their display labels, oldest first.</summary>
+    public static readonly IReadOnlyList<(SmbProtocolVersion Version, string Label)> SmbVersions =
+    [
+        (SmbProtocolVersion.Smb202, "SMB 2.0.2"),
+        (SmbProtocolVersion.Smb210, "SMB 2.1"),
+        (SmbProtocolVersion.Smb300, "SMB 3.0"),
+        (SmbProtocolVersion.Smb302, "SMB 3.0.2"),
+        (SmbProtocolVersion.Smb311, "SMB 3.1.1"),
+    ];
+
     // ── Search engine (Elasticsearch) ──
 
     /// <summary>Desired state of Elasticsearch (config flag). When off, the
@@ -147,6 +164,9 @@ public class SettingsViewModel
             {
                 SmbEnabled = await _config.GetBoolAsync(
                     DataServiceKeys.EnabledKey("smb"), fallback: true);
+                SmbProtocol = await _config.GetAsync(
+                    SmbProtocolSettings.ConfigKey, SmbProtocolSettings.Default());
+                SmbProtocol.Normalize();
                 // Status is written by the host process → read fresh, not cached.
                 SmbStatus = await _config.GetFreshAsync(
                     DataServiceKeys.StatusKey("smb"), "Unbekannt");
@@ -253,6 +273,46 @@ public class SettingsViewModel
     {
         if (!CanManageDataServices) return;
         SmbStatus = await _config.GetFreshAsync(DataServiceKeys.StatusKey("smb"), "Unbekannt");
+    }
+
+    /// <summary>
+    /// Persists the SMB protocol/security options (dialect range, signing,
+    /// encryption). Changes are applied by the SMB host on the next (re)start of
+    /// the service — a running server is not reconfigured live.
+    /// </summary>
+    public async Task<bool> SaveSmbProtocolAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!CanManageDataServices)
+        {
+            ErrorMessage = Resources.Web_Settings_NoPermissionDataServices;
+            return false;
+        }
+
+        // Guard against an inverted range (min newer than max) that would leave
+        // the server with no negotiable dialect.
+        SmbProtocol.Normalize();
+
+        try
+        {
+            await _config.SetAsync(SmbProtocolSettings.ConfigKey, SmbProtocol);
+
+            _logger.LogInformation(
+                "SMB protocol settings saved (Min={Min}, Max={Max}, Signing={Signing}, Encryption={Encryption})",
+                SmbProtocol.MinVersion, SmbProtocol.MaxVersion,
+                SmbProtocol.RequireSigning, SmbProtocol.RequireEncryption);
+            SuccessMessage = "SMB-Protokolleinstellungen gespeichert. " +
+                "Sie werden beim nächsten Neustart des SMB-Dienstes wirksam.";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save SMB protocol settings");
+            ErrorMessage = Resources.Web_Settings_DataServiceSaveFailed;
+            return false;
+        }
     }
 
     // ── Save Password Policy ──

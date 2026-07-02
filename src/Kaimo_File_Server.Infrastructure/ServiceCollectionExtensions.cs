@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Persistence;
@@ -66,6 +67,9 @@ namespace Kaimo_File_Server.Infrastructure
 
             // -- Search engine config flag (cross-process, read by the search router) --
             services.AddSingleton<ISearchConfigStore, Configuration.SearchConfigStore>();
+
+            // -- SMB protocol settings (cross-process, read by the SMB host on start) --
+            services.AddSingleton<ISmbConfigStore, Configuration.SmbConfigStore>();
 
             // -- Seeder --
             services.AddScoped<DatabaseSeeder>();

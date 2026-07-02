@@ -1,7 +1,9 @@
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Services.File;
 using Microsoft.Extensions.DependencyInjection;
 using Smb.Auth.Ntlm;
+using Smb.Protocol.Enums;
 using System.Collections.Concurrent;
 using System.Net;
 using LibSmbServer = Smb.Host.SmbServer;
@@ -126,12 +128,24 @@ namespace Kaimo_File_Server.Smb
                 NetbiosComputerName = Environment.MachineName.ToUpperInvariant(),
             };
 
+            // Read the admin-configured protocol/security options fresh from the
+            // config store (written by the Web UI in another process). They take
+            // effect here, on (re)start — the builder is only consulted once.
+            SmbProtocolSettings protocol = LoadProtocolSettings();
+
             SmbServerBuilder builder = SmbServerBuilder.Create()
                 .WithEndpoint(IPAddress.Any, 445)
                 .WithServerName(Environment.MachineName)
+                .WithDialectRange(MapDialect(protocol.MinVersion), MapDialect(protocol.MaxVersion))
+                .RequireSigning(protocol.RequireSigning)
+                .RequireEncryption(protocol.RequireEncryption)
                 .UseAuthentication(new NtlmSpnegoNegotiator(backend, ntlmOptions))
                 .UseShareAuthorization(policy)
                 .WithLogger(msg => Console.WriteLine($"[smb] {msg}"));
+
+            Console.WriteLine(
+                $"[smb] Protokoll: {protocol.MinVersion}..{protocol.MaxVersion}, " +
+                $"Signing={protocol.RequireSigning}, Encryption={protocol.RequireEncryption}");
 
             foreach (KaimoShare share in LoadSharesFromDb())
                 builder.AddShare(share);
@@ -150,6 +164,42 @@ namespace Kaimo_File_Server.Smb
 
             Console.WriteLine($"[+] SMB server gestartet mit {_activeShares.Count} Shares (ABE aktiv)");
         }
+
+        /// <summary>
+        /// Reads the desired protocol settings from the cross-process config store.
+        /// Falls back to library-default settings if the store is unavailable
+        /// (e.g. not registered) or a read fails, so the server always starts.
+        /// </summary>
+        private SmbProtocolSettings LoadProtocolSettings()
+        {
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var store = scope.ServiceProvider.GetService<ISmbConfigStore>();
+                if (store == null)
+                    return SmbProtocolSettings.Default();
+
+                var settings = SmbSync.Run(() => store.GetProtocolSettingsAsync());
+                settings.Normalize();
+                return settings;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[smb] Konnte Protokoll-Einstellungen nicht laden, nutze Standard: {ex.Message}");
+                return SmbProtocolSettings.Default();
+            }
+        }
+
+        /// <summary>Maps the transport-agnostic Core version onto the SMB library's dialect enum.</summary>
+        private static SmbDialect MapDialect(SmbProtocolVersion version) => version switch
+        {
+            SmbProtocolVersion.Smb202 => SmbDialect.Smb202,
+            SmbProtocolVersion.Smb210 => SmbDialect.Smb210,
+            SmbProtocolVersion.Smb300 => SmbDialect.Smb300,
+            SmbProtocolVersion.Smb302 => SmbDialect.Smb302,
+            SmbProtocolVersion.Smb311 => SmbDialect.Smb311,
+            _ => SmbDialect.Smb202,
+        };
 
         private List<KaimoShare> LoadSharesFromDb()
         {
