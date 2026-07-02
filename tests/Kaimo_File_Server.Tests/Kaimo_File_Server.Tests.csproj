@@ -17,6 +17,10 @@
     <PackageReference Include="Moq" Version="4.*" />
     <!-- In-memory relational DB for seeder tests (Sqlite supports TPC inheritance) -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8" />
+    <!-- Pin up the vulnerable native SQLite bundle pulled in transitively by EF Sqlite
+         (NU1903, GHSA-2m69-gcr7-jv3q on SQLitePCLRaw.lib.e_sqlite3 2.1.11). 3.0.3 brings a
+         patched SQLite native library and is API-compatible with EF Core's provider. -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.8" />
   </ItemGroup>
 
