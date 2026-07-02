@@ -13,7 +13,7 @@
     --bg-active: #383e54;
     --text-primary: #eef0f4;
     --text-secondary: #b0b8c8;
-    --text-tertiary: #6e7788;
+    --text-tertiary: #8791a3; /* lifted for small-icon / label legibility (~5.5:1 on bg) */
     --border: #2d3340;
     --border-light: #3a4050;
     --accent: #7facf5;
@@ -40,7 +40,7 @@
     --bg-active: #d8dce5;
     --text-primary: #111827;
     --text-secondary: #4b5563;
-    --text-tertiary: #8b929e;
+    --text-tertiary: #616a79; /* darkened for small-icon / label legibility (~4.7:1 on bg) */
     --border: #d4d8e0;
     --border-light: #e2e5ea;
     --accent: #2563eb;
@@ -131,7 +131,9 @@ html, body, #app {
 .main {
     flex: 1;
     overflow-y: auto;
-    padding: 24px 32px;
+    /* No top padding: the sticky search bar is the first child and should sit
+       flush against the top of the page. Sides/bottom keep their spacing. */
+    padding: 0 32px 24px;
     min-width: 0;
 }
 
@@ -1785,7 +1787,7 @@ html, body, #app {
 @media (max-width: 768px) {
     
     .main {
-        padding: 16px;
+        padding: 0 16px 16px;
     }
 
     .admin-content {
@@ -2944,7 +2946,7 @@ html, body, #app {
     flex-shrink: 0;
     width: 18px;
     height: 18px;
-    opacity: 0.5;
+    opacity: 0.7;
 }
 
 .search-input {
@@ -3020,7 +3022,7 @@ html, body, #app {
     flex-shrink: 0;
     width: 18px;
     height: 18px;
-    opacity: 0.5;
+    opacity: 0.75;
 }
 
 .search-result-info {
