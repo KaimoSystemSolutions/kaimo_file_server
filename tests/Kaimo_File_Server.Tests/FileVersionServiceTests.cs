@@ -12,6 +12,7 @@ public class FileVersionServiceTests : IDisposable
     private readonly string _testRoot;
     private readonly string _versionRoot;
     private readonly MockFileVersionRepository _repo;
+    private readonly MutableTimeProvider _time = new();
     private readonly FileVersionService _sut;
 
     public FileVersionServiceTests()
@@ -23,7 +24,7 @@ public class FileVersionServiceTests : IDisposable
 
         _repo = new MockFileVersionRepository();
         _sut = new FileVersionService(_repo, _versionRoot,
-            defaultMaxVersions: 5, defaultMaxAge: null);
+            defaultMaxVersions: 5, defaultMaxAge: null, timeProvider: _time);
     }
 
     public void Dispose()
@@ -71,10 +72,6 @@ public class FileVersionServiceTests : IDisposable
     public async Task CreateVersionAsync_SecondVersion_IncrementsVersionNumber()
     {
         await _sut.CreateVersionAsync("doc.txt", ToStream("Version 1"));
-
-        // Need a small delay so timestamps differ
-        await Task.Delay(10);
-
         var v2 = await _sut.CreateVersionAsync("doc.txt", ToStream("Version 2"));
 
         Assert.NotNull(v2);
@@ -97,7 +94,6 @@ public class FileVersionServiceTests : IDisposable
     public async Task CreateVersionAsync_ChangedContent_ReturnsNewVersion()
     {
         await _sut.CreateVersionAsync("doc.txt", ToStream("Version A"));
-        await Task.Delay(10);
         var v2 = await _sut.CreateVersionAsync("doc.txt", ToStream("Version B"));
 
         Assert.NotNull(v2);
@@ -216,7 +212,6 @@ public class FileVersionServiceTests : IDisposable
     public async Task ReadVersionAsync_MultipleVersions_ReturnsCorrectOne()
     {
         var v1 = await _sut.CreateVersionAsync("doc.txt", ToStream("Version 1"));
-        await Task.Delay(1100); // ensure different second
         var v2 = await _sut.CreateVersionAsync("doc.txt", ToStream("Version 2"));
 
         // Read v1
@@ -250,9 +245,7 @@ public class FileVersionServiceTests : IDisposable
     public async Task GetVersionsAsync_ReturnsAllVersions()
     {
         await _sut.CreateVersionAsync("doc.txt", ToStream("V1"));
-        await Task.Delay(1100);
         await _sut.CreateVersionAsync("doc.txt", ToStream("V2"));
-        await Task.Delay(1100);
         await _sut.CreateVersionAsync("doc.txt", ToStream("V3"));
 
         var versions = await _sut.GetVersionsAsync("doc.txt");
@@ -274,7 +267,7 @@ public class FileVersionServiceTests : IDisposable
     public async Task GetSnapshotTimestampsAsync_ReturnsDistinctTimestamps()
     {
         await _sut.CreateVersionAsync("a.txt", ToStream("A1"));
-        await Task.Delay(1100);
+        _time.Advance(TimeSpan.FromSeconds(1)); // distinct second across the two files
         await _sut.CreateVersionAsync("b.txt", ToStream("B1"));
 
         var timestamps = await _sut.GetSnapshotTimestampsAsync();
@@ -289,11 +282,12 @@ public class FileVersionServiceTests : IDisposable
     [Fact]
     public async Task Retention_TrimsToMaxVersions()
     {
-        // Max is 5 (set in constructor)
+        // Max is 5 (set in constructor). Advance the clock per write so timestamps
+        // stay monotonic (mirrors real time; retention keeps the newest snapshots).
         for (int i = 0; i < 8; i++)
         {
             await _sut.CreateVersionAsync("doc.txt", ToStream($"Version {i}"));
-            await Task.Delay(1100); // different seconds
+            _time.Advance(TimeSpan.FromSeconds(1));
         }
 
         var versions = await _sut.GetVersionsAsync("doc.txt");
@@ -307,13 +301,10 @@ public class FileVersionServiceTests : IDisposable
     {
         // Create with a service that has high max so auto-trim doesn't fire
         var highMaxService = new FileVersionService(_repo,
-            Path.Combine(_versionRoot, "ret"), defaultMaxVersions: 100);
+            Path.Combine(_versionRoot, "ret"), defaultMaxVersions: 100, timeProvider: _time);
 
         for (int i = 0; i < 10; i++)
-        {
             await highMaxService.CreateVersionAsync("doc.txt", ToStream($"V{i}"));
-            await Task.Delay(1100);
-        }
 
         // Now manually trim to 3
         var deleted = await highMaxService.ApplyRetentionAsync("doc.txt", maxVersions: 3);

@@ -31,17 +31,20 @@ public class FileVersionService : IFileVersionService
     private readonly string _versionStorageRoot;
     private readonly int _defaultMaxVersions;
     private readonly TimeSpan? _defaultMaxAge;
+    private readonly TimeProvider _timeProvider;
 
     public FileVersionService(
         IFileVersionRepository versionRepo,
         string versionStorageRoot,
         int defaultMaxVersions = 64,
-        TimeSpan? defaultMaxAge = null)
+        TimeSpan? defaultMaxAge = null,
+        TimeProvider? timeProvider = null)
     {
         _versionRepo = versionRepo;
         _versionStorageRoot = versionStorageRoot;
         _defaultMaxVersions = defaultMaxVersions;
         _defaultMaxAge = defaultMaxAge;
+        _timeProvider = timeProvider ?? TimeProvider.System;
 
         Directory.CreateDirectory(_versionStorageRoot);
     }
@@ -88,7 +91,7 @@ public class FileVersionService : IFileVersionService
 
         // 4. Create version record
         var versionNumber = await _versionRepo.GetMaxVersionNumberAsync(normalizedPath) + 1;
-        var now = TruncateToSeconds(DateTime.UtcNow);
+        var now = TruncateToSeconds(_timeProvider.GetUtcNow().UtcDateTime);
 
         // If a version at this exact second already exists, bump to next free second
         while (await _versionRepo.GetVersionAsync(normalizedPath, now) != null)
@@ -175,7 +178,7 @@ public class FileVersionService : IFileVersionService
 
         if (effectiveAge.HasValue)
         {
-            var cutoff = DateTime.UtcNow - effectiveAge.Value;
+            var cutoff = _timeProvider.GetUtcNow().UtcDateTime - effectiveAge.Value;
             deleted += await _versionRepo.DeleteOlderThanAsync(normalizedPath, cutoff);
         }
 

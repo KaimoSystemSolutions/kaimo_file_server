@@ -143,13 +143,6 @@ public class FileSystemStorageTests : IDisposable
     }
 
     [Fact]
-    public async Task WriteAsync_PathTraversal_ThrowsUnauthorized()
-    {
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(
-            () => _sut.WriteAsync("../../tmp/evil.txt", new MemoryStream([1])));
-    }
-
-    [Fact]
     public async Task DeleteAsync_PathTraversal_ThrowsUnauthorized()
     {
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
@@ -168,6 +161,7 @@ public class FileSystemStorageTests : IDisposable
     [InlineData("../")]
     [InlineData("sub/../../..")]
     [InlineData("./../../etc/shadow")]
+    [InlineData("../../tmp/evil.txt")]
     public async Task WriteAsync_PathTraversal_Variants_ThrowsUnauthorized(string path)
     {
         await Assert.ThrowsAsync<UnauthorizedAccessException>(

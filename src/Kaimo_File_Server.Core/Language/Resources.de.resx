@@ -1134,4 +1134,475 @@
   <data name="Web_Settings_Button_Save" xml:space="preserve">
     <value>Speichern</value>
   </data>
+  <data name="Web_Login_PageTitle" xml:space="preserve">
+    <value>Kaimo Files – Anmelden</value>
+  </data>
+  <data name="Web_Login_Subtitle" xml:space="preserve">
+    <value>Melde dich an, um fortzufahren</value>
+  </data>
+  <data name="Web_Login_Label_Username" xml:space="preserve">
+    <value>Benutzername</value>
+  </data>
+  <data name="Web_Login_Placeholder_Username" xml:space="preserve">
+    <value>Benutzername eingeben</value>
+  </data>
+  <data name="Web_Login_Label_Password" xml:space="preserve">
+    <value>Passwort</value>
+  </data>
+  <data name="Web_Login_Placeholder_Password" xml:space="preserve">
+    <value>Passwort eingeben</value>
+  </data>
+  <data name="Web_Login_LoggingIn" xml:space="preserve">
+    <value>Wird angemeldet…</value>
+  </data>
+  <data name="Web_Login_Submit" xml:space="preserve">
+    <value>Anmelden</value>
+  </data>
+  <data name="Web_Preview_Download" xml:space="preserve">
+    <value>Herunterladen</value>
+  </data>
+  <data name="Web_Preview_TooLarge" xml:space="preserve">
+    <value>Die Datei ist zu groß für die Vorschau (max. {0}).</value>
+  </data>
+  <data name="Web_Preview_Unsupported" xml:space="preserve">
+    <value>Für diesen Dateityp ist keine Vorschau verfügbar.</value>
+  </data>
+  <data name="Web_Common_Loading" xml:space="preserve">
+    <value>Lade...</value>
+  </data>
+  <data name="Web_Admin_PageTitle" xml:space="preserve">
+    <value>Kaimo Files – Verwaltung</value>
+  </data>
+  <data name="Web_Admin_Heading" xml:space="preserve">
+    <value>Verwaltung</value>
+  </data>
+  <data name="Web_Admin_NoPermission" xml:space="preserve">
+    <value>Keine Berechtigung. Sie haben keine Verwaltungsrechte zugewiesen.</value>
+  </data>
+  <data name="Web_Admin_Tab_Users" xml:space="preserve">
+    <value>Benutzer</value>
+  </data>
+  <data name="Web_Admin_Tab_Groups" xml:space="preserve">
+    <value>Gruppen</value>
+  </data>
+  <data name="Web_Admin_Tab_Roles" xml:space="preserve">
+    <value>Rollen</value>
+  </data>
+  <data name="Web_Admin_CreateUser" xml:space="preserve">
+    <value>Benutzer erstellen</value>
+  </data>
+  <data name="Web_Admin_CreateGroup" xml:space="preserve">
+    <value>Gruppe erstellen</value>
+  </data>
+  <data name="Web_Admin_CreateRole" xml:space="preserve">
+    <value>Rolle erstellen</value>
+  </data>
+  <data name="Web_Admin_NewUser" xml:space="preserve">
+    <value>Neuen Benutzer erstellen</value>
+  </data>
+  <data name="Web_Admin_NewGroup" xml:space="preserve">
+    <value>Neue Gruppe erstellen</value>
+  </data>
+  <data name="Web_Admin_NewRole" xml:space="preserve">
+    <value>Neue Rolle erstellen</value>
+  </data>
+  <data name="Web_Admin_Label_Department" xml:space="preserve">
+    <value>Abteilung</value>
+  </data>
+  <data name="Web_Admin_Label_DisplayName" xml:space="preserve">
+    <value>Anzeigename</value>
+  </data>
+  <data name="Web_Admin_Label_Username" xml:space="preserve">
+    <value>Benutzername</value>
+  </data>
+  <data name="Web_Admin_Label_Email" xml:space="preserve">
+    <value>E-Mail</value>
+  </data>
+  <data name="Web_Admin_Label_Description" xml:space="preserve">
+    <value>Beschreibung</value>
+  </data>
+  <data name="Web_Admin_Label_Password" xml:space="preserve">
+    <value>Passwort</value>
+  </data>
+  <data name="Web_Admin_Label_GroupName" xml:space="preserve">
+    <value>Gruppenname</value>
+  </data>
+  <data name="Web_Admin_Label_RoleName" xml:space="preserve">
+    <value>Rollenname</value>
+  </data>
+  <data name="Web_Admin_Label_Status" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="Web_Admin_Label_Type" xml:space="preserve">
+    <value>Typ</value>
+  </data>
+  <data name="Web_Admin_NoDepartments" xml:space="preserve">
+    <value>— Keine Abteilungen verfügbar —</value>
+  </data>
+  <data name="Web_Admin_Placeholder_DisplayName" xml:space="preserve">
+    <value>z.B. Max Mustermann</value>
+  </data>
+  <data name="Web_Admin_Placeholder_Username" xml:space="preserve">
+    <value>z.B. mmustermann</value>
+  </data>
+  <data name="Web_Admin_Placeholder_Email" xml:space="preserve">
+    <value>z.B. max@firma.de</value>
+  </data>
+  <data name="Web_Admin_Placeholder_Optional" xml:space="preserve">
+    <value>Optional</value>
+  </data>
+  <data name="Web_Admin_Placeholder_Password" xml:space="preserve">
+    <value>Mindestens 6 Zeichen</value>
+  </data>
+  <data name="Web_Admin_Placeholder_GroupName" xml:space="preserve">
+    <value>z.B. Entwickler</value>
+  </data>
+  <data name="Web_Admin_Placeholder_RoleName" xml:space="preserve">
+    <value>z.B. Abteilungsleiter</value>
+  </data>
+  <data name="Web_Admin_Toggle_AccountEnabled" xml:space="preserve">
+    <value>Konto aktiviert</value>
+  </data>
+  <data name="Web_Admin_Toggle_CanChangePassword" xml:space="preserve">
+    <value>Passwort ändern erlaubt</value>
+  </data>
+  <data name="Web_Admin_GroupDeptHint" xml:space="preserve">
+    <value>Jede Gruppe gehört genau einer Abteilung. Standard: Global.</value>
+  </data>
+  <data name="Web_Common_Creating" xml:space="preserve">
+    <value>Erstellt…</value>
+  </data>
+  <data name="Web_Common_Saving" xml:space="preserve">
+    <value>Speichert…</value>
+  </data>
+  <data name="Web_Common_Deleting" xml:space="preserve">
+    <value>Löscht…</value>
+  </data>
+  <data name="Web_Common_NoUsers" xml:space="preserve">
+    <value>Keine Benutzer vorhanden.</value>
+  </data>
+  <data name="Web_Common_NoGroups" xml:space="preserve">
+    <value>Keine Gruppen vorhanden.</value>
+  </data>
+  <data name="Web_Common_NoRoles" xml:space="preserve">
+    <value>Keine Rollen vorhanden.</value>
+  </data>
+  <data name="Web_Common_NoMembers" xml:space="preserve">
+    <value>Keine Mitglieder</value>
+  </data>
+  <data name="Web_Common_NoGroupsAssigned" xml:space="preserve">
+    <value>Keine Gruppen</value>
+  </data>
+  <data name="Web_Common_NoRolesAssigned" xml:space="preserve">
+    <value>Keine Rollen</value>
+  </data>
+  <data name="Web_Common_NoDepartments" xml:space="preserve">
+    <value>Keine Abteilungen</value>
+  </data>
+  <data name="Web_Common_Active" xml:space="preserve">
+    <value>Aktiv</value>
+  </data>
+  <data name="Web_Common_Disabled" xml:space="preserve">
+    <value>Deaktiviert</value>
+  </data>
+  <data name="Web_Common_Custom" xml:space="preserve">
+    <value>Benutzerdefiniert</value>
+  </data>
+  <data name="Web_Common_System" xml:space="preserve">
+    <value>System</value>
+  </data>
+  <data name="Web_Admin_EditUser" xml:space="preserve">
+    <value>Benutzer bearbeiten</value>
+  </data>
+  <data name="Web_Admin_Label_NewPassword" xml:space="preserve">
+    <value>Neues Passwort (optional)</value>
+  </data>
+  <data name="Web_Admin_Placeholder_PasswordEmpty" xml:space="preserve">
+    <value>Leer lassen = unverändert</value>
+  </data>
+  <data name="Web_Admin_Label_ConfirmPassword" xml:space="preserve">
+    <value>Passwort bestätigen</value>
+  </data>
+  <data name="Web_Admin_Placeholder_ConfirmPassword" xml:space="preserve">
+    <value>Passwort wiederholen</value>
+  </data>
+  <data name="Web_Admin_Label_Groups" xml:space="preserve">
+    <value>Gruppen</value>
+  </data>
+  <data name="Web_Admin_Label_Roles" xml:space="preserve">
+    <value>Rollen</value>
+  </data>
+  <data name="Web_Admin_Label_PasswordChange" xml:space="preserve">
+    <value>Passwort ändern</value>
+  </data>
+  <data name="Web_Admin_PasswordChange_Allowed" xml:space="preserve">
+    <value>Erlaubt</value>
+  </data>
+  <data name="Web_Admin_PasswordChange_Locked" xml:space="preserve">
+    <value>Gesperrt</value>
+  </data>
+  <data name="Web_Admin_Label_Departments" xml:space="preserve">
+    <value>Abteilungen</value>
+  </data>
+  <data name="Web_Admin_NotSpecified" xml:space="preserve">
+    <value>Nicht angegeben</value>
+  </data>
+  <data name="Web_Admin_NoDescription" xml:space="preserve">
+    <value>Keine Beschreibung</value>
+  </data>
+  <data name="Web_Admin_ScopedAssignments" xml:space="preserve">
+    <value>Delegierte Rollenzuweisungen</value>
+  </data>
+  <data name="Web_Admin_RemoveAssignment" xml:space="preserve">
+    <value>Zuweisung entfernen</value>
+  </data>
+  <data name="Web_Admin_ConfirmDeleteUser" xml:space="preserve">
+    <value>Benutzer wirklich löschen?</value>
+  </data>
+  <data name="Web_Admin_ConfirmDeleteGroup" xml:space="preserve">
+    <value>Gruppe wirklich löschen?</value>
+  </data>
+  <data name="Web_Admin_ConfirmDeleteRole" xml:space="preserve">
+    <value>Rolle wirklich löschen?</value>
+  </data>
+  <data name="Web_Common_YesDelete" xml:space="preserve">
+    <value>Ja, löschen</value>
+  </data>
+  <data name="Web_Admin_DeleteUser" xml:space="preserve">
+    <value>Benutzer löschen</value>
+  </data>
+  <data name="Web_Admin_DeleteGroup" xml:space="preserve">
+    <value>Gruppe löschen</value>
+  </data>
+  <data name="Web_Admin_DeleteRole" xml:space="preserve">
+    <value>Rolle löschen</value>
+  </data>
+  <data name="Web_Admin_ManageMembers" xml:space="preserve">
+    <value>Mitglieder verwalten</value>
+  </data>
+  <data name="Web_Admin_Label_Users" xml:space="preserve">
+    <value>Benutzer</value>
+  </data>
+  <data name="Web_Admin_Label_Group" xml:space="preserve">
+    <value>Gruppe</value>
+  </data>
+  <data name="Web_Admin_EditRole" xml:space="preserve">
+    <value>Rolle bearbeiten</value>
+  </data>
+  <data name="Web_Admin_DirectMembers" xml:space="preserve">
+    <value>Direkte Mitglieder</value>
+  </data>
+  <data name="Web_Admin_Label_Permissions" xml:space="preserve">
+    <value>Berechtigungen</value>
+  </data>
+  <data name="Web_Admin_NoPermissions" xml:space="preserve">
+    <value>Keine Berechtigungen</value>
+  </data>
+  <data name="Web_Admin_SystemRoleHint" xml:space="preserve">
+    <value>Berechtigungen von Systemrollen werden automatisch verwaltet.</value>
+  </data>
+  <data name="Web_Admin_SystemRole" xml:space="preserve">
+    <value>Systemrolle</value>
+  </data>
+  <data name="Web_Admin_CustomRole" xml:space="preserve">
+    <value>Benutzerdefinierte Rolle</value>
+  </data>
+  <data name="Web_Admin_DelegatedAssignments" xml:space="preserve">
+    <value>Delegierte Zuweisungen</value>
+  </data>
+  <data name="Web_Admin_AddAssignment" xml:space="preserve">
+    <value>Zuweisung hinzufügen</value>
+  </data>
+  <data name="Web_Admin_AssignTo" xml:space="preserve">
+    <value>Zuweisen an</value>
+  </data>
+  <data name="Web_Admin_Label_User" xml:space="preserve">
+    <value>Benutzer</value>
+  </data>
+  <data name="Web_Admin_Label_Scope" xml:space="preserve">
+    <value>Geltungsbereich</value>
+  </data>
+  <data name="Web_Admin_Scope_Global" xml:space="preserve">
+    <value>Global (systemweit)</value>
+  </data>
+  <data name="Web_Admin_Scope_Department" xml:space="preserve">
+    <value>Abteilung</value>
+  </data>
+  <data name="Web_Admin_Scope_Share" xml:space="preserve">
+    <value>Freigabe</value>
+  </data>
+  <data name="Web_Admin_Label_ShareId" xml:space="preserve">
+    <value>Freigabe-ID</value>
+  </data>
+  <data name="Web_Admin_Placeholder_ShareId" xml:space="preserve">
+    <value>GUID der Freigabe</value>
+  </data>
+  <data name="Web_Common_Select" xml:space="preserve">
+    <value>— Auswählen —</value>
+  </data>
+  <data name="Web_Common_Assign" xml:space="preserve">
+    <value>Zuweisen</value>
+  </data>
+  <data name="Web_Admin_NoDelegatedAssignments" xml:space="preserve">
+    <value>Keine delegierten Zuweisungen</value>
+  </data>
+  <data name="Web_Common_None" xml:space="preserve">
+    <value>Keine</value>
+  </data>
+  <data name="Web_Common_MoreItems" xml:space="preserve">
+    <value>+{0} weitere</value>
+  </data>
+  <data name="Web_Admin_ScopeType_Global" xml:space="preserve">
+    <value>Global</value>
+  </data>
+  <data name="Web_Admin_ScopeType_Department" xml:space="preserve">
+    <value>Abteilung</value>
+  </data>
+  <data name="Web_Admin_ScopeType_Share" xml:space="preserve">
+    <value>Freigabe</value>
+  </data>
+  <data name="Web_Dept_PageTitle" xml:space="preserve">
+    <value>Kaimo Files – Abteilungen</value>
+  </data>
+  <data name="Web_Dept_Heading" xml:space="preserve">
+    <value>Abteilungen</value>
+  </data>
+  <data name="Web_Dept_NoPermission" xml:space="preserve">
+    <value>Keine Berechtigung für die Abteilungsverwaltung.</value>
+  </data>
+  <data name="Web_Dept_Count" xml:space="preserve">
+    <value>{0} Abteilungen</value>
+  </data>
+  <data name="Web_Dept_CreateTitle" xml:space="preserve">
+    <value>Abteilung erstellen</value>
+  </data>
+  <data name="Web_Dept_NewDepartment" xml:space="preserve">
+    <value>Neue Abteilung erstellen</value>
+  </data>
+  <data name="Web_Dept_Label_Name" xml:space="preserve">
+    <value>Abteilungsname</value>
+  </data>
+  <data name="Web_Dept_Placeholder_Name" xml:space="preserve">
+    <value>z.B. Vertrieb</value>
+  </data>
+  <data name="Web_Dept_Label_Parent" xml:space="preserve">
+    <value>Elternabteilung</value>
+  </data>
+  <data name="Web_Dept_NoParent" xml:space="preserve">
+    <value>— Keine (Oberste Ebene) —</value>
+  </data>
+  <data name="Web_Dept_NoDepartments" xml:space="preserve">
+    <value>Keine Abteilungen vorhanden.</value>
+  </data>
+  <data name="Web_Dept_SubdepartmentCount" xml:space="preserve">
+    <value>{0} Unterabteilungen</value>
+  </data>
+  <data name="Web_Dept_Expand" xml:space="preserve">
+    <value>Aufklappen</value>
+  </data>
+  <data name="Web_Dept_Collapse" xml:space="preserve">
+    <value>Zuklappen</value>
+  </data>
+  <data name="Web_Dept_EditDepartment" xml:space="preserve">
+    <value>Abteilung bearbeiten</value>
+  </data>
+  <data name="Web_Dept_Label_InheritsFrom" xml:space="preserve">
+    <value>Erbt von (Elternabteilung)</value>
+  </data>
+  <data name="Web_Dept_InheritHint" xml:space="preserve">
+    <value>Erbt Admin-Rechte und Default-Berechtigungen von der Elternabteilung.</value>
+  </data>
+  <data name="Web_Dept_DefaultFilePerm" xml:space="preserve">
+    <value>Standard-Dateiberechtigung</value>
+  </data>
+  <data name="Web_Dept_DefaultFilePermHint" xml:space="preserve">
+    <value>Wird als virtueller Allow-Layer im ACL-System ausgewertet. Alle Abteilungsmitglieder erhalten diese Rechte auf den zugeordneten Freigaben.</value>
+  </data>
+  <data name="Web_Dept_DefineOwnPerm" xml:space="preserve">
+    <value>Eigene Berechtigung definieren</value>
+  </data>
+  <data name="Web_Dept_InheritedFromParent" xml:space="preserve">
+    <value>Wird von Elternabteilung geerbt.</value>
+  </data>
+  <data name="Web_Dept_NoParentNoPerm" xml:space="preserve">
+    <value>Keine Elternabteilung — keine Default-Berechtigung.</value>
+  </data>
+  <data name="Web_Dept_Label_Members" xml:space="preserve">
+    <value>Mitglieder (Benutzer)</value>
+  </data>
+  <data name="Web_Dept_Label_AssignedGroups" xml:space="preserve">
+    <value>Zugeordnete Gruppen</value>
+  </data>
+  <data name="Web_Dept_GroupsHint" xml:space="preserve">
+    <value>Jede Gruppe gehört genau einer Abteilung. Abgewählte Gruppen werden auf Global zurückgesetzt.</value>
+  </data>
+  <data name="Web_Dept_Label_AssignedShares" xml:space="preserve">
+    <value>Zugeordnete Freigaben</value>
+  </data>
+  <data name="Web_Dept_SharesHint" xml:space="preserve">
+    <value>Jede Freigabe gehört genau einer Abteilung. Abgewählte Freigaben werden auf Global zurückgesetzt.</value>
+  </data>
+  <data name="Web_Dept_NoSharesAvailable" xml:space="preserve">
+    <value>Keine Freigaben vorhanden</value>
+  </data>
+  <data name="Web_Dept_GlobalDepartment" xml:space="preserve">
+    <value>Globale Abteilung</value>
+  </data>
+  <data name="Web_Dept_Label_InheritsFromView" xml:space="preserve">
+    <value>Erbt von</value>
+  </data>
+  <data name="Web_Dept_NoParentTopLevel" xml:space="preserve">
+    <value>Keine (Oberste Ebene)</value>
+  </data>
+  <data name="Web_Dept_Label_MembersCount" xml:space="preserve">
+    <value>Mitglieder ({0})</value>
+  </data>
+  <data name="Web_Dept_Label_GroupsCount" xml:space="preserve">
+    <value>Gruppen ({0})</value>
+  </data>
+  <data name="Web_Dept_Label_SharesCount" xml:space="preserve">
+    <value>Freigaben ({0})</value>
+  </data>
+  <data name="Web_Dept_NoGroupsAssigned" xml:space="preserve">
+    <value>Keine Gruppen zugeordnet</value>
+  </data>
+  <data name="Web_Dept_NoSharesAssigned" xml:space="preserve">
+    <value>Keine Freigaben zugeordnet</value>
+  </data>
+  <data name="Web_Dept_NoDefaultPerm" xml:space="preserve">
+    <value>Keine Default-Berechtigung</value>
+  </data>
+  <data name="Web_Dept_InheritedFrom" xml:space="preserve">
+    <value>Geerbt von: {0}</value>
+  </data>
+  <data name="Web_Dept_ConfirmDelete" xml:space="preserve">
+    <value>Abteilung wirklich löschen? Gruppen und Freigaben werden auf Global zurückgesetzt.</value>
+  </data>
+  <data name="Web_Dept_DeleteDepartment" xml:space="preserve">
+    <value>Abteilung löschen</value>
+  </data>
+  <data name="Web_Common_Edit" xml:space="preserve">
+    <value>Bearbeiten</value>
+  </data>
+  <data name="Web_Common_Save" xml:space="preserve">
+    <value>Speichern</value>
+  </data>
+  <data name="Web_Common_Create" xml:space="preserve">
+    <value>Erstellen</value>
+  </data>
+  <data name="Web_Common_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="Web_Common_Close" xml:space="preserve">
+    <value>Schließen</value>
+  </data>
+  <data name="Web_Common_Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Web_Common_Remove" xml:space="preserve">
+    <value>Entfernen</value>
+  </data>
+  <data name="Web_Common_NoSharesAvailable" xml:space="preserve">
+    <value>Keine Freigaben vorhanden</value>
+  </data>
 </root>
