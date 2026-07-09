@@ -104,8 +104,85 @@ public class ElasticSearchService : ISearchService
 
     public Task onDirectoryCreated(string absolutePath)
     {
-        _logger.LogDebug("Directory created (no action): '{Path}'", absolutePath);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var doc = BuildDirectoryDocument(absolutePath);
+                if (doc is null)
+                {
+                    // Share-root directory (or the storage root itself) — not a
+                    // searchable folder within a share, so nothing to index.
+                    _logger.LogDebug("Directory create (not indexed): '{Path}'", absolutePath);
+                    return;
+                }
+
+                await IndexDirectoryDocumentAsync(doc);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Directory indexing failed for {Path}", absolutePath);
+            }
+        });
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Builds an index document describing a directory: name only, no content.
+    /// Returns <c>null</c> for the storage root and for share-root directories —
+    /// only folders *inside* a share are searchable entities.
+    /// </summary>
+    private FileDocument? BuildDirectoryDocument(string absolutePath)
+    {
+        string rootPath = _storage.getRootPath();
+        string relativePath = Path.GetRelativePath(rootPath, absolutePath);
+
+        var segments = relativePath.Split(
+            Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+        // segments.Length < 2  →  storage root ("." / "") or a share root.
+        if (segments.Length < 2)
+            return null;
+
+        string shareName = segments[0];
+        string sharePath = Path.GetRelativePath(Path.Combine(rootPath, shareName), absolutePath);
+
+        return new FileDocument
+        {
+            Id = GetStableId(absolutePath),
+            FileName = Path.GetFileName(absolutePath.TrimEnd(Path.DirectorySeparatorChar)),
+            ShareName = shareName,
+            AbsolutePath = absolutePath,
+            SharePath = sharePath,
+            Content = string.Empty,
+            FileType = string.Empty,
+            FileSizeBytes = 0,
+            IsDirectory = true,
+            Created = DateTime.UtcNow,
+            Modified = DateTime.UtcNow
+        };
+    }
+
+    /// <summary>
+    /// Indexes a directory document if it is not already present. A folder has no
+    /// content that could change, so an existing entry is left untouched (renames
+    /// are handled separately via <see cref="onDirectoryRenamed"/>).
+    /// </summary>
+    private async Task IndexDirectoryDocumentAsync(FileDocument doc, CancellationToken ct = default)
+    {
+        var existing = await _client.GetAsync<FileDocument>(doc.Id, g => g.Index(IndexName), ct);
+        if (existing.Found)
+        {
+            _logger.LogDebug("Directory {Id} already indexed, skipping", doc.Id);
+            return;
+        }
+
+        var response = await _client.IndexAsync(doc, idx => idx
+            .Index(IndexName)
+            .Id(doc.Id), ct);
+
+        if (!response.IsValidResponse)
+            _logger.LogError("Directory indexing failed for {Id}: {Error}",
+                doc.Id, response.DebugInformation);
     }
 
     public async Task onDirectoryDeleted(string absolutePath)
@@ -197,7 +274,7 @@ public class ElasticSearchService : ISearchService
                 while (guard++ < maxIterations)
                 {
                     var resp = await _client.SearchAsync<FileDocument>(s => s
-                        .Index(IndexName)
+                        .Indices(IndexName)
                         .Size(500)
                         .Query(q => q
                             .Prefix(p => p
@@ -241,6 +318,18 @@ public class ElasticSearchService : ISearchService
                     await _client.Indices.RefreshAsync(IndexName);
                 }
 
+                // The renamed directory's OWN document (its absolutePath equals the
+                // old path without a trailing separator) is not covered by the
+                // child-prefix query above — rewrite it explicitly.
+                string oldDirId = GetStableId(oldAbsolutePath);
+                var ownDoc = await _client.GetAsync<FileDocument>(oldDirId, g => g.Index(IndexName));
+                if (ownDoc.Found && ownDoc.Source is not null)
+                {
+                    var updatedOwn = BuildRenamedDocument(ownDoc.Source, newAbsolutePath);
+                    await ReplaceDocumentAsync(oldDirId, updatedOwn);
+                    processed++;
+                }
+
                 _logger.LogInformation(
                     "Index aktualisiert (Verzeichnis): '{Old}' -> '{New}' ({Count} Dokument(e))",
                     oldAbsolutePath, newAbsolutePath, processed);
@@ -274,8 +363,11 @@ public class ElasticSearchService : ISearchService
             AbsolutePath = newAbsolutePath,
             SharePath = sharePath,
             Content = source.Content,
-            FileType = Path.GetExtension(newAbsolutePath).TrimStart('.'),
+            FileType = source.IsDirectory
+                ? string.Empty
+                : Path.GetExtension(newAbsolutePath).TrimStart('.'),
             FileSizeBytes = source.FileSizeBytes,
+            IsDirectory = source.IsDirectory,
             Created = source.Created,
             Modified = DateTime.UtcNow,
             Author = source.Author,
@@ -449,7 +541,7 @@ public class ElasticSearchService : ISearchService
             return new List<FileDocument>();
 
         var response = await _client.SearchAsync<FileDocument>(s => s
-            .Index(IndexName)
+            .Indices(IndexName)
             .Size(RawFetchSize)
             .Query(q => q
                 .Bool(b => b
@@ -631,7 +723,14 @@ public class ElasticSearchService : ISearchService
             .Where(p => !IsHiddenRelative(rootPath, p))
             .ToList();
 
-        int total = files.Count;
+        // Directories are indexed too (by name), so folders show up in search.
+        // Share-root directories are excluded via BuildDirectoryDocument (they are
+        // not searchable entities inside a share).
+        var dirs = Directory.EnumerateDirectories(rootPath, "*", options)
+            .Where(p => !IsHiddenRelative(rootPath, p))
+            .ToList();
+
+        int total = files.Count + dirs.Count;
         int done = 0;
         progress?.Report((0, total));
 
@@ -654,7 +753,28 @@ public class ElasticSearchService : ISearchService
                 progress?.Report((done, total));
         }
 
-        _logger.LogInformation("Reindex abgeschlossen: {Done}/{Total} Dateien", done, total);
+        foreach (var absolutePath in dirs)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                var doc = BuildDirectoryDocument(absolutePath);
+                if (doc is not null)
+                    await IndexDirectoryDocumentAsync(doc, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Reindex: indexing failed for directory '{Path}'", absolutePath);
+            }
+
+            done++;
+            if (done % 25 == 0 || done == total)
+                progress?.Report((done, total));
+        }
+
+        _logger.LogInformation(
+            "Reindex abgeschlossen: {Done}/{Total} Einträge ({Files} Dateien, {Dirs} Verzeichnisse)",
+            done, total, files.Count, dirs.Count);
     }
 
     private static bool IsHiddenRelative(string rootPath, string absolutePath)
@@ -674,7 +794,7 @@ public class ElasticSearchService : ISearchService
     public async Task<SearchResult> SearchAsync(SearchRequest request, CancellationToken ct = default)
     {
         var response = await _client.SearchAsync<FileDocument>(s => s
-            .Index(IndexName)
+            .Indices(IndexName)
             .From(request.From)
             .Size(request.Size)
             .Query(q => BuildQuery(q, request)),
@@ -733,7 +853,7 @@ public class ElasticSearchService : ISearchService
             if (request.CreatedAfter.HasValue || request.CreatedBefore.HasValue)
             {
                 filters.Add(f => f.Range(r => r
-                    .DateRange(d =>
+                    .Date(d =>
                     {
                         d.Field("created");
                         if (request.CreatedAfter.HasValue)
@@ -785,6 +905,7 @@ public class ElasticSearchService : ISearchService
             },
             { "fileType",      new KeywordProperty() },
             { "fileSizeBytes", new LongNumberProperty() },
+            { "isDirectory",   new BooleanProperty() },
             { "created",       new DateProperty() },
             { "modified",      new DateProperty() },
             { "author",        new KeywordProperty() },

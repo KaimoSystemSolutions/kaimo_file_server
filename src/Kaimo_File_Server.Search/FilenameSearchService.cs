@@ -67,6 +67,7 @@ public sealed class FilenameSearchService
                 AttributesToSkip = FileAttributes.System
             };
 
+            // Match files by name...
             foreach (var absolutePath in Directory.EnumerateFiles(rootPath, "*", options))
             {
                 ct.ThrowIfCancellationRequested();
@@ -99,6 +100,47 @@ public sealed class FilenameSearchService
                     FileType = Path.GetExtension(fileName).TrimStart('.'),
                     FileSizeBytes = size,
                     HighlightSnippet = Highlight(fileName, searchText)
+                });
+
+                if (results.Count >= RawFetchSize)
+                    return results;
+            }
+
+            // ...and directories by name, so folders show up in search too.
+            foreach (var absolutePath in Directory.EnumerateDirectories(rootPath, "*", options))
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var folderName = Path.GetFileName(absolutePath);
+                if (folderName.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+
+                var relativePath = Path.GetRelativePath(rootPath, absolutePath);
+                if (IsHiddenPath(relativePath))
+                    continue;
+
+                var segments = relativePath.Split(
+                    Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+                // Skip share-root directories: only folders inside a share are hits.
+                if (segments.Length < 2)
+                    continue;
+
+                var shareName = segments[0];
+                var sharePath = Path.GetRelativePath(
+                    Path.Combine(rootPath, shareName), absolutePath);
+
+                results.Add(new FileDocument
+                {
+                    Id = absolutePath,
+                    FileName = folderName,
+                    ShareName = shareName,
+                    AbsolutePath = absolutePath,
+                    SharePath = sharePath,
+                    Content = string.Empty,
+                    FileType = string.Empty,
+                    FileSizeBytes = 0,
+                    IsDirectory = true,
+                    HighlightSnippet = Highlight(folderName, searchText)
                 });
 
                 if (results.Count >= RawFetchSize)

@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
     <PackageReference Include="xunit" Version="2.*" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <PrivateAssets>all</PrivateAssets>
@@ -16,12 +16,12 @@
     </PackageReference>
     <PackageReference Include="Moq" Version="4.*" />
     <!-- In-memory relational DB for seeder tests (Sqlite supports TPC inheritance) -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
     <!-- Pin up the vulnerable native SQLite bundle pulled in transitively by EF Sqlite
          (NU1903, GHSA-2m69-gcr7-jv3q on SQLitePCLRaw.lib.e_sqlite3 2.1.11). 3.0.3 brings a
          patched SQLite native library and is API-compatible with EF Core's provider. -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.9" />
   </ItemGroup>
 
   <ItemGroup>

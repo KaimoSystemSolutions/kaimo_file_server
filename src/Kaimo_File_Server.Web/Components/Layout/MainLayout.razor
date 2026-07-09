@@ -101,7 +101,7 @@
                             @foreach (var result in group)
                             {
                                 <div class="search-result-item" @onmousedown="() => NavigateToResult(result)">
-                                    @Assets.SVG(FileHelper.GetIcon(result.FileName), new SvgOptions())
+                                    @Assets.SVG(result.IsDirectory ? "folder.svg" : FileHelper.GetIcon(result.FileName), new SvgOptions())
                                     <div class="search-result-info">
                                         <span class="search-result-name">@result.FileName <span class="search-result-path">— @result.SharePath</span></span>
                                         @if (!string.IsNullOrEmpty(result.HighlightSnippet))
@@ -213,11 +213,24 @@
         _searchQuery = "";
         _searchResults.Clear();
 
-        var folderPath = Path.GetDirectoryName(result.SharePath);
-
-        var url = string.IsNullOrEmpty(folderPath)
-            ? $"/files/{result.ShareName}?select={Uri.EscapeDataString(result.FileName)}"
-            : $"/files/{result.ShareName}/{folderPath}?select={Uri.EscapeDataString(result.FileName)}";
+        string url;
+        if (result.IsDirectory)
+        {
+            // Navigate INTO the folder itself.
+            var dirPath = (result.SharePath ?? string.Empty).Replace('\\', '/').Trim('/');
+            url = string.IsNullOrEmpty(dirPath) || dirPath == "."
+                ? $"/files/{result.ShareName}"
+                : $"/files/{result.ShareName}/{dirPath}";
+        }
+        else
+        {
+            // Navigate to the containing folder and preselect the file.
+            var folderPath = (Path.GetDirectoryName(result.SharePath) ?? string.Empty)
+                .Replace('\\', '/').Trim('/');
+            url = string.IsNullOrEmpty(folderPath)
+                ? $"/files/{result.ShareName}?select={Uri.EscapeDataString(result.FileName)}"
+                : $"/files/{result.ShareName}/{folderPath}?select={Uri.EscapeDataString(result.FileName)}";
+        }
 
         Nav.NavigateTo(url);
     }

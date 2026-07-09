@@ -58,7 +58,7 @@ public sealed class SearchAclFilter
             var groupDocs = group.ToList();
 
             var items = groupDocs
-                .Select(d => (ShareRelativePath.Normalize(d.SharePath), false))
+                .Select(d => (ShareRelativePath.Normalize(d.SharePath), d.IsDirectory))
                 .Distinct()
                 .ToList();
 
