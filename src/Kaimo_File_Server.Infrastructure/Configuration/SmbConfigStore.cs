@@ -33,4 +33,20 @@ public sealed class SmbConfigStore : ISmbConfigStore
         settings.Normalize();
         return settings;
     }
+
+    public async Task<Guid> GetOrCreateServerGuidAsync()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var config = scope.ServiceProvider.GetRequiredService<IConfigRepository>();
+
+        // Fresh read: the value is written once (here) but may already exist from a
+        // previous run in another process, so bypass the cache to avoid re-minting it.
+        var raw = await config.GetFreshAsync(SmbConfigKeys.ServerGuidKey, string.Empty);
+        if (Guid.TryParse(raw, out var existing) && existing != Guid.Empty)
+            return existing;
+
+        var generated = Guid.NewGuid();
+        await config.SetAsync(SmbConfigKeys.ServerGuidKey, generated.ToString());
+        return generated;
+    }
 }

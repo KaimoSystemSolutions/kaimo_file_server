@@ -300,9 +300,11 @@ public class SettingsViewModel
             await _config.SetAsync(SmbProtocolSettings.ConfigKey, SmbProtocol);
 
             _logger.LogInformation(
-                "SMB protocol settings saved (Min={Min}, Max={Max}, Signing={Signing}, Encryption={Encryption})",
+                "SMB protocol settings saved (Min={Min}, Max={Max}, Signing={Signing}, " +
+                "Encryption={Encryption}, WsDiscovery={WsDiscovery}, Audit={Audit})",
                 SmbProtocol.MinVersion, SmbProtocol.MaxVersion,
-                SmbProtocol.RequireSigning, SmbProtocol.RequireEncryption);
+                SmbProtocol.RequireSigning, SmbProtocol.RequireEncryption,
+                SmbProtocol.EnableWsDiscovery, SmbProtocol.EnableAuditLog);
             SuccessMessage = "SMB-Protokolleinstellungen gespeichert. " +
                 "Sie werden beim nächsten Neustart des SMB-Dienstes wirksam.";
             return true;

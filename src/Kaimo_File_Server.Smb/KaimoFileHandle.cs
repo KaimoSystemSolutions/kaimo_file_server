@@ -31,19 +31,42 @@ internal sealed class KaimoFileHandle : IFileHandle
         try
         {
             FileMetadata meta = SmbSync.Run(() => _fileService.GetMetadataAsync(Session.RelativePath, Session.User));
-            // The open handle is authoritative for the current size — on-disk metadata can lag an
-            // in-progress write until it is flushed.
-            long size = Session.IsDirectory ? 0 : Session.Length;
-            return KaimoFileInfo.From(meta, size);
+            return BuildInfo(meta);
         }
         catch
         {
-            // Metadata may not be queryable yet (e.g. immediately after CREATE) — synthesize so the
-            // CREATE response can still be built instead of failing a successful open.
-            string name = System.IO.Path.GetFileName(Session.RelativePath.Replace('\\', '/'));
-            return KaimoFileInfo.Synthesize(name, Session.IsDirectory, Session.IsDirectory ? 0 : Session.Length);
+            return SynthesizeInfo();
         }
     }
+
+    /// <summary>Async metadata query used by the library's async QUERY_INFO / CREATE-response paths.</summary>
+    public async ValueTask<FileEntryInfo> GetInfoAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            FileMetadata meta = await _fileService.GetMetadataAsync(Session.RelativePath, Session.User);
+            return BuildInfo(meta);
+        }
+        catch
+        {
+            return SynthesizeInfo();
+        }
+    }
+
+    // The open handle is authoritative for the current size — on-disk metadata can lag an
+    // in-progress write until it is flushed.
+    private FileEntryInfo BuildInfo(FileMetadata meta)
+        => KaimoFileInfo.From(meta, Session.IsDirectory ? 0 : Session.Length);
+
+    // Metadata may not be queryable yet (e.g. immediately after CREATE) — synthesize so the
+    // CREATE response can still be built instead of failing a successful open.
+    private FileEntryInfo SynthesizeInfo()
+    {
+        string name = System.IO.Path.GetFileName(Session.RelativePath.Replace('\\', '/'));
+        return KaimoFileInfo.Synthesize(name, Session.IsDirectory, Session.IsDirectory ? 0 : Session.Length);
+    }
+
+    public async ValueTask DisposeAsync() => await Session.DisposeAsync();
 
     public void Dispose() => SmbSync.Run(() => Session.DisposeAsync());
 }

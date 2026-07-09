@@ -32,6 +32,9 @@ public class SettingsViewModelSmbTests
         Assert.Equal(SmbProtocolVersion.Smb311, s.MaxVersion);
         Assert.True(s.RequireSigning);
         Assert.False(s.RequireEncryption);
+        // Discoverability + auditing are on by default (usability / security posture).
+        Assert.True(s.EnableWsDiscovery);
+        Assert.True(s.EnableAuditLog);
     }
 
     [Fact]
@@ -153,6 +156,23 @@ public class SettingsViewModelSmbTests
         Assert.True(h.SavedProtocol.RequireEncryption);
         Assert.NotNull(h.Vm.SuccessMessage);
         Assert.Null(h.Vm.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task SaveSmbProtocolAsync_Persists_DiscoveryAndAuditFlags()
+    {
+        var h = new Harness(canManageDataServices: true);
+        await h.Vm.LoadAsync();
+
+        h.Vm.SmbProtocol.EnableWsDiscovery = false;
+        h.Vm.SmbProtocol.EnableAuditLog = false;
+
+        var ok = await h.Vm.SaveSmbProtocolAsync();
+
+        Assert.True(ok);
+        Assert.NotNull(h.SavedProtocol);
+        Assert.False(h.SavedProtocol!.EnableWsDiscovery);
+        Assert.False(h.SavedProtocol.EnableAuditLog);
     }
 
     [Fact]

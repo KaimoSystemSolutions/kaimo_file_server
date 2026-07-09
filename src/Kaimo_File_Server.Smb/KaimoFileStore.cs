@@ -35,69 +35,66 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
 
     // ───────────────────────── CREATE ─────────────────────────
 
-    public FileStoreResult<IFileHandle> Create(
+    public async ValueTask<FileStoreResult<FileCreateResult>> CreateAsync(
         string path, FileAccessIntent access, CreateDispositionIntent disposition,
-        bool directoryRequired, bool nonDirectoryRequired, out CreateOutcome createAction)
+        bool directoryRequired, bool nonDirectoryRequired, CancellationToken cancellationToken)
     {
-        createAction = CreateOutcome.Opened;
-
         if (!TryGetUser(out UserContext user))
-            return Fail(NtStatus.AccessDenied);
+            return FailCreate(NtStatus.AccessDenied);
 
         try
         {
             // Snapshot path (@GMT-…\real\path) → previous version, read-only.
             if (GmtToken.TrySplitSnapshotPath(path, out DateTime snapAt, out string realPath))
-                return OpenSnapshot(realPath, snapAt, user);
+                return await OpenSnapshotAsync(realPath, snapAt, user);
 
             string relative = ShareRelativePath.Normalize(path);
 
             if (directoryRequired)
-                return CreateDirectory(relative, disposition, user, out createAction);
+                return await OpenOrCreateDirectoryAsync(relative, disposition, user);
 
-            FileOpenResult result = SmbSync.Run(() => _fileService.OpenAsync(
-                relative, MapDisposition(disposition), MapAccess(access), AllShare, user));
+            FileOpenResult result = await _fileService.OpenAsync(
+                relative, MapDisposition(disposition), MapAccess(access), AllShare, user);
 
             if (nonDirectoryRequired && result.Session.IsDirectory)
             {
-                SmbSync.Run(() => result.Session.DisposeAsync());
-                return Fail(NtStatus.FileIsADirectory);
+                await result.Session.DisposeAsync();
+                return FailCreate(NtStatus.FileIsADirectory);
             }
 
-            createAction = MapOutcome(result.Status);
-            return Ok(new KaimoFileHandle(_fileService, result.Session));
+            return OkCreate(new KaimoFileHandle(_fileService, result.Session), MapOutcome(result.Status));
         }
-        catch (UnauthorizedAccessException) { return Fail(NtStatus.AccessDenied); }
-        catch (FileNotFoundException) { return Fail(NtStatus.ObjectNameNotFound); }
-        catch (DirectoryNotFoundException) { return Fail(NtStatus.ObjectPathNotFound); }
-        catch (IOException ex) when ((ex.HResult & 0xFFFF) == 32) { return Fail(NtStatus.SharingViolation); }
-        catch (IOException) when (disposition == CreateDispositionIntent.Create) { return Fail(NtStatus.ObjectNameCollision); }
+        catch (UnauthorizedAccessException) { return FailCreate(NtStatus.AccessDenied); }
+        catch (FileNotFoundException) { return FailCreate(NtStatus.ObjectNameNotFound); }
+        catch (DirectoryNotFoundException) { return FailCreate(NtStatus.ObjectPathNotFound); }
+        catch (IOException ex) when ((ex.HResult & 0xFFFF) == 32) { return FailCreate(NtStatus.SharingViolation); }
+        catch (IOException) when (disposition == CreateDispositionIntent.Create) { return FailCreate(NtStatus.ObjectNameCollision); }
         catch (Exception ex)
         {
             Console.WriteLine($"[CreateFile ERROR] {path}: {ex.Message}");
-            return Fail(NtStatus.AccessDenied);
+            return FailCreate(NtStatus.AccessDenied);
         }
     }
 
-    private FileStoreResult<IFileHandle> OpenSnapshot(string realPath, DateTime snapAt, UserContext user)
+    private async ValueTask<FileStoreResult<FileCreateResult>> OpenSnapshotAsync(
+        string realPath, DateTime snapAt, UserContext user)
     {
         // Snapshot root (no real path) → open the live share root read-only as a directory.
         if (string.IsNullOrEmpty(realPath))
         {
-            FileOpenResult root = SmbSync.Run(() => _fileService.OpenAsync(
-                "", OpenMode.Open, AccessIntent.Read, ShareIntent.Read, user));
-            return Ok(new KaimoFileHandle(_fileService, root.Session));
+            FileOpenResult root = await _fileService.OpenAsync(
+                "", OpenMode.Open, AccessIntent.Read, ShareIntent.Read, user);
+            return OkCreate(new KaimoFileHandle(_fileService, root.Session), CreateOutcome.Opened);
         }
 
-        IFileSession session = SmbSync.Run(() => _fileService.OpenSnapshotAsync(
-            ShareRelativePath.Normalize(realPath), snapAt, user));
-        return Ok(new KaimoFileHandle(_fileService, session));
+        IFileSession session = await _fileService.OpenSnapshotAsync(
+            ShareRelativePath.Normalize(realPath), snapAt, user);
+        return OkCreate(new KaimoFileHandle(_fileService, session), CreateOutcome.Opened);
     }
 
-    private FileStoreResult<IFileHandle> CreateDirectory(
-        string relative, CreateDispositionIntent disposition, UserContext user, out CreateOutcome createAction)
+    private async ValueTask<FileStoreResult<FileCreateResult>> OpenOrCreateDirectoryAsync(
+        string relative, CreateDispositionIntent disposition, UserContext user)
     {
-        createAction = CreateOutcome.Opened;
         bool mustNotExist = disposition == CreateDispositionIntent.Create;
         bool canCreate = disposition is CreateDispositionIntent.Create
             or CreateDispositionIntent.OpenIf or CreateDispositionIntent.OverwriteIf or CreateDispositionIntent.Supersede;
@@ -107,8 +104,8 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
         FileOpenResult? existing = null;
         try
         {
-            existing = SmbSync.Run(() => _fileService.OpenAsync(
-                relative, OpenMode.Open, AccessIntent.Read, ShareIntent.Read, user));
+            existing = await _fileService.OpenAsync(
+                relative, OpenMode.Open, AccessIntent.Read, ShareIntent.Read, user);
         }
         catch (FileNotFoundException) { exists = false; }
         catch (DirectoryNotFoundException) { exists = false; }
@@ -117,55 +114,53 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
         {
             if (!existing.Session.IsDirectory)
             {
-                SmbSync.Run(() => existing.Session.DisposeAsync());
-                return Fail(NtStatus.ObjectNameCollision); // a file already occupies this name
+                await existing.Session.DisposeAsync();
+                return FailCreate(NtStatus.ObjectNameCollision); // a file already occupies this name
             }
             if (mustNotExist)
             {
-                SmbSync.Run(() => existing.Session.DisposeAsync());
-                return Fail(NtStatus.ObjectNameCollision);
+                await existing.Session.DisposeAsync();
+                return FailCreate(NtStatus.ObjectNameCollision);
             }
-            return Ok(new KaimoFileHandle(_fileService, existing.Session));
+            return OkCreate(new KaimoFileHandle(_fileService, existing.Session), CreateOutcome.Opened);
         }
 
         if (!canCreate)
-            return Fail(NtStatus.ObjectNameNotFound);
+            return FailCreate(NtStatus.ObjectNameNotFound);
 
         // Create (ACL-checked: CreateWriteData on the parent), then open a handle to it.
-        SmbSync.Run(() => _fileService.CreateDirectoryAsync(relative, user));
-        FileOpenResult opened = SmbSync.Run(() => _fileService.OpenAsync(
-            relative, OpenMode.Open, AccessIntent.Read, ShareIntent.Read, user));
-        createAction = CreateOutcome.Created;
-        return Ok(new KaimoFileHandle(_fileService, opened.Session));
+        await _fileService.CreateDirectoryAsync(relative, user);
+        FileOpenResult opened = await _fileService.OpenAsync(
+            relative, OpenMode.Open, AccessIntent.Read, ShareIntent.Read, user);
+        return OkCreate(new KaimoFileHandle(_fileService, opened.Session), CreateOutcome.Created);
     }
 
     // ───────────────────────── READ / WRITE / FLUSH ─────────────────────────
 
-    public FileStoreResult<int> Read(IFileHandle handle, long offset, Span<byte> buffer)
+    public async ValueTask<FileStoreResult<int>> ReadAsync(
+        IFileHandle handle, long offset, Memory<byte> buffer, CancellationToken cancellationToken)
     {
         var h = (KaimoFileHandle)handle;
         if (h.IsDirectory) return FileStoreResult<int>.Fail(NtStatus.FileIsADirectory);
         try
         {
-            var tmp = new byte[buffer.Length];
-            int n = SmbSync.Run(() => h.Session.ReadAsync(offset, tmp, default));
-            if (n > 0) tmp.AsSpan(0, n).CopyTo(buffer);
+            int n = await h.Session.ReadAsync(offset, buffer, cancellationToken);
             return FileStoreResult<int>.Ok(n); // 0 → handler maps to STATUS_END_OF_FILE
         }
         catch (ObjectDisposedException) { return FileStoreResult<int>.Fail(NtStatus.FileClosed); }
         catch (Exception ex) { Console.WriteLine($"[ReadFile ERROR] {ex.Message}"); return FileStoreResult<int>.Fail(NtStatus.InvalidParameter); }
     }
 
-    public FileStoreResult<int> Write(IFileHandle handle, long offset, ReadOnlySpan<byte> data)
+    public async ValueTask<FileStoreResult<int>> WriteAsync(
+        IFileHandle handle, long offset, ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
     {
         var h = (KaimoFileHandle)handle;
         if (h.IsDirectory) return FileStoreResult<int>.Fail(NtStatus.FileIsADirectory);
         if (h.Session.IsReadOnly) return FileStoreResult<int>.Fail(NtStatus.AccessDenied);
         try
         {
-            byte[] arr = data.ToArray();
-            SmbSync.Run(() => h.Session.WriteAsync(offset, arr, default));
-            return FileStoreResult<int>.Ok(arr.Length);
+            await h.Session.WriteAsync(offset, data, cancellationToken);
+            return FileStoreResult<int>.Ok(data.Length);
         }
         catch (UnauthorizedAccessException) { return FileStoreResult<int>.Fail(NtStatus.AccessDenied); }
         catch (ObjectDisposedException) { return FileStoreResult<int>.Fail(NtStatus.FileClosed); }
@@ -173,22 +168,23 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
         catch (Exception ex) { Console.WriteLine($"[WriteFile ERROR] {ex.Message}"); return FileStoreResult<int>.Fail(NtStatus.InvalidParameter); }
     }
 
-    public NtStatus Flush(IFileHandle handle)
+    public async ValueTask<NtStatus> FlushAsync(IFileHandle handle, CancellationToken cancellationToken)
     {
-        try { SmbSync.Run(() => ((KaimoFileHandle)handle).Session.FlushAsync(default)); return NtStatus.Success; }
+        try { await ((KaimoFileHandle)handle).Session.FlushAsync(cancellationToken); return NtStatus.Success; }
         catch { return NtStatus.InvalidParameter; }
     }
 
     // ───────────────────────── QUERY DIRECTORY ─────────────────────────
 
-    public FileStoreResult<IReadOnlyList<FileEntryInfo>> QueryDirectory(IFileHandle handle, string searchPattern)
+    public async ValueTask<FileStoreResult<IReadOnlyList<FileEntryInfo>>> QueryDirectoryAsync(
+        IFileHandle handle, string searchPattern, CancellationToken cancellationToken)
     {
         var h = (KaimoFileHandle)handle;
         if (!h.IsDirectory) return FileStoreResult<IReadOnlyList<FileEntryInfo>>.Fail(NtStatus.InvalidParameter);
 
         try
         {
-            List<FileMetadata> items = SmbSync.Run(() => _fileService.ListAsync(h.Path, h.Session.User));
+            List<FileMetadata> items = await _fileService.ListAsync(h.Path, h.Session.User);
             string pattern = string.IsNullOrEmpty(searchPattern) ? "*" : searchPattern;
             bool wildcard = pattern is "*" or "*.*";
 
@@ -217,16 +213,16 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
 
     // ───────────────────────── SET INFO ─────────────────────────
 
-    public NtStatus SetEndOfFile(IFileHandle handle, long length)
+    public async ValueTask<NtStatus> SetEndOfFileAsync(IFileHandle handle, long length, CancellationToken cancellationToken)
     {
         var h = (KaimoFileHandle)handle;
         if (h.Session.IsReadOnly) return NtStatus.AccessDenied;
-        try { SmbSync.Run(() => h.Session.SetLengthAsync(length, default)); return NtStatus.Success; }
+        try { await h.Session.SetLengthAsync(length, cancellationToken); return NtStatus.Success; }
         catch (UnauthorizedAccessException) { return NtStatus.AccessDenied; }
         catch { return NtStatus.InvalidParameter; }
     }
 
-    public NtStatus Rename(IFileHandle handle, string newPath, bool replaceIfExists)
+    public async ValueTask<NtStatus> RenameAsync(IFileHandle handle, string newPath, bool replaceIfExists, CancellationToken cancellationToken)
     {
         var h = (KaimoFileHandle)handle;
         try
@@ -234,8 +230,8 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
             // The session renames in place (close → move → reopen at storage level) so this handle
             // stays valid afterwards. ACL checks (Delete on source, Create on target) happen inside.
             string newRelative = ShareRelativePath.Normalize(newPath);
-            SmbSync.Run(() => h.Session.FlushAsync(default));
-            SmbSync.Run(() => h.Session.RenameAsync(newRelative, replaceIfExists, default));
+            await h.Session.FlushAsync(cancellationToken);
+            await h.Session.RenameAsync(newRelative, replaceIfExists, cancellationToken);
             return NtStatus.Success;
         }
         catch (UnauthorizedAccessException) { return NtStatus.AccessDenied; }
@@ -243,7 +239,7 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
         catch { return NtStatus.InvalidParameter; }
     }
 
-    public NtStatus SetDeleteOnClose(IFileHandle handle, bool delete)
+    public async ValueTask<NtStatus> SetDeleteOnCloseAsync(IFileHandle handle, bool delete, CancellationToken cancellationToken)
     {
         if (!delete) return NtStatus.Success; // clearing the flag — nothing to undo on the Kaimo side
 
@@ -251,7 +247,7 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
         try
         {
             // DELETE_ON_CLOSE requires the Delete permission — not implied by the open access.
-            if (!SmbSync.Run(() => _fileService.CanDeleteAsync(h.Path, h.Session.User)))
+            if (!await _fileService.CanDeleteAsync(h.Path, h.Session.User))
                 return NtStatus.AccessDenied;
             h.Session.MarkDeleteOnClose();
             return NtStatus.Success;
@@ -303,8 +299,10 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
         return true;
     }
 
-    private static FileStoreResult<IFileHandle> Ok(IFileHandle h) => FileStoreResult<IFileHandle>.Ok(h);
-    private static FileStoreResult<IFileHandle> Fail(NtStatus s) => FileStoreResult<IFileHandle>.Fail(s);
+    private static FileStoreResult<FileCreateResult> OkCreate(IFileHandle handle, CreateOutcome action)
+        => FileStoreResult<FileCreateResult>.Ok(new FileCreateResult(handle, action));
+    private static FileStoreResult<FileCreateResult> FailCreate(NtStatus s)
+        => FileStoreResult<FileCreateResult>.Fail(s);
 
     private static OpenMode MapDisposition(CreateDispositionIntent d) => d switch
     {

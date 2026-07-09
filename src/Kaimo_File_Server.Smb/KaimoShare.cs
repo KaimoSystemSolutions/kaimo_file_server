@@ -13,6 +13,14 @@ internal sealed class KaimoShare : IShare
     public ShareType Type { get; init; } = ShareType.Disk;
     public IFileStore? FileStore { get; init; }
     public bool EncryptData { get; init; }
+
+    /// <summary>
+    /// Advertises persistent (continuously-available) handles. Off by default: Kaimo's file
+    /// sessions are not backed by a restart-surviving durable-handle store, so promising CA
+    /// would be incorrect. <see cref="IsHidden"/>/ACL behaviour is unaffected.
+    /// </summary>
+    public bool ContinuousAvailability { get; init; }
+
     public string Remark { get; init; } = string.Empty;
 
     /// <summary>Database id of the share (used by the authorization policy).</summary>

@@ -4,6 +4,7 @@ using Kaimo_File_Server.Core.Services.File;
 using Microsoft.Extensions.DependencyInjection;
 using Smb.Auth.Ntlm;
 using Smb.Protocol.Enums;
+using Smb.Server.Diagnostics;
 using System.Collections.Concurrent;
 using System.Net;
 using LibSmbServer = Smb.Host.SmbServer;
@@ -133,9 +134,15 @@ namespace Kaimo_File_Server.Smb
             // effect here, on (re)start — the builder is only consulted once.
             SmbProtocolSettings protocol = LoadProtocolSettings();
 
+            // Stable identity across restarts: durable-handle reconnect and the
+            // WS-Discovery endpoint id both key off this GUID, so it must not be
+            // re-minted on every start (the library's default is a per-process GUID).
+            Guid serverGuid = LoadServerGuid();
+
             SmbServerBuilder builder = SmbServerBuilder.Create()
                 .WithEndpoint(IPAddress.Any, 445)
                 .WithServerName(Environment.MachineName)
+                .WithServerGuid(serverGuid)
                 .WithDialectRange(MapDialect(protocol.MinVersion), MapDialect(protocol.MaxVersion))
                 .RequireSigning(protocol.RequireSigning)
                 .RequireEncryption(protocol.RequireEncryption)
@@ -143,9 +150,27 @@ namespace Kaimo_File_Server.Smb
                 .UseShareAuthorization(policy)
                 .WithLogger(msg => Console.WriteLine($"[smb] {msg}"));
 
+            // Route SMB security-audit events (auth, share access, file open/close/
+            // delete, permission changes, session/connection lifecycle) into the log.
+            if (protocol.EnableAuditLog)
+                builder.UseAuditLogger(
+                    evt => Console.WriteLine($"[smb-audit] {evt}"), SmbLogLevel.Information);
+
+            // Announce the server via WS-Discovery so it appears in Windows Explorer's
+            // "Network" view. Reuse the stable server GUID as the endpoint id so the
+            // device keeps one identity across restarts.
+            if (protocol.EnableWsDiscovery)
+                builder.UseWsDiscovery(wsd =>
+                {
+                    wsd.EndpointId = serverGuid;
+                    wsd.XAddrs = [$"http://{Environment.MachineName}/"];
+                });
+
             Console.WriteLine(
                 $"[smb] Protokoll: {protocol.MinVersion}..{protocol.MaxVersion}, " +
-                $"Signing={protocol.RequireSigning}, Encryption={protocol.RequireEncryption}");
+                $"Signing={protocol.RequireSigning}, Encryption={protocol.RequireEncryption}, " +
+                $"WsDiscovery={protocol.EnableWsDiscovery}, Audit={protocol.EnableAuditLog}, " +
+                $"ServerGuid={serverGuid}");
 
             foreach (KaimoShare share in LoadSharesFromDb())
                 builder.AddShare(share);
@@ -187,6 +212,29 @@ namespace Kaimo_File_Server.Smb
             {
                 Console.WriteLine($"[smb] Konnte Protokoll-Einstellungen nicht laden, nutze Standard: {ex.Message}");
                 return SmbProtocolSettings.Default();
+            }
+        }
+
+        /// <summary>
+        /// Loads the persisted, stable server GUID from the config store (creating it
+        /// on first use). Falls back to a per-process GUID if the store is unavailable
+        /// or a read fails, so the server always starts.
+        /// </summary>
+        private Guid LoadServerGuid()
+        {
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var store = scope.ServiceProvider.GetService<ISmbConfigStore>();
+                if (store == null)
+                    return Guid.NewGuid();
+
+                return SmbSync.Run(() => store.GetOrCreateServerGuidAsync());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[smb] Konnte Server-GUID nicht laden, nutze zufällige: {ex.Message}");
+                return Guid.NewGuid();
             }
         }
 

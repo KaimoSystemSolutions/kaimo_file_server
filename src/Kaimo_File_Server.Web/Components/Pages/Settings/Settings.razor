@@ -243,6 +243,14 @@ else
                         <input type="checkbox" @bind="VM.SmbProtocol.RequireEncryption" />
                         <span>Verschlüsselung erzwingen (nur SMB 3.0+; schließt SMB 2.x-Clients aus)</span>
                     </label>
+                    <label class="pw-rule">
+                        <input type="checkbox" @bind="VM.SmbProtocol.EnableWsDiscovery" />
+                        <span>Im Netzwerk sichtbar machen (WS-Discovery – erscheint in der Windows-Netzwerkumgebung)</span>
+                    </label>
+                    <label class="pw-rule">
+                        <input type="checkbox" @bind="VM.SmbProtocol.EnableAuditLog" />
+                        <span>Sicherheits-Audit-Protokoll aktivieren (Anmeldungen, Freigabezugriffe, Dateioperationen)</span>
+                    </label>
 
                     <div style="margin-top: 16px;">
                         <button class="btn-primary" @onclick="SaveSmbProtocol">

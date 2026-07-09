@@ -64,6 +64,22 @@ public sealed class SmbProtocolSettings
     /// </summary>
     public bool RequireEncryption { get; set; } = false;
 
+    /// <summary>
+    /// Announce the server via WS-Discovery so it appears in Windows Explorer's
+    /// "Network" view (a UDP responder on port 3702). Default <c>true</c>. Has no
+    /// effect when the server cannot reach the LAN broadcast domain (e.g. a
+    /// bridged container without host networking), where clients must still map
+    /// the share by its <c>\\host\share</c> path.
+    /// </summary>
+    public bool EnableWsDiscovery { get; set; } = true;
+
+    /// <summary>
+    /// Emit structured SMB security-audit events (authentication, share access,
+    /// file open/close/delete, permission changes, session/connection lifecycle)
+    /// to the server log. Default <c>true</c>.
+    /// </summary>
+    public bool EnableAuditLog { get; set; } = true;
+
     public static SmbProtocolSettings Default() => new();
 
     /// <summary>
@@ -87,6 +103,14 @@ public static class SmbConfigKeys
 {
     /// <summary>JSON object: the full <see cref="SmbProtocolSettings"/>.</summary>
     public const string ProtocolKey = SmbProtocolSettings.ConfigKey;
+
+    /// <summary>
+    /// Stable per-installation server GUID (string). Persisted once and reused so
+    /// clients recognise the same SMB server across restarts (NEGOTIATE identity,
+    /// durable-handle reconnect, WS-Discovery endpoint id). A missing/blank value
+    /// is generated on first start.
+    /// </summary>
+    public const string ServerGuidKey = "services.smb.serverGuid";
 }
 
 /// <summary>
@@ -103,4 +127,11 @@ public interface ISmbConfigStore
     /// process — a cached value would hide the change for up to the cache TTL.
     /// </summary>
     Task<SmbProtocolSettings> GetProtocolSettingsAsync();
+
+    /// <summary>
+    /// Returns the stable server GUID, generating and persisting one on first use.
+    /// Idempotent: subsequent calls return the same value so the SMB server keeps
+    /// its identity across restarts.
+    /// </summary>
+    Task<Guid> GetOrCreateServerGuidAsync();
 }

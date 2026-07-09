@@ -12,7 +12,7 @@ namespace Kaimo_File_Server.Tests;
 
 /// <summary>
 /// Tests for the SMB transport adapter (<see cref="KaimoFileStore"/>) over the self-written SMB
-/// library. The store implements the library's <see cref="IFileStore"/> and delegates every
+/// library. The store implements the library's async <see cref="IFileStore"/> and delegates every
 /// operation to a mocked <see cref="IFileService"/> / <see cref="IFileSession"/> — no real disk and
 /// no real SMB server.
 ///
@@ -72,25 +72,25 @@ public class KaimoFileStoreTests
                 It.IsAny<ShareIntent>(), It.IsAny<UserContext>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new FileOpenResult(session.Object, status));
 
-    private IFileHandle OpenFileHandle(Mock<IFileSession> session)
+    private async Task<IFileHandle> OpenFileHandleAsync(Mock<IFileSession> session)
     {
         AsUser(Username);
         SetupOpen(session);
-        var result = _sut.Create("file.txt", FileAccessIntent.Read, CreateDispositionIntent.Open,
-            directoryRequired: false, nonDirectoryRequired: true, out _);
+        var result = await _sut.CreateAsync("file.txt", FileAccessIntent.Read, CreateDispositionIntent.Open,
+            directoryRequired: false, nonDirectoryRequired: true, default);
         Assert.True(result.IsSuccess);
-        return result.Value!;
+        return result.Value.Handle;
     }
 
     // ═══════════════════ Security: caller resolution ═══════════════════
 
     [Fact]
-    public void Create_NoCaller_DeniesAccess()
+    public async Task Create_NoCaller_DeniesAccess()
     {
         SmbCaller.Current = null;
 
-        var result = _sut.Create("file.txt", FileAccessIntent.Read, CreateDispositionIntent.Open,
-            false, true, out _);
+        var result = await _sut.CreateAsync("file.txt", FileAccessIntent.Read, CreateDispositionIntent.Open,
+            false, true, default);
 
         Assert.Equal(NtStatus.AccessDenied, result.Status);
         _fileService.Verify(f => f.OpenAsync(
@@ -100,12 +100,12 @@ public class KaimoFileStoreTests
     }
 
     [Fact]
-    public void Create_UnknownUser_DeniesAccess()
+    public async Task Create_UnknownUser_DeniesAccess()
     {
         AsUser("not_registered");
 
-        var result = _sut.Create("file.txt", FileAccessIntent.Read, CreateDispositionIntent.Open,
-            false, true, out _);
+        var result = await _sut.CreateAsync("file.txt", FileAccessIntent.Read, CreateDispositionIntent.Open,
+            false, true, default);
 
         Assert.Equal(NtStatus.AccessDenied, result.Status);
         _fileService.Verify(f => f.OpenAsync(
@@ -117,18 +117,18 @@ public class KaimoFileStoreTests
     // ═══════════════════ Delegation happy path ═══════════════════
 
     [Fact]
-    public void Create_KnownUser_OpensViaFileService()
+    public async Task Create_KnownUser_OpensViaFileService()
     {
         AsUser(Username);
         var session = NewSession();
         SetupOpen(session, FileOpenStatus.Opened);
 
-        var result = _sut.Create("file.txt", FileAccessIntent.Read, CreateDispositionIntent.Open,
-            false, true, out var outcome);
+        var result = await _sut.CreateAsync("file.txt", FileAccessIntent.Read, CreateDispositionIntent.Open,
+            false, true, default);
 
         Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Value);
-        Assert.Equal(CreateOutcome.Opened, outcome);
+        Assert.NotNull(result.Value.Handle);
+        Assert.Equal(CreateOutcome.Opened, result.Value.Action);
         _fileService.Verify(f => f.OpenAsync(
             It.IsAny<string>(), It.IsAny<OpenMode>(), It.IsAny<AccessIntent>(),
             It.IsAny<ShareIntent>(), It.IsAny<UserContext>(), It.IsAny<CancellationToken>()),
@@ -136,80 +136,80 @@ public class KaimoFileStoreTests
     }
 
     [Fact]
-    public void Create_NewFile_ReportsCreatedOutcome()
+    public async Task Create_NewFile_ReportsCreatedOutcome()
     {
         AsUser(Username);
         var session = NewSession();
         SetupOpen(session, FileOpenStatus.Created);
 
-        _sut.Create("new.txt", FileAccessIntent.Write, CreateDispositionIntent.Create,
-            false, true, out var outcome);
+        var result = await _sut.CreateAsync("new.txt", FileAccessIntent.Write, CreateDispositionIntent.Create,
+            false, true, default);
 
-        Assert.Equal(CreateOutcome.Created, outcome);
+        Assert.Equal(CreateOutcome.Created, result.Value.Action);
     }
 
     [Fact]
-    public void Read_DelegatesToSession()
+    public async Task Read_DelegatesToSession()
     {
         var session = NewSession();
         session.Setup(x => x.ReadAsync(It.IsAny<long>(), It.IsAny<Memory<byte>>(), It.IsAny<CancellationToken>()))
             .Returns(new ValueTask<int>(3));
-        var handle = OpenFileHandle(session);
+        var handle = await OpenFileHandleAsync(session);
 
         var buffer = new byte[10];
-        var result = _sut.Read(handle, 0, buffer);
+        var result = await _sut.ReadAsync(handle, 0, buffer, default);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(3, result.Value);
     }
 
     [Fact]
-    public void Read_AtEnd_ReturnsZero()
+    public async Task Read_AtEnd_ReturnsZero()
     {
         var session = NewSession();
         session.Setup(x => x.ReadAsync(It.IsAny<long>(), It.IsAny<Memory<byte>>(), It.IsAny<CancellationToken>()))
             .Returns(new ValueTask<int>(0));
-        var handle = OpenFileHandle(session);
+        var handle = await OpenFileHandleAsync(session);
 
-        var result = _sut.Read(handle, 0, new byte[10]);
+        var result = await _sut.ReadAsync(handle, 0, new byte[10], default);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(0, result.Value); // dispatcher maps 0 → STATUS_END_OF_FILE
     }
 
     [Fact]
-    public void Write_DelegatesToSession()
+    public async Task Write_DelegatesToSession()
     {
         var session = NewSession();
         session.Setup(x => x.WriteAsync(It.IsAny<long>(), It.IsAny<ReadOnlyMemory<byte>>(), It.IsAny<CancellationToken>()))
             .Returns(ValueTask.CompletedTask);
-        var handle = OpenFileHandle(session);
+        var handle = await OpenFileHandleAsync(session);
 
-        var result = _sut.Write(handle, 0, new byte[] { 1, 2, 3, 4 });
+        var result = await _sut.WriteAsync(handle, 0, new byte[] { 1, 2, 3, 4 }, default);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(4, result.Value);
     }
 
     [Fact]
-    public void Flush_DelegatesToSession()
+    public async Task Flush_DelegatesToSession()
     {
         var session = NewSession();
-        var handle = OpenFileHandle(session);
+        var handle = await OpenFileHandleAsync(session);
 
-        Assert.Equal(NtStatus.Success, _sut.Flush(handle));
+        Assert.Equal(NtStatus.Success, await _sut.FlushAsync(handle, default));
         session.Verify(x => x.FlushAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
     }
 
     // ═══════════════════ Security: read-only & delete-on-close ═══════════════════
 
     [Fact]
-    public void Write_ReadOnlySession_DeniesAccess()
+    public async Task Write_ReadOnlySession_DeniesAccess()
     {
         var session = NewSession(isReadOnly: true);
-        var handle = OpenFileHandle(session);
+        var handle = await OpenFileHandleAsync(session);
 
-        var result = _sut.Write(handle, 0, new byte[] { 1 });
+        var result = await _sut.WriteAsync(handle, 0, new byte[] { 1 }, default);
 
         Assert.Equal(NtStatus.AccessDenied, result.Status);
         session.Verify(
@@ -218,40 +218,51 @@ public class KaimoFileStoreTests
     }
 
     [Fact]
-    public void SetDeleteOnClose_WithoutDeletePermission_DeniesAccess()
+    public async Task SetDeleteOnClose_WithoutDeletePermission_DeniesAccess()
     {
         var session = NewSession();
         _fileService.Setup(f => f.CanDeleteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
             .ReturnsAsync(false);
-        var handle = OpenFileHandle(session);
+        var handle = await OpenFileHandleAsync(session);
 
-        var status = _sut.SetDeleteOnClose(handle, true);
+        var status = await _sut.SetDeleteOnCloseAsync(handle, true, default);
 
         Assert.Equal(NtStatus.AccessDenied, status);
         session.Verify(x => x.MarkDeleteOnClose(), Times.Never);
     }
 
     [Fact]
-    public void SetDeleteOnClose_WithDeletePermission_MarksSession()
+    public async Task SetDeleteOnClose_WithDeletePermission_MarksSession()
     {
         var session = NewSession();
         _fileService.Setup(f => f.CanDeleteAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
             .ReturnsAsync(true);
-        var handle = OpenFileHandle(session);
+        var handle = await OpenFileHandleAsync(session);
 
-        var status = _sut.SetDeleteOnClose(handle, true);
+        var status = await _sut.SetDeleteOnCloseAsync(handle, true, default);
 
         Assert.Equal(NtStatus.Success, status);
         session.Verify(x => x.MarkDeleteOnClose(), Times.Once);
     }
 
     [Fact]
-    public void Dispose_DisposesSession()
+    public async Task Dispose_DisposesSession()
     {
         var session = NewSession();
-        var handle = OpenFileHandle(session);
+        var handle = await OpenFileHandleAsync(session);
 
         handle.Dispose();
+
+        session.Verify(x => x.DisposeAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task DisposeAsync_DisposesSession()
+    {
+        var session = NewSession();
+        var handle = await OpenFileHandleAsync(session);
+
+        await handle.DisposeAsync();
 
         session.Verify(x => x.DisposeAsync(), Times.Once);
     }
@@ -259,7 +270,7 @@ public class KaimoFileStoreTests
     // ═══════════════════ QueryDirectory ═══════════════════
 
     [Fact]
-    public void QueryDirectory_ListsChildrenPlusDotEntries()
+    public async Task QueryDirectory_ListsChildrenPlusDotEntries()
     {
         AsUser(Username);
         var dir = NewSession(isDirectory: true, relativePath: "dir");
@@ -273,20 +284,20 @@ public class KaimoFileStoreTests
                         CreatedAt = DateTime.UtcNow, ModifiedAt = DateTime.UtcNow },
             });
 
-        var open = _sut.Create("dir", FileAccessIntent.Read, CreateDispositionIntent.Open,
-            directoryRequired: true, nonDirectoryRequired: false, out _);
-        var result = _sut.QueryDirectory(open.Value!, "*");
+        var open = await _sut.CreateAsync("dir", FileAccessIntent.Read, CreateDispositionIntent.Open,
+            directoryRequired: true, nonDirectoryRequired: false, default);
+        var result = await _sut.QueryDirectoryAsync(open.Value.Handle, "*", default);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(4, result.Value!.Count); // "." + ".." + two children
     }
 
     [Fact]
-    public void QueryDirectory_OnFileHandle_ReturnsInvalidParameter()
+    public async Task QueryDirectory_OnFileHandle_ReturnsInvalidParameter()
     {
-        var handle = OpenFileHandle(NewSession(isDirectory: false));
+        var handle = await OpenFileHandleAsync(NewSession(isDirectory: false));
 
-        var result = _sut.QueryDirectory(handle, "*");
+        var result = await _sut.QueryDirectoryAsync(handle, "*", default);
 
         Assert.Equal(NtStatus.InvalidParameter, result.Status);
     }
@@ -294,7 +305,7 @@ public class KaimoFileStoreTests
     // ═══════════════════ GetInfo ═══════════════════
 
     [Fact]
-    public void GetInfo_MapsMetadataFromFileService()
+    public async Task GetInfo_MapsMetadataFromFileService()
     {
         var session = NewSession(length: 42);
         _fileService.Setup(f => f.GetMetadataAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
@@ -303,9 +314,28 @@ public class KaimoFileStoreTests
                 Name = "file.txt", IsDirectory = false, Size = 7,
                 CreatedAt = DateTime.UtcNow, ModifiedAt = DateTime.UtcNow,
             });
-        var handle = OpenFileHandle(session);
+        var handle = await OpenFileHandleAsync(session);
 
         FileEntryInfo info = handle.GetInfo();
+
+        Assert.Equal("file.txt", info.Name);
+        Assert.Equal(42, info.EndOfFile); // live size from the open session, not the cached metadata
+        Assert.False(info.IsDirectory);
+    }
+
+    [Fact]
+    public async Task GetInfoAsync_MapsMetadataFromFileService()
+    {
+        var session = NewSession(length: 42);
+        _fileService.Setup(f => f.GetMetadataAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
+            .ReturnsAsync(new FileMetadata
+            {
+                Name = "file.txt", IsDirectory = false, Size = 7,
+                CreatedAt = DateTime.UtcNow, ModifiedAt = DateTime.UtcNow,
+            });
+        var handle = await OpenFileHandleAsync(session);
+
+        FileEntryInfo info = await handle.GetInfoAsync(default);
 
         Assert.Equal("file.txt", info.Name);
         Assert.Equal(42, info.EndOfFile); // live size from the open session, not the cached metadata
@@ -326,7 +356,7 @@ public class KaimoFileStoreTests
     }
 
     [Fact]
-    public void Create_SnapshotPath_OpensViaSnapshotService()
+    public async Task Create_SnapshotPath_OpensViaSnapshotService()
     {
         AsUser(Username);
         var session = NewSession(relativePath: "file.txt");
@@ -334,8 +364,8 @@ public class KaimoFileStoreTests
                 It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<UserContext>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(session.Object);
 
-        var result = _sut.Create(@"@GMT-2026.06.24-10.30.00\file.txt",
-            FileAccessIntent.Read, CreateDispositionIntent.Open, false, true, out _);
+        var result = await _sut.CreateAsync(@"@GMT-2026.06.24-10.30.00\file.txt",
+            FileAccessIntent.Read, CreateDispositionIntent.Open, false, true, default);
 
         Assert.True(result.IsSuccess);
         _fileService.Verify(f => f.OpenSnapshotAsync(
