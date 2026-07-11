@@ -387,22 +387,32 @@ public class FileSystemStorage : IStorageEngine
         return Task.FromResult(Directory.Exists(fullPath));
     }
 
-    public Task MoveAsync(string oldPath, string newPath)
+    public Task<string> MoveAsync(string oldPath, string newPath)
     {
-        var fullOldPath = ToAbsolutePath(oldPath);
-        var fullNewPath = ToAbsolutePath(newPath);
+        var normalizedOld = ShareRelativePath.Normalize(oldPath);
+        var normalizedNew = ShareRelativePath.Normalize(newPath);
+
+        var fullOldPath = ToAbsolutePath(normalizedOld);
+        var fullNewPath = ToAbsolutePath(normalizedNew);
 
         Directory.CreateDirectory(Path.GetDirectoryName(fullNewPath)!);
 
+        // On a name collision, disambiguate with a timestamp suffix. Apply it to
+        // BOTH the relative and absolute path so the returned value matches what
+        // actually landed on disk.
         if (File.Exists(fullNewPath) || Directory.Exists(fullNewPath))
-            fullNewPath += "_" + DateTime.UtcNow.ToString("yyyy-MM-dd_HH-mm-ss");
+        {
+            var suffix = "_" + DateTime.UtcNow.ToString("yyyy-MM-dd_HH-mm-ss");
+            normalizedNew += suffix;
+            fullNewPath += suffix;
+        }
 
         if (File.Exists(fullOldPath))
             File.Move(fullOldPath, fullNewPath);
         else if (Directory.Exists(fullOldPath))
             Directory.Move(fullOldPath, fullNewPath);
 
-        return Task.CompletedTask;
+        return Task.FromResult(normalizedNew);
     }
 
     // ------------------ Directory Size ------------------

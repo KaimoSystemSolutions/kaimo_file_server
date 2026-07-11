@@ -463,8 +463,10 @@ public class FileService : IFileService
         if (isRecycleEnabled && !isAlreadyInRecycleBin)
         {
             var recyclePath = ShareRelativePath.Combine(RecycleBinFolder, normalized);
-            await _storage.MoveAsync(normalized, recyclePath);
-            await _acl.RenameAclPathAsync(_shareId, normalized, recyclePath);
+            // MoveAsync may append a timestamp suffix on a name collision in the
+            // recycle bin — align the ACL with the path that actually landed on disk.
+            var actualRecyclePath = await _storage.MoveAsync(normalized, recyclePath);
+            await _acl.RenameAclPathAsync(_shareId, normalized, actualRecyclePath);
         }
         else
         {

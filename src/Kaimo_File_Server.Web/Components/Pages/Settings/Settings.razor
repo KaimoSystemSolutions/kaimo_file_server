@@ -2,6 +2,8 @@
 @using System.Globalization
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Services.Https
+@using Microsoft.AspNetCore.Components.Forms
 @inject SettingsViewModel VM
 @inject NavigationManager Nav
 @inject AssetProvider Assets
@@ -84,6 +86,15 @@ else
                             @onclick="() => SwitchTab(SettingsTab.DataServices)">
                         @Assets.SVG("archive.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                         @Resources.Web_Settings_Tab_Fileservices
+                    </button>
+                }
+
+                @if (VM.CanManageCertificates)
+                {
+                    <button class="detail-tab @(_activeTab == SettingsTab.Certificate ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(SettingsTab.Certificate)">
+                        @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        @Resources.Web_Settings_Tab_Certificate
                     </button>
                 }
             </div>
@@ -586,6 +597,159 @@ else
                 </div>
             }
 
+            @* ── Tab: Certificate (HTTPS) ── *@
+            @if (_activeTab == SettingsTab.Certificate && VM.CanManageCertificates)
+            {
+                <div class="detail-section">
+                    <span class="detail-label">HTTPS-Zertifikat</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 16px;">
+                        Der Server erzeugt automatisch ein selbstsigniertes Zertifikat und erneuert es
+                        vor Ablauf. Lade die öffentliche Zertifikatsdatei herunter, um sie auf den Clients
+                        als vertrauenswürdig zu hinterlegen – oder ersetze sie durch ein eigenes Zertifikat.
+                    </p>
+
+                    @if (VM.HasCertificate)
+                    {
+                        <div class="info-card">
+                            <div class="info-row">
+                                <span class="info-key">Antragsteller (CN)</span>
+                                <span class="info-val">@VM.CertSubject</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-key">Typ</span>
+                                <span class="info-val">
+                                    @(VM.CertIsSelfSigned ? "Selbstsigniert" : "Eigenes Zertifikat")
+                                    · @(VM.CertSettings.Mode == CertificateMode.Auto ? "automatische Erneuerung" : "keine Erneuerung")
+                                </span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-key">Ausgestellt</span>
+                                <span class="info-val">@(VM.CertIssuedUtc?.ToString("yyyy-MM-dd HH:mm 'UTC'") ?? "—")</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-key">Läuft ab</span>
+                                <span class="info-val @(VM.CertDaysRemaining is <= 21 ? "is-muted" : "")">
+                                    @(VM.CertExpiresUtc?.ToString("yyyy-MM-dd HH:mm 'UTC'") ?? "—")
+                                    @if (VM.CertDaysRemaining is { } d)
+                                    {
+                                        <text> (@(d >= 0 ? $"noch {d} Tage" : $"seit {-d} Tagen abgelaufen"))</text>
+                                    }
+                                </span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-key">Fingerabdruck (SHA-1)</span>
+                                <span class="info-val is-muted">@VM.CertThumbprint</span>
+                            </div>
+                            @if (VM.CertSans.Count > 0)
+                            {
+                                <div class="info-row">
+                                    <span class="info-key">Alternative Namen (SAN)</span>
+                                    <span class="info-val">@string.Join(" · ", VM.CertSans)</span>
+                                </div>
+                            }
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap;">
+                            @if (_crtHref is not null)
+                            {
+                                <a class="btn-primary" href="@_crtHref" download="kaimo-fileserver.crt"
+                                   style="text-decoration: none;">.crt herunterladen</a>
+                            }
+                            @if (_pemHref is not null)
+                            {
+                                <a class="btn-icon" href="@_pemHref" download="kaimo-fileserver.pem"
+                                   style="text-decoration: none;" title="Als PEM herunterladen">.pem</a>
+                            }
+                            <button class="btn-icon" title="Aktualisieren" @onclick="RefreshCertificate">
+                                @Assets.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <p style="font-size: 13px; color: var(--text-tertiary);">
+                            Es ist noch kein Zertifikat geladen.
+                        </p>
+                    }
+                </div>
+
+                <div class="detail-section">
+                    <span class="detail-label">Automatisches Zertifikat</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 16px;">
+                        Gültigkeitsdauer des selbstsigniert erzeugten Zertifikats. Es wird rechtzeitig vor
+                        Ablauf automatisch erneuert – ohne Neustart.
+                    </p>
+
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                        <label style="font-size: 13px; min-width: 200px;">Laufzeit</label>
+                        <select class="edit-input" style="max-width: 200px;" @bind="VM.CertSettings.LifetimeDays">
+                            <option value="@HttpsCertificateSettings.LifetimeOneMonth">1 Monat (30 Tage)</option>
+                            <option value="@HttpsCertificateSettings.LifetimeThreeMonths">3 Monate (90 Tage)</option>
+                        </select>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                        <label style="font-size: 13px; min-width: 200px;">Common Name (optional)</label>
+                        <input type="text" class="edit-input" style="max-width: 320px;"
+                               placeholder="Standard: Hostname" @bind="VM.CertSettings.CommonName" />
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                        <label style="font-size: 13px; min-width: 200px;">Zusätzliche Namen/IPs</label>
+                        <input type="text" class="edit-input" style="max-width: 320px;"
+                               placeholder="fileserver.local, 10.0.0.5" @bind="VM.CertAdditionalSansText" />
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <button class="btn-primary" @onclick="SaveCertificateSettings">
+                            Speichern &amp; neu erzeugen
+                        </button>
+                        <button class="btn-icon" title="Jetzt neu erzeugen" @onclick="RegenerateCertificate">
+                            @Assets.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                        </button>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <span class="detail-label">Eigenes Zertifikat hochladen</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 16px;">
+                        Ersetze das automatische Zertifikat durch ein eigenes — das Format wird automatisch erkannt.
+                        Es muss der <strong>private Schlüssel</strong> dabei sein. Du hast drei Möglichkeiten:
+                        eine <strong>.pfx/.p12</strong>, eine <strong>kombinierte PEM</strong> (Zertifikat + Schlüssel
+                        in einer Datei), oder <strong>Zertifikat und Schlüssel als zwei getrennte Dateien</strong>
+                        (unten). Die automatische Erneuerung wird dafür pausiert.
+                    </p>
+
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                        <label style="font-size: 13px; min-width: 200px;">Zertifikat (.pfx/.p12/.pem/.crt/.cer)</label>
+                        <InputFile OnChange="OnCertFileSelected" accept=".pfx,.p12,.pem,.crt,.cer" />
+                        @if (_pendingCertName.Length > 0)
+                        {
+                            <span style="font-size: 12px; color: var(--text-tertiary);">@_pendingCertName</span>
+                        }
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                        <label style="font-size: 13px; min-width: 200px;">Privater Schlüssel (optional, .key/.pem)</label>
+                        <InputFile OnChange="OnKeyFileSelected" accept=".key,.pem,.der" />
+                        @if (_pendingKeyName.Length > 0)
+                        {
+                            <span style="font-size: 12px; color: var(--text-tertiary);">@_pendingKeyName</span>
+                        }
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                        <label style="font-size: 13px; min-width: 200px;">Passwort (bei .pfx/.p12 oder verschlüsseltem Schlüssel)</label>
+                        <input type="password" class="edit-input" style="max-width: 240px;"
+                               @bind="VM.CustomCertPassword" />
+                    </div>
+
+                    <button class="btn-primary" disabled="@(_pendingCert is null)" @onclick="ImportCustomCertificate">
+                        Zertifikat übernehmen
+                    </button>
+                </div>
+            }
+
         </div>
     </div>
 }
@@ -601,9 +765,18 @@ else
         Memory,
         DataServices,
         Search,
+        Certificate,
     }
 
     private SettingsTab _activeTab = SettingsTab.Language;
+
+    // Certificate tab local state.
+    private string? _crtHref;
+    private string? _pemHref;
+    private byte[]? _pendingCert;
+    private string _pendingCertName = "";
+    private byte[]? _pendingKey;
+    private string _pendingKeyName = "";
 
     /// <summary>Formats a percentage with an invariant '.' separator for inline CSS widths.</summary>
     private static string Pct(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
@@ -615,8 +788,16 @@ else
             await VM.LoadAsync();
 
             // Default to the first tab the user is actually allowed to see.
-            if (!VM.CanManageSettings && VM.CanManageDataServices)
-                _activeTab = SettingsTab.DataServices;
+            if (!VM.CanManageSettings)
+            {
+                if (VM.CanManageDataServices)
+                    _activeTab = SettingsTab.DataServices;
+                else if (VM.CanManageCertificates)
+                    _activeTab = SettingsTab.Certificate;
+            }
+
+            if (_activeTab == SettingsTab.Certificate)
+                BuildCertDownloadLinks();
 
             StateHasChanged();
         }
@@ -635,6 +816,75 @@ else
         if (tab == SettingsTab.Search)
             await VM.LoadSearchStateAsync();
 
+        if (tab == SettingsTab.Certificate)
+        {
+            await VM.LoadCertificateStateAsync();
+            BuildCertDownloadLinks();
+        }
+
+        StateHasChanged();
+    }
+
+    private void BuildCertDownloadLinks()
+    {
+        var der = VM.GetPublicCertDerBase64();
+        var pem = VM.GetPublicCertPemBase64();
+        _crtHref = der is null ? null : $"data:application/x-x509-ca-cert;base64,{der}";
+        _pemHref = pem is null ? null : $"data:application/x-pem-file;base64,{pem}";
+    }
+
+    private async Task RefreshCertificate()
+    {
+        await VM.LoadCertificateStateAsync();
+        BuildCertDownloadLinks();
+        StateHasChanged();
+    }
+
+    private async Task SaveCertificateSettings()
+    {
+        await VM.SaveCertificateSettingsAsync();
+        BuildCertDownloadLinks();
+        StateHasChanged();
+    }
+
+    private async Task RegenerateCertificate()
+    {
+        await VM.RegenerateCertificateNowAsync();
+        BuildCertDownloadLinks();
+        StateHasChanged();
+    }
+
+    // Certificates/keys are tiny; cap uploads so a huge file can't exhaust memory.
+    private const long MaxCertUploadSize = 512 * 1024;
+
+    private async Task OnCertFileSelected(InputFileChangeEventArgs e)
+    {
+        _pendingCertName = e.File.Name;
+        using var ms = new MemoryStream();
+        await e.File.OpenReadStream(MaxCertUploadSize).CopyToAsync(ms);
+        _pendingCert = ms.ToArray();
+    }
+
+    private async Task OnKeyFileSelected(InputFileChangeEventArgs e)
+    {
+        _pendingKeyName = e.File.Name;
+        using var ms = new MemoryStream();
+        await e.File.OpenReadStream(MaxCertUploadSize).CopyToAsync(ms);
+        _pendingKey = ms.ToArray();
+    }
+
+    private async Task ImportCustomCertificate()
+    {
+        if (_pendingCert is null) return;
+        var ok = await VM.ImportCustomCertificateAsync(_pendingCert, _pendingKey);
+        if (ok)
+        {
+            _pendingCert = null;
+            _pendingCertName = "";
+            _pendingKey = null;
+            _pendingKeyName = "";
+        }
+        BuildCertDownloadLinks();
         StateHasChanged();
     }
 

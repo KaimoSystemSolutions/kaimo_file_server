@@ -17,6 +17,7 @@ public partial class ShareListViewModel
     private readonly IUserRepository _userRepo;
     private readonly IGroupRepository _groupRepo;
     private readonly IAclRepository _aclRepo;
+    private readonly IFileMetadataRepository _metaRepo;
     private readonly IAclService _aclService;
     private readonly IManagementAuthService _mgmtAuth;
     private readonly IUserContextFactory _userContextFactory;
@@ -31,6 +32,7 @@ public partial class ShareListViewModel
         IUserRepository userRepo,
         IGroupRepository groupRepo,
         IAclRepository aclRepo,
+        IFileMetadataRepository metaRepo,
         IAclService aclService,
         IManagementAuthService mgmtAuth,
         IUserContextFactory userContextFactory,
@@ -44,6 +46,7 @@ public partial class ShareListViewModel
         _userRepo = userRepo;
         _groupRepo = groupRepo;
         _aclRepo = aclRepo;
+        _metaRepo = metaRepo;
         _aclService = aclService;
         _mgmtAuth = mgmtAuth;
         _userContextFactory = userContextFactory;
@@ -228,43 +231,44 @@ public partial class ShareListViewModel
             if (existing is not null)
             { CreateErrorMessage = Resources.Web_Error_ShareExists; return false; }
 
+            // Den Ersteller ZUERST auflösen. Ohne gültigen Owner darf kein Share
+            // entstehen, sonst bleibt ein verwaister Share ohne Owner-ACL zurück.
+            // Identity?.Name-Guard vermeidet den bisherigen Null-Deref.
+            var state = await _authState.GetAuthenticationStateAsync();
+            var username = state.User.Identity?.Name;
+            var user = string.IsNullOrEmpty(username)
+                ? null
+                : await _userRepo.GetByUsernameAsync(username);
+
+            if (user is null)
+            {
+                _logger.LogWarning(
+                    "Share creation aborted: could not resolve creator (user='{User}')", username);
+                CreateErrorMessage = Resources.Web_Error_CreateShareFailed;
+                return false;
+            }
+
             var share = new ShareDefinition(name, BuildSharePath(name));
             await _shareRepo.CreateAsync(share);
             await _storage.CreateDirectoryAsync(name);
 
+            // Root-FileMetadata persistieren (Path == "", Konvention aus
+            // ShareRelativePath) und die Owner-FullControl-ACL daran hängen.
+            // GetOrCreateAsync schreibt die Metadata-Zeile tatsächlich in die DB —
+            // vorher wurde nur die ACL angelegt, deren FileMetadata nie existierte.
+            var rootMeta = await _metaRepo.GetOrCreateAsync(
+                "", isDirectory: true, userId: user.Id, shareId: share.Id);
 
-            var state = await _authState.GetAuthenticationStateAsync();
-            //var userId = state.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var user = await _userRepo.GetByUsernameAsync(state.User.Identity.Name);
-
-            //if (userId is not null && Guid.TryParse(userId, out var uid))
-            if (user is not null)
+            var newAcl = new AccessEntry(
+                user.Id,
+                AclEntryType.Allow,
+                FilePermission.FullControl,
+                AclInheritance.AllDescendants)
             {
+                FileMetadataId = rootMeta.Id
+            };
 
-                // Create the root FileMetadata for the share + owner ACL
-                var rootMeta = new FileMetadata
-                {
-                    Id = Guid.NewGuid(),
-                    ShareId = share.Id,
-                    Path = "/",
-                    IsDirectory = true,
-                    Size = 0,
-                    OwnerId = user.Id,
-                    CreatedAt = DateTime.UtcNow,
-                    ModifiedAt = DateTime.UtcNow,
-                };
-
-                var newAcl = new AccessEntry(
-                    user.Id,
-                    AclEntryType.Allow,
-                    FilePermission.FullControl,
-                    AclInheritance.AllDescendants);
-                    
-                newAcl.FileMetadataId = rootMeta.Id;
-
-                await _aclRepo.AddAsync(newAcl);
-                //await _accessRepo.EnsureShareRootAclAsync(share.Id, user.Id);
-            }
+            await _aclRepo.AddAsync(newAcl);
 
             _logger.LogInformation("Share '{ShareName}' created", name);
 

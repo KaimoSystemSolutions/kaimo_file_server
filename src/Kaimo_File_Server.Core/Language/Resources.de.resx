@@ -1092,6 +1092,12 @@
   <data name="Web_Perm_ManageDataServices" xml:space="preserve">
     <value>Datendienste verwalten</value>
   </data>
+  <data name="Web_Perm_ManageCertificates" xml:space="preserve">
+    <value>HTTPS-Zertifikat verwalten</value>
+  </data>
+  <data name="Web_Settings_Tab_Certificate" xml:space="preserve">
+    <value>Zertifikat</value>
+  </data>
   <data name="Web_Share_Enabled" xml:space="preserve">
     <value>Share aktiviert.</value>
   </data>

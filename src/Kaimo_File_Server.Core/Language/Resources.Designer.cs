@@ -1859,7 +1859,25 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Perm_ManageDataServices", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Manage HTTPS certificate ähnelt.
+        /// </summary>
+        public static string Web_Perm_ManageCertificates {
+            get {
+                return ResourceManager.GetString("Web_Perm_ManageCertificates", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Certificate ähnelt.
+        /// </summary>
+        public static string Web_Settings_Tab_Certificate {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_Certificate", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Manage members ähnelt.
         /// </summary>

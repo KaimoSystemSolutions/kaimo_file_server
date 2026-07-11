@@ -54,7 +54,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
             .ReturnsAsync(true);
 
         return new ShareListViewModel(
-            ShareRepo(), UserRepo(), GroupRepo(), AclRepo(),
+            ShareRepo(), UserRepo(), GroupRepo(), AclRepo(), FileMetadataRepo(),
             _aclService.Object, _mgmtAuth.Object,
             UserContextFactoryFor((actor.Username, ctx)).Object,
             _storage.Object, _lockManager,
@@ -237,6 +237,63 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         Assert.False(ok);
         await using var db = NewContext();
         Assert.Equal(1, await db.ShareDefinitions.CountAsync());
+    }
+
+    [Fact]
+    public async Task CreateShareAsync_PersistsRootMetadataWithOwnerFullControlAcl()
+    {
+        var actor = SeedUser("admin");
+        var sut = BuildAdminSut(actor);
+
+        sut.NewShareName = "docs";
+        var ok = await sut.CreateShareAsync();
+
+        Assert.True(ok);
+
+        await using var db = NewContext();
+        var share = await db.ShareDefinitions.SingleAsync(s => s.Name == "docs");
+
+        // The root FileMetadata must exist and use the "" convention (not "/"),
+        // otherwise the ACL resolver never finds the owner entry.
+        var rootMeta = await db.FileMetadata
+            .Include(m => m.Acl)
+            .SingleAsync(m => m.ShareId == share.Id && m.Path == "");
+
+        Assert.True(rootMeta.IsDirectory);
+        Assert.Equal(actor.Id, rootMeta.OwnerId);
+
+        // The owner ACL must actually be persisted and linked to the root metadata.
+        var ownerAcl = Assert.Single(rootMeta.Acl);
+        Assert.Equal(actor.Id, ownerAcl.PrincipalId);
+        Assert.Equal(AclEntryType.Allow, ownerAcl.EntryType);
+        Assert.Equal(FilePermission.FullControl, ownerAcl.Permissions & FilePermission.FullControl);
+    }
+
+    [Fact]
+    public async Task CreateShareAsync_WithoutResolvableCreator_PersistsNothing()
+    {
+        // Actor is authenticated (name claim present) but has no matching user row,
+        // so the creator cannot be resolved. No orphaned share may be left behind.
+        _mgmtAuth
+            .Setup(m => m.HasAnyPermissionAsync(It.IsAny<UserContext>(), ManagementPermission.CreateShares))
+            .ReturnsAsync(true);
+
+        var sut = new ShareListViewModel(
+            ShareRepo(), UserRepo(), GroupRepo(), AclRepo(), FileMetadataRepo(),
+            _aclService.Object, _mgmtAuth.Object,
+            UserContextFactoryFor().Object,
+            _storage.Object, _lockManager,
+            AuthStateFor("ghost"),
+            NullLogger<ShareListViewModel>.Instance,
+            _storagePath);
+
+        sut.NewShareName = "docs";
+        var ok = await sut.CreateShareAsync();
+
+        Assert.False(ok);
+        await using var db = NewContext();
+        Assert.Empty(await db.ShareDefinitions.ToListAsync());
+        Assert.Empty(await db.FileMetadata.ToListAsync());
     }
 
     // ─────────────────────── Load scoping ───────────────────────

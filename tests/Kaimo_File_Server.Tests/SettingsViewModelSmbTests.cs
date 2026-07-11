@@ -7,6 +7,7 @@ using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components.ViewModels;
+using Kaimo_File_Server.Web.Services.Https;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -269,6 +270,7 @@ public class SettingsViewModelSmbTests
                 new StubAuthProvider("admin"),
                 Mock.Of<ISystemInfoService>(),
                 Mock.Of<ISearchAdminService>(),
+                Mock.Of<IHttpsCertificateProvider>(),
                 NullLogger<SettingsViewModel>.Instance);
         }
 

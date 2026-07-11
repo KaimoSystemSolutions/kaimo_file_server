@@ -489,6 +489,40 @@ public class FileSystemStorageTests : IDisposable
         Assert.Equal(2, items.Count); // "child" dir + "direct.txt" file
         Assert.DoesNotContain(items, i => i.Name == "grandchild.txt");
     }
+
+    // ═══════════════════ Move ═══════════════════
+
+    [Fact]
+    public async Task MoveAsync_WithoutCollision_ReturnsRequestedPath()
+    {
+        await _sut.WriteAsync("src.txt", new MemoryStream([1, 2, 3]));
+
+        var actual = await _sut.MoveAsync("src.txt", "bin/src.txt");
+
+        Assert.Equal("bin/src.txt", actual);
+        Assert.True(File.Exists(Path.Combine(_testRoot, "bin", "src.txt")));
+        Assert.False(File.Exists(Path.Combine(_testRoot, "src.txt")));
+    }
+
+    [Fact]
+    public async Task MoveAsync_OnNameCollision_ReturnsSuffixedPathAndKeepsBoth()
+    {
+        // A file with the target name already exists → the move must not clobber it.
+        await _sut.WriteAsync("bin/dup.txt", new MemoryStream([9]));
+        await _sut.WriteAsync("dup.txt", new MemoryStream([1, 2, 3]));
+
+        var actual = await _sut.MoveAsync("dup.txt", "bin/dup.txt");
+
+        // Returned path is disambiguated and differs from the requested one...
+        Assert.StartsWith("bin/dup.txt_", actual);
+        Assert.NotEqual("bin/dup.txt", actual);
+
+        // ...points at the file that actually landed on disk...
+        Assert.True(File.Exists(Path.Combine(_testRoot, actual.Replace('/', Path.DirectorySeparatorChar))));
+
+        // ...and the pre-existing file is untouched.
+        Assert.Equal([9], await File.ReadAllBytesAsync(Path.Combine(_testRoot, "bin", "dup.txt")));
+    }
 }
 
 /// <summary>
@@ -545,8 +579,8 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
     public Task<List<FileMetadata>> ListAsync(string directoryPath)
         => Invoke<List<FileMetadata>>("ListAsync", directoryPath);
 
-    public Task MoveAsync(string oldPath, string newPath)
-        => Invoke("MoveAsync", oldPath, newPath);
+    public Task<string> MoveAsync(string oldPath, string newPath)
+        => Invoke<string>("MoveAsync", oldPath, newPath);
 
     public Task RenameFileAsync(string oldPath, string newPath)
         => Invoke("RenameFileAsync", oldPath, newPath);

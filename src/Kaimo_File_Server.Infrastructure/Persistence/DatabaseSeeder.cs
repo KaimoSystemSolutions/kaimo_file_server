@@ -188,11 +188,12 @@ public class DatabaseSeeder
     /// </summary>
     private static readonly (string Name, ManagementPermission Perms, bool IsSystem)[] RoleDefinitions =
     [
-        ("Administrator",   ManagementPermission.FullAdmin,                                      true),
-        ("UserManager",     ManagementPermission.UserAdmin | ManagementPermission.AssignGroups,   true),
-        ("ShareManager",    ManagementPermission.ShareAdmin,                                     true),
-        ("DepartmentAdmin", ManagementPermission.DepartmentAdmin,                                true),
-        ("User",            ManagementPermission.None,                                           true),
+        ("Administrator",     ManagementPermission.FullAdmin,                                      true),
+        ("UserManager",       ManagementPermission.UserAdmin | ManagementPermission.AssignGroups,   true),
+        ("ShareManager",      ManagementPermission.ShareAdmin,                                     true),
+        ("DepartmentAdmin",   ManagementPermission.DepartmentAdmin,                                true),
+        ("CertificateManager", ManagementPermission.ManageCertificates,                            true),
+        ("User",              ManagementPermission.None,                                           true),
     ];
 
     private async Task SeedRolesAsync()

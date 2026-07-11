@@ -879,7 +879,7 @@ else
     private async Task OnKeyDownItemList(KeyboardEventArgs e)
     {
         if (e.Key == "Delete" && _selectedItems.Count > 0)
-            DeleteSelected();
+            await DeleteSelected();
 
         if (e.Key == "F2" && _selectedItems.Count == 1)
             await RenameSelected();

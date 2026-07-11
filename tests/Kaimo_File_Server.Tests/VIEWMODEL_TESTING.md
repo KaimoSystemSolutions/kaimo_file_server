@@ -98,15 +98,17 @@ public class MyViewModelDatabaseTests : DatabaseTestBase
 - ✅ Permission-Lifecycle (Ebene 3) — ACL grant/revoke/deny/inherit (Einzel **und** `HasAccessBatchAsync`) + Management-Delegation (scoped assignment / role-Recht) gegen echte Autorisierung
 - ⬜ ShareBrowserViewModel, LoginViewModel — Load-/Mapping-Logik, bislang nur indirekt abgedeckt
 
-## Beim Testen aufgefallen (nicht behoben — separate Aufgabe)
+## Beim Testen aufgefallen
 
 `ShareListViewModel` enthält halbfertige Methoden, deren „echter Wert" nicht sinnvoll
 testbar ist, weil die Persistenz fehlt:
 
-- `CreateShareAsync` erzeugt `rootMeta` (FileMetadata), **speichert es aber nie** und legt
-  danach eine `AccessEntry` mit `FileMetadataId = rootMeta.Id` an → verwaiste ACL / möglicher
-  FK-Bruch. Deshalb decken die Tests hier nur Validierung + Duplikat ab, nicht den Happy-Path.
-- `GrantAccessAsync`, `RevokeAccessAsync` haben leere `try`-Blöcke (No-Op).
-- `HasAccess(...)` gibt konstant `true` zurück.
+- ✅ `CreateShareAsync` — **behoben** (Review 2026-07-09): Root-`FileMetadata` wird jetzt via
+  `IFileMetadataRepository.GetOrCreateAsync` persistiert (Path `""`, nicht `"/"`), der Ersteller
+  wird vor dem Anlegen aufgelöst (kein verwaister Share). Happy-Path + „kein auflösbarer Owner"
+  sind per DB-Test abgesichert (`CreateShareAsync_PersistsRootMetadataWithOwnerFullControlAcl`,
+  `CreateShareAsync_WithoutResolvableCreator_PersistsNothing`).
+- ⬜ `GrantAccessAsync`, `RevokeAccessAsync` haben leere `try`-Blöcke (No-Op).
+- ⬜ `HasAccess(...)` gibt konstant `true` zurück.
 
-Diese sollten fertig implementiert und dann per DB-Test abgesichert werden.
+Die verbleibenden Punkte sollten fertig implementiert und dann per DB-Test abgesichert werden.

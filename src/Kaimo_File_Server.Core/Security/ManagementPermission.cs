@@ -44,6 +44,7 @@
         // -- System / Global Settings --
         ManageSystemSettings = 1L << 40,  // global settings, e.g. application language
         ManageDataServices = 1L << 41,  // start/stop data services (SMB, future NFS/FTP)
+        ManageCertificates = 1L << 42,  // view/download/replace the HTTPS server certificate
 
         // -- Shortcuts --
         UserAdmin = CreateUsers | DeleteUsers | EditUserProfiles
@@ -58,7 +59,7 @@
                         | ManageShareAccess | ManageShareAcls
                         | EditDepartment | ViewDepartment,
 
-        SystemAdmin = ManageSystemSettings | ManageDataServices,
+        SystemAdmin = ManageSystemSettings | ManageDataServices | ManageCertificates,
 
         FullAdmin = UserAdmin | GroupAdmin | ShareAdmin
                   | AssignGroups | AssignRoles | AssignDepartments
