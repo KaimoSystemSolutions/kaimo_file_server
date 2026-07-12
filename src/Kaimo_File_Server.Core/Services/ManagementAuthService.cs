@@ -214,6 +214,80 @@ public class ManagementAuthService : IManagementAuthService
             : AuthorizedScopeResult.None();
     }
 
+    // -- Delegation / no-privilege-elevation --
+
+    public async Task<ManagementPermission> GetEffectivePermissionsAtAsync(
+        UserContext actor, ScopeType targetScopeType, Guid targetScopeId)
+    {
+        var assignments = await GetEffectiveAssignmentsAsync(actor);
+        var effective = ManagementPermission.None;
+
+        foreach (var (assignment, role) in assignments)
+        {
+            if (await CoversAsync(assignment, targetScopeType, targetScopeId))
+                effective |= role.ManagementPermissions;
+        }
+
+        return effective;
+    }
+
+    public async Task<bool> CanAssignRoleAsync(
+        UserContext actor, ManagementPermission rolePermissions,
+        ScopeType targetScopeType, Guid targetScopeId)
+    {
+        var effective = await GetEffectivePermissionsAtAsync(
+            actor, targetScopeType, targetScopeId);
+
+        // Must hold the delegation right AT the target scope ...
+        if ((effective & ManagementPermission.AssignRoles) == 0)
+            return false;
+
+        // ... and may not grant a single bit the actor does not itself hold there.
+        // Subset check: no bit of the role falls outside the actor's effective set.
+        return (rolePermissions & ~effective) == ManagementPermission.None;
+    }
+
+    /// <summary>
+    /// Whether an actor's <paramref name="assignment"/> authority reaches a target scope.
+    ///   • Global covers every target.
+    ///   • A Department assignment covers that department (+ descendants) and any share
+    ///     whose department lies within it.
+    ///   • A Share assignment covers only that exact share.
+    /// A narrower scope never covers a broader one (a share can't cover its department,
+    /// and nothing but Global covers a Global target).
+    /// </summary>
+    private async Task<bool> CoversAsync(
+        ScopedRoleAssignment assignment, ScopeType targetType, Guid targetId)
+    {
+        if (assignment.ScopeType == ScopeType.Global)
+            return true;
+
+        switch (targetType)
+        {
+            case ScopeType.Global:
+                // Only a Global assignment (handled above) covers a Global target.
+                return false;
+
+            case ScopeType.Department:
+                return assignment.ScopeType == ScopeType.Department
+                    && await IsDepartmentInScopeAsync(targetId, assignment.ScopeId);
+
+            case ScopeType.Share:
+                if (assignment.ScopeType == ScopeType.Share)
+                    return assignment.ScopeId == targetId;
+                if (assignment.ScopeType == ScopeType.Department)
+                {
+                    var share = await _shareRepo.GetByIdAsync(targetId);
+                    return share != null
+                        && await IsDepartmentInScopeAsync(share.DepartmentId, assignment.ScopeId);
+                }
+                return false;
+
+            default:
+                return false;
+        }
+    }
+
     // -- Internals --
 
     /// <summary>

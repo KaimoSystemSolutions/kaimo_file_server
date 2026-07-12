@@ -87,7 +87,17 @@ public class UserListViewModel
     public bool CanAccessPage { get; private set; }
     public bool CanCreateUsers { get; private set; }
     public bool CanManageGroups { get; private set; }
+
+    /// <summary>Can the actor <em>assign</em> existing roles (within some scope)? Governs the
+    /// Roles tab and the scoped-assignment add/remove UI. The actual per-assignment limit is
+    /// enforced server-side by <see cref="IManagementAuthService.CanAssignRoleAsync"/>.</summary>
     public bool CanManageRoles { get; private set; }
+
+    /// <summary>Can the actor create/edit/delete role <em>definitions</em>? Roles are GLOBAL
+    /// objects, so mutating them requires Global-scoped AssignRoles — a scoped delegate may
+    /// assign roles but never redefine them.</summary>
+    public bool CanEditRoleDefinitions { get; private set; }
+
     public bool CanDeleteUsers { get; private set; }
     public bool CanDeleteGroups { get; private set; }
     public bool CanDeleteRoles { get; private set; }
@@ -341,13 +351,17 @@ public class UserListViewModel
         CanManageRoles = await _mgmtAuth.HasAnyPermissionAsync(
             _actorContext, ManagementPermission.AssignRoles);
 
+        // Role definitions are global objects → editing them requires Global AssignRoles.
+        CanEditRoleDefinitions = await _mgmtAuth.HasGlobalPermissionAsync(
+            _actorContext, ManagementPermission.AssignRoles);
+
         CanDeleteUsers = await _mgmtAuth.HasAnyPermissionAsync(
             _actorContext, ManagementPermission.DeleteUsers);
 
         CanDeleteGroups = await _mgmtAuth.HasAnyPermissionAsync(
             _actorContext, ManagementPermission.DeleteGroups);
 
-        CanDeleteRoles = IsGlobalAdmin;
+        CanDeleteRoles = CanEditRoleDefinitions;
 
         CanAccessPage = CanCreateUsers || canEditUsers || CanManageGroups || CanManageRoles;
 
@@ -654,7 +668,8 @@ public class UserListViewModel
     {
         if (SelectedRole is null || _actorContext is null) return;
 
-        if (!await _mgmtAuth.HasAnyPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
+        // Role definitions are global; editing one requires Global AssignRoles.
+        if (!await _mgmtAuth.HasGlobalPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
         {
             ErrorMessage = Resources.Web_Error_NoPermission;
             return;
@@ -668,7 +683,26 @@ public class UserListViewModel
 
     public async Task SaveRoleAsync()
     {
-        if (SelectedRole is null) return;
+        if (SelectedRole is null || _actorContext is null) return;
+
+        // Role definitions are GLOBAL objects: editing a role's bitmask changes it in every
+        // scope the role is assigned. Mutation therefore requires Global AssignRoles, and the
+        // resulting permission set may never exceed the actor's own global effective
+        // permissions — otherwise a role could be crafted to elevate beyond the actor.
+        var globalPerms = await _mgmtAuth.GetEffectivePermissionsAtAsync(
+            _actorContext, ScopeType.Global, Guid.Empty);
+
+        if ((globalPerms & ManagementPermission.AssignRoles) == 0)
+        {
+            ErrorMessage = Resources.Web_Error_NoPermission;
+            return;
+        }
+
+        if (!SelectedRole.IsSystemRole && (EditRolePermissions & ~globalPerms) != 0)
+        {
+            ErrorMessage = Resources.Web_Error_NoPermission;
+            return;
+        }
 
         try
         {
@@ -730,16 +764,21 @@ public class UserListViewModel
         { ErrorMessage = Resources.Web_Error_SelectUserOrGroup; return; }
         if (NewAssignmentScopeType != ScopeType.Global && NewAssignmentScopeId is null)
         { ErrorMessage = Resources.Web_Scope_SelectScope; return; }
-        if (!await _mgmtAuth.HasAnyPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
+
+        var scopeId = NewAssignmentScopeType == ScopeType.Global
+            ? Guid.Empty : NewAssignmentScopeId!.Value;
+
+        // No-privilege-elevation gate: the actor must hold AssignRoles AT the chosen scope
+        // and may not grant a role carrying any permission the actor lacks there. This blocks
+        // the escalation where a narrowly-scoped delegate assigns e.g. Administrator globally.
+        if (!await _mgmtAuth.CanAssignRoleAsync(
+                _actorContext, SelectedRole.ManagementPermissions, NewAssignmentScopeType, scopeId))
         { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
         {
             IsSaving = true;
             ErrorMessage = null;
-
-            var scopeId = NewAssignmentScopeType == ScopeType.Global
-                ? Guid.Empty : NewAssignmentScopeId!.Value;
 
             await _assignmentRepo.CreateAsync(new ScopedRoleAssignment(
                 NewAssignmentPrincipalId.Value, SelectedRole.Id, NewAssignmentScopeType, scopeId));
@@ -759,7 +798,18 @@ public class UserListViewModel
     public async Task DeleteAssignmentAsync(Guid assignmentId)
     {
         if (_actorContext is null) return;
-        if (!await _mgmtAuth.HasAnyPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
+
+        // Removing an assignment is bounded by the same authority as creating one: the actor
+        // must be able to assign that role at that scope. Otherwise any AssignRoles holder
+        // could strip arbitrary assignments (e.g. remove the sole global admin).
+        var assignment = await _assignmentRepo.GetByIdAsync(assignmentId);
+        if (assignment is null) { ErrorMessage = Resources.Web_Error_NoPermission; return; }
+
+        var role = await _roleRepo.GetByIdAsync(assignment.RoleId);
+        var rolePerms = role?.ManagementPermissions ?? ManagementPermission.None;
+
+        if (!await _mgmtAuth.CanAssignRoleAsync(
+                _actorContext, rolePerms, assignment.ScopeType, assignment.ScopeId))
         { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
@@ -903,7 +953,8 @@ public class UserListViewModel
         if (string.IsNullOrWhiteSpace(CreateRoleName)) { ErrorMessage = Resources.Web_Role_NameRequired; return; }
         if (_actorContext is null) return;
 
-        if (!await _mgmtAuth.HasAnyPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
+        // Creating a (global) role definition requires Global AssignRoles.
+        if (!await _mgmtAuth.HasGlobalPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
         { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try
@@ -978,7 +1029,8 @@ public class UserListViewModel
     public async Task ConfirmDeleteRoleAsync()
     {
         if (SelectedRole is null || _actorContext is null) return;
-        if (!await _mgmtAuth.HasAnyPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
+        // Deleting a (global) role definition requires Global AssignRoles.
+        if (!await _mgmtAuth.HasGlobalPermissionAsync(_actorContext, ManagementPermission.AssignRoles))
         { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
         try

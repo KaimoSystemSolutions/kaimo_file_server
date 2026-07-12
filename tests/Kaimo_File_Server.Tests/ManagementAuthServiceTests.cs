@@ -381,6 +381,155 @@ public class ManagementAuthServiceTests
         Assert.True(ok);
     }
 
+    // ═══════════════════ CanAssignRole (no privilege elevation) ═══════════════════
+
+    /// <summary>Registers a set of scoped assignments (each with its own role) as the actor's
+    /// effective assignments, so tests can model mixed-scope authority precisely.</summary>
+    private void GrantMany(params (ScopeType Type, Guid ScopeId, ManagementPermission Perms)[] grants)
+    {
+        var assignments = new List<ScopedRoleAssignment>();
+        foreach (var (type, scopeId, perms) in grants)
+        {
+            var roleId = Guid.NewGuid();
+            assignments.Add(new ScopedRoleAssignment(_actorId, roleId, type, scopeId));
+            _roleRepo.Setup(r => r.GetByIdAsync(roleId)).ReturnsAsync(new Role(roleId, "R", perms));
+        }
+        _assignmentRepo
+            .Setup(r => r.GetEffectiveAssignmentsAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync(assignments);
+    }
+
+    [Fact]
+    public async Task CanAssignRole_DeptScopedDelegate_CannotAssignGlobally()
+    {
+        // The headline escalation: a delegate with AssignRoles scoped to ONE department
+        // must not be able to assign a (FullAdmin) role at Global scope.
+        var dept = Guid.NewGuid();
+        GrantScoped(ScopeType.Department, dept,
+            ManagementPermission.AssignRoles | ManagementPermission.UserAdmin);
+
+        var ok = await _sut.CanAssignRoleAsync(
+            Actor(), ManagementPermission.FullAdmin, ScopeType.Global, Guid.Empty);
+
+        Assert.False(ok);
+    }
+
+    [Fact]
+    public async Task CanAssignRole_CannotGrantPermissionsBeyondOwn_EvenInScope()
+    {
+        // In-scope, but the role carries a bit (ManageCertificates) the actor lacks → denied.
+        var dept = Guid.NewGuid();
+        GrantScoped(ScopeType.Department, dept,
+            ManagementPermission.AssignRoles | ManagementPermission.UserAdmin);
+
+        var ok = await _sut.CanAssignRoleAsync(
+            Actor(),
+            ManagementPermission.UserAdmin | ManagementPermission.ManageCertificates,
+            ScopeType.Department, dept);
+
+        Assert.False(ok);
+    }
+
+    [Fact]
+    public async Task CanAssignRole_WithinScopeAndWithinOwnPermissions_ReturnsTrue()
+    {
+        var dept = Guid.NewGuid();
+        GrantScoped(ScopeType.Department, dept,
+            ManagementPermission.AssignRoles | ManagementPermission.UserAdmin);
+
+        var ok = await _sut.CanAssignRoleAsync(
+            Actor(), ManagementPermission.UserAdmin, ScopeType.Department, dept);
+
+        Assert.True(ok);
+    }
+
+    [Fact]
+    public async Task CanAssignRole_WithoutAssignRolesBit_ReturnsFalse()
+    {
+        // A DepartmentAdmin (no AssignRoles) cannot delegate roles even within its own scope.
+        var dept = Guid.NewGuid();
+        GrantScoped(ScopeType.Department, dept, ManagementPermission.DepartmentAdmin);
+
+        var ok = await _sut.CanAssignRoleAsync(
+            Actor(), ManagementPermission.None, ScopeType.Department, dept);
+
+        Assert.False(ok);
+    }
+
+    [Fact]
+    public async Task CanAssignRole_GlobalFullAdmin_CanAssignAnythingGlobally()
+    {
+        var ok = await _sut.CanAssignRoleAsync(
+            Actor(RoleWith(ManagementPermission.FullAdmin)),
+            ManagementPermission.FullAdmin, ScopeType.Global, Guid.Empty);
+
+        Assert.True(ok);
+    }
+
+    [Fact]
+    public async Task CanAssignRole_DeptDelegate_CannotAssignInSiblingDepartment()
+    {
+        var dept = Guid.NewGuid();
+        var sibling = Guid.NewGuid();
+        GrantScoped(ScopeType.Department, dept,
+            ManagementPermission.AssignRoles | ManagementPermission.UserAdmin);
+
+        var ok = await _sut.CanAssignRoleAsync(
+            Actor(), ManagementPermission.UserAdmin, ScopeType.Department, sibling);
+
+        Assert.False(ok);
+    }
+
+    [Fact]
+    public async Task CanAssignRole_ScopeUnionDoesNotLeakBitsAcrossScopes()
+    {
+        // Actor holds AssignRoles (only) globally, and FullAdmin scoped to a department.
+        // At Global, only the global assignment covers → FullAdmin must NOT be assignable.
+        var dept = Guid.NewGuid();
+        GrantMany(
+            (ScopeType.Global, Guid.Empty, ManagementPermission.AssignRoles),
+            (ScopeType.Department, dept, ManagementPermission.FullAdmin));
+
+        var atGlobal = await _sut.CanAssignRoleAsync(
+            Actor(), ManagementPermission.FullAdmin, ScopeType.Global, Guid.Empty);
+        // But at the department, both cover → union includes FullAdmin and AssignRoles.
+        var atDept = await _sut.CanAssignRoleAsync(
+            Actor(), ManagementPermission.FullAdmin, ScopeType.Department, dept);
+
+        Assert.False(atGlobal);
+        Assert.True(atDept);
+    }
+
+    [Fact]
+    public async Task CanAssignRole_DeptScope_CoversShareInThatDepartment()
+    {
+        var dept = Guid.NewGuid();
+        var share = new ShareDefinition("s", "/s", departmentId: dept);
+        _shareRepo.Setup(r => r.GetByIdAsync(share.Id)).ReturnsAsync(share);
+        GrantScoped(ScopeType.Department, dept,
+            ManagementPermission.AssignRoles | ManagementPermission.ManageShareAcls);
+
+        var ok = await _sut.CanAssignRoleAsync(
+            Actor(), ManagementPermission.ManageShareAcls, ScopeType.Share, share.Id);
+
+        Assert.True(ok);
+    }
+
+    [Fact]
+    public async Task CanAssignRole_ShareScope_DoesNotCoverItsDepartment()
+    {
+        // A share-scoped delegate cannot climb up to assign at the owning department.
+        var dept = Guid.NewGuid();
+        var shareId = Guid.NewGuid();
+        GrantScoped(ScopeType.Share, shareId,
+            ManagementPermission.AssignRoles | ManagementPermission.ManageShareAcls);
+
+        var ok = await _sut.CanAssignRoleAsync(
+            Actor(), ManagementPermission.ManageShareAcls, ScopeType.Department, dept);
+
+        Assert.False(ok);
+    }
+
     [Fact]
     public async Task ScopedAssignmentOnly_WithoutDirectRole_RestrictsToScope()
     {

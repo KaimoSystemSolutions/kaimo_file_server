@@ -42,7 +42,7 @@ else
                     @Assets.SVG("plus.svg", new SvgOptions(Width: 20, Height: 20, StrokeWidth: 2))
                 </button>
             }
-            else if (VM.ActiveTab == AdminTab.Roles && VM.CanManageRoles)
+            else if (VM.ActiveTab == AdminTab.Roles && VM.CanEditRoleDefinitions)
             {
                 <button class="btn-icon" title="Rolle erstellen" @onclick="() => VM.StartCreateRole()">
                     @Assets.SVG("plus.svg", new SvgOptions(Width: 20, Height: 20, StrokeWidth: 2))
@@ -922,7 +922,7 @@ else
                             </div>
 
                             <div class="detail-actions">
-                                @if (VM.CanManageRoles)
+                                @if (VM.CanEditRoleDefinitions)
                                 {
                                     <button class="btn-secondary" @onclick="EditRole">Bearbeiten</button>
                                 }

@@ -57,6 +57,11 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
             .ReturnsAsync(true);
         _mgmtAuth.Setup(m => m.GetAuthorizedDepartmentIdsAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
             .ReturnsAsync(AuthorizedScopeResult.Unrestricted());
+        // A global admin holds every bit everywhere and can delegate any role.
+        _mgmtAuth.Setup(m => m.GetEffectivePermissionsAtAsync(It.IsAny<UserContext>(), It.IsAny<ScopeType>(), It.IsAny<Guid>()))
+            .ReturnsAsync(ManagementPermission.FullAdmin);
+        _mgmtAuth.Setup(m => m.CanAssignRoleAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>(), It.IsAny<ScopeType>(), It.IsAny<Guid>()))
+            .ReturnsAsync(true);
 
         return new UserListViewModel(
             UserRepo(), GroupRepo(), RoleRepo(), DepartmentRepo(), ScopedRoleRepo(),
