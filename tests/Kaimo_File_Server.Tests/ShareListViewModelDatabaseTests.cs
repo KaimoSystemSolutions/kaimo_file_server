@@ -52,6 +52,10 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         _mgmtAuth
             .Setup(m => m.HasAnyPermissionAsync(It.IsAny<UserContext>(), ManagementPermission.CreateShares))
             .ReturnsAsync(true);
+        // Global admin → may perform every per-share management action.
+        _mgmtAuth
+            .Setup(m => m.CanManageShareAsync(It.IsAny<UserContext>(), It.IsAny<Guid>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(true);
 
         return new ShareListViewModel(
             ShareRepo(), UserRepo(), GroupRepo(), AclRepo(), FileMetadataRepo(),
@@ -118,6 +122,73 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         await using var db = NewContext();
         var row = await db.ShareDefinitions.FindAsync(seeded.Id);
         Assert.True(row!.IsShareHidden);
+    }
+
+    // ─────────────── Per-permission enforcement (ManageShareAccess vs EditShareSettings) ───────────────
+
+    /// <summary>
+    /// SUT for an actor who may edit share SETTINGS but does NOT hold ManageShareAccess.
+    /// The coarse listing gate still lists the share (so the razor would render controls),
+    /// which is exactly why the per-action server guard must be the real enforcement.
+    /// </summary>
+    private ShareListViewModel BuildSettingsOnlyManagerSut(User actor)
+    {
+        var ctx = ContextFor(actor);
+
+        _mgmtAuth
+            .Setup(m => m.GetAuthorizedShareIdsAnyAsync(It.IsAny<UserContext>(), ManagementPermission.ShareAdmin))
+            .ReturnsAsync(AuthorizedScopeResult.Unrestricted());
+        _mgmtAuth
+            .Setup(m => m.CanManageShareAsync(It.IsAny<UserContext>(), It.IsAny<Guid>(), ManagementPermission.EditShareSettings))
+            .ReturnsAsync(true);
+        _mgmtAuth
+            .Setup(m => m.CanManageShareAsync(It.IsAny<UserContext>(), It.IsAny<Guid>(), ManagementPermission.ManageShareAccess))
+            .ReturnsAsync(false);
+
+        return new ShareListViewModel(
+            ShareRepo(), UserRepo(), GroupRepo(), AclRepo(), FileMetadataRepo(),
+            _aclService.Object, _mgmtAuth.Object,
+            UserContextFactoryFor((actor.Username, ctx)).Object,
+            _storage.Object, _lockManager,
+            AuthStateFor(actor.Username),
+            NullLogger<ShareListViewModel>.Instance,
+            _storagePath);
+    }
+
+    [Fact]
+    public async Task ToggleShareHiddenAsync_WithoutManageShareAccess_IsDeniedAndNotPersisted()
+    {
+        var actor = SeedUser("editor");
+        var seeded = SeedShare("docs", isHidden: false);
+
+        var sut = BuildSettingsOnlyManagerSut(actor);
+        await sut.LoadAsync();
+        sut.SelectShare(sut.Shares.Single(s => s.Id == seeded.Id));
+
+        var ok = await sut.ToggleShareHiddenAsync();
+
+        Assert.False(ok);
+        await using var db = NewContext();
+        var row = await db.ShareDefinitions.FindAsync(seeded.Id);
+        Assert.False(row!.IsShareHidden); // guard blocked the mutation
+    }
+
+    [Fact]
+    public async Task ToggleRecycleEnabledAsync_WithEditShareSettings_Succeeds()
+    {
+        var actor = SeedUser("editor");
+        var seeded = SeedShare("docs", isRecycleEnabled: false);
+
+        var sut = BuildSettingsOnlyManagerSut(actor);
+        await sut.LoadAsync();
+        sut.SelectShare(sut.Shares.Single(s => s.Id == seeded.Id));
+
+        var ok = await sut.ToggleRecycleEnabledAsync();
+
+        Assert.True(ok); // EditShareSettings is sufficient here
+        await using var db = NewContext();
+        var row = await db.ShareDefinitions.FindAsync(seeded.Id);
+        Assert.True(row!.IsRecycleEnabled);
     }
 
     [Fact]

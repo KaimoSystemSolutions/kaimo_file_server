@@ -34,8 +34,8 @@
         CreateShares = 1L << 24,
         DeleteShares = 1L << 25,
         EditShareSettings = 1L << 26,
-        ManageShareAccess = 1L << 27,  // grant/revoke share-level access
-        ManageShareAcls = 1L << 28,  // manage file/folder ACLs within shares
+        ManageShareAccess = 1L << 27,  // share-level access: enable/disable + visibility (hidden)
+        ManageShareAcls = 1L << 28,  // manage file/folder ACLs within shares (incl. share root)
 
         // -- Department Management --
         EditDepartment = 1L << 32,

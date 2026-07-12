@@ -375,25 +375,4 @@ else
         StateHasChanged();
     }
 
-    private async Task ToggleAccessPrincipal(Guid principalId, bool shouldGrant)
-    {
-        if (shouldGrant)
-            await VM.GrantAccessAsync(principalId);
-        else
-            await VM.RevokeAccessAsync(principalId);
-
-        StateHasChanged();
-    }
-
-    private async Task GrantAccess(Guid principalId)
-    {
-        await VM.GrantAccessAsync(principalId);
-        StateHasChanged();
-    }
-
-    private async Task RevokeAccess(Guid principalId)
-    {
-        await VM.RevokeAccessAsync(principalId);
-        StateHasChanged();
-    }
 }

@@ -404,4 +404,57 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
         await using var db = NewContext();
         Assert.False(await db.ScopedRoleAssignments.AnyAsync(a => a.Id == assignment.Id));
     }
+
+    // ═══════════════════ Group list scope filtering ═══════════════════
+
+    [Fact]
+    public async Task GroupsTab_ScopedManager_SeesOnlyGroupsInManagedDepartments()
+    {
+        // Regression: the group list must be filtered by the actor's GROUP-management
+        // scope, not the department-view scope, and an out-of-scope group must NOT leak.
+        var actor = SeedUser("mgr");
+        var deptA = SeedDepartment("A");
+        var deptB = SeedDepartment("B");
+        var groupA = SeedGroupInDept("teamA", deptA.Id);
+        var groupB = SeedGroupInDept("teamB", deptB.Id);
+
+        var sut = BuildScopedGroupManagerSut(actor, managedDeptId: deptA.Id);
+        await sut.LoadAsync();
+        await sut.SwitchTabAsync(AdminTab.Groups);
+
+        Assert.Contains(sut.Groups, g => g.Id == groupA.Id);
+        Assert.DoesNotContain(sut.Groups, g => g.Id == groupB.Id);
+    }
+
+    private Group SeedGroupInDept(string name, Guid departmentId)
+    {
+        var group = new Group(Guid.NewGuid(), name, departmentId);
+        using var db = NewContext();
+        db.Groups.Add(group);
+        db.SaveChanges();
+        return group;
+    }
+
+    private UserListViewModel BuildScopedGroupManagerSut(User actor, Guid managedDeptId)
+    {
+        var ctx = ContextFor(actor);
+
+        _mgmtAuth.Setup(m => m.HasGlobalPermissionAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(false);
+        _mgmtAuth.Setup(m => m.HasAnyPermissionAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(true);
+        _mgmtAuth.Setup(m => m.GetAuthorizedDepartmentIdsAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(AuthorizedScopeResult.None());
+        // Group-management scope is limited to a single department.
+        _mgmtAuth.Setup(m => m.GetAuthorizedDepartmentIdsAnyAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(AuthorizedScopeResult.LimitedTo(new List<Guid> { managedDeptId }));
+
+        return new UserListViewModel(
+            UserRepo(), GroupRepo(), RoleRepo(), DepartmentRepo(), ScopedRoleRepo(),
+            _passwords, _ntHash.Object, _mgmtAuth.Object,
+            UserContextFactoryFor((actor.Username, ctx)).Object,
+            AuthStateFor(actor.Username),
+            NullLogger<UserListViewModel>.Instance,
+            ShareRepo(), _config.Object);
+    }
 }

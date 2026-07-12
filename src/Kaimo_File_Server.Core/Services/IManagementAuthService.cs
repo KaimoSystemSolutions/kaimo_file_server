@@ -47,8 +47,18 @@ public interface IManagementAuthService
     /// <summary>
     /// Returns the set of department IDs the actor can manage for the given permission.
     /// Returns Unrestricted if the actor has Global scope.
+    /// Uses ALL-bits semantics: the role must hold every bit in <paramref name="required"/>.
     /// </summary>
     Task<AuthorizedScopeResult> GetAuthorizedDepartmentIdsAsync(UserContext actor, ManagementPermission required);
+
+    /// <summary>
+    /// Like <see cref="GetAuthorizedDepartmentIdsAsync"/> but with ANY-bit semantics:
+    /// a department qualifies if the actor's role holds AT LEAST ONE of the bits in
+    /// <paramref name="anyOf"/>. Pass a combined mask such as
+    /// <see cref="ManagementPermission.GroupAdmin"/> to mean "any group-management right".
+    /// Returns Unrestricted if the actor has Global scope.
+    /// </summary>
+    Task<AuthorizedScopeResult> GetAuthorizedDepartmentIdsAnyAsync(UserContext actor, ManagementPermission anyOf);
 
     /// <summary>
     /// Returns the set of share IDs the actor can manage for the given permission.

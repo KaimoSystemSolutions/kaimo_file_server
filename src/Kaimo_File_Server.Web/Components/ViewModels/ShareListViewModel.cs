@@ -99,12 +99,29 @@ public partial class ShareListViewModel
     private bool _manageAllShares;
     private HashSet<Guid> _manageableShareIds = new();
 
+    // The resolved actor, kept so per-action mutations can re-check the SPECIFIC
+    // management permission (not just "manages some share") server-side.
+    private UserContext? _actorContext;
+
     /// <summary>
     /// Whether the current actor may open the management panel for a specific share.
     /// A share the actor only sees via ACL (normal user view) is NOT manageable.
+    /// This is the coarse "any share-management right" gate used for listing/visibility;
+    /// individual mutations additionally re-check their specific permission via
+    /// <see cref="CanManageSelectedShareAsync"/>.
     /// </summary>
     public bool CanManageShare(Guid shareId)
         => _manageAllShares || _manageableShareIds.Contains(shareId);
+
+    /// <summary>
+    /// Server-side per-action authorization: does the actor hold <paramref name="required"/>
+    /// on the currently selected share (globally, via its department, or a direct share
+    /// assignment)? The razor hides controls the actor cannot use; this is the enforcement.
+    /// </summary>
+    private Task<bool> CanManageSelectedShareAsync(ManagementPermission required)
+        => SelectedShare is not null && _actorContext is not null
+            ? _mgmtAuth.CanManageShareAsync(_actorContext, SelectedShare.Id, required)
+            : Task.FromResult(false);
 
     [GeneratedRegex(@"^[a-zA-Z0-9\-_.]+$")]
     private static partial Regex SafeShareNameRegex();
@@ -131,6 +148,7 @@ public partial class ShareListViewModel
             if (actor is null)
             {
                 // No resolvable user → show nothing (default deny).
+                _actorContext = null;
                 IsAdmin = false;
                 CanCreateShare = false;
                 _manageAllShares = false;
@@ -138,6 +156,8 @@ public partial class ShareListViewModel
                 Shares = [];
                 return;
             }
+
+            _actorContext = actor;
 
             // -- Resolve management scope (any share-management right) --
             // Global scope → unrestricted; otherwise limited to the actor's
@@ -322,6 +342,11 @@ public partial class ShareListViewModel
 
         EditErrorMessage = null;
         EditSuccessMessage = null;
+
+        // Server-side authorization guard (see DeleteShareAsync).
+        if (!await CanManageSelectedShareAsync(ManagementPermission.EditShareSettings))
+        { EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
+
         var newName = EditShareName.Trim();
         var oldName = SelectedShare.Name;
 
@@ -403,6 +428,10 @@ public partial class ShareListViewModel
         EditErrorMessage = null;
         EditSuccessMessage = null;
 
+        // Enabling/disabling a share governs whether anyone can access it → ManageShareAccess.
+        if (!await CanManageSelectedShareAsync(ManagementPermission.ManageShareAccess))
+        { EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
+
         try
         {
             SelectedShare.IsEnabled = !SelectedShare.IsEnabled;
@@ -437,6 +466,10 @@ public partial class ShareListViewModel
 
         EditErrorMessage = null;
         EditSuccessMessage = null;
+
+        // The recycle bin is a share feature setting → EditShareSettings.
+        if (!await CanManageSelectedShareAsync(ManagementPermission.EditShareSettings))
+        { EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
 
         try
         {
@@ -473,6 +506,10 @@ public partial class ShareListViewModel
         EditErrorMessage = null;
         EditSuccessMessage = null;
 
+        // Visibility (hidden = excluded from listings/ABE) is share-access control → ManageShareAccess.
+        if (!await CanManageSelectedShareAsync(ManagementPermission.ManageShareAccess))
+        { EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
+
         try
         {
             SelectedShare.IsShareHidden = !SelectedShare.IsShareHidden;
@@ -508,6 +545,12 @@ public partial class ShareListViewModel
         if (SelectedShare is null) return false;
 
         EditErrorMessage = null;
+
+        // Server-side authorization: the razor hides the button when the actor
+        // cannot manage this share, but the view-model method must guard too —
+        // it enforces the specific DeleteShares right AND the department scope.
+        if (!await CanManageSelectedShareAsync(ManagementPermission.DeleteShares))
+        { EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
 
         try
         {
@@ -550,38 +593,6 @@ public partial class ShareListViewModel
         }
     }
 
-    public async Task GrantAccessAsync(Guid principalId)
-    {
-        if (SelectedShare is null) return;
-        AccessErrorMessage = null;
-
-        try
-        {
-            
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error granting access");
-            AccessErrorMessage = Resources.Web_Error_GrantAccessFailed;
-        }
-    }
-
-    public async Task RevokeAccessAsync(Guid principalId)
-    {
-        if (SelectedShare is null) return;
-        AccessErrorMessage = null;
-
-        try
-        {
-            
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error revoking access");
-            AccessErrorMessage = Resources.Web_Error_RevokeAccessFailed;
-        }
-    }
-
     public string GetPrincipalDisplayName(Guid principalId)
     {
         var user = AllUsers.FirstOrDefault(u => u.Id == principalId);
@@ -599,10 +610,4 @@ public partial class ShareListViewModel
         if (AllGroups.Any(g => g.Id == principalId)) return "group";
         return "unknown";
     }
-
-    public bool HasAccess(Guid principalId)
-    {
-        return true;
-    }
-        
 }

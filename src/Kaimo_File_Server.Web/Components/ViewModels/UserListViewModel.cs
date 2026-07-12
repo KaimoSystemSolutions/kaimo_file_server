@@ -213,7 +213,9 @@ public class UserListViewModel
             new(ManagementPermission.DeleteUsers, Resources.Web_Perm_DeleteUsers),
             new(ManagementPermission.EditUserProfiles, Resources.Web_Perm_EditProfiles),
             new(ManagementPermission.ResetPasswords, Resources.Web_Perm_ResetPasswords),
-            new(ManagementPermission.EnableDisableUsers, Resources.Web_Perm_EnableDisable),
+            // EnableDisableUsers is intentionally NOT offered here: the IsEnabled
+            // toggle lives in the profile-edit form and is enforced via
+            // EditUserProfiles. A standalone bit would be dead (never checked).
         ]),
         new(Resources.Web_PermGroup_GroupMgmt,
         [
@@ -225,7 +227,9 @@ public class UserListViewModel
         [
             new(ManagementPermission.AssignGroups, Resources.Web_Perm_AssignGroups),
             new(ManagementPermission.AssignRoles, Resources.Web_Perm_AssignRoles),
-            new(ManagementPermission.AssignDepartments, Resources.Web_Perm_AssignDepartments),
+            // AssignDepartments is intentionally NOT offered here: department
+            // membership is edited through DepartmentViewModel and enforced via
+            // EditDepartment. A standalone bit would be dead (never checked).
         ]),
         new(Resources.Web_PermGroup_ShareMgmt,
         [
@@ -1064,11 +1068,18 @@ public class UserListViewModel
         var allGroups = (await _groupRepo.GetAllAsync()).OrderBy(g => g.Name).ToList();
 
         if (IsGlobalAdmin) { Groups = allGroups; return; }
-        if (!CanManageGroups) { Groups = []; return; }
+        if (_actorContext is null) { Groups = []; return; }
 
-        var authorizedDeptIds = AuthorizedDepartmentsForView.Select(d => d.Id).ToHashSet();
-        if (authorizedDeptIds.Count == 0) { Groups = allGroups; return; }
+        // Filter by the actor's GROUP-management scope — the departments in which the
+        // actor may manage groups — NOT the department-view scope used for the user list.
+        // A group is listed when its department is in that scope. This also fixes the old
+        // "empty scope → show everything" leak: no group-management scope now means [].
+        var scope = await _mgmtAuth.GetAuthorizedDepartmentIdsAnyAsync(
+            _actorContext, ManagementPermission.GroupAdmin);
 
+        if (scope.IsUnrestricted) { Groups = allGroups; return; }
+
+        var authorizedDeptIds = scope.ScopeIds.ToHashSet();
         Groups = allGroups.Where(g => authorizedDeptIds.Contains(g.DepartmentId)).ToList();
     }
 

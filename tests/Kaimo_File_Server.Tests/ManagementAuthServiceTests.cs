@@ -330,4 +330,64 @@ public class ManagementAuthServiceTests
 
         Assert.False(ok);
     }
+
+    // ═══════════════════ Direct vs. delegated (same role) ═══════════════════
+
+    [Fact]
+    public async Task DirectGlobalRole_PlusScopedAssignmentOfSameRole_GlobalWins()
+    {
+        // A role assigned BOTH directly (user_roles → Global scope) AND as a
+        // department-scoped assignment. Effective authority is the UNION, and the
+        // direct grant already covers everything, so the result is Global.
+        // Adding a department scope to a role the user ALSO holds directly does NOT
+        // narrow it — the common mental-model trap in the assignment UI. The dedup in
+        // GetEffectiveAssignmentsAsync drops the scoped copy in favour of the Global one.
+        var roleId = Guid.NewGuid();
+        var role = new Role(roleId, "DeptEditor", ManagementPermission.EditDepartment);
+        var scopedDept = Guid.NewGuid();
+        var otherDept = Guid.NewGuid();
+
+        _assignmentRepo
+            .Setup(r => r.GetEffectiveAssignmentsAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync(new List<ScopedRoleAssignment>
+            {
+                new(_actorId, roleId, ScopeType.Department, scopedDept)
+            });
+        _roleRepo.Setup(r => r.GetByIdAsync(roleId)).ReturnsAsync(role);
+
+        // Same role held directly → synthetic Global scope.
+        var actor = Actor(role);
+
+        // A department OUTSIDE the scoped one is still manageable (Global wins).
+        var ok = await _sut.CanManageDepartmentAsync(
+            actor, otherDept, ManagementPermission.EditDepartment);
+
+        Assert.True(ok);
+    }
+
+    [Fact]
+    public async Task ScopedAssignmentOnly_WithoutDirectRole_RestrictsToScope()
+    {
+        // The counterpart: the SAME role held ONLY as a department-scoped assignment
+        // (no direct grant) genuinely restricts to that department + descendants.
+        var roleId = Guid.NewGuid();
+        var role = new Role(roleId, "DeptEditor", ManagementPermission.EditDepartment);
+        var scopedDept = Guid.NewGuid();
+        var otherDept = Guid.NewGuid();
+
+        _assignmentRepo
+            .Setup(r => r.GetEffectiveAssignmentsAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync(new List<ScopedRoleAssignment>
+            {
+                new(_actorId, roleId, ScopeType.Department, scopedDept)
+            });
+        _roleRepo.Setup(r => r.GetByIdAsync(roleId)).ReturnsAsync(role);
+
+        var actor = Actor(); // no direct roles
+
+        Assert.True(await _sut.CanManageDepartmentAsync(
+            actor, scopedDept, ManagementPermission.EditDepartment));
+        Assert.False(await _sut.CanManageDepartmentAsync(
+            actor, otherDept, ManagementPermission.EditDepartment));
+    }
 }

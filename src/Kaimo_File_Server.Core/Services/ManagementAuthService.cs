@@ -121,15 +121,27 @@ public class ManagementAuthService : IManagementAuthService
             a.Assignment.ScopeType == ScopeType.Global);
     }
 
-    public async Task<AuthorizedScopeResult> GetAuthorizedDepartmentIdsAsync(
+    public Task<AuthorizedScopeResult> GetAuthorizedDepartmentIdsAsync(
         UserContext actor, ManagementPermission required)
+        => GetAuthorizedDepartmentIdsCoreAsync(actor, role => HasPermission(role, required));
+
+    public Task<AuthorizedScopeResult> GetAuthorizedDepartmentIdsAnyAsync(
+        UserContext actor, ManagementPermission anyOf)
+        => GetAuthorizedDepartmentIdsCoreAsync(actor, role => HasAnyOverlap(role, anyOf));
+
+    /// <summary>
+    /// Shared scope-resolution for departments. <paramref name="roleMatches"/> decides
+    /// whether a role qualifies (ALL-bits vs ANY-bit), the scope walk is identical.
+    /// </summary>
+    private async Task<AuthorizedScopeResult> GetAuthorizedDepartmentIdsCoreAsync(
+        UserContext actor, Func<Role, bool> roleMatches)
     {
         var assignments = await GetEffectiveAssignmentsAsync(actor);
         var result = new HashSet<Guid>();
 
         foreach (var (assignment, role) in assignments)
         {
-            if (!HasPermission(role, required))
+            if (!roleMatches(role))
                 continue;
 
             if (assignment.ScopeType == ScopeType.Global)
