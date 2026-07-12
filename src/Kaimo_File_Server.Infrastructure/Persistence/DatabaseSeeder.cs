@@ -114,7 +114,6 @@ public class DatabaseSeeder
         _db.Users.Add(admin);
         await _db.SaveChangesAsync();
 
-        _db.UserRoles.Add(new UserRole(admin.Id, adminRole.Id));
         _db.ScopedRoleAssignments.Add(
             ScopedRoleAssignment.Global(admin.Id, adminRole.Id));
         await _db.SaveChangesAsync();
@@ -449,7 +448,7 @@ public class DatabaseSeeder
         }
     }
 
-    // -- Role Assignments (direct → Global scope in ManagementAuthService) --
+    // -- Role Assignments (global-scoped ScopedRoleAssignments) --
 
     private void AssignUsersToRoles(
         Dictionary<string, User> users,
@@ -467,7 +466,8 @@ public class DatabaseSeeder
         {
             foreach (var roleName in roleNames)
             {
-                _db.UserRoles.Add(new UserRole(users[userKey].Id, roles[roleName].Id));
+                _db.ScopedRoleAssignments.Add(
+                    ScopedRoleAssignment.Global(users[userKey].Id, roles[roleName].Id));
             }
         }
     }
@@ -559,8 +559,7 @@ public class DatabaseSeeder
         Dictionary<string, Group> groups,
         Dictionary<string, ShareDefinition> shares)
     {
-        _db.ScopedRoleAssignments.Add(
-            ScopedRoleAssignment.Global(users["admin"].Id, roles["Administrator"].Id));
+        // admin → Administrator (Global) is already assigned in AssignUsersToRoles.
 
         _db.ScopedRoleAssignments.Add(
             ScopedRoleAssignment.ForDepartment(
@@ -645,7 +644,6 @@ public class DatabaseSeeder
             var remove = group.Where(r => r.Id != keep.Id).ToList();
             var removeIds = remove.Select(r => r.Id).ToHashSet();
 
-            await MigrateUserRolesAsync(removeIds, keep.Id);
             await MigrateScopedAssignmentsAsync(removeIds, keep.Id);
 
             _db.Roles.RemoveRange(remove);
@@ -688,20 +686,6 @@ public class DatabaseSeeder
     }
 
     // -- Migration Helpers --
-
-    private async Task MigrateUserRolesAsync(HashSet<Guid> fromRoleIds, Guid toRoleId)
-    {
-        var affected = await _db.UserRoles
-            .Where(ur => fromRoleIds.Contains(ur.RoleId))
-            .ToListAsync();
-
-        foreach (var ur in affected)
-        {
-            if (!await _db.UserRoles.AnyAsync(x => x.UserId == ur.UserId && x.RoleId == toRoleId))
-                _db.UserRoles.Add(new UserRole(ur.UserId, toRoleId));
-            _db.UserRoles.Remove(ur);
-        }
-    }
 
     private async Task MigrateScopedAssignmentsAsync(HashSet<Guid> fromRoleIds, Guid toRoleId)
     {

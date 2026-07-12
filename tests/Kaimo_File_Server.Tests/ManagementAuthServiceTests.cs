@@ -10,8 +10,8 @@ namespace Kaimo_File_Server.Tests;
 
 /// <summary>
 /// Characterization tests for <see cref="ManagementAuthService"/> — the scoped
-/// delegated-administration gate. They pin the two authority sources (direct roles →
-/// Global scope, scoped assignments → Department/Share) and the scope resolution for
+/// delegated-administration gate. Authority has a single source: scoped role
+/// assignments (Global / Department / Share). These pin the scope resolution for
 /// user, group, share and department management, so the shared-helper refactor cannot
 /// change behaviour silently.
 /// </summary>
@@ -43,9 +43,30 @@ public class ManagementAuthServiceTests
 
     // -- Helpers --
 
-    private UserContext Actor(params Role[] directRoles)
-        => new(new User(_actorId, "Actor", "actor", "h", "n"),
-               new HashSet<Group>(), new HashSet<Role>(directRoles), new HashSet<string>());
+    /// <summary>
+    /// Builds the actor. Any roles passed are granted at GLOBAL scope by registering
+    /// them as global <see cref="ScopedRoleAssignment"/>s in the mock repo — the model
+    /// no longer has a separate "direct role" path; a globally held role IS a
+    /// Global-scoped assignment. Passing no roles leaves any prior GrantScoped setup
+    /// intact.
+    /// </summary>
+    private UserContext Actor(params Role[] globalRoles)
+    {
+        if (globalRoles.Length > 0)
+        {
+            var assignments = globalRoles
+                .Select(r => new ScopedRoleAssignment(_actorId, r.Id, ScopeType.Global, Guid.Empty))
+                .ToList();
+            _assignmentRepo
+                .Setup(r => r.GetEffectiveAssignmentsAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<Guid>>()))
+                .ReturnsAsync(assignments);
+            foreach (var role in globalRoles)
+                _roleRepo.Setup(r => r.GetByIdAsync(role.Id)).ReturnsAsync(role);
+        }
+
+        return new(new User(_actorId, "Actor", "actor", "h", "n"),
+                   new HashSet<Group>(), new HashSet<Role>(), new HashSet<string>());
+    }
 
     private static Role RoleWith(ManagementPermission perms)
         => new(Guid.NewGuid(), "Role", perms);
@@ -331,17 +352,14 @@ public class ManagementAuthServiceTests
         Assert.False(ok);
     }
 
-    // ═══════════════════ Direct vs. delegated (same role) ═══════════════════
+    // ═══════════════════ Global vs. scoped (same role) ═══════════════════
 
     [Fact]
-    public async Task DirectGlobalRole_PlusScopedAssignmentOfSameRole_GlobalWins()
+    public async Task GlobalAssignment_PlusScopedAssignmentOfSameRole_GlobalWins()
     {
-        // A role assigned BOTH directly (user_roles → Global scope) AND as a
-        // department-scoped assignment. Effective authority is the UNION, and the
-        // direct grant already covers everything, so the result is Global.
-        // Adding a department scope to a role the user ALSO holds directly does NOT
-        // narrow it — the common mental-model trap in the assignment UI. The dedup in
-        // GetEffectiveAssignmentsAsync drops the scoped copy in favour of the Global one.
+        // The same role held at BOTH Global and Department scope. Effective authority
+        // is the UNION, so the Global grant lets the actor manage a department OUTSIDE
+        // the department-scoped copy — adding a narrow scope never removes the broad one.
         var roleId = Guid.NewGuid();
         var role = new Role(roleId, "DeptEditor", ManagementPermission.EditDepartment);
         var scopedDept = Guid.NewGuid();
@@ -351,16 +369,14 @@ public class ManagementAuthServiceTests
             .Setup(r => r.GetEffectiveAssignmentsAsync(It.IsAny<Guid>(), It.IsAny<IEnumerable<Guid>>()))
             .ReturnsAsync(new List<ScopedRoleAssignment>
             {
+                new(_actorId, roleId, ScopeType.Global, Guid.Empty),
                 new(_actorId, roleId, ScopeType.Department, scopedDept)
             });
         _roleRepo.Setup(r => r.GetByIdAsync(roleId)).ReturnsAsync(role);
 
-        // Same role held directly → synthetic Global scope.
-        var actor = Actor(role);
-
         // A department OUTSIDE the scoped one is still manageable (Global wins).
         var ok = await _sut.CanManageDepartmentAsync(
-            actor, otherDept, ManagementPermission.EditDepartment);
+            Actor(), otherDept, ManagementPermission.EditDepartment);
 
         Assert.True(ok);
     }

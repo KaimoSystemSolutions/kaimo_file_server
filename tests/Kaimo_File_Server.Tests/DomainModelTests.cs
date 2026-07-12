@@ -22,7 +22,6 @@ public class DomainModelTests
     [Fact] public void Group_Constructor_SetsIdAndName() { var id = Guid.NewGuid(); var g = new Group(id, "Admins"); Assert.Equal(id, g.Id); Assert.Equal("Admins", g.Name); }
     [Fact] public void Role_Constructor_SetsIdAndName() { var id = Guid.NewGuid(); var r = new Role(id, "Administrator"); Assert.Equal(id, r.Id); Assert.Equal("Administrator", r.Name); }
     [Fact] public void UserGroup_Constructor_SetsBothIds() { var u = Guid.NewGuid(); var g = Guid.NewGuid(); var ug = new UserGroup(u, g); Assert.Equal(u, ug.UserId); Assert.Equal(g, ug.GroupId); }
-    [Fact] public void UserRole_Constructor_SetsBothIds() { var u = Guid.NewGuid(); var r = Guid.NewGuid(); var ur = new UserRole(u, r); Assert.Equal(u, ur.UserId); Assert.Equal(r, ur.RoleId); }
 
     [Fact]
     public void UserContext_Constructor_SetsAllCollections()

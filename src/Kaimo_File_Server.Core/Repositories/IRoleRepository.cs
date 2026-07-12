@@ -38,19 +38,5 @@ namespace Kaimo_File_Server.Core.Repositories
         /// Implementations should cascade-delete related assignment rows.
         /// </summary>
         Task DeleteAsync(Guid id);
-
-        /// <summary>
-        /// Returns all users that are assigned to the specified role.
-        /// </summary>
-        // NOTE: Parameter was renamed from "groupId" to "roleId" — the original
-        //       name was a copy-paste error from IGroupRepository.
-        Task<List<User>> GetMembersAsync(Guid roleId);
-
-        /// <summary>
-        /// Replaces the full member list of a role with the given set of user IDs.
-        /// Users not in <paramref name="userIds"/> are removed; new ones are added.
-        /// </summary>
-        // NOTE: Same rename as above (groupId → roleId).
-        Task SetMembersAsync(Guid roleId, List<Guid> userIds);
     }
 }

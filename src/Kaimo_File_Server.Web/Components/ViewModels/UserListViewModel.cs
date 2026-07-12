@@ -131,7 +131,6 @@ public class UserListViewModel
     public List<User> GroupMembers { get; private set; } = [];
 
     // -- Role-Details --
-    public List<User> RoleMembers { get; private set; } = [];
     public List<ScopedAssignmentDisplayItem> RoleScopedAssignments { get; private set; } = [];
 
     // -- Password-Change --
@@ -142,7 +141,6 @@ public class UserListViewModel
     public List<CheckboxItem<User>> EditGroupMembers { get; private set; } = [];
 
     // -- Role-Edit --
-    public List<CheckboxItem<User>> EditRoleMembers { get; private set; } = [];
     public ManagementPermission EditRolePermissions { get; set; } = ManagementPermission.None;
 
     // -- Create User --
@@ -482,12 +480,11 @@ public class UserListViewModel
         if (SelectedRole?.Id == role.Id)
         {
             SelectedRole = null;
-            RoleMembers = []; RoleScopedAssignments = [];
+            RoleScopedAssignments = [];
             return;
         }
 
         SelectedRole = role;
-        RoleMembers = (await _roleRepo.GetMembersAsync(role.Id)).OrderBy(u => u.Name).ToList();
         await LoadRoleScopedAssignmentsAsync(role.Id);
     }
 
@@ -666,10 +663,6 @@ public class UserListViewModel
         IsEditing = true;
         ErrorMessage = null; SuccessMessage = null;
 
-        var allUsers = (await _userRepo.GetAllAsync()).OrderBy(u => u.Name).ToList();
-        var members = await _roleRepo.GetMembersAsync(SelectedRole.Id);
-        var memberIds = members.Select(u => u.Id).ToHashSet();
-        EditRoleMembers = allUsers.Select(u => new CheckboxItem<User>(u, memberIds.Contains(u.Id))).ToList();
         EditRolePermissions = SelectedRole.ManagementPermissions;
     }
 
@@ -682,16 +675,12 @@ public class UserListViewModel
             IsSaving = true;
             ErrorMessage = null;
 
-            var selectedUserIds = EditRoleMembers.Where(m => m.IsChecked).Select(m => m.Item.Id).ToList();
-            await _roleRepo.SetMembersAsync(SelectedRole.Id, selectedUserIds);
-
             if (!SelectedRole.IsSystemRole)
             {
                 SelectedRole.ManagementPermissions = EditRolePermissions;
                 await _roleRepo.UpdateAsync(SelectedRole);
             }
 
-            RoleMembers = (await _roleRepo.GetMembersAsync(SelectedRole.Id)).OrderBy(u => u.Name).ToList();
             var refreshed = await _roleRepo.GetByIdAsync(SelectedRole.Id);
             if (refreshed is not null) SelectedRole = refreshed;
             await LoadRoleScopedAssignmentsAsync(SelectedRole.Id);
@@ -996,7 +985,7 @@ public class UserListViewModel
         {
             IsSaving = true;
             await _roleRepo.DeleteAsync(SelectedRole.Id);
-            SelectedRole = null; RoleMembers = []; RoleScopedAssignments = [];
+            SelectedRole = null; RoleScopedAssignments = [];
             IsConfirmingDelete = false;
             await LoadTabDataAsync();
             SuccessMessage = Resources.Web_Role_Deleted;

@@ -17,7 +17,6 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<Group> Groups { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<UserGroup> UserGroups { get; set; }
-        public DbSet<UserRole> UserRoles { get; set; }
 
         // -- Files & Shares --
         public DbSet<FileMetadata> FileMetadata { get; set; }
@@ -87,12 +86,6 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
             {
                 entity.ToTable("user_groups");
                 entity.HasKey(e => new { e.UserId, e.GroupId });
-            });
-
-            modelBuilder.Entity<UserRole>(entity =>
-            {
-                entity.ToTable("user_roles");
-                entity.HasKey(e => new { e.UserId, e.RoleId });
             });
 
             // -- Files & Shares --

@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,9 +25,18 @@ public class UserContextFactory : IUserContextFactory
             .Join(db.Groups, ug => ug.GroupId, g => g.Id, (ug, g) => g)
             .ToHashSetAsync();
 
-        var roles = await db.UserRoles
-            .Where(ur => ur.UserId == user.Id)
-            .Join(db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r)
+        // Roles are derived from GLOBAL-scoped role assignments — the user's own
+        // plus those inherited via group membership. Only Global scope contributes:
+        // department/share-scoped assignments express management authority, not
+        // ACL-principal identity, so they must not leak into file-ACL matching.
+        var principalIds = new List<Guid> { user.Id };
+        principalIds.AddRange(groups.Select(g => g.Id));
+
+        var roles = await db.ScopedRoleAssignments
+            .Where(a => a.ScopeType == ScopeType.Global
+                     && principalIds.Contains(a.PrincipalId))
+            .Join(db.Roles, a => a.RoleId, r => r.Id, (a, r) => r)
+            .Distinct()
             .ToHashSetAsync();
 
         var departments = await db.DepartmentUsers

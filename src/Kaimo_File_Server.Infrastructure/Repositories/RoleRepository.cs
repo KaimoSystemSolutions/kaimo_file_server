@@ -45,22 +45,5 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
                 await _db.SaveChangesAsync();
             }
         }
-
-        public async Task<List<User>> GetMembersAsync(Guid roleId)
-        {
-            return await _db.UserRoles
-                .Where(ur => ur.RoleId == roleId)
-                .Join(_db.Users, ur => ur.UserId, u => u.Id, (_, u) => u)
-                .OrderBy(u => u.Name)
-                .ToListAsync();
-        }
-
-        public async Task SetMembersAsync(Guid roleId, List<Guid> userIds)
-        {
-            var existing = _db.UserRoles.Where(ur => ur.RoleId == roleId);
-            _db.UserRoles.RemoveRange(existing);
-            _db.UserRoles.AddRange(userIds.Select(uId => new UserRole(uId, roleId)));
-            await _db.SaveChangesAsync();
-        }
     }
 }

@@ -711,36 +711,6 @@ else
                                 <h3>Rolle bearbeiten</h3>
                                 <span class="detail-subtitle">@VM.SelectedRole.Name</span>
                             </div>
-                            <div class="detail-section">
-                                <span class="detail-label">Direkte Mitglieder</span>
-                                <div class="multi-select @(membersOpen ? "open" : "")">
-                                    <div class="multi-select-display" @onclick="() => membersOpen = !membersOpen">
-                                        <span class="multi-select-text">
-                                            @Checked(VM.EditRoleMembers.Where(m => m.IsChecked).Select(m => m.Item.Name), "Keine Mitglieder")
-                                        </span>
-                                        @Assets.SVG("chevron_down_transparent.svg", new SvgOptions(
-                                                Width: 14,
-                                                Height: 14,
-                                                StrokeWidth: 2f,
-                                                CssClass: "multi-select-chevron"
-                                            ))
-                                    </div>
-                                    @if (membersOpen)
-                                    {
-                                        <div class="multi-select-backdrop" @onclick="() => membersOpen = false"></div>
-                                        <div class="multi-select-dropdown">
-                                            @foreach (var item in VM.EditRoleMembers)
-                                            {
-                                                <label class="multi-select-option">
-                                                    <input type="checkbox" @bind="item.IsChecked" />
-                                                    <span>@item.Item.Name</span>
-                                                    <span class="multi-select-hint">@item.Item.Username</span>
-                                                </label>
-                                            }
-                                        </div>
-                                    }
-                                </div>
-                            </div>
                             @if (!VM.SelectedRole.IsSystemRole)
                             {
                                 <div class="detail-section" style="margin-top: 16px;">
@@ -806,12 +776,6 @@ else
                                 <span class="detail-subtitle">@(VM.SelectedRole.IsSystemRole ? "Systemrolle" : "Benutzerdefinierte Rolle")</span>
                             </div>
                             <div class="detail-field-grid">
-                                <div class="detail-field">
-                                    <span class="detail-field-label">Direkte Mitglieder</span>
-                                    <span class="detail-field-value">
-                                        @(VM.RoleMembers.Any() ? Format(VM.RoleMembers.Select(u => u.Name), 5) : "Keine Mitglieder")
-                                    </span>
-                                </div>
                                 <div class="detail-field">
                                     <span class="detail-field-label">Berechtigungen</span>
                                     <span class="detail-field-value">

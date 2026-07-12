@@ -20,7 +20,12 @@ namespace Kaimo_File_Server.Core.Domain.Identity
         /// <summary>All groups the user is a member of.</summary>
         public HashSet<Group> Groups { get; init; }
 
-        /// <summary>All roles assigned to the user (directly or via groups).</summary>
+        /// <summary>
+        /// Roles the user effectively holds at GLOBAL scope — resolved from the
+        /// user's own and its groups' global-scoped role assignments. Used for
+        /// ACL principal matching. (Department/share-scoped roles are not here;
+        /// they grant management authority, not ACL identity.)
+        /// </summary>
         public HashSet<Role> Roles { get; init; }
 
         /// <summary>

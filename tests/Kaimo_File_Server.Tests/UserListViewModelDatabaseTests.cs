@@ -261,7 +261,8 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
         await sut.SaveUserAsync();
 
         await using var db = NewContext();
-        Assert.True(await db.UserRoles.AnyAsync(ur => ur.UserId == target.Id && ur.RoleId == role.Id));
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a =>
+            a.PrincipalId == target.Id && a.RoleId == role.Id && a.ScopeType == ScopeType.Global));
     }
 
     // ═══════════════════ Save group ═══════════════════

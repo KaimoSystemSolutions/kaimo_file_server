@@ -1,5 +1,6 @@
 ﻿using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -76,9 +77,11 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         /// <inheritdoc />
         public async Task<List<Role>> GetRolesForUserAsync(Guid userId)
         {
-            return await _db.UserRoles
-                .Where(ur => ur.UserId == userId)
-                .Join(_db.Roles, ur => ur.RoleId, r => r.Id, (_, r) => r)
+            // A user's "direct" roles are its own GLOBAL-scoped role assignments.
+            return await _db.ScopedRoleAssignments
+                .Where(a => a.PrincipalId == userId && a.ScopeType == ScopeType.Global)
+                .Join(_db.Roles, a => a.RoleId, r => r.Id, (_, r) => r)
+                .Distinct()
                 .OrderBy(r => r.Name)
                 .ToListAsync();
         }
@@ -95,9 +98,14 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         /// <inheritdoc />
         public async Task SetRolesForUserAsync(Guid userId, List<Guid> roleIds)
         {
-            var existing = _db.UserRoles.Where(ur => ur.UserId == userId);
-            _db.UserRoles.RemoveRange(existing);
-            _db.UserRoles.AddRange(roleIds.Select(rId => new UserRole(userId, rId)));
+            // Replaces only the user's OWN global-scoped assignments. Scoped
+            // (department/share) assignments and group-inherited roles are left
+            // untouched — they are managed through the scoped-assignment UI.
+            var existing = _db.ScopedRoleAssignments
+                .Where(a => a.PrincipalId == userId && a.ScopeType == ScopeType.Global);
+            _db.ScopedRoleAssignments.RemoveRange(existing);
+            _db.ScopedRoleAssignments.AddRange(
+                roleIds.Select(rId => ScopedRoleAssignment.Global(userId, rId)));
             await _db.SaveChangesAsync();
         }
 

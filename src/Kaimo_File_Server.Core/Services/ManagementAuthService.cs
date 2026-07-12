@@ -7,13 +7,13 @@ namespace Kaimo_File_Server.Core.Services;
 /// <summary>
 /// Unified management authorization service.
 ///
-/// TWO sources of authority, merged into one pipeline:
+/// Authority has a SINGLE source: SCOPED role assignments
+/// (ScopedRoleAssignment table), each explicitly scoped to Global,
+/// Department, or Share. A principal may be the user itself or one of
+/// the groups it belongs to; both are resolved into the same pipeline.
 ///
-///   1. DIRECT role assignments (User → Role, via user_roles table)
-///      → Treated as GLOBAL scope automatically.
-///
-///   2. SCOPED role assignments (ScopedRoleAssignment table)
-///      → Explicitly scoped to Global, Department, or Share.
+/// (There is no separate "direct" User → Role path anymore — a globally
+/// held role is simply a ScopedRoleAssignment with ScopeType.Global.)
 ///
 /// Group and Share now carry a direct DepartmentId FK,
 /// so scope checks load the entity and compare DepartmentId
@@ -285,43 +285,23 @@ public class ManagementAuthService : IManagementAuthService
     }
 
     /// <summary>
-    /// Collects ALL effective assignments from two sources:
-    ///
-    /// 1. DIRECT role assignments (actor.Roles) → synthetic Global-scoped entries.
-    /// 2. SCOPED role assignments (ScopedRoleAssignment table) → from DB.
-    ///
-    /// Both are returned in the same format so all permission checks
-    /// evaluate them identically.
+    /// Collects the actor's effective role assignments from the
+    /// ScopedRoleAssignment table, considering both the user's own
+    /// assignments and those inherited via group membership. Each is
+    /// paired with its resolved <see cref="Role"/> so permission checks
+    /// can evaluate scope and management bits uniformly.
     /// </summary>
     private async Task<List<(ScopedRoleAssignment Assignment, Role Role)>>
         GetEffectiveAssignmentsAsync(UserContext actor)
     {
         var result = new List<(ScopedRoleAssignment, Role)>();
 
-        // -- 1. Direct role assignments → Global scope --
-        foreach (var role in actor.Roles)
-        {
-            if (role.ManagementPermissions == ManagementPermission.None)
-                continue;
-
-            var synthetic = new ScopedRoleAssignment(
-                actor.User.Id, role.Id, ScopeType.Global, Guid.Empty);
-
-            result.Add((synthetic, role));
-        }
-
-        // -- 2. Scoped assignments from DB --
         var groupIds = actor.Groups?.Select(g => g.Id) ?? Enumerable.Empty<Guid>();
         var assignments = await _assignmentRepo.GetEffectiveAssignmentsAsync(
             actor.User.Id, groupIds);
 
         foreach (var assignment in assignments)
         {
-            if (result.Any(r =>
-                r.Item1.RoleId == assignment.RoleId &&
-                r.Item1.ScopeType == ScopeType.Global))
-                continue;
-
             var role = await _roleRepo.GetByIdAsync(assignment.RoleId);
             if (role != null)
                 result.Add((assignment, role));
