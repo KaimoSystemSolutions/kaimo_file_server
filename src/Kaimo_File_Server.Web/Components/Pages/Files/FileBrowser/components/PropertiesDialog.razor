@@ -1,0 +1,197 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.Pages.Acl
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject FileBrowserViewModel VM
+@inject AssetProvider Assets
+
+@*
+    Compact, Windows-Explorer-style "Properties" dialog for a single file or folder.
+
+    Opened from the file browser context menu via <see cref="Open" />. The dialog is
+    deliberately small and read-only: the "General" tab lists metadata (type, size,
+    timestamps, owner, MIME type, …) and the optional "Security" tab embeds the shared
+    <see cref="AclEditor" /> so ACL managers can inspect and edit permissions in place.
+    The Security tab is only rendered when the current user may manage the share's ACLs.
+*@
+@if (_show && _target is not null)
+{
+    <div class="modal-backdrop" @onclick="Close">
+        <div class="properties-dialog" @onclick:stopPropagation="true">
+
+            @* -- Header: icon + name + close -- *@
+            <div class="properties-header">
+                <span class="properties-header-icon">
+                    @if (_target.IsDirectory)
+                    {
+                        @Assets.SVG("folder.svg", new SvgOptions(Width: 22, Height: 22, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)"))
+                    }
+                    else
+                    {
+                        @Assets.SVG(FileHelper.GetIcon(_target.Name), new SvgOptions(Width: 22, Height: 22, Color: "var(--text-tertiary)"))
+                    }
+                </span>
+                <span class="properties-header-name" title="@_target.Name">@_target.Name</span>
+                <button class="btn-icon" title="@Resources.Web_Button_Close" @onclick="Close">
+                    @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                </button>
+            </div>
+
+            @* -- Tabs -- *@
+            <div class="properties-tabs">
+                <button class="properties-tab @(_activeTab == Tab.General ? "properties-tab--active" : "")"
+                        @onclick="() => _activeTab = Tab.General">
+                    @Resources.Web_Properties_Tab_General
+                </button>
+                @if (_showSecurityTab)
+                {
+                    <button class="properties-tab @(_activeTab == Tab.Security ? "properties-tab--active" : "")"
+                            @onclick="() => _activeTab = Tab.Security">
+                        @Resources.Web_Properties_Tab_Security
+                    </button>
+                }
+            </div>
+
+            @* -- Body -- *@
+            <div class="properties-body">
+                @if (_activeTab == Tab.General)
+                {
+                    <dl class="properties-grid">
+                        <dt>@Resources.Web_Properties_Type</dt>
+                        <dd>@TypeDescription()</dd>
+
+                        <dt>@Resources.Web_Properties_Location</dt>
+                        <dd title="@_location">@_location</dd>
+
+                        <dt>@Resources.Web_Properties_Size</dt>
+                        <dd>@SizeDescription()</dd>
+
+                        @if (!_target.IsDirectory)
+                        {
+                            <dt>@Resources.Web_Properties_Extension</dt>
+                            <dd>@ExtensionDescription()</dd>
+
+                            <dt>@Resources.Web_Properties_MimeType</dt>
+                            <dd>@FileHelper.GetContentType(_target.Name)</dd>
+                        }
+
+                        <div class="properties-divider"></div>
+
+                        <dt>@Resources.Web_Properties_Created</dt>
+                        <dd>@FormatTs(_target.CreatedAt)</dd>
+
+                        <dt>@Resources.Web_Properties_Modified</dt>
+                        <dd>@FormatTs(_target.ModifiedAt)</dd>
+
+                        <dt>@Resources.Web_Properties_Accessed</dt>
+                        <dd>@(_target.LastAccessedAt is { } la ? FormatTs(la) : "–")</dd>
+
+                        <div class="properties-divider"></div>
+
+                        <dt>@Resources.Web_Properties_Owner</dt>
+                        <dd>@(_ownerName ?? "–")</dd>
+
+                        <dt>@Resources.Web_Properties_Share</dt>
+                        <dd>@(VM.CurrentShare?.Name ?? "–")</dd>
+
+                        @* Only persisted items carry a stable id; hide the row otherwise
+                           instead of showing a meaningless all-zero GUID. *@
+                        @if (_itemId is { } id)
+                        {
+                            <dt>@Resources.Web_Properties_ItemId</dt>
+                            <dd class="properties-mono" title="@id.ToString()">@id.ToString()</dd>
+                        }
+                    </dl>
+                }
+                else if (_showSecurityTab)
+                {
+                    <AclEditor @key="@($"props-acl-{VM.CurrentShare?.Id}-{_relativePath}")"
+                               Path="@_relativePath"
+                               ShareId="@VM.CurrentShare!.Id"
+                               IsDirectory="@_target.IsDirectory" />
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private enum Tab { General, Security }
+
+    private bool _show;
+    private Tab _activeTab = Tab.General;
+    private FileMetadata? _target;
+
+    // Precomputed on open so the render path stays synchronous.
+    private string _location = "";
+    private string _relativePath = "";
+    private string? _ownerName;
+    private Guid? _itemId;
+    private bool _showSecurityTab;
+
+    /// <summary>Opens the properties dialog for a single file or directory.</summary>
+    public async Task Open(FileMetadata target)
+    {
+        _target = target;
+        _activeTab = Tab.General;
+        _relativePath = VM.ShareRelativeOf(target);
+        _showSecurityTab = VM.CanManageAcls && VM.CurrentShare is not null;
+        _ownerName = null;
+        _itemId = null;
+        _show = true;
+
+        // Location = share name + share-relative parent folder (empty at the root).
+        var parent = Kaimo_File_Server.Core.Helpers.ShareRelativePath.GetParent(_relativePath);
+        var shareName = VM.CurrentShare?.Name ?? "";
+        _location = string.IsNullOrEmpty(parent) ? shareName : $"{shareName}/{parent}";
+
+        StateHasChanged();
+
+        // Identity/owner live in the database, not in the filesystem listing (whose
+        // Id/OwnerId are always empty). Resolve the persisted record after the first
+        // paint; fall back to the listing's owner id when no row exists yet.
+        var persisted = await VM.GetPersistedMetadataAsync(target);
+        _itemId = persisted?.Id;
+        _ownerName = await VM.GetOwnerDisplayNameAsync(persisted?.OwnerId ?? target.OwnerId);
+        StateHasChanged();
+    }
+
+    public void Close()
+    {
+        _show = false;
+        _target = null;
+        StateHasChanged();
+    }
+
+    /// <summary>Human-readable type label, mirroring Windows Explorer's wording.</summary>
+    private string TypeDescription()
+    {
+        if (_target is null) return "";
+        if (_target.IsDirectory) return Resources.Web_Properties_TypeFolder;
+
+        var ext = System.IO.Path.GetExtension(_target.Name);
+        return string.IsNullOrEmpty(ext)
+            ? Resources.Web_Properties_TypeFile
+            : string.Format(Resources.Web_Properties_TypeFileExt, ext.TrimStart('.').ToUpperInvariant());
+    }
+
+    /// <summary>Size as a human-readable value plus the exact byte count.</summary>
+    private string SizeDescription()
+    {
+        if (_target is null) return "";
+
+        long? bytes = _target.IsDirectory ? VM.GetDirectorySize(_target) : _target.Size;
+        if (bytes is null) return Resources.Web_Properties_Calculating;
+
+        return $"{FormatHelper.FormatFileSize(bytes.Value)} " +
+               string.Format(Resources.Web_Properties_Bytes, bytes.Value.ToString("N0"));
+    }
+
+    private string ExtensionDescription()
+    {
+        var ext = System.IO.Path.GetExtension(_target!.Name);
+        return string.IsNullOrEmpty(ext) ? "–" : ext.ToLowerInvariant();
+    }
+
+    private static string FormatTs(DateTime utc)
+        => utc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss");
+}

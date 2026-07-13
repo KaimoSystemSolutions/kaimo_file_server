@@ -82,6 +82,9 @@ public static class ContextCommandCatalog
             IconOptions: new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"),
             ValidScopes: AllSingle),
 
+        new ContextCommand("properties", () => Resources.Context_Menu_Properties, "info.svg",
+            ValidScopes: AllSingle),
+
         new ContextCommand("newfolder", () => Resources.Context_Menu_NewFolder, "folder.svg",
             ValidScopes: EveryScope),
 

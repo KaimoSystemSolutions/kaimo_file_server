@@ -385,6 +385,9 @@ else
                FilePreviewComponent="_filePreviewComponent"
                OnRestored="OnVersionRestored" />
 
+@* -- Properties dialog (size / metadata / ACL) -- *@
+<PropertiesDialog @ref="_propertiesDialogComponent" />
+
 @code {
     [Parameter] public string ShareName { get; set; } = "";
     [Parameter] public string? SubPath { get; set; }
@@ -618,6 +621,7 @@ else
     private FilePreview _filePreviewComponent;
     private ContextMenu _contextMenuComponent;
     private VersionDialog _versionDialogComponent = default!;
+    private PropertiesDialog _propertiesDialogComponent = default!;
     
     private ElementReference _fileDropZone;
     private bool _jsInitialized = false;
@@ -975,6 +979,10 @@ else
     /// <summary>Opens the version-history dialog for a file or the point-in-time dialog for a folder.</summary>
     public async Task OpenVersionDialog(FileMetadata item)
         => await _versionDialogComponent.Open(item);
+
+    /// <summary>Opens the properties dialog (metadata + optional ACL tab) for a file or folder.</summary>
+    public async Task OpenPropertiesDialog(FileMetadata item)
+        => await _propertiesDialogComponent.Open(item);
 
     /// <summary>After a restore the live file changed — reload the listing.</summary>
     private async Task OnVersionRestored()

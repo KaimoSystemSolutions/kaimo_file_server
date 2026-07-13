@@ -38,6 +38,7 @@ public class FileBrowserViewModel
     private readonly IManagementAuthService _mgmtAuth;
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<FileBrowserViewModel> _logger;
+    private readonly IUserRepository _userRepo;
 
     private readonly ISearchService _searchService;
 
@@ -51,7 +52,8 @@ public class FileBrowserViewModel
         IManagementAuthService mgmtAuth,
         AuthenticationStateProvider authState,
         ILogger<FileBrowserViewModel> logger,
-        ISearchService searchService)
+        ISearchService searchService,
+        IUserRepository userRepo)
     {
         _fileServiceFactory = fileServiceFactory;
         _shareRepo = shareRepo;
@@ -61,6 +63,7 @@ public class FileBrowserViewModel
         _authState = authState;
         _logger = logger;
         _searchService = searchService;
+        _userRepo = userRepo;
     }
 
     // -- State --
@@ -694,6 +697,62 @@ public class FileBrowserViewModel
 
     /// <summary>Public accessor for the share-relative path of a browsed item.</summary>
     public string ShareRelativeOf(FileMetadata item) => ToShareRelative(item.Path);
+
+    /// <summary>
+    /// Looks up the persisted metadata record (stable <see cref="FileMetadata.Id"/> and
+    /// <see cref="FileMetadata.OwnerId"/>) for a browsed item.
+    ///
+    /// Filesystem listings are the source of truth for browsing and carry no database
+    /// identity — their <c>Id</c> and <c>OwnerId</c> are always <see cref="Guid.Empty"/>.
+    /// A backing row is only created lazily (e.g. the first time an ACL is assigned via
+    /// <c>IFileMetadataRepository.GetOrCreateAsync</c>). Returns <c>null</c> when no row
+    /// exists yet, so callers can avoid presenting a meaningless all-zero identifier.
+    /// </summary>
+    public async Task<(Guid Id, Guid OwnerId)?> GetPersistedMetadataAsync(FileMetadata item)
+    {
+        if (CurrentShare is null) return null;
+
+        var normalized = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Normalize(ToShareRelative(item.Path));
+
+        try
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            var row = await db.FileMetadata
+                .Where(m => m.ShareId == CurrentShare.Id && m.Path == normalized)
+                .Select(m => new { m.Id, m.OwnerId })
+                .FirstOrDefaultAsync();
+
+            return row is null ? null : (row.Id, row.OwnerId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load persisted metadata for {Path}", item.Path);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Resolves the display name of an item's owner for the properties dialog.
+    /// Falls back to a short id fragment when the owning user cannot be found
+    /// (e.g. a deleted account) and returns null for the empty/unset owner.
+    /// </summary>
+    public async Task<string?> GetOwnerDisplayNameAsync(Guid ownerId)
+    {
+        if (ownerId == Guid.Empty) return null;
+
+        try
+        {
+            var user = await _userRepo.GetByIdAsync(ownerId);
+            if (user is not null)
+                return string.IsNullOrWhiteSpace(user.Name) ? user.Username : user.Name;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to resolve owner {OwnerId}", ownerId);
+        }
+
+        return ownerId.ToString()[..8] + "…";
+    }
     
     public async Task<OperationResult> ArchiveAsync(List<FileMetadata> items, string format)
     {

@@ -1674,4 +1674,61 @@
   <data name="Web_Common_NoSharesAvailable" xml:space="preserve">
     <value>Keine Freigaben vorhanden</value>
   </data>
+  <data name="Context_Menu_Properties" xml:space="preserve">
+    <value>Eigenschaften</value>
+  </data>
+  <data name="Web_Properties_Tab_General" xml:space="preserve">
+    <value>Allgemein</value>
+  </data>
+  <data name="Web_Properties_Tab_Security" xml:space="preserve">
+    <value>Sicherheit</value>
+  </data>
+  <data name="Web_Properties_Type" xml:space="preserve">
+    <value>Typ</value>
+  </data>
+  <data name="Web_Properties_TypeFolder" xml:space="preserve">
+    <value>Dateiordner</value>
+  </data>
+  <data name="Web_Properties_TypeFile" xml:space="preserve">
+    <value>Datei</value>
+  </data>
+  <data name="Web_Properties_TypeFileExt" xml:space="preserve">
+    <value>{0}-Datei</value>
+  </data>
+  <data name="Web_Properties_Location" xml:space="preserve">
+    <value>Ort</value>
+  </data>
+  <data name="Web_Properties_Size" xml:space="preserve">
+    <value>Größe</value>
+  </data>
+  <data name="Web_Properties_Bytes" xml:space="preserve">
+    <value>({0} Bytes)</value>
+  </data>
+  <data name="Web_Properties_Calculating" xml:space="preserve">
+    <value>wird berechnet…</value>
+  </data>
+  <data name="Web_Properties_Extension" xml:space="preserve">
+    <value>Dateiendung</value>
+  </data>
+  <data name="Web_Properties_MimeType" xml:space="preserve">
+    <value>MIME-Typ</value>
+  </data>
+  <data name="Web_Properties_Created" xml:space="preserve">
+    <value>Erstellt</value>
+  </data>
+  <data name="Web_Properties_Modified" xml:space="preserve">
+    <value>Geändert</value>
+  </data>
+  <data name="Web_Properties_Accessed" xml:space="preserve">
+    <value>Zugriff</value>
+  </data>
+  <data name="Web_Properties_Owner" xml:space="preserve">
+    <value>Besitzer</value>
+  </data>
+  <data name="Web_Properties_Share" xml:space="preserve">
+    <value>Freigabe</value>
+  </data>
+  <data name="Web_Properties_ItemId" xml:space="preserve">
+    <value>Objekt-ID</value>
+  </data>
 </root>

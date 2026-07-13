@@ -3260,5 +3260,176 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Validation_ReservedName", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Properties.
+        /// </summary>
+        public static string Context_Menu_Properties {
+            get {
+                return ResourceManager.GetString("Context_Menu_Properties", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to General.
+        /// </summary>
+        public static string Web_Properties_Tab_General {
+            get {
+                return ResourceManager.GetString("Web_Properties_Tab_General", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Security.
+        /// </summary>
+        public static string Web_Properties_Tab_Security {
+            get {
+                return ResourceManager.GetString("Web_Properties_Tab_Security", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Type.
+        /// </summary>
+        public static string Web_Properties_Type {
+            get {
+                return ResourceManager.GetString("Web_Properties_Type", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to File folder.
+        /// </summary>
+        public static string Web_Properties_TypeFolder {
+            get {
+                return ResourceManager.GetString("Web_Properties_TypeFolder", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to File.
+        /// </summary>
+        public static string Web_Properties_TypeFile {
+            get {
+                return ResourceManager.GetString("Web_Properties_TypeFile", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to {0} file.
+        /// </summary>
+        public static string Web_Properties_TypeFileExt {
+            get {
+                return ResourceManager.GetString("Web_Properties_TypeFileExt", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Location.
+        /// </summary>
+        public static string Web_Properties_Location {
+            get {
+                return ResourceManager.GetString("Web_Properties_Location", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Size.
+        /// </summary>
+        public static string Web_Properties_Size {
+            get {
+                return ResourceManager.GetString("Web_Properties_Size", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to ({0} bytes).
+        /// </summary>
+        public static string Web_Properties_Bytes {
+            get {
+                return ResourceManager.GetString("Web_Properties_Bytes", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to calculating….
+        /// </summary>
+        public static string Web_Properties_Calculating {
+            get {
+                return ResourceManager.GetString("Web_Properties_Calculating", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Extension.
+        /// </summary>
+        public static string Web_Properties_Extension {
+            get {
+                return ResourceManager.GetString("Web_Properties_Extension", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to MIME type.
+        /// </summary>
+        public static string Web_Properties_MimeType {
+            get {
+                return ResourceManager.GetString("Web_Properties_MimeType", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Created.
+        /// </summary>
+        public static string Web_Properties_Created {
+            get {
+                return ResourceManager.GetString("Web_Properties_Created", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Modified.
+        /// </summary>
+        public static string Web_Properties_Modified {
+            get {
+                return ResourceManager.GetString("Web_Properties_Modified", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Accessed.
+        /// </summary>
+        public static string Web_Properties_Accessed {
+            get {
+                return ResourceManager.GetString("Web_Properties_Accessed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Owner.
+        /// </summary>
+        public static string Web_Properties_Owner {
+            get {
+                return ResourceManager.GetString("Web_Properties_Owner", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Share.
+        /// </summary>
+        public static string Web_Properties_Share {
+            get {
+                return ResourceManager.GetString("Web_Properties_Share", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Item ID.
+        /// </summary>
+        public static string Web_Properties_ItemId {
+            get {
+                return ResourceManager.GetString("Web_Properties_ItemId", resourceCulture);
+            }
+        }
     }
 }

@@ -3,13 +3,14 @@
 @using Kaimo_File_Server.Infrastructure.Configuration
 @inject AssetProvider Assets
 @inject IConfigRepository Config
+@inject IJSRuntime JS
 
 
 @if (_showContextMenu)
 {
     <div class="context-menu-backdrop" @onclick="CloseContextMenu" @oncontextmenu="CloseContextMenu"
          @oncontextmenu:preventDefault="true"></div>
-    <div class="context-menu" style="top: @(_contextMenuY)px; left: @(_contextMenuX)px;">
+    <div class="context-menu" @ref="_menuRef" style="top: @(_contextMenuY)px; left: @(_contextMenuX)px;">
         <ContextMenu Items="BuildContextMenuItems()" />
     </div>
 }
@@ -42,6 +43,10 @@
     private bool _showContextMenu;
     private double _contextMenuX;
     private double _contextMenuY;
+
+    private ElementReference _menuRef;
+    // Set when the menu is (re)opened so OnAfterRenderAsync nudges it back on-screen once.
+    private bool _needsReposition;
 
     // Globally configured, per-scope menu layout (Settings → Kontextmenü).
     // Reloaded on every right-click (see ReloadMenuConfig) so a saved change
@@ -146,6 +151,8 @@
 
         "permissions" => () => { ContextAcl(target!); return Task.CompletedTask; },
 
+        "properties" => async () => { CloseContextMenu(); await FileBrowser.OpenPropertiesDialog(target!); },
+
         "newfolder" => () => { ContextNewFolder(); return Task.CompletedTask; },
         "refresh" => async () => { await ContextRefresh(); },
 
@@ -168,6 +175,7 @@
         _contextMenuX = e.ClientX;
         _contextMenuY = e.ClientY;
         _showContextMenu = true;
+        _needsReposition = true;
     }
 
     private async Task OnBackgroundContextMenu(MouseEventArgs e)
@@ -176,6 +184,19 @@
         _contextMenuX = e.ClientX;
         _contextMenuY = e.ClientY;
         _showContextMenu = true;
+        _needsReposition = true;
+    }
+
+    // After the menu renders at the click point, ask the browser to shift it back
+    // into the viewport if it would overflow the bottom/right edge — so entries near
+    // the screen edge stay fully reachable. Runs once per open.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_showContextMenu && _needsReposition)
+        {
+            _needsReposition = false;
+            await JS.InvokeVoidAsync("contextMenu.reposition", _menuRef);
+        }
     }
 
     // Re-read the layout on every open so an admin's saved change in

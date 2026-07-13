@@ -1389,6 +1389,10 @@ html, body, #app {
     padding: 4px;
     box-shadow: var(--shadow-lg);
     animation: scaleIn 0.12s ease-out;
+    /* Never taller than the viewport: JS nudges the menu up when it overflows,
+       and this fallback lets an extreme menu scroll instead of clipping. */
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
 }
 
 .context-menu-header {
@@ -1436,6 +1440,117 @@ html, body, #app {
     height: 1px;
     background: var(--border);
     margin: 3px 6px;
+}
+
+/* ══════════════════════════════════════════════════════════
+   Properties Dialog (Eigenschaften)
+   Compact, Explorer-style metadata panel with General/Security tabs.
+   ══════════════════════════════════════════════════════════ */
+
+.properties-dialog {
+    display: flex;
+    flex-direction: column;
+    width: 420px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 64px);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    animation: scaleIn 0.15s ease-out;
+    overflow: hidden;
+}
+
+.properties-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.properties-header-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+.properties-header-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.properties-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px 0 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.properties-tab {
+    padding: 7px 14px;
+    border: none;
+    background: none;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.12s, border-color 0.12s;
+}
+
+    .properties-tab:hover {
+        color: var(--text-secondary);
+    }
+
+.properties-tab--active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.properties-body {
+    padding: 16px;
+    overflow-y: auto;
+}
+
+/* Two-column definition list: label (left) / value (right). */
+.properties-grid {
+    display: grid;
+    grid-template-columns: 128px 1fr;
+    gap: 8px 14px;
+    margin: 0;
+}
+
+    .properties-grid dt {
+        font-size: 12px;
+        color: var(--text-tertiary);
+        white-space: nowrap;
+    }
+
+    .properties-grid dd {
+        margin: 0;
+        font-size: 12px;
+        color: var(--text-primary);
+        word-break: break-word;
+    }
+
+/* Full-width hairline between logical groups of rows. */
+.properties-divider {
+    grid-column: 1 / -1;
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+}
+
+.properties-mono {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px !important;
+    color: var(--text-secondary) !important;
 }
 
 /* ══════════════════════════════════════════════════════════
