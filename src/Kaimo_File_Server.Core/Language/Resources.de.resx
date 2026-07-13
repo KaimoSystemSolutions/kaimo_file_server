@@ -813,6 +813,12 @@
   <data name="Web_Role_NameRequired" xml:space="preserve">
     <value>Rollenname erforderlich.</value>
   </data>
+  <data name="Web_Role_ShowAllPermissions" xml:space="preserve">
+    <value>Alle anzeigen</value>
+  </data>
+  <data name="Web_Role_ShowFewerPermissions" xml:space="preserve">
+    <value>Weniger anzeigen</value>
+  </data>
   <data name="Web_Scope_SelectScope" xml:space="preserve">
     <value>Bitte einen Geltungsbereich auswählen.</value>
   </data>

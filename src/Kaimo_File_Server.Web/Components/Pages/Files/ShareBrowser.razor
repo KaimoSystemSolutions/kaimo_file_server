@@ -14,12 +14,10 @@
     <div style="display: flex; gap: 0.5rem;">
         @if (VM.CanManageShares)
         {
-            <button class="btn-icon" title="@Resources.Web_ShareBrowser_CreateShare" @onclick="() => { VM.IsCreating = !VM.IsCreating; }">
-                <NavLink class="nav-item" href="/" Match="NavLinkMatch.All">
-                    @Assets.SVG("folder.svg", new SvgOptions())
-                    @Resources.Web_ShareBrowser_ManageShares
-                </NavLink>
-            </button>
+            <NavLink class="nav-item" href="/" Match="NavLinkMatch.All" title="@Resources.Web_ShareBrowser_ManageShares">
+                @Assets.SVG("folder.svg", new SvgOptions())
+                @Resources.Web_ShareBrowser_ManageShares
+            </NavLink>
         }
     </div>
 </div>
@@ -45,6 +43,10 @@ else if (!VM.Shares.Any())
 else
 {
     <div class="file-list">
+        <div class="file-list-header">
+            <div class="file-cell file-name">@Resources.Web_Folder_Name</div>
+            <div class="file-cell file-share-path">@Resources.Web_ShareList_Label_Path</div>
+        </div>
         @foreach (var share in VM.Shares)
         {
             <div class="file-row file-row-dir" @onclick="() => OpenShare(share.Name)">
@@ -52,8 +54,7 @@ else
                     @Assets.SVG("folder.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)", CssClass: "file-icon"))
                     <span>@share.Name</span>
                 </div>
-                <div class="file-cell file-size">@share.Path</div>
-                <div class="file-cell file-date"></div>
+                <div class="file-cell file-share-path">@share.Path</div>
             </div>
         }
     </div>

@@ -2,6 +2,7 @@
 @using Kaimo_File_Server.Core.Domain.Identity
 @using Kaimo_File_Server.Core.Security
 @using Kaimo_File_Server.Core.Helpers
+@using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject UserListViewModel VM
@@ -498,7 +499,7 @@ else
                             <div class="detail-field-grid">
                                 <div class="detail-field">
                                     <span class="detail-field-label">Status</span>
-                                    <span>
+                                    <span class="detail-field-value">
                                         @if (VM.SelectedUser.IsEnabled)
                                         {
                                             <span class="status-badge status-badge--active"><span class="status-dot status-dot--active"></span>Aktiv</span>
@@ -663,15 +664,21 @@ else
                                 <h3>@VM.SelectedGroup.Name</h3>
                                 <span class="detail-subtitle">Gruppe</span>
                             </div>
-                            <div class="detail-section">
-                                <span class="detail-label">Abteilung</span>
-                                <span class="detail-value">@VM.GetDepartmentName(VM.SelectedGroup.DepartmentId)</span>
-                                <span class="detail-label">Mitglieder</span>
-                                <span class="detail-value">
-                                    @(VM.GroupMembers.Any() ? Format(VM.GroupMembers.Select(u => u.Name), 5) : "Keine Mitglieder")
-                                </span>
-                                <span class="detail-label">ID</span>
-                                <span class="detail-value" style="font-size: 11px; font-family: monospace;">@VM.SelectedGroup.Id</span>
+                            <div class="detail-field-grid">
+                                <div class="detail-field">
+                                    <span class="detail-field-label">Abteilung</span>
+                                    <span class="detail-field-value">@VM.GetDepartmentName(VM.SelectedGroup.DepartmentId)</span>
+                                </div>
+                                <div class="detail-field">
+                                    <span class="detail-field-label">Mitglieder (@VM.GroupMembers.Count)</span>
+                                    <span class="detail-field-value">
+                                        @(VM.GroupMembers.Any() ? Format(VM.GroupMembers.Select(u => u.Name), 5) : "Keine Mitglieder")
+                                    </span>
+                                </div>
+                                <div class="detail-field">
+                                    <span class="detail-field-label">ID</span>
+                                    <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">@VM.SelectedGroup.Id</span>
+                                </div>
                             </div>
                             <div class="detail-actions">
                                 @if (VM.CanManageGroups)
@@ -785,15 +792,36 @@ else
                                         }
                                         else
                                         {
+                                            var activePerms = UserListViewModel.PermissionGroups
+                                                .SelectMany(g => g.Flags)
+                                                .Where(f => (VM.SelectedRole.ManagementPermissions & f.Flag) == f.Flag)
+                                                .Select(f => f.Label)
+                                                .ToList();
+                                            const int previewCount = 3;
+                                            var showAll = _showAllRolePerms || activePerms.Count <= previewCount;
+                                            var visiblePerms = showAll ? activePerms : activePerms.Take(previewCount).ToList();
+
                                             <div class="permission-tags">
-                                                @foreach (var permGroup in UserListViewModel.PermissionGroups)
+                                                @foreach (var label in visiblePerms)
                                                 {
-                                                    @foreach (var flag in permGroup.Flags)
+                                                    <span class="permission-tag">@label</span>
+                                                }
+                                                @if (activePerms.Count > previewCount)
+                                                {
+                                                    @if (!showAll)
                                                     {
-                                                        if ((VM.SelectedRole.ManagementPermissions & flag.Flag) == flag.Flag)
-                                                        {
-                                                            <span class="permission-tag">@flag.Label</span>
-                                                        }
+                                                        <span class="permission-tag permission-tag--more" role="button" tabindex="0"
+                                                              title="@Resources.Web_Role_ShowAllPermissions"
+                                                              @onclick="() => _showAllRolePerms = true">
+                                                            +@(activePerms.Count - previewCount) …
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="permission-tag permission-tag--more" role="button" tabindex="0"
+                                                              @onclick="() => _showAllRolePerms = false">
+                                                            @Resources.Web_Role_ShowFewerPermissions
+                                                        </span>
                                                     }
                                                 }
                                             </div>
@@ -922,7 +950,7 @@ else
                             </div>
 
                             <div class="detail-actions">
-                                @if (VM.CanEditRoleDefinitions)
+                                @if (VM.CanEditRoleDefinitions && !VM.SelectedRole.IsSystemRole)
                                 {
                                     <button class="btn-secondary" @onclick="EditRole">Bearbeiten</button>
                                 }
@@ -956,6 +984,7 @@ else
 
 @code {
     private bool groupsOpen, rolesOpen, membersOpen;
+    private bool _showAllRolePerms;
 
     // -- Binding helpers --
 
@@ -1011,12 +1040,12 @@ else
     }
 
     // -- Tab switching --
-    private async Task SwitchTab(AdminTab tab) { CloseDropdowns(); await VM.SwitchTabAsync(tab); StateHasChanged(); }
+    private async Task SwitchTab(AdminTab tab) { CloseDropdowns(); _showAllRolePerms = false; await VM.SwitchTabAsync(tab); StateHasChanged(); }
 
     // -- Selection --
     private async Task SelectUser(User user) { CloseDropdowns(); await VM.SelectUserAsync(user); StateHasChanged(); }
     private async Task SelectGroup(Group group) { CloseDropdowns(); await VM.SelectGroupAsync(group); StateHasChanged(); }
-    private async Task SelectRole(Role role) { CloseDropdowns(); await VM.SelectRoleAsync(role); StateHasChanged(); }
+    private async Task SelectRole(Role role) { CloseDropdowns(); _showAllRolePerms = false; await VM.SelectRoleAsync(role); StateHasChanged(); }
 
     // -- Edit / Save / Create / Delete --
     private async Task EditUser() { CloseDropdowns(); await VM.StartEditUserAsync(); StateHasChanged(); }

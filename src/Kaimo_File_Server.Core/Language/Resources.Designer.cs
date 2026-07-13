@@ -2021,7 +2021,25 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Role_NameRequired", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Show all ähnelt.
+        /// </summary>
+        public static string Web_Role_ShowAllPermissions {
+            get {
+                return ResourceManager.GetString("Web_Role_ShowAllPermissions", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Show fewer ähnelt.
+        /// </summary>
+        public static string Web_Role_ShowFewerPermissions {
+            get {
+                return ResourceManager.GetString("Web_Role_ShowFewerPermissions", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Role saved. ähnelt.
         /// </summary>

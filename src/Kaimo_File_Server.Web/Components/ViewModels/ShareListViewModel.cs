@@ -279,11 +279,16 @@ public partial class ShareListViewModel
             var rootMeta = await _metaRepo.GetOrCreateAsync(
                 "", isDirectory: true, userId: user.Id, shareId: share.Id);
 
+            // Everything (ThisFolder | SubFolders | SubFiles | AllDescendants) — die
+            // Owner-Regel MUSS auch für den Share-Root selbst gelten. Mit nur
+            // AllDescendants greift sie ausschließlich für Unterelemente, wodurch der
+            // Root-Listing-Check (FileService.ListAsync) selbst für den Ersteller
+            // fehlschlägt und der Filebrowser "Zugriff verweigert" zeigt.
             var newAcl = new AccessEntry(
                 user.Id,
                 AclEntryType.Allow,
                 FilePermission.FullControl,
-                AclInheritance.AllDescendants)
+                AclInheritance.Everything)
             {
                 FileMetadataId = rootMeta.Id
             };

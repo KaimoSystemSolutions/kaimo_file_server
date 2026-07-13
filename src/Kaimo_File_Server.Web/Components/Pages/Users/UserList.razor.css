@@ -15,7 +15,7 @@
 
 .user-list-row {
     display: grid;
-    grid-template-columns: 1fr 200px 100px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 160px) minmax(96px, auto);
     align-items: center;
     padding: 10px 16px;
     border-bottom: 1px solid var(--border);
@@ -77,6 +77,7 @@
 .user-cell-username {
     font-size: 13px;
     color: var(--text-secondary);
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -200,21 +201,30 @@
 .detail-field {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
 }
 
 .detail-field-label {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--text-tertiary);
+    letter-spacing: 0.01em;
+    color: var(--text-secondary);
 }
 
+/* Read-only display box: a filled block (distinct from the bordered
+   .edit-input fields) so view mode is never confused with edit mode,
+   and the many user/role/group parameters stay clearly separated. */
 .detail-field-value {
-    font-size: 13px;
-    color: var(--text-secondary);
-    word-break: break-all;
+    display: block;
+    font-size: 12px;
+    color: var(--text-primary);
+    word-break: break-word;
+    line-height: 1.4;
+    padding: 5px 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    min-height: 28px;
 }
 
 .detail-field-value--empty {
@@ -235,11 +245,44 @@
     border: 1px solid var(--border);
 }
 
+/* -- Edit / create labels: match the view-mode field labels
+   (bigger, sentence-case heading style instead of tiny uppercase) -- */
+.form-group label,
+.detail-label {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0.01em;
+    color: var(--text-secondary);
+}
+
+/* -- Edit / create inputs: same size as the read-only view boxes
+   (identical font, padding, line-height and min-height) -- */
+.edit-input,
+.form-group input,
+.multi-select-display {
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 5px 10px;
+    min-height: 28px;
+}
+
+select.edit-input {
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 5px 32px 5px 10px;
+    min-height: 28px;
+}
+
+.multi-select-text {
+    font-size: 12px;
+}
+
 /* -- Responsive -- */
 
 @media (max-width: 768px) {
     .user-list-row {
-        grid-template-columns: 1fr 80px;
+        grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
     }
 
     .user-cell-username {
