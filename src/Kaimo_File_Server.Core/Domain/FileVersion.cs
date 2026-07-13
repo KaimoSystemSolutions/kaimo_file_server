@@ -20,6 +20,19 @@ namespace Kaimo_File_Server.Core.Domain
         public Guid Id { get; set; }
 
         /// <summary>
+        /// The share this version belongs to. Version history is scoped per
+        /// share: two different shares may each contain a file at the same
+        /// share-relative <see cref="FilePath"/> (e.g. "report.docx" at the
+        /// root), and their histories must stay isolated. Every version query
+        /// filters by this id.
+        ///
+        /// Legacy rows created before per-share scoping carry
+        /// <see cref="Guid.Empty"/> and therefore never match a real share —
+        /// they are treated as inaccessible rather than leaked cross-share.
+        /// </summary>
+        public Guid ShareId { get; set; }
+
+        /// <summary>
         /// Storage-relative path of the file (e.g. "docs/report.docx").
         /// Not a foreign key to <see cref="FileMetadata"/> — versions may
         /// exist before metadata has been created.
@@ -72,6 +85,7 @@ namespace Kaimo_File_Server.Core.Domain
         /// or <paramref name="contentHash"/> is null or whitespace.
         /// </exception>
         public FileVersion(
+            Guid shareId,
             string filePath,
             DateTime snapshotTimestampUtc,
             string storagePath,
@@ -81,6 +95,8 @@ namespace Kaimo_File_Server.Core.Domain
             int versionNumber)
         {
             Id = Guid.NewGuid();
+
+            ShareId = shareId;
 
             FilePath = !string.IsNullOrWhiteSpace(filePath)
                 ? filePath

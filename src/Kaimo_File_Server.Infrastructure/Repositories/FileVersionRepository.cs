@@ -14,35 +14,37 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             _db = db;
         }
 
-        public async Task<List<FileVersion>> GetVersionsAsync(string filePath)
+        public async Task<List<FileVersion>> GetVersionsAsync(Guid shareId, string filePath)
         {
             return await _db.Set<FileVersion>()
-                .Where(v => v.FilePath == filePath)
+                .Where(v => v.ShareId == shareId && v.FilePath == filePath)
                 .OrderByDescending(v => v.SnapshotTimestampUtc)
                 .ToListAsync();
         }
 
-        public async Task<FileVersion?> GetVersionAsync(string filePath, DateTime snapshotTimestampUtc)
+        public async Task<FileVersion?> GetVersionAsync(Guid shareId, string filePath, DateTime snapshotTimestampUtc)
         {
             return await _db.Set<FileVersion>()
                 .FirstOrDefaultAsync(v =>
+                    v.ShareId == shareId &&
                     v.FilePath == filePath &&
                     v.SnapshotTimestampUtc == snapshotTimestampUtc);
         }
 
-        public async Task<List<DateTime>> GetSnapshotTimestampsAsync(string filePath)
+        public async Task<List<DateTime>> GetSnapshotTimestampsAsync(Guid shareId, string filePath)
         {
             return await _db.Set<FileVersion>()
-                .Where(v => v.FilePath == filePath)
+                .Where(v => v.ShareId == shareId && v.FilePath == filePath)
                 .Select(v => v.SnapshotTimestampUtc)
                 .Distinct()
                 .OrderByDescending(t => t)
                 .ToListAsync();
         }
 
-        public async Task<List<DateTime>> GetAllSnapshotTimestampsAsync(string pathPrefix = "")
+        public async Task<List<DateTime>> GetAllSnapshotTimestampsAsync(Guid shareId, string pathPrefix = "")
         {
-            var query = _db.Set<FileVersion>().AsQueryable();
+            var query = _db.Set<FileVersion>()
+                .Where(v => v.ShareId == shareId);
 
             if (!string.IsNullOrEmpty(pathPrefix))
                 query = query.Where(v => v.FilePath.StartsWith(pathPrefix));
@@ -61,18 +63,18 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             return version;
         }
 
-        public async Task<int> GetMaxVersionNumberAsync(string filePath)
+        public async Task<int> GetMaxVersionNumberAsync(Guid shareId, string filePath)
         {
             var max = await _db.Set<FileVersion>()
-                .Where(v => v.FilePath == filePath)
+                .Where(v => v.ShareId == shareId && v.FilePath == filePath)
                 .MaxAsync(v => (int?)v.VersionNumber);
             return max ?? 0;
         }
 
-        public async Task<int> DeleteOlderThanAsync(string filePath, DateTime cutoff)
+        public async Task<int> DeleteOlderThanAsync(Guid shareId, string filePath, DateTime cutoff)
         {
             var toDelete = await _db.Set<FileVersion>()
-                .Where(v => v.FilePath == filePath && v.SnapshotTimestampUtc < cutoff)
+                .Where(v => v.ShareId == shareId && v.FilePath == filePath && v.SnapshotTimestampUtc < cutoff)
                 .ToListAsync();
 
             _db.Set<FileVersion>().RemoveRange(toDelete);
@@ -80,18 +82,18 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             return toDelete.Count;
         }
 
-        public async Task<int> TrimToMaxVersionsAsync(string filePath, int maxCount)
+        public async Task<int> TrimToMaxVersionsAsync(Guid shareId, string filePath, int maxCount)
         {
             // Get IDs of versions to keep (newest N)
             var keepIds = await _db.Set<FileVersion>()
-                .Where(v => v.FilePath == filePath)
+                .Where(v => v.ShareId == shareId && v.FilePath == filePath)
                 .OrderByDescending(v => v.SnapshotTimestampUtc)
                 .Take(maxCount)
                 .Select(v => v.Id)
                 .ToListAsync();
 
             var toDelete = await _db.Set<FileVersion>()
-                .Where(v => v.FilePath == filePath && !keepIds.Contains(v.Id))
+                .Where(v => v.ShareId == shareId && v.FilePath == filePath && !keepIds.Contains(v.Id))
                 .ToListAsync();
 
             if (toDelete.Count == 0) return 0;
@@ -101,13 +103,13 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             return toDelete.Count;
         }
 
-        public async Task<bool> ExistsWithHashAsync(string filePath, string contentHash)
+        public async Task<bool> ExistsWithHashAsync(Guid shareId, string filePath, string contentHash)
         {
             // Check if the LATEST version of this file already has this hash.
             // We only check the latest older versions may share the hash but
             // we still want to skip if nothing changed since last write.
             var latestHash = await _db.Set<FileVersion>()
-                .Where(v => v.FilePath == filePath)
+                .Where(v => v.ShareId == shareId && v.FilePath == filePath)
                 .OrderByDescending(v => v.SnapshotTimestampUtc)
                 .Select(v => v.ContentHash)
                 .FirstOrDefaultAsync();

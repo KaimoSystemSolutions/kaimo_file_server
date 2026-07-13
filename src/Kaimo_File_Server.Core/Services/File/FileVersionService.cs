@@ -23,7 +23,9 @@ namespace Kaimo_File_Server.Core.Services.File;
 ///
 /// Path convention:
 ///   All filePath parameters are share-relative (normalized via ShareRelativePath).
-///   The ShareId is NOT part of the path — it's tracked separately if needed.
+///   The ShareId is NOT part of the path — it is carried alongside every call and
+///   stored on each version so histories stay isolated between shares that happen
+///   to contain a file at the same relative path.
 /// </summary>
 public class FileVersionService : IFileVersionService
 {
@@ -50,7 +52,7 @@ public class FileVersionService : IFileVersionService
     }
 
     public async Task<FileVersion?> CreateVersionAsync(
-        string filePath, Stream content, string? userId = null)
+        Guid shareId, string filePath, Stream content, string? userId = null)
     {
         var normalizedPath = ShareRelativePath.Normalize(filePath);
 
@@ -60,7 +62,7 @@ public class FileVersionService : IFileVersionService
         content.Position = 0;
 
         // 2. Skip if content unchanged since last version
-        if (await _versionRepo.ExistsWithHashAsync(normalizedPath, hash))
+        if (await _versionRepo.ExistsWithHashAsync(shareId, normalizedPath, hash))
             return null;
 
         // 3. Store blob compressed (content-addressable)
@@ -90,14 +92,15 @@ public class FileVersionService : IFileVersionService
         content.Position = 0;
 
         // 4. Create version record
-        var versionNumber = await _versionRepo.GetMaxVersionNumberAsync(normalizedPath) + 1;
+        var versionNumber = await _versionRepo.GetMaxVersionNumberAsync(shareId, normalizedPath) + 1;
         var now = TruncateToSeconds(_timeProvider.GetUtcNow().UtcDateTime);
 
         // If a version at this exact second already exists, bump to next free second
-        while (await _versionRepo.GetVersionAsync(normalizedPath, now) != null)
+        while (await _versionRepo.GetVersionAsync(shareId, normalizedPath, now) != null)
             now = now.AddSeconds(1);
 
         var version = new FileVersion(
+            shareId: shareId,
             filePath: normalizedPath,
             snapshotTimestampUtc: now,
             storagePath: blobRelativePath,
@@ -114,17 +117,17 @@ public class FileVersionService : IFileVersionService
             $"{(double)compressedSize / Math.Max(content.Length, 1):P0} ratio)");
 
         // 5. Enforce retention
-        await ApplyRetentionAsync(normalizedPath, _defaultMaxVersions, _defaultMaxAge);
+        await ApplyRetentionAsync(shareId, normalizedPath, _defaultMaxVersions, _defaultMaxAge);
 
         return version;
     }
 
     public async Task<Stream> ReadVersionAsync(
-        string filePath, DateTime snapshotTimestampUtc)
+        Guid shareId, string filePath, DateTime snapshotTimestampUtc)
     {
         var normalizedPath = ShareRelativePath.Normalize(filePath);
 
-        var version = await _versionRepo.GetVersionAsync(normalizedPath, snapshotTimestampUtc);
+        var version = await _versionRepo.GetVersionAsync(shareId, normalizedPath, snapshotTimestampUtc);
         if (version == null)
             throw new FileNotFoundException(
                 $"No version found for '{normalizedPath}' at {snapshotTimestampUtc:O}");
@@ -147,25 +150,25 @@ public class FileVersionService : IFileVersionService
         return ms;
     }
 
-    public async Task<List<FileVersion>> GetVersionsAsync(string filePath)
+    public async Task<List<FileVersion>> GetVersionsAsync(Guid shareId, string filePath)
     {
-        return await _versionRepo.GetVersionsAsync(ShareRelativePath.Normalize(filePath));
+        return await _versionRepo.GetVersionsAsync(shareId, ShareRelativePath.Normalize(filePath));
     }
 
-    public async Task<List<DateTime>> GetSnapshotTimestampsAsync(string pathPrefix = "")
+    public async Task<List<DateTime>> GetSnapshotTimestampsAsync(Guid shareId, string pathPrefix = "")
     {
-        return await _versionRepo.GetAllSnapshotTimestampsAsync(ShareRelativePath.Normalize(pathPrefix));
+        return await _versionRepo.GetAllSnapshotTimestampsAsync(shareId, ShareRelativePath.Normalize(pathPrefix));
     }
 
     public async Task<FileVersion?> GetVersionAtAsync(
-        string filePath, DateTime snapshotTimestampUtc)
+        Guid shareId, string filePath, DateTime snapshotTimestampUtc)
     {
         return await _versionRepo.GetVersionAsync(
-            ShareRelativePath.Normalize(filePath), snapshotTimestampUtc);
+            shareId, ShareRelativePath.Normalize(filePath), snapshotTimestampUtc);
     }
 
     public async Task<int> ApplyRetentionAsync(
-        string filePath, int? maxVersions = null, TimeSpan? maxAge = null)
+        Guid shareId, string filePath, int? maxVersions = null, TimeSpan? maxAge = null)
     {
         var normalizedPath = ShareRelativePath.Normalize(filePath);
         int deleted = 0;
@@ -174,12 +177,12 @@ public class FileVersionService : IFileVersionService
         var effectiveAge = maxAge ?? _defaultMaxAge;
 
         if (effectiveMax > 0)
-            deleted += await _versionRepo.TrimToMaxVersionsAsync(normalizedPath, effectiveMax);
+            deleted += await _versionRepo.TrimToMaxVersionsAsync(shareId, normalizedPath, effectiveMax);
 
         if (effectiveAge.HasValue)
         {
             var cutoff = _timeProvider.GetUtcNow().UtcDateTime - effectiveAge.Value;
-            deleted += await _versionRepo.DeleteOlderThanAsync(normalizedPath, cutoff);
+            deleted += await _versionRepo.DeleteOlderThanAsync(shareId, normalizedPath, cutoff);
         }
 
         return deleted;

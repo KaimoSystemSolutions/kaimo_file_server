@@ -1,4 +1,4 @@
-﻿using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services.File;
 using System.IO.Compression;
@@ -9,6 +9,11 @@ namespace Kaimo_File_Server.Tests;
 
 public class FileVersionServiceTests : IDisposable
 {
+    // Version history is scoped per share. Most tests operate within a single
+    // share; the cross-share isolation tests use a second one.
+    private static readonly Guid ShareA = Guid.NewGuid();
+    private static readonly Guid ShareB = Guid.NewGuid();
+
     private readonly string _testRoot;
     private readonly string _versionRoot;
     private readonly MockFileVersionRepository _repo;
@@ -53,9 +58,10 @@ public class FileVersionServiceTests : IDisposable
     [Fact]
     public async Task CreateVersionAsync_FirstVersion_CreatesVersionAndBlob()
     {
-        var version = await _sut.CreateVersionAsync("doc.txt", ToStream("Hello World"), "user1");
+        var version = await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("Hello World"), "user1");
 
         Assert.NotNull(version);
+        Assert.Equal(ShareA, version.ShareId);
         Assert.Equal("doc.txt", version.FilePath);
         Assert.Equal(1, version.VersionNumber);
         Assert.Equal("user1", version.CreatedBy);
@@ -71,8 +77,8 @@ public class FileVersionServiceTests : IDisposable
     [Fact]
     public async Task CreateVersionAsync_SecondVersion_IncrementsVersionNumber()
     {
-        await _sut.CreateVersionAsync("doc.txt", ToStream("Version 1"));
-        var v2 = await _sut.CreateVersionAsync("doc.txt", ToStream("Version 2"));
+        await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("Version 1"));
+        var v2 = await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("Version 2"));
 
         Assert.NotNull(v2);
         Assert.Equal(2, v2.VersionNumber);
@@ -82,10 +88,10 @@ public class FileVersionServiceTests : IDisposable
     public async Task CreateVersionAsync_UnchangedContent_ReturnsNull()
     {
         var content = "Same content";
-        await _sut.CreateVersionAsync("doc.txt", ToStream(content));
+        await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream(content));
 
         // Same content again
-        var v2 = await _sut.CreateVersionAsync("doc.txt", ToStream(content));
+        var v2 = await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream(content));
 
         Assert.Null(v2); // Dedup: no new version
     }
@@ -93,8 +99,8 @@ public class FileVersionServiceTests : IDisposable
     [Fact]
     public async Task CreateVersionAsync_ChangedContent_ReturnsNewVersion()
     {
-        await _sut.CreateVersionAsync("doc.txt", ToStream("Version A"));
-        var v2 = await _sut.CreateVersionAsync("doc.txt", ToStream("Version B"));
+        await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("Version A"));
+        var v2 = await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("Version B"));
 
         Assert.NotNull(v2);
         Assert.Equal(2, v2.VersionNumber);
@@ -103,8 +109,8 @@ public class FileVersionServiceTests : IDisposable
     [Fact]
     public async Task CreateVersionAsync_DifferentFiles_IndependentVersionNumbers()
     {
-        var v1 = await _sut.CreateVersionAsync("a.txt", ToStream("Alpha"));
-        var v2 = await _sut.CreateVersionAsync("b.txt", ToStream("Beta"));
+        var v1 = await _sut.CreateVersionAsync(ShareA, "a.txt", ToStream("Alpha"));
+        var v2 = await _sut.CreateVersionAsync(ShareA, "b.txt", ToStream("Beta"));
 
         Assert.Equal(1, v1!.VersionNumber);
         Assert.Equal(1, v2!.VersionNumber);
@@ -114,8 +120,8 @@ public class FileVersionServiceTests : IDisposable
     public async Task CreateVersionAsync_SameContentDifferentFiles_SharesBlob()
     {
         var content = "Shared content across files";
-        var v1 = await _sut.CreateVersionAsync("a.txt", ToStream(content));
-        var v2 = await _sut.CreateVersionAsync("b.txt", ToStream(content));
+        var v1 = await _sut.CreateVersionAsync(ShareA, "a.txt", ToStream(content));
+        var v2 = await _sut.CreateVersionAsync(ShareA, "b.txt", ToStream(content));
 
         Assert.NotNull(v1);
         Assert.NotNull(v2);
@@ -132,7 +138,7 @@ public class FileVersionServiceTests : IDisposable
     public async Task CreateVersionAsync_BlobIsGzipCompressed()
     {
         var data = new string('A', 10000); // highly compressible
-        var version = await _sut.CreateVersionAsync("big.txt", ToStream(data));
+        var version = await _sut.CreateVersionAsync(ShareA, "big.txt", ToStream(data));
 
         Assert.NotNull(version);
 
@@ -147,7 +153,7 @@ public class FileVersionServiceTests : IDisposable
     [Fact]
     public async Task CreateVersionAsync_TimestampTruncatedToSeconds()
     {
-        var version = await _sut.CreateVersionAsync("doc.txt", ToStream("data"));
+        var version = await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("data"));
 
         Assert.NotNull(version);
         Assert.Equal(0, version.SnapshotTimestampUtc.Millisecond);
@@ -158,7 +164,7 @@ public class FileVersionServiceTests : IDisposable
     public async Task CreateVersionAsync_EmptyStream_CreatesVersion()
     {
         // Even empty files get versioned (if first version)
-        var version = await _sut.CreateVersionAsync("empty.txt", new MemoryStream(Array.Empty<byte>()));
+        var version = await _sut.CreateVersionAsync(ShareA, "empty.txt", new MemoryStream(Array.Empty<byte>()));
 
         // Empty stream has size 0, but hash is still computed
         // Whether this creates a version depends on implementation
@@ -175,9 +181,9 @@ public class FileVersionServiceTests : IDisposable
     public async Task ReadVersionAsync_ExistingVersion_ReturnsDecompressedContent()
     {
         var content = "Hello from version 1";
-        var version = await _sut.CreateVersionAsync("doc.txt", ToStream(content));
+        var version = await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream(content));
 
-        var stream = await _sut.ReadVersionAsync("doc.txt", version!.SnapshotTimestampUtc);
+        var stream = await _sut.ReadVersionAsync(ShareA, "doc.txt", version!.SnapshotTimestampUtc);
 
         using var reader = new StreamReader(stream);
         var result = await reader.ReadToEndAsync();
@@ -191,9 +197,9 @@ public class FileVersionServiceTests : IDisposable
         var data = new byte[4096];
         new Random(42).NextBytes(data);
 
-        var version = await _sut.CreateVersionAsync("binary.bin", ToStream(data));
+        var version = await _sut.CreateVersionAsync(ShareA, "binary.bin", ToStream(data));
 
-        var stream = await _sut.ReadVersionAsync("binary.bin", version!.SnapshotTimestampUtc);
+        var stream = await _sut.ReadVersionAsync(ShareA, "binary.bin", version!.SnapshotTimestampUtc);
 
         using var ms = new MemoryStream();
         await stream.CopyToAsync(ms);
@@ -205,22 +211,22 @@ public class FileVersionServiceTests : IDisposable
     public async Task ReadVersionAsync_NonExistentVersion_ThrowsFileNotFound()
     {
         await Assert.ThrowsAsync<FileNotFoundException>(() =>
-            _sut.ReadVersionAsync("nope.txt", DateTime.UtcNow));
+            _sut.ReadVersionAsync(ShareA, "nope.txt", DateTime.UtcNow));
     }
 
     [Fact]
     public async Task ReadVersionAsync_MultipleVersions_ReturnsCorrectOne()
     {
-        var v1 = await _sut.CreateVersionAsync("doc.txt", ToStream("Version 1"));
-        var v2 = await _sut.CreateVersionAsync("doc.txt", ToStream("Version 2"));
+        var v1 = await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("Version 1"));
+        var v2 = await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("Version 2"));
 
         // Read v1
-        var stream1 = await _sut.ReadVersionAsync("doc.txt", v1!.SnapshotTimestampUtc);
+        var stream1 = await _sut.ReadVersionAsync(ShareA, "doc.txt", v1!.SnapshotTimestampUtc);
         using var reader1 = new StreamReader(stream1);
         Assert.Equal("Version 1", await reader1.ReadToEndAsync());
 
         // Read v2
-        var stream2 = await _sut.ReadVersionAsync("doc.txt", v2!.SnapshotTimestampUtc);
+        var stream2 = await _sut.ReadVersionAsync(ShareA, "doc.txt", v2!.SnapshotTimestampUtc);
         using var reader2 = new StreamReader(stream2);
         Assert.Equal("Version 2", await reader2.ReadToEndAsync());
     }
@@ -228,9 +234,9 @@ public class FileVersionServiceTests : IDisposable
     [Fact]
     public async Task ReadVersionAsync_ReturnedStreamIsSeekable()
     {
-        var version = await _sut.CreateVersionAsync("doc.txt", ToStream("seekable"));
+        var version = await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("seekable"));
 
-        var stream = await _sut.ReadVersionAsync("doc.txt", version!.SnapshotTimestampUtc);
+        var stream = await _sut.ReadVersionAsync(ShareA, "doc.txt", version!.SnapshotTimestampUtc);
 
         Assert.True(stream.CanSeek);
         Assert.True(stream.CanRead);
@@ -244,11 +250,11 @@ public class FileVersionServiceTests : IDisposable
     [Fact]
     public async Task GetVersionsAsync_ReturnsAllVersions()
     {
-        await _sut.CreateVersionAsync("doc.txt", ToStream("V1"));
-        await _sut.CreateVersionAsync("doc.txt", ToStream("V2"));
-        await _sut.CreateVersionAsync("doc.txt", ToStream("V3"));
+        await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("V1"));
+        await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("V2"));
+        await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("V3"));
 
-        var versions = await _sut.GetVersionsAsync("doc.txt");
+        var versions = await _sut.GetVersionsAsync(ShareA, "doc.txt");
 
         Assert.Equal(3, versions.Count);
     }
@@ -256,9 +262,9 @@ public class FileVersionServiceTests : IDisposable
     [Fact]
     public async Task GetVersionsAsync_DifferentFile_ReturnsEmpty()
     {
-        await _sut.CreateVersionAsync("a.txt", ToStream("content"));
+        await _sut.CreateVersionAsync(ShareA, "a.txt", ToStream("content"));
 
-        var versions = await _sut.GetVersionsAsync("b.txt");
+        var versions = await _sut.GetVersionsAsync(ShareA, "b.txt");
 
         Assert.Empty(versions);
     }
@@ -266,13 +272,69 @@ public class FileVersionServiceTests : IDisposable
     [Fact]
     public async Task GetSnapshotTimestampsAsync_ReturnsDistinctTimestamps()
     {
-        await _sut.CreateVersionAsync("a.txt", ToStream("A1"));
+        await _sut.CreateVersionAsync(ShareA, "a.txt", ToStream("A1"));
         _time.Advance(TimeSpan.FromSeconds(1)); // distinct second across the two files
-        await _sut.CreateVersionAsync("b.txt", ToStream("B1"));
+        await _sut.CreateVersionAsync(ShareA, "b.txt", ToStream("B1"));
 
-        var timestamps = await _sut.GetSnapshotTimestampsAsync();
+        var timestamps = await _sut.GetSnapshotTimestampsAsync(ShareA);
 
         Assert.Equal(2, timestamps.Count);
+    }
+
+    // ═══════════════════════════════════════════
+    //  Cross-Share Isolation (security regression)
+    // ═══════════════════════════════════════════
+
+    [Fact]
+    public async Task GetVersionsAsync_SameRelativePathDifferentShares_AreIsolated()
+    {
+        // Both shares have a file at the same relative path.
+        await _sut.CreateVersionAsync(ShareA, "report.docx", ToStream("Share A content"));
+        await _sut.CreateVersionAsync(ShareB, "report.docx", ToStream("Share B content"));
+
+        var aVersions = await _sut.GetVersionsAsync(ShareA, "report.docx");
+        var bVersions = await _sut.GetVersionsAsync(ShareB, "report.docx");
+
+        Assert.Single(aVersions);
+        Assert.Single(bVersions);
+        Assert.Equal(ShareA, aVersions[0].ShareId);
+        Assert.Equal(ShareB, bVersions[0].ShareId);
+    }
+
+    [Fact]
+    public async Task GetSnapshotTimestampsAsync_DoesNotLeakAcrossShares()
+    {
+        await _sut.CreateVersionAsync(ShareA, "report.docx", ToStream("A only"));
+
+        // Share B never created a version for this path — it must see nothing.
+        var bTimestamps = await _sut.GetSnapshotTimestampsAsync(ShareB);
+
+        Assert.Empty(bTimestamps);
+    }
+
+    [Fact]
+    public async Task ReadVersionAsync_CannotReadAnotherSharesVersion()
+    {
+        var aVersion = await _sut.CreateVersionAsync(ShareA, "report.docx", ToStream("Secret in share A"));
+
+        // Share B asks for the exact timestamp of share A's version — must not resolve.
+        await Assert.ThrowsAsync<FileNotFoundException>(() =>
+            _sut.ReadVersionAsync(ShareB, "report.docx", aVersion!.SnapshotTimestampUtc));
+    }
+
+    [Fact]
+    public async Task CreateVersionAsync_SameSecondDifferentShares_BothPersist()
+    {
+        // Two shares writing the same relative path at the same wall-clock second
+        // must each get a version (previously blocked by a path-only unique key).
+        var a = await _sut.CreateVersionAsync(ShareA, "report.docx", ToStream("A content"));
+        var b = await _sut.CreateVersionAsync(ShareB, "report.docx", ToStream("B content"));
+
+        Assert.NotNull(a);
+        Assert.NotNull(b);
+        Assert.Equal(a!.SnapshotTimestampUtc, b!.SnapshotTimestampUtc);
+        Assert.Equal(1, a.VersionNumber);
+        Assert.Equal(1, b.VersionNumber);
     }
 
     // ═══════════════════════════════════════════
@@ -286,11 +348,11 @@ public class FileVersionServiceTests : IDisposable
         // stay monotonic (mirrors real time; retention keeps the newest snapshots).
         for (int i = 0; i < 8; i++)
         {
-            await _sut.CreateVersionAsync("doc.txt", ToStream($"Version {i}"));
+            await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream($"Version {i}"));
             _time.Advance(TimeSpan.FromSeconds(1));
         }
 
-        var versions = await _sut.GetVersionsAsync("doc.txt");
+        var versions = await _sut.GetVersionsAsync(ShareA, "doc.txt");
 
         Assert.True(versions.Count <= 5,
             $"Expected max 5 versions, got {versions.Count}");
@@ -304,14 +366,14 @@ public class FileVersionServiceTests : IDisposable
             Path.Combine(_versionRoot, "ret"), defaultMaxVersions: 100, timeProvider: _time);
 
         for (int i = 0; i < 10; i++)
-            await highMaxService.CreateVersionAsync("doc.txt", ToStream($"V{i}"));
+            await highMaxService.CreateVersionAsync(ShareA, "doc.txt", ToStream($"V{i}"));
 
         // Now manually trim to 3
-        var deleted = await highMaxService.ApplyRetentionAsync("doc.txt", maxVersions: 3);
+        var deleted = await highMaxService.ApplyRetentionAsync(ShareA, "doc.txt", maxVersions: 3);
 
         Assert.True(deleted > 0);
 
-        var remaining = await highMaxService.GetVersionsAsync("doc.txt");
+        var remaining = await highMaxService.GetVersionsAsync(ShareA, "doc.txt");
         Assert.True(remaining.Count <= 3);
     }
 
@@ -322,9 +384,9 @@ public class FileVersionServiceTests : IDisposable
     [Fact]
     public async Task GetVersionAtAsync_ExistingTimestamp_ReturnsVersion()
     {
-        var version = await _sut.CreateVersionAsync("doc.txt", ToStream("content"));
+        var version = await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("content"));
 
-        var found = await _sut.GetVersionAtAsync("doc.txt", version!.SnapshotTimestampUtc);
+        var found = await _sut.GetVersionAtAsync(ShareA, "doc.txt", version!.SnapshotTimestampUtc);
 
         Assert.NotNull(found);
         Assert.Equal(version.Id, found.Id);
@@ -333,9 +395,9 @@ public class FileVersionServiceTests : IDisposable
     [Fact]
     public async Task GetVersionAtAsync_WrongTimestamp_ReturnsNull()
     {
-        await _sut.CreateVersionAsync("doc.txt", ToStream("content"));
+        await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("content"));
 
-        var found = await _sut.GetVersionAtAsync("doc.txt",
+        var found = await _sut.GetVersionAtAsync(ShareA, "doc.txt",
             new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc));
 
         Assert.Null(found);
@@ -344,9 +406,9 @@ public class FileVersionServiceTests : IDisposable
     [Fact]
     public async Task GetVersionAtAsync_WrongFile_ReturnsNull()
     {
-        var version = await _sut.CreateVersionAsync("a.txt", ToStream("content"));
+        var version = await _sut.CreateVersionAsync(ShareA, "a.txt", ToStream("content"));
 
-        var found = await _sut.GetVersionAtAsync("b.txt", version!.SnapshotTimestampUtc);
+        var found = await _sut.GetVersionAtAsync(ShareA, "b.txt", version!.SnapshotTimestampUtc);
 
         Assert.Null(found);
     }
@@ -360,27 +422,28 @@ public class MockFileVersionRepository : IFileVersionRepository
 {
     private readonly List<FileVersion> _versions = new();
 
-    public Task<List<FileVersion>> GetVersionsAsync(string filePath)
+    public Task<List<FileVersion>> GetVersionsAsync(Guid shareId, string filePath)
     {
         var result = _versions
-            .Where(v => v.FilePath == filePath)
+            .Where(v => v.ShareId == shareId && v.FilePath == filePath)
             .OrderByDescending(v => v.SnapshotTimestampUtc)
             .ToList();
         return Task.FromResult(result);
     }
 
-    public Task<FileVersion?> GetVersionAsync(string filePath, DateTime snapshotTimestampUtc)
+    public Task<FileVersion?> GetVersionAsync(Guid shareId, string filePath, DateTime snapshotTimestampUtc)
     {
         var result = _versions.FirstOrDefault(v =>
+            v.ShareId == shareId &&
             v.FilePath == filePath &&
             v.SnapshotTimestampUtc == snapshotTimestampUtc);
         return Task.FromResult(result);
     }
 
-    public Task<List<DateTime>> GetSnapshotTimestampsAsync(string filePath)
+    public Task<List<DateTime>> GetSnapshotTimestampsAsync(Guid shareId, string filePath)
     {
         var result = _versions
-            .Where(v => v.FilePath == filePath)
+            .Where(v => v.ShareId == shareId && v.FilePath == filePath)
             .Select(v => v.SnapshotTimestampUtc)
             .Distinct()
             .OrderByDescending(t => t)
@@ -388,9 +451,9 @@ public class MockFileVersionRepository : IFileVersionRepository
         return Task.FromResult(result);
     }
 
-    public Task<List<DateTime>> GetAllSnapshotTimestampsAsync(string pathPrefix = "")
+    public Task<List<DateTime>> GetAllSnapshotTimestampsAsync(Guid shareId, string pathPrefix = "")
     {
-        var query = _versions.AsEnumerable();
+        var query = _versions.Where(v => v.ShareId == shareId);
         if (!string.IsNullOrEmpty(pathPrefix))
             query = query.Where(v => v.FilePath.StartsWith(pathPrefix));
 
@@ -408,28 +471,28 @@ public class MockFileVersionRepository : IFileVersionRepository
         return Task.FromResult(version);
     }
 
-    public Task<int> GetMaxVersionNumberAsync(string filePath)
+    public Task<int> GetMaxVersionNumberAsync(Guid shareId, string filePath)
     {
         var max = _versions
-            .Where(v => v.FilePath == filePath)
+            .Where(v => v.ShareId == shareId && v.FilePath == filePath)
             .Select(v => (int?)v.VersionNumber)
             .Max();
         return Task.FromResult(max ?? 0);
     }
 
-    public Task<int> DeleteOlderThanAsync(string filePath, DateTime cutoff)
+    public Task<int> DeleteOlderThanAsync(Guid shareId, string filePath, DateTime cutoff)
     {
         var toRemove = _versions
-            .Where(v => v.FilePath == filePath && v.SnapshotTimestampUtc < cutoff)
+            .Where(v => v.ShareId == shareId && v.FilePath == filePath && v.SnapshotTimestampUtc < cutoff)
             .ToList();
         foreach (var v in toRemove) _versions.Remove(v);
         return Task.FromResult(toRemove.Count);
     }
 
-    public Task<int> TrimToMaxVersionsAsync(string filePath, int maxCount)
+    public Task<int> TrimToMaxVersionsAsync(Guid shareId, string filePath, int maxCount)
     {
         var ordered = _versions
-            .Where(v => v.FilePath == filePath)
+            .Where(v => v.ShareId == shareId && v.FilePath == filePath)
             .OrderByDescending(v => v.SnapshotTimestampUtc)
             .ToList();
 
@@ -440,10 +503,10 @@ public class MockFileVersionRepository : IFileVersionRepository
         return Task.FromResult(toRemove.Count);
     }
 
-    public Task<bool> ExistsWithHashAsync(string filePath, string contentHash)
+    public Task<bool> ExistsWithHashAsync(Guid shareId, string filePath, string contentHash)
     {
         var latestHash = _versions
-            .Where(v => v.FilePath == filePath)
+            .Where(v => v.ShareId == shareId && v.FilePath == filePath)
             .OrderByDescending(v => v.SnapshotTimestampUtc)
             .Select(v => v.ContentHash)
             .FirstOrDefault();

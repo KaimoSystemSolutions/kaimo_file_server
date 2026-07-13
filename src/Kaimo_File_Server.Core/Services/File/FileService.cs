@@ -114,7 +114,7 @@ public class FileService : IFileService
                     if (snap != null)
                     {
                         await _owner._versionService.CreateVersionAsync(
-                            rel, snap, User.User.Id.ToString());
+                            _owner._shareId, rel, snap, User.User.Id.ToString());
                     }
                 }
                 catch (Exception ex)
@@ -598,7 +598,7 @@ public class FileService : IFileService
 
         await EnsureAccessAsync(user, normalized, false, FilePermission.ListReadData);
 
-        var stream = await _versionService.ReadVersionAsync(normalized, ts);
+        var stream = await _versionService.ReadVersionAsync(_shareId, normalized, ts);
         return new ReadOnlySnapshotSession(stream, normalized, user);
     }
 
@@ -607,6 +607,8 @@ public class FileService : IFileService
         if (_versionService == null) return new List<DateTime>();
         // No ACL check on timestamps themselves — they're just dates.
         // Per-path access is enforced when the user opens an @GMT- path.
-        return await _versionService.GetSnapshotTimestampsAsync();
+        // Scoped to this share so snapshots never leak across shares that
+        // happen to contain files at the same relative path.
+        return await _versionService.GetSnapshotTimestampsAsync(_shareId);
     }
 }
