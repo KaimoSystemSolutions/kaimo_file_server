@@ -1,6 +1,9 @@
 ﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
+using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Repositories;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.IO.Compression;
 using System.Security.Cryptography;
 
@@ -34,19 +37,22 @@ public class FileVersionService : IFileVersionService
     private readonly int _defaultMaxVersions;
     private readonly TimeSpan? _defaultMaxAge;
     private readonly TimeProvider _timeProvider;
+    private readonly ILogger<FileVersionService> _logger;
 
     public FileVersionService(
         IFileVersionRepository versionRepo,
         string versionStorageRoot,
         int defaultMaxVersions = 64,
         TimeSpan? defaultMaxAge = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ILogger<FileVersionService>? logger = null)
     {
         _versionRepo = versionRepo;
         _versionStorageRoot = versionStorageRoot;
         _defaultMaxVersions = defaultMaxVersions;
         _defaultMaxAge = defaultMaxAge;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _logger = logger ?? NullLogger<FileVersionService>.Instance;
 
         Directory.CreateDirectory(_versionStorageRoot);
     }
@@ -111,10 +117,10 @@ public class FileVersionService : IFileVersionService
 
         await _versionRepo.CreateAsync(version);
 
-        Console.WriteLine(
-            $"[Versioning] v{versionNumber} for '{normalizedPath}' " +
-            $"({content.Length} → {compressedSize} bytes, " +
-            $"{(double)compressedSize / Math.Max(content.Length, 1):P0} ratio)");
+        if (_logger.IsEnabled(LogLevel.Debug))
+            _logger.LogDebug(LogEvents.FileVersionCreated, LogMessages.FileVersionCreated,
+                versionNumber, normalizedPath, content.Length, compressedSize,
+                ((double)compressedSize / Math.Max(content.Length, 1)).ToString("P0"));
 
         // 5. Enforce retention
         await ApplyRetentionAsync(shareId, normalizedPath, _defaultMaxVersions, _defaultMaxAge);

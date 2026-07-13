@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Configuration;
+using Kaimo_File_Server.Infrastructure.Logging;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Smb;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,6 +9,9 @@ var builder = Host.CreateApplicationBuilder(args);
 
 // -- Infrastructure (DB + Repositories + AuthenticationLookup) --
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// -- Global, live-reloadable log level (shared with the Web UI via the DB) --
+builder.AddDynamicLogLevel();
 
 // -- Elastic Search --
 //    Must be registered BEFORE AddCoreServices so the real search service wins

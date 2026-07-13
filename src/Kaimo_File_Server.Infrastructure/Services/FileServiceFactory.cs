@@ -34,7 +34,8 @@ namespace Kaimo_File_Server.Infrastructure.Services
             // Same scoping concern for ownership persistence (writes a FileMetadata row).
             var ownershipService = new ScopedFileOwnershipService(_serviceProvider);
 
-            return new FileService(storage, aclService, _searchService, shareId, versionService, ownershipService);
+            return new FileService(storage, aclService, _searchService, shareId, versionService, ownershipService,
+                _serviceProvider.GetRequiredService<ILogger<FileService>>());
         }
     }
 }

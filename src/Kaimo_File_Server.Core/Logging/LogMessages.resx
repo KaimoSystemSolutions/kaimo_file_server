@@ -1,0 +1,291 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- Generated file. English (invariant) log message templates. Do not localize. -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <data name="SmbAlreadyRunning" xml:space="preserve">
+    <value>SMB server already running, start skipped.</value>
+  </data>
+  <data name="SmbNotRunning" xml:space="preserve">
+    <value>SMB server not running, stop skipped.</value>
+  </data>
+  <data name="SmbStopped" xml:space="preserve">
+    <value>SMB server stopped.</value>
+  </data>
+  <data name="SmbLibraryMessage" xml:space="preserve">
+    <value>{Message}</value>
+  </data>
+  <data name="SmbAuditEvent" xml:space="preserve">
+    <value>SMB audit: {Event}</value>
+  </data>
+  <data name="SmbStarted" xml:space="preserve">
+    <value>SMB server started with {ShareCount} shares (ABE active).</value>
+  </data>
+  <data name="SmbWatchingStorage" xml:space="preserve">
+    <value>Watching storage folder: {Path}</value>
+  </data>
+  <data name="SmbShareLoaded" xml:space="preserve">
+    <value>Share loaded: {Share} ({ShareId}) -&gt; {Path}</value>
+  </data>
+  <data name="SmbStorageChanged" xml:space="preserve">
+    <value>Storage change detected ({Reason}), synchronizing shares.</value>
+  </data>
+  <data name="SmbSyncFailed" xml:space="preserve">
+    <value>Share sync from database failed.</value>
+  </data>
+  <data name="SmbShareAlreadyExists" xml:space="preserve">
+    <value>Share already exists, skipped: {Share}</value>
+  </data>
+  <data name="SmbShareAdded" xml:space="preserve">
+    <value>Share added at runtime: {Share} ({ShareId}) -&gt; {Path}</value>
+  </data>
+  <data name="SmbShareNotFound" xml:space="preserve">
+    <value>Share not found, skipped: {Share}</value>
+  </data>
+  <data name="SmbShareRemoved" xml:space="preserve">
+    <value>Share removed at runtime: {Share} ({ShareId})</value>
+  </data>
+  <data name="SmbShareUpdated" xml:space="preserve">
+    <value>Share updated: {OldName} -&gt; {NewName} ({ShareId}) -&gt; {Path}</value>
+  </data>
+  <data name="SmbShareRemovedSync" xml:space="preserve">
+    <value>Share removed during sync: {Share} ({ShareId})</value>
+  </data>
+  <data name="SmbShareUpdatedSync" xml:space="preserve">
+    <value>Share updated during sync: {Share} -&gt; {Path}</value>
+  </data>
+  <data name="SmbShareAddedSync" xml:space="preserve">
+    <value>Share added during sync: {Share} ({ShareId}) -&gt; {Path}</value>
+  </data>
+  <data name="SmbSyncCompleted" xml:space="preserve">
+    <value>Database sync complete: {ShareCount} active shares.</value>
+  </data>
+  <data name="SmbUserNotFound" xml:space="preserve">
+    <value>SMB auth: user not found: {User}</value>
+  </data>
+  <data name="SmbNtHashLookupFailed" xml:space="preserve">
+    <value>SMB auth: failed to retrieve NT hash for {User}.</value>
+  </data>
+  <data name="SmbUserAuthenticated" xml:space="preserve">
+    <value>SMB auth: user authenticated: {User}</value>
+  </data>
+  <data name="SmbVisibilityCheckFailed" xml:space="preserve">
+    <value>SMB ABE visibility check failed for share {Share}.</value>
+  </data>
+  <data name="SmbShareAccessCheckFailed" xml:space="preserve">
+    <value>SMB share access check failed: {User} -&gt; {Share}.</value>
+  </data>
+  <data name="SmbCreateFailed" xml:space="preserve">
+    <value>SMB create failed for {Path}.</value>
+  </data>
+  <data name="SmbReadFailed" xml:space="preserve">
+    <value>SMB read failed.</value>
+  </data>
+  <data name="SmbWriteFailed" xml:space="preserve">
+    <value>SMB write failed.</value>
+  </data>
+  <data name="SmbQueryDirectoryFailed" xml:space="preserve">
+    <value>SMB directory query failed.</value>
+  </data>
+  <data name="SmbSnapshotsFailed" xml:space="preserve">
+    <value>SMB snapshot enumeration failed.</value>
+  </data>
+  <data name="SmbServiceStartFailed" xml:space="preserve">
+    <value>SMB service start failed.</value>
+  </data>
+  <data name="SmbServiceStopFailed" xml:space="preserve">
+    <value>SMB service stop failed.</value>
+  </data>
+  <data name="SmbProtocolConfig" xml:space="preserve">
+    <value>SMB protocol {MinVersion}..{MaxVersion}, Signing={Signing}, Encryption={Encryption}, WsDiscovery={WsDiscovery}, Audit={Audit}, ServerGuid={ServerGuid}</value>
+  </data>
+  <data name="SmbProtocolLoadFailed" xml:space="preserve">
+    <value>Could not load SMB protocol settings, using defaults.</value>
+  </data>
+  <data name="SmbServerGuidLoadFailed" xml:space="preserve">
+    <value>Could not load SMB server GUID, using a random one.</value>
+  </data>
+  <data name="FileVersionSnapshotFailed" xml:space="preserve">
+    <value>Versioning failed while closing {Path}.</value>
+  </data>
+  <data name="FileSearchHookFailed" xml:space="preserve">
+    <value>Search index hook failed for {Path}.</value>
+  </data>
+  <data name="FileOwnerRecordFailed" xml:space="preserve">
+    <value>Failed to record owner for {Path}.</value>
+  </data>
+  <data name="FileWriteVersionFailed" xml:space="preserve">
+    <value>Versioning failed after writing {Path}.</value>
+  </data>
+  <data name="FileVersionCreated" xml:space="preserve">
+    <value>Created version {Version} for {Path} ({OriginalBytes} -&gt; {CompressedBytes} bytes, {Ratio} ratio).</value>
+  </data>
+  <data name="StorageAclLoadFailed" xml:space="preserve">
+    <value>ACL load failed for {Path}.</value>
+  </data>
+  <data name="DatabaseReady" xml:space="preserve">
+    <value>Database ready.</value>
+  </data>
+  <data name="DatabaseNotReadyRetry" xml:space="preserve">
+    <value>Database not ready, retrying in 3s ({RemainingAttempts} attempts left).</value>
+  </data>
+  <data name="LogLevelApplied" xml:space="preserve">
+    <value>Global log level set to {Level}.</value>
+  </data>
+  <data name="LogLevelReloadFailed" xml:space="preserve">
+    <value>Failed to reload the global log level from the config store.</value>
+  </data>
+  <data name="SeedBootstrapAdminSkipped" xml:space="preserve">
+    <value>Users already present, skipping bootstrap admin.</value>
+  </data>
+  <data name="SeedAdminRoleMissing" xml:space="preserve">
+    <value>Administrator role missing, cannot seed bootstrap admin.</value>
+  </data>
+  <data name="SeedBootstrapAdminPassword" xml:space="preserve">
+    <value>Bootstrap admin created (user 'admin'). Generated one-time password: {Password}. Change it immediately; this password will NOT be shown again.</value>
+  </data>
+  <data name="SeedBootstrapAdminCreated" xml:space="preserve">
+    <value>Bootstrap admin 'admin' created with the configured password.</value>
+  </data>
+  <data name="SeedGlobalDepartmentCreated" xml:space="preserve">
+    <value>Global department created (Id: {Id}).</value>
+  </data>
+  <data name="SeedRoleUpdated" xml:space="preserve">
+    <value>Role '{Name}' updated -&gt; {Perms}</value>
+  </data>
+  <data name="SeedRoleCreated" xml:space="preserve">
+    <value>Role '{Name}' created (permissions: {Perms})</value>
+  </data>
+  <data name="SeedGroupCreated" xml:space="preserve">
+    <value>Group '{Name}' created (department: Global)</value>
+  </data>
+  <data name="SeedDepartmentsCreated" xml:space="preserve">
+    <value>Departments created: Entwicklung (-&gt; Backend, Frontend), Marketing, Geschaeftsleitung.</value>
+  </data>
+  <data name="SeedTestUsersSkipped" xml:space="preserve">
+    <value>Users already present, skipping test users.</value>
+  </data>
+  <data name="SeedTestUsersCreating" xml:space="preserve">
+    <value>Creating test users...</value>
+  </data>
+  <data name="SeedConfigEntries" xml:space="preserve">
+    <value>Config entries seeded.</value>
+  </data>
+  <data name="SeedTestUserSummary" xml:space="preserve">
+    <value>Test users created: admin, marco.hanisch, anna.weber, lisa.mueller (password '1234', admin 'admin1234').</value>
+  </data>
+  <data name="SeedDuplicateRolesRemoved" xml:space="preserve">
+    <value>Removed {Count} duplicate role(s) named '{Name}'.</value>
+  </data>
+  <data name="SeedDuplicateGroupsRemoved" xml:space="preserve">
+    <value>Removed {Count} duplicate group(s) named '{Name}'.</value>
+  </data>
+  <data name="ReconcilerStarted" xml:space="preserve">
+    <value>Data service reconciler started ({Count} services).</value>
+  </data>
+  <data name="ReconcileRunFailed" xml:space="preserve">
+    <value>Reconcile run failed.</value>
+  </data>
+  <data name="ReconcileStopFailed" xml:space="preserve">
+    <value>Failed to stop service '{Key}' during shutdown.</value>
+  </data>
+  <data name="ServiceStarting" xml:space="preserve">
+    <value>Starting data service '{Key}'.</value>
+  </data>
+  <data name="ServiceStopping" xml:space="preserve">
+    <value>Stopping data service '{Key}'.</value>
+  </data>
+  <data name="SearchFlagReadFailed" xml:space="preserve">
+    <value>Could not read the Elasticsearch flag, assuming enabled.</value>
+  </data>
+  <data name="SearchElasticFailed" xml:space="preserve">
+    <value>Elasticsearch search failed, falling back to filename search.</value>
+  </data>
+  <data name="SearchElasticUnreachable" xml:space="preserve">
+    <value>Elasticsearch not reachable, search running in filename mode.</value>
+  </data>
+  <data name="SearchElasticDisabled" xml:space="preserve">
+    <value>Elasticsearch disabled, search running in filename mode.</value>
+  </data>
+  <data name="SearchReindexFailed" xml:space="preserve">
+    <value>Reindex failed.</value>
+  </data>
+  <data name="AclEditorLoadData" xml:space="preserve">
+    <value>AclEditor.LoadDataAsync Path='{Path}', ShareId={ShareId}</value>
+  </data>
+  <data name="AclEditorNoPath" xml:space="preserve">
+    <value>AclEditor: path is null, aborting.</value>
+  </data>
+  <data name="AclEditorNoShareId" xml:space="preserve">
+    <value>AclEditor: shareId is empty, aborting.</value>
+  </data>
+  <data name="AclEditorLoading" xml:space="preserve">
+    <value>AclEditor: loading {Path} (share {ShareId}, isDirectory {IsDirectory}).</value>
+  </data>
+  <data name="AclEditorLoaded" xml:space="preserve">
+    <value>AclEditor: loaded={Loaded}, entries={Entries}, inherited={Inherited}.</value>
+  </data>
+  <data name="AclEditorLoadFailed" xml:space="preserve">
+    <value>AclEditor: load failed: {Error}</value>
+  </data>
+  <data name="AclEditorException" xml:space="preserve">
+    <value>AclEditor: unhandled exception while loading ACL.</value>
+  </data>
+</root>

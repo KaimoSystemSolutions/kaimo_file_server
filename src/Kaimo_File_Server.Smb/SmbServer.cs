@@ -1,7 +1,9 @@
+using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Services.File;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Smb.Auth.Ntlm;
 using Smb.Protocol.Enums;
 using Smb.Server.Diagnostics;
@@ -23,6 +25,12 @@ namespace Kaimo_File_Server.Smb
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly IFileServiceFactory _fileServiceFactory;
+        private readonly ILoggerFactory _loggerFactory;
+        private readonly ILogger<SmbServer> _logger;
+        // Sub-category loggers so the SMB library's own chatter and the security-audit
+        // stream can be told apart in the output while staying under the Smb project prefix.
+        private readonly ILogger _libraryLogger;
+        private readonly ILogger _auditLogger;
         private readonly string _storagePath;
         private readonly object _shareLock = new();
 
@@ -45,10 +53,15 @@ namespace Kaimo_File_Server.Smb
         public SmbServer(
             IServiceProvider serviceProvider,
             IFileServiceFactory fileServiceFactory,
+            ILoggerFactory loggerFactory,
             string storagePath)
         {
             _serviceProvider = serviceProvider;
             _fileServiceFactory = fileServiceFactory;
+            _loggerFactory = loggerFactory;
+            _logger = loggerFactory.CreateLogger<SmbServer>();
+            _libraryLogger = loggerFactory.CreateLogger("Kaimo_File_Server.Smb.Library");
+            _auditLogger = loggerFactory.CreateLogger("Kaimo_File_Server.Smb.Audit");
             _storagePath = storagePath;
         }
 
@@ -81,7 +94,7 @@ namespace Kaimo_File_Server.Smb
             {
                 if (_server != null)
                 {
-                    Console.WriteLine("[~] SMB server läuft bereits, Start übersprungen.");
+                    _logger.LogDebug(LogEvents.SmbAlreadyRunning, LogMessages.SmbAlreadyRunning);
                     return;
                 }
 
@@ -100,7 +113,7 @@ namespace Kaimo_File_Server.Smb
             {
                 if (_server == null)
                 {
-                    Console.WriteLine("[~] SMB server läuft nicht, Stop übersprungen.");
+                    _logger.LogDebug(LogEvents.SmbNotRunning, LogMessages.SmbNotRunning);
                     return;
                 }
 
@@ -111,7 +124,7 @@ namespace Kaimo_File_Server.Smb
                 _server = null;
                 _activeShares.Clear();
 
-                Console.WriteLine("[*] SMB server gestoppt.");
+                _logger.LogInformation(LogEvents.SmbStopped, LogMessages.SmbStopped);
             }
         }
 
@@ -148,13 +161,20 @@ namespace Kaimo_File_Server.Smb
                 .RequireEncryption(protocol.RequireEncryption)
                 .UseAuthentication(new NtlmSpnegoNegotiator(backend, ntlmOptions))
                 .UseShareAuthorization(policy)
-                .WithLogger(msg => Console.WriteLine($"[smb] {msg}"));
+                .WithLogger(msg =>
+                {
+                    // The library computes the message eagerly; only forward when the
+                    // Smb category is at Debug so nothing is emitted otherwise.
+                    if (_libraryLogger.IsEnabled(LogLevel.Debug))
+                        _libraryLogger.LogDebug(LogEvents.SmbLibraryMessage, LogMessages.SmbLibraryMessage, msg);
+                });
 
             // Route SMB security-audit events (auth, share access, file open/close/
             // delete, permission changes, session/connection lifecycle) into the log.
             if (protocol.EnableAuditLog)
                 builder.UseAuditLogger(
-                    evt => Console.WriteLine($"[smb-audit] {evt}"), SmbLogLevel.Information);
+                    evt => _auditLogger.LogInformation(LogEvents.SmbAuditEvent, LogMessages.SmbAuditEvent, evt),
+                    SmbLogLevel.Information);
 
             // Announce the server via WS-Discovery so it appears in Windows Explorer's
             // "Network" view. Reuse the stable server GUID as the endpoint id so the
@@ -166,11 +186,9 @@ namespace Kaimo_File_Server.Smb
                     wsd.XAddrs = [$"http://{Environment.MachineName}/"];
                 });
 
-            Console.WriteLine(
-                $"[smb] Protokoll: {protocol.MinVersion}..{protocol.MaxVersion}, " +
-                $"Signing={protocol.RequireSigning}, Encryption={protocol.RequireEncryption}, " +
-                $"WsDiscovery={protocol.EnableWsDiscovery}, Audit={protocol.EnableAuditLog}, " +
-                $"ServerGuid={serverGuid}");
+            _logger.LogDebug(LogEvents.SmbProtocolConfig, LogMessages.SmbProtocolConfig,
+                protocol.MinVersion, protocol.MaxVersion, protocol.RequireSigning,
+                protocol.RequireEncryption, protocol.EnableWsDiscovery, protocol.EnableAuditLog, serverGuid);
 
             foreach (KaimoShare share in LoadSharesFromDb())
                 builder.AddShare(share);
@@ -187,7 +205,7 @@ namespace Kaimo_File_Server.Smb
                 throw;
             }
 
-            Console.WriteLine($"[+] SMB server gestartet mit {_activeShares.Count} Shares (ABE aktiv)");
+            _logger.LogInformation(LogEvents.SmbStarted, LogMessages.SmbStarted, _activeShares.Count);
         }
 
         /// <summary>
@@ -210,7 +228,7 @@ namespace Kaimo_File_Server.Smb
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[smb] Konnte Protokoll-Einstellungen nicht laden, nutze Standard: {ex.Message}");
+                _logger.LogWarning(LogEvents.SmbProtocolLoadFailed, ex, LogMessages.SmbProtocolLoadFailed);
                 return SmbProtocolSettings.Default();
             }
         }
@@ -233,7 +251,7 @@ namespace Kaimo_File_Server.Smb
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[smb] Konnte Server-GUID nicht laden, nutze zufällige: {ex.Message}");
+                _logger.LogWarning(LogEvents.SmbServerGuidLoadFailed, ex, LogMessages.SmbServerGuidLoadFailed);
                 return Guid.NewGuid();
             }
         }
@@ -267,7 +285,7 @@ namespace Kaimo_File_Server.Smb
                     Path = def.Path,
                     IsHidden = def.IsShareHidden,
                 };
-                Console.WriteLine($"[+] Share '{def.Name}' ({def.Id}) -> {def.Path}");
+                _logger.LogDebug(LogEvents.SmbShareLoaded, LogMessages.SmbShareLoaded, def.Name, def.Id, def.Path);
             }
 
             return shares;
@@ -285,12 +303,12 @@ namespace Kaimo_File_Server.Smb
                 IncludeSubdirectories = false
             };
 
-            _watcher.Created += (_, e) => OnStorageChanged($"Neuer Ordner: {e.Name}");
-            _watcher.Deleted += (_, e) => OnStorageChanged($"Ordner gelöscht: {e.Name}");
-            _watcher.Renamed += (_, e) => OnStorageChanged($"Ordner umbenannt: {e.OldName} -> {e.Name}");
+            _watcher.Created += (_, e) => OnStorageChanged($"new folder: {e.Name}");
+            _watcher.Deleted += (_, e) => OnStorageChanged($"folder deleted: {e.Name}");
+            _watcher.Renamed += (_, e) => OnStorageChanged($"folder renamed: {e.OldName} -> {e.Name}");
             _watcher.EnableRaisingEvents = true;
 
-            Console.WriteLine($"[+] Beobachte Storage-Ordner: {_storagePath}");
+            _logger.LogDebug(LogEvents.SmbWatchingStorage, LogMessages.SmbWatchingStorage, _storagePath);
         }
 
         private void OnStorageChanged(string reason)
@@ -302,7 +320,7 @@ namespace Kaimo_File_Server.Smb
                 await Task.Delay(1000);
                 Interlocked.Exchange(ref _debounce, 0);
 
-                Console.WriteLine($"[*] Storage-Änderung erkannt ({reason}), Shares werden synchronisiert...");
+                _logger.LogDebug(LogEvents.SmbStorageChanged, LogMessages.SmbStorageChanged, reason);
 
                 try
                 {
@@ -310,7 +328,7 @@ namespace Kaimo_File_Server.Smb
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[SyncFromDb ERROR] {ex.Message}");
+                    _logger.LogError(LogEvents.SmbSyncFailed, ex, LogMessages.SmbSyncFailed);
                 }
             });
         }
@@ -330,14 +348,14 @@ namespace Kaimo_File_Server.Smb
 
                 if (_activeShares.ContainsKey(name))
                 {
-                    Console.WriteLine($"[~] Share '{name}' existiert bereits, übersprungen.");
+                    _logger.LogDebug(LogEvents.SmbShareAlreadyExists, LogMessages.SmbShareAlreadyExists, name);
                     return;
                 }
 
                 _server.AddShare(CreateShare(shareId, name, path, isHidden));
                 _activeShares[name] = new ShareEntry { Id = shareId, DbName = name, Path = path, IsHidden = isHidden };
 
-                Console.WriteLine($"[+] Share '{name}' ({shareId}) -> {path} [live hinzugefügt]");
+                _logger.LogInformation(LogEvents.SmbShareAdded, LogMessages.SmbShareAdded, name, shareId, path);
             }
         }
 
@@ -354,12 +372,12 @@ namespace Kaimo_File_Server.Smb
 
                 if (!_activeShares.TryRemove(name, out var entry))
                 {
-                    Console.WriteLine($"[~] Share '{name}' nicht gefunden, übersprungen.");
+                    _logger.LogDebug(LogEvents.SmbShareNotFound, LogMessages.SmbShareNotFound, name);
                     return false;
                 }
 
                 _server.RemoveShare(name);
-                Console.WriteLine($"[-] Share '{name}' ({entry.Id}) [live entfernt]");
+                _logger.LogInformation(LogEvents.SmbShareRemoved, LogMessages.SmbShareRemoved, name, entry.Id);
                 return true;
             }
         }
@@ -381,7 +399,7 @@ namespace Kaimo_File_Server.Smb
                 _server.AddShare(CreateShare(shareId, newName, newPath, isHidden));
                 _activeShares[newName] = new ShareEntry { Id = shareId, DbName = newName, Path = newPath, IsHidden = isHidden };
 
-                Console.WriteLine($"[~] Share aktualisiert: '{oldName}' -> '{newName}' ({shareId}) -> {newPath}");
+                _logger.LogInformation(LogEvents.SmbShareUpdated, LogMessages.SmbShareUpdated, oldName, newName, shareId, newPath);
             }
         }
 
@@ -412,7 +430,7 @@ namespace Kaimo_File_Server.Smb
                     {
                         _activeShares.TryRemove(active.DbName, out _);
                         _server.RemoveShare(active.DbName);
-                        Console.WriteLine($"[-] Share '{active.DbName}' ({active.Id}) [sync entfernt]");
+                        _logger.LogInformation(LogEvents.SmbShareRemovedSync, LogMessages.SmbShareRemovedSync, active.DbName, active.Id);
                     }
                 }
 
@@ -431,18 +449,18 @@ namespace Kaimo_File_Server.Smb
                             _server.AddShare(CreateShare(id, name, path, isHidden));
                             _activeShares[name] = new ShareEntry { Id = id, DbName = name, Path = path, IsHidden = isHidden };
 
-                            Console.WriteLine($"[~] Share '{name}' aktualisiert -> {path}");
+                            _logger.LogInformation(LogEvents.SmbShareUpdatedSync, LogMessages.SmbShareUpdatedSync, name, path);
                         }
                     }
                     else
                     {
                         _server.AddShare(CreateShare(id, name, path, isHidden));
                         _activeShares[name] = new ShareEntry { Id = id, DbName = name, Path = path, IsHidden = isHidden };
-                        Console.WriteLine($"[+] Share '{name}' ({id}) -> {path} [sync hinzugefügt]");
+                        _logger.LogInformation(LogEvents.SmbShareAddedSync, LogMessages.SmbShareAddedSync, name, id, path);
                     }
                 }
 
-                Console.WriteLine($"[*] DB-Sync abgeschlossen: {_activeShares.Count} aktive Shares");
+                _logger.LogDebug(LogEvents.SmbSyncCompleted, LogMessages.SmbSyncCompleted, _activeShares.Count);
             }
         }
 
@@ -458,7 +476,7 @@ namespace Kaimo_File_Server.Smb
                 Name = name,
                 ShareId = shareId,
                 IsHidden = isHidden,
-                FileStore = new KaimoFileStore(shareId, fileService),
+                FileStore = new KaimoFileStore(shareId, fileService, _loggerFactory.CreateLogger<KaimoFileStore>()),
             };
         }
 

@@ -1,8 +1,11 @@
 ﻿@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Logging
 @using Kaimo_File_Server.Core.Security
 @using Kaimo_File_Server.Web.DynamicHelpers
+@using Microsoft.Extensions.Logging
 @inject AclEditorViewModel VM
 @inject AssetProvider Assets
+@inject ILogger<AclEditor> Logger
 
 <div class="acl-editor">
 
@@ -306,12 +309,12 @@
 
     private async Task LoadDataAsync()
     {
-        Console.WriteLine($"[AclEditor] LoadDataAsync called! Path='{Path}', ShareId={ShareId}");
+        Logger.LogDebug(LogEvents.AclEditorLoadData, LogMessages.AclEditorLoadData, Path, ShareId);
 
         if (Path is null)
         {
             _errorMessage = Resources.Web_Acl_Error_NoPath;
-            Console.WriteLine("[AclEditor] Path is null, aborting");
+            Logger.LogDebug(LogEvents.AclEditorNoPath, LogMessages.AclEditorNoPath);
             StateHasChanged();
             return;
         }
@@ -319,7 +322,7 @@
         if (ShareId == Guid.Empty)
         {
             _errorMessage = Resources.Web_Acl_Error_NoShareId;
-            Console.WriteLine($"[AclEditor] ShareId is empty, aborting");
+            Logger.LogDebug(LogEvents.AclEditorNoShareId, LogMessages.AclEditorNoShareId);
             StateHasChanged();
             return;
         }
@@ -331,10 +334,11 @@
 
         try
         {
-            Console.WriteLine($"[AclEditor] Calling VM.LoadAsync('{Path}', {ShareId}, {IsDirectory})");
+            Logger.LogDebug(LogEvents.AclEditorLoading, LogMessages.AclEditorLoading, Path, ShareId, IsDirectory);
             await VM.LoadAsync(Path, ShareId, IsDirectory);
 
-            Console.WriteLine($"[AclEditor] VM.IsLoaded={VM.IsLoaded}, Entries={VM.Entries.Count}, Inherited={VM.InheritedEntries.Count}");
+            Logger.LogDebug(LogEvents.AclEditorLoaded, LogMessages.AclEditorLoaded,
+                VM.IsLoaded, VM.Entries.Count, VM.InheritedEntries.Count);
 
             if (VM.IsLoaded)
             {
@@ -343,13 +347,13 @@
             else
             {
                 _errorMessage = VM.ErrorMessage ?? Resources.Web_Acl_Error_LoadFailed;
-                Console.WriteLine($"[AclEditor] Load failed: {_errorMessage}");
+                Logger.LogDebug(LogEvents.AclEditorLoadFailed, LogMessages.AclEditorLoadFailed, _errorMessage);
             }
         }
         catch (Exception ex)
         {
             _errorMessage = $"{Resources.Web_Acl_Error_Exception}: {ex.Message}";
-            Console.WriteLine($"[AclEditor] Exception: {ex}");
+            Logger.LogError(LogEvents.AclEditorException, ex, LogMessages.AclEditorException);
         }
         finally
         {

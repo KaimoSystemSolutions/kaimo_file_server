@@ -1,0 +1,99 @@
+# Name	EventId	Message (English, named {placeholders})
+# ============================ Smb (4000-4999) ============================
+# -- server lifecycle 4000-4099 --
+SmbAlreadyRunning	4001	SMB server already running, start skipped.
+SmbNotRunning	4002	SMB server not running, stop skipped.
+SmbStopped	4003	SMB server stopped.
+SmbLibraryMessage	4004	{Message}
+SmbAuditEvent	4005	SMB audit: {Event}
+SmbStarted	4006	SMB server started with {ShareCount} shares (ABE active).
+SmbWatchingStorage	4007	Watching storage folder: {Path}
+# -- share sync 4100-4199 --
+SmbShareLoaded	4101	Share loaded: {Share} ({ShareId}) -> {Path}
+SmbStorageChanged	4102	Storage change detected ({Reason}), synchronizing shares.
+SmbSyncFailed	4103	Share sync from database failed.
+SmbShareAlreadyExists	4104	Share already exists, skipped: {Share}
+SmbShareAdded	4105	Share added at runtime: {Share} ({ShareId}) -> {Path}
+SmbShareNotFound	4106	Share not found, skipped: {Share}
+SmbShareRemoved	4107	Share removed at runtime: {Share} ({ShareId})
+SmbShareUpdated	4108	Share updated: {OldName} -> {NewName} ({ShareId}) -> {Path}
+SmbShareRemovedSync	4109	Share removed during sync: {Share} ({ShareId})
+SmbShareUpdatedSync	4110	Share updated during sync: {Share} -> {Path}
+SmbShareAddedSync	4111	Share added during sync: {Share} ({ShareId}) -> {Path}
+SmbSyncCompleted	4112	Database sync complete: {ShareCount} active shares.
+# -- identity/auth 4200-4299 --
+SmbUserNotFound	4201	SMB auth: user not found: {User}
+SmbNtHashLookupFailed	4202	SMB auth: failed to retrieve NT hash for {User}.
+SmbUserAuthenticated	4203	SMB auth: user authenticated: {User}
+# -- share policy 4300-4399 --
+SmbVisibilityCheckFailed	4301	SMB ABE visibility check failed for share {Share}.
+SmbShareAccessCheckFailed	4302	SMB share access check failed: {User} -> {Share}.
+# -- file store 4400-4499 --
+SmbCreateFailed	4401	SMB create failed for {Path}.
+SmbReadFailed	4402	SMB read failed.
+SmbWriteFailed	4403	SMB write failed.
+SmbQueryDirectoryFailed	4404	SMB directory query failed.
+SmbSnapshotsFailed	4405	SMB snapshot enumeration failed.
+# -- managed service 4500-4599 --
+SmbServiceStartFailed	4501	SMB service start failed.
+SmbServiceStopFailed	4502	SMB service stop failed.
+# -- protocol/config 4600-4699 --
+SmbProtocolConfig	4601	SMB protocol {MinVersion}..{MaxVersion}, Signing={Signing}, Encryption={Encryption}, WsDiscovery={WsDiscovery}, Audit={Audit}, ServerGuid={ServerGuid}
+SmbProtocolLoadFailed	4602	Could not load SMB protocol settings, using defaults.
+SmbServerGuidLoadFailed	4603	Could not load SMB server GUID, using a random one.
+# ============================ Core (1000-1999) ============================
+# -- FileService 1000-1099 --
+FileVersionSnapshotFailed	1001	Versioning failed while closing {Path}.
+FileSearchHookFailed	1002	Search index hook failed for {Path}.
+FileOwnerRecordFailed	1003	Failed to record owner for {Path}.
+FileWriteVersionFailed	1004	Versioning failed after writing {Path}.
+# -- FileVersionService 1100-1199 --
+FileVersionCreated	1101	Created version {Version} for {Path} ({OriginalBytes} -> {CompressedBytes} bytes, {Ratio} ratio).
+# ============================ Infrastructure (2000-2999) ============================
+# -- storage 2000-2099 --
+StorageAclLoadFailed	2001	ACL load failed for {Path}.
+# -- database init 2200-2299 --
+DatabaseReady	2201	Database ready.
+DatabaseNotReadyRetry	2202	Database not ready, retrying in 3s ({RemainingAttempts} attempts left).
+# -- dynamic log-level config 2300-2399 --
+LogLevelApplied	2301	Global log level set to {Level}.
+LogLevelReloadFailed	2302	Failed to reload the global log level from the config store.
+# -- database seeder 2100-2199 --
+SeedBootstrapAdminSkipped	2101	Users already present, skipping bootstrap admin.
+SeedAdminRoleMissing	2102	Administrator role missing, cannot seed bootstrap admin.
+SeedBootstrapAdminPassword	2103	Bootstrap admin created (user 'admin'). Generated one-time password: {Password}. Change it immediately; this password will NOT be shown again.
+SeedBootstrapAdminCreated	2104	Bootstrap admin 'admin' created with the configured password.
+SeedGlobalDepartmentCreated	2105	Global department created (Id: {Id}).
+SeedRoleUpdated	2106	Role '{Name}' updated -> {Perms}
+SeedRoleCreated	2107	Role '{Name}' created (permissions: {Perms})
+SeedGroupCreated	2108	Group '{Name}' created (department: Global)
+SeedDepartmentsCreated	2109	Departments created: Entwicklung (-> Backend, Frontend), Marketing, Geschaeftsleitung.
+SeedTestUsersSkipped	2110	Users already present, skipping test users.
+SeedTestUsersCreating	2111	Creating test users...
+SeedConfigEntries	2112	Config entries seeded.
+SeedTestUserSummary	2113	Test users created: admin, marco.hanisch, anna.weber, lisa.mueller (password '1234', admin 'admin1234').
+SeedDuplicateRolesRemoved	2114	Removed {Count} duplicate role(s) named '{Name}'.
+SeedDuplicateGroupsRemoved	2115	Removed {Count} duplicate group(s) named '{Name}'.
+# ============================ Host (6000-6999) ============================
+# -- data service reconciler 6100-6199 --
+ReconcilerStarted	6101	Data service reconciler started ({Count} services).
+ReconcileRunFailed	6102	Reconcile run failed.
+ReconcileStopFailed	6103	Failed to stop service '{Key}' during shutdown.
+ServiceStarting	6104	Starting data service '{Key}'.
+ServiceStopping	6105	Stopping data service '{Key}'.
+# ============================ Search (3000-3999) ============================
+# -- search router 3200-3299 --
+SearchFlagReadFailed	3201	Could not read the Elasticsearch flag, assuming enabled.
+SearchElasticFailed	3202	Elasticsearch search failed, falling back to filename search.
+SearchElasticUnreachable	3203	Elasticsearch not reachable, search running in filename mode.
+SearchElasticDisabled	3204	Elasticsearch disabled, search running in filename mode.
+SearchReindexFailed	3205	Reindex failed.
+# ============================ Web (5000-5999) ============================
+# -- AclEditor 5600-5699 --
+AclEditorLoadData	5601	AclEditor.LoadDataAsync Path='{Path}', ShareId={ShareId}
+AclEditorNoPath	5602	AclEditor: path is null, aborting.
+AclEditorNoShareId	5603	AclEditor: shareId is empty, aborting.
+AclEditorLoading	5604	AclEditor: loading {Path} (share {ShareId}, isDirectory {IsDirectory}).
+AclEditorLoaded	5605	AclEditor: loaded={Loaded}, entries={Entries}, inherited={Inherited}.
+AclEditorLoadFailed	5606	AclEditor: load failed: {Error}
+AclEditorException	5607	AclEditor: unhandled exception while loading ACL.

@@ -1,4 +1,6 @@
+using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Services.DataServices;
+using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Smb
 {
@@ -12,10 +14,12 @@ namespace Kaimo_File_Server.Smb
     public sealed class SmbManagedDataService : IManagedDataService
     {
         private readonly SmbServer _server;
+        private readonly ILogger<SmbManagedDataService> _logger;
 
-        public SmbManagedDataService(SmbServer server)
+        public SmbManagedDataService(SmbServer server, ILogger<SmbManagedDataService> logger)
         {
             _server = server;
+            _logger = logger;
         }
 
         public string Key => "smb";
@@ -41,7 +45,7 @@ namespace Kaimo_File_Server.Smb
             catch (Exception ex)
             {
                 Status = DataServiceStatus.Faulted;
-                Console.WriteLine($"[SMB] Start fehlgeschlagen: {ex.Message}");
+                _logger.LogError(LogEvents.SmbServiceStartFailed, ex, LogMessages.SmbServiceStartFailed);
                 throw;
             }
 
@@ -65,7 +69,7 @@ namespace Kaimo_File_Server.Smb
             catch (Exception ex)
             {
                 Status = DataServiceStatus.Faulted;
-                Console.WriteLine($"[SMB] Stop fehlgeschlagen: {ex.Message}");
+                _logger.LogError(LogEvents.SmbServiceStopFailed, ex, LogMessages.SmbServiceStopFailed);
                 throw;
             }
 

@@ -78,6 +78,12 @@ else
                         @Assets.SVG("search.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                         @Resources.Web_Settings_Tab_Search
                     </button>
+
+                    <button class="detail-tab @(_activeTab == SettingsTab.Logging ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(SettingsTab.Logging)">
+                        @Assets.SVG("gear.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        @Resources.Web_Settings_Tab_Logging
+                    </button>
                 }
 
                 @if (VM.CanManageDataServices)
@@ -597,6 +603,30 @@ else
                 </div>
             }
 
+            @* ── Tab: Logging ── *@
+            @if (_activeTab == SettingsTab.Logging && VM.CanManageSettings)
+            {
+                <div class="detail-section">
+                    <span class="detail-label">@Resources.Web_Settings_Logging_Detail</span>
+                    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 16px;">
+                        @Resources.Web_Settings_Logging_Desc
+                    </p>
+
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <select class="edit-input" style="max-width: 240px;" @bind="VM.LogLevel">
+                            @foreach (var level in SettingsViewModel.LogLevels)
+                            {
+                                <option value="@level">@level</option>
+                            }
+                        </select>
+
+                        <button class="btn-primary" @onclick="SaveLogging">
+                            @Resources.Web_Settings_Button_Save
+                        </button>
+                    </div>
+                </div>
+            }
+
             @* ── Tab: Certificate (HTTPS) ── *@
             @if (_activeTab == SettingsTab.Certificate && VM.CanManageCertificates)
             {
@@ -765,6 +795,7 @@ else
         Memory,
         DataServices,
         Search,
+        Logging,
         Certificate,
     }
 
@@ -977,6 +1008,12 @@ else
     private async Task SaveSearch()
     {
         await VM.SaveSearchAsync();
+        StateHasChanged();
+    }
+
+    private async Task SaveLogging()
+    {
+        await VM.SaveLoggingAsync();
         StateHasChanged();
     }
 

@@ -1,5 +1,6 @@
 using Elastic.Clients.Elasticsearch;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Logging;
 using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Search;
@@ -86,7 +87,7 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
             {
                 // If the flag can't be read, stay backward compatible (enabled) and
                 // let the reachability check decide the effective state.
-                _logger.LogWarning(ex, "Konnte Elasticsearch-Flag nicht lesen, nehme 'aktiviert' an.");
+                _logger.LogWarning(LogEvents.SearchFlagReadFailed, ex, LogMessages.SearchFlagReadFailed);
                 enabled = true;
             }
 
@@ -227,8 +228,7 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex,
-                    "Elasticsearch-Suche fehlgeschlagen – Fallback auf Dateinamen-Suche.");
+                _logger.LogWarning(LogEvents.SearchElasticFailed, ex, LogMessages.SearchElasticFailed);
                 InvalidateState();
             }
         }
@@ -242,15 +242,13 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
 
         if (!state.Reachable)
         {
-            _logger.LogInformation(
-                "Elasticsearch nicht erreichbar – Suche läuft im Dateinamen-Modus.");
+            _logger.LogDebug(LogEvents.SearchElasticUnreachable, LogMessages.SearchElasticUnreachable);
             return;
         }
 
         if (!state.Enabled)
         {
-            _logger.LogInformation(
-                "Elasticsearch ist deaktiviert – Suche läuft im Dateinamen-Modus.");
+            _logger.LogDebug(LogEvents.SearchElasticDisabled, LogMessages.SearchElasticDisabled);
             return;
         }
 
@@ -335,7 +333,7 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Reindex fehlgeschlagen.");
+            _logger.LogError(LogEvents.SearchReindexFailed, ex, LogMessages.SearchReindexFailed);
             lock (_reindexGate)
             {
                 _reindexProgress = new ReindexProgress

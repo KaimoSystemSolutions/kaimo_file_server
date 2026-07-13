@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Infrastructure.Configuration;
 
@@ -38,8 +39,7 @@ namespace Kaimo_File_Server.Host
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation(
-                "DataServiceReconciler gestartet ({Count} Dienste).", _services.Count());
+            _logger.LogDebug(LogEvents.ReconcilerStarted, LogMessages.ReconcilerStarted, _services.Count());
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -49,7 +49,7 @@ namespace Kaimo_File_Server.Host
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Reconcile run failed.");
+                    _logger.LogError(LogEvents.ReconcileRunFailed, ex, LogMessages.ReconcileRunFailed);
                 }
 
                 try
@@ -71,8 +71,7 @@ namespace Kaimo_File_Server.Host
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex,
-                        "Fehler beim Stoppen von '{Key}' während des Shutdowns.", service.Key);
+                    _logger.LogWarning(LogEvents.ReconcileStopFailed, ex, LogMessages.ReconcileStopFailed, service.Key);
                 }
             }
         }
@@ -95,12 +94,12 @@ namespace Kaimo_File_Server.Host
 
                 if (desired && !running)
                 {
-                    _logger.LogInformation("Starte Dienst '{Key}'…", service.Key);
+                    _logger.LogInformation(LogEvents.ServiceStarting, LogMessages.ServiceStarting, service.Key);
                     await service.StartAsync(ct);
                 }
                 else if (!desired && running)
                 {
-                    _logger.LogInformation("Stoppe Dienst '{Key}'…", service.Key);
+                    _logger.LogInformation(LogEvents.ServiceStopping, LogMessages.ServiceStopping, service.Key);
                     await service.StopAsync(ct);
                 }
 

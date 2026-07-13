@@ -1,11 +1,14 @@
 using System.IO.Compression;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
+using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Formats.Tar;
 
 namespace Kaimo_File_Server.Infrastructure.Storage;
@@ -185,6 +188,7 @@ public class FileSystemStorage : IStorageEngine
     private readonly string _rootPath;
     private readonly Guid _shareId;
     private readonly IServiceProvider? _serviceProvider;
+    private readonly ILogger _logger;
 
     /// <summary>
     /// Creates a storage engine bound to a specific share.
@@ -194,6 +198,8 @@ public class FileSystemStorage : IStorageEngine
         _rootPath = rootPath;
         _shareId = shareId;
         _serviceProvider = serviceProvider;
+        _logger = serviceProvider?.GetService<ILogger<FileSystemStorage>>()
+            ?? (ILogger)NullLogger<FileSystemStorage>.Instance;
         Directory.CreateDirectory(_rootPath);
     }
 
@@ -473,7 +479,7 @@ public class FileSystemStorage : IStorageEngine
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[FileSystemStorage] ACL load failed for '{normalized}': {ex.Message}");
+                _logger.LogWarning(LogEvents.StorageAclLoadFailed, ex, LogMessages.StorageAclLoadFailed, normalized);
             }
         }
 

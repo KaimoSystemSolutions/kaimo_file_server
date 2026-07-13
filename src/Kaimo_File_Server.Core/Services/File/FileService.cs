@@ -1,10 +1,12 @@
 ﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
+using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Search;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Kaimo_File_Server.Core.Services.File;
 
@@ -119,7 +121,7 @@ public class FileService : IFileService
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[FileSession Versioning] {rel}: {ex.Message}");
+                    _owner._logger.LogWarning(LogEvents.FileVersionSnapshotFailed, ex, LogMessages.FileVersionSnapshotFailed, rel);
                 }
             }
 
@@ -148,7 +150,7 @@ public class FileService : IFileService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[FileSession SearchHook] {rel}: {ex.Message}");
+                _owner._logger.LogWarning(LogEvents.FileSearchHookFailed, ex, LogMessages.FileSearchHookFailed, rel);
             }
         }
     }
@@ -203,6 +205,7 @@ public class FileService : IFileService
     private readonly ISearchService? _searchService;
     private readonly IFileVersionService? _versionService;
     private readonly IFileOwnershipService? _ownershipService;
+    private readonly ILogger<FileService> _logger;
     private readonly Guid _shareId;
 
     private const string RecycleBinFolder = ".RECYCLE_BIN";
@@ -213,7 +216,8 @@ public class FileService : IFileService
     ISearchService searchService,
     Guid shareId,
     IFileVersionService? versionService = null,
-    IFileOwnershipService? ownershipService = null)
+    IFileOwnershipService? ownershipService = null,
+    ILogger<FileService>? logger = null)
     {
         _storage = storage;
         _acl = acl;
@@ -221,6 +225,7 @@ public class FileService : IFileService
         _shareId = shareId;
         _versionService = versionService;
         _ownershipService = ownershipService;
+        _logger = logger ?? NullLogger<FileService>.Instance;
     }
 
     /// <summary>
@@ -238,7 +243,7 @@ public class FileService : IFileService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Owner] Failed to record owner for '{normalizedPath}': {ex.Message}");
+            _logger.LogWarning(LogEvents.FileOwnerRecordFailed, ex, LogMessages.FileOwnerRecordFailed, normalizedPath);
         }
     }
 
@@ -420,7 +425,7 @@ public class FileService : IFileService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[WriteFile Versioning] {normalized}: {ex.Message}");
+                _logger.LogWarning(LogEvents.FileWriteVersionFailed, ex, LogMessages.FileWriteVersionFailed, normalized);
             }
         }
 

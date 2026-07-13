@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
@@ -14,6 +15,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Infrastructure
 {
@@ -71,6 +73,9 @@ namespace Kaimo_File_Server.Infrastructure
             // -- SMB protocol settings (cross-process, read by the SMB host on start) --
             services.AddSingleton<ISmbConfigStore, Configuration.SmbConfigStore>();
 
+            // -- Global log level (cross-process, read by the LoggingLevelReloader) --
+            services.AddSingleton<Core.Logging.ILoggingConfigStore, Configuration.LoggingConfigStore>();
+
             // -- Seeder --
             services.AddScoped<DatabaseSeeder>();
 
@@ -112,7 +117,8 @@ namespace Kaimo_File_Server.Infrastructure
                     sp.GetRequiredService<IFileVersionRepository>(),
                     versionStoragePath,
                     defaultMaxVersions: 64,
-                    defaultMaxAge: TimeSpan.FromDays(90)));
+                    defaultMaxAge: TimeSpan.FromDays(90),
+                    logger: sp.GetRequiredService<ILogger<FileVersionService>>()));
 
             // -- Share Lock Manager (in-memory, single instance) --
             services.AddSingleton<ShareLockManager>();
@@ -129,6 +135,9 @@ namespace Kaimo_File_Server.Infrastructure
         {
             const int maxRetries = 5;
 
+            var logger = host.Services.GetRequiredService<ILoggerFactory>()
+                .CreateLogger("Kaimo_File_Server.Infrastructure.Database");
+
             for (int attempt = 1; attempt <= maxRetries; attempt++)
             {
                 try
@@ -137,7 +146,7 @@ namespace Kaimo_File_Server.Infrastructure
                     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                     //await db.Database.EnsureCreatedAsync();
                     await db.Database.MigrateAsync();
-                    Console.WriteLine("[+] Datenbank bereit");
+                    logger.LogInformation(LogEvents.DatabaseReady, LogMessages.DatabaseReady);
 
                     var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
                     await seeder.SeedAsync();
@@ -147,10 +156,10 @@ namespace Kaimo_File_Server.Infrastructure
                 {
                     if (attempt == maxRetries)
                         throw new InvalidOperationException(
-                            "Datenbank konnte nach mehreren Versuchen nicht erreicht werden.", ex);
+                            "Database could not be reached after multiple attempts.", ex);
 
-                    Console.WriteLine(
-                        $"[!] DB nicht bereit, warte 3s... ({maxRetries - attempt} Versuche übrig)");
+                    logger.LogWarning(LogEvents.DatabaseNotReadyRetry, ex,
+                        LogMessages.DatabaseNotReadyRetry, maxRetries - attempt);
                     await Task.Delay(3000);
                 }
             }

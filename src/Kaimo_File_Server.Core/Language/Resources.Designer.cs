@@ -3431,5 +3431,41 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Properties_ItemId", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Logging.
+        /// </summary>
+        public static string Web_Settings_Tab_Logging {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_Logging", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Global log level.
+        /// </summary>
+        public static string Web_Settings_Logging_Detail {
+            get {
+                return ResourceManager.GetString("Web_Settings_Logging_Detail", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string for the logging tab description.
+        /// </summary>
+        public static string Web_Settings_Logging_Desc {
+            get {
+                return ResourceManager.GetString("Web_Settings_Logging_Desc", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Log level saved.
+        /// </summary>
+        public static string Web_Settings_Logging_Saved {
+            get {
+                return ResourceManager.GetString("Web_Settings_Logging_Saved", resourceCulture);
+            }
+        }
     }
 }

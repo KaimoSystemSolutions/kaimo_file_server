@@ -1,6 +1,8 @@
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Security;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Smb.Auth;
 using Smb.FileSystem;
 using Smb.Server.Authorization;
@@ -18,8 +20,13 @@ namespace Kaimo_File_Server.Smb;
 internal sealed class KaimoSharePolicy : IShareAccessPolicy
 {
     private readonly IServiceProvider _services;
+    private readonly ILogger<KaimoSharePolicy> _logger;
 
-    public KaimoSharePolicy(IServiceProvider services) => _services = services;
+    public KaimoSharePolicy(IServiceProvider services)
+    {
+        _services = services;
+        _logger = services.GetRequiredService<ILogger<KaimoSharePolicy>>();
+    }
 
     public bool IsVisible(ShareAccessContext context)
     {
@@ -39,7 +46,7 @@ internal sealed class KaimoSharePolicy : IShareAccessPolicy
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ABE] Visibility check failed for '{share.Name}': {ex.Message}");
+            _logger.LogWarning(LogEvents.SmbVisibilityCheckFailed, ex, LogMessages.SmbVisibilityCheckFailed, share.Name);
             return false; // can't determine → hide (safe default)
         }
     }
@@ -75,7 +82,8 @@ internal sealed class KaimoSharePolicy : IShareAccessPolicy
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ShareAccess] {context.Identity.UserName} -> {share.Name}: {ex.Message}");
+            _logger.LogWarning(LogEvents.SmbShareAccessCheckFailed, ex, LogMessages.SmbShareAccessCheckFailed,
+                context.Identity.UserName, share.Name);
             return ShareAccessResult.Deny();
         }
     }

@@ -1,8 +1,10 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
+using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
+using Microsoft.Extensions.Logging;
 using Smb.FileSystem;
 using Smb.FileSystem.Versioning;
 using Smb.Protocol.Enums;
@@ -26,11 +28,13 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
 {
     private readonly Guid _shareId;
     private readonly IFileService _fileService;
+    private readonly ILogger<KaimoFileStore> _logger;
 
-    public KaimoFileStore(Guid shareId, IFileService fileService)
+    public KaimoFileStore(Guid shareId, IFileService fileService, ILogger<KaimoFileStore> logger)
     {
         _shareId = shareId;
         _fileService = fileService;
+        _logger = logger;
     }
 
     // ───────────────────────── CREATE ─────────────────────────
@@ -71,7 +75,7 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
         catch (IOException) when (disposition == CreateDispositionIntent.Create) { return FailCreate(NtStatus.ObjectNameCollision); }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CreateFile ERROR] {path}: {ex.Message}");
+            _logger.LogError(LogEvents.SmbCreateFailed, ex, LogMessages.SmbCreateFailed, path);
             return FailCreate(NtStatus.AccessDenied);
         }
     }
@@ -148,7 +152,7 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
             return FileStoreResult<int>.Ok(n); // 0 → handler maps to STATUS_END_OF_FILE
         }
         catch (ObjectDisposedException) { return FileStoreResult<int>.Fail(NtStatus.FileClosed); }
-        catch (Exception ex) { Console.WriteLine($"[ReadFile ERROR] {ex.Message}"); return FileStoreResult<int>.Fail(NtStatus.InvalidParameter); }
+        catch (Exception ex) { _logger.LogError(LogEvents.SmbReadFailed, ex, LogMessages.SmbReadFailed); return FileStoreResult<int>.Fail(NtStatus.InvalidParameter); }
     }
 
     public async ValueTask<FileStoreResult<int>> WriteAsync(
@@ -165,7 +169,7 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
         catch (UnauthorizedAccessException) { return FileStoreResult<int>.Fail(NtStatus.AccessDenied); }
         catch (ObjectDisposedException) { return FileStoreResult<int>.Fail(NtStatus.FileClosed); }
         catch (IOException) { return FileStoreResult<int>.Fail(NtStatus.DiskFull); }
-        catch (Exception ex) { Console.WriteLine($"[WriteFile ERROR] {ex.Message}"); return FileStoreResult<int>.Fail(NtStatus.InvalidParameter); }
+        catch (Exception ex) { _logger.LogError(LogEvents.SmbWriteFailed, ex, LogMessages.SmbWriteFailed); return FileStoreResult<int>.Fail(NtStatus.InvalidParameter); }
     }
 
     public async ValueTask<NtStatus> FlushAsync(IFileHandle handle, CancellationToken cancellationToken)
@@ -206,7 +210,7 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
         catch (UnauthorizedAccessException) { return FileStoreResult<IReadOnlyList<FileEntryInfo>>.Fail(NtStatus.AccessDenied); }
         catch (Exception ex)
         {
-            Console.WriteLine($"[QueryDirectory ERROR] {ex.Message}");
+            _logger.LogError(LogEvents.SmbQueryDirectoryFailed, ex, LogMessages.SmbQueryDirectoryFailed);
             return FileStoreResult<IReadOnlyList<FileEntryInfo>>.Fail(NtStatus.InvalidParameter);
         }
     }
@@ -266,7 +270,7 @@ internal sealed class KaimoFileStore : IFileStore, ISnapshotStore, IVolumeInfoPr
     {
         if (!TryGetUser(out UserContext user)) return Array.Empty<DateTime>();
         try { return SmbSync.Run(() => _fileService.GetSnapshotTimestampsAsync(user)); }
-        catch (Exception ex) { Console.WriteLine($"[Snapshots ERROR] {ex.Message}"); return Array.Empty<DateTime>(); }
+        catch (Exception ex) { _logger.LogError(LogEvents.SmbSnapshotsFailed, ex, LogMessages.SmbSnapshotsFailed); return Array.Empty<DateTime>(); }
     }
 
     // ───────────────────────── VOLUME (IVolumeInfoProvider) ─────────────────────────

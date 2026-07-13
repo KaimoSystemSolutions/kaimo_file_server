@@ -1,6 +1,8 @@
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Security;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Smb.Auth;
 
 namespace Kaimo_File_Server.Smb;
@@ -17,8 +19,13 @@ namespace Kaimo_File_Server.Smb;
 internal sealed class KaimoIdentityBackend : IIdentityBackend
 {
     private readonly IServiceProvider _services;
+    private readonly ILogger<KaimoIdentityBackend> _logger;
 
-    public KaimoIdentityBackend(IServiceProvider services) => _services = services;
+    public KaimoIdentityBackend(IServiceProvider services)
+    {
+        _services = services;
+        _logger = services.GetRequiredService<ILogger<KaimoIdentityBackend>>();
+    }
 
     public bool TryGetNtHash(string domain, string user, out byte[] ntHash)
     {
@@ -30,7 +37,7 @@ internal sealed class KaimoIdentityBackend : IIdentityBackend
             byte[]? hash = SmbSync.Run(() => auth.GetNtHashAsync(user));
             if (hash is not { Length: > 0 })
             {
-                Console.WriteLine($"[-] User '{user}' nicht gefunden");
+                _logger.LogWarning(LogEvents.SmbUserNotFound, LogMessages.SmbUserNotFound, user);
                 return false;
             }
             ntHash = hash;
@@ -38,7 +45,7 @@ internal sealed class KaimoIdentityBackend : IIdentityBackend
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[NtHash ERROR] Failed to retrieve hash for '{user}': {ex.Message}");
+            _logger.LogError(LogEvents.SmbNtHashLookupFailed, ex, LogMessages.SmbNtHashLookupFailed, user);
             return false;
         }
     }
@@ -53,7 +60,7 @@ internal sealed class KaimoIdentityBackend : IIdentityBackend
 
         // Cache the rich context so per-operation authorization needs no further DB round-trip.
         KaimoUserRegistry.Register(ctx);
-        Console.WriteLine($"[+] User '{user}' authentifiziert");
+        _logger.LogInformation(LogEvents.SmbUserAuthenticated, LogMessages.SmbUserAuthenticated, user);
         return new SecurityIdentity { DomainName = domain ?? string.Empty, UserName = user };
     }
 }

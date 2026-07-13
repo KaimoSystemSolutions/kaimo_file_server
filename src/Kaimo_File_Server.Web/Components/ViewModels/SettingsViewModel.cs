@@ -1,9 +1,11 @@
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Infrastructure.Configuration;
+using Kaimo_File_Server.Infrastructure.Logging;
 using Microsoft.AspNetCore.Components.Authorization;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Search;
@@ -21,6 +23,8 @@ public class SettingsViewModel
     private readonly ISystemInfoService _sysInfo;
     private readonly ISearchAdminService _searchAdmin;
     private readonly IHttpsCertificateProvider _certProvider;
+    private readonly ILoggingConfigStore _loggingStore;
+    private readonly LoggingLevelConfigurationSource _loggingSource;
     private readonly ILogger<SettingsViewModel> _logger;
 
     public SettingsViewModel(
@@ -31,6 +35,8 @@ public class SettingsViewModel
         ISystemInfoService sysInfo,
         ISearchAdminService searchAdmin,
         IHttpsCertificateProvider certProvider,
+        ILoggingConfigStore loggingStore,
+        LoggingLevelConfigurationSource loggingSource,
         ILogger<SettingsViewModel> logger)
     {
         _config = config;
@@ -40,6 +46,8 @@ public class SettingsViewModel
         _sysInfo = sysInfo;
         _searchAdmin = searchAdmin;
         _certProvider = certProvider;
+        _loggingStore = loggingStore;
+        _loggingSource = loggingSource;
         _logger = logger;
     }
 
@@ -112,6 +120,14 @@ public class SettingsViewModel
 
     /// <summary>Progress of the last/running manual reindex.</summary>
     public ReindexProgress ReindexProgress { get; private set; } = ReindexProgress.Idle;
+
+    // ── Logging (global log level) ──
+
+    /// <summary>The single global application log level (working copy). One of <see cref="LogLevels"/>.</summary>
+    public string LogLevel { get; set; } = LoggingConfigKeys.DefaultLevel;
+
+    /// <summary>Selectable log levels, most→least verbose.</summary>
+    public static IReadOnlyList<string> LogLevels => LoggingConfigKeys.AllowedLevels;
 
     // ── HTTPS Certificate ──
 
@@ -199,6 +215,7 @@ public class SettingsViewModel
                     SessionSecuritySettings.DefaultRevalidationSeconds);
                 RefreshSystemInfo();
                 await LoadSearchStateAsync();
+                LogLevel = await _loggingStore.GetLevelAsync();
             }
 
             if (CanManageCertificates)
@@ -279,6 +296,44 @@ public class SettingsViewModel
         {
             _logger.LogError(ex, "Failed to save language setting");
             ErrorMessage = Resources.Web_Settings_LanguageSaveFailed;
+            return false;
+        }
+    }
+
+    // ── Save Logging ──
+
+    /// <summary>
+    /// Persists the global log level and applies it immediately in this (Web) process.
+    /// Other processes (the SMB host) pick it up through their own reloader within one
+    /// poll interval. Mirrors the other save methods' permission + messaging pattern.
+    /// </summary>
+    public async Task<bool> SaveLoggingAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!CanManageSettings)
+        {
+            ErrorMessage = Resources.Web_Settings_NoPermissionChange;
+            return false;
+        }
+
+        try
+        {
+            await _loggingStore.SetLevelAsync(LogLevel);
+
+            // Apply right away in this process so the change is visible without waiting
+            // for the reloader tick; cross-process propagation happens via the reloaders.
+            _loggingSource.SetLevel(LogLevel);
+
+            _logger.LogInformation("Global log level set to {Level}", LogLevel);
+            SuccessMessage = Resources.Web_Settings_Logging_Saved;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save log level setting");
+            ErrorMessage = Resources.Web_Settings_DataServiceSaveFailed;
             return false;
         }
     }

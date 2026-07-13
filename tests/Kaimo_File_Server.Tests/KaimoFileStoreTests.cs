@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Smb;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Smb.FileSystem;
 using Smb.Protocol.Enums;
@@ -41,7 +42,7 @@ public class KaimoFileStoreTests
         // The store resolves the caller (username) to this context through the registry.
         KaimoUserRegistry.Register(_user);
 
-        _sut = new KaimoFileStore(Guid.NewGuid(), _fileService.Object);
+        _sut = new KaimoFileStore(Guid.NewGuid(), _fileService.Object, NullLogger<KaimoFileStore>.Instance);
     }
 
     // ───────────────────────── helpers ─────────────────────────

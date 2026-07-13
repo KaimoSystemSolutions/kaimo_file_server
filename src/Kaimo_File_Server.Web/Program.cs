@@ -4,6 +4,7 @@ using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Configuration;
+using Kaimo_File_Server.Infrastructure.Logging;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components;
 using Kaimo_File_Server.Web.Components.ViewModels;
@@ -41,6 +42,9 @@ builder.WebHost.ConfigureKestrel(options =>
 // ══════════════════════════════════════════
 
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// -- Global, live-reloadable log level (shared with the SMB host via the DB) --
+builder.AddDynamicLogLevel();
 
 
 

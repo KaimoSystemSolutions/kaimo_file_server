@@ -1191,6 +1191,18 @@
   <data name="Web_Settings_Tab_Search" xml:space="preserve">
     <value>Suche</value>
   </data>
+  <data name="Web_Settings_Tab_Logging" xml:space="preserve">
+    <value>Logging</value>
+  </data>
+  <data name="Web_Settings_Logging_Detail" xml:space="preserve">
+    <value>Globales Log-Level</value>
+  </data>
+  <data name="Web_Settings_Logging_Desc" xml:space="preserve">
+    <value>Gilt für die gesamte Applikation (Web und die Dateidienste). Debug ist sehr detailliert; Information ergänzt Benutzeraktivität wie Anmeldungen; Warning meldet potenzielle Probleme und Sicherheitsrisiken; Error meldet nur fehlgeschlagene Operationen. Standard ist Warning. Änderungen greifen innerhalb weniger Sekunden – ohne Neustart.</value>
+  </data>
+  <data name="Web_Settings_Logging_Saved" xml:space="preserve">
+    <value>Log-Level gespeichert.</value>
+  </data>
   <data name="Web_Settings_Tab_Ram" xml:space="preserve">
     <value>Arbeitsspeicher</value>
   </data>

@@ -271,6 +271,8 @@ public class SettingsViewModelSmbTests
                 Mock.Of<ISystemInfoService>(),
                 Mock.Of<ISearchAdminService>(),
                 Mock.Of<IHttpsCertificateProvider>(),
+                Mock.Of<Kaimo_File_Server.Core.Logging.ILoggingConfigStore>(),
+                new Kaimo_File_Server.Infrastructure.Logging.LoggingLevelConfigurationSource(),
                 NullLogger<SettingsViewModel>.Instance);
         }
 

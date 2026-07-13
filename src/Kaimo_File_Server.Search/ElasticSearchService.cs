@@ -93,7 +93,7 @@ public class ElasticSearchService : ISearchService
                 if (response.Deleted == 0)
                     _logger.LogWarning("No document found for path '{Path}'", absolutePath);
                 else
-                    _logger.LogInformation("Removed document for '{Path}' from the index", absolutePath);
+                    _logger.LogDebug("Removed document for '{Path}' from the index", absolutePath);
             }
             catch (Exception ex)
             {
@@ -210,7 +210,7 @@ public class ElasticSearchService : ISearchService
                     _logger.LogError("DeleteByQuery failed for directory '{Path}': {Error}",
                         absolutePath, response.DebugInformation);
                 else
-                    _logger.LogInformation(
+                    _logger.LogDebug(
                         "{Count} Dokument(e) für Verzeichnis '{Path}' aus Index entfernt",
                         response.Deleted, absolutePath);
             }
@@ -245,7 +245,7 @@ public class ElasticSearchService : ISearchService
                 var updated = BuildRenamedDocument(existing.Source, newAbsolutePath);
                 await ReplaceDocumentAsync(oldId, updated);
 
-                _logger.LogInformation("Index updated (file): '{Old}' -> '{New}'",
+                _logger.LogDebug("Index updated (file): '{Old}' -> '{New}'",
                     oldAbsolutePath, newAbsolutePath);
             }
             catch (Exception ex)
@@ -330,7 +330,7 @@ public class ElasticSearchService : ISearchService
                     processed++;
                 }
 
-                _logger.LogInformation(
+                _logger.LogDebug(
                     "Index aktualisiert (Verzeichnis): '{Old}' -> '{New}' ({Count} Dokument(e))",
                     oldAbsolutePath, newAbsolutePath, processed);
             }
@@ -468,7 +468,7 @@ public class ElasticSearchService : ISearchService
         if (!response.IsValidResponse)
             _logger.LogError("Index could not be created: {Error}", response.DebugInformation);
         else
-            _logger.LogInformation("Index '{Index}' created", IndexName);
+            _logger.LogDebug("Index '{Index}' created", IndexName);
     }
 
     /// <summary>
@@ -488,7 +488,7 @@ public class ElasticSearchService : ISearchService
                 if (health.IsValidResponse && health.Status != HealthStatus.Red)
                 {
                     if (attempt > 1)
-                        _logger.LogInformation("Elasticsearch-Cluster bereit (Status {Status})", health.Status);
+                        _logger.LogDebug("Elasticsearch cluster ready (status {Status})", health.Status);
                     return;
                 }
 
@@ -672,16 +672,16 @@ public class ElasticSearchService : ISearchService
         switch (existenceCheck)
         {
             case ExistsResult.ExactFileExists:
-                _logger.LogInformation("Document {Id} already indexed, skipping", document.Id);
+                _logger.LogDebug("Document {Id} already indexed, skipping", document.Id);
                 return;
 
             case ExistsResult.OldVersionExists:
-                _logger.LogInformation("Found older version of {Id}, overwriting it", document.Id);
+                _logger.LogDebug("Found older version of {Id}, overwriting it", document.Id);
                 await _client.DeleteAsync<FileDocument>(document.Id, d => d.Index(IndexName), ct);
                 break;
 
             case ExistsResult.DoesntExist:
-                _logger.LogInformation("Indexing new document {Id}", document.Id);
+                _logger.LogDebug("Indexing new document {Id}", document.Id);
                 break;
         }
 
@@ -772,7 +772,7 @@ public class ElasticSearchService : ISearchService
                 progress?.Report((done, total));
         }
 
-        _logger.LogInformation(
+        _logger.LogDebug(
             "Reindex abgeschlossen: {Done}/{Total} Einträge ({Files} Dateien, {Dirs} Verzeichnisse)",
             done, total, files.Count, dirs.Count);
     }

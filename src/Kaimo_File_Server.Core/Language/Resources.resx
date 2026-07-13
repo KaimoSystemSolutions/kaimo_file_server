@@ -1191,6 +1191,18 @@
   <data name="Web_Settings_Tab_Search" xml:space="preserve">
     <value>Search</value>
   </data>
+  <data name="Web_Settings_Tab_Logging" xml:space="preserve">
+    <value>Logging</value>
+  </data>
+  <data name="Web_Settings_Logging_Detail" xml:space="preserve">
+    <value>Global log level</value>
+  </data>
+  <data name="Web_Settings_Logging_Desc" xml:space="preserve">
+    <value>Applies to the whole application (Web and the file services). Debug is very detailed; Information adds user activity such as logins; Warning reports potential problems and security risks; Error only reports failed operations. The default is Warning. Changes take effect within a few seconds — no restart required.</value>
+  </data>
+  <data name="Web_Settings_Logging_Saved" xml:space="preserve">
+    <value>Log level saved.</value>
+  </data>
   <data name="Web_Settings_Tab_Ram" xml:space="preserve">
     <value>RAM</value>
   </data>

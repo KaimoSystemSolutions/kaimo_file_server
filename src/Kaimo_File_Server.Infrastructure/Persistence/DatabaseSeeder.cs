@@ -2,6 +2,7 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
+using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Microsoft.EntityFrameworkCore;
@@ -92,14 +93,14 @@ public class DatabaseSeeder
     {
         if (await _db.Users.AnyAsync())
         {
-            _logger.LogDebug("Users already present – skipping bootstrap admin");
+            _logger.LogDebug(LogEvents.SeedBootstrapAdminSkipped, LogMessages.SeedBootstrapAdminSkipped);
             return;
         }
 
         var roles = await LoadRoleLookupAsync();
         if (!roles.TryGetValue("Administrator", out var adminRole))
         {
-            _logger.LogWarning("Administrator role missing – cannot seed bootstrap admin");
+            _logger.LogWarning(LogEvents.SeedAdminRoleMissing, LogMessages.SeedAdminRoleMissing);
             return;
         }
 
@@ -120,17 +121,11 @@ public class DatabaseSeeder
 
         if (generated)
         {
-            _logger.LogWarning(
-                "==================================================================\n" +
-                " Bootstrap-Admin angelegt – Benutzer 'admin'.\n" +
-                " Generiertes Einmal-Passwort: {Password}\n" +
-                " Bitte umgehend ändern. Dieses Passwort wird NICHT erneut angezeigt.\n" +
-                "==================================================================",
-                password);
+            _logger.LogWarning(LogEvents.SeedBootstrapAdminPassword, LogMessages.SeedBootstrapAdminPassword, password);
         }
         else
         {
-            _logger.LogInformation("Bootstrap-Admin 'admin' mit konfiguriertem Passwort angelegt.");
+            _logger.LogInformation(LogEvents.SeedBootstrapAdminCreated, LogMessages.SeedBootstrapAdminCreated);
         }
     }
 
@@ -172,8 +167,8 @@ public class DatabaseSeeder
         _db.Departments.Add(global);
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation(
-            "Global-Department angelegt (Id: {Id})", WellKnownDepartments.GlobalId);
+        _logger.LogDebug(LogEvents.SeedGlobalDepartmentCreated, LogMessages.SeedGlobalDepartmentCreated,
+            WellKnownDepartments.GlobalId);
     }
 
     // ══════════════════════════════════════════
@@ -209,14 +204,14 @@ public class DatabaseSeeder
                 {
                     role.ManagementPermissions = perms;
                     role.IsSystemRole = isSystem;
-                    _logger.LogInformation("Rolle '{Name}' aktualisiert → {Perms}", name, perms);
+                    _logger.LogDebug(LogEvents.SeedRoleUpdated, LogMessages.SeedRoleUpdated, name, perms);
                     changed = true;
                 }
             }
             else
             {
                 _db.Roles.Add(new Role(Guid.NewGuid(), name, perms, isSystem));
-                _logger.LogInformation("Rolle '{Name}' angelegt (Permissions: {Perms})", name, perms);
+                _logger.LogDebug(LogEvents.SeedRoleCreated, LogMessages.SeedRoleCreated, name, perms);
                 changed = true;
             }
         }
@@ -249,7 +244,7 @@ public class DatabaseSeeder
                 // All default groups start in Global department.
                 // Department-specific groups get reassigned in SeedTestUsersAsync.
                 _db.Groups.Add(new Group(Guid.NewGuid(), name));
-                _logger.LogInformation("Gruppe '{Name}' angelegt (Department: Global)", name);
+                _logger.LogDebug(LogEvents.SeedGroupCreated, LogMessages.SeedGroupCreated, name);
                 changed = true;
             }
         }
@@ -311,8 +306,7 @@ public class DatabaseSeeder
         _db.Departments.AddRange(backend, frontend);
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation(
-            "Departments angelegt: Entwicklung (→ Backend, Frontend), Marketing, Geschäftsleitung");
+        _logger.LogDebug(LogEvents.SeedDepartmentsCreated, LogMessages.SeedDepartmentsCreated);
     }
 
     // ══════════════════════════════════════════
@@ -323,11 +317,11 @@ public class DatabaseSeeder
     {
         if (await _db.Users.AnyAsync())
         {
-            _logger.LogDebug("Users already present - skipping test users");
+            _logger.LogDebug(LogEvents.SeedTestUsersSkipped, LogMessages.SeedTestUsersSkipped);
             return;
         }
 
-        _logger.LogInformation("Erstelle Testbenutzer...");
+        _logger.LogDebug(LogEvents.SeedTestUsersCreating, LogMessages.SeedTestUsersCreating);
 
         // Load references
         var roles = await LoadRoleLookupAsync();
@@ -594,20 +588,14 @@ public class DatabaseSeeder
         );
 
         await _db.SaveChangesAsync();
-        _logger.LogInformation("Config entries seeded");
+        _logger.LogDebug(LogEvents.SeedConfigEntries, LogMessages.SeedConfigEntries);
     }
 
     // -- Logging --
 
     private void LogTestUserSummary(Dictionary<string, User> users)
     {
-        _logger.LogInformation("""
-            Testbenutzer erstellt:
-              admin / admin1234         → Global Admin
-              marco.hanisch / 1234      → DepartmentAdmin Entwicklung (+ Backend, Frontend)
-              anna.weber / 1234         → Backend-Mitglied, Default: Read|Write (geerbt)
-              lisa.mueller / 1234       → DepartmentAdmin Marketing, Default: Read
-            """);
+        _logger.LogDebug(LogEvents.SeedTestUserSummary, LogMessages.SeedTestUserSummary);
     }
 
     // ══════════════════════════════════════════
@@ -647,8 +635,8 @@ public class DatabaseSeeder
             await MigrateScopedAssignmentsAsync(removeIds, keep.Id);
 
             _db.Roles.RemoveRange(remove);
-            _logger.LogInformation(
-                "{Count} doppelte Rolle(n) '{Name}' entfernt", remove.Count, group.Key);
+            _logger.LogInformation(LogEvents.SeedDuplicateRolesRemoved, LogMessages.SeedDuplicateRolesRemoved,
+                remove.Count, group.Key);
             cleaned = true;
         }
 
@@ -677,8 +665,8 @@ public class DatabaseSeeder
             // retains its DepartmentId.
 
             _db.Groups.RemoveRange(remove);
-            _logger.LogInformation(
-                "{Count} doppelte Gruppe(n) '{Name}' entfernt", remove.Count, group.Key);
+            _logger.LogInformation(LogEvents.SeedDuplicateGroupsRemoved, LogMessages.SeedDuplicateGroupsRemoved,
+                remove.Count, group.Key);
             cleaned = true;
         }
 
