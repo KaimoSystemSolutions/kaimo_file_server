@@ -28,9 +28,17 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
     // while keeping cross-process toggles reasonably responsive.
     private static readonly TimeSpan StateTtl = TimeSpan.FromSeconds(5);
 
-    // Upper bound for the reachability ping so an absent container can't stall a
-    // write or a search for long.
-    private static readonly TimeSpan PingTimeout = TimeSpan.FromSeconds(2);
+    // Upper bound for a SINGLE reachability ping so an absent container can't stall
+    // a write or a search for long.
+    private static readonly TimeSpan PingTimeout = TimeSpan.FromSeconds(5);
+
+    // A single failed ping is not proof that ES is down. Under Docker/WSL2 the VM
+    // clock can drift and stall Elasticsearch's timer thread for ~10s at a time
+    // (logs: "timer thread slept for [11s]" / "absolute clock went backwards").
+    // During such a stall a probe times out even though the cluster is green. We
+    // retry a couple of times before declaring the container unreachable, so a
+    // transient stall doesn't flip the settings page to "offline" and block reindex.
+    private const int PingAttempts = 2;
 
     private readonly ElasticSearchService _es;
     private readonly FilenameSearchService _filename;
@@ -106,18 +114,30 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
 
     private async Task<bool> PingAsync(CancellationToken ct)
     {
-        try
+        for (int attempt = 1; attempt <= PingAttempts; attempt++)
         {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(PingTimeout);
-            var resp = await _client.PingAsync(cts.Token);
-            return resp.IsValidResponse;
+            try
+            {
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                cts.CancelAfter(PingTimeout);
+                var resp = await _client.PingAsync(cts.Token);
+                if (resp.IsValidResponse)
+                    return true;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // The caller cancelled (not our per-ping timeout) → propagate.
+                throw;
+            }
+            catch (Exception)
+            {
+                // Connection refused / DNS failure / per-ping timeout (e.g. a clock
+                // stall) → fall through and retry before giving up.
+            }
         }
-        catch (Exception)
-        {
-            // Connection refused / timeout / DNS failure → treat as unreachable.
-            return false;
-        }
+
+        // Every attempt failed → treat as unreachable.
+        return false;
     }
 
     private void InvalidateState() => _stateExpiresUtc = DateTime.MinValue;
