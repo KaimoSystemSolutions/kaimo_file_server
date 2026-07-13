@@ -13,7 +13,7 @@ using SmbServerBuilder = Smb.Host.SmbServerBuilder;
 namespace Kaimo_File_Server.Smb
 {
     /// <summary>
-    /// Hosts the self-written SMB-2/3 server (<see cref="Smb.Host.SmbServer"/>) for the Kaimo file
+    /// Hosts the self-written SMB-2/3 server for the Kaimo file
     /// server. Loads shares from the database, watches the storage directory, and reconciles shares at
     /// runtime — without a server restart. Authentication, per-user/per-path ACLs, ABE and snapshots are
     /// provided through the Kaimo bridge types (<see cref="KaimoIdentityBackend"/>,
