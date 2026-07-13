@@ -377,6 +377,24 @@ public class FileService : IFileService
 
         await _storage.WriteAsync(normalized, data, cancellationToken);
 
+        // Versioning: snapshot the freshly-written content so web uploads/overwrites
+        // build the same version history that SMB writes do (FileSession.DisposeAsync).
+        // Content-addressable dedup skips this when the content is unchanged. A
+        // versioning failure must never fail the upload itself.
+        if (!isDir && _versionService != null)
+        {
+            try
+            {
+                await using var written = await _storage.ReadAsync(normalized);
+                await _versionService.CreateVersionAsync(
+                    _shareId, normalized, written, user.User.Id.ToString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[WriteFile Versioning] {normalized}: {ex.Message}");
+            }
+        }
+
         OnFileCreated(ToAbsolutePath(path), _storage.ReadAsync(normalized));
     }
 

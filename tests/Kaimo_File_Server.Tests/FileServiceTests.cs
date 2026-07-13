@@ -202,6 +202,54 @@ public class FileServiceTests
             () => _sut.WriteFileAsync("/test.txt", Stream.Null, ctx));
     }
 
+    [Fact]
+    public async Task WriteFileAsync_WithVersioning_SnapshotsWrittenContent()
+    {
+        // A web upload/overwrite must build the same version history that SMB
+        // writes do, so the version service is invoked with the new content.
+        var versionMock = new Mock<IFileVersionService>();
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, null, _shareId, versionMock.Object);
+
+        var ctx = CreateContext();
+        var data = new MemoryStream([1, 2, 3]);
+        _storageMock.Setup(s => s.IsDirectoryAsync(It.IsAny<string>())).ReturnsAsync(false);
+        _storageMock.Setup(s => s.ReadAsync(It.IsAny<string>()))
+            .ReturnsAsync(() => new MemoryStream([1, 2, 3]));
+        AllowAccess(FilePermission.CreateWriteData);
+
+        await sut.WriteFileAsync("/test.txt", data, ctx);
+
+        versionMock.Verify(v => v.CreateVersionAsync(
+            _shareId, "test.txt", It.IsAny<Stream>(), It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task WriteFileAsync_VersioningFailure_DoesNotFailWrite()
+    {
+        // Versioning is a best-effort side effect: if it throws, the upload
+        // itself must still succeed.
+        var versionMock = new Mock<IFileVersionService>();
+        versionMock
+            .Setup(v => v.CreateVersionAsync(
+                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<string>()))
+            .ThrowsAsync(new IOException("boom"));
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, null, _shareId, versionMock.Object);
+
+        var ctx = CreateContext();
+        var data = new MemoryStream([1, 2, 3]);
+        _storageMock.Setup(s => s.IsDirectoryAsync(It.IsAny<string>())).ReturnsAsync(false);
+        _storageMock.Setup(s => s.ReadAsync(It.IsAny<string>()))
+            .ReturnsAsync(() => new MemoryStream([1, 2, 3]));
+        AllowAccess(FilePermission.CreateWriteData);
+
+        await sut.WriteFileAsync("/test.txt", data, ctx);
+
+        _storageMock.Verify(s => s.WriteAsync(
+            It.IsAny<string>(), data, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     // ═══════════════════ CreateFileAsync ═══════════════════
 
     [Fact]
