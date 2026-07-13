@@ -114,7 +114,7 @@ public class FileService : IFileService
                     if (snap != null)
                     {
                         await _owner._versionService.CreateVersionAsync(
-                            rel, snap, User.User.Id.ToString());
+                            _owner._shareId, rel, snap, User.User.Id.ToString());
                     }
                 }
                 catch (Exception ex)
@@ -598,7 +598,7 @@ public class FileService : IFileService
 
         await EnsureAccessAsync(user, normalized, false, FilePermission.ListReadData);
 
-        var stream = await _versionService.ReadVersionAsync(normalized, ts);
+        var stream = await _versionService.ReadVersionAsync(_shareId, normalized, ts);
         return new ReadOnlySnapshotSession(stream, normalized, user);
     }
 
@@ -607,7 +607,9 @@ public class FileService : IFileService
         if (_versionService == null) return new List<DateTime>();
         // No ACL check on timestamps themselves — they're just dates.
         // Per-path access is enforced when the user opens an @GMT- path.
-        return await _versionService.GetSnapshotTimestampsAsync();
+        // Scoped to this share so snapshots never leak across shares that
+        // happen to contain files at the same relative path.
+        return await _versionService.GetSnapshotTimestampsAsync(_shareId);
     }
 
     // ------------------ Versioning (web UI) ------------------
@@ -619,7 +621,7 @@ public class FileService : IFileService
         var normalized = ShareRelativePath.Normalize(path);
         await EnsureAccessAsync(user, normalized, false, FilePermission.ListReadData);
 
-        return await _versionService.GetVersionsAsync(normalized);
+        return await _versionService.GetVersionsAsync(_shareId, normalized);
     }
 
     public async Task<Stream> ReadFileVersionAsync(
@@ -631,7 +633,7 @@ public class FileService : IFileService
         var normalized = ShareRelativePath.Normalize(path);
         await EnsureAccessAsync(user, normalized, false, FilePermission.ListReadData);
 
-        return await _versionService.ReadVersionAsync(normalized, snapshotTimestampUtc);
+        return await _versionService.ReadVersionAsync(_shareId, normalized, snapshotTimestampUtc);
     }
 
     public async Task RestoreFileVersionAsync(
@@ -648,11 +650,11 @@ public class FileService : IFileService
         if (await _storage.ExistsAsync(normalized))
         {
             await using var current = await _storage.ReadAsync(normalized);
-            await _versionService.CreateVersionAsync(normalized, current, user.User.Id.ToString());
+            await _versionService.CreateVersionAsync(_shareId, normalized, current, user.User.Id.ToString());
         }
 
         // Overwrite the live file with the chosen version's content.
-        await using var restored = await _versionService.ReadVersionAsync(normalized, snapshotTimestampUtc);
+        await using var restored = await _versionService.ReadVersionAsync(_shareId, normalized, snapshotTimestampUtc);
         await _storage.WriteAsync(normalized, restored);
 
         OnFileCreated(ToAbsolutePath(normalized), _storage.ReadAsync(normalized));
@@ -666,7 +668,7 @@ public class FileService : IFileService
         var normalized = ShareRelativePath.Normalize(folderPath);
         await EnsureAccessAsync(user, normalized, true, FilePermission.ListReadData);
 
-        return await _versionService.GetSnapshotTimestampsAsync(normalized);
+        return await _versionService.GetSnapshotTimestampsAsync(_shareId, normalized);
     }
 
     public async Task<List<FileVersion>> GetFolderSnapshotAsync(
@@ -677,7 +679,7 @@ public class FileService : IFileService
         var normalized = ShareRelativePath.Normalize(folderPath);
         await EnsureAccessAsync(user, normalized, true, FilePermission.ListReadData);
 
-        var versions = await _versionService.GetFolderSnapshotAsync(normalized, asOfUtc);
+        var versions = await _versionService.GetFolderSnapshotAsync(_shareId, normalized, asOfUtc);
         if (versions.Count == 0) return versions;
 
         // Hide files the user may not read (per-file ACLs can differ from the folder).

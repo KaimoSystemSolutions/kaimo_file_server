@@ -139,14 +139,18 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
             {
                 entity.ToTable("file_versions");
                 entity.HasKey(e => e.Id);
+                entity.Property(e => e.ShareId).IsRequired();
                 entity.Property(e => e.FilePath).IsRequired().HasMaxLength(1000);
                 entity.Property(e => e.SnapshotTimestampUtc).IsRequired();
                 entity.Property(e => e.StoragePath).IsRequired().HasMaxLength(500);
                 entity.Property(e => e.ContentHash).IsRequired().HasMaxLength(64);
                 entity.Property(e => e.CreatedBy).HasMaxLength(200);
-                entity.HasIndex(e => new { e.FilePath, e.SnapshotTimestampUtc }).IsUnique();
+                // Version history is scoped per share: the same share-relative path
+                // may exist in multiple shares, so every uniqueness/lookup index is
+                // keyed by ShareId first.
+                entity.HasIndex(e => new { e.ShareId, e.FilePath, e.SnapshotTimestampUtc }).IsUnique();
                 entity.HasIndex(e => e.SnapshotTimestampUtc);
-                entity.HasIndex(e => new { e.FilePath, e.ContentHash });
+                entity.HasIndex(e => new { e.ShareId, e.FilePath, e.ContentHash });
             });
 
             // -- Departments --

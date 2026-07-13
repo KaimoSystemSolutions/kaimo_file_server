@@ -27,26 +27,30 @@ namespace Kaimo_File_Server.Core.Services.File
         ///   - Retention policy trimming
         /// 
         /// Returns the created version, or null if content was unchanged.
+        ///
+        /// <paramref name="shareId"/> scopes the version history: two shares may
+        /// each hold a file at the same relative <paramref name="filePath"/>, and
+        /// their histories stay isolated.
         /// </summary>
-        Task<FileVersion?> CreateVersionAsync(string filePath, Stream content, string? userId = null);
+        Task<FileVersion?> CreateVersionAsync(Guid shareId, string filePath, Stream content, string? userId = null);
 
         /// <summary>
         /// Read the content of a specific version.
         /// Returns a readonly stream.
         /// </summary>
-        Task<Stream> ReadVersionAsync(string filePath, DateTime snapshotTimestampUtc);
+        Task<Stream> ReadVersionAsync(Guid shareId, string filePath, DateTime snapshotTimestampUtc);
 
         /// <summary>
         /// Get all versions of a file (newest first).
         /// </summary>
-        Task<List<FileVersion>> GetVersionsAsync(string filePath);
+        Task<List<FileVersion>> GetVersionsAsync(Guid shareId, string filePath);
 
         /// <summary>
-        /// Get all distinct snapshot timestamps across all files.
+        /// Get all distinct snapshot timestamps across all files in a share.
         /// This is what SMB's FSCTL_SRV_ENUMERATE_SNAPSHOTS returns.
         /// Also useful for HTTP API "list all snapshots" endpoint.
         /// </summary>
-        Task<List<DateTime>> GetSnapshotTimestampsAsync(string pathPrefix = "");
+        Task<List<DateTime>> GetSnapshotTimestampsAsync(Guid shareId, string pathPrefix = "");
 
         /// <summary>
         /// Point-in-time state of a folder: for every versioned file under
@@ -54,19 +58,19 @@ namespace Kaimo_File_Server.Core.Services.File
         /// <paramref name="asOfUtc"/>. Files that did not exist yet at that time
         /// are omitted. Used by the web UI to browse a folder "as of" a snapshot.
         /// </summary>
-        Task<List<FileVersion>> GetFolderSnapshotAsync(string folderPath, DateTime asOfUtc);
+        Task<List<FileVersion>> GetFolderSnapshotAsync(Guid shareId, string folderPath, DateTime asOfUtc);
 
         /// <summary>
         /// Get metadata for a file at a specific snapshot time.
         /// Used to resolve @GMT- paths in SMB and version-specific requests in HTTP.
         /// Returns null if no version exists at that timestamp.
         /// </summary>
-        Task<FileVersion?> GetVersionAtAsync(string filePath, DateTime snapshotTimestampUtc);
+        Task<FileVersion?> GetVersionAtAsync(Guid shareId, string filePath, DateTime snapshotTimestampUtc);
 
         /// <summary>
         /// Apply retention policy: delete versions older than maxAge or exceeding maxCount.
         /// Can be called periodically by a background job.
         /// </summary>
-        Task<int> ApplyRetentionAsync(string filePath, int? maxVersions = null, TimeSpan? maxAge = null);
+        Task<int> ApplyRetentionAsync(Guid shareId, string filePath, int? maxVersions = null, TimeSpan? maxAge = null);
     }
 }

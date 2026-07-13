@@ -9,7 +9,9 @@ public class FileVersionTests
     public void Constructor_SetsAllProperties()
     {
         var now = DateTime.UtcNow;
+        var shareId = Guid.NewGuid();
         var version = new FileVersion(
+            shareId: shareId,
             filePath: "docs/report.docx",
             snapshotTimestampUtc: now,
             storagePath: "AB/CD/ABCDEF.bin.gz",
@@ -19,6 +21,7 @@ public class FileVersionTests
             versionNumber: 3);
 
         Assert.NotEqual(Guid.Empty, version.Id);
+        Assert.Equal(shareId, version.ShareId);
         Assert.Equal("docs/report.docx", version.FilePath);
         Assert.Equal(now, version.SnapshotTimestampUtc);
         Assert.Equal("AB/CD/ABCDEF.bin.gz", version.StoragePath);
@@ -33,7 +36,7 @@ public class FileVersionTests
     {
         var ts = new DateTime(2026, 5, 10, 14, 30, 45, DateTimeKind.Utc);
         var version = new FileVersion(
-            "test.txt", ts, "path", "hash", 100, null, 1);
+            Guid.NewGuid(), "test.txt", ts, "path", "hash", 100, null, 1);
 
         Assert.Equal("@GMT-2026.05.10-14.30.45", version.ToGmtToken());
     }
@@ -43,7 +46,7 @@ public class FileVersionTests
     {
         var ts = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var version = new FileVersion(
-            "test.txt", ts, "path", "hash", 100, null, 1);
+            Guid.NewGuid(), "test.txt", ts, "path", "hash", 100, null, 1);
 
         Assert.Equal("@GMT-2026.01.01-00.00.00", version.ToGmtToken());
     }
@@ -108,7 +111,7 @@ public class FileVersionTests
     {
         var ts = new DateTime(2026, 12, 31, 23, 59, 59, DateTimeKind.Utc);
         var version = new FileVersion(
-            "test.txt", ts, "path", "hash", 100, null, 1);
+            Guid.NewGuid(), "test.txt", ts, "path", "hash", 100, null, 1);
 
         var token = version.ToGmtToken();
         var parsed = FileVersion.ParseGmtToken(token);
@@ -121,7 +124,7 @@ public class FileVersionTests
     public void CreatedBy_CanBeNull()
     {
         var version = new FileVersion(
-            "test.txt", DateTime.UtcNow, "path", "hash", 0, null, 1);
+            Guid.NewGuid(), "test.txt", DateTime.UtcNow, "path", "hash", 0, null, 1);
 
         Assert.Null(version.CreatedBy);
     }
@@ -130,7 +133,7 @@ public class FileVersionTests
     public void VersionNumber_StartsAtOne()
     {
         var version = new FileVersion(
-            "test.txt", DateTime.UtcNow, "path", "hash", 0, null, 1);
+            Guid.NewGuid(), "test.txt", DateTime.UtcNow, "path", "hash", 0, null, 1);
 
         Assert.Equal(1, version.VersionNumber);
     }
@@ -141,8 +144,8 @@ public class FileVersionTests
         var ts1 = new DateTime(2026, 5, 10, 10, 0, 0, DateTimeKind.Utc);
         var ts2 = new DateTime(2026, 5, 10, 11, 0, 0, DateTimeKind.Utc);
 
-        var v1 = new FileVersion("file.txt", ts1, "p1", "hash1", 100, null, 1);
-        var v2 = new FileVersion("file.txt", ts2, "p2", "hash2", 200, null, 2);
+        var v1 = new FileVersion(Guid.NewGuid(), "file.txt", ts1, "p1", "hash1", 100, null, 1);
+        var v2 = new FileVersion(Guid.NewGuid(), "file.txt", ts2, "p2", "hash2", 200, null, 2);
 
         Assert.NotEqual(v1.Id, v2.Id);
         Assert.NotEqual(v1.ToGmtToken(), v2.ToGmtToken());

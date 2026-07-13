@@ -30,56 +30,56 @@ namespace Kaimo_File_Server.Infrastructure.Services
         }
 
         public async Task<FileVersion?> CreateVersionAsync(
-            string filePath, Stream content, string? userId = null)
+            Guid shareId, string filePath, Stream content, string? userId = null)
         {
             using var scope = _serviceProvider.CreateScope();
             var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
-            return await svc.CreateVersionAsync(filePath, content, userId);
+            return await svc.CreateVersionAsync(shareId, filePath, content, userId);
         }
 
-        public async Task<Stream> ReadVersionAsync(string filePath, DateTime snapshotTimestampUtc)
+        public async Task<Stream> ReadVersionAsync(Guid shareId, string filePath, DateTime snapshotTimestampUtc)
         {
             using var scope = _serviceProvider.CreateScope();
             var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
             // FileVersionService returns a fully buffered MemoryStream, so it
             // remains usable after the scope (and its DbContext) is disposed.
-            return await svc.ReadVersionAsync(filePath, snapshotTimestampUtc);
+            return await svc.ReadVersionAsync(shareId, filePath, snapshotTimestampUtc);
         }
 
-        public async Task<List<FileVersion>> GetVersionsAsync(string filePath)
+        public async Task<List<FileVersion>> GetVersionsAsync(Guid shareId, string filePath)
         {
             using var scope = _serviceProvider.CreateScope();
             var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
-            return await svc.GetVersionsAsync(filePath);
+            return await svc.GetVersionsAsync(shareId, filePath);
         }
 
-        public async Task<List<DateTime>> GetSnapshotTimestampsAsync(string pathPrefix = "")
+        public async Task<List<DateTime>> GetSnapshotTimestampsAsync(Guid shareId, string pathPrefix = "")
         {
             using var scope = _serviceProvider.CreateScope();
             var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
-            return await svc.GetSnapshotTimestampsAsync(pathPrefix);
+            return await svc.GetSnapshotTimestampsAsync(shareId, pathPrefix);
         }
 
-        public async Task<List<FileVersion>> GetFolderSnapshotAsync(string folderPath, DateTime asOfUtc)
+        public async Task<List<FileVersion>> GetFolderSnapshotAsync(Guid shareId, string folderPath, DateTime asOfUtc)
         {
             using var scope = _serviceProvider.CreateScope();
             var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
-            return await svc.GetFolderSnapshotAsync(folderPath, asOfUtc);
+            return await svc.GetFolderSnapshotAsync(shareId, folderPath, asOfUtc);
         }
 
-        public async Task<FileVersion?> GetVersionAtAsync(string filePath, DateTime snapshotTimestampUtc)
+        public async Task<FileVersion?> GetVersionAtAsync(Guid shareId, string filePath, DateTime snapshotTimestampUtc)
         {
             using var scope = _serviceProvider.CreateScope();
             var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
-            return await svc.GetVersionAtAsync(filePath, snapshotTimestampUtc);
+            return await svc.GetVersionAtAsync(shareId, filePath, snapshotTimestampUtc);
         }
 
         public async Task<int> ApplyRetentionAsync(
-            string filePath, int? maxVersions = null, TimeSpan? maxAge = null)
+            Guid shareId, string filePath, int? maxVersions = null, TimeSpan? maxAge = null)
         {
             using var scope = _serviceProvider.CreateScope();
             var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
-            return await svc.ApplyRetentionAsync(filePath, maxVersions, maxAge);
+            return await svc.ApplyRetentionAsync(shareId, filePath, maxVersions, maxAge);
         }
     }
 }
