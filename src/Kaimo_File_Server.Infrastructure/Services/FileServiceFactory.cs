@@ -31,7 +31,10 @@ namespace Kaimo_File_Server.Infrastructure.Services
             // for the whole process — wrap it so each call gets its own DI scope.
             var versionService = new ScopedFileVersionService(_serviceProvider);
 
-            return new FileService(storage, aclService, _searchService, shareId, versionService);
+            // Same scoping concern for ownership persistence (writes a FileMetadata row).
+            var ownershipService = new ScopedFileOwnershipService(_serviceProvider);
+
+            return new FileService(storage, aclService, _searchService, shareId, versionService, ownershipService);
         }
     }
 }

@@ -202,6 +202,7 @@ public class FileService : IFileService
     private readonly IAclService _acl;
     private readonly ISearchService? _searchService;
     private readonly IFileVersionService? _versionService;
+    private readonly IFileOwnershipService? _ownershipService;
     private readonly Guid _shareId;
 
     private const string RecycleBinFolder = ".RECYCLE_BIN";
@@ -211,13 +212,34 @@ public class FileService : IFileService
     IAclService acl,
     ISearchService searchService,
     Guid shareId,
-    IFileVersionService? versionService = null)
+    IFileVersionService? versionService = null,
+    IFileOwnershipService? ownershipService = null)
     {
         _storage = storage;
         _acl = acl;
         _searchService = searchService;
         _shareId = shareId;
         _versionService = versionService;
+        _ownershipService = ownershipService;
+    }
+
+    /// <summary>
+    /// Persists the creating user as the owner of a freshly created item. Best-effort:
+    /// a failure here (e.g. a transient DB error or a create race) must never fail the
+    /// underlying file operation, so it is swallowed and logged. No-op when ownership
+    /// tracking is not configured.
+    /// </summary>
+    private async Task RecordOwnerAsync(string normalizedPath, bool isDirectory, UserContext user)
+    {
+        if (_ownershipService is null) return;
+        try
+        {
+            await _ownershipService.EnsureOwnerAsync(_shareId, normalizedPath, isDirectory, user.User.Id);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Owner] Failed to record owner for '{normalizedPath}': {ex.Message}");
+        }
     }
 
 
@@ -375,7 +397,14 @@ public class FileService : IFileService
 
         await EnsureAccessAsync(user, normalized, isDir, FilePermission.CreateWriteData);
 
+        // Distinguish a fresh create from an overwrite so ownership is stamped on the
+        // creator, never reassigned to whoever later overwrites the file.
+        var existedBefore = await _storage.ExistsAsync(normalized);
+
         await _storage.WriteAsync(normalized, data, cancellationToken);
+
+        if (!existedBefore)
+            await RecordOwnerAsync(normalized, isDirectory: false, user);
 
         // Versioning: snapshot the freshly-written content so web uploads/overwrites
         // build the same version history that SMB writes do (FileSession.DisposeAsync).
@@ -448,7 +477,9 @@ public class FileService : IFileService
 
         await EnsureAccessAsync(user, parentPath, true, FilePermission.CreateWriteData);
 
-        await _storage.WriteAsync(ShareRelativePath.Normalize(path), Stream.Null);
+        var normalized = ShareRelativePath.Normalize(path);
+        await _storage.WriteAsync(normalized, Stream.Null);
+        await RecordOwnerAsync(normalized, isDirectory: false, user);
     }
 
     public async Task CreateDirectoryAsync(string path, UserContext user)
@@ -457,7 +488,9 @@ public class FileService : IFileService
 
         await EnsureAccessAsync(user, parentPath, true, FilePermission.CreateWriteData);
 
-        await _storage.CreateDirectory(ShareRelativePath.Normalize(path));
+        var normalized = ShareRelativePath.Normalize(path);
+        await _storage.CreateDirectory(normalized);
+        await RecordOwnerAsync(normalized, isDirectory: true, user);
         onDirectoryCreated(ToAbsolutePath(path));
     }
 
@@ -596,6 +629,11 @@ public class FileService : IFileService
             (OpenMode.Truncate, _) => FileOpenStatus.Overwritten,
             _ => FileOpenStatus.Opened
         };
+
+        // Create-via-open is how the SMB transport creates files — stamp the creator as
+        // owner here so SMB writes get the same ownership record as web uploads.
+        if (status == FileOpenStatus.Created)
+            await RecordOwnerAsync(normalized, storageHandle.IsDirectory, user);
 
         // A handle opened purely for reading must never accept data writes,
         // even if a later request slips through the transport layer.

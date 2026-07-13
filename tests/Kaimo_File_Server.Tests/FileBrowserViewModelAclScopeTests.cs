@@ -33,6 +33,7 @@ public class FileBrowserViewModelAclScopeTests
     private readonly Mock<IManagementAuthService> _mgmtAuth = new();
     private readonly Mock<AuthenticationStateProvider> _authState = new();
     private readonly Mock<ISearchService> _searchService = new();
+    private readonly Mock<IUserRepository> _userRepo = new();
 
     private readonly ShareDefinition _share = new("share", "/data/share", isEnabled: true);
     private readonly FileBrowserViewModel _sut;
@@ -62,7 +63,7 @@ public class FileBrowserViewModelAclScopeTests
         _sut = new FileBrowserViewModel(
             _fileServiceFactory.Object, _shareRepo.Object, _dbFactory.Object,
             _userContextFactory.Object, _mgmtAuth.Object, _authState.Object,
-            NullLogger<FileBrowserViewModel>.Instance, _searchService.Object);
+            NullLogger<FileBrowserViewModel>.Instance, _searchService.Object, _userRepo.Object);
     }
 
     private void Authorize(bool allowed) =>
