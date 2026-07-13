@@ -154,7 +154,23 @@ public class FileVersionService : IFileVersionService
 
     public async Task<List<DateTime>> GetSnapshotTimestampsAsync(string pathPrefix = "")
     {
-        return await _versionRepo.GetAllSnapshotTimestampsAsync(ShareRelativePath.Normalize(pathPrefix));
+        return await _versionRepo.GetAllSnapshotTimestampsAsync(FolderPrefix(pathPrefix));
+    }
+
+    public async Task<List<FileVersion>> GetFolderSnapshotAsync(string folderPath, DateTime asOfUtc)
+    {
+        return await _versionRepo.GetLatestVersionsUnderPrefixAsync(FolderPrefix(folderPath), asOfUtc);
+    }
+
+    /// <summary>
+    /// Normalizes a folder path into a prefix that matches only files inside
+    /// that folder — a trailing slash prevents "foo" from matching "foobar/…".
+    /// The share root ("") stays empty so it matches every file.
+    /// </summary>
+    private static string FolderPrefix(string folderPath)
+    {
+        var normalized = ShareRelativePath.Normalize(folderPath);
+        return normalized.Length == 0 ? "" : normalized + "/";
     }
 
     public async Task<FileVersion?> GetVersionAtAsync(

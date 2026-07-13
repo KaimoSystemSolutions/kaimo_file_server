@@ -54,6 +54,26 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
                 .ToListAsync();
         }
 
+        public async Task<List<FileVersion>> GetLatestVersionsUnderPrefixAsync(
+            string pathPrefix, DateTime asOfUtc)
+        {
+            var query = _db.Set<FileVersion>()
+                .Where(v => v.SnapshotTimestampUtc <= asOfUtc);
+
+            if (!string.IsNullOrEmpty(pathPrefix))
+                query = query.Where(v => v.FilePath.StartsWith(pathPrefix));
+
+            // Retention caps versions per file, so the candidate set stays small.
+            // Group in memory to pick the newest snapshot at-or-before the cutoff.
+            var candidates = await query.ToListAsync();
+
+            return candidates
+                .GroupBy(v => v.FilePath)
+                .Select(g => g.OrderByDescending(v => v.SnapshotTimestampUtc).First())
+                .OrderBy(v => v.FilePath, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         public async Task<FileVersion> CreateAsync(FileVersion version)
         {
             _db.Set<FileVersion>().Add(version);

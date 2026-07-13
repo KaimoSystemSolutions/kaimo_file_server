@@ -36,6 +36,21 @@ window.filePreview = {
 
     revokeBlob: function (url) {
         if (url) URL.revokeObjectURL(url);
+    },
+
+    // Triggers a browser download of raw bytes without keeping a blob URL around.
+    downloadBytes: function (bytes, contentType, fileName) {
+        const arr = new Uint8Array(bytes);
+        const url = URL.createObjectURL(
+            new Blob([arr], { type: contentType || 'application/octet-stream' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName || 'download';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        // Give the browser a tick to start the download before revoking.
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 };
 

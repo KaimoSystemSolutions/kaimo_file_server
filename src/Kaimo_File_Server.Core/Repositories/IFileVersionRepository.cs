@@ -43,6 +43,19 @@ namespace Kaimo_File_Server.Core.Repositories
         Task<List<DateTime>> GetAllSnapshotTimestampsAsync(string pathPrefix = "");
 
         /// <summary>
+        /// Returns, for every distinct file under <paramref name="pathPrefix"/>,
+        /// the newest version whose snapshot timestamp is at or before
+        /// <paramref name="asOfUtc"/>. This is the "point-in-time" state of a
+        /// folder: what each file looked like at that moment. Files that did not
+        /// yet exist at that time are omitted.
+        /// </summary>
+        /// <param name="pathPrefix">
+        /// A path prefix to filter by, or an empty string for the whole share.
+        /// </param>
+        /// <param name="asOfUtc">The upper bound (inclusive) for the snapshot timestamp.</param>
+        Task<List<FileVersion>> GetLatestVersionsUnderPrefixAsync(string pathPrefix, DateTime asOfUtc);
+
+        /// <summary>
         /// Persists a new version entry.
         /// </summary>
         /// <param name="version">The version to store.</param>

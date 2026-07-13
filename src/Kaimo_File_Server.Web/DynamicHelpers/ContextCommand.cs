@@ -69,6 +69,9 @@ public static class ContextCommandCatalog
         new ContextCommand("compress.targz", () => Resources.Context_Menu_CompressTarGz, "archive.svg",
             ValidScopes: Compressible),
 
+        new ContextCommand("versions", () => Resources.Context_Menu_Versions, "history.svg",
+            ValidScopes: AllSingle),
+
         new ContextCommand("rename", () => Resources.Context_Menu_Rename, "edit.svg",
             ValidScopes: AllSingle),
 

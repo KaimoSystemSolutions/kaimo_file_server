@@ -71,5 +71,39 @@ namespace Kaimo_File_Server.Core.Services.File
             CancellationToken ct = default);
 
         Task<List<DateTime>> GetSnapshotTimestampsAsync(UserContext user);
+
+        // ------------ Versioning (web UI) ------------
+
+        /// <summary>
+        /// Lists all stored versions of a file (newest first). Requires read access.
+        /// Returns an empty list when versioning is not configured.
+        /// </summary>
+        Task<List<FileVersion>> GetFileVersionsAsync(string path, UserContext user);
+
+        /// <summary>
+        /// Reads the content of a specific version of a file. Requires read access.
+        /// The returned stream is fully buffered and seekable.
+        /// </summary>
+        Task<Stream> ReadFileVersionAsync(string path, DateTime snapshotTimestampUtc, UserContext user);
+
+        /// <summary>
+        /// Restores a file to the content of an earlier version. The current content
+        /// is snapshotted as its own version first, so a restore is itself undoable.
+        /// Requires write access.
+        /// </summary>
+        Task RestoreFileVersionAsync(string path, DateTime snapshotTimestampUtc, UserContext user);
+
+        /// <summary>
+        /// Distinct snapshot timestamps of any file inside a folder (newest first).
+        /// Drives the "point-in-time" picker in the web UI. Requires list access.
+        /// </summary>
+        Task<List<DateTime>> GetFolderSnapshotTimestampsAsync(string folderPath, UserContext user);
+
+        /// <summary>
+        /// Point-in-time state of a folder: for every versioned file the user may
+        /// read, the newest version at or before <paramref name="asOfUtc"/>.
+        /// Requires list access on the folder.
+        /// </summary>
+        Task<List<FileVersion>> GetFolderSnapshotAsync(string folderPath, DateTime asOfUtc, UserContext user);
     }
 }

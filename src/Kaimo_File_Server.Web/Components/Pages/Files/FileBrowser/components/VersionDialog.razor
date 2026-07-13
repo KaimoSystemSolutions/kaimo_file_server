@@ -1,0 +1,290 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject FileBrowserViewModel VM
+@inject AssetProvider Assets
+@inject IJSRuntime JS
+@inject ToastService Toast
+
+@if (_show)
+{
+    <div class="modal-backdrop" @onclick="Close">
+        <div class="preview-dialog version-dialog" @onclick:stopPropagation="true">
+            <div class="preview-header">
+                <span class="preview-title">@_title</span>
+                <div class="preview-actions">
+                    <button class="btn-icon" title="@Resources.Web_Button_Close" @onclick="Close">
+                        @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                    </button>
+                </div>
+            </div>
+
+            <div class="version-body">
+                @if (_loading)
+                {
+                    <div class="preview-loading">
+                        <div class="preview-spinner"></div>
+                        <span class="preview-loading-text">@Resources.Web_Version_Loading</span>
+                    </div>
+                }
+                else if (_isFolder && _selectedSnapshot is null)
+                {
+                    @* -- Folder: pick a point in time -- *@
+                    @if (_snapshots.Count == 0)
+                    {
+                        <div class="version-empty">@Resources.Web_Version_EmptyFolder</div>
+                    }
+                    else
+                    {
+                        <p class="version-hint">@Resources.Web_Version_FolderPickHint</p>
+                        <div class="version-list">
+                            @foreach (var ts in _snapshots)
+                            {
+                                <button class="version-row version-row--clickable" @onclick="() => SelectSnapshot(ts)">
+                                    @Assets.SVG("history.svg", new SvgOptions(Width: 16, Height: 16))
+                                    <span class="version-row-main">@FormatTs(ts)</span>
+                                    @Assets.SVG("chevron_right.svg", new SvgOptions(Width: 16, Height: 16, Color: "var(--text-tertiary)"))
+                                </button>
+                            }
+                        </div>
+                    }
+                }
+                else if (_isFolder)
+                {
+                    @* -- Folder: files as of the chosen snapshot -- *@
+                    <div class="version-subheader">
+                        <button class="btn-icon btn-icon--small" title="@Resources.Web_Version_FolderBack" @onclick="BackToSnapshots">
+                            @Assets.SVG("chevron_left.svg", new SvgOptions(Width: 16, Height: 16))
+                        </button>
+                        <span class="version-asof">@string.Format(Resources.Web_Version_FolderAsOf, FormatTs(_selectedSnapshot!.Value))</span>
+                    </div>
+                    @if (_folderEntries.Count == 0)
+                    {
+                        <div class="version-empty">@Resources.Web_Version_FolderNoFiles</div>
+                    }
+                    else
+                    {
+                        <div class="version-list">
+                            @foreach (var entry in _folderEntries)
+                            {
+                                var name = EntryName(entry.FilePath);
+                                <div class="version-row">
+                                    @Assets.SVG(FileHelper.GetIcon(name), new SvgOptions(Width: 16, Height: 16, Color: "var(--text-tertiary)"))
+                                    <span class="version-row-main" title="@FileBrowserViewModel.RelativeName(entry.FilePath, _folderRel)">
+                                        @FileBrowserViewModel.RelativeName(entry.FilePath, _folderRel)
+                                    </span>
+                                    <span class="version-row-size">@FormatHelper.FormatFileSize(entry.Size)</span>
+                                    <div class="version-row-actions">
+                                        <button class="btn-icon btn-icon--small" title="@Resources.Web_Version_Preview"
+                                                @onclick="() => PreviewVersion(entry.FilePath, entry.SnapshotTimestampUtc, name, entry.Size)">
+                                            @Assets.SVG("arrow_right.svg", new SvgOptions(Width: 14, Height: 14))
+                                        </button>
+                                        <button class="btn-icon btn-icon--small" title="@Resources.Web_Version_Download"
+                                                @onclick="() => DownloadVersion(entry.FilePath, entry.SnapshotTimestampUtc, name)">
+                                            @Assets.SVG("download.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+                else
+                {
+                    @* -- File: version history -- *@
+                    @if (_versions.Count == 0)
+                    {
+                        <div class="version-empty">@Resources.Web_Version_EmptyFile</div>
+                    }
+                    else
+                    {
+                        <div class="version-list">
+                            @foreach (var v in _versions)
+                            {
+                                <div class="version-row">
+                                    <span class="version-badge">@string.Format(Resources.Web_Version_Number, v.VersionNumber)</span>
+                                    <span class="version-row-main">@FormatTs(v.SnapshotTimestampUtc)</span>
+                                    <span class="version-row-size">@FormatHelper.FormatFileSize(v.Size)</span>
+                                    <div class="version-row-actions">
+                                        <button class="btn-icon btn-icon--small" title="@Resources.Web_Version_Preview"
+                                                @onclick="() => PreviewVersion(_fileRel, v.SnapshotTimestampUtc, _target!.Name, v.Size)">
+                                            @Assets.SVG("arrow_right.svg", new SvgOptions(Width: 14, Height: 14))
+                                        </button>
+                                        <button class="btn-icon btn-icon--small" title="@Resources.Web_Version_Download"
+                                                @onclick="() => DownloadVersion(_fileRel, v.SnapshotTimestampUtc, _target!.Name)">
+                                            @Assets.SVG("download.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                                        </button>
+                                        <button class="btn-icon btn-icon--small" title="@Resources.Web_Version_Restore"
+                                                @onclick="() => AskRestore(v.SnapshotTimestampUtc)">
+                                            @Assets.SVG("refresh.svg", new SvgOptions(Width: 14, Height: 14))
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@* -- Restore confirmation -- *@
+@if (_restoreConfirm is not null)
+{
+    <div class="modal-backdrop" @onclick="CancelRestore">
+        <div class="modal-dialog" @onclick:stopPropagation="true">
+            <h3 class="modal-title">@Resources.Web_Version_Restore</h3>
+            <p class="modal-text">
+                @((MarkupString)string.Format(Resources.Web_Version_RestoreConfirm,
+                    $"<strong>{System.Net.WebUtility.HtmlEncode(_target?.Name)}</strong>",
+                    $"<strong>{FormatTs(_restoreConfirm.Value)}</strong>"))
+            </p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" @onclick="CancelRestore">@Resources.Web_Button_Cancel</button>
+                <button class="btn btn-primary" @onclick="ConfirmRestore">@Resources.Web_Version_Restore</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public FilePreview FilePreviewComponent { get; set; } = default!;
+    [Parameter] public EventCallback OnRestored { get; set; }
+
+    private bool _show;
+    private bool _loading;
+    private bool _isFolder;
+    private FileMetadata? _target;
+
+    // File mode
+    private string _fileRel = "";
+    private List<FileVersion> _versions = new();
+
+    // Folder mode
+    private string _folderRel = "";
+    private List<DateTime> _snapshots = new();
+    private DateTime? _selectedSnapshot;
+    private List<FileVersion> _folderEntries = new();
+
+    private DateTime? _restoreConfirm;
+
+    private string _title = "";
+
+    public async Task Open(FileMetadata target)
+    {
+        _target = target;
+        _isFolder = target.IsDirectory;
+        _show = true;
+        _loading = true;
+        _selectedSnapshot = null;
+        _versions = new();
+        _folderEntries = new();
+        _snapshots = new();
+        _restoreConfirm = null;
+
+        _title = string.Format(
+            _isFolder ? Resources.Web_Version_TitleFolder : Resources.Web_Version_TitleFile,
+            target.Name);
+
+        StateHasChanged();
+
+        if (_isFolder)
+        {
+            _folderRel = VM.ShareRelativeOf(target);
+            _snapshots = await VM.GetFolderSnapshotTimestampsAsync(target);
+        }
+        else
+        {
+            _fileRel = VM.ShareRelativeOf(target);
+            _versions = await VM.GetFileVersionsAsync(target);
+        }
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    public void Close()
+    {
+        _show = false;
+        _restoreConfirm = null;
+        StateHasChanged();
+    }
+
+    private async Task SelectSnapshot(DateTime ts)
+    {
+        _selectedSnapshot = ts;
+        _loading = true;
+        StateHasChanged();
+
+        _folderEntries = await VM.GetFolderSnapshotAsync(_target!, ts);
+
+        _loading = false;
+        StateHasChanged();
+    }
+
+    private void BackToSnapshots()
+    {
+        _selectedSnapshot = null;
+        _folderEntries = new();
+        StateHasChanged();
+    }
+
+    private async Task PreviewVersion(string shareRelativePath, DateTime ts, string name, long size)
+    {
+        var result = await VM.ReadVersionForPreviewAsync(shareRelativePath, ts, name, size);
+        if (result is null)
+        {
+            Toast.Show(Resources.Web_Version_PreviewFailed, ToastType.Error);
+            return;
+        }
+
+        var (data, contentType, kind) = result.Value;
+        await FilePreviewComponent.OpenPreviewFromDataAsync(data, contentType, kind, name);
+    }
+
+    private async Task DownloadVersion(string shareRelativePath, DateTime ts, string name)
+    {
+        var bytes = await VM.ReadVersionBytesAsync(shareRelativePath, ts);
+        if (bytes is null)
+        {
+            Toast.Show(Resources.Web_Version_DownloadFailed, ToastType.Error);
+            return;
+        }
+
+        await JS.InvokeVoidAsync("filePreview.downloadBytes", bytes, FileHelper.GetContentType(name), name);
+    }
+
+    private void AskRestore(DateTime ts) { _restoreConfirm = ts; StateHasChanged(); }
+    private void CancelRestore() { _restoreConfirm = null; StateHasChanged(); }
+
+    private async Task ConfirmRestore()
+    {
+        if (_target is null || _restoreConfirm is null) return;
+        var ts = _restoreConfirm.Value;
+        _restoreConfirm = null;
+
+        var result = await VM.RestoreVersionAsync(_target, ts);
+        if (result.Success)
+        {
+            Toast.Show(string.Format(Resources.Web_Version_RestoreSuccess, _target.Name), ToastType.Success);
+            // Refresh the version list (the previous "current" state is now a version)
+            // and let the browser reload the changed file listing.
+            _versions = await VM.GetFileVersionsAsync(_target);
+            await OnRestored.InvokeAsync();
+        }
+        else
+        {
+            Toast.Show(result.Error ?? Resources.Web_Version_RestoreFailed, ToastType.Error);
+        }
+        StateHasChanged();
+    }
+
+    private static string EntryName(string path)
+    {
+        var slash = path.LastIndexOf('/');
+        return slash >= 0 ? path[(slash + 1)..] : path;
+    }
+
+    private static string FormatTs(DateTime utc)
+        => utc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss");
+}

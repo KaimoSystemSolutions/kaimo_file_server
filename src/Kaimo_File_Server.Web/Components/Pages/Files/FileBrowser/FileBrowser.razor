@@ -380,6 +380,11 @@ else
 
 <FilePreview @ref="_filePreviewComponent"/>
 
+@* -- Version history / point-in-time dialog -- *@
+<VersionDialog @ref="_versionDialogComponent"
+               FilePreviewComponent="_filePreviewComponent"
+               OnRestored="OnVersionRestored" />
+
 @code {
     [Parameter] public string ShareName { get; set; } = "";
     [Parameter] public string? SubPath { get; set; }
@@ -612,6 +617,7 @@ else
     
     private FilePreview _filePreviewComponent;
     private ContextMenu _contextMenuComponent;
+    private VersionDialog _versionDialogComponent = default!;
     
     private ElementReference _fileDropZone;
     private bool _jsInitialized = false;
@@ -963,6 +969,19 @@ else
 
     public void TriggerReRender()
         => StateHasChanged();
+
+    // ========== Versionierung ==========
+
+    /// <summary>Opens the version-history dialog for a file or the point-in-time dialog for a folder.</summary>
+    public async Task OpenVersionDialog(FileMetadata item)
+        => await _versionDialogComponent.Open(item);
+
+    /// <summary>After a restore the live file changed — reload the listing.</summary>
+    private async Task OnVersionRestored()
+    {
+        await VM.LoadShareAsync(ShareName, SubPath ?? "");
+        StateHasChanged();
+    }
     
     private FileMetadata? FindShareItem(string itemName)
     {

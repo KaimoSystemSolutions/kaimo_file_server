@@ -129,6 +129,63 @@
   <data name="Context_Menu_Rename" xml:space="preserve">
     <value>Umbenennen</value>
   </data>
+  <data name="Context_Menu_Versions" xml:space="preserve">
+    <value>Versionen</value>
+  </data>
+  <data name="Web_Version_TitleFile" xml:space="preserve">
+    <value>Versionen – {0}</value>
+  </data>
+  <data name="Web_Version_TitleFolder" xml:space="preserve">
+    <value>Ordnerversionen – {0}</value>
+  </data>
+  <data name="Web_Version_Loading" xml:space="preserve">
+    <value>Versionen werden geladen…</value>
+  </data>
+  <data name="Web_Version_EmptyFile" xml:space="preserve">
+    <value>Für diese Datei sind keine Versionen vorhanden.</value>
+  </data>
+  <data name="Web_Version_EmptyFolder" xml:space="preserve">
+    <value>Für diesen Ordner sind keine Versionen vorhanden.</value>
+  </data>
+  <data name="Web_Version_Number" xml:space="preserve">
+    <value>Version {0}</value>
+  </data>
+  <data name="Web_Version_Preview" xml:space="preserve">
+    <value>Vorschau</value>
+  </data>
+  <data name="Web_Version_Download" xml:space="preserve">
+    <value>Herunterladen</value>
+  </data>
+  <data name="Web_Version_Restore" xml:space="preserve">
+    <value>Wiederherstellen</value>
+  </data>
+  <data name="Web_Version_RestoreConfirm" xml:space="preserve">
+    <value>{0} auf die Version vom {1} zurücksetzen? Der aktuelle Stand wird zuvor als Version gesichert.</value>
+  </data>
+  <data name="Web_Version_RestoreSuccess" xml:space="preserve">
+    <value>„{0}" wurde auf eine frühere Version zurückgesetzt.</value>
+  </data>
+  <data name="Web_Version_RestoreFailed" xml:space="preserve">
+    <value>Wiederherstellen fehlgeschlagen.</value>
+  </data>
+  <data name="Web_Version_PreviewFailed" xml:space="preserve">
+    <value>Diese Version kann nicht als Vorschau angezeigt werden.</value>
+  </data>
+  <data name="Web_Version_DownloadFailed" xml:space="preserve">
+    <value>Diese Version konnte nicht heruntergeladen werden.</value>
+  </data>
+  <data name="Web_Version_FolderPickHint" xml:space="preserve">
+    <value>Wählen Sie einen Zeitpunkt, um den Stand des Ordners anzuzeigen.</value>
+  </data>
+  <data name="Web_Version_FolderAsOf" xml:space="preserve">
+    <value>Stand vom {0}</value>
+  </data>
+  <data name="Web_Version_FolderBack" xml:space="preserve">
+    <value>Zurück zur Zeitpunktauswahl</value>
+  </data>
+  <data name="Web_Version_FolderNoFiles" xml:space="preserve">
+    <value>Zu diesem Zeitpunkt existierten keine Dateien.</value>
+  </data>
   <data name="Context_Menu_Delete" xml:space="preserve">
     <value>Löschen</value>
   </data>

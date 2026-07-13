@@ -276,6 +276,59 @@ public class FileVersionServiceTests : IDisposable
     }
 
     // ═══════════════════════════════════════════
+    //  Folder Snapshot (point-in-time)
+    // ═══════════════════════════════════════════
+
+    [Fact]
+    public async Task GetFolderSnapshotAsync_ReturnsLatestVersionPerFileAtOrBeforeCutoff()
+    {
+        // folder/a.txt: v1 @ t0, v2 @ t2 ; folder/b.txt: v1 @ t1
+        await _sut.CreateVersionAsync("folder/a.txt", ToStream("A1"));
+
+        _time.Advance(TimeSpan.FromSeconds(1));
+        await _sut.CreateVersionAsync("folder/b.txt", ToStream("B1"));
+        var cutoff = _time.GetUtcNow().UtcDateTime; // t1 — after a.v1 and b.v1, before a.v2
+
+        _time.Advance(TimeSpan.FromSeconds(1));
+        await _sut.CreateVersionAsync("folder/a.txt", ToStream("A2"));
+
+        var snapshot = await _sut.GetFolderSnapshotAsync("folder", cutoff);
+
+        Assert.Equal(2, snapshot.Count);
+        var a = Assert.Single(snapshot, v => v.FilePath == "folder/a.txt");
+        Assert.Equal(1, a.VersionNumber); // the older a.txt, not the post-cutoff v2
+        Assert.Contains(snapshot, v => v.FilePath == "folder/b.txt");
+    }
+
+    [Fact]
+    public async Task GetFolderSnapshotAsync_OmitsFilesCreatedAfterCutoff()
+    {
+        await _sut.CreateVersionAsync("folder/a.txt", ToStream("A1"));
+        var cutoff = _time.GetUtcNow().UtcDateTime;
+
+        _time.Advance(TimeSpan.FromSeconds(1));
+        await _sut.CreateVersionAsync("folder/later.txt", ToStream("L1"));
+
+        var snapshot = await _sut.GetFolderSnapshotAsync("folder", cutoff);
+
+        Assert.Single(snapshot);
+        Assert.Equal("folder/a.txt", snapshot[0].FilePath);
+    }
+
+    [Fact]
+    public async Task GetFolderSnapshotAsync_PrefixDoesNotMatchSiblingFolder()
+    {
+        await _sut.CreateVersionAsync("folder/a.txt", ToStream("A1"));
+        await _sut.CreateVersionAsync("folder2/b.txt", ToStream("B1"));
+        var cutoff = _time.GetUtcNow().UtcDateTime.AddSeconds(1);
+
+        var snapshot = await _sut.GetFolderSnapshotAsync("folder", cutoff);
+
+        Assert.Single(snapshot);
+        Assert.Equal("folder/a.txt", snapshot[0].FilePath);
+    }
+
+    // ═══════════════════════════════════════════
     //  Retention Policy
     // ═══════════════════════════════════════════
 
@@ -398,6 +451,20 @@ public class MockFileVersionRepository : IFileVersionRepository
             .Select(v => v.SnapshotTimestampUtc)
             .Distinct()
             .OrderByDescending(t => t)
+            .ToList();
+        return Task.FromResult(result);
+    }
+
+    public Task<List<FileVersion>> GetLatestVersionsUnderPrefixAsync(string pathPrefix, DateTime asOfUtc)
+    {
+        var query = _versions.Where(v => v.SnapshotTimestampUtc <= asOfUtc);
+        if (!string.IsNullOrEmpty(pathPrefix))
+            query = query.Where(v => v.FilePath.StartsWith(pathPrefix));
+
+        var result = query
+            .GroupBy(v => v.FilePath)
+            .Select(g => g.OrderByDescending(v => v.SnapshotTimestampUtc).First())
+            .OrderBy(v => v.FilePath, StringComparer.OrdinalIgnoreCase)
             .ToList();
         return Task.FromResult(result);
     }

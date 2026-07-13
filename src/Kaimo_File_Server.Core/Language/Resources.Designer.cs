@@ -149,7 +149,121 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Context_Menu_Rename", resourceCulture);
             }
         }
-        
+
+        public static string Context_Menu_Versions {
+            get {
+                return ResourceManager.GetString("Context_Menu_Versions", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_TitleFile {
+            get {
+                return ResourceManager.GetString("Web_Version_TitleFile", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_TitleFolder {
+            get {
+                return ResourceManager.GetString("Web_Version_TitleFolder", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_Loading {
+            get {
+                return ResourceManager.GetString("Web_Version_Loading", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_EmptyFile {
+            get {
+                return ResourceManager.GetString("Web_Version_EmptyFile", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_EmptyFolder {
+            get {
+                return ResourceManager.GetString("Web_Version_EmptyFolder", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_Number {
+            get {
+                return ResourceManager.GetString("Web_Version_Number", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_Preview {
+            get {
+                return ResourceManager.GetString("Web_Version_Preview", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_Download {
+            get {
+                return ResourceManager.GetString("Web_Version_Download", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_Restore {
+            get {
+                return ResourceManager.GetString("Web_Version_Restore", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_RestoreConfirm {
+            get {
+                return ResourceManager.GetString("Web_Version_RestoreConfirm", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_RestoreSuccess {
+            get {
+                return ResourceManager.GetString("Web_Version_RestoreSuccess", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_RestoreFailed {
+            get {
+                return ResourceManager.GetString("Web_Version_RestoreFailed", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_PreviewFailed {
+            get {
+                return ResourceManager.GetString("Web_Version_PreviewFailed", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_DownloadFailed {
+            get {
+                return ResourceManager.GetString("Web_Version_DownloadFailed", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_FolderPickHint {
+            get {
+                return ResourceManager.GetString("Web_Version_FolderPickHint", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_FolderAsOf {
+            get {
+                return ResourceManager.GetString("Web_Version_FolderAsOf", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_FolderBack {
+            get {
+                return ResourceManager.GetString("Web_Version_FolderBack", resourceCulture);
+            }
+        }
+
+        public static string Web_Version_FolderNoFiles {
+            get {
+                return ResourceManager.GetString("Web_Version_FolderNoFiles", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Selected {0} items ähnelt.
         /// </summary>

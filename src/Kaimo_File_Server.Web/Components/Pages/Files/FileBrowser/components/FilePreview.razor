@@ -159,6 +159,37 @@
         StateHasChanged();
     }
 
+    /// <summary>
+    /// Opens the preview modal for content already held in memory (e.g. a specific
+    /// file version), rather than reading the current file from storage.
+    /// </summary>
+    public async Task OpenPreviewFromDataAsync(byte[] data, string contentType, PreviewKind kind, string fileName)
+    {
+        await RevokeUrlsAsync();
+
+        _previewFileName = fileName;
+        _previewSize = data.Length;
+        _displayUrl = "";
+        _downloadUrl = "";
+        _previewTooLarge = false;
+        _previewKind = kind;
+        _showFilePreview = true;
+        _previewLoading = true;
+        StateHasChanged();
+
+        var urls = await JS.InvokeAsync<PreviewUrls>(
+            "filePreview.preparePreview", data, contentType, kind.ToString());
+
+        _downloadUrl = urls.DownloadUrl ?? "";
+        _displayUrl = urls.DisplayUrl ?? "";
+
+        if (string.IsNullOrEmpty(_displayUrl))
+            _previewKind = PreviewKind.Unsupported;
+
+        _previewLoading = false;
+        StateHasChanged();
+    }
+
     private async Task RevokeUrlsAsync()
     {
         if (!string.IsNullOrEmpty(_displayUrl))

@@ -41,16 +41,16 @@ public class ContextMenuConfig
         ContextMenuScope.Background => new() { "newfolder", "refresh" },
 
         ContextMenuScope.Folder => new()
-            { "open", "compress.zip", "compress.targz", "rename", "delete", "permissions", "newfolder", "refresh" },
+            { "open", "compress.zip", "compress.targz", "rename", "versions", "delete", "permissions", "newfolder", "refresh" },
 
         ContextMenuScope.Archive => new()
-            { "open", "extract", "rename", "delete", "permissions", "newfolder", "refresh" },
+            { "open", "extract", "rename", "versions", "delete", "permissions", "newfolder", "refresh" },
 
         ContextMenuScope.MultiSelection => new()
             { "extract", "compress.zip", "compress.targz", "delete", "newfolder", "refresh" },
 
         // Image / Video / Audio / Document / OtherFile share the regular-file layout.
         _ => new()
-            { "open", "compress.zip", "compress.targz", "rename", "delete", "permissions", "newfolder", "refresh" },
+            { "open", "compress.zip", "compress.targz", "rename", "versions", "delete", "permissions", "newfolder", "refresh" },
     };
 }

@@ -135,6 +135,8 @@
             await FileBrowser.ArchiveFiles(CompressTargets(scope, target, selected), ".tar.gz");
         },
 
+        "versions" => async () => { CloseContextMenu(); await FileBrowser.OpenVersionDialog(target!); },
+
         "rename" => () => { ContextRename(target!); return Task.CompletedTask; },
 
         "delete" when scope == ContextMenuScope.MultiSelection

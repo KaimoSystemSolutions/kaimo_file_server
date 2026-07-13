@@ -60,6 +60,13 @@ namespace Kaimo_File_Server.Infrastructure.Services
             return await svc.GetSnapshotTimestampsAsync(pathPrefix);
         }
 
+        public async Task<List<FileVersion>> GetFolderSnapshotAsync(string folderPath, DateTime asOfUtc)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
+            return await svc.GetFolderSnapshotAsync(folderPath, asOfUtc);
+        }
+
         public async Task<FileVersion?> GetVersionAtAsync(string filePath, DateTime snapshotTimestampUtc)
         {
             using var scope = _serviceProvider.CreateScope();

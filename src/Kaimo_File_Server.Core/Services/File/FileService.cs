@@ -609,4 +609,81 @@ public class FileService : IFileService
         // Per-path access is enforced when the user opens an @GMT- path.
         return await _versionService.GetSnapshotTimestampsAsync();
     }
+
+    // ------------------ Versioning (web UI) ------------------
+
+    public async Task<List<FileVersion>> GetFileVersionsAsync(string path, UserContext user)
+    {
+        if (_versionService == null) return new List<FileVersion>();
+
+        var normalized = ShareRelativePath.Normalize(path);
+        await EnsureAccessAsync(user, normalized, false, FilePermission.ListReadData);
+
+        return await _versionService.GetVersionsAsync(normalized);
+    }
+
+    public async Task<Stream> ReadFileVersionAsync(
+        string path, DateTime snapshotTimestampUtc, UserContext user)
+    {
+        if (_versionService == null)
+            throw new NotSupportedException("Versioning is not configured.");
+
+        var normalized = ShareRelativePath.Normalize(path);
+        await EnsureAccessAsync(user, normalized, false, FilePermission.ListReadData);
+
+        return await _versionService.ReadVersionAsync(normalized, snapshotTimestampUtc);
+    }
+
+    public async Task RestoreFileVersionAsync(
+        string path, DateTime snapshotTimestampUtc, UserContext user)
+    {
+        if (_versionService == null)
+            throw new NotSupportedException("Versioning is not configured.");
+
+        var normalized = ShareRelativePath.Normalize(path);
+        await EnsureAccessAsync(user, normalized, false, FilePermission.CreateWriteData);
+
+        // Snapshot the current content first so restoring is itself undoable.
+        // Content-addressable dedup skips this if it equals the latest version.
+        if (await _storage.ExistsAsync(normalized))
+        {
+            await using var current = await _storage.ReadAsync(normalized);
+            await _versionService.CreateVersionAsync(normalized, current, user.User.Id.ToString());
+        }
+
+        // Overwrite the live file with the chosen version's content.
+        await using var restored = await _versionService.ReadVersionAsync(normalized, snapshotTimestampUtc);
+        await _storage.WriteAsync(normalized, restored);
+
+        OnFileCreated(ToAbsolutePath(normalized), _storage.ReadAsync(normalized));
+    }
+
+    public async Task<List<DateTime>> GetFolderSnapshotTimestampsAsync(
+        string folderPath, UserContext user)
+    {
+        if (_versionService == null) return new List<DateTime>();
+
+        var normalized = ShareRelativePath.Normalize(folderPath);
+        await EnsureAccessAsync(user, normalized, true, FilePermission.ListReadData);
+
+        return await _versionService.GetSnapshotTimestampsAsync(normalized);
+    }
+
+    public async Task<List<FileVersion>> GetFolderSnapshotAsync(
+        string folderPath, DateTime asOfUtc, UserContext user)
+    {
+        if (_versionService == null) return new List<FileVersion>();
+
+        var normalized = ShareRelativePath.Normalize(folderPath);
+        await EnsureAccessAsync(user, normalized, true, FilePermission.ListReadData);
+
+        var versions = await _versionService.GetFolderSnapshotAsync(normalized, asOfUtc);
+        if (versions.Count == 0) return versions;
+
+        // Hide files the user may not read (per-file ACLs can differ from the folder).
+        var readable = await FilterReadablePathsAsync(
+            versions.Select(v => (v.FilePath, false)).ToList(), user);
+
+        return versions.Where(v => readable.Contains(v.FilePath)).ToList();
+    }
 }

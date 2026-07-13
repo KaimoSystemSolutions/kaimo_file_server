@@ -129,6 +129,63 @@
   <data name="Context_Menu_Rename" xml:space="preserve">
     <value>Rename</value>
   </data>
+  <data name="Context_Menu_Versions" xml:space="preserve">
+    <value>Versions</value>
+  </data>
+  <data name="Web_Version_TitleFile" xml:space="preserve">
+    <value>Versions – {0}</value>
+  </data>
+  <data name="Web_Version_TitleFolder" xml:space="preserve">
+    <value>Folder versions – {0}</value>
+  </data>
+  <data name="Web_Version_Loading" xml:space="preserve">
+    <value>Loading versions…</value>
+  </data>
+  <data name="Web_Version_EmptyFile" xml:space="preserve">
+    <value>No versions are available for this file.</value>
+  </data>
+  <data name="Web_Version_EmptyFolder" xml:space="preserve">
+    <value>No versions are available for this folder.</value>
+  </data>
+  <data name="Web_Version_Number" xml:space="preserve">
+    <value>Version {0}</value>
+  </data>
+  <data name="Web_Version_Preview" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="Web_Version_Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="Web_Version_Restore" xml:space="preserve">
+    <value>Restore</value>
+  </data>
+  <data name="Web_Version_RestoreConfirm" xml:space="preserve">
+    <value>Restore {0} to the version from {1}? The current state is saved as a version first.</value>
+  </data>
+  <data name="Web_Version_RestoreSuccess" xml:space="preserve">
+    <value>'{0}' was restored to an earlier version.</value>
+  </data>
+  <data name="Web_Version_RestoreFailed" xml:space="preserve">
+    <value>Restore failed.</value>
+  </data>
+  <data name="Web_Version_PreviewFailed" xml:space="preserve">
+    <value>This version cannot be previewed.</value>
+  </data>
+  <data name="Web_Version_DownloadFailed" xml:space="preserve">
+    <value>This version could not be downloaded.</value>
+  </data>
+  <data name="Web_Version_FolderPickHint" xml:space="preserve">
+    <value>Select a point in time to view the folder's state.</value>
+  </data>
+  <data name="Web_Version_FolderAsOf" xml:space="preserve">
+    <value>State as of {0}</value>
+  </data>
+  <data name="Web_Version_FolderBack" xml:space="preserve">
+    <value>Back to time selection</value>
+  </data>
+  <data name="Web_Version_FolderNoFiles" xml:space="preserve">
+    <value>No files existed at that point in time.</value>
+  </data>
   <data name="Context_Menu_Delete" xml:space="preserve">
     <value>Delete</value>
   </data>

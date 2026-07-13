@@ -49,6 +49,14 @@ namespace Kaimo_File_Server.Core.Services.File
         Task<List<DateTime>> GetSnapshotTimestampsAsync(string pathPrefix = "");
 
         /// <summary>
+        /// Point-in-time state of a folder: for every versioned file under
+        /// <paramref name="folderPath"/>, the newest version at or before
+        /// <paramref name="asOfUtc"/>. Files that did not exist yet at that time
+        /// are omitted. Used by the web UI to browse a folder "as of" a snapshot.
+        /// </summary>
+        Task<List<FileVersion>> GetFolderSnapshotAsync(string folderPath, DateTime asOfUtc);
+
+        /// <summary>
         /// Get metadata for a file at a specific snapshot time.
         /// Used to resolve @GMT- paths in SMB and version-specific requests in HTTP.
         /// Returns null if no version exists at that timestamp.
