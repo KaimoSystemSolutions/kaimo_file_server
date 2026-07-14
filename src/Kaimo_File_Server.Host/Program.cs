@@ -5,6 +5,21 @@ using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Smb;
 using Microsoft.Extensions.DependencyInjection;
 
+// The SMB library processes every non-READ/WRITE command (CREATE, SET_INFO, CLOSE, ...)
+// strictly sequentially per connection, and its handle-teardown path disposes open handles
+// through the synchronous IDisposable.Dispose. In our bridge that crosses the async
+// IFileService via SmbSync.Run (Task.Run(...).GetResult()), which parks one thread-pool
+// thread while a second runs the work. A burst — deleting many files, or a client
+// disconnect that disposes many still-open DELETE_ON_CLOSE handles — can therefore drain
+// the pool and stall for seconds, because the pool only grows ~1-2 threads/second past its
+// minimum. Raise the floor (default = CPU core count) so those bursts have threads at once.
+{
+    int desiredMin = Math.Max(Environment.ProcessorCount * 4, 64);
+    ThreadPool.GetMinThreads(out int workerMin, out int completionMin);
+    if (workerMin < desiredMin)
+        ThreadPool.SetMinThreads(desiredMin, completionMin);
+}
+
 var builder = Host.CreateApplicationBuilder(args);
 
 // -- Infrastructure (DB + Repositories + AuthenticationLookup) --
