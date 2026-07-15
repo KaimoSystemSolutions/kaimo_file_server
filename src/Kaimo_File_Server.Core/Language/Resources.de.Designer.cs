@@ -3326,5 +3326,17 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Delete_BatchSuccess", resourceCulture);
             }
         }
+        
+        internal static string Web_Upload_ProgressWithSpeed {
+            get {
+                return ResourceManager.GetString("Web_Upload_ProgressWithSpeed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Upload_BatchProgressWithSpeed {
+            get {
+                return ResourceManager.GetString("Web_Upload_BatchProgressWithSpeed", resourceCulture);
+            }
+        }
     }
 }

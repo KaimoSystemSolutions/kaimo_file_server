@@ -1,4 +1,5 @@
 @using System.Collections
+@using System.Diagnostics
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Pages.Acl
 @using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser.components
@@ -545,9 +546,14 @@ else
         int completedCount = 0;
         var failedFiles = new List<string>();
 
+        var stopwatch = Stopwatch.StartNew();
+        long lastSampleBytes = 0;
+        TimeSpan lastSampleTime = TimeSpan.Zero;
+        double currentSpeedBytesPerSec = 0;
+
         string toastId = null!;
         toastId = Toast.Show(
-            BuildProgressText(files[0].Name, 0, files.Count),
+            BuildProgressText(files[0].Name, 0, files.Count, currentSpeedBytesPerSec),
             ToastType.Progress,
             onDismiss: () =>
             {
@@ -584,15 +590,25 @@ else
                         totalUploadedBytes += bytesRead - fileBytesUploaded;
                         fileBytesUploaded = bytesRead;
 
-                        var percent = totalBytes > 0 ? (int)(totalUploadedBytes * 100 / totalBytes) : 0;
-
-                        InvokeAsync(() =>
+                        var elapsedSinceSample = stopwatch.Elapsed - lastSampleTime;
+                        if (elapsedSinceSample.TotalMilliseconds >= 500)
                         {
-                            Toast.Update(toastId,
-                                BuildProgressText(file.Name, completedCount, files.Count),
-                                progress: percent);
-                            StateHasChanged();
-                        });
+                            var bytesSinceSample = totalUploadedBytes - lastSampleBytes;
+                            currentSpeedBytesPerSec = bytesSinceSample / elapsedSinceSample.TotalSeconds;
+
+                            lastSampleBytes = totalUploadedBytes;
+                            lastSampleTime = stopwatch.Elapsed;
+
+                            var percent = totalBytes > 0 ? (int)(totalUploadedBytes * 100 / totalBytes) : 0;
+
+                            InvokeAsync(() =>
+                            {
+                                Toast.Update(toastId,
+                                    BuildProgressText(file.Name, completedCount, files.Count, currentSpeedBytesPerSec),
+                                    progress: percent);
+                                StateHasChanged();
+                            });
+                        }
                     });
 
                     var result = await VM.UploadFileAsync(file.Name, progressStream, cts.Token);
@@ -617,6 +633,8 @@ else
             }
         }
 
+        stopwatch.Stop();
+
         if (!cts.IsCancellationRequested)
         {
             if (failedFiles.Count == 0)
@@ -640,6 +658,23 @@ else
 
         await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
         StateHasChanged();
+    }
+
+    private string BuildProgressText(string currentFileName, int completedCount, int totalCount, double speedBytesPerSec)
+    {
+        var speedText = FormatSpeed(speedBytesPerSec);
+        return totalCount == 1
+            ? string.Format(Resources.Web_Upload_ProgressWithSpeed, currentFileName, speedText)
+            : string.Format(Resources.Web_Upload_BatchProgressWithSpeed, completedCount + 1, totalCount, currentFileName, speedText);
+    }
+
+    private static string FormatSpeed(double bytesPerSec)
+    {
+        if (bytesPerSec < 1024)
+            return $"{bytesPerSec:F0} B/s";
+        if (bytesPerSec < 1024 * 1024)
+            return $"{bytesPerSec / 1024:F1} KB/s";
+        return $"{bytesPerSec / (1024 * 1024):F1} MB/s";
     }
 
     private string BuildProgressText(string currentFileName, int completedCount, int totalCount)

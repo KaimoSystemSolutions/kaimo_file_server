@@ -1758,4 +1758,10 @@
   <data name="Web_Delete_BatchSuccess" xml:space="preserve">
   <value>{0} Elemente erfolgreich gelöscht</value>
 </data>
+  <data name="Web_Upload_ProgressWithSpeed" xml:space="preserve">
+  <value>Lade {0} hoch ({1})</value>
+</data>
+  <data name="Web_Upload_BatchProgressWithSpeed" xml:space="preserve">
+  <value>Lade Datei {0} von {1} hoch: {2} ({3})</value>
+</data>
 </root>
