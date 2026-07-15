@@ -38,7 +38,7 @@
         {
             <button class="btn-icon" title="@Resources.Web_ManagePermissions"
                     @onclick="ToggleAclPanel">
-                
+
                 @Assets.SVG("acl_panel.svg", new SvgOptions(Color: _showAclPanel ? "var(--accent)" : "currentColor"))
             </button>
             var rootCount = GetAclCount(_aclPath);
@@ -62,7 +62,7 @@
     <div class="toolbar-actions">
         <button class="toolbar-btn" title="@Resources.Web_Action_Open"
                 disabled="@(!CanOpenSelection)" @onclick="OpenSelected">
-            
+
             @Assets.SVG("arrow_right.svg", new SvgOptions(Width: 16, Height: 16))
             <span>@Resources.Web_Action_Open</span>
         </button>
@@ -73,13 +73,13 @@
         </button>
         <button class="toolbar-btn toolbar-btn--danger" title="@Resources.Web_Action_Delete"
                 disabled="@(!CanDeleteSelection)" @onclick="DeleteSelected">
-            
+
             @Assets.SVG("trash.svg", new SvgOptions(Width: 16, Height: 16))
             <span>@Resources.Web_Action_Delete</span>
         </button>
         <button class="toolbar-btn" title="@Resources.Web_Action_Permissions"
                 disabled="@(!CanAclSelection)" @onclick="AclSelected">
-            
+
             @Assets.SVG("shield.svg", new SvgOptions(Width: 16, Height: 16, Style: "vertical-align: -2px; margin-right: 6px;"))
             <span>@Resources.Web_Action_Permissions</span>
         </button>
@@ -94,7 +94,7 @@
             <h3 class="modal-title">@Resources.Web_CreateFolder_Title</h3>
             <input class="modal-input" type="text" placeholder="@Resources.Web_CreateFolder_Placeholder"
                    @bind="_newFolderName" @bind:event="oninput"
-                   @onkeydown="OnCreateFolderKeyDown" />
+                   @onkeydown="OnCreateFolderKeyDown"/>
             @if (_createFolderError is not null)
             {
                 <div class="modal-error">@_createFolderError</div>
@@ -113,7 +113,8 @@
 @* -- Dialog: confirm deletion -- *@
 @if (_showDeleteConfirm)
 {
-    <div class="modal-backdrop" @onclick="CancelDelete" @onkeydown="OnDeleteKeyDown" tabindex="0" @ref="_deleteModalRef">
+    <div class="modal-backdrop" @onclick="CancelDelete" @onkeydown="OnDeleteKeyDown" tabindex="0"
+         @ref="_deleteModalRef">
         <div class="modal-dialog" @onclick:stopPropagation="true">
             <h3 class="modal-title">@Resources.Web_DeleteConfirm_Title</h3>
             @if (_deleteTargets.Count == 1)
@@ -122,7 +123,8 @@
                     @((MarkupString)string.Format(Resources.Web_DeleteConfirm_Single, $"<strong>{System.Net.WebUtility.HtmlEncode(_deleteTargets[0].Name)}</strong>"))
                     @if (_deleteTargets[0].IsDirectory)
                     {
-                        <br /><span class="modal-warning">@Resources.Web_DeleteConfirm_FolderWarning</span>
+                        <br/>
+                        <span class="modal-warning">@Resources.Web_DeleteConfirm_FolderWarning</span>
                     }
                 </p>
             }
@@ -132,7 +134,8 @@
                     @((MarkupString)string.Format(Resources.Web_DeleteConfirm_Multiple, $"<strong>{_deleteTargets.Count}</strong>"))
                     @if (_deleteTargets.Any(t => t.IsDirectory))
                     {
-                        <br /><span class="modal-warning">@Resources.Web_DeleteConfirm_FoldersWarning</span>
+                        <br/>
+                        <span class="modal-warning">@Resources.Web_DeleteConfirm_FoldersWarning</span>
                     }
                 </p>
             }
@@ -175,7 +178,7 @@ else
                        Path="@_aclPath"
                        ShareId="@VM.CurrentShare.Id"
                        IsDirectory="true"
-                       OnChanged="LoadAclCounts" />
+                       OnChanged="LoadAclCounts"/>
         </div>
     }
 
@@ -188,7 +191,7 @@ else
          @oncontextmenu="(e) => _contextMenuComponent.OnItemContextMenu(e)"
          @oncontextmenu:preventDefault="true"
          @oncontextmenu:stopPropagation="true"
-         >
+    >
 
         @* -- Header (sortierbar) -- *@
         <div class="file-grid-header">
@@ -246,7 +249,7 @@ else
         {
             <div class="file-grid-row file-row-dir" @onclick="NavigateUp">
                 <div class="col-name">
-                    
+
                     @Assets.SVG("chevron_left.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)", CssClass: "file-icon"))
                     <span>..</span>
                 </div>
@@ -264,13 +267,14 @@ else
                 var aclPath = entry.IsDirectory ? GetDirAclPath(entry) : GetFileAclPath(entry);
                 var aclCount = CanManageAcls() ? GetAclCount(aclPath) : 0;
             }
-            <div class="file-grid-row @(entry.IsDirectory ? "file-row-dir" : "") @(isSelected ? "file-row--selected" : "")"
-                 @onclick="(e) => OnItemClick(e, entry)"
-                 @onclick:stopPropagation="true"
-                 @ondblclick="() => OnItemActivate(entry)"
-                 @oncontextmenu="(e) => _contextMenuComponent.OnItemContextMenu(e, entry)"
-                 @oncontextmenu:preventDefault="true"
-                 @oncontextmenu:stopPropagation="true">
+            <div
+                class="file-grid-row @(entry.IsDirectory ? "file-row-dir" : "") @(isSelected ? "file-row--selected" : "")"
+                @onclick="(e) => OnItemClick(e, entry)"
+                @onclick:stopPropagation="true"
+                @ondblclick="() => OnItemActivate(entry)"
+                @oncontextmenu="(e) => _contextMenuComponent.OnItemContextMenu(e, entry)"
+                @oncontextmenu:preventDefault="true"
+                @oncontextmenu:stopPropagation="true">
 
                 <div class="col-name">
                     @if (entry.IsDirectory && entry.Name == ".RECYCLE_BIN")
@@ -319,7 +323,8 @@ else
 
                 <div class="col-created">@entry.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
                 <div class="col-modified">@entry.ModifiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                <div class="col-lastaccess">@(entry.LastAccessedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</div>
+                <div
+                    class="col-lastaccess">@(entry.LastAccessedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</div>
             </div>
 
             @if (_showFolderAcl && _aclFolderPath == aclPath)
@@ -327,14 +332,16 @@ else
                 <div class="file-row-acl-expand-wrap">
                     <div class="file-row-acl-expand">
                         <div class="acl-panel-header" style="padding: 0 0 8px 0;">
-                            <span class="detail-subtitle">@string.Format(Resources.Web_Acl_PermissionsFor, entry.Name)</span>
-                            <button class="btn-icon btn-icon--small" title="@Resources.Web_Button_Close" @onclick="CloseFolderAcl">
+                            <span
+                                class="detail-subtitle">@string.Format(Resources.Web_Acl_PermissionsFor, entry.Name)</span>
+                            <button class="btn-icon btn-icon--small" title="@Resources.Web_Button_Close"
+                                    @onclick="CloseFolderAcl">
                                 @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                             </button>
                         </div>
                         <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
                                    Path="@_aclFolderPath" ShareId="@VM.CurrentShare.Id"
-                                   IsDirectory="@entry.IsDirectory" OnChanged="LoadAclCounts" />
+                                   IsDirectory="@entry.IsDirectory" OnChanged="LoadAclCounts"/>
                     </div>
                 </div>
             }
@@ -350,7 +357,7 @@ else
 }
 
 @* -- Context menu (right-click) -- *@
-<ContextMenu @ref="_contextMenuComponent" FileBrowser="this" FilePreviewComponent="_filePreviewComponent" />
+<ContextMenu @ref="_contextMenuComponent" FileBrowser="this" FilePreviewComponent="_filePreviewComponent"/>
 
 @* -- Dialog: Umbenennen -- *@
 @if (_showRenameDialog)
@@ -361,7 +368,7 @@ else
             <input id="rename-input" class="modal-input" type="text"
                    placeholder="@Resources.Web_Rename_Placeholder"
                    @bind="_renameNewName" @bind:event="oninput"
-                   @onkeydown="OnRenameKeyDown" />
+                   @onkeydown="OnRenameKeyDown"/>
             @if (_renameError is not null)
             {
                 <div class="modal-error">@_renameError</div>
@@ -383,10 +390,10 @@ else
 @* -- Version history / point-in-time dialog -- *@
 <VersionDialog @ref="_versionDialogComponent"
                FilePreviewComponent="_filePreviewComponent"
-               OnRestored="OnVersionRestored" />
+               OnRestored="OnVersionRestored"/>
 
 @* -- Properties dialog (size / metadata / ACL) -- *@
-<PropertiesDialog @ref="_propertiesDialogComponent" />
+<PropertiesDialog @ref="_propertiesDialogComponent"/>
 
 @code {
     [Parameter] public string ShareName { get; set; } = "";
@@ -438,11 +445,14 @@ else
                     _nameWidth = w >= ColMinWidth ? Math.Round(w) : 0;
                     continue;
                 }
+
                 if (_colWidths.ContainsKey(col) && w >= ColMinWidth)
                     _colWidths[col] = Math.Round(w);
             }
         }
-        catch { }
+        catch
+        {
+        }
 
         InvokeAsync(StateHasChanged);
     }
@@ -451,7 +461,7 @@ else
 
     private static readonly float EmptyAreaHeightPx = 123f;
     private static readonly float ItemHeightPx = 41f;
-    
+
     private float GetTableExtraPaddingPx()
     {
         int itemCount = SortedDirectories.Count() + SortedFiles.Count();
@@ -459,10 +469,10 @@ else
 
         if (itemCount == 0)
             return 0;
-        
+
         if (remainingHeight < 0)
             return 0;
-        
+
         return remainingHeight;
     }
 
@@ -523,25 +533,36 @@ else
     {
         StateHasChanged();
     }
-    
+
     private async Task OnFileUploaded(InputFileChangeEventArgs e)
     {
-        foreach (var file in e.GetMultipleFiles())
+        var files = e.GetMultipleFiles(int.MaxValue);
+        if (files.Count == 0) return;
+
+        var cts = new CancellationTokenSource();
+        long totalBytes = files.Sum(f => f.Size);
+        long totalUploadedBytes = 0;
+        int completedCount = 0;
+        var failedFiles = new List<string>();
+
+        string toastId = null!;
+        toastId = Toast.Show(
+            BuildProgressText(files[0].Name, 0, files.Count),
+            ToastType.Progress,
+            onDismiss: () =>
+            {
+                cts.Cancel();
+                Toast.Update(toastId, Resources.Web_Upload_BatchCancelled, type: ToastType.Error);
+                return Task.CompletedTask;
+            });
+
+        foreach (var file in files)
         {
-            var cts = new CancellationTokenSource();
-            string? toastId = null;
-    
-            toastId = Toast.Show(
-                string.Format(Resources.Web_Upload_Progress, file.Name),
-                ToastType.Progress,
-                onDismiss: () =>
-                {
-                    cts.Cancel();
-                    if (toastId is not null)
-                        Toast.Update(toastId, string.Format(Resources.Web_Upload_Cancelled, file.Name), type: ToastType.Error);
-                    return Task.CompletedTask;
-                });
-    
+            if (cts.IsCancellationRequested)
+                break;
+
+            long fileBytesUploaded = 0;
+
             Stream stream;
             try
             {
@@ -549,53 +570,84 @@ else
             }
             catch (IOException)
             {
-                Toast.Update(toastId, string.Format(Resources.Web_Upload_TooLarge, file.Name), type: ToastType.Error);
+                failedFiles.Add(file.Name);
+                completedCount++;
                 continue;
             }
-    
+
             try
             {
                 await using (stream)
                 {
                     var progressStream = new ProgressStream(stream, file.Size, (bytesRead, total) =>
                     {
-                        var percent = (int)(bytesRead * 100 / total);
+                        totalUploadedBytes += bytesRead - fileBytesUploaded;
+                        fileBytesUploaded = bytesRead;
+
+                        var percent = totalBytes > 0 ? (int)(totalUploadedBytes * 100 / totalBytes) : 0;
+
                         InvokeAsync(() =>
                         {
-                            Toast.Update(toastId, progress: percent);
+                            Toast.Update(toastId,
+                                BuildProgressText(file.Name, completedCount, files.Count),
+                                progress: percent);
                             StateHasChanged();
                         });
                     });
-    
+
                     var result = await VM.UploadFileAsync(file.Name, progressStream, cts.Token);
-    
-                    if (result.Success)
-                        Toast.Update(toastId, string.Format(Resources.Web_Upload_Success, file.Name), type: ToastType.Success);
-                    else
-                        Toast.Update(toastId, result.Error ?? Resources.Web_Upload_Failed, type: ToastType.Error);
+
+                    if (!result.Success)
+                        failedFiles.Add(file.Name);
                 }
             }
             catch (OperationCanceledException)
             {
-                // Already handled by the onDismiss callback
+                break;
             }
             catch (JSException)
             {
-                Toast.Update(toastId, string.Format(Resources.Web_Upload_PageLeft, file.Name), type: ToastType.Error);
-                break;
+                Toast.Update(toastId, Resources.Web_Upload_PageLeft, type: ToastType.Error);
+                cts.Dispose();
+                return;
             }
             finally
             {
-                cts.Dispose();
+                completedCount++;
             }
         }
 
-        // Refresh once after the whole batch — not per file — so an N-file upload
-        // triggers a single re-list instead of N full reloads.
+        if (!cts.IsCancellationRequested)
+        {
+            if (failedFiles.Count == 0)
+            {
+                Toast.Update(toastId,
+                    files.Count == 1
+                        ? string.Format(Resources.Web_Upload_Success, files[0].Name)
+                        : string.Format(Resources.Web_Upload_BatchSuccess, files.Count),
+                    type: ToastType.Success, progress: 100);
+            }
+            else
+            {
+                Toast.Update(toastId,
+                    string.Format(Resources.Web_Upload_BatchPartialFailure,
+                        files.Count - failedFiles.Count, files.Count),
+                    type: ToastType.Error);
+            }
+        }
+
+        cts.Dispose();
+
         await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
         StateHasChanged();
     }
 
+    private string BuildProgressText(string currentFileName, int completedCount, int totalCount)
+    {
+        return totalCount == 1
+            ? string.Format(Resources.Web_Upload_Progress, currentFileName)
+            : string.Format(Resources.Web_Upload_BatchProgress, completedCount + 1, totalCount, currentFileName);
+    }
 
     // ========== State ==========
 
@@ -617,12 +669,12 @@ else
     private string? _renameError;
 
     private ElementReference _deleteModalRef;
-    
+
     private FilePreview _filePreviewComponent;
     private ContextMenu _contextMenuComponent;
     private VersionDialog _versionDialogComponent = default!;
     private PropertiesDialog _propertiesDialogComponent = default!;
-    
+
     private ElementReference _fileDropZone;
     private bool _jsInitialized = false;
 
@@ -640,7 +692,7 @@ else
         _selectedItems.Add(item);
         StateHasChanged();
     }
-    
+
     public void RemoveItemFromSelection(FileMetadata item)
     {
         _selectedItems.Remove(item);
@@ -655,16 +707,16 @@ else
 
     public bool SelectedItemsContain(FileMetadata fileMetadata)
         => _selectedItems.Contains(fileMetadata);
-    
+
     public int GetAmountSelectedItems()
         => _selectedItems.Count;
 
     public FileMetadata getFirstSelectedItem()
         => _selectedItems.First();
-    
+
     public HashSet<FileMetadata> getSelectedItems()
         => _selectedItems;
-    
+
     private void OnItemClick(MouseEventArgs e, FileMetadata item)
     {
         if (e.CtrlKey || e.MetaKey)
@@ -721,7 +773,7 @@ else
         _renameNewName = item.Name;
         _renameError = null;
         _showRenameDialog = true;
-        
+
         // Wait one frame so the input is actually in the DOM
         await Task.Delay(50);
         await JS.InvokeVoidAsync("selectFileName", "#rename-input");
@@ -733,7 +785,7 @@ else
         _deleteTargets = _selectedItems.ToList();
         _deleteError = null;
         _showDeleteConfirm = true;
-        
+
         StateHasChanged();
         await Task.Yield(); // let Blazor render the modal first
         await _deleteModalRef.FocusAsync();
@@ -746,10 +798,10 @@ else
         if (item.IsDirectory) OpenFolderAcl(item);
         else OpenFileAcl(item);
     }
-    
-    
+
+
     // ========== Zip ==========
-    
+
     public async Task ArchiveFiles(IEnumerable<FileMetadata> items, string format)
     {
         var itemList = items.ToList();
@@ -772,9 +824,9 @@ else
             Toast.Update(toastId, result.Error ?? Resources.Web_Archive_Error, type: ToastType.Error);
         }
     }
-    
+
     // ========== Unzip ==========
-    
+
     public async Task UnzipFile(FileMetadata file)
     {
         var toastId = Toast.Show(string.Format(Resources.Web_Unzip_Progress, file.Name), ToastType.Progress);
@@ -792,12 +844,12 @@ else
             Toast.Update(toastId, result.Error ?? Resources.Web_Unzip_Error, type: ToastType.Error);
         }
     }
-    
+
     // ========== Lifecycle ==========
 
     public async Task Refresh()
         => await OnParametersSetAsync();
-    
+
     protected override async Task OnParametersSetAsync()
     {
         _showFolderAcl = false;
@@ -884,7 +936,7 @@ else
         else
             _createFolderError = result.Error;
     }
-    
+
     // ========== Löschen ==========
     private async Task OnKeyDownItemList(KeyboardEventArgs e)
     {
@@ -893,9 +945,8 @@ else
 
         if (e.Key == "F2" && _selectedItems.Count == 1)
             await RenameSelected();
-        
     }
-    
+
     private async Task OnDeleteKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
@@ -903,7 +954,7 @@ else
         else if (e.Key == "Escape")
             CancelDelete();
     }
-    
+
     private void RequestDelete(FileMetadata item)
     {
         _deleteTargets = new List<FileMetadata> { item };
@@ -920,13 +971,28 @@ else
     private async Task ConfirmDelete()
     {
         if (!_deleteTargets.Any()) return;
-        foreach (var target in _deleteTargets.ToList())
+
+        var targets = _deleteTargets.ToList();
+        var deletedNames = new List<string>();
+
+        foreach (var target in targets)
         {
             var result = await VM.DeleteAsync(target);
-            if (!result.Success) { _deleteError = result.Error; return; }
+            if (!result.Success)
+            {
+                _deleteError = result.Error;
+                return;
+            }
 
-            Toast.Show(string.Format(Resources.Web_Delete_Success, target.Name), ToastType.Success);
+            deletedNames.Add(target.Name);
         }
+
+        Toast.Show(
+            deletedNames.Count == 1
+                ? string.Format(Resources.Web_Delete_Success, deletedNames[0])
+                : string.Format(Resources.Web_Delete_BatchSuccess, deletedNames.Count),
+            ToastType.Success);
+
         _showDeleteConfirm = false;
         _deleteTargets.Clear();
         _selectedItems.Clear();
@@ -953,22 +1019,21 @@ else
     {
         if (_renameTarget is null || string.IsNullOrWhiteSpace(_renameNewName)) return;
         var result = await VM.RenameAsync(_renameTarget, _renameNewName.Trim());
-        
+
         if (!result.Success)
             _renameError = result.Error;
-        
+
         _selectedItems.Clear();
         _showRenameDialog = false;
         _renameTarget = null;
-        
+
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
         await LoadAclCounts();
-            
+
         // put renamed item into the new selection
         var newItem = FindShareItem(_renameNewName);
         if (newItem is not null)
             _selectedItems.Add(newItem);
-
     }
 
     public void TriggerReRender()
@@ -990,7 +1055,7 @@ else
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
         StateHasChanged();
     }
-    
+
     private FileMetadata? FindShareItem(string itemName)
     {
         FileMetadata? file = SortedFiles
@@ -998,7 +1063,7 @@ else
 
         if (file is not null)
             return file;
-        
+
         return SortedDirectories
             .FirstOrDefault(folder => folder.Name.Equals(itemName));
     }
@@ -1027,18 +1092,38 @@ else
     internal void OpenFolderAcl(FileMetadata dir)
     {
         var path = GetDirAclPath(dir);
-        if (_showFolderAcl && _aclFolderPath == path) { _showFolderAcl = false; _aclFolderPath = ""; }
-        else { _showFolderAcl = true; _aclFolderPath = path; }
+        if (_showFolderAcl && _aclFolderPath == path)
+        {
+            _showFolderAcl = false;
+            _aclFolderPath = "";
+        }
+        else
+        {
+            _showFolderAcl = true;
+            _aclFolderPath = path;
+        }
     }
 
     internal void OpenFileAcl(FileMetadata file)
     {
         var path = GetFileAclPath(file);
-        if (_showFolderAcl && _aclFolderPath == path) { _showFolderAcl = false; _aclFolderPath = ""; }
-        else { _showFolderAcl = true; _aclFolderPath = path; }
+        if (_showFolderAcl && _aclFolderPath == path)
+        {
+            _showFolderAcl = false;
+            _aclFolderPath = "";
+        }
+        else
+        {
+            _showFolderAcl = true;
+            _aclFolderPath = path;
+        }
     }
 
-    private void CloseFolderAcl() { _showFolderAcl = false; _aclFolderPath = ""; }
+    private void CloseFolderAcl()
+    {
+        _showFolderAcl = false;
+        _aclFolderPath = "";
+    }
 
     // ========== Navigation ==========
 
@@ -1067,7 +1152,7 @@ else
             relativePath = relativePath[VM.CurrentShare.Path.Length..].TrimStart('/');
         Nav.NavigateTo($"/files/{ShareName}/{relativePath}");
     }
-    
+
     private void NavigateUp()
     {
         if (string.IsNullOrEmpty(VM.ParentPath))

@@ -1743,4 +1743,19 @@
   <data name="Web_Properties_ItemId" xml:space="preserve">
     <value>Objekt-ID</value>
   </data>
+  <data name="Web_Upload_BatchProgress" xml:space="preserve">
+  <value>Lade Datei {0} von {1} hoch: {2}</value>
+</data>
+  <data name="Web_Upload_BatchSuccess" xml:space="preserve">
+  <value>{0} Dateien erfolgreich hochgeladen</value>
+</data>
+  <data name="Web_Upload_BatchPartialFailure" xml:space="preserve">
+  <value>{0} von {1} Dateien hochgeladen — einige fehlgeschlagen</value>
+</data>
+  <data name="Web_Upload_BatchCancelled" xml:space="preserve">
+  <value>Upload abgebrochen</value>
+</data>
+  <data name="Web_Delete_BatchSuccess" xml:space="preserve">
+  <value>{0} Elemente erfolgreich gelöscht</value>
+</data>
 </root>

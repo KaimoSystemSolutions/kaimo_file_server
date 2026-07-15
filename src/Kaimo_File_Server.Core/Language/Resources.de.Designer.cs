@@ -69,6 +69,120 @@ namespace Kaimo_File_Server.Core.Language {
             }
         }
         
+        internal static string Context_Menu_Versions {
+            get {
+                return ResourceManager.GetString("Context_Menu_Versions", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_TitleFile {
+            get {
+                return ResourceManager.GetString("Web_Version_TitleFile", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_TitleFolder {
+            get {
+                return ResourceManager.GetString("Web_Version_TitleFolder", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_Loading {
+            get {
+                return ResourceManager.GetString("Web_Version_Loading", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_EmptyFile {
+            get {
+                return ResourceManager.GetString("Web_Version_EmptyFile", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_EmptyFolder {
+            get {
+                return ResourceManager.GetString("Web_Version_EmptyFolder", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_Number {
+            get {
+                return ResourceManager.GetString("Web_Version_Number", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_Preview {
+            get {
+                return ResourceManager.GetString("Web_Version_Preview", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_Download {
+            get {
+                return ResourceManager.GetString("Web_Version_Download", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_Restore {
+            get {
+                return ResourceManager.GetString("Web_Version_Restore", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_RestoreConfirm {
+            get {
+                return ResourceManager.GetString("Web_Version_RestoreConfirm", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_RestoreSuccess {
+            get {
+                return ResourceManager.GetString("Web_Version_RestoreSuccess", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_RestoreFailed {
+            get {
+                return ResourceManager.GetString("Web_Version_RestoreFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_PreviewFailed {
+            get {
+                return ResourceManager.GetString("Web_Version_PreviewFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_DownloadFailed {
+            get {
+                return ResourceManager.GetString("Web_Version_DownloadFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_FolderPickHint {
+            get {
+                return ResourceManager.GetString("Web_Version_FolderPickHint", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_FolderAsOf {
+            get {
+                return ResourceManager.GetString("Web_Version_FolderAsOf", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_FolderBack {
+            get {
+                return ResourceManager.GetString("Web_Version_FolderBack", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Version_FolderNoFiles {
+            get {
+                return ResourceManager.GetString("Web_Version_FolderNoFiles", resourceCulture);
+            }
+        }
+        
         internal static string Context_Menu_Delete {
             get {
                 return ResourceManager.GetString("Context_Menu_Delete", resourceCulture);
@@ -957,21 +1071,2259 @@ namespace Kaimo_File_Server.Core.Language {
             }
         }
         
-        internal static string Web_Search_Searching {
-            get {
-                return ResourceManager.GetString("Web_Search_Searching", resourceCulture);
-            }
-        }
-        
         internal static string Web_Search_Placeholder {
             get {
                 return ResourceManager.GetString("Web_Search_Placeholder", resourceCulture);
             }
         }
         
+        internal static string Web_Search_Searching {
+            get {
+                return ResourceManager.GetString("Web_Search_Searching", resourceCulture);
+            }
+        }
+        
         internal static string Web_Search_NoResults {
             get {
                 return ResourceManager.GetString("Web_Search_NoResults", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Login_Failed {
+            get {
+                return ResourceManager.GetString("Web_Login_Failed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Login_InvalidCredentials {
+            get {
+                return ResourceManager.GetString("Web_Login_InvalidCredentials", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Login_CredentialsRequired {
+            get {
+                return ResourceManager.GetString("Web_Login_CredentialsRequired", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Login_AccountDisabled {
+            get {
+                return ResourceManager.GetString("Web_Login_AccountDisabled", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Login_TooManyAttempts {
+            get {
+                return ResourceManager.GetString("Web_Login_TooManyAttempts", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_NotAuthenticated {
+            get {
+                return ResourceManager.GetString("Web_Error_NotAuthenticated", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_NotLoggedIn {
+            get {
+                return ResourceManager.GetString("Web_Error_NotLoggedIn", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_NoPermission {
+            get {
+                return ResourceManager.GetString("Web_Error_NoPermission", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_AccessDenied {
+            get {
+                return ResourceManager.GetString("Web_Error_AccessDenied", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_NoManagementPermission {
+            get {
+                return ResourceManager.GetString("Web_Error_NoManagementPermission", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_InvalidPath {
+            get {
+                return ResourceManager.GetString("Web_Error_InvalidPath", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Folder_NameRequired {
+            get {
+                return ResourceManager.GetString("Web_Folder_NameRequired", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Rename_NameRequired {
+            get {
+                return ResourceManager.GetString("Web_Rename_NameRequired", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Rename_Unchanged {
+            get {
+                return ResourceManager.GetString("Web_Rename_Unchanged", resourceCulture);
+            }
+        }
+        
+        internal static string Web_FileName_Missing {
+            get {
+                return ResourceManager.GetString("Web_FileName_Missing", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Name_InvalidChars {
+            get {
+                return ResourceManager.GetString("Web_Name_InvalidChars", resourceCulture);
+            }
+        }
+        
+        internal static string Web_FileName_InvalidChars {
+            get {
+                return ResourceManager.GetString("Web_FileName_InvalidChars", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_FileOrFolderNotFound {
+            get {
+                return ResourceManager.GetString("Web_Error_FileOrFolderNotFound", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_ItemExists {
+            get {
+                return ResourceManager.GetString("Web_Error_ItemExists", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_FolderExists {
+            get {
+                return ResourceManager.GetString("Web_Error_FolderExists", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_FileExists {
+            get {
+                return ResourceManager.GetString("Web_Error_FileExists", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_NotValidZip {
+            get {
+                return ResourceManager.GetString("Web_Error_NotValidZip", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_CreateFolderFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_CreateFolderFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_DeleteFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_DeleteFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_RenameFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_RenameFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_RenameFailedCheckLogs {
+            get {
+                return ResourceManager.GetString("Web_Error_RenameFailedCheckLogs", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_UploadFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_UploadFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_ArchiveFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_ArchiveFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_ExtractFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_ExtractFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Upload_Aborted {
+            get {
+                return ResourceManager.GetString("Web_Upload_Aborted", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_ShareInUse {
+            get {
+                return ResourceManager.GetString("Web_Error_ShareInUse", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_ShareDisabled {
+            get {
+                return ResourceManager.GetString("Web_Error_ShareDisabled", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_ShareNotFound {
+            get {
+                return ResourceManager.GetString("Web_Error_ShareNotFound", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_NoShareLoaded {
+            get {
+                return ResourceManager.GetString("Web_Error_NoShareLoaded", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_LoadFilesFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_LoadFilesFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_ShareExists {
+            get {
+                return ResourceManager.GetString("Web_Error_ShareExists", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_CreateShareFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_CreateShareFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_LoadSharesFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_LoadSharesFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_ChangeVisibilityFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_ChangeVisibilityFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_ChangeStatusFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_ChangeStatusFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Acl_LoadPermissionsFailed {
+            get {
+                return ResourceManager.GetString("Web_Acl_LoadPermissionsFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Acl_Added {
+            get {
+                return ResourceManager.GetString("Web_Acl_Added", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Acl_Updated {
+            get {
+                return ResourceManager.GetString("Web_Acl_Updated", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Acl_Removed {
+            get {
+                return ResourceManager.GetString("Web_Acl_Removed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Acl_SelectAtLeastOnePermission {
+            get {
+                return ResourceManager.GetString("Web_Acl_SelectAtLeastOnePermission", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_SelectUserOrGroup {
+            get {
+                return ResourceManager.GetString("Web_Error_SelectUserOrGroup", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_AddFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_AddFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_SaveFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_SaveFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_RemoveFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_RemoveFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_CreateFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_CreateFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_LoadFailedGeneric {
+            get {
+                return ResourceManager.GetString("Web_Error_LoadFailedGeneric", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_EntryNotFound {
+            get {
+                return ResourceManager.GetString("Web_Error_EntryNotFound", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_NameRequired {
+            get {
+                return ResourceManager.GetString("Web_Error_NameRequired", resourceCulture);
+            }
+        }
+        
+        internal static string Web_ChangesSaved {
+            get {
+                return ResourceManager.GetString("Web_ChangesSaved", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Created {
+            get {
+                return ResourceManager.GetString("Web_Dept_Created", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Deleted {
+            get {
+                return ResourceManager.GetString("Web_Dept_Deleted", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Saved {
+            get {
+                return ResourceManager.GetString("Web_Dept_Saved", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_NameRequired {
+            get {
+                return ResourceManager.GetString("Web_Dept_NameRequired", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_SelectDepartment {
+            get {
+                return ResourceManager.GetString("Web_Dept_SelectDepartment", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_CannotDeleteGlobal {
+            get {
+                return ResourceManager.GetString("Web_Dept_CannotDeleteGlobal", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_NoPermissionInDept {
+            get {
+                return ResourceManager.GetString("Web_Dept_NoPermissionInDept", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_NoPermissionEdit {
+            get {
+                return ResourceManager.GetString("Web_Dept_NoPermissionEdit", resourceCulture);
+            }
+        }
+        
+        internal static string Web_User_Created {
+            get {
+                return ResourceManager.GetString("Web_User_Created", resourceCulture);
+            }
+        }
+        
+        internal static string Web_User_Deleted {
+            get {
+                return ResourceManager.GetString("Web_User_Deleted", resourceCulture);
+            }
+        }
+        
+        internal static string Web_User_NameTaken {
+            get {
+                return ResourceManager.GetString("Web_User_NameTaken", resourceCulture);
+            }
+        }
+        
+        internal static string Web_User_NameRequired {
+            get {
+                return ResourceManager.GetString("Web_User_NameRequired", resourceCulture);
+            }
+        }
+        
+        internal static string Web_User_NoPermissionEdit {
+            get {
+                return ResourceManager.GetString("Web_User_NoPermissionEdit", resourceCulture);
+            }
+        }
+        
+        internal static string Web_User_NoPermissionPasswordReset {
+            get {
+                return ResourceManager.GetString("Web_User_NoPermissionPasswordReset", resourceCulture);
+            }
+        }
+        
+        internal static string Web_User_PasswordMinLength {
+            get {
+                return ResourceManager.GetString("Web_User_PasswordMinLength", resourceCulture);
+            }
+        }
+        
+        internal static string Web_User_PasswordsDoNotMatch {
+            get {
+                return ResourceManager.GetString("Web_User_PasswordsDoNotMatch", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Group_Created {
+            get {
+                return ResourceManager.GetString("Web_Group_Created", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Group_Deleted {
+            get {
+                return ResourceManager.GetString("Web_Group_Deleted", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Group_NameRequired {
+            get {
+                return ResourceManager.GetString("Web_Group_NameRequired", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Role_Created {
+            get {
+                return ResourceManager.GetString("Web_Role_Created", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Role_Deleted {
+            get {
+                return ResourceManager.GetString("Web_Role_Deleted", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Role_Saved {
+            get {
+                return ResourceManager.GetString("Web_Role_Saved", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Role_NameRequired {
+            get {
+                return ResourceManager.GetString("Web_Role_NameRequired", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Role_ShowAllPermissions {
+            get {
+                return ResourceManager.GetString("Web_Role_ShowAllPermissions", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Role_ShowFewerPermissions {
+            get {
+                return ResourceManager.GetString("Web_Role_ShowFewerPermissions", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Scope_SelectScope {
+            get {
+                return ResourceManager.GetString("Web_Scope_SelectScope", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_LoadAccessRightsFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_LoadAccessRightsFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_GrantAccessFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_GrantAccessFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_RevokeAccessFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_RevokeAccessFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_CreateAssignmentFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_CreateAssignmentFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_DeleteAssignmentFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_DeleteAssignmentFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Assignment_Removed {
+            get {
+                return ResourceManager.GetString("Web_Assignment_Removed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Assignment_Created {
+            get {
+                return ResourceManager.GetString("Web_Assignment_Created", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Members_Saved {
+            get {
+                return ResourceManager.GetString("Web_Members_Saved", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_LoadFailed {
+            get {
+                return ResourceManager.GetString("Web_Settings_LoadFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_NoPermissionChange {
+            get {
+                return ResourceManager.GetString("Web_Settings_NoPermissionChange", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_LanguageSaved {
+            get {
+                return ResourceManager.GetString("Web_Settings_LanguageSaved", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Language_Detail {
+            get {
+                return ResourceManager.GetString("Web_Settings_Language_Detail", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_LanguageSaveFailed {
+            get {
+                return ResourceManager.GetString("Web_Settings_LanguageSaveFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_NoPermissionDataServices {
+            get {
+                return ResourceManager.GetString("Web_Settings_NoPermissionDataServices", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_DataServiceSaveFailed {
+            get {
+                return ResourceManager.GetString("Web_Settings_DataServiceSaveFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_SmbEnabled {
+            get {
+                return ResourceManager.GetString("Web_Settings_SmbEnabled", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_SmbDisabled {
+            get {
+                return ResourceManager.GetString("Web_Settings_SmbDisabled", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Tab_ContextMenu {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_ContextMenu", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_ContextMenu_Desc {
+            get {
+                return ResourceManager.GetString("Web_Settings_ContextMenu_Desc", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxAvailable {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxAvailable", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxAssigned {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxAssigned", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxAdd {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxAdd", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxRemove {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxRemove", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxMoveUp {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxMoveUp", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxMoveDown {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxMoveDown", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxReset {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxReset", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxSaved {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxSaved", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxSaveFailed {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxSaveFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxScope_Background {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Background", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxScope_Folder {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Folder", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxScope_Archive {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Archive", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxScope_Image {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Image", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxScope_Video {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Video", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxScope_Audio {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Audio", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxScope_Document {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Document", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxScope_OtherFile {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_OtherFile", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_CtxScope_Multi {
+            get {
+                return ResourceManager.GetString("Web_Settings_CtxScope_Multi", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_PwPolicy_TooShort {
+            get {
+                return ResourceManager.GetString("Web_Settings_PwPolicy_TooShort", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_PwPolicy_NeedUpper {
+            get {
+                return ResourceManager.GetString("Web_Settings_PwPolicy_NeedUpper", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_PwPolicy_NeedLower {
+            get {
+                return ResourceManager.GetString("Web_Settings_PwPolicy_NeedLower", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_PwPolicy_NeedDigit {
+            get {
+                return ResourceManager.GetString("Web_Settings_PwPolicy_NeedDigit", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_PwPolicy_NeedSpecial {
+            get {
+                return ResourceManager.GetString("Web_Settings_PwPolicy_NeedSpecial", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_PwPolicySaved {
+            get {
+                return ResourceManager.GetString("Web_Settings_PwPolicySaved", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_PwPolicySaveFailed {
+            get {
+                return ResourceManager.GetString("Web_Settings_PwPolicySaveFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Validation_NameEmpty {
+            get {
+                return ResourceManager.GetString("Web_Validation_NameEmpty", resourceCulture);
+            }
+        }
+        
+        internal static string Web_ShareName_MaxLength {
+            get {
+                return ResourceManager.GetString("Web_ShareName_MaxLength", resourceCulture);
+            }
+        }
+        
+        internal static string Web_ShareName_AllowedChars {
+            get {
+                return ResourceManager.GetString("Web_ShareName_AllowedChars", resourceCulture);
+            }
+        }
+        
+        internal static string Web_ShareName_NoLeadingTrailingDot {
+            get {
+                return ResourceManager.GetString("Web_ShareName_NoLeadingTrailingDot", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Share_RenamedTo {
+            get {
+                return ResourceManager.GetString("Web_Share_RenamedTo", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Share_RecycleEnabled {
+            get {
+                return ResourceManager.GetString("Web_Share_RecycleEnabled", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Share_RecycleDisabled {
+            get {
+                return ResourceManager.GetString("Web_Share_RecycleDisabled", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_ArchiveExists {
+            get {
+                return ResourceManager.GetString("Web_Error_ArchiveExists", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Validation_NameWhitespace {
+            get {
+                return ResourceManager.GetString("Web_Validation_NameWhitespace", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Validation_NameTooLong {
+            get {
+                return ResourceManager.GetString("Web_Validation_NameTooLong", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Validation_InvalidChars {
+            get {
+                return ResourceManager.GetString("Web_Validation_InvalidChars", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Validation_NameEndsWithDot {
+            get {
+                return ResourceManager.GetString("Web_Validation_NameEndsWithDot", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Validation_NameEndsWithSpace {
+            get {
+                return ResourceManager.GetString("Web_Validation_NameEndsWithSpace", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Validation_ReservedName {
+            get {
+                return ResourceManager.GetString("Web_Validation_ReservedName", resourceCulture);
+            }
+        }
+        
+        internal static string Web_DeptPerm_Read {
+            get {
+                return ResourceManager.GetString("Web_DeptPerm_Read", resourceCulture);
+            }
+        }
+        
+        internal static string Web_DeptPerm_ReadDesc {
+            get {
+                return ResourceManager.GetString("Web_DeptPerm_ReadDesc", resourceCulture);
+            }
+        }
+        
+        internal static string Web_DeptPerm_Write {
+            get {
+                return ResourceManager.GetString("Web_DeptPerm_Write", resourceCulture);
+            }
+        }
+        
+        internal static string Web_DeptPerm_WriteDesc {
+            get {
+                return ResourceManager.GetString("Web_DeptPerm_WriteDesc", resourceCulture);
+            }
+        }
+        
+        internal static string Web_DeptPerm_Delete {
+            get {
+                return ResourceManager.GetString("Web_DeptPerm_Delete", resourceCulture);
+            }
+        }
+        
+        internal static string Web_DeptPerm_DeleteDesc {
+            get {
+                return ResourceManager.GetString("Web_DeptPerm_DeleteDesc", resourceCulture);
+            }
+        }
+        
+        internal static string Web_DeptPerm_Admin {
+            get {
+                return ResourceManager.GetString("Web_DeptPerm_Admin", resourceCulture);
+            }
+        }
+        
+        internal static string Web_DeptPerm_AdminDesc {
+            get {
+                return ResourceManager.GetString("Web_DeptPerm_AdminDesc", resourceCulture);
+            }
+        }
+        
+        internal static string Web_PermGroup_UserMgmt {
+            get {
+                return ResourceManager.GetString("Web_PermGroup_UserMgmt", resourceCulture);
+            }
+        }
+        
+        internal static string Web_PermGroup_GroupMgmt {
+            get {
+                return ResourceManager.GetString("Web_PermGroup_GroupMgmt", resourceCulture);
+            }
+        }
+        
+        internal static string Web_PermGroup_AssignDelegation {
+            get {
+                return ResourceManager.GetString("Web_PermGroup_AssignDelegation", resourceCulture);
+            }
+        }
+        
+        internal static string Web_PermGroup_ShareMgmt {
+            get {
+                return ResourceManager.GetString("Web_PermGroup_ShareMgmt", resourceCulture);
+            }
+        }
+        
+        internal static string Web_PermGroup_DeptMgmt {
+            get {
+                return ResourceManager.GetString("Web_PermGroup_DeptMgmt", resourceCulture);
+            }
+        }
+        
+        internal static string Web_PermGroup_SystemMgmt {
+            get {
+                return ResourceManager.GetString("Web_PermGroup_SystemMgmt", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_CreateUsers {
+            get {
+                return ResourceManager.GetString("Web_Perm_CreateUsers", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_DeleteUsers {
+            get {
+                return ResourceManager.GetString("Web_Perm_DeleteUsers", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_EditProfiles {
+            get {
+                return ResourceManager.GetString("Web_Perm_EditProfiles", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_ResetPasswords {
+            get {
+                return ResourceManager.GetString("Web_Perm_ResetPasswords", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_EnableDisable {
+            get {
+                return ResourceManager.GetString("Web_Perm_EnableDisable", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_CreateGroups {
+            get {
+                return ResourceManager.GetString("Web_Perm_CreateGroups", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_DeleteGroups {
+            get {
+                return ResourceManager.GetString("Web_Perm_DeleteGroups", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_ManageMembers {
+            get {
+                return ResourceManager.GetString("Web_Perm_ManageMembers", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_AssignGroups {
+            get {
+                return ResourceManager.GetString("Web_Perm_AssignGroups", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_AssignRoles {
+            get {
+                return ResourceManager.GetString("Web_Perm_AssignRoles", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_AssignDepartments {
+            get {
+                return ResourceManager.GetString("Web_Perm_AssignDepartments", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_CreateShares {
+            get {
+                return ResourceManager.GetString("Web_Perm_CreateShares", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_DeleteShares {
+            get {
+                return ResourceManager.GetString("Web_Perm_DeleteShares", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_EditSettings {
+            get {
+                return ResourceManager.GetString("Web_Perm_EditSettings", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_ManageAccess {
+            get {
+                return ResourceManager.GetString("Web_Perm_ManageAccess", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_ManageAcls {
+            get {
+                return ResourceManager.GetString("Web_Perm_ManageAcls", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_EditDepartment {
+            get {
+                return ResourceManager.GetString("Web_Perm_EditDepartment", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_ViewDepartment {
+            get {
+                return ResourceManager.GetString("Web_Perm_ViewDepartment", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_ManageSystemSettings {
+            get {
+                return ResourceManager.GetString("Web_Perm_ManageSystemSettings", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_ManageDataServices {
+            get {
+                return ResourceManager.GetString("Web_Perm_ManageDataServices", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Perm_ManageCertificates {
+            get {
+                return ResourceManager.GetString("Web_Perm_ManageCertificates", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Tab_Certificate {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_Certificate", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Share_Enabled {
+            get {
+                return ResourceManager.GetString("Web_Share_Enabled", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Share_Disabled {
+            get {
+                return ResourceManager.GetString("Web_Share_Disabled", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Tab_UsersCount {
+            get {
+                return ResourceManager.GetString("Web_Tab_UsersCount", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Tab_GroupsCount {
+            get {
+                return ResourceManager.GetString("Web_Tab_GroupsCount", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Tab_RolesCount {
+            get {
+                return ResourceManager.GetString("Web_Tab_RolesCount", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Tab_Language {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_Language", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Tab_Password {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_Password", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Tab_Storage {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_Storage", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Tab_Fileservices {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_Fileservices", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Tab_Search {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_Search", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Tab_Logging {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_Logging", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Logging_Detail {
+            get {
+                return ResourceManager.GetString("Web_Settings_Logging_Detail", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Logging_Desc {
+            get {
+                return ResourceManager.GetString("Web_Settings_Logging_Desc", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Logging_Saved {
+            get {
+                return ResourceManager.GetString("Web_Settings_Logging_Saved", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Tab_Ram {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_Ram", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Tab_IP_Address {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_IP_Address", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_ContextMenu_Detail {
+            get {
+                return ResourceManager.GetString("Web_Settings_ContextMenu_Detail", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Settings_Button_Save {
+            get {
+                return ResourceManager.GetString("Web_Settings_Button_Save", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Login_PageTitle {
+            get {
+                return ResourceManager.GetString("Web_Login_PageTitle", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Login_Subtitle {
+            get {
+                return ResourceManager.GetString("Web_Login_Subtitle", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Login_Label_Username {
+            get {
+                return ResourceManager.GetString("Web_Login_Label_Username", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Login_Placeholder_Username {
+            get {
+                return ResourceManager.GetString("Web_Login_Placeholder_Username", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Login_Label_Password {
+            get {
+                return ResourceManager.GetString("Web_Login_Label_Password", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Login_Placeholder_Password {
+            get {
+                return ResourceManager.GetString("Web_Login_Placeholder_Password", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Login_LoggingIn {
+            get {
+                return ResourceManager.GetString("Web_Login_LoggingIn", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Login_Submit {
+            get {
+                return ResourceManager.GetString("Web_Login_Submit", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Preview_Download {
+            get {
+                return ResourceManager.GetString("Web_Preview_Download", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Preview_TooLarge {
+            get {
+                return ResourceManager.GetString("Web_Preview_TooLarge", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Preview_Unsupported {
+            get {
+                return ResourceManager.GetString("Web_Preview_Unsupported", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Loading {
+            get {
+                return ResourceManager.GetString("Web_Common_Loading", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_PageTitle {
+            get {
+                return ResourceManager.GetString("Web_Admin_PageTitle", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Heading {
+            get {
+                return ResourceManager.GetString("Web_Admin_Heading", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_NoPermission {
+            get {
+                return ResourceManager.GetString("Web_Admin_NoPermission", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Tab_Users {
+            get {
+                return ResourceManager.GetString("Web_Admin_Tab_Users", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Tab_Groups {
+            get {
+                return ResourceManager.GetString("Web_Admin_Tab_Groups", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Tab_Roles {
+            get {
+                return ResourceManager.GetString("Web_Admin_Tab_Roles", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_CreateUser {
+            get {
+                return ResourceManager.GetString("Web_Admin_CreateUser", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_CreateGroup {
+            get {
+                return ResourceManager.GetString("Web_Admin_CreateGroup", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_CreateRole {
+            get {
+                return ResourceManager.GetString("Web_Admin_CreateRole", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_NewUser {
+            get {
+                return ResourceManager.GetString("Web_Admin_NewUser", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_NewGroup {
+            get {
+                return ResourceManager.GetString("Web_Admin_NewGroup", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_NewRole {
+            get {
+                return ResourceManager.GetString("Web_Admin_NewRole", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_Department {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Department", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_DisplayName {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_DisplayName", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_Username {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Username", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_Email {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Email", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_Description {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Description", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_Password {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Password", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_GroupName {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_GroupName", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_RoleName {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_RoleName", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_Status {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Status", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_Type {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Type", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_NoDepartments {
+            get {
+                return ResourceManager.GetString("Web_Admin_NoDepartments", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Placeholder_DisplayName {
+            get {
+                return ResourceManager.GetString("Web_Admin_Placeholder_DisplayName", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Placeholder_Username {
+            get {
+                return ResourceManager.GetString("Web_Admin_Placeholder_Username", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Placeholder_Email {
+            get {
+                return ResourceManager.GetString("Web_Admin_Placeholder_Email", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Placeholder_Optional {
+            get {
+                return ResourceManager.GetString("Web_Admin_Placeholder_Optional", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Placeholder_Password {
+            get {
+                return ResourceManager.GetString("Web_Admin_Placeholder_Password", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Placeholder_GroupName {
+            get {
+                return ResourceManager.GetString("Web_Admin_Placeholder_GroupName", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Placeholder_RoleName {
+            get {
+                return ResourceManager.GetString("Web_Admin_Placeholder_RoleName", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Toggle_AccountEnabled {
+            get {
+                return ResourceManager.GetString("Web_Admin_Toggle_AccountEnabled", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Toggle_CanChangePassword {
+            get {
+                return ResourceManager.GetString("Web_Admin_Toggle_CanChangePassword", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_GroupDeptHint {
+            get {
+                return ResourceManager.GetString("Web_Admin_GroupDeptHint", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Creating {
+            get {
+                return ResourceManager.GetString("Web_Common_Creating", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Saving {
+            get {
+                return ResourceManager.GetString("Web_Common_Saving", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Deleting {
+            get {
+                return ResourceManager.GetString("Web_Common_Deleting", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_NoUsers {
+            get {
+                return ResourceManager.GetString("Web_Common_NoUsers", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_NoGroups {
+            get {
+                return ResourceManager.GetString("Web_Common_NoGroups", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_NoRoles {
+            get {
+                return ResourceManager.GetString("Web_Common_NoRoles", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_NoMembers {
+            get {
+                return ResourceManager.GetString("Web_Common_NoMembers", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_NoGroupsAssigned {
+            get {
+                return ResourceManager.GetString("Web_Common_NoGroupsAssigned", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_NoRolesAssigned {
+            get {
+                return ResourceManager.GetString("Web_Common_NoRolesAssigned", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_NoDepartments {
+            get {
+                return ResourceManager.GetString("Web_Common_NoDepartments", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Active {
+            get {
+                return ResourceManager.GetString("Web_Common_Active", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Disabled {
+            get {
+                return ResourceManager.GetString("Web_Common_Disabled", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Custom {
+            get {
+                return ResourceManager.GetString("Web_Common_Custom", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_System {
+            get {
+                return ResourceManager.GetString("Web_Common_System", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_EditUser {
+            get {
+                return ResourceManager.GetString("Web_Admin_EditUser", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_NewPassword {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_NewPassword", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Placeholder_PasswordEmpty {
+            get {
+                return ResourceManager.GetString("Web_Admin_Placeholder_PasswordEmpty", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_ConfirmPassword {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_ConfirmPassword", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Placeholder_ConfirmPassword {
+            get {
+                return ResourceManager.GetString("Web_Admin_Placeholder_ConfirmPassword", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_Groups {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Groups", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_Roles {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Roles", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_PasswordChange {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_PasswordChange", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_PasswordChange_Allowed {
+            get {
+                return ResourceManager.GetString("Web_Admin_PasswordChange_Allowed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_PasswordChange_Locked {
+            get {
+                return ResourceManager.GetString("Web_Admin_PasswordChange_Locked", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_Departments {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Departments", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_NotSpecified {
+            get {
+                return ResourceManager.GetString("Web_Admin_NotSpecified", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_NoDescription {
+            get {
+                return ResourceManager.GetString("Web_Admin_NoDescription", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_ScopedAssignments {
+            get {
+                return ResourceManager.GetString("Web_Admin_ScopedAssignments", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_RemoveAssignment {
+            get {
+                return ResourceManager.GetString("Web_Admin_RemoveAssignment", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_ConfirmDeleteUser {
+            get {
+                return ResourceManager.GetString("Web_Admin_ConfirmDeleteUser", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_ConfirmDeleteGroup {
+            get {
+                return ResourceManager.GetString("Web_Admin_ConfirmDeleteGroup", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_ConfirmDeleteRole {
+            get {
+                return ResourceManager.GetString("Web_Admin_ConfirmDeleteRole", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_YesDelete {
+            get {
+                return ResourceManager.GetString("Web_Common_YesDelete", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_DeleteUser {
+            get {
+                return ResourceManager.GetString("Web_Admin_DeleteUser", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_DeleteGroup {
+            get {
+                return ResourceManager.GetString("Web_Admin_DeleteGroup", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_DeleteRole {
+            get {
+                return ResourceManager.GetString("Web_Admin_DeleteRole", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_ManageMembers {
+            get {
+                return ResourceManager.GetString("Web_Admin_ManageMembers", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_Users {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Users", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_Group {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Group", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_EditRole {
+            get {
+                return ResourceManager.GetString("Web_Admin_EditRole", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_DirectMembers {
+            get {
+                return ResourceManager.GetString("Web_Admin_DirectMembers", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_Permissions {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Permissions", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_NoPermissions {
+            get {
+                return ResourceManager.GetString("Web_Admin_NoPermissions", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_SystemRoleHint {
+            get {
+                return ResourceManager.GetString("Web_Admin_SystemRoleHint", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_SystemRole {
+            get {
+                return ResourceManager.GetString("Web_Admin_SystemRole", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_CustomRole {
+            get {
+                return ResourceManager.GetString("Web_Admin_CustomRole", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_DelegatedAssignments {
+            get {
+                return ResourceManager.GetString("Web_Admin_DelegatedAssignments", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_AddAssignment {
+            get {
+                return ResourceManager.GetString("Web_Admin_AddAssignment", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_AssignTo {
+            get {
+                return ResourceManager.GetString("Web_Admin_AssignTo", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_User {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_User", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_Scope {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Scope", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Scope_Global {
+            get {
+                return ResourceManager.GetString("Web_Admin_Scope_Global", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Scope_Department {
+            get {
+                return ResourceManager.GetString("Web_Admin_Scope_Department", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Scope_Share {
+            get {
+                return ResourceManager.GetString("Web_Admin_Scope_Share", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Label_ShareId {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_ShareId", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_Placeholder_ShareId {
+            get {
+                return ResourceManager.GetString("Web_Admin_Placeholder_ShareId", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Select {
+            get {
+                return ResourceManager.GetString("Web_Common_Select", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Assign {
+            get {
+                return ResourceManager.GetString("Web_Common_Assign", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_NoDelegatedAssignments {
+            get {
+                return ResourceManager.GetString("Web_Admin_NoDelegatedAssignments", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_None {
+            get {
+                return ResourceManager.GetString("Web_Common_None", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_MoreItems {
+            get {
+                return ResourceManager.GetString("Web_Common_MoreItems", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_ScopeType_Global {
+            get {
+                return ResourceManager.GetString("Web_Admin_ScopeType_Global", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_ScopeType_Department {
+            get {
+                return ResourceManager.GetString("Web_Admin_ScopeType_Department", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Admin_ScopeType_Share {
+            get {
+                return ResourceManager.GetString("Web_Admin_ScopeType_Share", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_PageTitle {
+            get {
+                return ResourceManager.GetString("Web_Dept_PageTitle", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Heading {
+            get {
+                return ResourceManager.GetString("Web_Dept_Heading", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_NoPermission {
+            get {
+                return ResourceManager.GetString("Web_Dept_NoPermission", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Count {
+            get {
+                return ResourceManager.GetString("Web_Dept_Count", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_CreateTitle {
+            get {
+                return ResourceManager.GetString("Web_Dept_CreateTitle", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_NewDepartment {
+            get {
+                return ResourceManager.GetString("Web_Dept_NewDepartment", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Label_Name {
+            get {
+                return ResourceManager.GetString("Web_Dept_Label_Name", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Placeholder_Name {
+            get {
+                return ResourceManager.GetString("Web_Dept_Placeholder_Name", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Label_Parent {
+            get {
+                return ResourceManager.GetString("Web_Dept_Label_Parent", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_NoParent {
+            get {
+                return ResourceManager.GetString("Web_Dept_NoParent", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_NoDepartments {
+            get {
+                return ResourceManager.GetString("Web_Dept_NoDepartments", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_SubdepartmentCount {
+            get {
+                return ResourceManager.GetString("Web_Dept_SubdepartmentCount", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Expand {
+            get {
+                return ResourceManager.GetString("Web_Dept_Expand", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Collapse {
+            get {
+                return ResourceManager.GetString("Web_Dept_Collapse", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_EditDepartment {
+            get {
+                return ResourceManager.GetString("Web_Dept_EditDepartment", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Label_InheritsFrom {
+            get {
+                return ResourceManager.GetString("Web_Dept_Label_InheritsFrom", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_InheritHint {
+            get {
+                return ResourceManager.GetString("Web_Dept_InheritHint", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_DefaultFilePerm {
+            get {
+                return ResourceManager.GetString("Web_Dept_DefaultFilePerm", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_DefaultFilePermHint {
+            get {
+                return ResourceManager.GetString("Web_Dept_DefaultFilePermHint", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_DefineOwnPerm {
+            get {
+                return ResourceManager.GetString("Web_Dept_DefineOwnPerm", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_InheritedFromParent {
+            get {
+                return ResourceManager.GetString("Web_Dept_InheritedFromParent", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_NoParentNoPerm {
+            get {
+                return ResourceManager.GetString("Web_Dept_NoParentNoPerm", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Label_Members {
+            get {
+                return ResourceManager.GetString("Web_Dept_Label_Members", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Label_AssignedGroups {
+            get {
+                return ResourceManager.GetString("Web_Dept_Label_AssignedGroups", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_GroupsHint {
+            get {
+                return ResourceManager.GetString("Web_Dept_GroupsHint", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Label_AssignedShares {
+            get {
+                return ResourceManager.GetString("Web_Dept_Label_AssignedShares", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_SharesHint {
+            get {
+                return ResourceManager.GetString("Web_Dept_SharesHint", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_NoSharesAvailable {
+            get {
+                return ResourceManager.GetString("Web_Dept_NoSharesAvailable", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_GlobalDepartment {
+            get {
+                return ResourceManager.GetString("Web_Dept_GlobalDepartment", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Label_InheritsFromView {
+            get {
+                return ResourceManager.GetString("Web_Dept_Label_InheritsFromView", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_NoParentTopLevel {
+            get {
+                return ResourceManager.GetString("Web_Dept_NoParentTopLevel", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Label_MembersCount {
+            get {
+                return ResourceManager.GetString("Web_Dept_Label_MembersCount", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Label_GroupsCount {
+            get {
+                return ResourceManager.GetString("Web_Dept_Label_GroupsCount", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_Label_SharesCount {
+            get {
+                return ResourceManager.GetString("Web_Dept_Label_SharesCount", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_NoGroupsAssigned {
+            get {
+                return ResourceManager.GetString("Web_Dept_NoGroupsAssigned", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_NoSharesAssigned {
+            get {
+                return ResourceManager.GetString("Web_Dept_NoSharesAssigned", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_NoDefaultPerm {
+            get {
+                return ResourceManager.GetString("Web_Dept_NoDefaultPerm", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_InheritedFrom {
+            get {
+                return ResourceManager.GetString("Web_Dept_InheritedFrom", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_ConfirmDelete {
+            get {
+                return ResourceManager.GetString("Web_Dept_ConfirmDelete", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Dept_DeleteDepartment {
+            get {
+                return ResourceManager.GetString("Web_Dept_DeleteDepartment", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Edit {
+            get {
+                return ResourceManager.GetString("Web_Common_Edit", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Save {
+            get {
+                return ResourceManager.GetString("Web_Common_Save", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Create {
+            get {
+                return ResourceManager.GetString("Web_Common_Create", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Cancel {
+            get {
+                return ResourceManager.GetString("Web_Common_Cancel", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Close {
+            get {
+                return ResourceManager.GetString("Web_Common_Close", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Name {
+            get {
+                return ResourceManager.GetString("Web_Common_Name", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_Remove {
+            get {
+                return ResourceManager.GetString("Web_Common_Remove", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Common_NoSharesAvailable {
+            get {
+                return ResourceManager.GetString("Web_Common_NoSharesAvailable", resourceCulture);
+            }
+        }
+        
+        internal static string Context_Menu_Properties {
+            get {
+                return ResourceManager.GetString("Context_Menu_Properties", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_Tab_General {
+            get {
+                return ResourceManager.GetString("Web_Properties_Tab_General", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_Tab_Security {
+            get {
+                return ResourceManager.GetString("Web_Properties_Tab_Security", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_Type {
+            get {
+                return ResourceManager.GetString("Web_Properties_Type", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_TypeFolder {
+            get {
+                return ResourceManager.GetString("Web_Properties_TypeFolder", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_TypeFile {
+            get {
+                return ResourceManager.GetString("Web_Properties_TypeFile", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_TypeFileExt {
+            get {
+                return ResourceManager.GetString("Web_Properties_TypeFileExt", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_Location {
+            get {
+                return ResourceManager.GetString("Web_Properties_Location", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_Size {
+            get {
+                return ResourceManager.GetString("Web_Properties_Size", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_Bytes {
+            get {
+                return ResourceManager.GetString("Web_Properties_Bytes", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_Calculating {
+            get {
+                return ResourceManager.GetString("Web_Properties_Calculating", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_Extension {
+            get {
+                return ResourceManager.GetString("Web_Properties_Extension", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_MimeType {
+            get {
+                return ResourceManager.GetString("Web_Properties_MimeType", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_Created {
+            get {
+                return ResourceManager.GetString("Web_Properties_Created", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_Modified {
+            get {
+                return ResourceManager.GetString("Web_Properties_Modified", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_Accessed {
+            get {
+                return ResourceManager.GetString("Web_Properties_Accessed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_Owner {
+            get {
+                return ResourceManager.GetString("Web_Properties_Owner", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_Share {
+            get {
+                return ResourceManager.GetString("Web_Properties_Share", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Properties_ItemId {
+            get {
+                return ResourceManager.GetString("Web_Properties_ItemId", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Upload_BatchProgress {
+            get {
+                return ResourceManager.GetString("Web_Upload_BatchProgress", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Upload_BatchSuccess {
+            get {
+                return ResourceManager.GetString("Web_Upload_BatchSuccess", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Upload_BatchPartialFailure {
+            get {
+                return ResourceManager.GetString("Web_Upload_BatchPartialFailure", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Upload_BatchCancelled {
+            get {
+                return ResourceManager.GetString("Web_Upload_BatchCancelled", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Delete_BatchSuccess {
+            get {
+                return ResourceManager.GetString("Web_Delete_BatchSuccess", resourceCulture);
             }
         }
     }
