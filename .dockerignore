@@ -23,6 +23,10 @@
 **/values.dev.yaml
 LICENSE
 README.md
+# Runtime-/Testdaten: Bind-Mount-Ziele fuer Postgres, Elasticsearch und Storage.
+# Diese wachsen im Betrieb unbegrenzt und duerfen NICHT in den Build-Context.
+tests/data
+**/tests/data
 !**/.gitignore
 !.git/HEAD
 !.git/config
