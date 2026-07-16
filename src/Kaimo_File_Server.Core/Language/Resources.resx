@@ -1764,5 +1764,22 @@
   <data name="Web_Upload_BatchProgressWithSpeed" xml:space="preserve">
   <value>Uploading file {0} of {1}: {2} ({3})</value>
 </data>
-  
+  <data name="Web_Error_MoveFailed" xml:space="preserve">
+  <value>Failed to move the item.</value>
+</data>
+  <data name="Web_Move_Progress" xml:space="preserve">
+  <value>Moving {0}…</value>
+</data>
+  <data name="Web_Move_BatchProgress" xml:space="preserve">
+  <value>Moving {0} items…</value>
+</data>
+  <data name="Web_Move_Success" xml:space="preserve">
+  <value>{0} moved successfully.</value>
+</data>
+  <data name="Web_Move_BatchSuccess" xml:space="preserve">
+  <value>{0} items moved successfully.</value>
+</data>
+  <data name="Web_Move_BatchPartialFailure" xml:space="preserve">
+  <value>{0} of {1} items moved. Some items failed.</value>
+</data>
 </root>

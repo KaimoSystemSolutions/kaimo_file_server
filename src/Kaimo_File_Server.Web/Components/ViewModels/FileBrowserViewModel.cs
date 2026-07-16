@@ -308,61 +308,95 @@ public class FileBrowserViewModel
             return OperationResult.Fail(Resources.Web_Error_DeleteFailed);
         }
     }
+public async Task<OperationResult> RenameAsync(FileMetadata item, string newName)
+{
+    if (string.IsNullOrWhiteSpace(newName))
+        return OperationResult.Fail(Resources.Web_Rename_NameRequired);
 
-    /// <summary>Rename a file or directory.</summary>
-    public async Task<OperationResult> RenameAsync(FileMetadata item, string newName)
+    if (!WindowsFileNameHelper.IsValid(newName))
     {
-        if (_fileService is null || CurrentShare is null)
-            return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
-
-        if (string.IsNullOrWhiteSpace(newName))
-            return OperationResult.Fail(Resources.Web_Rename_NameRequired);
-
-        if (!WindowsFileNameHelper.IsValid(newName))
-        {
-            var errors = WindowsFileNameHelper.GetValidationErrors(newName);
-            return OperationResult.Fail(
-                Resources.Web_Name_InvalidChars + string.Join(", ", errors));
-        }
-
-        try
-        {
-            var userContext = await GetCurrentUserContextAsync();
-            if (userContext is null)
-                return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
-
-            var relativePath = item.Path;
-            if (relativePath.StartsWith(CurrentShare.Path))
-                relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
-
-            // BUG FIX: Construct the full sibling path instead of passing
-            // just the bare name. FileService.RenameAsync expects a complete
-            // share-relative target path, not just a filename.
-            var parentDir = Kaimo_File_Server.Core.Helpers.ShareRelativePath.GetParent(relativePath);
-            var newRelativePath = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Combine(parentDir, newName);
-
-            await _fileService.RenameAsync(relativePath, newRelativePath, userContext);
-
-            _logger.LogInformation("{Type} renamed: '{OldPath}' -> '{NewPath}' by {User}",
-                item.IsDirectory ? "Directory" : "File",
-                relativePath, newRelativePath, userContext.User.Username);
-
-            return OperationResult.Ok();
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return OperationResult.Fail(Resources.Web_Error_AccessDenied);
-        }
-        catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
-        {
-            return OperationResult.Fail(Resources.Web_Error_ItemExists);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error renaming '{Path}' to '{NewName}'", item.Path, newName);
-            return OperationResult.Fail(Resources.Web_Error_RenameFailed);
-        }
+        var errors = WindowsFileNameHelper.GetValidationErrors(newName);
+        return OperationResult.Fail(
+            Resources.Web_Name_InvalidChars + string.Join(", ", errors));
     }
+
+    if (CurrentShare is null)
+        return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
+
+    var relativePath = item.Path;
+    if (relativePath.StartsWith(CurrentShare.Path))
+        relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
+
+    var parentDir = Kaimo_File_Server.Core.Helpers.ShareRelativePath.GetParent(relativePath);
+    var newRelativePath = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Combine(parentDir, newName);
+
+    return await MoveInternalAsync(item, relativePath, newRelativePath, "renamed");
+}
+
+/// <summary>
+/// Moves an item into a different directory within the same share, keeping its name.
+/// </summary>
+/// <param name="item">The item to move.</param>
+/// <param name="destRelativePath">Share-relative path of the destination directory ("" = share root).</param>
+public async Task<OperationResult> MoveAsync(FileMetadata item, string destRelativePath)
+{
+    if (CurrentShare is null)
+        return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
+
+    var relativePath = item.Path;
+    if (relativePath.StartsWith(CurrentShare.Path))
+        relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
+
+    var newRelativePath = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Combine(destRelativePath, item.Name);
+
+    // No-op: dropped onto the folder it's already in
+    var currentParent = Kaimo_File_Server.Core.Helpers.ShareRelativePath.GetParent(relativePath);
+    if (string.Equals(currentParent, destRelativePath.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
+        return OperationResult.Ok();
+
+    return await MoveInternalAsync(item, relativePath, newRelativePath, "moved");
+}
+
+/// <summary>
+/// Shared implementation for Rename and Move: both are just "relocate item from
+/// one share-relative path to another" as far as the file service is concerned.
+/// </summary>
+private async Task<OperationResult> MoveInternalAsync(
+    FileMetadata item, string relativePath, string newRelativePath, string logVerb)
+{
+    if (_fileService is null)
+        return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
+
+    try
+    {
+        var userContext = await GetCurrentUserContextAsync();
+        if (userContext is null)
+            return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
+
+        await _fileService.RenameAsync(relativePath, newRelativePath, userContext);
+
+        _logger.LogInformation("{Type} {Verb}: '{OldPath}' -> '{NewPath}' by {User}",
+            item.IsDirectory ? "Directory" : "File",
+            logVerb, relativePath, newRelativePath, userContext.User.Username);
+
+        return OperationResult.Ok();
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return OperationResult.Fail(Resources.Web_Error_AccessDenied);
+    }
+    catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+    {
+        return OperationResult.Fail(Resources.Web_Error_ItemExists);
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error relocating '{Path}' to '{NewPath}'", relativePath, newRelativePath);
+        return OperationResult.Fail(logVerb == "moved"
+            ? Resources.Web_Error_MoveFailed
+            : Resources.Web_Error_RenameFailed);
+    }
+}
 
     private async Task<UserContext?> GetCurrentUserContextAsync()
     {

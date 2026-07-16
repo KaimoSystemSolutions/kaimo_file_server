@@ -3047,6 +3047,16 @@ html, body, #app {
         background: var(--accent-selected);
     }
 
+.file-row--dragging {
+    opacity: 0.4;
+}
+
+.file-row-dir.file-row--drop-target {
+    background: var(--accent-transparent, rgba(0, 120, 255, 0.15));
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
+}
+
 /* -- Toggle row (used in edit forms) -- */
 .toggle-row {
     display: flex;

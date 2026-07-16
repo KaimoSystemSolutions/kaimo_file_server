@@ -248,9 +248,13 @@ else
         @* -- ".." Elternverzeichnis -- *@
         @if (VM.HasParent)
         {
-            <div class="file-grid-row file-row-dir" @onclick="NavigateUp">
+            <div class="file-grid-row file-row-dir @(_dragOverPath == ".." ? "file-row--drop-target" : "")"
+                 @onclick="NavigateUp"
+                 ondragover="event.preventDefault()"
+                 @ondragenter="OnDragEnterParent"
+                 @ondragleave="OnDragLeave"
+                 @ondrop="OnDropOnParent">
                 <div class="col-name">
-
                     @Assets.SVG("chevron_left.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)", CssClass: "file-icon"))
                     <span>..</span>
                 </div>
@@ -270,14 +274,22 @@ else
             }
             <div
                 class="file-grid-row @(entry.IsDirectory ? "file-row-dir" : "") @(isSelected ? "file-row--selected" : "")"
+                data-path="@entry.Path"
+                data-is-dir="@(entry.IsDirectory ? "true" : "false")"
                 @onclick="(e) => OnItemClick(e, entry)"
                 @onclick:stopPropagation="true"
                 @ondblclick="() => OnItemActivate(entry)"
+                @ondrop="() => OnDropOnEntry(entry)"
+                ondragover="event.preventDefault()"
                 @oncontextmenu="(e) => _contextMenuComponent.OnItemContextMenu(e, entry)"
                 @oncontextmenu:preventDefault="true"
                 @oncontextmenu:stopPropagation="true">
 
-                <div class="col-name">
+                <div class="col-name"
+                     draggable="true"
+                     data-path="@entry.Path"
+                     @ondragstart="() => OnDragStart(entry)"
+                     @ondragend="OnDragEnd">
                     @if (entry.IsDirectory && entry.Name == ".RECYCLE_BIN")
                     {
                         @Assets.SVG("trash.svg", new SvgOptions(Width: 20, Height: 20, CssClass: "file-icon"))
@@ -297,9 +309,9 @@ else
                               title="@(aclCount != 1 ? string.Format(Resources.Web_Acl_RulesPlural, aclCount) : string.Format(Resources.Web_Acl_RulesSingular, aclCount))"
                               @onclick="() => OpenEntryAcl(entry)"
                               @onclick:stopPropagation="true">
-                            @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
+                @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
                             <span class="acl-indicator-count">@aclCount</span>
-                        </span>
+            </span>
                     }
                 </div>
 
@@ -713,6 +725,10 @@ else
     private ElementReference _fileDropZone;
     private bool _jsInitialized = false;
 
+    // ========== Drag & Drop ==========
+    private HashSet<FileMetadata> _draggedItems = new();
+    private string? _dragOverPath; // Pfad des aktuell gehoverten Drop-Ziels, ".." für Parent-Zeile
+
     // ========== Toolbar Computed ==========
 
     private bool CanOpenSelection => _selectedItems.Count == 1;
@@ -834,6 +850,131 @@ else
         else OpenFileAcl(item);
     }
 
+// ---- Drag start/end ----
+
+    private void OnDragStart(FileMetadata entry)
+    {
+        // Wenn das gezogene Item Teil der aktuellen Selektion ist, wird die
+        // gesamte Selektion gezogen, sonst nur das einzelne Item.
+        if (!_selectedItems.Contains(entry))
+        {
+            _selectedItems.Clear();
+            _selectedItems.Add(entry);
+        }
+
+        _draggedItems = new HashSet<FileMetadata>(_selectedItems);
+    }
+
+    private void OnDragEnd()
+    {
+        _draggedItems.Clear();
+        _dragOverPath = null;
+    }
+
+// ---- Drop-Ziel-Prüfung ----
+
+    private bool CanDropOn(FileMetadata target)
+    {
+        if (_draggedItems.Count == 0) return false;
+        if (!target.IsDirectory) return false;
+        if (_draggedItems.Contains(target)) return false;
+
+        // Verhindert, dass ein Ordner in sich selbst / seine eigenen Unterordner verschoben wird
+        foreach (var item in _draggedItems)
+        {
+            if (item.IsDirectory &&
+                (target.Path == item.Path || target.Path.StartsWith(item.Path.TrimEnd('/') + "/")))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool CanDropOnParent() => _draggedItems.Count > 0 && VM.HasParent;
+
+// ---- Hover-Feedback ----
+
+    private void OnDragEnterEntry(FileMetadata target)
+    {
+        if (CanDropOn(target))
+            _dragOverPath = target.Path;
+    }
+
+    private void OnDragEnterParent()
+    {
+        if (CanDropOnParent())
+            _dragOverPath = "..";
+    }
+
+    private void OnDragLeave() => _dragOverPath = null;
+
+// ---- Drop-Handling ----
+
+    private async Task OnDropOnEntry(FileMetadata target)
+    {
+        if (!CanDropOn(target))
+        {
+            OnDragEnd();
+            return;
+        }
+
+        await MoveDraggedItemsTo(GetDirAclPath(target));
+    }
+
+    private async Task OnDropOnParent()
+    {
+        if (!CanDropOnParent())
+        {
+            OnDragEnd();
+            return;
+        }
+
+        await MoveDraggedItemsTo(VM.ParentPath ?? "");
+    }
+
+    private async Task MoveDraggedItemsTo(string destRelativePath)
+    {
+        var items = _draggedItems.ToList();
+        _draggedItems.Clear();
+        _dragOverPath = null;
+
+        if (items.Count == 0) return;
+
+        var toastId = Toast.Show(
+            items.Count == 1
+                ? string.Format(Resources.Web_Move_Progress, items[0].Name)
+                : string.Format(Resources.Web_Move_BatchProgress, items.Count),
+            ToastType.Progress);
+
+        var failed = new List<string>();
+        foreach (var item in items)
+        {
+            var result = await VM.MoveAsync(item, destRelativePath);
+            if (!result.Success)
+                failed.Add(item.Name);
+        }
+
+        if (failed.Count == 0)
+        {
+            Toast.Update(toastId,
+                items.Count == 1
+                    ? string.Format(Resources.Web_Move_Success, items[0].Name)
+                    : string.Format(Resources.Web_Move_BatchSuccess, items.Count),
+                type: ToastType.Success);
+        }
+        else
+        {
+            Toast.Update(toastId,
+                string.Format(Resources.Web_Move_BatchPartialFailure, items.Count - failed.Count, items.Count),
+                type: ToastType.Error);
+        }
+
+        _selectedItems.Clear();
+        await VM.LoadShareAsync(ShareName, SubPath ?? "");
+        StateHasChanged();
+    }
 
     // ========== Zip ==========
 
@@ -929,6 +1070,7 @@ else
             _jsInitialized = true;
             _dotNetRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("initFileUpload", "#file-drop-zone", _dotNetRef);
+            await JS.InvokeVoidAsync("initInternalDragDrop");
         }
     }
 

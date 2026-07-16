@@ -3338,5 +3338,41 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Upload_BatchProgressWithSpeed", resourceCulture);
             }
         }
+        
+        internal static string Web_Error_MoveFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_MoveFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Move_Progress {
+            get {
+                return ResourceManager.GetString("Web_Move_Progress", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Move_BatchProgress {
+            get {
+                return ResourceManager.GetString("Web_Move_BatchProgress", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Move_Success {
+            get {
+                return ResourceManager.GetString("Web_Move_Success", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Move_BatchSuccess {
+            get {
+                return ResourceManager.GetString("Web_Move_BatchSuccess", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Move_BatchPartialFailure {
+            get {
+                return ResourceManager.GetString("Web_Move_BatchPartialFailure", resourceCulture);
+            }
+        }
     }
 }
