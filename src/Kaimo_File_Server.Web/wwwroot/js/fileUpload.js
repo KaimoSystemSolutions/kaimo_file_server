@@ -1,6 +1,12 @@
 function initFileUpload(elementSelector, dotNetRef) {
 
+    function isOsFileDrag(e) {
+        return !!e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files');
+    }
+
     document.addEventListener('dragenter', e => {
+        if (!isOsFileDrag(e)) return;
+
         const el = document.querySelector(elementSelector);
         e.preventDefault();
         if (el?.contains(e.target)) {
@@ -11,8 +17,10 @@ function initFileUpload(elementSelector, dotNetRef) {
     document.addEventListener("dragstart", e => {
         e.dataTransfer.setData("text/html", "...")
     })
-    
+
     document.addEventListener('dragover', e => {
+        if (!isOsFileDrag(e)) return;
+
         const el = document.querySelector(elementSelector);
         e.preventDefault();
 
@@ -22,6 +30,8 @@ function initFileUpload(elementSelector, dotNetRef) {
     });
 
     document.addEventListener('dragleave', e => {
+        if (!isOsFileDrag(e)) return;
+
         const el = document.querySelector(elementSelector);
         if (el && !el.contains(e.relatedTarget)) {
             el.classList.remove('file-dragged-over');
@@ -29,6 +39,8 @@ function initFileUpload(elementSelector, dotNetRef) {
     });
 
     document.addEventListener('drop', async e => {
+        if (!isOsFileDrag(e)) return;
+
         e.preventDefault();
         const el = document.querySelector(elementSelector);
         console.log('drop fired', e.target, 'el:', el, 'contains:', el?.contains(e.target));

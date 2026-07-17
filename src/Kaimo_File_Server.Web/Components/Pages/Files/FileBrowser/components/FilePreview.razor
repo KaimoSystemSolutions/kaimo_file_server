@@ -122,6 +122,7 @@
 
         // Files above the inline-preview cap are never buffered into memory — show the
         // download fallback directly instead of spinning and then silently closing.
+        
         if (file.Size > VM.GetMaxPreviewSizeBytes())
         {
             _previewTooLarge = true;
@@ -129,7 +130,7 @@
             StateHasChanged();
             return;
         }
-
+        
         _previewLoading = true;
         StateHasChanged();
 

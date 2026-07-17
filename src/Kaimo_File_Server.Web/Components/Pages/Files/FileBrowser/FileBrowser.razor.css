@@ -268,39 +268,39 @@
     border-radius: 8px;
 }
 
-    .file-dragged-over::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: var(--accent-subtle);
-        backdrop-filter: blur(2px);
-        z-index: 10;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        pointer-events: none;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%237facf5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpolyline points='17 8 12 3 7 8'/%3E%3Cline x1='12' y1='3' x2='12' y2='15'/%3E%3C/svg%3E");
-        background-repeat: no-repeat;
-        background-position: center calc(50% - 16px);
-        animation: fadeIn 0.15s ease-out;
-    }
+.file-dragged-over::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent-subtle);
+    backdrop-filter: blur(2px);
+    z-index: 10;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%237facf5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpolyline points='17 8 12 3 7 8'/%3E%3Cline x1='12' y1='3' x2='12' y2='15'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center calc(50% - 16px);
+    animation: fadeIn 0.15s ease-out;
+}
 
-    .file-dragged-over::before {
-        content: 'Dateien hier ablegen';
-        position: absolute;
-        inset: 0;
-        z-index: 11;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding-top: 56px;
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--accent);
-        letter-spacing: 0.02em;
-        pointer-events: none;
-    }
+.file-dragged-over::before {
+    content: 'Dateien hier ablegen';
+    position: absolute;
+    inset: 0;
+    z-index: 11;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 56px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+    pointer-events: none;
+}
 
 /* ══════════════════════════════════════════════════════════
    Responsive – Spalten ausblenden bei schmalen Viewports

@@ -2,38 +2,70 @@
 services:
   kaimo_file_server.host:
     build:
-      context: "/media/boyfag/HDD/fileserver"
+      context: "/run/media/rearguardalpha/HDD/programing/kaimo_file_server_core"
       dockerfile: "src/Kaimo_File_Server.Host/Dockerfile"
       target: "base"
+      args:
+        BUILD_CONFIGURATION: "Debug"
     command: []
     entrypoint:
-    - "dotnet"
-    - "/app/bin/Debug/net10.0/Kaimo_File_Server.Host.dll"
+    - "/opt/JetBrains/RiderDebuggerTools/linux-x64/JetBrains.Debugger.Worker"
+    - "--runtimeconfig"
+    - "/opt/JetBrains/RiderDebuggerTools/JetBrains.Debugger.Worker.runtimeconfig.json"
+    - "--mode=server"
+    - "--frontend-port=57000"
+    - "--backend-port=57200"
+    - "--roslyn-worker-port=57418"
+    - "--timeout=60"
     environment:
       DOTNET_USE_POLLING_FILE_WATCHER: "true"
+      RIDER_DEBUGGER_LOG_DIR: "/var/opt/JetBrains/RiderDebuggerTools"
+      RESHARPER_LOG_CONF: "/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
     image: "kaimofileserver:dev"
-    ports: []
+    ports:
+    - "127.0.0.1:57018:57000"
+    - "127.0.0.1:57218:57200"
+    - "127.0.0.1:57418:57418"
     volumes:
-    - "/media/boyfag/HDD/fileserver/src/Kaimo_File_Server.Host:/app:rw"
-    - "/media/boyfag/HDD/fileserver:/src:rw"
-    - "/home/boyfag/.nuget/packages:/home/app/.nuget/packages"
+    - "/run/media/rearguardalpha/HDD/programing/kaimo_file_server_core/src/Kaimo_File_Server.Host:/app:rw"
+    - "/run/media/rearguardalpha/HDD/programing/kaimo_file_server_core:/src:rw"
+    - "/home/rearguardalpha/.nuget/packages:/home/app/.nuget/packages"
+    - "/home/rearguardalpha/.local/share/JetBrains/RiderRemoteDebugger/2026.1.2/Linux64:/opt/JetBrains/RiderDebuggerTools"
+    - "/run/media/rearguardalpha/HDD/Programs/Rider/bin/backend-log.xml:/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
+    - "/home/rearguardalpha/.cache/JetBrains/Rider2026.1/log/DebuggerWorker/JetBrains.Debugger.Worker.2026_7_17_00_40_34:/var/opt/JetBrains/RiderDebuggerTools:rw"
     working_dir: "/app"
   kaimo_file_server.web:
     build:
-      context: "/media/boyfag/HDD/fileserver"
+      context: "/run/media/rearguardalpha/HDD/programing/kaimo_file_server_core"
       dockerfile: "src/Kaimo_File_Server.Web/Dockerfile"
       target: "base"
+      args:
+        BUILD_CONFIGURATION: "Debug"
     command: []
     entrypoint:
-    - "dotnet"
-    - "/app/bin/Debug/net10.0/Kaimo_File_Server.Web.dll"
+    - "/opt/JetBrains/RiderDebuggerTools/linux-x64/JetBrains.Debugger.Worker"
+    - "--runtimeconfig"
+    - "/opt/JetBrains/RiderDebuggerTools/JetBrains.Debugger.Worker.runtimeconfig.json"
+    - "--mode=server"
+    - "--frontend-port=57000"
+    - "--backend-port=57200"
+    - "--roslyn-worker-port=57419"
+    - "--timeout=60"
     environment:
       ASPNETCORE_STATICWEBASSETS: "/app/bin/Debug/net10.0/Kaimo_File_Server.Web.staticwebassets.runtime.CT.json"
       DOTNET_USE_POLLING_FILE_WATCHER: "true"
+      RIDER_DEBUGGER_LOG_DIR: "/var/opt/JetBrains/RiderDebuggerTools"
+      RESHARPER_LOG_CONF: "/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
     image: "kaimofileserverweb:dev"
-    ports: []
+    ports:
+    - "127.0.0.1:57019:57000"
+    - "127.0.0.1:57219:57200"
+    - "127.0.0.1:57419:57419"
     volumes:
-    - "/media/boyfag/HDD/fileserver/src/Kaimo_File_Server.Web:/app:rw"
-    - "/media/boyfag/HDD/fileserver:/src:rw"
-    - "/home/boyfag/.nuget/packages:/home/app/.nuget/packages"
+    - "/run/media/rearguardalpha/HDD/programing/kaimo_file_server_core/src/Kaimo_File_Server.Web:/app:rw"
+    - "/run/media/rearguardalpha/HDD/programing/kaimo_file_server_core:/src:rw"
+    - "/home/rearguardalpha/.nuget/packages:/home/app/.nuget/packages"
+    - "/home/rearguardalpha/.local/share/JetBrains/RiderRemoteDebugger/2026.1.2/Linux64:/opt/JetBrains/RiderDebuggerTools"
+    - "/run/media/rearguardalpha/HDD/Programs/Rider/bin/backend-log.xml:/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
+    - "/home/rearguardalpha/.cache/JetBrains/Rider2026.1/log/DebuggerWorker/JetBrains.Debugger.Worker.2026_7_17_00_40_34:/var/opt/JetBrains/RiderDebuggerTools:rw"
     working_dir: "/app"
