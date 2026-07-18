@@ -2,6 +2,7 @@ using Grpc.Core;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.SmbBridge.Grpc;
 
 namespace Kaimo_File_Server.SmbBridge.Services;
@@ -21,6 +22,7 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     private readonly IShareRepository _shares;
     private readonly IAuthenticationLookup _auth;
     private readonly IAclService _acl;
+    private readonly ISmbConfigStore _config;
     private readonly ILogger<AuthzGrpcService> _logger;
 
     public AuthzGrpcService(
@@ -28,18 +30,27 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         IShareRepository shares,
         IAuthenticationLookup auth,
         IAclService acl,
+        ISmbConfigStore config,
         ILogger<AuthzGrpcService> logger)
     {
         _users = users;
         _shares = shares;
         _auth = auth;
         _acl = acl;
+        _config = config;
         _logger = logger;
     }
 
     public override async Task<AuthorizeReply> AuthorizeConnect(
         AuthorizeConnectRequest request, ServerCallContext context)
     {
+        // Phase 5 cutover: the SMB on/off toggle. The old in-process SmbServer was
+        // start/stopped by the host reconciler; smbd now runs in its own container.
+        // Enforcing the flag here (deny every TREE_CONNECT when disabled) is what
+        // makes "SMB off" actually block clients — no share becomes enterable.
+        if (!await _config.IsSmbEnabledAsync())
+            return Deny($"smb service disabled (services.smb.enabled=false)");
+
         var user = await _users.GetByUsernameAsync(request.Username);
         if (user is null || !user.IsEnabled)
             return Deny($"unknown or disabled user '{request.Username}'");

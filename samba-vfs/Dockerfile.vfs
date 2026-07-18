@@ -159,9 +159,9 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
 # The installed .so is located by name (not a hardcoded path) and overwritten.
 WORKDIR /build/samba-4.19.5
 COPY module/vfs_kaimo_bridge.c source3/modules/vfs_kaimo_bridge.c
-RUN ./buildtools/bin/waf build --targets=vfs_kaimo_bridge \
-    && built="$(find bin -name 'vfs_kaimo_bridge*.so' | head -n1)" \
-    && dest="$(find /opt/samba -name 'vfs_kaimo_bridge*.so' | head -n1)" \
+RUN PYTHONHASHSEED=1 ./buildtools/bin/waf build --targets=vfs_kaimo_bridge \
+    && built="$(find bin -name '*kaimo_bridge*.so' | head -n1)" \
+    && dest="$(find /opt/samba -name '*kaimo_bridge*.so' | head -n1)" \
     && test -n "$built" && test -n "$dest" \
     && cp "$built" "$dest" \
     && echo "updated real module: $dest"

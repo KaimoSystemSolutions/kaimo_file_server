@@ -1,11 +1,11 @@
 namespace Kaimo_File_Server.Core.Services.DataServices;
 
 /// <summary>
-/// SMB protocol dialect versions the server can negotiate. Mirrors the SMB
-/// library's dialect enum but is declared here in Core so the config model
-/// carries <b>no</b> compile-time dependency on the SMB transport assembly (only
-/// <c>Kaimo_File_Server.Smb</c> references the library). The SMB host maps these
-/// onto the library's <c>SmbDialect</c> when it builds the server.
+/// SMB protocol dialect versions the server can negotiate. Declared here in Core
+/// so the config model stays transport-agnostic. Since the Phase 5 cutover the SMB
+/// protocol layer is real Samba (<c>smbd</c>) in a separate container; the bridge's
+/// <c>ConfigService</c> maps these enum members onto Samba's dialect tokens
+/// (<c>SMB2_02</c>…<c>SMB3_11</c>) for <c>server min/max protocol</c>.
 ///
 /// The members are declared in ascending order so an ordinal comparison
 /// (<c>(int)a &lt;= (int)b</c>) reflects "older … newer". SMB 1 is intentionally
@@ -134,4 +134,14 @@ public interface ISmbConfigStore
     /// its identity across restarts.
     /// </summary>
     Task<Guid> GetOrCreateServerGuidAsync();
+
+    /// <summary>
+    /// Whether the SMB service is enabled (the "Datendienste" on/off toggle,
+    /// <c>services.smb.enabled</c>). Read fresh, since the flag is written by the
+    /// Web process. Since the Phase 5 cutover, smbd runs in a separate container:
+    /// this flag is enforced by the bridge's <c>AuthorizeConnect</c> (deny-all when
+    /// disabled), which is what actually makes a disabled service reject every
+    /// TREE_CONNECT. Defaults to <c>true</c> so an unconfigured system stays on.
+    /// </summary>
+    Task<bool> IsSmbEnabledAsync();
 }

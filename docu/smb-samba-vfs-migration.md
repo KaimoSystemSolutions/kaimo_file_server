@@ -1,10 +1,12 @@
 # SMB Migration: Samba + Custom VFS Module (gRPC Bridge to .NET)
 
-> **Status:** 🟢 Phase 0–4 **completed** — Auth, ACLs (Connect/Open/Listing), Close-Hooks
-> (Versioning/Ownership/Index), **dynamic shares** (Registry provisioning from DB) and
-> **protocol settings** (Dialect-Range/Signing/Encryption from `ISmbConfigStore`) run via gRPC;
-> Data path remains native. Next step: Phase 5 (Snapshots/@GMT & Cutover)
-> **Author:** Design document, created 2026-07-17
+> **Status:** 🟢 Phase 0–5 **completed** — Auth, ACLs (Connect/Open/Listing), Close-Hooks
+> (Versioning/Ownership/Index), **dynamic shares** (Registry provisioning from DB),
+> **protocol settings** (Dialect-Range/Signing/Encryption from `ISmbConfigStore`) and
+> **@GMT snapshots** ("Previous Versions") run via gRPC; data path remains native. The old
+> `Kaimo_File_Server.Smb` library is **removed**; Samba owns port 445 (**cutover done**).
+> Remaining items are tracked in the "Open SMB problems" list at the end of this document.
+> **Author:** Design document, created 2026-07-17; Phase 5 completed 2026-07-18
 > **Concerns:** Replacement of SMB protocol layer in Kaimo File Server
 > **Related:** `src/Kaimo_File_Server.Smb/` (to be replaced),
 > `src/Kaimo_File_Server.SmbBridge/` (new gRPC control plane), `docker-compose.yml`,
@@ -196,7 +198,7 @@ C++ translation unit with `extern "C"` shim. Since the control plane is **low-fr
 | **2b — Open/Path ACL** ✅ | VFS `create_file` hook → gRPC `AuthorizeOpen` (exact `OpenAsync` parity) + `readdir` filter (`ListAsync` parity, sidecar cache) | File open (read/write/create) and listing per real ACLs — **works** (write-deny, per-file-deny + hiding verified) |
 | **3 — Close Hooks** ✅ | `close`/`unlinkat`/`renameat`/`mkdirat` → Sidecar → gRPC `EventService` → `FileService.NotifyExternal*` (versioning, ownership, search index, ACL realign) | Parity to `FileSession.DisposeAsync` — **works** (versioning/ownership verified; see [`../samba-vfs/README.md`](../samba-vfs/README.md)) |
 | **4 — Dyn. Shares & Visibility** ✅ | ShareControl sync (`ListShares` → `kaimo_sharesync` → `sync-shares.sh` → `net conf`) ✅; ABE = **hidden flag only** (`browseable`) ✅; Protocol settings from `ISmbConfigStore` (`GetProtocolSettings` → `kaimo_configsync` → `sync-config.sh` → `net conf setparm global`) ✅ | dynamic shares + protocol config live — **works** |
-| **5 — Snapshots & Cutover** | @GMT mapping; `enable/disable SMB` redirect to `smbd`; remove `Kaimo_File_Server.Smb`; finalize compose | old lib removed |
+| **5 — Snapshots & Cutover** ✅ | @GMT snapshots via `get_shadow_copy_data` + timewarp resolve (`SnapshotService` → `IFileVersionService`); `enable/disable SMB` now enforced by the bridge `connect` hook (deny-all when `services.smb.enabled=false`); `Kaimo_File_Server.Smb` **removed** (host runs `SambaSmbControlService` for status only); Samba owns port 445 | **old lib removed, migration complete** |
 
 ---
 
@@ -225,3 +227,57 @@ The rest is well-scoped integration work because Kaimo's core logic in `Core`/
 > live registry shares) with minimal effort before larger investment.
 
 Phase 0 progress is tracked in [`samba-vfs/README.md`](../samba-vfs/README.md).
+
+---
+
+## 9. Open SMB problems (post-Phase-5 backlog)
+
+The migration is functionally complete, but the following items remain. Ordered
+roughly by priority.
+
+### A — Validation & hardening (must-do before production)
+1. **@GMT hooks not yet exercised end-to-end.** The C snapshot hooks
+   (`get_shadow_copy_data`, twrp resolve in `create_file`/`stat`/`lstat`) are
+   written against Samba's `shadow_copy2` conventions but compile+run only in the
+   Samba source build. Needs: build the `kaimo_samba` image, drive a real Windows
+   "Previous Versions" → *view* and *restore*, and `smbclient` snapshot ops.
+2. **Folder-level snapshot browsing over SMB.** Only file-level restore is wired
+   (enumerate + open/stat of a versioned file). Browsing a whole folder "as of" a
+   snapshot may need extra path hooks (`openat`/`readdir`/`fstatat` twrp handling).
+   The web UI already does folder snapshots (`GetFolderSnapshotAsync`).
+3. **Snapshot cache lifecycle.** `<share>/.kaimo-snapshots/` grows unbounded — no
+   eviction/TTL/size cap yet, and it is not cleaned when a share/version is deleted.
+4. **`connect` deny still surfaces as `NT_STATUS_UNSUCCESSFUL`** to clients (Samba
+   hardcodes this on VFS connect errors) instead of `ACCESS_DENIED`. Cosmetic.
+
+### B — Feature parity gaps
+5. **Recycle bin on SMB delete.** Deliberately not implemented (parity with the old
+   path, which also didn't recycle) — but if product wants SMB deletes to land in
+   `.RECYCLE_BIN`, add an `unlinkat` → recycle path.
+6. **Per-user ABE share visibility.** Only the hidden flag (`browseable = no`) is
+   honored; shares a user cannot access are still *listed* (access is denied on
+   connect). Full ABE (hide inaccessible shares in enumeration) is unimplemented.
+7. **WS-Discovery & audit log settings are inert.** `EnableWsDiscovery` /
+   `EnableAuditLog` exist in `SmbProtocolSettings` but are not wired to Samba
+   (would need `wsdd` and the `full_audit` VFS). The UI toggles currently do nothing.
+8. **`mkdirat` close-hook unreliable** in Samba's SMB2 dir-create path → new
+   directories created over SMB may not be indexed/owner-stamped.
+9. **Rapid successive writes may collapse into one version** (version re-read from
+   disk on close, not from the write stream).
+
+### C — Operational / correctness
+10. **Storage write permissions on ACL-less filesystems.** Group-writable
+    (`kaimo` group + `2775`) works, but on filesystems without POSIX ACLs, files
+    later created by web/host (UID 1654) need umask `002` or SMB can read but not
+    overwrite them. Fragile on drvfs/9p dev mounts.
+11. **Elasticsearch indexing system-wide inactive.** SMB writes index via the same
+    `SearchServiceRouter` as web; once ES is re-enabled this should be re-verified.
+12. **`enabled` flag enforced only at TREE_CONNECT.** Disabling SMB blocks new
+    connections but does not drop already-established sessions; smbd keeps
+    listening on 445. Acceptable, but not a hard stop.
+13. **Samba version pinning / ABI 49.** The VFS module is bound to the exact Samba
+    build (`SMB_VFS_INTERFACE_VERSION = 49`); Samba upgrades require a module
+    rebuild. No CI guard for this yet.
+14. **Bridge is a single point of failure & unauthenticated (h2c).** If the bridge
+    is down, authz fails open by default (`KAIMO_AUTHZ_FAILCLOSED=1` to flip).
+    gRPC is plaintext on the internal network with no mTLS.

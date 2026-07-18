@@ -374,6 +374,66 @@ group write permission still depends on the web/host container's umask — with 
 `0644` (group read-only), so SMB can read them but not overwrite. Fix: **umask `002`** in web/host
 container. Files already on disk were touched once at rollout to `g+rwX` and are uncritical.
 
+## Phase 5 — Snapshots (@GMT) & Cutover
+
+**Result: implemented (pending end-to-end validation in the Samba build).** Two parts:
+
+### @GMT "Previous Versions" over SMB
+
+Because Kaimo stores versions as gzip-compressed, content-addressed blobs (not
+filesystem snapshot dirs), native `vfs_shadow_copy2` cannot serve them. The custom
+module does it via the bridge instead:
+
+```
+ Windows "Previous Versions" tab
+   │  FSCTL_SRV_ENUMERATE_SNAPSHOTS          open "@GMT-…\file" (smb_fname->twrp set)
+   ▼                                          ▼
+ kaimo_bridge.so get_shadow_copy_data      kaimo_bridge.so create_file/stat (twrp)
+   │  SNAPENUM                                │  SNAPRESOLVE
+   ▼                                          ▼
+ kaimo_authd ──gRPC EnumerateSnapshots──►   kaimo_authd ──gRPC ResolveVersion──►
+                SmbBridge (.NET)                            SmbBridge (.NET)
+                GetSnapshotTimestamps/GetVersions           GetVersionAt + ReadVersion
+                                                            → materialize decompressed copy
+                                                              into <share>/.kaimo-snapshots/@GMT-…/
+   labels (@GMT tokens)                        base_name rewritten to that copy → native read
+```
+
+- **Enumeration** (`get_shadow_copy_data_fn`) returns the `@GMT-` labels for the
+  file. **Resolution**: a timewarp open/stat (`smb_fname->twrp`) is turned into an
+  `@GMT-` token, the bridge materializes that one version **decompressed** into a
+  hidden in-share cache (`<share>/.kaimo-snapshots/@GMT-…/<relpath>`, hidden from
+  listings, reused idempotently) and the module redirects the open there — so the
+  **data path stays native**, exactly like live files.
+- **ACL parity:** `EnumerateSnapshots`/`ResolveVersion` require `ListReadData` on
+  the path, so users only see/read snapshots of files they may read.
+- **.NET:** [`SnapshotGrpcService`](../src/Kaimo_File_Server.SmbBridge/Services/SnapshotGrpcService.cs)
+  — thin facade over the already-complete `IFileVersionService`.
+- **C/C++:** `get_shadow_copy_data_fn` + `stat`/`lstat` + `create_file` twrp branch
+  in [`vfs_kaimo_bridge.c`](module/vfs_kaimo_bridge.c); `SNAPENUM`/`SNAPRESOLVE`
+  handlers in [`authd.cpp`](module/authd.cpp).
+
+> **Validation status:** the .NET side is build- and unit-tested. The C VFS hooks
+> follow Samba's `shadow_copy2` conventions (ABI 49 timewarp model) but must be
+> exercised against the Samba source build and a real Windows "Previous Versions"
+> dialog; folder-level snapshot **browsing** over SMB (vs. file-level restore) may
+> need additional path hooks and is the most likely area to iterate.
+
+### Cutover
+
+- **Old library removed:** the whole `Kaimo_File_Server.Smb` project (in-process
+  SMB server, `KaimoFileStore`, `KaimoSharePolicy`, `SmbSync`, …) and its two unit
+  test files are deleted; references dropped from the solution, `Host`, and tests.
+- **On/off toggle:** the "Datendienste" flag (`services.smb.enabled`) is now
+  enforced by the bridge's `AuthorizeConnect` — when disabled it **denies every
+  TREE_CONNECT**, so no share is enterable (smbd keeps listening). The host runs a
+  tiny [`SambaSmbControlService`](../src/Kaimo_File_Server.Host/SambaSmbControlService.cs)
+  so the reconciler still reflects Running/Stopped status in the UI without an
+  in-process server. The state is also surfaced to the container via
+  `GetProtocolSettings.enabled` → `sync-config.sh` (log only).
+- **Port 445** belongs to `kaimo_samba` in [`../docker-compose.yml`](../docker-compose.yml);
+  the host no longer serves SMB.
+
 ## Deployment via docker compose
 
 The spike is integrated as service `kaimo_samba` in the central [`../docker-compose.yml`](../docker-compose.yml)

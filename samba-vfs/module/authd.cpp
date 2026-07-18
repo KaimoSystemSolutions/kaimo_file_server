@@ -12,6 +12,9 @@
 //     "MKDIR\t<user>\t<share>\t<path>"                   directory created
 //     "DELETE\t<user>\t<share>\t<isdir 0|1>\t<path>"
 //     "RENAME\t<user>\t<share>\t<isdir 0|1>\t<old>\t<new>"
+//   Snapshots (Phase 5, @GMT / "Previous Versions"):
+//     "SNAPENUM\t<user>\t<share>\t<path>"    -> "OK\t<n>\n<tok1>\n<tok2>..."|"ERROR"
+//     "SNAPRESOLVE\t<user>\t<share>\t<@GMT>\t<path>" -> "OK\t<cachepath>\t<size>"|"ERROR"
 //
 // Each connection is handled in its own thread so slow events
 // (versioning reads the file) don't block authorization requests.
@@ -40,6 +43,7 @@ using namespace kaimo::smb::bridge::v1;
 static std::string g_bridge_addr;
 static std::unique_ptr<AuthzService::Stub> g_authz;
 static std::unique_ptr<EventService::Stub> g_events;
+static std::unique_ptr<SnapshotService::Stub> g_snapshot;
 
 // --- TTL decision cache (mutex-protected due to multi-threading) ---
 struct CacheEntry { bool allow; std::chrono::steady_clock::time_point expiry; };
@@ -116,6 +120,39 @@ static void ev_rename(const std::string& user, const std::string& share, bool is
     NotifyReply reply; g_events->NotifyRename(&ctx, req, &reply);
 }
 
+// ---- Snapshots (Phase 5, @GMT / "Previous Versions") ----
+static std::string do_snapenum(const std::string& user, const std::string& share,
+                               const std::string& path) {
+    EnumerateSnapshotsRequest req;
+    req.set_username(user); req.set_share(share); req.set_path(path);
+    grpc::ClientContext ctx; ctx.set_deadline(deadline(10));
+    EnumerateSnapshotsReply reply;
+    grpc::Status st = g_snapshot->EnumerateSnapshots(&ctx, req, &reply);
+    if (!st.ok()) {
+        std::cerr << "kaimo_authd: EnumerateSnapshots: " << st.error_message() << std::endl;
+        return "ERROR\n";
+    }
+    std::string out = "OK\t" + std::to_string(reply.gmt_tokens_size()) + "\n";
+    for (const auto& t : reply.gmt_tokens()) out += t + "\n";
+    return out;
+}
+
+static std::string do_snapresolve(const std::string& user, const std::string& share,
+                                  const std::string& token, const std::string& path) {
+    ResolveVersionRequest req;
+    req.set_username(user); req.set_share(share);
+    req.set_gmt_token(token); req.set_path(path);
+    grpc::ClientContext ctx; ctx.set_deadline(deadline(30));
+    ResolveVersionReply reply;
+    grpc::Status st = g_snapshot->ResolveVersion(&ctx, req, &reply);
+    if (!st.ok()) {
+        std::cerr << "kaimo_authd: ResolveVersion: " << st.error_message() << std::endl;
+        return "ERROR\n";
+    }
+    if (!reply.found()) return "ERROR\n";
+    return "OK\t" + reply.cache_path() + "\t" + std::to_string(reply.size()) + "\n";
+}
+
 // Splits into up to max fields; the last field takes the rest.
 static std::vector<std::string> split_tabs(const std::string& line, size_t max_fields) {
     std::vector<std::string> parts;
@@ -139,30 +176,35 @@ static void handle_client(int cfd) {
     auto nl = line.find('\n');
     if (nl != std::string::npos) line.resize(nl);
 
-    const char* result = "ERROR";
+    std::string out = "ERROR\n"; // default; snapshot handlers set a full multi-line reply
     if (line.rfind("CONNECT\t", 0) == 0) {
         auto p = split_tabs(line, 3);
-        if (p.size() == 3) result = do_connect(p[1], p[2]);
+        if (p.size() == 3) out = std::string(do_connect(p[1], p[2])) + "\n";
     } else if (line.rfind("OPEN\t", 0) == 0) {
         auto p = split_tabs(line, 5);
-        if (p.size() == 5) result = do_open(p[1], p[2], p[3], p[4], line);
+        if (p.size() == 5) out = std::string(do_open(p[1], p[2], p[3], p[4], line)) + "\n";
     } else if (line.rfind("CLOSE\t", 0) == 0) {
         auto p = split_tabs(line, 4);
-        if (p.size() == 4) { ev_close(p[1], p[2], p[3]); result = "OK"; }
+        if (p.size() == 4) { ev_close(p[1], p[2], p[3]); out = "OK\n"; }
     } else if (line.rfind("MKDIR\t", 0) == 0) {
         auto p = split_tabs(line, 4);
-        if (p.size() == 4) { ev_mkdir(p[1], p[2], p[3]); result = "OK"; }
+        if (p.size() == 4) { ev_mkdir(p[1], p[2], p[3]); out = "OK\n"; }
     } else if (line.rfind("DELETE\t", 0) == 0) {
         auto p = split_tabs(line, 5);
-        if (p.size() == 5) { ev_delete(p[1], p[2], p[3] == "1", p[4]); result = "OK"; }
+        if (p.size() == 5) { ev_delete(p[1], p[2], p[3] == "1", p[4]); out = "OK\n"; }
     } else if (line.rfind("RENAME\t", 0) == 0) {
         auto p = split_tabs(line, 6);
-        if (p.size() == 6) { ev_rename(p[1], p[2], p[3] == "1", p[4], p[5]); result = "OK"; }
+        if (p.size() == 6) { ev_rename(p[1], p[2], p[3] == "1", p[4], p[5]); out = "OK\n"; }
+    } else if (line.rfind("SNAPENUM\t", 0) == 0) {
+        auto p = split_tabs(line, 4);
+        if (p.size() == 4) out = do_snapenum(p[1], p[2], p[3]);
+    } else if (line.rfind("SNAPRESOLVE\t", 0) == 0) {
+        auto p = split_tabs(line, 5);
+        if (p.size() == 5) out = do_snapresolve(p[1], p[2], p[3], p[4]);
     } else {
         std::cerr << "kaimo_authd: unknown request: " << line << std::endl;
     }
 
-    std::string out = std::string(result) + "\n";
     (void)write(cfd, out.c_str(), out.size());
     close(cfd);
 }
@@ -178,6 +220,7 @@ int main() {
     auto channel = grpc::CreateChannel(g_bridge_addr, grpc::InsecureChannelCredentials());
     g_authz = AuthzService::NewStub(channel);
     g_events = EventService::NewStub(channel);
+    g_snapshot = SnapshotService::NewStub(channel);
 
     int sfd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sfd < 0) { std::cerr << "kaimo_authd: socket() failed" << std::endl; return 1; }

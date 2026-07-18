@@ -33,10 +33,11 @@ services:
     volumes:
       - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
 
-  # Phase 0 spike: real Samba (smbd) + custom VFS module (kaimo_bridge).
-  # Runs IN PARALLEL with existing .NET SMB implementation in host container.
-  # Port 445 stays with .NET host for now; Samba is mapped to host port 1445 during migration.
-  # At cutover (Phase 5) Samba takes over port 445.
+  # Real Samba (smbd) + custom VFS module (kaimo_bridge) — the SMB protocol layer
+  # since the Phase 5 cutover. It fully replaces the former in-process .NET SMB
+  # server (removed with the Kaimo_File_Server.Smb project); Samba owns port 445.
+  # Auth/ACLs/versioning/shares/protocol settings and @GMT "Previous Versions" run
+  # through the gRPC control plane (kaimo_smb_bridge); the data path stays native.
   # Details: samba-vfs/README.md and docu/smb-samba-vfs-migration.md
   kaimo_samba:
     image: ${DOCKER_REGISTRY-}kaimosamba

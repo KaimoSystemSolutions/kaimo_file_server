@@ -20,7 +20,6 @@
     <ProjectReference Include="..\Kaimo_File_Server.Core\Kaimo_File_Server.Core.csproj" />
     <ProjectReference Include="..\Kaimo_File_Server.Infrastructure\Kaimo_File_Server.Infrastructure.csproj" />
     <ProjectReference Include="..\Kaimo_File_Server.Search\Kaimo_File_Server.Search.csproj" />
-    <ProjectReference Include="..\Kaimo_File_Server.Smb\Kaimo_File_Server.Smb.csproj" />
   </ItemGroup>
 
 </Project>

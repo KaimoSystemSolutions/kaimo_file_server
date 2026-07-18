@@ -28,7 +28,6 @@
     <!-- Referenz auf dein Hauptprojekt anpassen: -->
     <ProjectReference Include="..\..\src\Kaimo_File_Server.Core\Kaimo_File_Server.Core.csproj" />
 	<ProjectReference Include="..\..\src\Kaimo_File_Server.Infrastructure\Kaimo_File_Server.Infrastructure.csproj" />
-	<ProjectReference Include="..\..\src\Kaimo_File_Server.Smb\Kaimo_File_Server.Smb.csproj" />
 	<ProjectReference Include="..\..\src\Kaimo_File_Server.Web\Kaimo_File_Server.Web.csproj" />
   </ItemGroup>
 

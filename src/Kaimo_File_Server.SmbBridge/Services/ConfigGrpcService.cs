@@ -31,6 +31,7 @@ public sealed class ConfigGrpcService : ConfigService.ConfigServiceBase
         GetProtocolSettingsRequest request, ServerCallContext context)
     {
         var s = await _config.GetProtocolSettingsAsync(); // already normalized (Min <= Max)
+        bool enabled = await _config.IsSmbEnabledAsync();
 
         var reply = new ProtocolSettingsReply
         {
@@ -38,11 +39,12 @@ public sealed class ConfigGrpcService : ConfigService.ConfigServiceBase
             MaxProtocol = ToSambaDialect(s.MaxVersion),
             RequireSigning = s.RequireSigning,
             RequireEncryption = s.RequireEncryption,
+            Enabled = enabled,
         };
 
         _logger.LogInformation(
-            "GetProtocolSettings -> min={Min} max={Max} signing={Sign} encrypt={Enc}",
-            reply.MinProtocol, reply.MaxProtocol, reply.RequireSigning, reply.RequireEncryption);
+            "GetProtocolSettings -> min={Min} max={Max} signing={Sign} encrypt={Enc} enabled={Enabled}",
+            reply.MinProtocol, reply.MaxProtocol, reply.RequireSigning, reply.RequireEncryption, reply.Enabled);
         return reply;
     }
 

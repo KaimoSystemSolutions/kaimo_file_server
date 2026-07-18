@@ -7,6 +7,11 @@
  *   Phase 2a: Authorize TREE_CONNECT (connect hook -> CanAccessShareAsync).
  *   Phase 2b: File/path ACL (create_file hook -> FileService.OpenAsync parity)
  *             and directory listing filter (readdir hook -> ListAsync parity).
+ *   Phase 3:  Close/Delete/Rename/Mkdir event hooks (versioning/index/ownership).
+ *   Phase 5:  @GMT snapshots ("Previous Versions"): get_shadow_copy_data enumerates
+ *             version tokens; a timewarp (smb_fname->twrp) on open/stat is resolved
+ *             to a materialized, decompressed version copy inside the share, which
+ *             is then served natively. Backed by IFileVersionService via the bridge.
  *
  * Deliberately pure C without gRPC: gRPC complexity lives in the kaimo_authd
  * sidecar; the module only does simple Unix socket roundtrips (no fork/threads in smbd).
@@ -14,9 +19,11 @@
 
 #include "includes.h"
 #include "smbd/smbd.h"
+#include "include/ntioctl.h" /* struct shadow_copy_data / SHADOW_COPY_LABEL (@GMT) */
 
 #include <stdlib.h>
 #include <fcntl.h>
+#include <time.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 
@@ -144,6 +151,176 @@ static void kaimo_notify_send(const char *req, size_t len)
 	close(fd);
 }
 
+/* ---- Phase 5: snapshot helpers (@GMT / "Previous Versions") ---- */
+
+/* Reads a full response (until EOF) from kaimo_authd. Snapshot replies (a token
+ * list) can exceed the single small read used by the authz path. Returns the
+ * number of bytes read (>=0) or -1 on infrastructure error. */
+static ssize_t kaimo_snap_request(const char *req, size_t req_len,
+				  char *buf, size_t buf_sz)
+{
+	const char *sock_path = getenv("KAIMO_AUTHD_SOCK");
+	if (sock_path == NULL) sock_path = KAIMO_AUTHD_SOCK_DEFAULT;
+
+	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (fd < 0) return -1;
+
+	struct sockaddr_un addr;
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strlcpy(addr.sun_path, sock_path, sizeof(addr.sun_path));
+
+	if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+		close(fd);
+		return -1;
+	}
+	if (write(fd, req, req_len) != (ssize_t)req_len) {
+		close(fd);
+		return -1;
+	}
+
+	size_t total = 0;
+	while (total + 1 < buf_sz) {
+		ssize_t r = read(fd, buf + total, buf_sz - 1 - total);
+		if (r < 0) { close(fd); return -1; }
+		if (r == 0) break; /* EOF */
+		total += (size_t)r;
+	}
+	close(fd);
+	buf[total] = '\0';
+	return (ssize_t)total;
+}
+
+/* Converts an SMB timewarp token (NTTIME) to the Windows label
+ * "@GMT-YYYY.MM.DD-HH.MM.SS" (24 chars). out must hold >= 25 bytes. */
+static bool kaimo_twrp_to_gmt(NTTIME twrp, char *out, size_t out_sz)
+{
+	time_t t = nt_time_to_unix(twrp);
+	struct tm tmv;
+	if (gmtime_r(&t, &tmv) == NULL) return false;
+	return strftime(out, out_sz, "@GMT-%Y.%m.%d-%H.%M.%S", &tmv) == 24;
+}
+
+/* If smb_fname carries a timewarp (twrp != 0), ask the bridge to materialize that
+ * version (decompressed) inside the share and rewrite base_name to the cache copy,
+ * then clear twrp so downstream native ops treat it as an ordinary file.
+ *   1  = rewritten to a snapshot copy (bridge already enforced read ACL)
+ *   0  = no twrp, nothing to do
+ *  -1  = twrp set but version not found / infrastructure error (fail the op) */
+static int kaimo_apply_twrp(vfs_handle_struct *handle, struct smb_filename *smb_fname)
+{
+	if (smb_fname == NULL || smb_fname->twrp == 0) return 0;
+
+	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
+	if (ctx == NULL || smb_fname->base_name == NULL) return -1;
+
+	char gmt[32];
+	if (!kaimo_twrp_to_gmt(smb_fname->twrp, gmt, sizeof(gmt))) return -1;
+
+	char req[6144];
+	int n = snprintf(req, sizeof(req), "SNAPRESOLVE\t%s\t%s\t%s\t%s\n",
+			 ctx->user, ctx->share, gmt, smb_fname->base_name);
+	if (n <= 0 || n >= (int)sizeof(req)) return -1;
+
+	char resp[8192];
+	ssize_t r = kaimo_snap_request(req, (size_t)n, resp, sizeof(resp));
+	if (r <= 0 || strncmp(resp, "OK\t", 3) != 0) return -1;
+
+	/* resp = "OK\t<cachepath>\t<size>\n" -> isolate <cachepath> */
+	char *p = resp + 3;
+	char *tab = strchr(p, '\t');
+	if (tab != NULL) *tab = '\0';
+	char *nl = strchr(p, '\n');
+	if (nl != NULL) *nl = '\0';
+	if (p[0] == '\0') return -1;
+
+	char *newname = talloc_strdup(smb_fname, p);
+	if (newname == NULL) return -1;
+	smb_fname->base_name = newname;
+	smb_fname->twrp = 0; /* handled -> ordinary file for NEXT_* */
+	DBG_INFO("kaimo_bridge: SNAPSHOT resolve [%s] -> [%s]\n", gmt, newname);
+	return 1;
+}
+
+/* FSCTL_SRV_ENUMERATE_SNAPSHOTS: return the @GMT- tokens available for this file.
+ * The bridge maps to IFileVersionService.GetSnapshotTimestamps / GetVersions.
+ * Signature matches vfs.h: returns int (0 = ok, -1 + errno on failure). The label
+ * array is talloc'd off the shadow_copy_data object itself (as vfs_shadow_copy2). */
+static int kaimo_get_shadow_copy_data(vfs_handle_struct *handle,
+				      struct files_struct *fsp,
+				      struct shadow_copy_data *shadow_copy_data,
+				      bool labels)
+{
+	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
+	const char *path = (fsp != NULL && fsp->fsp_name != NULL &&
+			    fsp->fsp_name->base_name != NULL)
+				? fsp->fsp_name->base_name : "";
+
+	shadow_copy_data->num_volumes = 0;
+	shadow_copy_data->labels = NULL;
+	if (ctx == NULL) return 0;
+
+	char req[5120];
+	int n = snprintf(req, sizeof(req), "SNAPENUM\t%s\t%s\t%s\n",
+			 ctx->user, ctx->share, path);
+	if (n <= 0 || n >= (int)sizeof(req)) { errno = ENOMEM; return -1; }
+
+	char resp[65536];
+	ssize_t r = kaimo_snap_request(req, (size_t)n, resp, sizeof(resp));
+	if (r < 0) {
+		/* Infrastructure down -> report "no snapshots" rather than failing
+		 * the whole Properties dialog. */
+		DBG_WARNING("kaimo_bridge: SNAPENUM authd unreachable\n");
+		return 0;
+	}
+	if (strncmp(resp, "OK\t", 3) != 0) return 0;
+
+	int count = atoi(resp + 3);
+	if (count <= 0) return 0;
+
+	if (!labels) {
+		shadow_copy_data->num_volumes = count;
+		return 0;
+	}
+
+	SHADOW_COPY_LABEL *lbl = talloc_zero_array(shadow_copy_data,
+						   SHADOW_COPY_LABEL, count);
+	if (lbl == NULL) { errno = ENOMEM; return -1; }
+
+	/* Lines after the "OK\t<n>\n" header are the tokens, one per line. */
+	char *line = strchr(resp, '\n');
+	int i = 0;
+	while (line != NULL && i < count) {
+		line++; /* step over '\n' */
+		if (*line == '\0') break;
+		char *end = strchr(line, '\n');
+		size_t len = (end != NULL) ? (size_t)(end - line) : strlen(line);
+		if (len >= sizeof(SHADOW_COPY_LABEL)) len = sizeof(SHADOW_COPY_LABEL) - 1;
+		memcpy(lbl[i], line, len);
+		lbl[i][len] = '\0';
+		i++;
+		line = end;
+	}
+
+	shadow_copy_data->num_volumes = i;
+	shadow_copy_data->labels = lbl;
+	DBG_INFO("kaimo_bridge: SNAPENUM path=[%s] -> %d labels\n", path, i);
+	return 0;
+}
+
+/* ---- Snapshot-aware stat/lstat: resolve a timewarp path to its version copy ---- */
+static int kaimo_stat(vfs_handle_struct *handle, struct smb_filename *smb_fname)
+{
+	if (kaimo_apply_twrp(handle, smb_fname) < 0) { errno = ENOENT; return -1; }
+	return SMB_VFS_NEXT_STAT(handle, smb_fname);
+}
+
+static int kaimo_lstat(vfs_handle_struct *handle, struct smb_filename *smb_fname)
+{
+	if (kaimo_apply_twrp(handle, smb_fname) < 0) { errno = ENOENT; return -1; }
+	return SMB_VFS_NEXT_LSTAT(handle, smb_fname);
+}
+
 /* Builds the share-relative path from directory-fsp + at-relative name. */
 static void kaimo_join_path(char *out, size_t n,
 			    struct files_struct *dirfsp,
@@ -222,6 +399,19 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 {
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
 
+	/* Phase 5: a timewarp open ("Previous Versions") -> serve the materialized
+	 * version copy. The bridge already enforced the read ACL in ResolveVersion,
+	 * so skip the normal live-file AuthorizeOpen and open the redirected path. */
+	if (smb_fname != NULL && smb_fname->twrp != 0) {
+		if (kaimo_apply_twrp(handle, smb_fname) < 0)
+			return NT_STATUS_OBJECT_NAME_NOT_FOUND;
+		return SMB_VFS_NEXT_CREATE_FILE(handle, req, dirfsp, smb_fname, access_mask,
+					       share_access, create_disposition, create_options,
+					       file_attributes, oplock_request, lease,
+					       allocation_size, private_flags, sd, ea_list,
+					       result, pinfo, in_context_blobs, out_context_blobs);
+	}
+
 	if (ctx != NULL && smb_fname != NULL && smb_fname->base_name != NULL) {
 		bool want_read  = (access_mask & SEC_FILE_READ_DATA) != 0;
 		bool want_write = (access_mask & (SEC_FILE_WRITE_DATA | SEC_FILE_APPEND_DATA)) != 0;
@@ -267,6 +457,11 @@ static struct dirent *kaimo_readdir(vfs_handle_struct *handle,
 		/* Always allow "." and ".." */
 		if (nm[0] == '.' && (nm[1] == '\0' || (nm[1] == '.' && nm[2] == '\0')))
 			return e;
+
+		/* Hide the internal snapshot materialization cache
+		 * (<share>/.kaimo-snapshots) — served via @GMT, never browsed directly. */
+		if (strncmp(nm, ".kaimo-", 7) == 0)
+			continue;
 
 		char path[4096];
 		if (at_root)
@@ -387,6 +582,10 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 	.unlinkat_fn    = kaimo_unlinkat,
 	.renameat_fn    = kaimo_renameat,
 	.mkdirat_fn     = kaimo_mkdirat,
+	/* Phase 5: @GMT snapshots ("Previous Versions"). */
+	.get_shadow_copy_data_fn = kaimo_get_shadow_copy_data,
+	.stat_fn        = kaimo_stat,
+	.lstat_fn       = kaimo_lstat,
 };
 
 static_decl_vfs;

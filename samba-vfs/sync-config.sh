@@ -21,10 +21,19 @@ if [ $rc -ne 0 ]; then
     exit 1
 fi
 
-IFS=$'\t' read -r min_proto max_proto req_sign req_enc <<< "$OUT"
+IFS=$'\t' read -r min_proto max_proto req_sign req_enc enabled <<< "$OUT"
 if [ -z "${min_proto:-}" ] || [ -z "${max_proto:-}" ]; then
     echo "[sync-config] empty/incomplete response, skipped."
     exit 0
+fi
+
+# Phase 5: on/off state. The authoritative gate is the bridge's AuthorizeConnect
+# (deny-all when disabled), enforced in the VFS connect hook — smbd keeps listening
+# but grants no TREE_CONNECT. Logged here for operator visibility.
+if [ "${enabled:-1}" = "0" ]; then
+    echo "[sync-config] smb service: DISABLED (bridge denies all TREE_CONNECT)."
+else
+    echo "[sync-config] smb service: enabled."
 fi
 
 # Bool -> Samba semantics.

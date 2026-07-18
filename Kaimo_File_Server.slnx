@@ -7,7 +7,6 @@
   <Project Path="src/Kaimo_File_Server.Core/Kaimo_File_Server.Core.csproj" />
   <Project Path="src/Kaimo_File_Server.Host/Kaimo_File_Server.Host.csproj" />
   <Project Path="src/Kaimo_File_Server.Infrastructure/Kaimo_File_Server.Infrastructure.csproj" />
-  <Project Path="src/Kaimo_File_Server.Smb/Kaimo_File_Server.Smb.csproj" />
   <Project Path="src/Kaimo_File_Server.SmbBridge/Kaimo_File_Server.SmbBridge.csproj" />
   <Project Path="src/Kaimo_File_Server.Web/Kaimo_File_Server.Web.csproj" Id="25b5aa0a-5188-49d6-81f9-1442ebf1dd91" />
   <Project Path="tests/Kaimo_File_Server.Tests/Kaimo_File_Server.Tests.csproj" />

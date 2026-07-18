@@ -1,9 +1,12 @@
 // kaimo_configsync - gRPC C++ client for protocol settings (Phase 4).
 //
 // Calls GetProtocolSettings on the .NET bridge (h2c) and outputs ONE line
-// "min<TAB>max<TAB>signing(0|1)<TAB>encrypt(0|1)" to stdout. The mapping
-// to Samba's global parameters (net conf setparm global) is handled by the
+// "min<TAB>max<TAB>signing(0|1)<TAB>encrypt(0|1)<TAB>enabled(0|1)" to stdout. The
+// mapping to Samba's global parameters (net conf setparm global) is handled by the
 // shell script sync-config.sh. Mirror to kaimo_authsync / kaimo_sharesync.
+// The enabled flag (Phase 5) is informational here — the authoritative on/off gate
+// is the bridge's AuthorizeConnect (deny-all when disabled), enforced in the VFS
+// connect hook. sync-config.sh logs it for operator visibility.
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
@@ -44,7 +47,8 @@ int main() {
 
     std::cout << reply.min_protocol() << '\t' << reply.max_protocol() << '\t'
               << (reply.require_signing() ? '1' : '0') << '\t'
-              << (reply.require_encryption() ? '1' : '0') << '\n';
+              << (reply.require_encryption() ? '1' : '0') << '\t'
+              << (reply.enabled() ? '1' : '0') << '\n';
     std::cerr << "kaimo_configsync: settings received (addr=" << addr << ")." << std::endl;
     return 0;
 }

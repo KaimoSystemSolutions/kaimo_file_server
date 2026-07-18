@@ -148,4 +148,56 @@ message ProtocolSettingsReply {
   string max_protocol       = 2;
   bool   require_signing    = 3; // -> server signing = mandatory | auto
   bool   require_encryption = 4; // -> smb encrypt = required | default
+
+  // Phase 5 cutover: the SMB on/off toggle (Datendienste tab -> services.smb.enabled).
+  // The old in-process SmbServer was start/stopped by the host reconciler; smbd now
+  // lives in a separate container. The authoritative gate is AuthorizeConnect
+  // (deny-all when disabled), so a disabled service accepts no TREE_CONNECT. This
+  // field lets the config sync log/reflect the state in the Samba container.
+  bool   enabled            = 5;
+}
+
+// Snapshots / "Previous Versions" over SMB (Phase 5). Windows requests the list
+// of point-in-time versions via FSCTL_SRV_ENUMERATE_SNAPSHOTS and then opens a
+// path prefixed with an @GMT- token to read that version. Because Kaimo stores
+// versions as gzip-compressed, content-addressed blobs (NOT filesystem snapshot
+// dirs), the native vfs_shadow_copy2 cannot serve them; the custom VFS module
+// asks this service to enumerate tokens and to materialize a specific version as
+// a plain (decompressed) file the module can then serve natively.
+// Backed by the already-complete IFileVersionService.
+service SnapshotService {
+  // FSCTL_SRV_ENUMERATE_SNAPSHOTS: all @GMT- tokens available for <path> in
+  // <share> (a file -> that file's versions; "" -> whole share). ACL-filtered:
+  // only returned when the user may read the path (ListReadData parity).
+  rpc EnumerateSnapshots(EnumerateSnapshotsRequest) returns (EnumerateSnapshotsReply);
+
+  // Materialize one version (decompressed) into a cache file INSIDE the share
+  // directory and return its share-relative path + size. The module redirects
+  // the @GMT open/stat there and serves it natively (data path stays native,
+  // just like live files). Idempotent: an already-materialized version is reused.
+  rpc ResolveVersion(ResolveVersionRequest) returns (ResolveVersionReply);
+}
+
+message EnumerateSnapshotsRequest {
+  string username = 1;
+  string share    = 2;
+  string path     = 3; // share-relative file/dir the client asked about ("" = share root)
+}
+
+message EnumerateSnapshotsReply {
+  // "@GMT-YYYY.MM.DD-HH.MM.SS" tokens (as Windows expects them), newest first.
+  repeated string gmt_tokens = 1;
+}
+
+message ResolveVersionRequest {
+  string username  = 1;
+  string share     = 2;
+  string gmt_token = 3; // "@GMT-..." selecting the version
+  string path      = 4; // share-relative path WITHOUT the @GMT- component
+}
+
+message ResolveVersionReply {
+  bool   found      = 1;
+  string cache_path = 2; // share-relative path of the decompressed cache file
+  int64  size       = 3;
 }

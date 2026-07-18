@@ -49,4 +49,14 @@ public sealed class SmbConfigStore : ISmbConfigStore
         await config.SetAsync(SmbConfigKeys.ServerGuidKey, generated.ToString());
         return generated;
     }
+
+    public async Task<bool> IsSmbEnabledAsync()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var config = scope.ServiceProvider.GetRequiredService<IConfigRepository>();
+
+        // Fresh read + fallback true: mirrors the host reconciler's desired-state
+        // default (SMB keeps running until explicitly disabled).
+        return await config.GetFreshAsync(DataServiceKeys.EnabledKey("smb"), fallback: true);
+    }
 }
