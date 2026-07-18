@@ -1,228 +1,227 @@
-# SMB-Umstieg: Samba + eigenes VFS-Modul (gRPC-Bridge zu .NET)
+# SMB Migration: Samba + Custom VFS Module (gRPC Bridge to .NET)
 
-> **Status:** 🟢 Phase 0–4 **abgeschlossen** — Auth, ACLs (Connect/Open/Listing), Close-Hooks
-> (Versionierung/Ownership/Index), **dynamische Shares** (Registry-Provisioning aus der DB) und
-> **Protokoll-Settings** (Dialekt-Range/Signing/Encryption aus `ISmbConfigStore`) laufen über gRPC;
-> Datenpfad bleibt nativ. Nächster Schritt: Phase 5 (Snapshots/@GMT & Cutover)
-> **Autor:** Design-Dokument, erstellt 2026-07-17
-> **Betrifft:** Ersatz der SMB-Protokollebene des Kaimo File Servers
-> **Verwandt:** `src/Kaimo_File_Server.Smb/` (wird ersetzt),
-> `src/Kaimo_File_Server.SmbBridge/` (neue gRPC-Control-Plane), `docker-compose.yml`,
-> [`../samba-vfs/README.md`](../samba-vfs/README.md) (Phase-0/1-Ergebnisse)
-
----
-
-## Inhalt
-
-1. [Kontext & Motivation](#1-kontext--motivation)
-2. [Zielarchitektur](#2-zielarchitektur)
-3. [Aufgabenteilung: Samba nativ vs. gRPC → .NET](#3-aufgabenteilung-samba-nativ-vs-grpc--net)
-4. [Was wegfällt / bleibt / neu ist](#4-was-wegfällt--bleibt--neu-ist)
-5. [Risiken & offene Entscheidungen](#5-risiken--offene-entscheidungen)
-6. [Umsetzung in Phasen](#6-umsetzung-in-phasen)
-7. [Verifikation](#7-verifikation)
-8. [Aufwand & Empfehlung](#8-aufwand--empfehlung)
+> **Status:** 🟢 Phase 0–4 **completed** — Auth, ACLs (Connect/Open/Listing), Close-Hooks
+> (Versioning/Ownership/Index), **dynamic shares** (Registry provisioning from DB) and
+> **protocol settings** (Dialect-Range/Signing/Encryption from `ISmbConfigStore`) run via gRPC;
+> Data path remains native. Next step: Phase 5 (Snapshots/@GMT & Cutover)
+> **Author:** Design document, created 2026-07-17
+> **Concerns:** Replacement of SMB protocol layer in Kaimo File Server
+> **Related:** `src/Kaimo_File_Server.Smb/` (to be replaced),
+> `src/Kaimo_File_Server.SmbBridge/` (new gRPC control plane), `docker-compose.yml`,
+> [`../samba-vfs/README.md`](../samba-vfs/README.md) (Phase 0/1 results)
 
 ---
 
-## 1. Kontext & Motivation
+## Contents
 
-Der aktuelle SMB-Zugang läuft über die **selbstgeschriebene NuGet-Lib `SMB-Server` 2.1.1**
-(Projekt `Kaimo_File_Server.Smb`, Namespaces `Smb.*`). Weil es eine eigene, unvollständige
-SMB-2/3-Implementierung ist, ist sie in der Praxis **unzuverlässig**: Interop-Probleme mit
-Windows/macOS, Protokoll-Edge-Cases, Signing/Encryption, Durable Handles, Oplocks/Leases.
+1. [Context & Motivation](#1-context--motivation)
+2. [Target Architecture](#2-target-architecture)
+3. [Responsibility Division: Samba Native vs. gRPC → .NET](#3-responsibility-division-samba-native-vs-grpc--net)
+4. [What is removed / remains / is new](#4-what-is-removed--remains--is-new)
+5. [Risks & Open Decisions](#5-risks--open-decisions)
+6. [Implementation in Phases](#6-implementation-in-phases)
+7. [Verification](#7-verification)
+8. [Effort & Recommendation](#8-effort--recommendation)
 
-**Ziel:** die Protokollebene durch **echtes Samba (`smbd`)** ersetzen — die de-facto-Referenz-
-Implementierung, die jeder SMB-Client kennt — und die Kaimo-Geschäftslogik (ACLs, Versionierung,
-Suche, Ownership, Recycle) über ein **eigenes Samba-VFS-Modul in C** anbinden, das per **gRPC** mit
-dem bestehenden .NET-Teil spricht. Samba läuft als **eigener Docker-Container**, deployed über
+---
+
+## 1. Context & Motivation
+
+The current SMB access runs through the **self-written NuGet library `SMB-Server` 2.1.1**
+(project `Kaimo_File_Server.Smb`, namespaces `Smb.*`). Because it is a custom, incomplete
+SMB 2/3 implementation, it is in practice **unreliable**: interoperability issues with
+Windows/macOS, protocol edge cases, signing/encryption, durable handles, oplocks/leases.
+
+**Goal:** replace the protocol layer with **real Samba (`smbd`)** — the de-facto reference
+implementation that every SMB client knows — and connect Kaimo business logic (ACLs, versioning,
+search, ownership, recycle) via a **custom Samba VFS module in C** that communicates via **gRPC** with
+the existing .NET part. Samba runs as a **separate Docker container**, deployed via
 `docker compose`.
 
-### Entschiedene Weichen
+### Decided Trade-offs
 
-| Frage | Entscheidung | Konsequenz |
+| Question | Decision | Consequence |
 |---|---|---|
-| **Datenpfad** | Samba liest/schreibt **direkt** auf dem gemounteten Storage | gRPC nur für Control-Plane → geringe Latenz, native Durchsatzleistung |
-| **Auth** | Bestehende, verschlüsselte **NT-Hashes aus der DB** weiternutzen | Kompatibel (`MD4(UTF16LE(pw))` = Sambas NT-Hash), custom `pdb`-Modul nötig |
-| **Rollout** | **Vollersatz** der `SMB-Server`-Lib und des `Kaimo_File_Server.Smb`-Layers | Kein Parallelbetrieb; sauberer Schnitt |
+| **Data path** | Samba reads/writes **directly** to mounted storage | gRPC only for control plane → low latency, native throughput performance |
+| **Auth** | Continue using existing, encrypted **NT hashes from the DB** | Compatible (`MD4(UTF16LE(pw))` = Samba's NT hash), custom `pdb` module needed |
+| **Rollout** | **Complete replacement** of `SMB-Server` library and `Kaimo_File_Server.Smb` layer | No parallel operation; clean cut |
 
 ---
 
-## 2. Zielarchitektur
+## 2. Target Architecture
 
 ```
-   SMB-Clients (Windows / macOS / Linux)
+   SMB Clients (Windows / macOS / Linux)
               │  SMB 2/3, Port 445
               ▼
  ┌─────────────────────────────────────────┐        ┌──────────────────────────────┐
- │  Container: kaimo_samba  (NEU)           │        │  Container: kaimo_file_server │
- │  ─ smbd (echtes Samba)                   │        │  (Host, .NET)                 │
- │  ─ config backend = registry             │  gRPC  │  ─ NEU: SmbBridge gRPC-Server │
- │  ─ VFS-Modul  kaimo_bridge.so  (C/C++) ──┼───────►│    (Control-Plane)            │
- │  ─ pdb-Modul  kaimo_pdb  (NT-Hash)     ──┼───────►│  ─ IFileService / IAclService │
- │  ─ ShareControl-Daemon  ◄────────────────┼────────┤    IAuthenticationLookup      │
- │                                          │        │    IFileVersionService, Suche │
- │  mount: /data/storage  (direkte I/O)     │        │    (alles aus Core, bleibt)   │
+ │  Container: kaimo_samba  (NEW)           │        │  Container: kaimo_file_server │
+ │  ─ smbd (real Samba)                     │        │  (Host, .NET)                 │
+ │  ─ config backend = registry             │  gRPC  │  ─ NEW: SmbBridge gRPC Server │
+ │  ─ VFS Module  kaimo_bridge.so  (C/C++) ──┼───────►│    (Control Plane)            │
+ │  ─ pdb Module  kaimo_pdb  (NT Hash)    ──┼───────►│  ─ IFileService / IAclService │
+ │  ─ ShareControl Daemon  ◄────────────────┼────────┤    IAuthenticationLookup      │
+ │                                          │        │    IFileVersionService, Search│
+ │  mount: /data/storage  (direct I/O)      │        │    (all from Core, remains)   │
  └───────────────┬──────────────────────────┘        └──────────────┬───────────────┘
-                 │ liest/schreibt Dateien direkt                     │
+                 │ reads/writes files directly                       │
                  ▼                                                   ▼
         ┌──────────────── shared volume:  /data/storage ────────────────┐
         └───────────────────────────────────────────────────────────────┘
-                         (Postgres + Elasticsearch wie bisher)
+                         (Postgres + Elasticsearch as before)
 ```
 
-Beide Container mounten denselben Storage. Samba macht die rohe Datei-I/O selbst; das VFS-Modul ruft
-.NET nur an den „Cross-Cutting"-Stellen. .NET kann dieselben Dateien lesen (für Versionierung/Index),
-weil es dasselbe Volume gemountet hat — genau wie heute Host und Web.
+Both containers mount the same storage. Samba performs raw file I/O itself; the VFS module calls
+.NET only at "cross-cutting" points. .NET can read the same files (for versioning/index)
+because it has the same volume mounted — just like host and web do today.
 
 ---
 
-## 3. Aufgabenteilung: Samba nativ vs. gRPC → .NET
+## 3. Responsibility Division: Samba Native vs. gRPC → .NET
 
-| Aufgabe | Wer erledigt es | Anmerkung |
+| Task | Who Handles It | Note |
 |---|---|---|
-| SMB-Protokoll, Signing, Encryption, Durable Handles, Oplocks/Leases | **Samba nativ** | genau der Grund für den Umstieg |
-| Roh-Read/Write/Seek/Flush | **Samba nativ, direkt auf Disk** | kein gRPC pro Byte |
-| NTLMv2-Handshake | **Samba nativ** | Hashvergleich lokal |
-| NT-Hash-Beschaffung | **gRPC → .NET** | custom `pdb`-Modul (Risiko 1) |
-| TREE_CONNECT-Autorisierung (Share-Zugriff) | **VFS `connect`-Hook → gRPC** | `CanAccessShareAsync` |
-| ACL-Entscheidung bei Open/Create/Mkdir/Delete | **VFS-Hook → gRPC** | heute in `FileService.OpenAsync` |
-| Versionierung/Snapshot beim Close | **VFS `close`-Hook → gRPC** | `IFileVersionService` |
-| Suchindex + Ownership beim Close | **VFS `close`-Hook → gRPC** | Elasticsearch, Ownership-Stamp |
-| Delete → Recycle-Bin | **VFS `unlink`-Hook → gRPC** *oder* nativ `vfs_recycle` | Abwägung (Risiko 4) |
-| „Previous Versions" (@GMT) | **VFS Snapshot-Hooks → gRPC** | `GetSnapshotTimestampsAsync` / `OpenSnapshotAsync` |
-| Directory-Listing inkl. ACL-Filter | **VFS `readdir`-Hook** (perf-sensibel) | heute filtert `FileService.ListAsync` per ACL |
-| Share-Liste dynamisch verwalten | **ShareControl → `net conf` (registry)** | ersetzt heutigen FileSystemWatcher/`SyncFromDb` |
-| Share-Sichtbarkeit pro User (ABE) | **offen** — siehe Risiko 2 | heute `KaimoSharePolicy.IsVisible` |
+| SMB protocol, signing, encryption, durable handles, oplocks/leases | **Samba native** | exactly why we're switching |
+| Raw Read/Write/Seek/Flush | **Samba native, directly to disk** | no gRPC per byte |
+| NTLMv2 handshake | **Samba native** | hash comparison local |
+| NT hash retrieval | **gRPC → .NET** | custom `pdb` module (Risk 1) |
+| TREE_CONNECT authorization (share access) | **VFS `connect` hook → gRPC** | `CanAccessShareAsync` |
+| ACL decision on Open/Create/Mkdir/Delete | **VFS hook → gRPC** | today in `FileService.OpenAsync` |
+| Versioning/Snapshot on Close | **VFS `close` hook → gRPC** | `IFileVersionService` |
+| Search index + Ownership on Close | **VFS `close` hook → gRPC** | Elasticsearch, Ownership stamp |
+| Delete → Recycle Bin | **VFS `unlink` hook → gRPC** *or* native `vfs_recycle` | Trade-off (Risk 4) |
+| "Previous Versions" (@GMT) | **VFS Snapshot Hooks → gRPC** | `GetSnapshotTimestampsAsync` / `OpenSnapshotAsync` |
+| Directory listing including ACL filtering | **VFS `readdir` hook** (performance sensitive) | today `FileService.ListAsync` filters per ACL |
+| Manage share list dynamically | **ShareControl → `net conf` (registry)** | replaces current FileSystemWatcher/`SyncFromDb` |
+| Share visibility per user (ABE) | **open** — see Risk 2 | today `KaimoSharePolicy.IsVisible` |
 
 ---
 
-## 4. Was wegfällt / bleibt / neu ist
+## 4. What is Removed / Remains / Is New
 
-### Wegfällt (ersetzt)
-- NuGet `SMB-Server` 2.1.1 und das gesamte Projekt `Kaimo_File_Server.Smb`
+### Removed (replaced)
+- NuGet `SMB-Server` 2.1.1 and the entire `Kaimo_File_Server.Smb` project
   (`SmbServer.cs`, `KaimoIdentityBackend.cs`, `KaimoSharePolicy.cs`, `KaimoFileStore.cs`,
   `KaimoFileHandle/Info`, `KaimoShare`, `KaimoUserRegistry`, `SmbSync`, `SmbManagedDataService`).
-- Der FileSystemWatcher-basierte Share-Reconcile-Mechanismus in `SmbServer.cs`.
+- The FileSystemWatcher-based share reconciliation mechanism in `SmbServer.cs`.
 
-### Bleibt praktisch unverändert (der große Vorteil)
-- `Kaimo_File_Server.Core` — Domain, `IFileService`/`FileService`, `IAclService`, Versionierung,
-  Ownership, Suche. Wird nur hinter eine gRPC-Fassade statt hinter `KaimoFileStore` gesetzt.
+### Remains practically unchanged (the big advantage)
+- `Kaimo_File_Server.Core` — Domain, `IFileService`/`FileService`, `IAclService`, versioning,
+  ownership, search. Placed behind a gRPC facade instead of `KaimoFileStore`.
 - `Kaimo_File_Server.Infrastructure` — `FileSystemStorage`, Repositories, `FileServiceFactory`,
-  `IAuthenticationLookup`, Config-Store, Migrationen (inkl. `AesGcmNtHashProtector`).
-- `Kaimo_File_Server.Web` — Admin-UI (kann unverändert bleiben, wenn ShareControl die DB pollt).
-- Postgres, Elasticsearch, das `/data/storage`-Volume-Modell.
+  `IAuthenticationLookup`, config store, migrations (including `AesGcmNtHashProtector`).
+- `Kaimo_File_Server.Web` — Admin UI (can remain unchanged if ShareControl polls the DB).
+- Postgres, Elasticsearch, the `/data/storage` volume model.
 
-### Neu
-1. **.NET: gRPC-Control-Plane-Server** (neues Projekt `Kaimo_File_Server.SmbBridge` oder im Host).
-   Dünne Fassade auf die bestehenden Core-Services. Wiederverwenden:
+### New
+1. **.NET: gRPC Control Plane Server** (new project `Kaimo_File_Server.SmbBridge` or in Host).
+   Thin facade on existing core services. Reuse:
    `IFileServiceFactory.CreateForShare(shareId, path)`, `IFileService.OpenAsync/ListAsync/…`,
    `IAuthenticationLookup.GetNtHashAsync/ResolveUserContextAsync`, `IAclService`, `IFileVersionService`.
-2. **C-Projekt `samba-vfs/`**: VFS-Modul `kaimo_bridge` (C + C++-TU für den gRPC-Client mit
-   `extern "C"`-Shim), custom `pdb`-Modul, ShareControl-Daemon, `smb.conf`-Vorlage mit
-   `config backend = registry`, Entrypoint.
-3. **Gemeinsame `.proto`-Dateien** — einmal definiert, für .NET (`Grpc.Tools`) und C/C++
-   (`protoc` + `grpc_cpp_plugin`) generiert.
-4. **`samba-vfs/Dockerfile`** + neuer compose-Service `kaimo_samba` (Port 445, mount `/data/storage`);
-   Port 445 wandert vom Host- zum Samba-Container.
+2. **C Project `samba-vfs/`**: VFS module `kaimo_bridge` (C + C++ translation unit for gRPC client with
+   `extern "C"` shim), custom `pdb` module, ShareControl daemon, `smb.conf` template with
+   `config backend = registry`, entrypoint.
+3. **Shared `.proto` files** — defined once, generated for .NET (`Grpc.Tools`) and C/C++
+   (`protoc` + `grpc_cpp_plugin`).
+4. **`samba-vfs/Dockerfile`** + new compose service `kaimo_samba` (port 445, mount `/data/storage`);
+   port 445 moves from host to Samba container.
 
 ---
 
-## 5. Risiken & offene Entscheidungen
+## 5. Risks & Open Decisions
 
-### Risiko 1 — Auth: NT-Hash-Reuse braucht ein custom Samba-`pdb`-Backend
-Samba validiert NTLMv2 lokal, braucht den NT-Hash aber aus seiner `passdb`. Kaimos NT-Hash ist
-`MD4(UTF16LE(pw))` — **exakt Sambas NT-Hash**, also kompatibel. Zwei Wege:
-- *(empfohlen)* **custom `pdb`-Modul** (`pdb_methods`, v. a. `getsampwnam`), holt den Hash live per
-  gRPC von .NET → eine Quelle der Wahrheit. Kosten: C gegen Samba-Interna + SID-/Flag-Mapping.
-- *(Fallback)* NT-Hashes periodisch in Sambas `tdbsam` **synchronisieren**. Einfacher, aber
-  Sync-Job nötig und zweite Datenhaltung.
+### Risk 1 — Auth: NT Hash Reuse Requires Custom Samba `pdb` Backend
+Samba validates NTLMv2 locally but needs the NT hash from its `passdb`. Kaimo's NT hash is
+`MD4(UTF16LE(pw))` — **exactly Samba's NT hash**, so it's compatible. Two approaches:
+- *(recommended)* **custom `pdb` module** (`pdb_methods`, especially `getsampwnam`), fetches the hash live via
+  gRPC from .NET → single source of truth. Cost: C against Samba internals + SID/flag mapping.
+- *(Fallback)* Periodically **synchronize** NT hashes into Samba's `tdbsam`. Simpler but
+  requires sync job and duplicate data storage.
 
-> **In Phase 1 umgesetzt (Fallback-Weg):** Die .NET-Bridge (`Kaimo_File_Server.SmbBridge`) liefert
-> per gRPC `ListUsers`/`GetNtHash` die NT-Hashes; der C++-Client `kaimo_authsync` im Samba-Container
-> importiert sie via `pdbedit` in `tdbsam`. Echter NTLMv2-Login (`admin/admin1234`,
-> `marco.hanisch/1234`) funktioniert, Falschpasswort wird abgelehnt. Das custom `pdb`-Modul (on-demand,
-> ohne Bulk-Sync) bleibt die spätere Produktions-Option. **Nebenbei erledigt:** gRPC-in-C++ im
-> Samba-Container ist damit bewiesen — das letzte offene Toolchain-Risiko aus Phase 0.
+> **Implemented in Phase 1 (fallback approach):** The .NET bridge (`Kaimo_File_Server.SmbBridge`) provides
+> NT hashes via gRPC with `ListUsers`/`GetNtHash`; the C++ client `kaimo_authsync` in the Samba container
+> imports them via `pdbedit` into `tdbsam`. Real NTLMv2 login (`admin/admin1234`,
+> `marco.hanisch/1234`) works, wrong password is rejected. The custom `pdb` module (on-demand,
+> without bulk sync) remains a later production option. **As a side benefit:** gRPC-in-C++ in
+> Samba container is now proven — the last open toolchain risk from Phase 0.
 
-### Risiko 2 — Dynamische Share-*Sichtbarkeit* pro User ⚠️ (kniffligster Punkt)
-- *Shares dynamisch existieren lassen* → **gelöst** über `config backend = registry` +
-  `registry shares = yes`: `smbd` liest Shares live aus `registry.tdb`, **ohne Reload/Restart**. Der
-  ShareControl-Daemon setzt sie per `net conf addshare/setparm/delshare`. Ersetzt `SyncFromDb()`.
-- *Pro-User-ABE-Sichtbarkeit* (heute `KaimoSharePolicy.IsVisible` → `CanListShareAsync`) →
-  **der echte Knackpunkt.** Share-Enumeration läuft über `srvsvc`/IPC$ *bevor* ein Share-VFS aktiv
-  ist; kein sauberer VFS-Hook. Optionen:
-  - **(a)** natives `access based share enum = yes` + Share-ACL aus Kaimo in die Registry sync'en.
-  - **(b)** nur grobe `IsShareHidden`-Semantik (`browseable = no`), feingranulares Listing aufgeben.
-  - **(c)** Kompromiss: (a) für Sichtbarkeit + `connect`-Hook für die harte Autorisierung.
-  - → **Entscheidung (Phase 4): (b).** Nur das Hidden-Flag steuert die Sichtbarkeit
-    (`IsShareHidden` → `browseable = no`); der harte Zugriff wird ohnehin schon vom Phase-2a-
-    `connect`-Hook nach echten Kaimo-ACLs entschieden. Damit entfällt die Pro-User-`valid users`-
-    Synchronisation, die sich mit dem `connect`-Hook als Zugriffsautorität überschneiden und die
-    ACL-Logik doppeln würde. Volle Per-User-ABE (Variante c) bleibt eine spätere Option, falls das
-    Ausblenden nicht-zugänglicher Shares in der Auflistung gefordert wird.
+### Risk 2 — Dynamic Share *Visibility* Per User ⚠️ (Trickiest Point)
+- *Make shares exist dynamically* → **solved** via `config backend = registry` +
+  `registry shares = yes`: `smbd` reads shares live from `registry.tdb`, **without reload/restart**. The
+  ShareControl daemon manages them via `net conf addshare/setparm/delshare`. Replaces `SyncFromDb()`.
+- *Per-User ABE Visibility* (today `KaimoSharePolicy.IsVisible` → `CanListShareAsync`) →
+  **the real bottleneck.** Share enumeration runs via `srvsvc`/IPC$ *before* a share VFS is active;
+  no clean VFS hook. Options:
+  - **(a)** native `access based share enum = yes` + sync share ACL from Kaimo to registry.
+  - **(b)** coarse `IsShareHidden` semantics only (`browseable = no`), give up fine-grained listing.
+  - **(c)** compromise: (a) for visibility + `connect` hook for hard authorization.
+  - → **Decision (Phase 4): (b).** Only the hidden flag controls visibility
+    (`IsShareHidden` → `browseable = no`); hard access is already decided by Phase 2a's
+    `connect` hook based on real Kaimo ACLs. This eliminates per-user `valid users`
+    synchronization, which would overlap with the `connect` hook as access authority and duplicate
+    ACL logic. Full per-user ABE (option c) remains a later option if hiding non-accessible shares
+    in enumeration becomes a requirement.
 
-### Risiko 3 — VFS-ABI-Kopplung + gRPC-in-C-Toolchain
-VFS-Module müssen gegen die **exakte Samba-Version** (`SMB_VFS_INTERFACE_VERSION`) kompiliert werden;
-die internen Header (`vfs.h` u. a.) liegen **nicht** in `samba-dev`, sondern nur im Quellbaum. →
-Modul im selben Image gegen dieselbe Samba-Quelle bauen; Samba-Upgrade kann Neubau erfordern
-(Wartungskosten). gRPC hat in reinem C nur eine Low-Level-API → praktikabel ist **gRPC-C++** in einer
-C++-TU mit `extern "C"`-Shim. Da die Control-Plane **niederfrequent** ist (open/close/connect, nicht
-pro Byte), ist der Transport unkritisch — Alternative: Protobuf über Unix-Socket (nanopb).
+### Risk 3 — VFS ABI Coupling + gRPC-in-C Toolchain
+VFS modules must be compiled against the **exact Samba version** (`SMB_VFS_INTERFACE_VERSION`);
+internal headers (`vfs.h` etc.) are **not** in `samba-dev`, only in the source tree. →
+Build module in the same image against the same Samba source; Samba upgrades may require rebuilds
+(maintenance cost). gRPC has only a low-level API in pure C → practical is **gRPC-C++** in a
+C++ translation unit with `extern "C"` shim. Since the control plane is **low-frequency**
+(open/close/connect, not per byte), transport is not critical — alternative: Protobuf over Unix socket (nanopb).
 
-> **In Phase 0 bestätigt:** `samba-dev` liefert die VFS-Header nicht (Out-of-Tree-Build unmöglich),
-> und ein upstream-gebautes Modul lädt **nicht** in die Distro-Samba
-> (`libsmbd-base-samba4.so: cannot open shared object`). Konsequenz: **Samba selbst bauen und
-> betreiben** (`--prefix=/opt/samba`) — Modul, `smbd` und private Libs aus einem Build. Das Kaimo-
-> Samba-Image pinnt damit ohnehin die Samba-Version, was die ABI-Kopplung entschärft.
+> **Confirmed in Phase 0:** `samba-dev` does not provide VFS headers (out-of-tree build impossible),
+> and an upstream-built module does **not** load into distro Samba
+> (`libsmbd-base-samba4.so: cannot open shared object`). Consequence: **build and operate Samba ourselves**
+> (`--prefix=/opt/samba`) — module, `smbd` and private libs from one build. The Kaimo
+> Samba image thus pins the Samba version anyway, which mitigates ABI coupling.
 
-### Risiko 4 — Feature-Parität an drei Stellen
-- **Snapshots/@GMT:** Snapshot-VFS-Modul (`FSCTL_SRV_ENUMERATE_SNAPSHOTS` → gRPC) *oder* Kaimos
-  Versionslayout so ablegen, dass das native `vfs_shadow_copy2` es versteht.
-- **Recycle:** prüfen, ob das native `vfs_recycle` reicht (weniger Code) oder ob Kaimos
-  `.RECYCLE_BIN`/`IsRecycleEnabled`-Verhalten den `unlink`-Hook → gRPC braucht.
-- **Directory-Listing-ACL-Filter:** heute versteckt `FileService.ListAsync` Einträge ohne Recht. Ein
-  `readdir`-Hook mit gRPC pro Eintrag wäre teuer → Batch-Filter/Caching. Perf-sensibel, früh messen.
+### Risk 4 — Feature Parity at Three Locations
+- **Snapshots/@GMT:** Snapshot VFS module (`FSCTL_SRV_ENUMERATE_SNAPSHOTS` → gRPC) *or* arrange Kaimo's
+  version layout so that native `vfs_shadow_copy2` understands it.
+- **Recycle:** check whether native `vfs_recycle` is sufficient (less code) or whether Kaimo's
+  `.RECYCLE_BIN`/`IsRecycleEnabled` behavior requires `unlink` hook → gRPC.
+- **Directory Listing ACL Filter:** today `FileService.ListAsync` hides entries without permission. A
+  `readdir` hook with gRPC per entry would be expensive → batch filter/caching. Performance sensitive, measure early.
 
 ---
 
-## 6. Umsetzung in Phasen
+## 6. Implementation in Phases
 
-| Phase | Inhalt | Ziel |
+| Phase | Content | Goal |
 |---|---|---|
-| **0 — Spike/PoC** ✅ | `samba-vfs/`-Container: Live-Registry-Shares + `kaimo_bridge`-Modul, das Connect/Open/Disconnect abfängt | Toolchain + ABI-Bindung + Live-Shares **bewiesen** — siehe [`../samba-vfs/README.md`](../samba-vfs/README.md) |
-| **1 — Auth** ✅ | `.proto` + .NET-gRPC-Bridge (`GetNtHash`/`ListUsers` über `IAuthenticationLookup`); C++-Client `kaimo_authsync` synct NT-Hashes in Sambas `tdbsam` | echter NTLMv2-Login gegen Kaimo-User **läuft** — siehe [`../samba-vfs/README.md`](../samba-vfs/README.md) |
-| **2a — Connect-Autz** ✅ | VFS-`connect`-Hook → Sidecar `kaimo_authd` (Unix-Socket) → gRPC `AuthorizeConnect` → `CanAccessShareAsync` | Share-Zugriff nach echten Kaimo-ACLs — **läuft** (dept-basiertes Allow/Deny verifiziert) |
-| **2b — Open/Path-ACL** ✅ | VFS-`create_file`-Hook → gRPC `AuthorizeOpen` (exakte `OpenAsync`-Parität) + `readdir`-Filter (`ListAsync`-Parität, Sidecar-Cache) | Datei-Open (read/write/create) und Listing nach echten ACLs — **läuft** (write-Deny, per-Datei-Deny + Hiding verifiziert) |
-| **3 — Close-Hooks** ✅ | `close`/`unlinkat`/`renameat`/`mkdirat` → Sidecar → gRPC `EventService` → `FileService.NotifyExternal*` (Versionierung, Ownership, Suchindex, ACL-Realign) | Parität zu `FileSession.DisposeAsync` — **läuft** (Versionierung/Ownership verifiziert; s. [`../samba-vfs/README.md`](../samba-vfs/README.md)) |
-| **4 — Dyn. Shares & Sichtbarkeit** ✅ | ShareControl-Sync (`ListShares` → `kaimo_sharesync` → `sync-shares.sh` → `net conf`) ✅; ABE = **nur Hidden-Flag** (`browseable`) ✅; Protokoll-Settings aus `ISmbConfigStore` (`GetProtocolSettings` → `kaimo_configsync` → `sync-config.sh` → `net conf setparm global`) ✅ | dynamische Shares + Protokoll-Config live — **läuft** |
-| **5 — Snapshots & Cutover** | @GMT-Mapping; `enable/disable SMB` auf `smbd` umbiegen; `Kaimo_File_Server.Smb` entfernen; compose finalisieren | alte Lib raus |
+| **0 — Spike/PoC** ✅ | `samba-vfs/` container: Live Registry shares + `kaimo_bridge` module intercepting Connect/Open/Disconnect | Toolchain + ABI binding + Live shares **proven** — see [`../samba-vfs/README.md`](../samba-vfs/README.md) |
+| **1 — Auth** ✅ | `.proto` + .NET gRPC bridge (`GetNtHash`/`ListUsers` via `IAuthenticationLookup`); C++ client `kaimo_authsync` syncs NT hashes to Samba's `tdbsam` | real NTLMv2 login against Kaimo user **works** — see [`../samba-vfs/README.md`](../samba-vfs/README.md) |
+| **2a — Connect Auth** ✅ | VFS `connect` hook → Sidecar `kaimo_authd` (Unix socket) → gRPC `AuthorizeConnect` → `CanAccessShareAsync` | Share access per real Kaimo ACLs — **works** (dept-based allow/deny verified) |
+| **2b — Open/Path ACL** ✅ | VFS `create_file` hook → gRPC `AuthorizeOpen` (exact `OpenAsync` parity) + `readdir` filter (`ListAsync` parity, sidecar cache) | File open (read/write/create) and listing per real ACLs — **works** (write-deny, per-file-deny + hiding verified) |
+| **3 — Close Hooks** ✅ | `close`/`unlinkat`/`renameat`/`mkdirat` → Sidecar → gRPC `EventService` → `FileService.NotifyExternal*` (versioning, ownership, search index, ACL realign) | Parity to `FileSession.DisposeAsync` — **works** (versioning/ownership verified; see [`../samba-vfs/README.md`](../samba-vfs/README.md)) |
+| **4 — Dyn. Shares & Visibility** ✅ | ShareControl sync (`ListShares` → `kaimo_sharesync` → `sync-shares.sh` → `net conf`) ✅; ABE = **hidden flag only** (`browseable`) ✅; Protocol settings from `ISmbConfigStore` (`GetProtocolSettings` → `kaimo_configsync` → `sync-config.sh` → `net conf setparm global`) ✅ | dynamic shares + protocol config live — **works** |
+| **5 — Snapshots & Cutover** | @GMT mapping; `enable/disable SMB` redirect to `smbd`; remove `Kaimo_File_Server.Smb`; finalize compose | old lib removed |
 
 ---
 
-## 7. Verifikation (End-to-End)
+## 7. Verification (End-to-End)
 
-- `docker compose up`, dann von **Windows-Explorer + macOS Finder + `smbclient`** gegen
-  `\\host\<share>`: Login mit Kaimo-User (NTLMv2), Ordner/Dateien anlegen, lesen, schreiben,
-  umbenennen, löschen.
-- **ACL:** User ohne Recht bekommt `AccessDenied` bei Open/Connect (gRPC-Entscheidung greift).
-- **Versionierung:** Datei mehrfach speichern → „Vorgängerversionen" (@GMT) sichtbar; ES-Index
-  aktualisiert; Ownership gestempelt.
-- **Dynamik:** über Web-UI Share anlegen/umbenennen/löschen → erscheint/verschwindet live ohne
-  Neustart; versteckte/ABE-Shares korrekt (un)sichtbar.
-- **Robustheit:** `smbtorture`/`smbclient`-Interop, Signing/Encryption erzwungen — der Kern-Grund.
-- **Perf:** Latenz bei vielen kleinen Dateien / großen Directory-Listings messen (Risiko 4).
+- `docker compose up`, then from **Windows Explorer + macOS Finder + `smbclient`** against
+  `\\host\<share>`: Login with Kaimo user (NTLMv2), create/read/write/rename/delete folders/files.
+- **ACL:** User without permission gets `AccessDenied` on open/connect (gRPC decision takes effect).
+- **Versioning:** save file multiple times → "Previous versions" (@GMT) visible; ES index
+  updated; ownership stamped.
+- **Dynamics:** via web UI create/rename/delete share → appears/disappears live without
+  restart; hidden/ABE shares correctly (in)visible.
+- **Robustness:** `smbtorture`/`smbclient` interop, signing/encryption enforced — the core reason.
+- **Performance:** measure latency with many small files / large directory listings (Risk 4).
 
 ---
 
-## 8. Aufwand & Empfehlung
+## 8. Effort & Recommendation
 
-Substanzielles Vorhaben, **mehrere Wochen**. Risiko konzentriert auf: (1) custom `pdb`-Backend,
-(2) Per-User-ABE-Sichtbarkeit, (3) VFS-ABI/gRPC-in-C-Toolchain, (4) Snapshot/@GMT & Listing-Filter.
-Der Rest ist gut kalkulierbares Integrations-Handwerk, weil die Kaimo-Kernlogik in `Core`/
-`Infrastructure` erhalten bleibt und nur neu „verdrahtet" wird.
+Substantial undertaking, **several weeks**. Risk concentrated on: (1) custom `pdb` backend,
+(2) Per-user ABE visibility, (3) VFS ABI/gRPC-in-C toolchain, (4) snapshot/@GMT & listing filter.
+The rest is well-scoped integration work because Kaimo's core logic in `Core`/
+`Infrastructure` is preserved and only "rewired."
 
-> **Empfehlung: Phase 0 zuerst** — sie klärt die zwei größten Unbekannten (Build-Toolchain +
-> Live-Registry-Shares) mit minimalem Einsatz, bevor größere Investition erfolgt.
+> **Recommendation: Phase 0 first** — it clarifies the two biggest unknowns (build toolchain +
+> live registry shares) with minimal effort before larger investment.
 
-Der Fortschritt von Phase 0 wird in [`samba-vfs/README.md`](../samba-vfs/README.md) festgehalten.
+Phase 0 progress is tracked in [`samba-vfs/README.md`](../samba-vfs/README.md).

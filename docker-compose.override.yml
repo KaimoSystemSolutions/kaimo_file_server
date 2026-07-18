@@ -12,8 +12,8 @@ services:
   kaimo_smb_bridge:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      # MUSS mit Host/Web uebereinstimmen, sonst koennen verschluesselte
-      # NT-Hashes nicht entschluesselt werden.
+      # MUST match Host/Web, otherwise encrypted
+      # NT hashes cannot be decrypted.
       - NtHash__EncryptionKey=DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey
 
   kaimo_file_server.web:
@@ -25,3 +25,8 @@ services:
     volumes:
       - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
       - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+
+  kaimo_samba:
+    dns_search:
+      - "."
+ 

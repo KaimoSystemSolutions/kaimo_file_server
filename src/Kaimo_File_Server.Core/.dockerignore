@@ -23,8 +23,8 @@
 **/values.dev.yaml
 LICENSE
 README.md
-# Test-/Beispieldaten im Core-Projekt (per csproj schon vom Build ausgeschlossen):
-# gehoeren auch nicht in den Build-Context.
+# Test/sample data in Core project (already excluded from build via csproj):
+# also should not be in the build context.
 Tests
 **/Tests
 **/tests/data

@@ -1,11 +1,11 @@
-// kaimo_authsync - gRPC-C++-Client fuer den NT-Hash-Sync.
+// kaimo_authsync - gRPC C++ client for NT-Hash sync.
 //
-// Ruft ListUsers auf der .NET-Bridge (h2c) auf und gibt je aktivem Benutzer
-// eine Zeile "username<TAB>NTHASHHEX" auf stdout aus. Der Import in Sambas
-// tdbsam macht das Shell-Skript sync-users.sh.
+// Calls ListUsers on the .NET bridge (h2c) and outputs one line
+// "username<TAB>NTHASHHEX" per active user to stdout. The import into Samba's
+// tdbsam is handled by the shell script sync-users.sh.
 //
-// Beweist zugleich, dass gRPC aus dem C/C++-Umfeld des Samba-Containers
-// funktioniert (letztes Toolchain-Risiko aus Phase 0).
+// Also proves that gRPC works from the C/C++ environment of the Samba container
+// (last toolchain risk from Phase 0).
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
@@ -44,7 +44,7 @@ int main() {
     ListUsersReply reply;
     grpc::Status status = stub->ListUsers(&ctx, req, &reply);
     if (!status.ok()) {
-        std::cerr << "kaimo_authsync: ListUsers RPC fehlgeschlagen: "
+        std::cerr << "kaimo_authsync: ListUsers RPC failed: "
                   << status.error_code() << " " << status.error_message()
                   << " (addr=" << addr << ")" << std::endl;
         return 1;
@@ -52,10 +52,10 @@ int main() {
 
     for (const auto& u : reply.users()) {
         const std::string& h = u.nt_hash();
-        if (h.size() != 16) continue;  // nur gueltige 16-Byte-NT-Hashes
+        if (h.size() != 16) continue;  // only valid 16-byte NT-Hashes
         std::cout << u.username() << '\t' << to_hex(h) << '\n';
     }
     std::cerr << "kaimo_authsync: " << reply.users_size()
-              << " Benutzer empfangen (addr=" << addr << ")." << std::endl;
+              << " users received (addr=" << addr << ")." << std::endl;
     return 0;
 }

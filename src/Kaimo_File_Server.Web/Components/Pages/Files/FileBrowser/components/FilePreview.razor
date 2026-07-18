@@ -16,11 +16,11 @@
                 <div class="preview-actions">
                     @if (!string.IsNullOrEmpty(_downloadUrl))
                     {
-                        <a class="btn-icon" href="@_downloadUrl" download="@_previewFileName" title="Herunterladen">
+                        <a class="btn-icon" href="@_downloadUrl" download="@_previewFileName" title="Download">
                             @Assets.SVG("download.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                         </a>
                     }
-                    <button class="btn-icon" title="Schließen" @onclick="CloseFilePreview">
+                    <button class="btn-icon" title="Close" @onclick="CloseFilePreview">
                         @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                     </button>
                 </div>
@@ -66,8 +66,8 @@
                     <span class="preview-fallback-name">@_previewFileName</span>
                     <span class="preview-fallback-hint">
                         @(_previewTooLarge
-                            ? $"Die Datei ist zu groß für die Vorschau (max. {FormatHelper.FormatFileSize(VM.GetMaxPreviewSizeBytes())})."
-                            : "Für diesen Dateityp ist keine Vorschau verfügbar.")
+                            ? $"File is too large for preview (max. {FormatHelper.FormatFileSize(VM.GetMaxPreviewSizeBytes())})."
+                            : "No preview available for this file type.")
                     </span>
                     @if (_previewSize > 0)
                     {
@@ -77,7 +77,7 @@
                     {
                         <a class="btn-primary preview-fallback-download" href="@_downloadUrl" download="@_previewFileName">
                             @Assets.SVG("download.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
-                            Herunterladen
+                            Download
                         </a>
                     }
                 </div>

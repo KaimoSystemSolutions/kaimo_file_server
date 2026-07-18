@@ -3,7 +3,7 @@
    File Table Grid, Column Sorting, ACL Indicators, Responsive
    ══════════════════════════════════════════════════════════ */
 
-/* -- File Table – CSS Grid (5 Spalten, ohne Actions) ----- */
+/* -- File Table – CSS Grid (5 columns, without actions) ----- */
 
 .file-table-wrap {
     /* Shared column track definition. Header and every data row read this variable,
@@ -124,7 +124,7 @@
             border-right: none;
         }
 
-    /* --- Name-Spalte --- */
+    /* --- Name column --- */
 
     .file-grid-row > .col-name,
     .file-grid-header > .col-name {
@@ -151,13 +151,13 @@
             min-width: 0;
         }
 
-/* --- Size rechts --- */
-/* nein margo, das sieht komisch aus.
+/* --- Size right --- */
+/* no margo, that looks weird.
 .col-size {
     text-align: right;
 }
 */
-/* --- Resize Handle (nur im Header) --- */
+/* --- Resize Handle (header only) --- */
 
 .col-resize-handle {
     position: absolute;
@@ -179,7 +179,7 @@
         border-radius: 3px;
     }
 
-/* --- Selektion --- */
+/* --- Selection --- */
 
 .file-grid-row.file-row--selected > div {
     background: var(--accent-selected);
@@ -220,7 +220,7 @@
 }
 
 /* ══════════════════════════════════════════════════════════
-   ACL Indicator (im Name-Feld, neben Dateiname)
+   ACL Indicator (in name field, next to filename)
    ══════════════════════════════════════════════════════════ */
 
 .acl-indicator {
@@ -287,7 +287,7 @@
 }
 
 .file-dragged-over::before {
-    content: 'Dateien hier ablegen';
+    content: 'Drop files here';
     position: absolute;
     inset: 0;
     z-index: 11;
@@ -303,11 +303,11 @@
 }
 
 /* ══════════════════════════════════════════════════════════
-   Responsive – Spalten ausblenden bei schmalen Viewports
-   !important überschreibt inline grid-template-columns
+   Responsive – hide columns on narrow viewports
+   !important overrides inline grid-template-columns
    ══════════════════════════════════════════════════════════ */
 
-/* < 1024px: "Letzter Zugriff" ausblenden → 4 Spalten */
+/* < 1024px: hide "Last Access" → 4 columns */
 @media (max-width: 1024px) {
     .file-table-wrap {
         --grid-cols: 1fr 90px 140px 140px !important;
@@ -318,7 +318,7 @@
     }
 }
 
-/* < 800px: "Erstellt" auch ausblenden → 3 Spalten */
+/* < 800px: also hide "Created" → 3 columns */
 @media (max-width: 800px) {
     .file-table-wrap {
         --grid-cols: 1fr 90px 140px !important;
@@ -330,7 +330,7 @@
     }
 }
 
-/* < 600px: "Geändert" auch ausblenden → 2 Spalten */
+/* < 600px: also hide "Modified" → 2 columns */
 @media (max-width: 600px) {
     .file-table-wrap {
         --grid-cols: 1fr 90px !important;
@@ -343,7 +343,7 @@
     }
 }
 
-/* < 420px: "Größe" auch ausblenden → nur Name */
+/* < 420px: also hide "Size" → name only */
 @media (max-width: 420px) {
     .file-table-wrap {
         --grid-cols: 1fr !important;
@@ -356,7 +356,7 @@
         display: none !important;
     }
 
-    /* ACL Indicator kürzer auf sehr kleinen Screens */
+    /* ACL indicator shorter on very small screens */
     .acl-indicator {
         padding: 1px 4px;
         margin-left: 4px;

@@ -82,10 +82,10 @@ public class AclRepository : IAclRepository
                 ? newNormalized
                 : newNormalized + meta.Path.Substring(oldNormalized.Length);
 
-            // Ein paralleler Watcher/Indexer kann den OS-Rename (aus _handle.MoveAsync)
-            // bereits aufgegriffen und selbst eine Metadata-Zeile am Zielpfad angelegt
-            // haben, bevor wir hier ankommen. In dem Fall ist diese Zeile die "aktuelle" -
-            // wir verwerfen dann unsere veraltete Quellzeile statt zu kollidieren.
+            // A concurrent watcher/indexer may have already picked up the OS rename
+            // (from _handle.MoveAsync) and created a metadata row at the target path
+            // before we arrive here. In that case, that row is the "current" one —
+            // we discard our stale source row instead of colliding.
             var existingAtTarget = await _db.FileMetadata
                 .FirstOrDefaultAsync(m => m.ShareId == shareId
                                           && m.Path == targetPath

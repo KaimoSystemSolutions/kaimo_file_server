@@ -7,13 +7,13 @@ using Kaimo_File_Server.SmbBridge.Grpc;
 namespace Kaimo_File_Server.SmbBridge.Services;
 
 /// <summary>
-/// gRPC-Fassade fuer die Autorisierungs-Control-Plane (Phase 2). Entscheidet
-/// anhand der echten Kaimo-ACLs, ob ein Benutzer einen Share betreten darf —
-/// dieselbe Semantik wie das frühere <c>KaimoSharePolicy.AuthorizeConnect</c>
+/// gRPC facade for the authorization control plane (Phase 2). Decides based on
+/// real Kaimo ACLs whether a user can enter a share — same semantics as the
+/// earlier <c>KaimoSharePolicy.AuthorizeConnect</c>
 /// (→ <see cref="IAuthenticationLookup.CanAccessShareAsync"/>).
 ///
-/// Der Samba-Sidecar <c>kaimo_authd</c> ruft dies im VFS-connect-Hook auf und
-/// uebersetzt Namen (User/Share) — die Aufloesung auf Guids passiert hier.
+/// The Samba sidecar <c>kaimo_authd</c> calls this in the VFS connect hook and
+/// translates names (user/share) — GUID resolution happens here.
 /// </summary>
 public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
 {
@@ -58,12 +58,12 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     }
 
     /// <summary>
-    /// Datei-/Pfad-Autorisierung — spiegelt <c>FileService.OpenAsync</c> exakt:
-    /// nicht-existent + create → Parent braucht <c>CreateWriteData</c>; existent →
-    /// write braucht <c>CreateWriteData</c>, jeder nicht-reine-write-Open braucht
-    /// zusaetzlich <c>ListReadData</c> (Read wird unabhaengig geprueft). Nicht
-    /// vorhandene Dateien ohne Create-Absicht sind kein ACL-Deny (das behandelt
-    /// Samba als „not found").
+    /// File/path authorization — mirrors <c>FileService.OpenAsync</c> exactly:
+    /// non-existent + create → parent needs <c>CreateWriteData</c>; existent →
+    /// write needs <c>CreateWriteData</c>, every non-pure-write open additionally
+    /// needs <c>ListReadData</c> (read is checked independently). Non-existent
+    /// files without create intent are not an ACL deny (Samba treats that as
+    /// "not found").
     /// </summary>
     public override async Task<AuthorizeReply> AuthorizeOpen(
         AuthorizeOpenRequest request, ServerCallContext context)
@@ -85,7 +85,7 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         string reason = "";
         if (!exists)
         {
-            // Kein Ziel + keine Create-Absicht -> „not found", kein ACL-Deny.
+            // No target + no create intent → "not found", no ACL deny.
             if (!request.WantsCreate)
             {
                 allow = true;
@@ -108,7 +108,7 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
                 reason = "write denied: CreateWriteData";
             }
 
-            // Jeder nicht-reine-write-Open liest den Eintrag (auch delete-only).
+            // Every non-pure-write open reads the entry (also delete-only).
             bool wantsRead = request.WantRead || !request.WantWrite;
             if (allow && wantsRead &&
                 !await _acl.HasAccessAsync(user, share.Id, normalized, isDir, FilePermission.ListReadData))
@@ -118,10 +118,10 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
             }
         }
 
-        // ALLOW bleibt auf Debug (sonst flutet der readdir-Filter das Log); jede
-        // ABLEHNUNG kommt auf Info MIT Grund -> so ist sofort sichtbar, ob (und
-        // warum) die ACL einen Write blockt. Steht bei einem gescheiterten Write
-        // KEINE DENY-Zeile hier, hat die ACL erlaubt -> die Ablehnung ist FS-seitig.
+        // ALLOW stays at debug (otherwise the readdir filter floods the log); every
+        // DENY comes at info WITH reason → so it's immediately visible whether (and
+        // why) the ACL blocks a write. If there's NO DENY line here for a failed write,
+        // the ACL allowed it → the rejection is filesystem-side.
         if (allow)
             _logger.LogDebug(
                 "AuthorizeOpen ALLOW: user={User} share={Share} path=[{Path}] r={R} w={W} c={C}",

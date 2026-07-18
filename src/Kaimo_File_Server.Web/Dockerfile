@@ -1,6 +1,6 @@
-# Unter https://aka.ms/customizecontainer erfahren Sie, wie Sie Ihren Debugcontainer anpassen und wie Visual Studio dieses Dockerfile verwendet, um Ihre Images für ein schnelleres Debuggen zu erstellen.
+# Visit https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-# Diese Stufe wird verwendet, wenn sie von VS im Schnellmodus ausgeführt wird (Standardeinstellung für Debugkonfiguration).
+# This stage is used when run by VS in quick mode (default for debug configuration).
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 USER $APP_UID
 WORKDIR /app
@@ -9,28 +9,28 @@ EXPOSE 8081
 EXPOSE 8443
 
 
-# Diese Stufe wird zum Erstellen des Dienstprojekts verwendet.
+# This stage is used to build the service project.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-# nuget.config zuerst -> deterministischer Restore (nuget.org als einzige Quelle).
+# nuget.config first → deterministic restore (nuget.org as sole source).
 COPY ["nuget.config", "."]
 COPY ["src/Kaimo_File_Server.Web/Kaimo_File_Server.Web.csproj", "src/Kaimo_File_Server.Web/"]
 COPY ["src/Kaimo_File_Server.Core/Kaimo_File_Server.Core.csproj", "src/Kaimo_File_Server.Core/"]
 COPY ["src/Kaimo_File_Server.Infrastructure/Kaimo_File_Server.Infrastructure.csproj", "src/Kaimo_File_Server.Infrastructure/"]
 RUN dotnet restore "./src/Kaimo_File_Server.Web/Kaimo_File_Server.Web.csproj"
-# Nur den Quellcode ins Build-Image kopieren -- kein tests/, docu/, tools/ und
-# keine IDE-/Build-Artefakte (die haelt zusaetzlich .dockerignore aus dem Context).
+# Copy only source code into build image — no tests/, docs/, tools/ and no
+# IDE/build artifacts (additionally kept out by .dockerignore from context).
 COPY src/ src/
 WORKDIR "/src/src/Kaimo_File_Server.Web"
 RUN dotnet build "./Kaimo_File_Server.Web.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
-# Diese Stufe wird verwendet, um das Dienstprojekt zu veröffentlichen, das in die letzte Phase kopiert werden soll.
+# This stage is used to publish the service project to be copied into the final stage.
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "./Kaimo_File_Server.Web.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
-# Diese Stufe wird in der Produktion oder bei Ausführung von VS im regulären Modus verwendet (Standard, wenn die Debugkonfiguration nicht verwendet wird).
+# This stage is used in production or when run by VS in regular mode (default if debug configuration is not used).
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .

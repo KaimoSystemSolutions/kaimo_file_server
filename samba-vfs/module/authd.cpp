@@ -1,20 +1,20 @@
-// kaimo_authd - Autorisierungs- + Event-Sidecar fuer den Samba-Container.
+// kaimo_authd - Authorization and event sidecar for the Samba container.
 //
-// Ueberbrueckt Unix-Socket (vom VFS-Modul, reines C) <-> gRPC (zur .NET-Bridge).
-// So bleibt das smbd-VFS-Modul frei von gRPC/Threads/Fork-Problemen.
+// Bridges Unix socket (from VFS module, pure C) <-> gRPC (to .NET bridge).
+// This keeps the smbd VFS module free from gRPC/threads/fork issues.
 //
-// Protokoll (eine Anfrage pro Verbindung, tab-getrennt, mit \n):
-//   Authz (Antwort ALLOW|DENY|ERROR):
+// Protocol (one request per connection, tab-separated, with \n):
+//   Authz (response ALLOW|DENY|ERROR):
 //     "CONNECT\t<user>\t<share>"
 //     "OPEN\t<user>\t<share>\t<flags>\t<path>"          flags: r/w/c
-//   Events (fire-and-forget, Antwort OK):
-//     "CLOSE\t<user>\t<share>\t<path>"                   Datei geschrieben+zu
-//     "MKDIR\t<user>\t<share>\t<path>"                   Verzeichnis angelegt
+//   Events (fire-and-forget, response OK):
+//     "CLOSE\t<user>\t<share>\t<path>"                   file written and closed
+//     "MKDIR\t<user>\t<share>\t<path>"                   directory created
 //     "DELETE\t<user>\t<share>\t<isdir 0|1>\t<path>"
 //     "RENAME\t<user>\t<share>\t<isdir 0|1>\t<old>\t<new>"
 //
-// Jede Verbindung wird in einem eigenen Thread bedient, damit langsame Events
-// (Versionierung liest die Datei) die Authz-Anfragen nicht blockieren.
+// Each connection is handled in its own thread so slow events
+// (versioning reads the file) don't block authorization requests.
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -41,7 +41,7 @@ static std::string g_bridge_addr;
 static std::unique_ptr<AuthzService::Stub> g_authz;
 static std::unique_ptr<EventService::Stub> g_events;
 
-// --- TTL-Entscheidungs-Cache (mutex-geschuetzt, da multi-threaded) ---
+// --- TTL decision cache (mutex-protected due to multi-threading) ---
 struct CacheEntry { bool allow; std::chrono::steady_clock::time_point expiry; };
 static std::unordered_map<std::string, CacheEntry> g_cache;
 static std::mutex g_cache_mtx;
@@ -116,7 +116,7 @@ static void ev_rename(const std::string& user, const std::string& share, bool is
     NotifyReply reply; g_events->NotifyRename(&ctx, req, &reply);
 }
 
-// Zerlegt in bis zu max Felder; das letzte Feld nimmt den Rest auf.
+// Splits into up to max fields; the last field takes the rest.
 static std::vector<std::string> split_tabs(const std::string& line, size_t max_fields) {
     std::vector<std::string> parts;
     size_t start = 0;
@@ -159,7 +159,7 @@ static void handle_client(int cfd) {
         auto p = split_tabs(line, 6);
         if (p.size() == 6) { ev_rename(p[1], p[2], p[3] == "1", p[4], p[5]); result = "OK"; }
     } else {
-        std::cerr << "kaimo_authd: unbekannte Anfrage: " << line << std::endl;
+        std::cerr << "kaimo_authd: unknown request: " << line << std::endl;
     }
 
     std::string out = std::string(result) + "\n";
@@ -180,7 +180,7 @@ int main() {
     g_events = EventService::NewStub(channel);
 
     int sfd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (sfd < 0) { std::cerr << "kaimo_authd: socket() fehlgeschlagen" << std::endl; return 1; }
+    if (sfd < 0) { std::cerr << "kaimo_authd: socket() failed" << std::endl; return 1; }
 
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
@@ -189,12 +189,12 @@ int main() {
     unlink(sock_path.c_str());
 
     if (bind(sfd, (struct sockaddr*)&addr, sizeof(addr)) != 0) {
-        std::cerr << "kaimo_authd: bind(" << sock_path << ") fehlgeschlagen" << std::endl; return 1;
+        std::cerr << "kaimo_authd: bind(" << sock_path << ") failed" << std::endl; return 1;
     }
     chmod(sock_path.c_str(), 0666);
-    if (listen(sfd, 128) != 0) { std::cerr << "kaimo_authd: listen() fehlgeschlagen" << std::endl; return 1; }
+    if (listen(sfd, 128) != 0) { std::cerr << "kaimo_authd: listen() failed" << std::endl; return 1; }
 
-    std::cerr << "kaimo_authd: bereit. socket=" << sock_path << " bridge=" << g_bridge_addr << std::endl;
+    std::cerr << "kaimo_authd: ready. socket=" << sock_path << " bridge=" << g_bridge_addr << std::endl;
 
     for (;;) {
         int cfd = accept(sfd, nullptr, nullptr);

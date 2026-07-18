@@ -1,6 +1,6 @@
-# Phase-0-Spike, Schritt A: Stock-Samba mit dynamischen Registry-Shares.
-# Ziel: beweisen, dass `net conf` Shares LIVE ohne Reload bereitstellt und
-# ein SMB3-Client lesen/schreiben kann. (Custom-VFS-Modul kommt in Schritt B.)
+# Phase-0-Spike, step A: Stock Samba with dynamic registry shares.
+# Goal: prove that `net conf` provides shares LIVE without reload and
+# an SMB3 client can read/write. (Custom VFS module comes in step B.)
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive

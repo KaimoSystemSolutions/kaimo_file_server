@@ -1,9 +1,9 @@
-// kaimo_sharesync - gRPC-C++-Client fuer das Share-Provisioning (Phase 4).
+// kaimo_sharesync - gRPC C++ client for share provisioning (Phase 4).
 //
-// Ruft ListShares auf der .NET-Bridge (h2c) auf und gibt je aktiviertem Share
-// eine Zeile "name<TAB>path<TAB>hidden(0|1)" auf stdout aus. Die eigentliche
-// Reconciliation in Sambas Registry (net conf addshare/setparm/delshare) macht
-// das Shell-Skript sync-shares.sh. Spiegelbild zu kaimo_authsync (NT-Hash-Sync).
+// Calls ListShares on the .NET bridge (h2c) and outputs one line
+// "name<TAB>path<TAB>hidden(0|1)" per enabled share to stdout. The actual
+// reconciliation in Samba's registry (net conf addshare/setparm/delshare) is
+// handled by the shell script sync-shares.sh. Mirror to kaimo_authsync (NT-Hash sync).
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
@@ -31,18 +31,18 @@ int main() {
     ListSharesReply reply;
     grpc::Status status = stub->ListShares(&ctx, req, &reply);
     if (!status.ok()) {
-        std::cerr << "kaimo_sharesync: ListShares RPC fehlgeschlagen: "
+        std::cerr << "kaimo_sharesync: ListShares RPC failed: "
                   << status.error_code() << " " << status.error_message()
                   << " (addr=" << addr << ")" << std::endl;
         return 1;
     }
 
     for (const auto& s : reply.shares()) {
-        if (s.name().empty() || s.path().empty()) continue;  // unvollstaendige Eintraege ueberspringen
+        if (s.name().empty() || s.path().empty()) continue;  // skip incomplete entries
         std::cout << s.name() << '\t' << s.path() << '\t'
                   << (s.is_hidden() ? '1' : '0') << '\n';
     }
     std::cerr << "kaimo_sharesync: " << reply.shares_size()
-              << " Shares empfangen (addr=" << addr << ")." << std::endl;
+              << " shares received (addr=" << addr << ")." << std::endl;
     return 0;
 }

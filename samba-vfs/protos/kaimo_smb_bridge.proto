@@ -1,20 +1,20 @@
 syntax = "proto3";
 
-// Gemeinsamer Vertrag zwischen der .NET-Control-Plane (Server) und dem
-// Samba-Container (C++-Client). Aus dieser einen Datei werden sowohl die
-// C#- als auch die C++-Stubs generiert.
+// Shared contract between the .NET Control Plane (server) and the
+// Samba container (C++ client). Both C# and C++ stubs are generated
+// from this single file.
 package kaimo.smb.bridge.v1;
 
 option csharp_namespace = "Kaimo_File_Server.SmbBridge.Grpc";
 
-// Auth-Teil der Control-Plane. Quelle der Wahrheit bleibt die Kaimo-DB
-// (IAuthenticationLookup); Samba bekommt nur die NT-Hashes zur lokalen
-// NTLMv2-Pruefung.
+// Auth portion of the Control Plane. The source of truth remains the Kaimo DB
+// (IAuthenticationLookup); Samba receives only the NT-Hashes for local
+// NTLMv2 verification.
 service AuthService {
-  // Einzelabruf des NT-Hash (fuer ein spaeteres On-Demand-pdb-Modul).
+  // Single retrieval of NT-Hash (for a future On-Demand pdb module).
   rpc GetNtHash(GetNtHashRequest) returns (GetNtHashReply);
 
-  // Alle aktiven Benutzer + NT-Hash, fuer den tdbsam-Sync (Phase 1).
+  // All active users + NT-Hash for tdbsam sync (Phase 1).
   rpc ListUsers(ListUsersRequest) returns (ListUsersReply);
 }
 
@@ -24,61 +24,61 @@ message GetNtHashRequest {
 
 message GetNtHashReply {
   bool  found   = 1;
-  bytes nt_hash = 2; // rohe 16 Byte; leer, wenn nicht gefunden/deaktiviert
+  bytes nt_hash = 2; // raw 16 bytes; empty if not found/disabled
 }
 
 message ListUsersRequest {}
 
 message UserEntry {
   string username = 1;
-  bytes  nt_hash  = 2; // rohe 16 Byte
+  bytes  nt_hash  = 2; // raw 16 bytes
 }
 
 message ListUsersReply {
   repeated UserEntry users = 1;
 }
 
-// Autorisierungs-Teil der Control-Plane (Phase 2). Entscheidet anhand der
-// echten Kaimo-ACLs, ob ein Benutzer auf einen Share zugreifen darf. Wird vom
-// Samba-Sidecar (kaimo_authd) im VFS-connect-Hook aufgerufen.
+// Authorization portion of the Control Plane (Phase 2). Decides whether a
+// user may access a share based on the actual Kaimo ACLs. Called by the
+// Samba sidecar (kaimo_authd) in the VFS connect hook.
 service AuthzService {
-  // TREE_CONNECT: darf <username> den <share> ueberhaupt betreten?
-  // Mappt auf IAuthenticationLookup.CanAccessShareAsync.
+  // TREE_CONNECT: may <username> enter the <share> at all?
+  // Maps to IAuthenticationLookup.CanAccessShareAsync.
   rpc AuthorizeConnect(AuthorizeConnectRequest) returns (AuthorizeReply);
 
-  // Datei-/Pfad-Zugriff (Phase 2b). Exakte Paritaet zu FileService.OpenAsync:
+  // File/path access (Phase 2b). Exact parity with FileService.OpenAsync:
   // write -> CreateWriteData, read -> ListReadData, create -> Parent-Check.
-  // Wird vom create_file-Hook (Open) und vom readdir-Filter (read-only) genutzt.
+  // Used by the create_file hook (Open) and readdir filter (read-only).
   rpc AuthorizeOpen(AuthorizeOpenRequest) returns (AuthorizeReply);
 }
 
 message AuthorizeConnectRequest {
   string username = 1;
-  string share    = 2; // Share-Name (wie in Samba/registry), nicht die Guid
+  string share    = 2; // Share name (as in Samba/registry), not the GUID
 }
 
 message AuthorizeReply {
   bool   allow  = 1;
-  string reason = 2; // optionaler Grund fuers Logging (z. B. "unknown share")
+  string reason = 2; // optional reason for logging (e.g., "unknown share")
 }
 
 message AuthorizeOpenRequest {
   string username     = 1;
   string share        = 2;
-  string path         = 3; // share-relativ, Forward-Slashes
-  bool   want_read    = 4; // FILE_READ_DATA angefragt
-  bool   want_write   = 5; // FILE_WRITE_DATA / FILE_APPEND_DATA angefragt
-  bool   wants_create = 6; // create-disposition legt neue Datei an
+  string path         = 3; // share-relative, forward slashes
+  bool   want_read    = 4; // FILE_READ_DATA requested
+  bool   want_write   = 5; // FILE_WRITE_DATA / FILE_APPEND_DATA requested
+  bool   wants_create = 6; // create disposition creates new file
 }
 
-// Close-/Event-Hooks (Phase 3). Samba fuehrt die I/O nativ aus und meldet danach
-// das Ereignis; .NET erledigt die Cross-Cutting-Effekte (Versionierung, Suchindex,
-// Ownership) wie frueher in FileSession.DisposeAsync. Fire-and-forget, best-effort.
+// Close/Event hooks (Phase 3). Samba performs I/O natively and reports the event
+// afterward; .NET handles cross-cutting concerns (versioning, search index,
+// ownership) as previously in FileSession.DisposeAsync. Fire-and-forget, best-effort.
 service EventService {
-  rpc NotifyClose (NotifyCloseRequest)  returns (NotifyReply); // Datei geschrieben+geschlossen
-  rpc NotifyMkdir (NotifyPathRequest)   returns (NotifyReply); // Verzeichnis angelegt
-  rpc NotifyDelete(NotifyPathRequest)   returns (NotifyReply); // Datei/Verzeichnis geloescht
-  rpc NotifyRename(NotifyRenameRequest) returns (NotifyReply); // umbenannt/verschoben
+  rpc NotifyClose (NotifyCloseRequest)  returns (NotifyReply); // file written and closed
+  rpc NotifyMkdir (NotifyPathRequest)   returns (NotifyReply); // directory created
+  rpc NotifyDelete(NotifyPathRequest)   returns (NotifyReply); // file/directory deleted
+  rpc NotifyRename(NotifyRenameRequest) returns (NotifyReply); // renamed/moved
 }
 
 message NotifyCloseRequest {
@@ -104,36 +104,36 @@ message NotifyRenameRequest {
 
 message NotifyReply { bool ok = 1; }
 
-// Share-Provisioning (Phase 4). Quelle der Wahrheit bleibt die Kaimo-DB
-// (IShareRepository). Der ShareControl-Daemon (kaimo_sharesync -> sync-shares.sh)
-// spiegelt die aktivierten Shares live in Sambas Registry (net conf), sodass smbd
-// sie ohne Neustart anbietet. Ersetzt das fruehere FileSystemWatcher/SyncFromDb()
-// aus SmbServer.cs.
+// Share provisioning (Phase 4). The source of truth remains the Kaimo DB
+// (IShareRepository). The ShareControl daemon (kaimo_sharesync -> sync-shares.sh)
+// mirrors the enabled shares live into Samba's registry (net conf) so smbd
+// offers them without restart. Replaces the former FileSystemWatcher/SyncFromDb()
+// from SmbServer.cs.
 service ShareService {
-  // Alle aktivierten Shares (Name, Pfad, Hidden-Flag) fuer den Registry-Sync.
+  // All enabled shares (name, path, hidden flag) for registry sync.
   rpc ListShares(ListSharesRequest) returns (ListSharesReply);
 }
 
 message ListSharesRequest {}
 
 message ShareEntry {
-  string name      = 1; // Share-Name (= Registry-Sektion, = Verzeichnisname)
-  string path      = 2; // absoluter Pfad im Container-Storage
-  bool   is_hidden = 3; // IsShareHidden -> browseable = no (ABE: nur Hidden-Flag)
+  string name      = 1; // Share name (= registry section, = directory name)
+  string path      = 2; // absolute path in container storage
+  bool   is_hidden = 3; // IsShareHidden -> browseable = no (ABE: hidden flag only)
 }
 
 message ListSharesReply {
   repeated ShareEntry shares = 1;
 }
 
-// Protokoll-/Sicherheits-Settings (Phase 4). Quelle der Wahrheit bleibt die
-// Kaimo-DB (ISmbConfigStore, per Web-UI gepflegt). Der Config-Sync
-// (kaimo_configsync -> sync-config.sh) spiegelt die Werte in Sambas globale
-// Registry-Config (net conf setparm global). Entspricht dem, was
-// SmbServer.LoadProtocolSettings() beim (Re)Start in den alten .NET-SMB-Server
-// einspeiste. WS-Discovery/Audit-Log sind bewusst NICHT enthalten: sie haben in
-// Samba keine globalen smb.conf-Parameter (separate Mechanismen: wsdd bzw.
-// full_audit-VFS).
+// Protocol/security settings (Phase 4). The source of truth remains the
+// Kaimo DB (ISmbConfigStore, maintained via web UI). The config sync
+// (kaimo_configsync -> sync-config.sh) mirrors values into Samba's global
+// registry config (net conf setparm global). Corresponds to what
+// SmbServer.LoadProtocolSettings() fed into the old .NET SMB Server at
+// (re)start. WS-Discovery/Audit-Log are intentionally NOT included: they have
+// no global smb.conf parameters in Samba (separate mechanisms: wsdd and
+// full_audit VFS).
 service ConfigService {
   rpc GetProtocolSettings(GetProtocolSettingsRequest) returns (ProtocolSettingsReply);
 }
@@ -141,9 +141,9 @@ service ConfigService {
 message GetProtocolSettingsRequest {}
 
 message ProtocolSettingsReply {
-  // Samba-Dialekt-Token, direkt fuer `server min/max protocol` verwendbar
-  // (SMB2_02, SMB2_10, SMB3_00, SMB3_02, SMB3_11). Mapping aus dem .NET-Enum
-  // passiert in der Bridge, damit die Shell samba-agnostisch bleibt.
+  // Samba dialect token, directly usable for `server min/max protocol`
+  // (SMB2_02, SMB2_10, SMB3_00, SMB3_02, SMB3_11). Mapping from the .NET enum
+  // happens in the bridge so the shell remains Samba-agnostic.
   string min_protocol       = 1;
   string max_protocol       = 2;
   bool   require_signing    = 3; // -> server signing = mandatory | auto

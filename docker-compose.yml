@@ -5,10 +5,10 @@ services:
     #user: root
     #ports:
     #  - 445:445
-    # umask 002 -> neu angelegte Dateien werden 0664 (gruppen-schreibbar), damit die
-    # Samba-Seite (Gruppe kaimo) sie ueberschreiben kann. Fallback fuer FS ohne ACL-
-    # Support (drvfs/9p auf der Windows-Dev-Maschine); auf ext4 uebernehmen das die
-    # Default-ACLs aus dem Samba-Entrypoint. Siehe samba-vfs/README.md (Storage-Ownership).
+    # umask 002 -> newly created files become 0664 (group-writable) so that the
+    # Samba side (group kaimo) can overwrite them. Fallback for filesystems without ACL
+    # support (drvfs/9p on Windows dev machine); on ext4 the default ACLs from the
+    # Samba entrypoint handle this. See samba-vfs/README.md (Storage Ownership).
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Host.dll"]
     volumes:
       - ./tests/data/storage:/data/storage
@@ -21,9 +21,9 @@ services:
       context: .
       dockerfile: src/Kaimo_File_Server.Host/Dockerfile
 
-  # Phase 1: gRPC-Control-Plane fuer Samba. Liefert (vorerst) NT-Hashes der
-  # Kaimo-Benutzer aus der DB, damit Samba NTLMv2 lokal pruefen kann.
-  # Nur intern erreichbar (kein Port nach aussen), h2c auf :5080.
+  # Phase 1: gRPC control plane for Samba. Provides (for now) NT hashes of
+  # Kaimo users from the DB so Samba can check NTLMv2 locally.
+  # Only internally reachable (no port exposed), h2c on :5080.
   kaimo_smb_bridge:
     image: ${DOCKER_REGISTRY-}kaimosmbbridge
     container_name: kaimo_smb_bridge
@@ -36,18 +36,26 @@ services:
     volumes:
       - ./tests/data/storage:/data/storage
 
-  # Phase-0-Spike: echtes Samba (smbd) + eigenes VFS-Modul (kaimo_bridge).
-  # Laeuft PARALLEL zur bestehenden .NET-SMB-Implementierung im Host-Container.
-  # Port 445 bleibt vorerst beim .NET-Host; Samba wird waehrend der Migration
-  # auf Host-Port 1445 gemappt. Beim Cutover (Phase 5) uebernimmt Samba die 445.
-  # Details: samba-vfs/README.md und docu/smb-samba-vfs-migration.md
+  # Phase 0 spike: real Samba (smbd) + custom VFS module (kaimo_bridge).
+  # Runs IN PARALLEL with existing .NET SMB implementation in host container.
+  # Port 445 stays with .NET host for now; Samba is mapped to host port 1445 during migration.
+  # At cutover (Phase 5) Samba takes over port 445.
+  # Details: samba-vfs/README.md and docu/smb-samba-vfs-migration.md
   kaimo_samba:
     image: ${DOCKER_REGISTRY-}kaimosamba
     container_name: kaimo_samba
+    # Neutralize search domain inherited from host (e.g., home.lab). Otherwise the
+    # gRPC C++ client (c-ares, NOT glibc/NSS) appends it to the bridge service name
+    # -> asks "kaimo_smb_bridge.home.lab" -> Docker forwards to LAN DNS,
+    # which resolves unknown names via wildcard to wrong LAN IP ->
+    # "Connection refused". "." = empty search domain, so only the bare
+    # service name remains, which the embedded Docker DNS (127.0.0.11) resolves correctly.
+    dns_search:
+      - "."
     ports:
       - 445:445
     volumes:
-      # Gleicher Storage wie Host/Web -> Samba macht die Datei-I/O direkt.
+      # Same storage as Host/Web -> Samba performs file I/O directly.
       - ./tests/data/storage:/data/storage
     build:
       context: ./samba-vfs
@@ -55,7 +63,7 @@ services:
     depends_on:
       - kaimo_smb_bridge
     environment:
-      # Adresse der gRPC-Bridge fuer den NT-Hash-Sync (kaimo_authsync).
+      # Address of gRPC bridge for NT hash sync (kaimo_authsync).
       KAIMO_BRIDGE_ADDR: kaimo_smb_bridge:5080
     healthcheck:
       test: ["CMD-SHELL", "/opt/samba/bin/smbclient -L localhost -U kaimotest%Passw0rd! -m SMB3 >/dev/null 2>&1 || exit 1"]
@@ -72,10 +80,10 @@ services:
       - 8443:8443
     environment:
       TZ: Europe/Berlin
-    # umask 002 -> neue Dateien 0664 (gruppen-schreibbar), damit die Samba-Seite
-    # (Gruppe kaimo) sie ueberschreiben kann. Fallback fuer FS ohne ACL-Support
-    # (drvfs/9p, Windows-Dev); auf ext4 uebernehmen das die Default-ACLs aus dem
-    # Samba-Entrypoint. Siehe samba-vfs/README.md (Storage-Ownership).
+    # umask 002 -> new files 0664 (group-writable) so that Samba side
+    # (group kaimo) can overwrite them. Fallback for filesystems without ACL support
+    # (drvfs/9p, Windows dev); on ext4 the default ACLs from the
+    # Samba entrypoint handle this. See samba-vfs/README.md (Storage Ownership).
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Web.dll"]
     volumes:
       - ./tests/data/storage:/data/storage
@@ -116,9 +124,9 @@ services:
   #    discovery.type: single-node
   #    xpack.security.enabled: "false"
   #    ES_JAVA_OPTS: "-Xms2g -Xmx2g"
-  #    # Dev-Maschine: Festplatte darf voller werden, bevor ES das Zuweisen von
-  #    # Shards blockiert. Standard ist 85/90/95% -> bei einer fast vollen C:
-  #    # bleibt sonst jeder Shard "unassigned" und der Cluster wird rot.
+  #    # Dev machine: disk can fill more before ES blocks shard allocation.
+  #    # Default is 85/90/95% -> on a nearly full C:
+  #    # otherwise every shard remains "unassigned" and the cluster turns red.
   #    cluster.routing.allocation.disk.watermark.low: "95%"
   #    cluster.routing.allocation.disk.watermark.high: "97%"
   #    cluster.routing.allocation.disk.watermark.flood_stage: "98%"

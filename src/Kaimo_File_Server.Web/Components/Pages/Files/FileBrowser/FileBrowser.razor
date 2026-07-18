@@ -87,7 +87,7 @@
     </div>
 </div>
 
-@* -- Dialog: Neuen Ordner erstellen -- *@
+@* -- Dialog: Create new folder -- *@
 @if (_showCreateFolder)
 {
     <div class="modal-backdrop" @onkeydown="OnCreateFolderKeyDown" tabindex="0">
@@ -245,7 +245,7 @@ else
             </div>
         </div>
 
-        @* -- ".." Elternverzeichnis -- *@
+        @* -- ".." Parent directory -- *@
         @if (VM.HasParent)
         {
             <div class="file-grid-row file-row-dir @(_dragOverPath == ".." ? "file-row--drop-target" : "")"
@@ -265,7 +265,7 @@ else
             </div>
         }
 
-        @* -- Entries (Ordner zuerst, dann Dateien) — virtualisiert -- *@
+        @* -- Entries (folders first, then files) — virtualized -- *@
         <Virtualize Items="SortedEntries" Context="entry" ItemSize="ItemHeightPx" OverscanCount="8">
             @{
                 var isSelected = _selectedItems.Contains(entry);
@@ -372,7 +372,7 @@ else
 @* -- Context menu (right-click) -- *@
 <ContextMenu @ref="_contextMenuComponent" FileBrowser="this" FilePreviewComponent="_filePreviewComponent"/>
 
-@* -- Dialog: Umbenennen -- *@
+@* -- Dialog: Rename -- *@
 @if (_showRenameDialog)
 {
     <div class="modal-backdrop" @onclick="CancelRename">
@@ -422,7 +422,7 @@ else
         ["lastaccess"] = 140
     };
 
-    // Name-Breite: 0 = noch nicht resized → 1fr; > 0 = feste px
+    // Name width: 0 = not yet resized → 1fr; > 0 = fixed px
     private double _nameWidth = 0;
 
     private const double ColMinWidth = 50;
@@ -727,7 +727,7 @@ else
 
     // ========== Drag & Drop ==========
     private HashSet<FileMetadata> _draggedItems = new();
-    private string? _dragOverPath; // Pfad des aktuell gehoverten Drop-Ziels, ".." für Parent-Zeile
+    private string? _dragOverPath; // Path of the currently hovered drop target, ".." for the parent row
 
     // ========== Toolbar Computed ==========
 
@@ -803,7 +803,7 @@ else
 
     private void OnListBackgroundClick(MouseEventArgs e) => _selectedItems.Clear();
 
-    // ========== Toolbar Aktionen ==========
+    // ========== Toolbar Actions ==========
 
     private async Task OpenSelected()
     {
@@ -854,8 +854,8 @@ else
 
     private void OnDragStart(FileMetadata entry)
     {
-        // Wenn das gezogene Item Teil der aktuellen Selektion ist, wird die
-        // gesamte Selektion gezogen, sonst nur das einzelne Item.
+        // If the dragged item is part of the current selection, the entire
+        // selection is dragged, otherwise only the single item.
         if (!_selectedItems.Contains(entry))
         {
             _selectedItems.Clear();
@@ -871,7 +871,7 @@ else
         _dragOverPath = null;
     }
 
-// ---- Drop-Ziel-Prüfung ----
+// ---- Drop target validation ----
 
     private bool CanDropOn(FileMetadata target)
     {
@@ -879,7 +879,7 @@ else
         if (!target.IsDirectory) return false;
         if (_draggedItems.Contains(target)) return false;
 
-        // Verhindert, dass ein Ordner in sich selbst / seine eigenen Unterordner verschoben wird
+        // Prevents a folder from being moved into itself / its own subfolders
         foreach (var item in _draggedItems)
         {
             if (item.IsDirectory &&
@@ -1082,7 +1082,7 @@ else
         _showFolderAcl = false;
     }
 
-    // ========== Ordner erstellen ==========
+    // ========== Create folder ==========
 
     internal void ShowCreateFolderDialog()
     {
@@ -1114,7 +1114,7 @@ else
             _createFolderError = result.Error;
     }
 
-    // ========== Löschen ==========
+    // ========== Delete ==========
     private async Task OnKeyDownItemList(KeyboardEventArgs e)
     {
         if (e.Key == "Delete" && _selectedItems.Count > 0)
@@ -1176,7 +1176,7 @@ else
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
     }
 
-    // ========== Umbenennen ==========
+    // ========== Rename ==========
 
     private void CancelRename()
     {
@@ -1216,7 +1216,7 @@ else
     public void TriggerReRender()
         => StateHasChanged();
 
-    // ========== Versionierung ==========
+    // ========== Versioning ==========
 
     /// <summary>Opens the version-history dialog for a file or the point-in-time dialog for a folder.</summary>
     public async Task OpenVersionDialog(FileMetadata item)

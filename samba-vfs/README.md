@@ -1,338 +1,335 @@
 # samba-vfs — Phase-0-Spike (Proof-of-Concept)
 
-Ziel dieses Verzeichnisses: **beweisen, dass der Samba+VFS-Ansatz überhaupt trägt**, bevor größer
-investiert wird. Siehe Gesamtplan: [`../docu/smb-samba-vfs-migration.md`](../docu/smb-samba-vfs-migration.md).
+Goal of this directory: **prove that the Samba+VFS approach is viable**, before investing further. See overall plan: [`../docu/smb-samba-vfs-migration.md`](../docu/smb-samba-vfs-migration.md).
 
-Phase 0 klärt die zwei größten Unbekannten:
+Phase 0 clarifies the two biggest unknowns:
 
-| # | Unbekannte | Status |
+| # | Unknown | Status |
 |---|---|---|
-| A | Dynamische Shares live über `net conf` (Registry-Backend), ohne smbd-Neustart | ✅ **bewiesen** |
-| B | Eigenes VFS-Modul gegen die exakte Samba-ABI bauen **und** von smbd laden | ✅ **bewiesen** |
+| A | Dynamic shares live via `net conf` (Registry backend), without smbd restart | ✅ **proven** |
+| B | Custom VFS module against exact Samba ABI build **and** load from smbd | ✅ **proven** |
 
-**Fazit Phase 0: der Ansatz trägt.** Beide Kern-Unbekannten sind geklärt. Der Weg nach vorne
-(Phasen 1–5) ist im [Gesamtplan](../docu/smb-samba-vfs-migration.md) beschrieben.
+**Conclusion Phase 0: the approach is viable.** Both core unknowns are resolved. The path forward
+(Phases 1–5) is described in the [overall plan](../docu/smb-samba-vfs-migration.md).
 
 ---
 
-## Schritt A — Live-Registry-Shares (Stock-Samba)
+## Step A — Live Registry Shares (Stock Samba)
 
-**Ergebnis: funktioniert.** Ein per `net conf addshare` angelegter Share erscheint sofort in
-`smbclient -L`, **ohne** dass smbd neu gestartet wird; Schreiben/Lesen über SMB3 landet direkt auf
-dem Storage. Das ersetzt später den FileSystemWatcher/`SyncFromDb`-Mechanismus aus
+**Result: works.** A share created via `net conf addshare` appears immediately in
+`smbclient -L`, **without** smbd needing to restart; write/read via SMB3 lands directly on
+storage. This will later replace the FileSystemWatcher/`SyncFromDb` mechanism from
 `src/Kaimo_File_Server.Smb/SmbServer.cs`.
 
 ```bash
-# Image bauen und starten
+# Build and start image
 docker build -t kaimo-samba-spike:phase0 .
 docker run -d --name kaimo-samba-spike -p 1445:445 kaimo-samba-spike:phase0
 
-# Selbsttest (legt Share live an, schreibt/liest, entfernt ihn wieder)
+# Self-test (creates share live, writes/reads, removes it again)
 docker exec kaimo-samba-spike bash /usr/local/bin/selftest.sh
 ```
 
-Dateien: [`Dockerfile`](Dockerfile), [`conf/smb.conf`](conf/smb.conf),
+Files: [`Dockerfile`](Dockerfile), [`conf/smb.conf`](conf/smb.conf),
 [`entrypoint.sh`](entrypoint.sh), [`selftest.sh`](selftest.sh).
 
-Kern der Konfig (`smb.conf`):
+Core of the config (`smb.conf`):
 ```ini
 registry shares = yes
-include = registry           # smbd liest Shares LIVE aus registry.tdb
+include = registry           # smbd reads shares LIVE from registry.tdb
 ```
 
 ---
 
-## Schritt B — Eigenes VFS-Modul
+## Step B — Custom VFS Module
 
-**Ergebnis: funktioniert.** `smbd` lädt unser Modul und die Hooks feuern bei jedem Connect/Open —
-auf einem dynamisch per `net conf` angelegten Share:
+**Result: works.** `smbd` loads our module and the hooks fire on each Connect/Open —
+on a dynamically created share via `net conf`:
 
 ```
 kaimo_bridge: CONNECT service=[hooktest] user=[kaimotest]   <- TREE_CONNECT
-kaimo_bridge: OPENAT  name=[x.txt]                          <- jeder Datei-Open
+kaimo_bridge: OPENAT  name=[x.txt]                          <- every file open
 kaimo_bridge: DISCONNECT
 ```
 
-Genau diese drei Nähte sind die späteren gRPC-Aufrufpunkte zur .NET-Control-Plane
-(`CanAccessShareAsync` beim Connect, ACL-Entscheidung beim Open, Close-Hooks für Versionierung/Index).
-Die eigentliche I/O bleibt nativ (`SMB_VFS_NEXT_*`) — die Datei landet direkt auf dem Storage.
+These three seams are precisely the later gRPC call points to the .NET control plane
+(`CanAccessShareAsync` on connect, ACL decision on open, close hooks for versioning/indexing).
+The actual I/O remains native (`SMB_VFS_NEXT_*`) — the file lands directly on storage.
 
-### Zwei zentrale Befunde (bestätigen Risiko 3)
+### Two key findings (confirm Risk 3)
 
-1. **`samba-dev` reicht nicht.** Das Distro-Dev-Paket (4.19.5) liefert die internen VFS-Header
-   **nicht** (kein `vfs.h` mit `SMB_VFS_INTERFACE_VERSION`, kein `smb_register_vfs`). Ein
-   Out-of-Tree-Build gegen Distro-Header ist unmöglich → Bau gegen den **Quellbaum**.
-2. **Modul + smbd müssen aus demselben Build stammen.** Ein gegen die Upstream-Quelle gebautes Modul
-   in die *Distro*-Samba einzusetzen scheitert an
-   `libsmbd-base-samba4.so: cannot open shared object file` (Ubuntu benennt die privaten Samba-Libs
-   um). → Wir **bauen und betreiben Samba selbst** (`--prefix=/opt/samba`). Das ist zugleich der
-   spätere Produktionspfad, weil wir die Samba-Version ohnehin kontrollieren müssen (ABI 49).
+1. **`samba-dev` is insufficient.** The distro dev package (4.19.5) does not provide the internal VFS headers
+   **at all** (no `vfs.h` with `SMB_VFS_INTERFACE_VERSION`, no `smb_register_vfs`). An
+   out-of-tree build against distro headers is impossible → build against the **source tree**.
+2. **Module + smbd must come from the same build.** A module built against upstream source
+   will fail when deployed to *distro* Samba with
+   `libsmbd-base-samba4.so: cannot open shared object file` (Ubuntu renames the private Samba libs).
+   → We **build and operate Samba ourselves** (`--prefix=/opt/samba`). This is also the
+   later production path, because we must control the Samba version anyway (ABI 49).
 
-### Bauen & testen
+### Build & test
 
 ```bash
-# Voraussetzung: Quell-Image mit dem Samba-Quellbaum (einmalig, cacht den Download)
+# Prerequisite: source image with Samba source tree (one-time, caches the download)
 #   docker build -f Dockerfile.src -t kaimo-samba-src:4.19.5 .
-# Samba + Modul aus einer Quelle bauen (~7 min: 2:30 build, 4:10 install)
+# Build Samba + module from one source (~7 min: 2:30 build, 4:10 install)
 docker build -f Dockerfile.vfs -t kaimo-samba-spike:vfs .
 docker run -d --name kaimo-samba-vfs -p 1446:445 kaimo-samba-spike:vfs
-# Datei-Op erzwingen und Hooks im Log nachweisen
+# Force file op and verify hooks in log
 docker exec kaimo-samba-vfs bash /usr/local/bin/selftest.sh
 docker logs kaimo-samba-vfs 2>&1 | grep "kaimo_bridge:"
 ```
 
-Dateien: [`Dockerfile.vfs`](Dockerfile.vfs), [`module/vfs_kaimo_bridge.c`](module/vfs_kaimo_bridge.c),
+Files: [`Dockerfile.vfs`](Dockerfile.vfs), [`module/vfs_kaimo_bridge.c`](module/vfs_kaimo_bridge.c),
 [`conf/smb.conf.vfs`](conf/smb.conf.vfs), [`entrypoint.vfs.sh`](entrypoint.vfs.sh).
 
-> Das Zwischen-Image `kaimo-samba-src:4.19.5` (siehe [`Dockerfile.src`](Dockerfile.src)) cacht nur
-> den entpackten Samba-Quellbaum, damit der Modul-Build nicht bei jeder Iteration neu herunterlädt.
+> The intermediate image `kaimo-samba-src:4.19.5` (see [`Dockerfile.src`](Dockerfile.src)) only caches
+> the unpacked Samba source tree, so the module build doesn't re-download on each iteration.
 
 ---
 
-## Phase 1 — Auth (echter NTLMv2-Login gegen Kaimo-User)
+## Phase 1 — Auth (genuine NTLMv2 login against Kaimo user)
 
-**Ergebnis: funktioniert.** Ein Kaimo-Benutzer meldet sich mit seinem echten Passwort per NTLMv2 an;
-ein falsches Passwort wird abgelehnt. Die NT-Hashes stammen live aus der Kaimo-DB.
+**Result: works.** A Kaimo user logs in with their actual password via NTLMv2;
+a wrong password is rejected. The NT hashes come live from the Kaimo DB.
 
-**Fluss:**
+**Flow:**
 
 ```
  Kaimo-DB ──► SmbBridge (.NET gRPC, :5080 h2c) ──gRPC ListUsers──► kaimo_authsync (C++)
-                 IAuthenticationLookup.GetNtHashAsync                 │  username + NT-Hash
-                 (entschlüsselt, filtert deaktiviert/leer)            ▼
-                                                          sync-users.sh ──pdbedit──► Sambas tdbsam
+                 IAuthenticationLookup.GetNtHashAsync                 │  username + NT hash
+                 (decrypted, filters disabled/empty)                  ▼
+                                                          sync-users.sh ──pdbedit──► Samba's tdbsam
                                                                                         │
-                                             smbd prüft NTLMv2 lokal gegen den NT-Hash ─┘
+                                             smbd verifies NTLMv2 locally against NT hash ─┘
 ```
 
-- **.NET-Seite:** neues Projekt `src/Kaimo_File_Server.SmbBridge` (ASP.NET-gRPC). Dünne Fassade über
-  das bestehende `IAuthenticationLookup` — keine Auth-Logik dupliziert. Braucht denselben
-  `NtHash__EncryptionKey` wie Host/Web (in `docker-compose.override.yml` gesetzt).
-- **C++-Seite:** `module/authsync.cpp` (gRPC-C++-Client) + [`sync-users.sh`](sync-users.sh). Der
-  Entrypoint synct beim Start (mit Retries) und danach alle 60 s. **Damit ist auch gRPC-in-C++ im
-  Samba-Container bewiesen** — das letzte offene Toolchain-Risiko aus Phase 0.
-- **Proto-Vertrag:** [`protos/kaimo_smb_bridge.proto`](protos/kaimo_smb_bridge.proto) — einmal
-  definiert, generiert C#- (Bridge) und C++-Stubs (authsync).
+- **.NET side:** new project `src/Kaimo_File_Server.SmbBridge` (ASP.NET gRPC). Thin facade over
+  the existing `IAuthenticationLookup` — no auth logic duplicated. Needs the same
+  `NtHash__EncryptionKey` as Host/Web (set in `docker-compose.override.yml`).
+- **C++ side:** `module/authsync.cpp` (gRPC C++ client) + [`sync-users.sh`](sync-users.sh). The
+  entrypoint syncs on start (with retries) and then every 60 s. **This also proves gRPC-in-C++ in the
+  Samba container** — the last open toolchain risk from Phase 0.
+- **Proto contract:** [`protos/kaimo_smb_bridge.proto`](protos/kaimo_smb_bridge.proto) — defined once,
+  generates C# (Bridge) and C++ stubs (authsync).
 
-**Testen (Kurzform):**
+**Test (short form):**
 ```bash
 docker compose up -d kaimo_smb_bridge kaimo_samba
 docker compose exec kaimo_samba bash -lc '\
   export PATH=/opt/samba/sbin:/opt/samba/bin:$PATH; \
-  smbclient -L localhost -U admin%admin1234 -m SMB3;      # RICHTIG  -> Shares
-  smbclient -L localhost -U admin%falsch    -m SMB3'      # FALSCH   -> NT_STATUS_LOGON_FAILURE
+  smbclient -L localhost -U admin%admin1234 -m SMB3;      # CORRECT  -> Shares
+  smbclient -L localhost -U admin%wrong     -m SMB3'      # WRONG    -> NT_STATUS_LOGON_FAILURE
 ```
-> Voraussetzung: die Demo-User sind geseedet (`Seed:DemoData=true`, dev): `admin/admin1234`,
+> Prerequisite: demo users are seeded (`Seed:DemoData=true`, dev): `admin/admin1234`,
 > `marco.hanisch/1234`, `anna.weber/1234`, `lisa.mueller/1234`.
 
-**Offen für Phase 2:** Die Autorisierung (Share-Zugriff, ACL beim Open) läuft noch nicht über gRPC —
-die VFS-Hooks (`connect`/`openat`) protokollieren bisher nur. Als Nächstes rufen sie
-`CanAccessShareAsync` / `FileService.OpenAsync` über dieselbe Bridge.
+**Open for Phase 2:** Authorization (share access, ACL on open) doesn't run via gRPC yet —
+the VFS hooks (`connect`/`openat`) only log for now. Next they will call
+`CanAccessShareAsync` / `FileService.OpenAsync` via the same bridge.
 
-## Phase 2a — Connect-Autorisierung (echte Kaimo-ACLs entscheiden den Share-Zugriff)
+## Phase 2a — Connect Authorization (genuine Kaimo ACLs decide share access)
 
-**Ergebnis: funktioniert.** Beim TREE_CONNECT entscheidet die echte Kaimo-ACL, ob ein Benutzer den
-Share betreten darf — dieselbe Semantik wie das frühere `KaimoSharePolicy.AuthorizeConnect`.
+**Result: works.** On TREE_CONNECT, the genuine Kaimo ACL decides whether a user can
+enter the share — same semantics as the earlier `KaimoSharePolicy.AuthorizeConnect`.
 
-**Fluss:**
+**Flow:**
 
 ```
- smbd VFS connect-Hook (kaimo_bridge.so, reines C)
-   │  Unix-Socket:  "CONNECT\t<user>\t<share>"
+ smbd VFS connect hook (kaimo_bridge.so, pure C)
+   │  Unix socket:  "CONNECT\t<user>\t<share>"
    ▼
- kaimo_authd (Sidecar, C++)  ──gRPC AuthorizeConnect──►  SmbBridge (.NET)
+ kaimo_authd (sidecar, C++)  ──gRPC AuthorizeConnect──►  SmbBridge (.NET)
    │  "ALLOW" / "DENY"                                     CanAccessShareAsync(shareId, userId)
    ▼
- erlauben -> SMB_VFS_NEXT_CONNECT   |   ablehnen -> errno=EACCES, TREE_CONNECT scheitert
+ allow -> SMB_VFS_NEXT_CONNECT   |   deny -> errno=EACCES, TREE_CONNECT fails
 ```
 
-- **Warum ein Sidecar?** So bleibt das smbd-VFS-Modul reines C (nur ein Socket-Roundtrip) — kein
-  gRPC/Threads/Fork im smbd-Prozess. Die gRPC-Komplexität kapselt `kaimo_authd`
+- **Why a sidecar?** This keeps the smbd VFS module as pure C (just a socket roundtrip) — no
+  gRPC/threads/fork in the smbd process. The gRPC complexity is encapsulated in `kaimo_authd`
   ([`module/authd.cpp`](module/authd.cpp)).
-- **.NET:** [`AuthzGrpcService`](../src/Kaimo_File_Server.SmbBridge/Services/AuthzGrpcService.cs) löst
-  User-/Share-Namen auf Guids auf und ruft `IAuthenticationLookup.CanAccessShareAsync`.
-- **IPC$** wird immer zugelassen (Share-Enumeration).
+- **.NET:** [`AuthzGrpcService`](../src/Kaimo_File_Server.SmbBridge/Services/AuthzGrpcService.cs) resolves
+  user/share names to GUIDs and calls `IAuthenticationLookup.CanAccessShareAsync`.
+- **IPC$** is always allowed (share enumeration).
 
-**Verifiziert (dept-basiertes Allow/Deny, entspricht exakt den Kaimo-ACLs):**
+**Verified (dept-based allow/deny, matches Kaimo ACLs exactly):**
 
-| User (Abteilung) | Share | Entscheidung |
+| User (Department) | Share | Decision |
 |---|---|---|
 | marco.hanisch (Frontend) | frontend-docs | **ALLOW** |
 | marco.hanisch (Frontend) | marketing-files | **DENY** |
 | lisa.mueller (Marketing) | marketing-files | **ALLOW** |
 | lisa.mueller (Marketing) | frontend-docs | **DENY** |
 | anna.weber (Backend) | backend-docs | **ALLOW** |
-| admin (nur Management-Rolle) | jeder Share | **DENY** |
+| admin (management role only) | every share | **DENY** |
 
-> **Hinweis admin:** `admin` hat die Management-Rolle „Administrator", aber **keine Datei-ACLs** auf
-> den Shares. `CanAccessShareAsync` verweigert daher — **genau wie der alte SMB-Stack** (getreue
-> Parität, kein Fehler). Datei-Zugriff wird über ACLs/Departments vergeben, nicht über die
-> Management-Rolle.
+> **Note about admin:** `admin` has the "Administrator" management role, but **no file ACLs** on
+> the shares. `CanAccessShareAsync` therefore denies — **just like the old SMB stack** (faithful
+> parity, not a bug). File access is granted via ACLs/departments, not management roles.
 
-**Fail-Verhalten:** Ist der Sidecar/die Bridge nicht erreichbar, erlaubt das Modul standardmäßig
-(fail-open, damit ein Ausfall nicht alles sperrt). Mit `KAIMO_AUTHZ_FAILCLOSED=1` wird strikt
-abgelehnt.
+**Fail behavior:** If the sidecar/bridge is unreachable, the module allows by default
+(fail-open, so an outage doesn't lock everything). With `KAIMO_AUTHZ_FAILCLOSED=1`, it strictly
+denies.
 
-**Bekannte Kosmetik:** Ein Deny erscheint clientseitig als `NT_STATUS_UNSUCCESSFUL` (nicht
-`ACCESS_DENIED`) — mehrere Samba-Codepfade hartkodieren das bei VFS-connect-Fehlern. Funktional ist
-der Zugriff korrekt verweigert.
+**Known cosmetic issue:** A deny appears client-side as `NT_STATUS_UNSUCCESSFUL` (not
+`ACCESS_DENIED`) — several Samba code paths hardcode this for VFS connect errors. Functionally
+access is correctly denied.
 
-**Offen (Phase 2b):** Datei-/Pfad-ACL beim `openat`/`unlink`/`rename` (heute nur Logging) und der
-Directory-Listing-Filter — perf-sensibel und mit Pfad-Rekonstruktion verbunden, daher als eigener
-Schritt.
+**Open (Phase 2b):** File/path ACL on `openat`/`unlink`/`rename` (currently logging only) and
+directory listing filter — performance-sensitive and tied to path reconstruction, so as a separate
+step.
 
-## Phase 2b — Datei-/Pfad-ACL + Listing-Filter (Phase 2 komplett)
+## Phase 2b — File/path ACL + listing filter (Phase 2 complete)
 
-**Ergebnis: funktioniert.** Datei-Open (read/write/create) und Directory-Listing folgen den echten
-Kaimo-ACLs — mit **exakter Parität** zum alten `FileService.OpenAsync` bzw. `ListAsync`.
+**Result: works.** File open (read/write/create) and directory listing follow genuine
+Kaimo ACLs — with **exact parity** to the old `FileService.OpenAsync` and `ListAsync`.
 
-- **`create_file`-Hook** ([vfs_kaimo_bridge.c](module/vfs_kaimo_bridge.c)) → gRPC `AuthorizeOpen`.
-  Der richtige Seam (nicht `openat`): voller Pfad + Access-Mask, gibt sauberes `ACCESS_DENIED`.
-  Paritätslogik in [`AuthzGrpcService.AuthorizeOpen`](../src/Kaimo_File_Server.SmbBridge/Services/AuthzGrpcService.cs):
-  write→`CreateWriteData`, read→`ListReadData`, create→`CreateWriteData` auf dem Parent; jede
-  Zugriffsart einzeln; nicht-existent ohne Create = „not found" (kein ACL-Deny).
-- **`readdir`-Hook** → verbirgt Einträge ohne Leserecht (`AuthorizeOpen` read-only pro Eintrag).
-  Der **Sidecar cached** Entscheidungen (TTL 3 s), damit große Listings die Bridge nicht fluten.
-  Abschaltbar mit `KAIMO_LIST_FILTER=0`.
+- **`create_file` hook** ([vfs_kaimo_bridge.c](module/vfs_kaimo_bridge.c)) → gRPC `AuthorizeOpen`.
+  The correct seam (not `openat`): full path + access mask, returns clean `ACCESS_DENIED`.
+  Parity logic in [`AuthzGrpcService.AuthorizeOpen`](../src/Kaimo_File_Server.SmbBridge/Services/AuthzGrpcService.cs):
+  write→`CreateWriteData`, read→`ListReadData`, create→`CreateWriteData` on parent; each
+  access type separately; non-existent without create = "not found" (no ACL deny).
+- **`readdir` hook** → hides entries without read permission (`AuthorizeOpen` read-only per entry).
+  The **sidecar caches** decisions (TTL 3 s) so large listings don't flood the bridge.
+  Disabled with `KAIMO_LIST_FILTER=0`.
 
-**Verifiziert:**
+**Verified:**
 
-| Fall | Ergebnis |
+| Case | Result |
 |---|---|
-| lisa (Marketing = nur-lesend) schreibt in marketing-files | **DENY** (`create_file` → `CreateWriteData`) |
-| marco (Entwicklung = schreibend) schreibt in frontend-docs | **ALLOW**, Datei auf Disk |
-| marco liest Datei mit explizitem Deny-ACL | **DENY** (`ACCESS_DENIED`) |
-| marco listet Verzeichnis mit Deny-Datei | Datei **unsichtbar** (Listing-Filter), liegt aber real auf Disk |
+| lisa (Marketing = read-only) writes to marketing-files | **DENY** (`create_file` → `CreateWriteData`) |
+| marco (Development = write) writes to frontend-docs | **ALLOW**, file on disk |
+| marco reads file with explicit deny ACL | **DENY** (`ACCESS_DENIED`) |
+| marco lists directory with deny file | File **invisible** (listing filter), but physically on disk |
 
-> **Wichtig — Storage-Mount:** Die Bridge braucht denselben `/data/storage`-Mount (Existenz-/Typ-
-> Prüfung wie `OpenAsync`). In [`../docker-compose.yml`](../docker-compose.yml) ist er gesetzt. Ohne
-> ihn behandelt die Bridge existierende Dateien als „not found" und erlaubt zu viel.
+> **Important — storage mount:** The bridge needs the same `/data/storage` mount (existence/type
+> check as `OpenAsync`). It is set in [`../docker-compose.yml`](../docker-compose.yml). Without
+> it, the bridge treats existing files as "not found" and allows too much.
 
-**Noch offen für spätere Phasen:** Snapshots/@GMT (Phase 5), Recycle-Bin/Versionierung/Suchindex an
-den Close-Hooks (Phase 3), sowie das durchgehende `NT_STATUS_ACCESS_DENIED` beim connect (heute
-`NT_STATUS_UNSUCCESSFUL`, Samba-intern).
+**Still open for later phases:** Snapshots/@GMT (Phase 5), recycle bin/versioning/search index on
+close hooks (Phase 3), and consistent `NT_STATUS_ACCESS_DENIED` on connect (currently
+`NT_STATUS_UNSUCCESSFUL`, Samba-internal).
 
-## Phase 3 — Close-Hooks (Versionierung, Ownership, Suchindex)
+## Phase 3 — Close hooks (versioning, ownership, search index)
 
-**Ergebnis: funktioniert.** Samba führt die Datei-I/O nativ aus und meldet danach das Ereignis; die
-Bridge erledigt dieselben Cross-Cutting-Effekte wie früher `FileSession.DisposeAsync`.
+**Result: works.** Samba performs the file I/O natively and then reports the event; the
+bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsync`.
 
-**Fluss:**
+**Flow:**
 
 ```
- smbd VFS-Hook (reines C)          Sidecar (kaimo_authd)        SmbBridge (.NET)
-  close_fn   (Datei geschrieben) ──"CLOSE\t…"──► NotifyClose ──► FileService.NotifyExternalCloseAsync
-  unlinkat_fn(geloescht)         ──"DELETE\t…"─► NotifyDelete ─►   → Version (CreateVersionAsync)
-  renameat_fn(umbenannt)         ──"RENAME\t…"─► NotifyRename ─►   → Ownership (EnsureOwnerAsync)
-  mkdirat_fn (Verz. angelegt)    ──"MKDIR\t…"──► NotifyMkdir  ─►   → Suchindex (SearchServiceRouter)
-                                    (fire-and-forget)               → ACL-Realign (Rename)
+ smbd VFS hook (pure C)            Sidecar (kaimo_authd)        SmbBridge (.NET)
+  close_fn   (file written)    ──"CLOSE\t…"──► NotifyClose ──► FileService.NotifyExternalCloseAsync
+  unlinkat_fn(deleted)         ──"DELETE\t…"─► NotifyDelete ─►   → Version (CreateVersionAsync)
+  renameat_fn(renamed)         ──"RENAME\t…"─► NotifyRename ─►   → Ownership (EnsureOwnerAsync)
+  mkdirat_fn (directory created) ──"MKDIR\t…"──► NotifyMkdir  ─►   → Search index (SearchServiceRouter)
+                                    (fire-and-forget)               → ACL realignment (Rename)
 ```
 
-- **.NET:** neue `FileService.NotifyExternal{Close,Delete,Rename,Mkdir}Async` (in Core) nutzen die
-  **bereits verdrahteten** Version-/Ownership-/Such-Services — identische Ergebnisse wie Web-Uploads.
-  Fassade: [`FileEventGrpcService`](../src/Kaimo_File_Server.SmbBridge/Services/FileEventGrpcService.cs).
-- **Sidecar** ist jetzt **multi-threaded** (Thread pro Verbindung), damit langsame Events
-  (Versionierung liest die Datei) die Authz-Anfragen nicht blockieren. Events sind fire-and-forget.
-- **Recycle-Bin** bewusst **nicht** implementiert: der alte SMB-Pfad (`MarkDeleteOnClose`) recycelt
-  ebenfalls nicht — Recycle gibt es nur im Web-`DeleteFileAsync`. Das ist also getreue Parität.
+- **.NET:** new `FileService.NotifyExternal{Close,Delete,Rename,Mkdir}Async` (in Core) use the
+  **already wired** version/ownership/search services — identical results as web uploads.
+  Facade: [`FileEventGrpcService`](../src/Kaimo_File_Server.SmbBridge/Services/FileEventGrpcService.cs).
+- **Sidecar** is now **multi-threaded** (one thread per connection) so slow events
+  (versioning reads the file) don't block authz requests. Events are fire-and-forget.
+- **Recycle bin** deliberately **not** implemented: the old SMB path (`MarkDeleteOnClose`) also doesn't recycle —
+  recycle only exists in web `DeleteFileAsync`. So this is faithful parity.
 
-**Verifiziert:**
+**Verified:**
 
-| Ereignis | Ergebnis |
+| Event | Result |
 |---|---|
-| marco schreibt Datei → schließt | `file_versions`-Snapshot angelegt (**Versionierung** ✅) |
-| dieselbe Datei | `file_metadata.OwnerId = marco` (**Ownership** ✅) |
-| Datei löschen | `NotifyDelete` gefeuert → Deindex-Pfad ✅ |
-| Datei umbenennen | `NotifyRename` gefeuert → ACL-Realign + Index-Pfad ✅ |
+| marco writes file → closes | `file_versions` snapshot created (**versioning** ✅) |
+| same file | `file_metadata.OwnerId = marco` (**ownership** ✅) |
+| delete file | `NotifyDelete` fired → deindex path ✅ |
+| rename file | `NotifyRename` fired → ACL realignment + index path ✅ |
 
-**Bekannte Punkte:**
+**Known points:**
 
-- **Suchindex:** Die Indizierung läuft über denselben `SearchServiceRouter` wie der Host. Der Router
-  gated Elasticsearch über einen Erreichbarkeits-Ping; auf diesem System ist ES-Indexing aktuell
-  **systemweit inaktiv** (auch der Host indiziert seit dem 9. Juli nichts Neues — unabhängig von
-  dieser Migration). Die Bridge verhält sich also **parität-treu**. Sobald ES-Indexing wieder aktiv
-  ist, werden SMB-Writes wie Web-Uploads indiziert.
-- **Rasch aufeinanderfolgende Schreibvorgänge** derselben Datei können zu einer Version
-  zusammenfallen: die Version wird beim Close aus der Datei **nachgelesen** (nicht aus dem offenen
-  Stream wie im alten In-Process-Pfad). Für normale Speicherabstände unkritisch.
-- **`mkdirat`-Hook** feuert in Sambas SMB2-Verzeichnis-Erstellungspfad nicht zuverlässig (Dirs werden
-  offenbar nicht immer über `mkdirat_fn` angelegt) — kleiner Rand-Gap, Datei-Ops sind vollständig.
+- **Search index:** Indexing runs via the same `SearchServiceRouter` as the host. The router
+  gates Elasticsearch via a reachability ping; on this system ES indexing is currently
+  **system-wide inactive** (the host also hasn't indexed anything new since July 9 — independent of
+  this migration). The bridge therefore behaves **parity-faithfully**. Once ES indexing is active again,
+  SMB writes will be indexed like web uploads.
+- **Rapid successive writes** to the same file may collapse into one version: the version is
+  **re-read** from the file on close (not from the open stream as in the old in-process path).
+  Uncritical for normal save intervals.
+- **`mkdirat` hook** doesn't fire reliably in Samba's SMB2 directory creation path (directories
+  apparently aren't always created via `mkdirat_fn`) — minor edge gap, file ops are complete.
 
-## Phase 4 — Dynamische Shares (Registry-Provisioning aus der Kaimo-DB)
+## Phase 4 — Dynamic shares (Registry provisioning from Kaimo DB)
 
-**Ergebnis: funktioniert.** Die in der Kaimo-DB *aktivierten* Shares erscheinen automatisch in
-Samba — ohne smbd-Neustart —, und Anlegen/Umbenennen/Löschen/Deaktivieren über die Web-UI schlägt
-live durch. Das ersetzt den FileSystemWatcher/`SyncFromDb()`-Mechanismus aus
+**Result: works.** Shares *enabled* in the Kaimo DB appear automatically in
+Samba — without smbd restart — and create/rename/delete/disable via the web UI takes effect live. This
+replaces the FileSystemWatcher/`SyncFromDb()` mechanism from
 `src/Kaimo_File_Server.Smb/SmbServer.cs`.
 
-**Fluss (Spiegelbild zum NT-Hash-Sync aus Phase 1):**
+**Flow (mirror of NT hash sync from Phase 1):**
 
 ```
  Kaimo-DB ──► SmbBridge (.NET gRPC, :5080) ──gRPC ListShares──► kaimo_sharesync (C++)
                  IShareRepository.GetAllEnabledAsync                 │  name<TAB>path<TAB>hidden
-                 (nur aktivierte Shares)                             ▼
+                 (enabled shares only)                               ▼
                                                           sync-shares.sh ──net conf──► registry.tdb
                                                             (add/setparm/delshare)        │
-                                                    smbd liest Shares LIVE aus Registry ──┘
+                                                    smbd reads shares LIVE from registry ──┘
 ```
 
 - **.NET:** [`ShareGrpcService`](../src/Kaimo_File_Server.SmbBridge/Services/ShareGrpcService.cs) —
-  dünne Fassade über `IShareRepository`; keine Share-Logik dupliziert (deaktivierte Shares filtert
-  bereits das Repository). Registriert in [`Program.cs`](../src/Kaimo_File_Server.SmbBridge/Program.cs).
-- **C++:** [`module/sharesync.cpp`](module/sharesync.cpp) (gRPC-Client) +
-  [`sync-shares.sh`](sync-shares.sh). Der Entrypoint synct beim Start (mit Retries, bis die Bridge
-  erreichbar ist) und danach alle 60 s — wie der User-Sync.
-- **Reconciliation** in `sync-shares.sh` ist idempotent: neue Shares → `net conf addshare`,
-  geänderte (Pfad/Sichtbarkeit) → `net conf setparm`, entfernte/deaktivierte → `net conf delshare`.
-  `global` wird nie angefasst.
+  thin facade over `IShareRepository`; no share logic duplicated (repository already filters disabled shares).
+  Registered in [`Program.cs`](../src/Kaimo_File_Server.SmbBridge/Program.cs).
+- **C++:** [`module/sharesync.cpp`](module/sharesync.cpp) (gRPC client) +
+  [`sync-shares.sh`](sync-shares.sh). The entrypoint syncs on start (with retries until bridge
+  is reachable) and then every 60 s — same as user sync.
+- **Reconciliation** in `sync-shares.sh` is idempotent: new shares → `net conf addshare`,
+  changed (path/visibility) → `net conf setparm`, removed/disabled → `net conf delshare`.
+  `global` is never touched.
 
-### Sichtbarkeit (ABE) — Entscheidung: nur Hidden-Flag
+### Visibility (ABE) — Decision: hidden flag only
 
-`IsShareHidden` → `browseable = no` (der Share verschwindet aus der Auflistung, bleibt aber per
-`\\host\share` direkt erreichbar). Der **harte** Share-Zugriff wird unverändert vom Phase-2a-
-`connect`-Hook nach echten Kaimo-ACLs entschieden. Volle Per-User-ABE (`valid users` pro Share)
-wurde bewusst **nicht** umgesetzt — sie würde sich mit dem `connect`-Hook überschneiden und die
-ACL-Logik doppeln. Details/Begründung: [Risiko 2 im Gesamtplan](../docu/smb-samba-vfs-migration.md#risiko-2--dynamische-share-sichtbarkeit-pro-user--kniffligster-punkt).
+`IsShareHidden` → `browseable = no` (the share disappears from listing but remains directly
+accessible via `\\host\share`). The **hard** share access is decided unchanged by the Phase 2a
+`connect` hook based on genuine Kaimo ACLs. Full per-user ABE (`valid users` per share)
+was deliberately **not** implemented — it would overlap with the `connect` hook and duplicate
+ACL logic. Details/rationale: [Risk 2 in overall plan](../docu/smb-samba-vfs-migration.md#risk-2--dynamic-share-visibility-per-user--trickiest-point).
 
-**Testen (nachdem die Web-UI/DB Shares enthält):**
+**Test (after web UI/DB contains shares):**
 ```bash
 docker compose up -d kaimo_smb_bridge kaimo_samba
 docker compose exec kaimo_samba bash -lc '\
   export PATH=/opt/samba/sbin:/opt/samba/bin:$PATH; \
-  /usr/local/bin/sync-shares.sh;               # Registry aus der DB spiegeln
-  net conf listshares;                         # -> die aktivierten Kaimo-Shares
-  smbclient -L localhost -U admin%admin1234 -m SMB3'   # -> Shares in der Enumeration
+  /usr/local/bin/sync-shares.sh;               # Mirror registry from DB
+  net conf listshares;                         # -> the enabled Kaimo shares
+  smbclient -L localhost -U admin%admin1234 -m SMB3'   # -> shares in enumeration
 ```
 
-### Protokoll-Settings aus der Kaimo-DB (`ISmbConfigStore`)
+### Protocol settings from Kaimo DB (`ISmbConfigStore`)
 
-**Ergebnis: funktioniert.** Die per Web-UI gepflegten SMB-Protokoll/Sicherheits-Optionen
-(Dialekt-Range, Signing, Encryption) landen in Sambas globaler Config — dasselbe, was
-`SmbServer.LoadProtocolSettings()` beim (Re)Start in den alten .NET-SMB-Server einspeiste.
+**Result: works.** The SMB protocol/security options maintained via web UI
+(dialect range, signing, encryption) land in Samba's global config — the same thing
+`SmbServer.LoadProtocolSettings()` used to feed the old .NET SMB server on (re)start.
 
-**Fluss** (analog zum Share-Sync):
+**Flow** (similar to share sync):
 
 ```
  Kaimo-DB ──► SmbBridge (:5080) ──gRPC GetProtocolSettings──► kaimo_configsync (C++)
                  ISmbConfigStore.GetProtocolSettingsAsync         │  min⇥max⇥signing⇥encrypt
-                 (frisch, ohne Cache)                             ▼
+                 (fresh, no cache)                                ▼
                                               sync-config.sh ──net conf setparm global──► registry.tdb
-                                                (nur bei Aenderung: smbcontrol smbd reload-config)
+                                                (only on change: smbcontrol smbd reload-config)
 ```
 
-- **Mapping** (in der Bridge, damit die Shell samba-agnostisch bleibt): Dialekt-Enum → `server min/max
+- **Mapping** (in the bridge, so the shell remains Samba-agnostic): dialect enum → `server min/max
   protocol` (`SMB2_02`…`SMB3_11`); `RequireSigning` → `server signing = mandatory|auto`;
   `RequireEncryption` → `smb encrypt = required|default`.
-- **Präzedenz:** In [`conf/smb.conf.vfs`](conf/smb.conf.vfs) steht `include = registry` **am Ende** der
-  `[global]`-Sektion, damit die per `net conf` gesetzten DB-Werte die Inline-Fallback-Defaults
-  überschreiben. smbd liest sie beim Start bzw. nach `smbcontrol smbd reload-config` (nur neue
-  Verbindungen; bestehende bleiben). Der Config-Sync löst den Reload **nur bei tatsächlicher
-  Änderung** aus.
-- **Bewusst nicht synchronisiert:** WS-Discovery und Audit-Log haben in Samba keine globalen
-  smb.conf-Parameter (separate Mechanismen: `wsdd` bzw. der `full_audit`-VFS; das Kaimo-VFS-Modul
-  loggt Connect/Open/Close ohnehin selbst).
+- **Precedence:** In [`conf/smb.conf.vfs`](conf/smb.conf.vfs), `include = registry` is **at the end** of
+  the `[global]` section so DB values set via `net conf` override inline fallback defaults.
+  smbd reads them on start or after `smbcontrol smbd reload-config` (new connections only; existing ones stay).
+  The config sync triggers the reload **only on actual change**.
+- **Deliberately not synced:** WS-Discovery and audit log have no global
+  smb.conf parameters in Samba (separate mechanisms: `wsdd` and the `full_audit` VFS; the Kaimo VFS module
+  logs connect/open/close itself anyway).
 
-**Testen:**
+**Test:**
 ```bash
 docker compose exec kaimo_samba bash -lc '\
   export PATH=/opt/samba/sbin:/opt/samba/bin:$PATH; \
@@ -341,80 +338,77 @@ docker compose exec kaimo_samba bash -lc '\
   net conf getparm global "server signing"'
 ```
 
-### Bekanntes Problem — Schreibrechte über SMB (Storage-Ownership)
+### Known issue — SMB write permissions (storage ownership)
 
-**Symptom:** Lesen über SMB geht, **Schreiben scheitert** mit `ACCESS_DENIED` (die Web-UI schreibt
-normal). Ursache: Samba macht die Datei-I/O **als der authentifizierte Unix-User** (jeder Kaimo-User
-bekommt via `sync-users.sh` ein POSIX-Konto mit eigener UID). Die Share-Verzeichnisse legt aber der
-**Host/Web-Container** an — er läuft als `$APP_UID` (**1654**, der Standard-`app`-User der .NET-Images)
-und erzeugt sie mit Modus `0755`. Also darf nur uid 1654 schreiben; die SMB-User (andere UIDs) dürfen
-nur lesen. Die Kaimo-ACL sagt sogar ALLOW — erst der Kernel wirft `EACCES`.
+**Symptom:** Read via SMB works, **write fails** with `ACCESS_DENIED` (web UI writes normally).
+Root cause: Samba does file I/O **as the authenticated Unix user** (each Kaimo user gets a POSIX account
+with their own UID via `sync-users.sh`). But share directories are created by the
+**Host/Web container** — it runs as `$APP_UID` (**1654**, the standard `app` user of .NET images)
+and creates them with mode `0755`. So only UID 1654 can write; SMB users (other UIDs) can only read.
+The Kaimo ACL even says ALLOW — only the kernel throws `EACCES`.
 
-> **Sackgassen (nicht verwenden):** Sambas `force user` **und** „alle User teilen dieselbe UID"
-> lösen zwar die Schreibrechte, **zerstören aber Sambas Per-User-Identität** (SID wird algorithmisch
-> aus der UID abgeleitet, plus `getpwuid`-Ruecklookups) → alle User kollabieren auf einen Principal →
-> **Auth/Connect bricht**. Beides wurde probiert und wieder verworfen.
+> **Dead ends (don't use):** Samba's `force user` **and** "all users share same UID"
+> do solve write permissions, **but destroy Samba's per-user identity** (SID is algorithmically
+> derived from UID, plus `getpwuid` lookups) → all users collapse to one principal →
+> **auth/connect breaks**. Both were tried and abandoned.
 
-**Fix (umgesetzt):** Per-User-Identität behalten (distinkte UIDs), das Schreibrecht über eine
-**gemeinsame Gruppe + gruppen-schreibbaren Storage** lösen. Konkret:
+**Fix (implemented):** Keep per-user identity (distinct UIDs), solve write permission via
+**shared group + group-writable storage**. Specifically:
 
-- [`entrypoint.vfs.sh`](entrypoint.vfs.sh) legt beim Start die Gruppe `kaimo` mit der Storage-GID an
-  (`KAIMO_STORAGE_GID`, Default **1654**), setzt die Share-Verzeichnisse auf `2775` (setgid + g+w) und
-  zieht die Gruppe/Rechte rekursiv nach (die internen Dot-Dirs `.dp-keys`/`.certs` bleiben ausgenommen).
-- [`sync-users.sh`](sync-users.sh) nimmt **jeden** synchronisierten Kaimo-User per `usermod -aG` in die
-  Gruppe auf — als **sekundäre** Gruppe, die primäre UID/Gruppe (und damit SID/Identität) bleibt.
-- [`sync-shares.sh`](sync-shares.sh) setzt neu provisionierte Shares direkt auf Gruppe + `2775`.
-- [`conf/smb.conf.vfs`](conf/smb.conf.vfs) erzwingt gruppen-schreibbare neue Objekte:
+- [`entrypoint.vfs.sh`](entrypoint.vfs.sh) creates the `kaimo` group with storage GID on start
+  (`KAIMO_STORAGE_GID`, default **1654**), sets share directories to `2775` (setgid + g+w) and
+  applies the group/permissions recursively (internal dot-dirs `.dp-keys`/`.certs` are exempted).
+- [`sync-users.sh`](sync-users.sh) adds **each** synced Kaimo user to the group via `usermod -aG` —
+  as a **secondary** group, primary UID/group (and thus SID/identity) stays.
+- [`sync-shares.sh`](sync-shares.sh) sets newly provisioned shares directly to group + `2775`.
+- [`conf/smb.conf.vfs`](conf/smb.conf.vfs) enforces group-writable new objects:
   `create mask = 0664` / `force create mode = 0060` / `directory mask = 2775` / `force directory mode = 0070`.
 
-`force user` / geteilte UIDs bleiben tabu (siehe Sackgassen oben). Verifiziert: SMB-Write als
-`marco.hanisch` auf einen `0755`-Share (`crazyFrog`) → vorher `ACCESS_DENIED`, nachher Datei mit Modus
-`0664`, Gruppe `kaimo`.
+`force user` / shared UIDs remain taboo (see dead ends above). Verified: SMB write as
+`marco.hanisch` on a `0755` share (`crazyFrog`) → before `ACCESS_DENIED`, after file with mode
+`0664`, group `kaimo`.
 
-**Rest-Gap:** POSIX-ACLs sind auf dem Storage-FS dieses Setups **nicht** verfügbar (`setfacl` schlägt
-fehl), daher greift der Default-ACL-Weg nicht. Für **künftig vom Web** (uid 1654) angelegte Dateien
-hängt das Gruppen-Schreibrecht noch an der Host-umask des Web/Host-Containers — mit `022` werden sie
-`0644` (Gruppe nur lesend), sodass SMB sie zwar lesen, aber nicht überschreiben kann. Fix dafür:
-**umask `002`** im Web/Host-Container. Bereits auf Disk liegende Dateien wurden beim Rollout einmalig
-auf `g+rwX` gezogen und sind unkritisch.
+**Remaining gap:** POSIX ACLs are **not** available on this setup's storage filesystem (`setfacl` fails),
+so the default ACL path doesn't work. For files **created later by web** (UID 1654),
+group write permission still depends on the web/host container's umask — with `022` they become
+`0644` (group read-only), so SMB can read them but not overwrite. Fix: **umask `002`** in web/host
+container. Files already on disk were touched once at rollout to `g+rwX` and are uncritical.
 
-## Deployment über docker compose
+## Deployment via docker compose
 
-Der Spike ist als Service `kaimo_samba` in die zentrale [`../docker-compose.yml`](../docker-compose.yml)
-eingebunden — `docker compose up` zieht ihn mit hoch, **ohne** die bestehende .NET-SMB-Implementierung
-zu stören:
+The spike is integrated as service `kaimo_samba` in the central [`../docker-compose.yml`](../docker-compose.yml)
+— `docker compose up` brings it up, **without** disturbing the existing .NET SMB implementation:
 
 ```bash
-cd ..                       # ins Verzeichnis mit docker-compose.yml
-docker compose up -d kaimo_samba          # nur Samba
-# oder alles zusammen:
+cd ..                       # into the docker-compose.yml directory
+docker compose up -d kaimo_samba          # Samba only
+# or everything together:
 docker compose up -d
 ```
 
-- **Port:** Host-Port **1445** → Container-445 (der .NET-Host behält vorerst 445; beim Cutover in
-  Phase 5 übernimmt Samba die 445).
-- **Storage:** derselbe Bind-Mount `./tests/data/storage:/data/storage` wie Host/Web → Samba macht die
-  Datei-I/O direkt.
-- **Healthcheck:** meldet `healthy`, sobald `smbd` Verbindungen annimmt.
+- **Port:** host port **1445** → container 445 (the .NET host keeps 445 for now; on cutover in
+  Phase 5, Samba takes 445).
+- **Storage:** same bind mount `./tests/data/storage:/data/storage` as host/web → Samba does file I/O directly.
+- **Healthcheck:** reports `healthy` once `smbd` accepts connections.
 
-Testen nach dem Hochfahren:
+Test after startup:
 ```bash
 docker compose exec kaimo_samba bash /usr/local/bin/selftest.sh
 docker compose logs kaimo_samba | grep "kaimo_bridge:"
 ```
 
-> Der erste Build kompiliert Samba aus der Quelle (~7 min). Danach greift der BuildKit-Layer-Cache.
+> The first build compiles Samba from source (~7 min). After that, BuildKit layer cache takes effect.
 
-## Wichtige Fakten aus Phase 0
+## Important facts from Phase 0
 
-- Samba-Version Runtime: **4.19.5-Ubuntu** (`ubuntu:24.04`-Paket).
-- **`SMB_VFS_INTERFACE_VERSION = 49`** — das VFS-Modul muss gegen genau diese ABI gebaut werden.
-- VFS-Modulverzeichnis: `/usr/lib/x86_64-linux-gnu/samba/vfs/`.
-- Modul-Init-Symbol: `vfs_kaimo_bridge_init` → registriert unter dem Namen `kaimo_bridge`.
-- Registrierung im Build: `bld.SAMBA3_MODULE('vfs_kaimo_bridge', subsystem='vfs', …)` in
-  `source3/modules/wscript_build`, plus Eintrag in `default_shared_modules` in `source3/wscript`.
+- Samba runtime version: **4.19.5-Ubuntu** (`ubuntu:24.04` package).
+- **`SMB_VFS_INTERFACE_VERSION = 49`** — the VFS module must be built against exactly this ABI.
+- VFS module directory: `/usr/lib/x86_64-linux-gnu/samba/vfs/`.
+- Module init symbol: `vfs_kaimo_bridge_init` → registered under the name `kaimo_bridge`.
+- Build registration: `bld.SAMBA3_MODULE('vfs_kaimo_bridge', subsystem='vfs', …)` in
+  `source3/modules/wscript_build`, plus entry in `default_shared_modules` in `source3/wscript`.
 
-## Nächste Schritte (nach Phase 0)
+## Next steps (after Phase 0)
 
-Phase 1 (Auth) — `.proto` + gRPC `GetNtHash`/`ResolveUser` in .NET, custom `pdb`-Modul; danach
-Zugriff/I/O-Hooks (Phase 2). Details im [Gesamtplan](../docu/smb-samba-vfs-migration.md#6-umsetzung-in-phasen).
+Phase 1 (Auth) — `.proto` + gRPC `GetNtHash`/`ResolveUser` in .NET, custom `pdb` module; then
+access/I/O hooks (Phase 2). Details in [overall plan](../docu/smb-samba-vfs-migration.md#6-implementation-in-phases).

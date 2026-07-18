@@ -5,17 +5,17 @@ using Kaimo_File_Server.SmbBridge.Grpc;
 namespace Kaimo_File_Server.SmbBridge.Services;
 
 /// <summary>
-/// gRPC-Fassade für das Share-Provisioning (Phase 4). Liefert die aktuell
-/// aktivierten Kaimo-Shares, damit der Samba-Container sie live in seine Registry
-/// (<c>net conf</c>) spiegeln kann — der Ersatz für den FileSystemWatcher/
-/// <c>SyncFromDb()</c>-Mechanismus aus <c>SmbServer.cs</c>. Dünne Fassade über
-/// <see cref="IShareRepository.GetAllEnabledAsync"/>; es wird keine Share-Logik
-/// dupliziert (deaktivierte Shares filtert bereits das Repository).
+/// gRPC facade for share provisioning (Phase 4). Provides the currently enabled
+/// Kaimo shares so the Samba container can mirror them live in its registry
+/// (<c>net conf</c>) — the replacement for the FileSystemWatcher/
+/// <c>SyncFromDb()</c> mechanism from <c>SmbServer.cs</c>. Thin facade over
+/// <see cref="IShareRepository.GetAllEnabledAsync"/>; no share logic is
+/// duplicated (the repository already filters disabled shares).
 ///
-/// Sichtbarkeit (ABE): es wird nur das Hidden-Flag transportiert
-/// (<see cref="ShareEntry.IsHidden"/> → <c>browseable = no</c>). Der harte
-/// Share-Zugriff wird unverändert vom VFS-connect-Hook nach echten Kaimo-ACLs
-/// entschieden (<see cref="AuthzGrpcService.AuthorizeConnect"/>).
+/// Visibility (ABE): only the hidden flag is transported
+/// (<see cref="ShareEntry.IsHidden"/> → <c>browseable = no</c>). Hard share
+/// access is unchanged and decided by the VFS connect hook based on real Kaimo ACLs
+/// (<see cref="AuthzGrpcService.AuthorizeConnect"/>).
 /// </summary>
 public sealed class ShareGrpcService : ShareService.ShareServiceBase
 {
@@ -44,7 +44,7 @@ public sealed class ShareGrpcService : ShareService.ShareServiceBase
             });
         }
 
-        _logger.LogInformation("ListShares -> {Count} aktivierte Shares.", reply.Shares.Count);
+        _logger.LogInformation("ListShares -> {Count} enabled shares.", reply.Shares.Count);
         return reply;
     }
 }

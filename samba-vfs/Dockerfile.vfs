@@ -1,16 +1,16 @@
-# Phase-0-Spike, Schritt B: eigenes VFS-Modul + Samba aus EINER Quelle.
+# Phase-0-Spike, step B: own VFS module + Samba from ONE source.
 #
-# Self-contained, damit `docker compose build` es ohne Vorarbeit bauen kann.
-# (Fuer schnelle lokale Modul-Iterationen gibt es zusaetzlich Dockerfile.src, das
-#  nur den Quell-Download cacht — fuer Compose nicht noetig.)
+# Self-contained so `docker compose build` can build it without prerequisites.
+# (For fast local module iterations there's also Dockerfile.src that only
+#  caches source download — not needed for Compose.)
 #
-# Befund aus Phase 0: `samba-dev` liefert die internen VFS-Header nicht, und ein
-# upstream-gebautes Modul laedt nicht in die Distro-Samba
-# (libsmbd-base-samba4.so: cannot open shared object). Loesung + Produktionspfad:
-# Samba selbst bauen und betreiben, damit Modul, smbd und private Libs aus
-# demselben Build stammen (ABI 49, Samba 4.19.5).
+# Finding from Phase 0: `samba-dev` doesn't provide internal VFS headers, and
+# an upstream-built module doesn't load into distro Samba
+# (libsmbd-base-samba4.so: cannot open shared object). Solution + production path:
+# Build and operate Samba ourselves so module, smbd, and private libs come from
+# the same build (ABI 49, Samba 4.19.5).
 
-# ---------- Stage 1: Samba-Quellbaum (eigener Layer -> gut cachebar) ----------
+# ---------- Stage 1: Samba source tree (own layer -> highly cacheable) ----------
 FROM ubuntu:24.04 AS src
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -qq && apt-get install -y -qq wget && rm -rf /var/lib/apt/lists/*
@@ -19,11 +19,11 @@ RUN wget -q https://download.samba.org/pub/samba/stable/samba-4.19.5.tar.gz \
     && tar xf samba-4.19.5.tar.gz \
     && rm samba-4.19.5.tar.gz
 
-# ---------- Stage 2: bauen + installieren + laufen ----------
+# ---------- Stage 2: build + install + run ----------
 FROM src AS runtime
 ENV DEBIAN_FRONTEND=noninteractive
 
-# deb-src aktivieren und Samba-Build-Abhaengigkeiten holen.
+# Enable deb-src and fetch Samba build dependencies.
 RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources \
     && apt-get update \
     && apt-get build-dep -y samba \
@@ -33,10 +33,10 @@ RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.s
 
 WORKDIR /build/samba-4.19.5
 
-# Modulquelle einspielen.
+# Insert module source.
 COPY module/vfs_kaimo_bridge.c source3/modules/vfs_kaimo_bridge.c
 
-# 1) Modul im Build-System registrieren (Vorlage: vfs_fake_perms).
+# 1) Register module in build system (template: vfs_fake_perms).
 RUN cat >> source3/modules/wscript_build <<'PYEOF'
 
 bld.SAMBA3_MODULE('vfs_kaimo_bridge',
@@ -48,18 +48,18 @@ bld.SAMBA3_MODULE('vfs_kaimo_bridge',
                  enabled=bld.SAMBA3_IS_ENABLED_MODULE('vfs_kaimo_bridge'))
 PYEOF
 
-# 2) Modul als shared module aktivieren.
+# 2) Enable module as shared module.
 RUN sed -i "s/default_shared_modules.extend(\['vfs_recycle'/default_shared_modules.extend(['vfs_kaimo_bridge', 'vfs_recycle'/" source3/wscript \
     && grep -n "vfs_kaimo_bridge" source3/wscript
 
-# 3) Samba nach /opt/samba bauen und installieren (inkl. unseres Moduls).
+# 3) Build and install Samba to /opt/samba (incl. our module).
 RUN ./configure --without-ad-dc --enable-debug --prefix=/opt/samba \
     && PYTHONHASHSEED=1 make -j"$(nproc)" \
     && PYTHONHASHSEED=1 make install \
-    && find /opt/samba -name '*kaimo_bridge*.so' | sed 's/^/installiertes Modul: /'
+    && find /opt/samba -name '*kaimo_bridge*.so' | sed 's/^/installed module: /'
 
-# 4) Phase 1: gRPC-C++-Client (kaimo_authsync) fuer den NT-Hash-Sync bauen.
-#    Beweist zugleich gRPC-in-C++ im Samba-Container (letztes Toolchain-Risiko).
+# 4) Phase 1: build gRPC C++ client (kaimo_authsync) for NT-Hash sync.
+#    Also proves gRPC-in-C++ in the Samba container works (last toolchain risk).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        protobuf-compiler protobuf-compiler-grpc \
@@ -99,7 +99,7 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
     && test -x /usr/local/bin/kaimo_sharesync \
     && test -x /usr/local/bin/kaimo_configsync
 
-# 5) Konfig, Entrypoint, Sync- und Selbsttest-Skripte fuer die selbst gebaute Samba.
+# 5) Config, entrypoint, sync and self-test scripts for self-built Samba.
 COPY conf/smb.conf.vfs        /opt/samba/etc/smb.conf
 COPY entrypoint.vfs.sh        /usr/local/bin/entrypoint.sh
 COPY selftest.sh              /usr/local/bin/selftest.sh

@@ -1290,7 +1290,7 @@ html, body, #app {
     }
 
 /* ══════════════════════════════════════════════════════════
-   Modal Dialogs (Ordner erstellen, Löschen, Umbenennen)
+   Modal Dialogs (Create folder, Delete, Rename)
    ══════════════════════════════════════════════════════════ */
 
 .modal-backdrop {
@@ -2166,7 +2166,7 @@ html, body, #app {
     opacity: 0.7;
 }
 
-/* -- User List (Admin Tab: Benutzer) -- */
+/* -- User List (Admin Tab: Users) -- */
 
 .user-list-container {
     border: 1px solid var(--border);
@@ -2339,7 +2339,7 @@ html, body, #app {
     font-size: 12px;
 }
 
-/* -- Toggle Switch (Konto aktiviert / Passwort ändern) -- */
+/* -- Toggle Switch (Account enabled / Change password) -- */
 
 .create-form-toggles {
     display: flex;
@@ -2585,7 +2585,7 @@ html, body, #app {
 }
 
 /* ══════════════════════════════════════════════════════════
-   Toggle Button Group (Benutzer / Gruppe Auswahl)
+   Toggle Button Group (User / Group selection)
    ══════════════════════════════════════════════════════════ */
 
 .toggle-button-group {

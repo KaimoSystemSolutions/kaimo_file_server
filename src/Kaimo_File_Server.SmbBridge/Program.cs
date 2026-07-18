@@ -4,31 +4,31 @@ using Kaimo_File_Server.Search;
 using Kaimo_File_Server.SmbBridge.Services;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 
-// Kaimo SMB Bridge: schlanke gRPC-Control-Plane fuer den Samba-Container.
-// Phase 1 stellt nur den Auth-Teil bereit (NT-Hashes fuer Sambas tdbsam),
-// gestuetzt auf die bestehenden Core-/Infrastructure-Services.
+// Kaimo SMB Bridge: lean gRPC control plane for the Samba container.
+// Phase 1 only provides the auth part (NT hashes for Samba's tdbsam),
+// backed by existing Core/Infrastructure services.
 var builder = WebApplication.CreateBuilder(args);
 
-// Bestehende Kaimo-Dienste wiederverwenden (DB, Repos, AuthenticationLookup,
-// NtHashProtector). Braucht denselben NtHash:EncryptionKey wie Host/Web.
+// Reuse existing Kaimo services (DB, repos, AuthenticationLookup,
+// NtHashProtector). Needs the same NtHash:EncryptionKey as Host/Web.
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// Echter Elasticsearch-Suchdienst — MUSS vor AddCoreServices kommen, damit er
-// den NoOp-Fallback gewinnt (Phase 3: SMB-Writes werden indiziert wie Web-Uploads).
+// Real Elasticsearch search service — MUST come before AddCoreServices so it wins
+// the NoOp fallback (Phase 3: SMB writes are indexed like web uploads).
 builder.Services.AddElasticSearch(builder.Configuration);
 
 var storagePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
 builder.Services.AddCoreServices(storagePath);
 
-// Config store (wie im Host): wird transitiv von ILoginService/ManagementAuth
-// benoetigt und daher fuer die DI-Validierung registriert.
+// Config store (like in Host): needed transitively by ILoginService/ManagementAuth
+// and therefore registered for DI validation.
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<IConfigRepository, ConfigRepository>();
 
 builder.Services.AddGrpc();
 
-// gRPC ueber HTTP/2 im Klartext (h2c) im internen Docker-Netz - kein TLS noetig,
-// die Bridge ist nicht nach aussen exponiert.
+// gRPC over HTTP/2 in plaintext (h2c) on internal Docker network — no TLS needed,
+// the bridge is not exposed externally.
 builder.WebHost.ConfigureKestrel(options =>
 {
     options.ListenAnyIP(5080, listen => listen.Protocols = HttpProtocols.Http2);

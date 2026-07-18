@@ -1,5 +1,5 @@
-# Zwischen-Image: entpackter Samba-Quellbaum 4.19.5 (passend zur Distro-ABI 49).
-# Dient nur dazu, den Quell-Download zu cachen, damit Modul-Iterationen schnell sind.
+# Intermediate image: unpacked Samba source tree 4.19.5 (matching distro ABI 49).
+# Serves only to cache the source download so module iterations are fast.
 #   docker build -f Dockerfile.src -t kaimo-samba-src:4.19.5 .
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive

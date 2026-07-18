@@ -8,11 +8,11 @@ using Kaimo_File_Server.SmbBridge.Grpc;
 namespace Kaimo_File_Server.SmbBridge.Services;
 
 /// <summary>
-/// gRPC-Fassade für die Close-/Event-Hooks (Phase 3). Samba führt die Datei-I/O
-/// nativ aus und meldet danach das Ereignis; hier laufen die Cross-Cutting-Effekte
-/// (Versionierung, Suchindex, Ownership) über eine per <see cref="IFileServiceFactory"/>
-/// erzeugte <see cref="IFileService"/> — dieselbe Verdrahtung wie im Host, also
-/// identische Version-/Index-/Ownership-Ergebnisse wie bei Web-Uploads.
+/// gRPC facade for close/event hooks (Phase 3). Samba performs file I/O natively
+/// and reports the event afterward; here cross-cutting effects (versioning, search
+/// index, ownership) run through an <see cref="IFileService"/> created via
+/// <see cref="IFileServiceFactory"/> — same wiring as in the host, so identical
+/// version/index/ownership results as web uploads.
 /// </summary>
 public sealed class FileEventGrpcService : EventService.EventServiceBase
 {
@@ -89,7 +89,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
         var def = await _shares.GetByNameAsync(share);
         if (def is null)
         {
-            _logger.LogWarning("Event für unbekannten Share '{Share}' verworfen.", share);
+            _logger.LogWarning("Event for unknown share '{Share}' discarded.", share);
             return null;
         }
         return _factory.CreateForShare(def.Id, def.Path);

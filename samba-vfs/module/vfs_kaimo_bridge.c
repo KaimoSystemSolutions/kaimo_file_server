@@ -1,15 +1,15 @@
 /*
  * Kaimo File Server - Samba VFS Bridge
  *
- * Haengt sich in die SMB-Naht ein, an der die Kaimo-Control-Plane entscheidet.
- * Der Datenpfad bleibt nativ (immer SMB_VFS_NEXT_*), Samba macht die I/O direkt.
+ * Plugs into the SMB junction where the Kaimo Control Plane decides.
+ * The data path remains native (always SMB_VFS_NEXT_*), Samba does I/O directly.
  *
- *   Phase 2a: TREE_CONNECT autorisieren (connect-Hook -> CanAccessShareAsync).
- *   Phase 2b: Datei-/Pfad-ACL (create_file-Hook -> FileService.OpenAsync-Parität)
- *             und Directory-Listing-Filter (readdir-Hook -> ListAsync-Parität).
+ *   Phase 2a: Authorize TREE_CONNECT (connect hook -> CanAccessShareAsync).
+ *   Phase 2b: File/path ACL (create_file hook -> FileService.OpenAsync parity)
+ *             and directory listing filter (readdir hook -> ListAsync parity).
  *
- * Bewusst reines C ohne gRPC: die gRPC-Komplexitaet lebt im Sidecar kaimo_authd,
- * das Modul macht nur simple Unix-Socket-Roundtrips (kein Fork/Threads in smbd).
+ * Deliberately pure C without gRPC: gRPC complexity lives in the kaimo_authd
+ * sidecar; the module only does simple Unix socket roundtrips (no fork/threads in smbd).
  */
 
 #include "includes.h"
@@ -25,7 +25,7 @@
 
 #define KAIMO_AUTHD_SOCK_DEFAULT "/var/run/kaimo/authz.sock"
 
-/* Pro-Verbindung im VFS-Handle hinterlegt (bei TREE_CONNECT gesetzt). */
+/* Per-connection stored in VFS handle (set at TREE_CONNECT). */
 struct kaimo_conn_ctx {
 	char user[128];
 	char share[128];
@@ -39,16 +39,16 @@ static void kaimo_free_data(void **pptr)
 	}
 }
 
-/* Fail-Verhalten bei Infrastrukturfehlern: default fail-open (erlauben),
- * mit KAIMO_AUTHZ_FAILCLOSED=1 strikt ablehnen. */
+/* Fail behavior on infrastructure errors: default fail-open (allow),
+ * with KAIMO_AUTHZ_FAILCLOSED=1 strictly deny. */
 static bool kaimo_failmode_allow(void)
 {
 	const char *fc = getenv("KAIMO_AUTHZ_FAILCLOSED");
 	return !(fc != NULL && fc[0] == '1');
 }
 
-/* Sendet eine Anfragezeile an kaimo_authd und liest die Antwort.
- * Rueckgabe: 1 = ALLOW, 0 = DENY, -1 = Infrastrukturfehler. */
+/* Sends a request line to kaimo_authd and reads the response.
+ * Return: 1 = ALLOW, 0 = DENY, -1 = Infrastructure error. */
 static int kaimo_authz_send(const char *req, size_t len)
 {
 	const char *sock_path = getenv("KAIMO_AUTHD_SOCK");
@@ -79,7 +79,7 @@ static int kaimo_authz_send(const char *req, size_t len)
 
 	if (strncmp(buf, "ALLOW", 5) == 0) return 1;
 	if (strncmp(buf, "DENY", 4) == 0)  return 0;
-	return -1; /* "ERROR" oder Unerwartetes */
+	return -1; /* "ERROR" or unexpected */
 }
 
 static bool kaimo_authz_connect(const char *service, const char *user)
@@ -91,7 +91,7 @@ static bool kaimo_authz_connect(const char *service, const char *user)
 
 	int d = kaimo_authz_send(req, (size_t)n);
 	if (d < 0) {
-		DBG_WARNING("kaimo_bridge: authd nicht erreichbar (connect), fail-%s\n",
+		DBG_WARNING("kaimo_bridge: authd unreachable (connect), fail-%s\n",
 			    kaimo_failmode_allow() ? "open" : "closed");
 		return kaimo_failmode_allow();
 	}
@@ -121,11 +121,11 @@ static bool kaimo_authz_open(const char *user, const char *share, const char *pa
 static bool kaimo_list_filter_enabled(void)
 {
 	const char *v = getenv("KAIMO_LIST_FILTER");
-	return !(v != NULL && v[0] == '0'); /* default: an */
+	return !(v != NULL && v[0] == '0'); /* default: on */
 }
 
-/* Fire-and-forget-Benachrichtigung an kaimo_authd (keine Antwort erwartet),
- * damit der SMB-Close/Delete/Rename nicht auf die gRPC-Verarbeitung wartet. */
+/* Fire-and-forget notification to kaimo_authd (no response expected),
+ * so SMB Close/Delete/Rename doesn't wait for gRPC processing. */
 static void kaimo_notify_send(const char *req, size_t len)
 {
 	const char *sock_path = getenv("KAIMO_AUTHD_SOCK");
@@ -144,7 +144,7 @@ static void kaimo_notify_send(const char *req, size_t len)
 	close(fd);
 }
 
-/* Baut den share-relativen Pfad aus Verzeichnis-fsp + at-relativem Namen. */
+/* Builds the share-relative path from directory-fsp + at-relative name. */
 static void kaimo_join_path(char *out, size_t n,
 			    struct files_struct *dirfsp,
 			    const struct smb_filename *name)
@@ -161,7 +161,7 @@ static void kaimo_join_path(char *out, size_t n,
 		snprintf(out, n, "%s/%s", dir, leaf);
 }
 
-/* ---- TREE_CONNECT: autorisieren + Kontext (user/share) am Handle hinterlegen ---- */
+/* ---- TREE_CONNECT: authorize + store context (user/share) in handle ---- */
 static int kaimo_connect(vfs_handle_struct *handle,
 			 const char *service,
 			 const char *user)
@@ -199,7 +199,7 @@ static void kaimo_disconnect(vfs_handle_struct *handle)
 	SMB_VFS_NEXT_DISCONNECT(handle);
 }
 
-/* ---- Datei-Open (CREATE): ACL-Entscheidung via gRPC (FileService.OpenAsync) ---- */
+/* ---- File Open (CREATE): ACL decision via gRPC (FileService.OpenAsync) ---- */
 static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 				  struct smb_request *req,
 				  struct files_struct *dirfsp,
@@ -246,7 +246,7 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 				       result, pinfo, in_context_blobs, out_context_blobs);
 }
 
-/* ---- Directory-Listing-Filter: Eintraege ohne Leserecht verbergen (ListAsync) ---- */
+/* ---- Directory listing filter: hide entries without read permission (ListAsync) ---- */
 static struct dirent *kaimo_readdir(vfs_handle_struct *handle,
 				    struct files_struct *dirfsp,
 				    DIR *dirp)
@@ -264,7 +264,7 @@ static struct dirent *kaimo_readdir(vfs_handle_struct *handle,
 		if (!filter) return e;
 
 		const char *nm = e->d_name;
-		/* "." und ".." immer durchlassen. */
+		/* Always allow "." and ".." */
 		if (nm[0] == '.' && (nm[1] == '\0' || (nm[1] == '.' && nm[2] == '\0')))
 			return e;
 
@@ -275,14 +275,14 @@ static struct dirent *kaimo_readdir(vfs_handle_struct *handle,
 			snprintf(path, sizeof(path), "%s/%s", dirpath, nm);
 
 		if (kaimo_authz_open(ctx->user, ctx->share, path, true, false, false))
-			return e; /* lesbar -> anzeigen */
+			return e; /* readable -> show */
 
 		DBG_INFO("kaimo_bridge: LIST hide [%s] user=[%s]\n", path, ctx->user);
-		/* nicht lesbar -> ueberspringen, naechsten Eintrag holen */
+		/* not readable -> skip, get next entry */
 	}
 }
 
-/* ---- Close-Hook: geschriebene Datei -> Versionierung/Index/Ownership (Phase 3) ---- */
+/* ---- Close hook: written file -> versioning/index/ownership (Phase 3) ---- */
 static int kaimo_close(vfs_handle_struct *handle, files_struct *fsp)
 {
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
@@ -306,7 +306,7 @@ static int kaimo_close(vfs_handle_struct *handle, files_struct *fsp)
 	return ret;
 }
 
-/* ---- Delete-Hook: Suchindex bereinigen (Phase 3) ---- */
+/* ---- Delete hook: clean up search index (Phase 3) ---- */
 static int kaimo_unlinkat(vfs_handle_struct *handle,
 			  struct files_struct *srcdir_fsp,
 			  const struct smb_filename *smb_fname,
@@ -329,7 +329,7 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 	return ret;
 }
 
-/* ---- Rename-Hook: ACL-Pfad + Suchindex nachziehen (Phase 3) ---- */
+/* ---- Rename hook: ACL path + search index follow-up (Phase 3) ---- */
 static int kaimo_renameat(vfs_handle_struct *handle,
 			  struct files_struct *srcdir_fsp,
 			  const struct smb_filename *smb_fname_src,
@@ -345,8 +345,8 @@ static int kaimo_renameat(vfs_handle_struct *handle,
 					dstdir_fsp, smb_fname_dst);
 
 	if (ret == 0 && ctx != NULL && oldp[0] != '\0' && newp[0] != '\0') {
-		/* is_directory hier nicht sicher bekannt -> 0 (Datei); Verzeichnis-
-		 * Renames sind selten und werden als Pfad-Update behandelt. */
+		/* is_directory not reliably known here -> 0 (file); directory
+		 * renames are rare and treated as path updates. */
 		char req[8192];
 		int n = snprintf(req, sizeof(req), "RENAME\t%s\t%s\t0\t%s\t%s\n",
 				 ctx->user, ctx->share, oldp, newp);
@@ -356,7 +356,7 @@ static int kaimo_renameat(vfs_handle_struct *handle,
 	return ret;
 }
 
-/* ---- Mkdir-Hook: neues Verzeichnis indizieren + Ownership (Phase 3) ---- */
+/* ---- Mkdir hook: index new directory + ownership (Phase 3) ---- */
 static int kaimo_mkdirat(vfs_handle_struct *handle,
 			 struct files_struct *dirfsp,
 			 const struct smb_filename *smb_fname,

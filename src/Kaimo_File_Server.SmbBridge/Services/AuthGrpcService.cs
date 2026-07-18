@@ -7,9 +7,9 @@ using Kaimo_File_Server.SmbBridge.Grpc;
 namespace Kaimo_File_Server.SmbBridge.Services;
 
 /// <summary>
-/// gRPC-Fassade fuer die Auth-Control-Plane. Duenne Schicht ueber
-/// <see cref="IAuthenticationLookup"/> — die gesamte Logik (Entschluesselung,
-/// Deaktiviert-/Leerpasswort-Filter) bleibt in Core/Infrastructure.
+/// gRPC facade for the auth control plane. Thin layer over
+/// <see cref="IAuthenticationLookup"/> — all logic (decryption,
+/// disabled/empty password filter) remains in Core/Infrastructure.
 /// </summary>
 public sealed class AuthGrpcService : AuthService.AuthServiceBase
 {
@@ -48,9 +48,8 @@ public sealed class AuthGrpcService : AuthService.AuthServiceBase
 
         foreach (var user in await _users.GetAllAsync())
         {
-            // GetNtHashAsync filtert deaktivierte Konten und das Leerpasswort
-            // bereits heraus (gibt null zurueck) — solche User werden nicht
-            // nach Samba synchronisiert.
+            // GetNtHashAsync already filters out disabled accounts and empty passwords
+            // (returns null) — such users are not synchronized to Samba.
             byte[]? hash = await _auth.GetNtHashAsync(user.Username);
             if (hash is not { Length: > 0 })
                 continue;
@@ -62,7 +61,7 @@ public sealed class AuthGrpcService : AuthService.AuthServiceBase
             });
         }
 
-        _logger.LogInformation("ListUsers: {Count} aktive Benutzer exportiert.", reply.Users.Count);
+        _logger.LogInformation("ListUsers: {Count} active users exported.", reply.Users.Count);
         return reply;
     }
 }

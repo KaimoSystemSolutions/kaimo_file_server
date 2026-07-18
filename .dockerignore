@@ -23,13 +23,13 @@
 **/values.dev.yaml
 LICENSE
 README.md
-# Kompletter Test-Baum: Testprojekt-Quelle UND Runtime-/Testdaten
-# (Bind-Mount-Ziele fuer Postgres, Elasticsearch, Storage). Wird von keinem
-# Service-Image gebraucht, wuchs im Betrieb unbegrenzt und machte beim Build
-# Probleme -> gehoert nie in den Build-Context.
+# Complete test tree: test project source AND runtime/test data
+# (bind mount targets for Postgres, Elasticsearch, storage). Not needed by any
+# service image, grows unbounded at runtime and causes build problems
+# -> should never be in the build context.
 tests
 **/tests/data
-# Weitere Nicht-Quellcode-Ordner/-Dateien, die kein Image braucht.
+# Additional non-source folders/files that no image needs.
 docu
 tools
 TestResults

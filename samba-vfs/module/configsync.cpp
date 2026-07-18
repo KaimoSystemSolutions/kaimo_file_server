@@ -1,9 +1,9 @@
-// kaimo_configsync - gRPC-C++-Client fuer die Protokoll-Settings (Phase 4).
+// kaimo_configsync - gRPC C++ client for protocol settings (Phase 4).
 //
-// Ruft GetProtocolSettings auf der .NET-Bridge (h2c) auf und gibt EINE Zeile
-// "min<TAB>max<TAB>signing(0|1)<TAB>encrypt(0|1)" auf stdout aus. Die Abbildung
-// auf Sambas globale Parameter (net conf setparm global) macht das Shell-Skript
-// sync-config.sh. Spiegelbild zu kaimo_authsync / kaimo_sharesync.
+// Calls GetProtocolSettings on the .NET bridge (h2c) and outputs ONE line
+// "min<TAB>max<TAB>signing(0|1)<TAB>encrypt(0|1)" to stdout. The mapping
+// to Samba's global parameters (net conf setparm global) is handled by the
+// shell script sync-config.sh. Mirror to kaimo_authsync / kaimo_sharesync.
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
@@ -31,20 +31,20 @@ int main() {
     ProtocolSettingsReply reply;
     grpc::Status status = stub->GetProtocolSettings(&ctx, req, &reply);
     if (!status.ok()) {
-        std::cerr << "kaimo_configsync: GetProtocolSettings RPC fehlgeschlagen: "
+        std::cerr << "kaimo_configsync: GetProtocolSettings RPC failed: "
                   << status.error_code() << " " << status.error_message()
                   << " (addr=" << addr << ")" << std::endl;
         return 1;
     }
 
     if (reply.min_protocol().empty() || reply.max_protocol().empty()) {
-        std::cerr << "kaimo_configsync: unvollstaendige Antwort (leerer Dialekt)." << std::endl;
+        std::cerr << "kaimo_configsync: incomplete response (empty dialect)." << std::endl;
         return 1;
     }
 
     std::cout << reply.min_protocol() << '\t' << reply.max_protocol() << '\t'
               << (reply.require_signing() ? '1' : '0') << '\t'
               << (reply.require_encryption() ? '1' : '0') << '\n';
-    std::cerr << "kaimo_configsync: settings empfangen (addr=" << addr << ")." << std::endl;
+    std::cerr << "kaimo_configsync: settings received (addr=" << addr << ")." << std::endl;
     return 0;
 }
