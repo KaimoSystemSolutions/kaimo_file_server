@@ -144,12 +144,48 @@ namespace Kaimo_File_Server.Infrastructure
                 {
                     using var scope = host.Services.CreateScope();
                     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                    //await db.Database.EnsureCreatedAsync();
-                    await db.Database.MigrateAsync();
-                    logger.LogInformation(LogEvents.DatabaseReady, LogMessages.DatabaseReady);
 
-                    var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
-                    await seeder.SeedAsync();
+                    // Both the Host and the Web app call this on startup and each
+                    // runs MigrateAsync() + the seeder against the same database.
+                    // On a fresh DB they would otherwise race:
+                    //   * migrations: both read an empty __EFMigrationsHistory and
+                    //     apply the full chain concurrently, corrupting each other
+                    //     (e.g. one process drops an index the other hasn't created
+                    //     yet).
+                    //   * seeding: the seeder guards with `if (Users.AnyAsync())
+                    //     return;`, a check-then-insert that only holds if the two
+                    //     processes are serialized — otherwise both insert the
+                    //     'admin' account and hit a duplicate-key violation.
+                    // A Postgres session-level advisory lock serializes them: the
+                    // first process migrates + seeds, the second blocks here and
+                    // then finds migrations already applied (no-op) and rows
+                    // already present (seeder skips).
+                    //
+                    // The connection is opened explicitly so it stays the same
+                    // physical session for the whole critical section — EF does not
+                    // close a connection it did not open, so the advisory lock is
+                    // held across MigrateAsync() and the seeder (which shares this
+                    // scoped DbContext / connection).
+                    await db.Database.OpenConnectionAsync();
+                    try
+                    {
+                        await db.Database.ExecuteSqlRawAsync(
+                            "SELECT pg_advisory_lock(hashtext('kaimo_file_server_migrations'))");
+
+                        //await db.Database.EnsureCreatedAsync();
+                        await db.Database.MigrateAsync();
+                        logger.LogInformation(LogEvents.DatabaseReady, LogMessages.DatabaseReady);
+
+                        var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
+                        await seeder.SeedAsync();
+                    }
+                    finally
+                    {
+                        await db.Database.ExecuteSqlRawAsync(
+                            "SELECT pg_advisory_unlock(hashtext('kaimo_file_server_migrations'))");
+                        await db.Database.CloseConnectionAsync();
+                    }
+
                     return;
                 }
                 catch (Exception ex)
