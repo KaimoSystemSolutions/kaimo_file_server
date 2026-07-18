@@ -3,8 +3,8 @@ services:
     image: ${DOCKER_REGISTRY-}kaimofileserver
     container_name: kaimo_file_server
     #user: root
-    ports:
-      - 445:445
+    #ports:
+    #  - 445:445
     volumes:
       - ./tests/data/storage:/data/storage
     depends_on:
