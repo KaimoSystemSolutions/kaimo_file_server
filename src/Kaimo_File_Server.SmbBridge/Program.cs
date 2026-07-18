@@ -39,6 +39,8 @@ var app = builder.Build();
 app.MapGrpcService<AuthGrpcService>();       // Phase 1: NT-Hashes (GetNtHash/ListUsers)
 app.MapGrpcService<AuthzGrpcService>();      // Phase 2: Autorisierung (Connect/Open)
 app.MapGrpcService<FileEventGrpcService>();  // Phase 3: Close-Hooks (Version/Index/Ownership)
+app.MapGrpcService<ShareGrpcService>();      // Phase 4: Share-Provisioning (ListShares -> net conf)
+app.MapGrpcService<ConfigGrpcService>();     // Phase 4: Protokoll-Settings (GetProtocolSettings -> net conf global)
 app.MapGet("/", () => "Kaimo SMB Bridge (gRPC/h2c on :5080). Use a gRPC client.");
 
 app.Run();

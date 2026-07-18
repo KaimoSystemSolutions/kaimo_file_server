@@ -23,6 +23,11 @@
 **/values.dev.yaml
 LICENSE
 README.md
+# Test-/Beispieldaten im Core-Projekt (per csproj schon vom Build ausgeschlossen):
+# gehoeren auch nicht in den Build-Context.
+Tests
+**/Tests
+**/tests/data
 !**/.gitignore
 !.git/HEAD
 !.git/config

@@ -103,3 +103,49 @@ message NotifyRenameRequest {
 }
 
 message NotifyReply { bool ok = 1; }
+
+// Share-Provisioning (Phase 4). Quelle der Wahrheit bleibt die Kaimo-DB
+// (IShareRepository). Der ShareControl-Daemon (kaimo_sharesync -> sync-shares.sh)
+// spiegelt die aktivierten Shares live in Sambas Registry (net conf), sodass smbd
+// sie ohne Neustart anbietet. Ersetzt das fruehere FileSystemWatcher/SyncFromDb()
+// aus SmbServer.cs.
+service ShareService {
+  // Alle aktivierten Shares (Name, Pfad, Hidden-Flag) fuer den Registry-Sync.
+  rpc ListShares(ListSharesRequest) returns (ListSharesReply);
+}
+
+message ListSharesRequest {}
+
+message ShareEntry {
+  string name      = 1; // Share-Name (= Registry-Sektion, = Verzeichnisname)
+  string path      = 2; // absoluter Pfad im Container-Storage
+  bool   is_hidden = 3; // IsShareHidden -> browseable = no (ABE: nur Hidden-Flag)
+}
+
+message ListSharesReply {
+  repeated ShareEntry shares = 1;
+}
+
+// Protokoll-/Sicherheits-Settings (Phase 4). Quelle der Wahrheit bleibt die
+// Kaimo-DB (ISmbConfigStore, per Web-UI gepflegt). Der Config-Sync
+// (kaimo_configsync -> sync-config.sh) spiegelt die Werte in Sambas globale
+// Registry-Config (net conf setparm global). Entspricht dem, was
+// SmbServer.LoadProtocolSettings() beim (Re)Start in den alten .NET-SMB-Server
+// einspeiste. WS-Discovery/Audit-Log sind bewusst NICHT enthalten: sie haben in
+// Samba keine globalen smb.conf-Parameter (separate Mechanismen: wsdd bzw.
+// full_audit-VFS).
+service ConfigService {
+  rpc GetProtocolSettings(GetProtocolSettingsRequest) returns (ProtocolSettingsReply);
+}
+
+message GetProtocolSettingsRequest {}
+
+message ProtocolSettingsReply {
+  // Samba-Dialekt-Token, direkt fuer `server min/max protocol` verwendbar
+  // (SMB2_02, SMB2_10, SMB3_00, SMB3_02, SMB3_11). Mapping aus dem .NET-Enum
+  // passiert in der Bridge, damit die Shell samba-agnostisch bleibt.
+  string min_protocol       = 1;
+  string max_protocol       = 2;
+  bool   require_signing    = 3; // -> server signing = mandatory | auto
+  bool   require_encryption = 4; // -> smb encrypt = required | default
+}

@@ -23,10 +23,24 @@
 **/values.dev.yaml
 LICENSE
 README.md
-# Runtime-/Testdaten: Bind-Mount-Ziele fuer Postgres, Elasticsearch und Storage.
-# Diese wachsen im Betrieb unbegrenzt und duerfen NICHT in den Build-Context.
-tests/data
+# Kompletter Test-Baum: Testprojekt-Quelle UND Runtime-/Testdaten
+# (Bind-Mount-Ziele fuer Postgres, Elasticsearch, Storage). Wird von keinem
+# Service-Image gebraucht, wuchs im Betrieb unbegrenzt und machte beim Build
+# Probleme -> gehoert nie in den Build-Context.
+tests
 **/tests/data
+# Weitere Nicht-Quellcode-Ordner/-Dateien, die kein Image braucht.
+docu
+tools
+TestResults
+**/TestResults
+**/.idea
+.github
+qodana.yaml
+.gitattributes
+**/*.dcproj
+**/*.dcproj.user
+**/launchSettings.json
 !**/.gitignore
 !.git/HEAD
 !.git/config

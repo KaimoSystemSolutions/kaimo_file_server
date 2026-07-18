@@ -1,7 +1,9 @@
 # SMB-Umstieg: Samba + eigenes VFS-Modul (gRPC-Bridge zu .NET)
 
-> **Status:** 🟢 Phase 0–3 **erfolgreich** — Auth, ACLs (Connect/Open/Listing) und Close-Hooks
-> (Versionierung/Ownership/Index) laufen über gRPC; Datenpfad bleibt nativ
+> **Status:** 🟢 Phase 0–4 **abgeschlossen** — Auth, ACLs (Connect/Open/Listing), Close-Hooks
+> (Versionierung/Ownership/Index), **dynamische Shares** (Registry-Provisioning aus der DB) und
+> **Protokoll-Settings** (Dialekt-Range/Signing/Encryption aus `ISmbConfigStore`) laufen über gRPC;
+> Datenpfad bleibt nativ. Nächster Schritt: Phase 5 (Snapshots/@GMT & Cutover)
 > **Autor:** Design-Dokument, erstellt 2026-07-17
 > **Betrifft:** Ersatz der SMB-Protokollebene des Kaimo File Servers
 > **Verwandt:** `src/Kaimo_File_Server.Smb/` (wird ersetzt),
@@ -153,7 +155,12 @@ Samba validiert NTLMv2 lokal, braucht den NT-Hash aber aus seiner `passdb`. Kaim
   - **(a)** natives `access based share enum = yes` + Share-ACL aus Kaimo in die Registry sync'en.
   - **(b)** nur grobe `IsShareHidden`-Semantik (`browseable = no`), feingranulares Listing aufgeben.
   - **(c)** Kompromiss: (a) für Sichtbarkeit + `connect`-Hook für die harte Autorisierung.
-  - → **Empfehlung: (c).** Vor Umsetzung als bewusste Produkt-Entscheidung festhalten.
+  - → **Entscheidung (Phase 4): (b).** Nur das Hidden-Flag steuert die Sichtbarkeit
+    (`IsShareHidden` → `browseable = no`); der harte Zugriff wird ohnehin schon vom Phase-2a-
+    `connect`-Hook nach echten Kaimo-ACLs entschieden. Damit entfällt die Pro-User-`valid users`-
+    Synchronisation, die sich mit dem `connect`-Hook als Zugriffsautorität überschneiden und die
+    ACL-Logik doppeln würde. Volle Per-User-ABE (Variante c) bleibt eine spätere Option, falls das
+    Ausblenden nicht-zugänglicher Shares in der Auflistung gefordert wird.
 
 ### Risiko 3 — VFS-ABI-Kopplung + gRPC-in-C-Toolchain
 VFS-Module müssen gegen die **exakte Samba-Version** (`SMB_VFS_INTERFACE_VERSION`) kompiliert werden;
@@ -188,7 +195,7 @@ pro Byte), ist der Transport unkritisch — Alternative: Protobuf über Unix-Soc
 | **2a — Connect-Autz** ✅ | VFS-`connect`-Hook → Sidecar `kaimo_authd` (Unix-Socket) → gRPC `AuthorizeConnect` → `CanAccessShareAsync` | Share-Zugriff nach echten Kaimo-ACLs — **läuft** (dept-basiertes Allow/Deny verifiziert) |
 | **2b — Open/Path-ACL** ✅ | VFS-`create_file`-Hook → gRPC `AuthorizeOpen` (exakte `OpenAsync`-Parität) + `readdir`-Filter (`ListAsync`-Parität, Sidecar-Cache) | Datei-Open (read/write/create) und Listing nach echten ACLs — **läuft** (write-Deny, per-Datei-Deny + Hiding verifiziert) |
 | **3 — Close-Hooks** ✅ | `close`/`unlinkat`/`renameat`/`mkdirat` → Sidecar → gRPC `EventService` → `FileService.NotifyExternal*` (Versionierung, Ownership, Suchindex, ACL-Realign) | Parität zu `FileSession.DisposeAsync` — **läuft** (Versionierung/Ownership verifiziert; s. [`../samba-vfs/README.md`](../samba-vfs/README.md)) |
-| **4 — Dyn. Shares & Sichtbarkeit** | ShareControl-Daemon → `net conf`; ABE nach Risiko-2-Empfehlung; Protokoll-Settings aus `ISmbConfigStore` | dynamische Shares live |
+| **4 — Dyn. Shares & Sichtbarkeit** ✅ | ShareControl-Sync (`ListShares` → `kaimo_sharesync` → `sync-shares.sh` → `net conf`) ✅; ABE = **nur Hidden-Flag** (`browseable`) ✅; Protokoll-Settings aus `ISmbConfigStore` (`GetProtocolSettings` → `kaimo_configsync` → `sync-config.sh` → `net conf setparm global`) ✅ | dynamische Shares + Protokoll-Config live — **läuft** |
 | **5 — Snapshots & Cutover** | @GMT-Mapping; `enable/disable SMB` auf `smbd` umbiegen; `Kaimo_File_Server.Smb` entfernen; compose finalisieren | alte Lib raus |
 
 ---

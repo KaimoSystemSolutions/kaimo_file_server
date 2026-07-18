@@ -6,10 +6,10 @@
     log level = 2
     logging = stdout
 
-    # Dynamische Shares aus der Registry (net conf) - wie in smb.conf.
-    registry shares = yes
-    include = registry
-
+    # SMB2/3-Fallback-Defaults. Sie gelten, bis der Config-Sync (sync-config.sh)
+    # die Werte aus der Kaimo-DB (ISmbConfigStore) in die Registry schreibt. Weil
+    # `include = registry` am ENDE dieser Sektion steht, gewinnen die per
+    # `net conf setparm global` gesetzten DB-Werte ueber diese Inline-Defaults.
     server min protocol = SMB2_10
     access based share enum = yes
 
@@ -17,7 +17,28 @@
     # Kaimo-DB via gRPC-Bridge (kaimo_authsync -> sync-users.sh) hineingespielt.
     passdb backend = tdbsam
 
+    # --- Storage-Schreibrechte: neue Dateien/Ordner gruppen-schreibbar erzwingen ---
+    # smbd macht die Datei-I/O als der authentifizierte User (eigene UID). Damit Web
+    # (uid 1654) und SMB-User sich gegenseitig lesen/schreiben koennen, muessen neue
+    # Objekte der gemeinsamen Gruppe (kaimo, gid 1654) Schreibrecht geben. `force
+    # create/directory mode` erzwingt die Gruppen-Bits unabhaengig vom Client-Wunsch;
+    # das setgid-Bit (2xxx) laesst neue Dateien die Gruppe erben. Die Gruppenzuordnung
+    # + g+w auf den Share-Dirs setzt der Entrypoint/sync-shares.sh.
+    create mask          = 0664
+    force create mode    = 0060
+    directory mask       = 2775
+    force directory mode = 0070
+
     # --- Phase-0-Kern Schritt B: eigenes VFS-Modul global aktivieren ---
-    # Gilt fuer alle Shares (auch die dynamischen aus der Registry). Spaeter
-    # sitzt hier die gRPC-Bruecke zur .NET-Control-Plane.
+    # Gilt fuer alle Shares (auch die dynamischen aus der Registry). Die gRPC-
+    # Bruecke zur .NET-Control-Plane sitzt im Sidecar kaimo_authd.
     vfs objects = kaimo_bridge
+
+    # --- Phase 4: dynamische Shares + globale Protokoll-Settings aus der DB ---
+    # `registry shares = yes` -> smbd liest Share-Definitionen live aus der Registry
+    # (Anlegen/Entfernen ohne Reload/Restart; gefuellt von sync-shares.sh).
+    # `include = registry` (am Ende!) -> auch globale Parameter kommen aus der
+    # Registry und ueberschreiben die Inline-Defaults oben (gefuellt von
+    # sync-config.sh: server min/max protocol, server signing, smb encrypt).
+    registry shares = yes
+    include = registry

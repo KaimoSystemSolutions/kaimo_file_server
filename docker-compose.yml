@@ -5,13 +5,18 @@ services:
     #user: root
     #ports:
     #  - 445:445
+    # umask 002 -> neu angelegte Dateien werden 0664 (gruppen-schreibbar), damit die
+    # Samba-Seite (Gruppe kaimo) sie ueberschreiben kann. Fallback fuer FS ohne ACL-
+    # Support (drvfs/9p auf der Windows-Dev-Maschine); auf ext4 uebernehmen das die
+    # Default-ACLs aus dem Samba-Entrypoint. Siehe samba-vfs/README.md (Storage-Ownership).
+    entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Host.dll"]
     volumes:
       - ./tests/data/storage:/data/storage
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
+      #elasticsearch:
+      #  condition: service_healthy
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.Host/Dockerfile
@@ -67,6 +72,11 @@ services:
       - 8443:8443
     environment:
       TZ: Europe/Berlin
+    # umask 002 -> neue Dateien 0664 (gruppen-schreibbar), damit die Samba-Seite
+    # (Gruppe kaimo) sie ueberschreiben kann. Fallback fuer FS ohne ACL-Support
+    # (drvfs/9p, Windows-Dev); auf ext4 uebernehmen das die Default-ACLs aus dem
+    # Samba-Entrypoint. Siehe samba-vfs/README.md (Storage-Ownership).
+    entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Web.dll"]
     volumes:
       - ./tests/data/storage:/data/storage
     depends_on:
@@ -74,8 +84,8 @@ services:
         condition: service_healthy
       kaimo_file_server.host:
         condition: service_started
-      elasticsearch:
-        condition: service_healthy
+      #elasticsearch:
+      #  condition: service_healthy
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.Web/Dockerfile
@@ -98,30 +108,30 @@ services:
       timeout: 5s
       retries: 10
       
-  elasticsearch:
-    container_name: kaimo_elasticsearch
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
-    environment:
-      TZ: Europe/Berlin
-      discovery.type: single-node
-      xpack.security.enabled: "false"
-      ES_JAVA_OPTS: "-Xms2g -Xmx2g"
-      # Dev-Maschine: Festplatte darf voller werden, bevor ES das Zuweisen von
-      # Shards blockiert. Standard ist 85/90/95% -> bei einer fast vollen C:
-      # bleibt sonst jeder Shard "unassigned" und der Cluster wird rot.
-      cluster.routing.allocation.disk.watermark.low: "95%"
-      cluster.routing.allocation.disk.watermark.high: "97%"
-      cluster.routing.allocation.disk.watermark.flood_stage: "98%"
-    volumes:
-      - ./tests/data/elasticsearch:/usr/share/elasticsearch/data
-    ports:
-      - "9200:9200"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsSL http://localhost:9200/_cluster/health || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 15
-      
+  #elasticsearch:
+  #  container_name: kaimo_elasticsearch
+  #  image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+  #  environment:
+  #    TZ: Europe/Berlin
+  #    discovery.type: single-node
+  #    xpack.security.enabled: "false"
+  #    ES_JAVA_OPTS: "-Xms2g -Xmx2g"
+  #    # Dev-Maschine: Festplatte darf voller werden, bevor ES das Zuweisen von
+  #    # Shards blockiert. Standard ist 85/90/95% -> bei einer fast vollen C:
+  #    # bleibt sonst jeder Shard "unassigned" und der Cluster wird rot.
+  #    cluster.routing.allocation.disk.watermark.low: "95%"
+  #    cluster.routing.allocation.disk.watermark.high: "97%"
+  #    cluster.routing.allocation.disk.watermark.flood_stage: "98%"
+  #  volumes:
+  #    - ./tests/data/elasticsearch:/usr/share/elasticsearch/data
+  #  ports:
+  #    - "9200:9200"
+  #  healthcheck:
+  #    test: ["CMD-SHELL", "curl -fsSL http://localhost:9200/_cluster/health || exit 1"]
+  #    interval: 5s
+  #    timeout: 5s
+  #    retries: 15
+  #    
       # Reserve Memory Addresses for files straight away. Elastic search loads up files on demand later on 
       # sudo sysctl -w vm.max_map_count=262144
       # echo "vm.max_map_count=262144" | sudo tee -a /etc/sysctl.conf

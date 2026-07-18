@@ -82,6 +82,7 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         bool isDir = Directory.Exists(full);
 
         bool allow;
+        string reason = "";
         if (!exists)
         {
             // Kein Ziel + keine Create-Absicht -> „not found", kein ACL-Deny.
@@ -94,6 +95,7 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
                 string parent = ShareRelativePath.GetParent(normalized);
                 allow = await _acl.HasAccessAsync(
                     user, share.Id, parent, true, FilePermission.CreateWriteData);
+                if (!allow) reason = $"create denied: parent '{parent}' lacks CreateWriteData";
             }
         }
         else
@@ -101,21 +103,37 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
             allow = true;
             if (request.WantWrite &&
                 !await _acl.HasAccessAsync(user, share.Id, normalized, isDir, FilePermission.CreateWriteData))
+            {
                 allow = false;
+                reason = "write denied: CreateWriteData";
+            }
 
             // Jeder nicht-reine-write-Open liest den Eintrag (auch delete-only).
             bool wantsRead = request.WantRead || !request.WantWrite;
             if (allow && wantsRead &&
                 !await _acl.HasAccessAsync(user, share.Id, normalized, isDir, FilePermission.ListReadData))
+            {
                 allow = false;
+                reason = "read denied: ListReadData";
+            }
         }
 
-        _logger.LogDebug(
-            "AuthorizeOpen: user={User} share={Share} path=[{Path}] r={R} w={W} c={C} -> {Decision}",
-            request.Username, request.Share, request.Path,
-            request.WantRead, request.WantWrite, request.WantsCreate, allow ? "ALLOW" : "DENY");
+        // ALLOW bleibt auf Debug (sonst flutet der readdir-Filter das Log); jede
+        // ABLEHNUNG kommt auf Info MIT Grund -> so ist sofort sichtbar, ob (und
+        // warum) die ACL einen Write blockt. Steht bei einem gescheiterten Write
+        // KEINE DENY-Zeile hier, hat die ACL erlaubt -> die Ablehnung ist FS-seitig.
+        if (allow)
+            _logger.LogDebug(
+                "AuthorizeOpen ALLOW: user={User} share={Share} path=[{Path}] r={R} w={W} c={C}",
+                request.Username, request.Share, request.Path,
+                request.WantRead, request.WantWrite, request.WantsCreate);
+        else
+            _logger.LogInformation(
+                "AuthorizeOpen DENY: user={User} share={Share} path=[{Path}] r={R} w={W} c={C} — {Reason}",
+                request.Username, request.Share, request.Path,
+                request.WantRead, request.WantWrite, request.WantsCreate, reason);
 
-        return new AuthorizeReply { Allow = allow, Reason = allow ? "" : "acl denied" };
+        return new AuthorizeReply { Allow = allow, Reason = allow ? "" : reason };
     }
 
     private AuthorizeReply Deny(string reason)

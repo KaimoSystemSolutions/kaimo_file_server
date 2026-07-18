@@ -28,7 +28,7 @@ RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.s
     && apt-get update \
     && apt-get build-dep -y samba \
     && apt-get install -y --no-install-recommends build-essential python3 \
-       samba-common-bin smbclient \
+       samba-common-bin smbclient acl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build/samba-4.19.5
@@ -70,6 +70,8 @@ WORKDIR /build/authsync
 COPY protos/kaimo_smb_bridge.proto ./
 COPY module/authsync.cpp ./
 COPY module/authd.cpp ./
+COPY module/sharesync.cpp ./
+COPY module/configsync.cpp ./
 RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
     && protoc --grpc_out=. --plugin=protoc-gen-grpc="$(which grpc_cpp_plugin)" kaimo_smb_bridge.proto \
     && g++ -std=c++17 -O2 \
@@ -82,15 +84,31 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
        $(pkg-config --cflags grpc++ protobuf) \
        $(pkg-config --libs grpc++ protobuf) \
        -o /usr/local/bin/kaimo_authd \
+    && g++ -std=c++17 -O2 \
+       sharesync.cpp kaimo_smb_bridge.pb.cc kaimo_smb_bridge.grpc.pb.cc \
+       $(pkg-config --cflags grpc++ protobuf) \
+       $(pkg-config --libs grpc++ protobuf) \
+       -o /usr/local/bin/kaimo_sharesync \
+    && g++ -std=c++17 -O2 \
+       configsync.cpp kaimo_smb_bridge.pb.cc kaimo_smb_bridge.grpc.pb.cc \
+       $(pkg-config --cflags grpc++ protobuf) \
+       $(pkg-config --libs grpc++ protobuf) \
+       -o /usr/local/bin/kaimo_configsync \
     && test -x /usr/local/bin/kaimo_authsync \
-    && test -x /usr/local/bin/kaimo_authd
+    && test -x /usr/local/bin/kaimo_authd \
+    && test -x /usr/local/bin/kaimo_sharesync \
+    && test -x /usr/local/bin/kaimo_configsync
 
 # 5) Konfig, Entrypoint, Sync- und Selbsttest-Skripte fuer die selbst gebaute Samba.
 COPY conf/smb.conf.vfs        /opt/samba/etc/smb.conf
 COPY entrypoint.vfs.sh        /usr/local/bin/entrypoint.sh
 COPY selftest.sh              /usr/local/bin/selftest.sh
 COPY sync-users.sh            /usr/local/bin/sync-users.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh /usr/local/bin/sync-users.sh
+COPY sync-shares.sh           /usr/local/bin/sync-shares.sh
+COPY sync-config.sh           /usr/local/bin/sync-config.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
+             /usr/local/bin/sync-users.sh /usr/local/bin/sync-shares.sh \
+             /usr/local/bin/sync-config.sh
 
 EXPOSE 445
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

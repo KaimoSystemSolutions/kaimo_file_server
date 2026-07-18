@@ -13,11 +13,15 @@ EXPOSE 8443
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
+# nuget.config zuerst -> deterministischer Restore (nuget.org als einzige Quelle).
+COPY ["nuget.config", "."]
 COPY ["src/Kaimo_File_Server.Web/Kaimo_File_Server.Web.csproj", "src/Kaimo_File_Server.Web/"]
 COPY ["src/Kaimo_File_Server.Core/Kaimo_File_Server.Core.csproj", "src/Kaimo_File_Server.Core/"]
 COPY ["src/Kaimo_File_Server.Infrastructure/Kaimo_File_Server.Infrastructure.csproj", "src/Kaimo_File_Server.Infrastructure/"]
 RUN dotnet restore "./src/Kaimo_File_Server.Web/Kaimo_File_Server.Web.csproj"
-COPY . .
+# Nur den Quellcode ins Build-Image kopieren -- kein tests/, docu/, tools/ und
+# keine IDE-/Build-Artefakte (die haelt zusaetzlich .dockerignore aus dem Context).
+COPY src/ src/
 WORKDIR "/src/src/Kaimo_File_Server.Web"
 RUN dotnet build "./Kaimo_File_Server.Web.csproj" -c $BUILD_CONFIGURATION -o /app/build
 

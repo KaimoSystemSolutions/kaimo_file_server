@@ -13,6 +13,7 @@ using Kaimo_File_Server.Web.Helpers;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Core.Language;
+using System.Diagnostics;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -548,7 +549,7 @@ private async Task<OperationResult> MoveInternalAsync(
 
         // Never buffer an oversized file into memory — the caller shows a download
         // fallback for anything above the cap.
-        if (file.Size > MaxPreviewSizeBytes) return null;
+        //if (file.Size > MaxPreviewSizeBytes) return null;
 
         var userContext = await GetCurrentUserContextAsync();
         if (userContext is null) return null;

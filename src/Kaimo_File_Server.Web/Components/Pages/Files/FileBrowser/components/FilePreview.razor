@@ -1,3 +1,4 @@
+@using System.Diagnostics
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Kaimo_File_Server.Web.Helpers
@@ -122,17 +123,19 @@
 
         // Files above the inline-preview cap are never buffered into memory — show the
         // download fallback directly instead of spinning and then silently closing.
-        
-        if (file.Size > VM.GetMaxPreviewSizeBytes())
-        {
-            _previewTooLarge = true;
-            _previewLoading = false;
-            StateHasChanged();
-            return;
-        }
-        
+
+
+        // if (file.Size > VM.GetMaxPreviewSizeBytes())
+        // {
+        //     _previewTooLarge = true;
+        //     _previewLoading = false;
+        //     StateHasChanged();
+        //     return;
+        // }
+
         _previewLoading = true;
         StateHasChanged();
+
 
         var result = await VM.ReadFileForPreviewAsync(file);
         if (result is null)
@@ -146,8 +149,10 @@
         var (data, contentType, kind) = result.Value;
         _previewKind = kind;
 
+        var sw = Stopwatch.StartNew();
         var urls = await JS.InvokeAsync<PreviewUrls>(
             "filePreview.preparePreview", data, contentType, kind.ToString());
+        sw.Stop();
 
         _downloadUrl = urls.DownloadUrl ?? "";
         _displayUrl = urls.DisplayUrl ?? "";
