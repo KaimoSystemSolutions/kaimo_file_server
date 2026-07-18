@@ -1,8 +1,28 @@
+# syntax=docker/dockerfile:1
+#
 # Phase-0-Spike, step B: own VFS module + Samba from ONE source.
 #
 # Self-contained so `docker compose build` can build it without prerequisites.
-# (For fast local module iterations there's also Dockerfile.src that only
-#  caches source download — not needed for Compose.)
+#
+# FAST ITERATION (why the stages are split the way they are):
+#   The expensive part is compiling ALL of Samba (`./configure && make`, many
+#   minutes). That must run EXACTLY ONCE and then stay in Docker's layer cache.
+#   The trap: if the frequently-changed module source is an input to that step,
+#   every edit busts the cache and rebuilds all of Samba. Re-running `./configure`
+#   alone already regenerates the global config env -> waf invalidates ~1500
+#   targets even with a build cache mount.
+#
+#   Solution: the `sambabuild` stage configures + builds + installs Samba against
+#   a CONSTANT stub of vfs_kaimo_bridge.c (registration strings are constant too),
+#   so its inputs never change on a module edit -> Docker caches it forever.
+#   The `runtime` stage copies the REAL module over the stub and rebuilds ONLY
+#   that one waf target (no ./configure) -> a module edit relinks a single .so in
+#   seconds. The stub exists solely to let configure/make/install produce a
+#   complete tree that the real module is incrementally relinked into.
+#
+#   The base rebuilds only when YOU change the sambabuild stage (Samba version,
+#   configure flags, build deps). That is the manual "base image" behaviour, but
+#   managed automatically by the layer cache -- nothing to tag or build by hand.
 #
 # Finding from Phase 0: `samba-dev` doesn't provide internal VFS headers, and
 # an upstream-built module doesn't load into distro Samba
@@ -19,8 +39,10 @@ RUN wget -q https://download.samba.org/pub/samba/stable/samba-4.19.5.tar.gz \
     && tar xf samba-4.19.5.tar.gz \
     && rm samba-4.19.5.tar.gz
 
-# ---------- Stage 2: build + install + run ----------
-FROM src AS runtime
+# ---------- Stage 2: expensive, cache-stable Samba build (stub module) ----------
+# This stage MUST NOT depend on the real module content. Its only module input is
+# a constant stub written inline below. Rebuilds only when this stage changes.
+FROM src AS sambabuild
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Enable deb-src and fetch Samba build dependencies.
@@ -31,12 +53,17 @@ RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.s
        samba-common-bin smbclient acl \
     && rm -rf /var/lib/apt/lists/*
 
+# Toolchain for the gRPC C++ sidecar clients. Installed here (rarely changes) so a
+# module edit in the runtime stage never re-triggers this apt install.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       protobuf-compiler protobuf-compiler-grpc \
+       libgrpc++-dev libprotobuf-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /build/samba-4.19.5
 
-# Insert module source.
-COPY module/vfs_kaimo_bridge.c source3/modules/vfs_kaimo_bridge.c
-
-# 1) Register module in build system (template: vfs_fake_perms).
+# 1) Register module in build system (template: vfs_fake_perms). Constant strings.
 RUN cat >> source3/modules/wscript_build <<'PYEOF'
 
 bld.SAMBA3_MODULE('vfs_kaimo_bridge',
@@ -52,20 +79,48 @@ PYEOF
 RUN sed -i "s/default_shared_modules.extend(\['vfs_recycle'/default_shared_modules.extend(['vfs_kaimo_bridge', 'vfs_recycle'/" source3/wscript \
     && grep -n "vfs_kaimo_bridge" source3/wscript
 
-# 3) Build and install Samba to /opt/samba (incl. our module).
+# 3) CONSTANT build-time stub of the module. The real implementation is compiled
+#    in the runtime stage. This only needs to be a registrable, compilable VFS
+#    module so configure/make/install complete and produce all object files +
+#    private libs the real module later links against (same ABI).
+RUN cat > source3/modules/vfs_kaimo_bridge.c <<'CEOF'
+/* Build-time stub -- replaced by the real module in the runtime stage.
+ * See the header of Dockerfile.vfs for why this exists. */
+#include "includes.h"
+#include "smbd/smbd.h"
+
+#undef DBGC_CLASS
+#define DBGC_CLASS DBGC_VFS
+
+static struct vfs_fn_pointers kaimo_bridge_fns = {
+	.connect_fn = NULL,
+};
+
+static_decl_vfs;
+NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)
+{
+	return smb_register_vfs(SMB_VFS_INTERFACE_VERSION, "kaimo_bridge",
+				&kaimo_bridge_fns);
+}
+CEOF
+
+# 4) Build and install Samba to /opt/samba (incl. the stub module). The waf build
+#    tree under bin/ is kept in the IMAGE (no cache mount, no clean) so the runtime
+#    stage inherits a fully configured tree with all object files and can relink a
+#    single module target without reconfiguring. This makes the base image large
+#    (~1-2 GB of build tree); acceptable for a dev iteration base. If final image
+#    size matters, add a slim stage that copies only /opt/samba + /usr/local/bin.
 RUN ./configure --without-ad-dc --enable-debug --prefix=/opt/samba \
     && PYTHONHASHSEED=1 make -j"$(nproc)" \
     && PYTHONHASHSEED=1 make install \
-    && find /opt/samba -name '*kaimo_bridge*.so' | sed 's/^/installed module: /'
+    && find /opt/samba -name '*kaimo_bridge*.so' | sed 's/^/installed stub module: /'
 
-# 4) Phase 1: build gRPC C++ client (kaimo_authsync) for NT-Hash sync.
-#    Also proves gRPC-in-C++ in the Samba container works (last toolchain risk).
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-       protobuf-compiler protobuf-compiler-grpc \
-       libgrpc++-dev libprotobuf-dev pkg-config \
-    && rm -rf /var/lib/apt/lists/*
+# ---------- Stage 3: runtime (cheap; reruns on source edits) ----------
+FROM sambabuild AS runtime
+ENV DEBIAN_FRONTEND=noninteractive
 
+# Phase 1: build gRPC C++ clients (authsync/authd/sharesync/configsync) for
+# NT-Hash + share + config sync. Toolchain already present from sambabuild.
 WORKDIR /build/authsync
 COPY protos/kaimo_smb_bridge.proto ./
 COPY module/authsync.cpp ./
@@ -98,6 +153,18 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
     && test -x /usr/local/bin/kaimo_authd \
     && test -x /usr/local/bin/kaimo_sharesync \
     && test -x /usr/local/bin/kaimo_configsync
+
+# Real VFS module: overwrite the stub and relink ONLY this target (no reconfigure).
+# This is the layer that reruns on a module edit -> a single object + relink.
+# The installed .so is located by name (not a hardcoded path) and overwritten.
+WORKDIR /build/samba-4.19.5
+COPY module/vfs_kaimo_bridge.c source3/modules/vfs_kaimo_bridge.c
+RUN ./buildtools/bin/waf build --targets=vfs_kaimo_bridge \
+    && built="$(find bin -name 'vfs_kaimo_bridge*.so' | head -n1)" \
+    && dest="$(find /opt/samba -name 'vfs_kaimo_bridge*.so' | head -n1)" \
+    && test -n "$built" && test -n "$dest" \
+    && cp "$built" "$dest" \
+    && echo "updated real module: $dest"
 
 # 5) Config, entrypoint, sync and self-test scripts for self-built Samba.
 COPY conf/smb.conf.vfs        /opt/samba/etc/smb.conf

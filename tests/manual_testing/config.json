@@ -1,6 +1,6 @@
 {
   "ip": "127.0.0.1",
-  "port": 4445,
+  "port": 445,
   "username": "admin",
   "password": "admin1234",
   "domain": "",

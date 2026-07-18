@@ -2,16 +2,13 @@ services:
   kaimo_file_server.host:
     image: ${DOCKER_REGISTRY-}kaimofileserver
     container_name: kaimo_file_server
-    #user: root
-    #ports:
-    #  - 445:445
     # umask 002 -> newly created files become 0664 (group-writable) so that the
     # Samba side (group kaimo) can overwrite them. Fallback for filesystems without ACL
     # support (drvfs/9p on Windows dev machine); on ext4 the default ACLs from the
     # Samba entrypoint handle this. See samba-vfs/README.md (Storage Ownership).
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Host.dll"]
     volumes:
-      - ./tests/data/storage:/data/storage
+      - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
@@ -34,7 +31,7 @@ services:
       kaimo_file_server_db:
         condition: service_healthy
     volumes:
-      - ./tests/data/storage:/data/storage
+      - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
 
   # Phase 0 spike: real Samba (smbd) + custom VFS module (kaimo_bridge).
   # Runs IN PARALLEL with existing .NET SMB implementation in host container.
@@ -56,7 +53,7 @@ services:
       - 445:445
     volumes:
       # Same storage as Host/Web -> Samba performs file I/O directly.
-      - ./tests/data/storage:/data/storage
+      - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
     build:
       context: ./samba-vfs
       dockerfile: Dockerfile.vfs
@@ -86,7 +83,7 @@ services:
     # Samba entrypoint handle this. See samba-vfs/README.md (Storage Ownership).
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Web.dll"]
     volumes:
-      - ./tests/data/storage:/data/storage
+      - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
@@ -107,7 +104,7 @@ services:
       POSTGRES_USER: kaimo_test_user
       POSTGRES_PASSWORD: change_me
     volumes:
-      - ./tests/data/postgres:/var/lib/postgresql/data
+      - ${LOCATION_DB:-./tests/data/postgres}:/var/lib/postgresql/data
     ports:
       - "5432"
     healthcheck:
