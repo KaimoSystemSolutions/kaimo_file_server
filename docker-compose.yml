@@ -16,6 +16,49 @@ services:
       context: .
       dockerfile: src/Kaimo_File_Server.Host/Dockerfile
 
+  # Phase 1: gRPC-Control-Plane fuer Samba. Liefert (vorerst) NT-Hashes der
+  # Kaimo-Benutzer aus der DB, damit Samba NTLMv2 lokal pruefen kann.
+  # Nur intern erreichbar (kein Port nach aussen), h2c auf :5080.
+  kaimo_smb_bridge:
+    image: ${DOCKER_REGISTRY-}kaimosmbbridge
+    container_name: kaimo_smb_bridge
+    build:
+      context: .
+      dockerfile: src/Kaimo_File_Server.SmbBridge/Dockerfile
+    depends_on:
+      kaimo_file_server_db:
+        condition: service_healthy
+    volumes:
+      - ./tests/data/storage:/data/storage
+
+  # Phase-0-Spike: echtes Samba (smbd) + eigenes VFS-Modul (kaimo_bridge).
+  # Laeuft PARALLEL zur bestehenden .NET-SMB-Implementierung im Host-Container.
+  # Port 445 bleibt vorerst beim .NET-Host; Samba wird waehrend der Migration
+  # auf Host-Port 1445 gemappt. Beim Cutover (Phase 5) uebernimmt Samba die 445.
+  # Details: samba-vfs/README.md und docu/smb-samba-vfs-migration.md
+  kaimo_samba:
+    image: ${DOCKER_REGISTRY-}kaimosamba
+    container_name: kaimo_samba
+    ports:
+      - 445:445
+    volumes:
+      # Gleicher Storage wie Host/Web -> Samba macht die Datei-I/O direkt.
+      - ./tests/data/storage:/data/storage
+    build:
+      context: ./samba-vfs
+      dockerfile: Dockerfile.vfs
+    depends_on:
+      - kaimo_smb_bridge
+    environment:
+      # Adresse der gRPC-Bridge fuer den NT-Hash-Sync (kaimo_authsync).
+      KAIMO_BRIDGE_ADDR: kaimo_smb_bridge:5080
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/samba/bin/smbclient -L localhost -U kaimotest%Passw0rd! -m SMB3 >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 6
+      start_period: 20s
+
   kaimo_file_server.web:
     image: ${DOCKER_REGISTRY-}kaimofileserverweb
     container_name: kaimo_file_server_web

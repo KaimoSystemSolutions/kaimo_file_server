@@ -278,6 +278,91 @@ public class FileService : IFileService
         _searchService?.onDirectoryRenamed(oldAbsolutePath, newAbsolutePath);
     }
 
+    // ------------------ External-writer close hooks (Samba VFS direct I/O) ------------------
+    //
+    // Samba performs the raw file I/O itself, then the VFS bridge calls these so the same
+    // cross-cutting effects as FileSession.DisposeAsync happen: versioning, search indexing,
+    // ownership. All best-effort — a hook failure must never surface as an SMB error.
+
+    public async Task NotifyExternalCloseAsync(string path, UserContext user)
+    {
+        var rel = ShareRelativePath.Normalize(path);
+        var abs = _storage.ToAbsolutePath(rel);
+
+        // Ownership (idempotent, swallows its own errors).
+        await RecordOwnerAsync(rel, isDirectory: false, user);
+
+        // Versioning: snapshot the freshly written content (mirrors DisposeAsync).
+        if (_versionService != null)
+        {
+            try
+            {
+                await using var content = await _storage.ReadAsync(rel);
+                await _versionService.CreateVersionAsync(_shareId, rel, content, user.User.Id.ToString());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(LogEvents.FileVersionSnapshotFailed, ex, LogMessages.FileVersionSnapshotFailed, rel);
+            }
+        }
+
+        // Search index. Awaited (not fire-and-forget like the in-process DisposeAsync):
+        // the bridge runs this inside a short-lived gRPC scope, so we must let it finish
+        // before the scope/DbContext is torn down — and surface errors.
+        if (_searchService != null)
+        {
+            try { await _searchService.onFileCreated(abs, _storage.ReadAsync(rel)); }
+            catch (Exception ex) { _logger.LogWarning(LogEvents.FileSearchHookFailed, ex, LogMessages.FileSearchHookFailed, rel); }
+        }
+    }
+
+    public async Task NotifyExternalMkdirAsync(string path, UserContext user)
+    {
+        var rel = ShareRelativePath.Normalize(path);
+        var abs = _storage.ToAbsolutePath(rel);
+        await RecordOwnerAsync(rel, isDirectory: true, user);
+        if (_searchService != null)
+        {
+            try { await _searchService.onDirectoryCreated(abs); }
+            catch (Exception ex) { _logger.LogWarning(LogEvents.FileSearchHookFailed, ex, LogMessages.FileSearchHookFailed, rel); }
+        }
+    }
+
+    public async Task NotifyExternalDeleteAsync(string path, bool isDirectory)
+    {
+        var rel = ShareRelativePath.Normalize(path);
+        var abs = _storage.ToAbsolutePath(rel);
+        if (_searchService == null) return;
+        try
+        {
+            if (isDirectory) await _searchService.onDirectoryDeleted(abs);
+            else await _searchService.onFileDeleted(abs);
+        }
+        catch (Exception ex) { _logger.LogWarning(LogEvents.FileSearchHookFailed, ex, LogMessages.FileSearchHookFailed, rel); }
+    }
+
+    public async Task NotifyExternalRenameAsync(string oldPath, string newPath, bool isDirectory)
+    {
+        var oldRel = ShareRelativePath.Normalize(oldPath);
+        var newRel = ShareRelativePath.Normalize(newPath);
+        var oldAbs = _storage.ToAbsolutePath(oldRel);
+        var newAbs = _storage.ToAbsolutePath(newRel);
+
+        // Keep ACL records aligned with the new path (mirrors FileSession.RenameAsync).
+        try { await _acl.RenameAclPathAsync(_shareId, oldRel, newRel); }
+        catch (Exception ex) { _logger.LogWarning(LogEvents.FileSearchHookFailed, ex, LogMessages.FileSearchHookFailed, newRel); }
+
+        if (_searchService != null)
+        {
+            try
+            {
+                if (isDirectory) await _searchService.onDirectoryRenamed(oldAbs, newAbs);
+                else await _searchService.onFileRenamed(oldAbs, newAbs);
+            }
+            catch (Exception ex) { _logger.LogWarning(LogEvents.FileSearchHookFailed, ex, LogMessages.FileSearchHookFailed, newRel); }
+        }
+    }
+
     // ------------------ ACL helpers ------------------
 
     /// <summary>

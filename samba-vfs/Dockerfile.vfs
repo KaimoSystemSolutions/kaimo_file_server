@@ -1,0 +1,96 @@
+# Phase-0-Spike, Schritt B: eigenes VFS-Modul + Samba aus EINER Quelle.
+#
+# Self-contained, damit `docker compose build` es ohne Vorarbeit bauen kann.
+# (Fuer schnelle lokale Modul-Iterationen gibt es zusaetzlich Dockerfile.src, das
+#  nur den Quell-Download cacht — fuer Compose nicht noetig.)
+#
+# Befund aus Phase 0: `samba-dev` liefert die internen VFS-Header nicht, und ein
+# upstream-gebautes Modul laedt nicht in die Distro-Samba
+# (libsmbd-base-samba4.so: cannot open shared object). Loesung + Produktionspfad:
+# Samba selbst bauen und betreiben, damit Modul, smbd und private Libs aus
+# demselben Build stammen (ABI 49, Samba 4.19.5).
+
+# ---------- Stage 1: Samba-Quellbaum (eigener Layer -> gut cachebar) ----------
+FROM ubuntu:24.04 AS src
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -qq && apt-get install -y -qq wget && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+RUN wget -q https://download.samba.org/pub/samba/stable/samba-4.19.5.tar.gz \
+    && tar xf samba-4.19.5.tar.gz \
+    && rm samba-4.19.5.tar.gz
+
+# ---------- Stage 2: bauen + installieren + laufen ----------
+FROM src AS runtime
+ENV DEBIAN_FRONTEND=noninteractive
+
+# deb-src aktivieren und Samba-Build-Abhaengigkeiten holen.
+RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources \
+    && apt-get update \
+    && apt-get build-dep -y samba \
+    && apt-get install -y --no-install-recommends build-essential python3 \
+       samba-common-bin smbclient \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build/samba-4.19.5
+
+# Modulquelle einspielen.
+COPY module/vfs_kaimo_bridge.c source3/modules/vfs_kaimo_bridge.c
+
+# 1) Modul im Build-System registrieren (Vorlage: vfs_fake_perms).
+RUN cat >> source3/modules/wscript_build <<'PYEOF'
+
+bld.SAMBA3_MODULE('vfs_kaimo_bridge',
+                 subsystem='vfs',
+                 source='vfs_kaimo_bridge.c',
+                 deps='samba-util',
+                 init_function='',
+                 internal_module=bld.SAMBA3_IS_STATIC_MODULE('vfs_kaimo_bridge'),
+                 enabled=bld.SAMBA3_IS_ENABLED_MODULE('vfs_kaimo_bridge'))
+PYEOF
+
+# 2) Modul als shared module aktivieren.
+RUN sed -i "s/default_shared_modules.extend(\['vfs_recycle'/default_shared_modules.extend(['vfs_kaimo_bridge', 'vfs_recycle'/" source3/wscript \
+    && grep -n "vfs_kaimo_bridge" source3/wscript
+
+# 3) Samba nach /opt/samba bauen und installieren (inkl. unseres Moduls).
+RUN ./configure --without-ad-dc --enable-debug --prefix=/opt/samba \
+    && PYTHONHASHSEED=1 make -j"$(nproc)" \
+    && PYTHONHASHSEED=1 make install \
+    && find /opt/samba -name '*kaimo_bridge*.so' | sed 's/^/installiertes Modul: /'
+
+# 4) Phase 1: gRPC-C++-Client (kaimo_authsync) fuer den NT-Hash-Sync bauen.
+#    Beweist zugleich gRPC-in-C++ im Samba-Container (letztes Toolchain-Risiko).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       protobuf-compiler protobuf-compiler-grpc \
+       libgrpc++-dev libprotobuf-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build/authsync
+COPY protos/kaimo_smb_bridge.proto ./
+COPY module/authsync.cpp ./
+COPY module/authd.cpp ./
+RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
+    && protoc --grpc_out=. --plugin=protoc-gen-grpc="$(which grpc_cpp_plugin)" kaimo_smb_bridge.proto \
+    && g++ -std=c++17 -O2 \
+       authsync.cpp kaimo_smb_bridge.pb.cc kaimo_smb_bridge.grpc.pb.cc \
+       $(pkg-config --cflags grpc++ protobuf) \
+       $(pkg-config --libs grpc++ protobuf) \
+       -o /usr/local/bin/kaimo_authsync \
+    && g++ -std=c++17 -O2 -pthread \
+       authd.cpp kaimo_smb_bridge.pb.cc kaimo_smb_bridge.grpc.pb.cc \
+       $(pkg-config --cflags grpc++ protobuf) \
+       $(pkg-config --libs grpc++ protobuf) \
+       -o /usr/local/bin/kaimo_authd \
+    && test -x /usr/local/bin/kaimo_authsync \
+    && test -x /usr/local/bin/kaimo_authd
+
+# 5) Konfig, Entrypoint, Sync- und Selbsttest-Skripte fuer die selbst gebaute Samba.
+COPY conf/smb.conf.vfs        /opt/samba/etc/smb.conf
+COPY entrypoint.vfs.sh        /usr/local/bin/entrypoint.sh
+COPY selftest.sh              /usr/local/bin/selftest.sh
+COPY sync-users.sh            /usr/local/bin/sync-users.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh /usr/local/bin/sync-users.sh
+
+EXPOSE 445
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

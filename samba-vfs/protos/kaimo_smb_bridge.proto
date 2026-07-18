@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+// Gemeinsamer Vertrag zwischen der .NET-Control-Plane (Server) und dem
+// Samba-Container (C++-Client). Aus dieser einen Datei werden sowohl die
+// C#- als auch die C++-Stubs generiert.
+package kaimo.smb.bridge.v1;
+
+option csharp_namespace = "Kaimo_File_Server.SmbBridge.Grpc";
+
+// Auth-Teil der Control-Plane. Quelle der Wahrheit bleibt die Kaimo-DB
+// (IAuthenticationLookup); Samba bekommt nur die NT-Hashes zur lokalen
+// NTLMv2-Pruefung.
+service AuthService {
+  // Einzelabruf des NT-Hash (fuer ein spaeteres On-Demand-pdb-Modul).
+  rpc GetNtHash(GetNtHashRequest) returns (GetNtHashReply);
+
+  // Alle aktiven Benutzer + NT-Hash, fuer den tdbsam-Sync (Phase 1).
+  rpc ListUsers(ListUsersRequest) returns (ListUsersReply);
+}
+
+message GetNtHashRequest {
+  string username = 1;
+}
+
+message GetNtHashReply {
+  bool  found   = 1;
+  bytes nt_hash = 2; // rohe 16 Byte; leer, wenn nicht gefunden/deaktiviert
+}
+
+message ListUsersRequest {}
+
+message UserEntry {
+  string username = 1;
+  bytes  nt_hash  = 2; // rohe 16 Byte
+}
+
+message ListUsersReply {
+  repeated UserEntry users = 1;
+}
+
+// Autorisierungs-Teil der Control-Plane (Phase 2). Entscheidet anhand der
+// echten Kaimo-ACLs, ob ein Benutzer auf einen Share zugreifen darf. Wird vom
+// Samba-Sidecar (kaimo_authd) im VFS-connect-Hook aufgerufen.
+service AuthzService {
+  // TREE_CONNECT: darf <username> den <share> ueberhaupt betreten?
+  // Mappt auf IAuthenticationLookup.CanAccessShareAsync.
+  rpc AuthorizeConnect(AuthorizeConnectRequest) returns (AuthorizeReply);
+
+  // Datei-/Pfad-Zugriff (Phase 2b). Exakte Paritaet zu FileService.OpenAsync:
+  // write -> CreateWriteData, read -> ListReadData, create -> Parent-Check.
+  // Wird vom create_file-Hook (Open) und vom readdir-Filter (read-only) genutzt.
+  rpc AuthorizeOpen(AuthorizeOpenRequest) returns (AuthorizeReply);
+}
+
+message AuthorizeConnectRequest {
+  string username = 1;
+  string share    = 2; // Share-Name (wie in Samba/registry), nicht die Guid
+}
+
+message AuthorizeReply {
+  bool   allow  = 1;
+  string reason = 2; // optionaler Grund fuers Logging (z. B. "unknown share")
+}
+
+message AuthorizeOpenRequest {
+  string username     = 1;
+  string share        = 2;
+  string path         = 3; // share-relativ, Forward-Slashes
+  bool   want_read    = 4; // FILE_READ_DATA angefragt
+  bool   want_write   = 5; // FILE_WRITE_DATA / FILE_APPEND_DATA angefragt
+  bool   wants_create = 6; // create-disposition legt neue Datei an
+}
+
+// Close-/Event-Hooks (Phase 3). Samba fuehrt die I/O nativ aus und meldet danach
+// das Ereignis; .NET erledigt die Cross-Cutting-Effekte (Versionierung, Suchindex,
+// Ownership) wie frueher in FileSession.DisposeAsync. Fire-and-forget, best-effort.
+service EventService {
+  rpc NotifyClose (NotifyCloseRequest)  returns (NotifyReply); // Datei geschrieben+geschlossen
+  rpc NotifyMkdir (NotifyPathRequest)   returns (NotifyReply); // Verzeichnis angelegt
+  rpc NotifyDelete(NotifyPathRequest)   returns (NotifyReply); // Datei/Verzeichnis geloescht
+  rpc NotifyRename(NotifyRenameRequest) returns (NotifyReply); // umbenannt/verschoben
+}
+
+message NotifyCloseRequest {
+  string username = 1;
+  string share    = 2;
+  string path     = 3;
+}
+
+message NotifyPathRequest {
+  string username     = 1;
+  string share        = 2;
+  string path         = 3;
+  bool   is_directory = 4;
+}
+
+message NotifyRenameRequest {
+  string username     = 1;
+  string share        = 2;
+  string old_path     = 3;
+  string new_path     = 4;
+  bool   is_directory = 5;
+}
+
+message NotifyReply { bool ok = 1; }

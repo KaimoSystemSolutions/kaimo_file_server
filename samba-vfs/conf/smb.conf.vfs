@@ -1,0 +1,23 @@
+[global]
+    workgroup = WORKGROUP
+    server string = Kaimo Samba Spike (VFS)
+    server role = standalone server
+    map to guest = never
+    log level = 2
+    logging = stdout
+
+    # Dynamische Shares aus der Registry (net conf) - wie in smb.conf.
+    registry shares = yes
+    include = registry
+
+    server min protocol = SMB2_10
+    access based share enum = yes
+
+    # Phase 1: lokale NTLMv2-Pruefung gegen tdbsam. Die NT-Hashes werden aus der
+    # Kaimo-DB via gRPC-Bridge (kaimo_authsync -> sync-users.sh) hineingespielt.
+    passdb backend = tdbsam
+
+    # --- Phase-0-Kern Schritt B: eigenes VFS-Modul global aktivieren ---
+    # Gilt fuer alle Shares (auch die dynamischen aus der Registry). Spaeter
+    # sitzt hier die gRPC-Bruecke zur .NET-Control-Plane.
+    vfs objects = kaimo_bridge

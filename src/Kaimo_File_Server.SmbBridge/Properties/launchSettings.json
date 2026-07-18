@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "Kaimo_File_Server.SmbBridge": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:27084;http://localhost:27085"
+    }
+  }
+}

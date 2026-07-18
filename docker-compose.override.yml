@@ -9,6 +9,13 @@ services:
       - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
       - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
 
+  kaimo_smb_bridge:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      # MUSS mit Host/Web uebereinstimmen, sonst koennen verschluesselte
+      # NT-Hashes nicht entschluesselt werden.
+      - NtHash__EncryptionKey=DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey
+
   kaimo_file_server.web:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development

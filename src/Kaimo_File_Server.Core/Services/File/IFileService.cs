@@ -45,7 +45,24 @@ namespace Kaimo_File_Server.Core.Services.File
         void onFileDeleted(string absolutePath);
 
         void onDirectoryDeleted(string absolutePath);
-        
+
+        // ---- External-writer close hooks (Samba VFS direct I/O) ----
+        // Samba performs the raw I/O natively, then calls these so the same
+        // cross-cutting effects as FileSession.DisposeAsync run: versioning,
+        // search indexing, ownership. Best-effort (failures logged, not thrown).
+
+        /// <summary>A file was written+closed externally: snapshot a version, index it, stamp owner.</summary>
+        Task NotifyExternalCloseAsync(string path, UserContext user);
+
+        /// <summary>A directory was created externally: index it and stamp owner.</summary>
+        Task NotifyExternalMkdirAsync(string path, UserContext user);
+
+        /// <summary>A file/directory was deleted externally: remove it from the search index.</summary>
+        Task NotifyExternalDeleteAsync(string path, bool isDirectory);
+
+        /// <summary>A file/directory was renamed externally: realign ACL records and the search index.</summary>
+        Task NotifyExternalRenameAsync(string oldPath, string newPath, bool isDirectory);
+
         /// <summary>
         /// Returns the subset of paths the user has ListReadData permission on.
         /// Single DB round trip via batch ACL evaluation.

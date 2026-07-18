@@ -1,0 +1,10 @@
+# Zwischen-Image: entpackter Samba-Quellbaum 4.19.5 (passend zur Distro-ABI 49).
+# Dient nur dazu, den Quell-Download zu cachen, damit Modul-Iterationen schnell sind.
+#   docker build -f Dockerfile.src -t kaimo-samba-src:4.19.5 .
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -qq && apt-get install -y -qq wget && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+RUN wget -q https://download.samba.org/pub/samba/stable/samba-4.19.5.tar.gz \
+    && tar xf samba-4.19.5.tar.gz \
+    && rm samba-4.19.5.tar.gz
