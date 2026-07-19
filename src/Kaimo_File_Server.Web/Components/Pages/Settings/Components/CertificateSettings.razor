@@ -1,0 +1,65 @@
+
+@using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Services.Https
+@using Microsoft.AspNetCore.Components.Forms
+@inject AssetProvider Icons
+
+<div class="detail-section">
+    <span class="detail-label">HTTPS-Zertifikat</span>
+    <p class="settings-description">Der Server erzeugt automatisch ein selbstsigniertes Zertifikat und erneuert es vor Ablauf. Lade die öffentliche Zertifikatsdatei herunter, um sie auf den Clients als vertrauenswürdig zu hinterlegen – oder ersetze sie durch ein eigenes Zertifikat.</p>
+    @if (VM.HasCertificate)
+    {
+        <div class="info-card">
+            <div class="info-row"><span class="info-key">Antragsteller (CN)</span><span class="info-val">@VM.CertSubject</span></div>
+            <div class="info-row"><span class="info-key">Typ</span><span class="info-val">@(VM.CertIsSelfSigned ? "Selbstsigniert" : "Eigenes Zertifikat") · @(VM.CertSettings.Mode == CertificateMode.Auto ? "automatische Erneuerung" : "keine Erneuerung")</span></div>
+            <div class="info-row"><span class="info-key">Ausgestellt</span><span class="info-val">@(VM.CertIssuedUtc?.ToString("yyyy-MM-dd HH:mm 'UTC'") ?? "—")</span></div>
+            <div class="info-row"><span class="info-key">Läuft ab</span><span class="info-val @(VM.CertDaysRemaining is <= 21 ? "is-muted" : "")">@(VM.CertExpiresUtc?.ToString("yyyy-MM-dd HH:mm 'UTC'") ?? "—") @if (VM.CertDaysRemaining is { } d) { <text>(@(d >= 0 ? $"noch {d} Tage" : $"seit {-d} Tagen abgelaufen"))</text> }</span></div>
+            <div class="info-row"><span class="info-key">Fingerabdruck (SHA-1)</span><span class="info-val is-muted">@VM.CertThumbprint</span></div>
+            @if (VM.CertSans.Count > 0) { <div class="info-row"><span class="info-key">Alternative Namen (SAN)</span><span class="info-val">@string.Join(" · ", VM.CertSans)</span></div> }
+        </div>
+        <div class="settings-row settings-actions settings-wrap">
+            @if (_crtHref is not null) { <a class="btn-primary settings-download" href="@_crtHref" download="kaimo-fileserver.crt">.crt herunterladen</a> }
+            @if (_pemHref is not null) { <a class="btn-icon settings-download" href="@_pemHref" download="kaimo-fileserver.pem" title="Als PEM herunterladen">.pem</a> }
+            <button class="btn-icon" title="Aktualisieren" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button>
+        </div>
+    }
+    else { <p class="settings-empty">Es ist noch kein Zertifikat geladen.</p> }
+</div>
+
+<div class="detail-section">
+    <span class="detail-label">Automatisches Zertifikat</span>
+    <p class="settings-description">Gültigkeitsdauer des selbstsigniert erzeugten Zertifikats. Es wird rechtzeitig vor Ablauf automatisch erneuert – ohne Neustart.</p>
+    <div class="settings-row settings-row-spaced"><label class="settings-field-label">Laufzeit</label><select class="edit-input settings-select" @bind="VM.CertSettings.LifetimeDays"><option value="@HttpsCertificateSettings.LifetimeOneMonth">1 Monat (30 Tage)</option><option value="@HttpsCertificateSettings.LifetimeThreeMonths">3 Monate (90 Tage)</option></select></div>
+    <div class="settings-row settings-row-spaced"><label class="settings-field-label">Common Name (optional)</label><input type="text" class="edit-input settings-text" placeholder="Standard: Hostname" @bind="VM.CertSettings.CommonName" /></div>
+    <div class="settings-row settings-row-spaced"><label class="settings-field-label">Zusätzliche Namen/IPs</label><input type="text" class="edit-input settings-text" placeholder="fileserver.local, 10.0.0.5" @bind="VM.CertAdditionalSansText" /></div>
+    <div class="settings-row"><button class="btn-primary" @onclick="SaveSettings">Speichern &amp; neu erzeugen</button><button class="btn-icon" title="Jetzt neu erzeugen" @onclick="Regenerate">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button></div>
+</div>
+
+<div class="detail-section">
+    <span class="detail-label">Eigenes Zertifikat hochladen</span>
+    <p class="settings-description">Ersetze das automatische Zertifikat durch ein eigenes — das Format wird automatisch erkannt. Es muss der <strong>private Schlüssel</strong> dabei sein. Du hast drei Möglichkeiten: eine <strong>.pfx/.p12</strong>, eine <strong>kombinierte PEM</strong> (Zertifikat + Schlüssel in einer Datei), oder <strong>Zertifikat und Schlüssel als zwei getrennte Dateien</strong>. Die automatische Erneuerung wird dafür pausiert.</p>
+    <div class="settings-row settings-row-spaced"><label class="settings-field-label">Zertifikat (.pfx/.p12/.pem/.crt/.cer)</label><InputFile OnChange="OnCertFileSelected" accept=".pfx,.p12,.pem,.crt,.cer" />@if (_pendingCertName.Length > 0) { <span class="settings-hint">@_pendingCertName</span> }</div>
+    <div class="settings-row settings-row-spaced"><label class="settings-field-label">Privater Schlüssel (optional, .key/.pem)</label><InputFile OnChange="OnKeyFileSelected" accept=".key,.pem,.der" />@if (_pendingKeyName.Length > 0) { <span class="settings-hint">@_pendingKeyName</span> }</div>
+    <div class="settings-row settings-row-spaced"><label class="settings-field-label">Passwort</label><input type="password" class="edit-input settings-select" @bind="VM.CustomCertPassword" /></div>
+    <button class="btn-primary" disabled="@(_pendingCert is null)" @onclick="Import">Zertifikat übernehmen</button>
+</div>
+
+@code {
+    private const long MaxCertUploadSize = 512 * 1024;
+    [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+    private string? _crtHref;
+    private string? _pemHref;
+    private byte[]? _pendingCert;
+    private string _pendingCertName = "";
+    private byte[]? _pendingKey;
+    private string _pendingKeyName = "";
+
+    protected override void OnParametersSet() => BuildDownloadLinks();
+    private void BuildDownloadLinks() { var der = VM.GetPublicCertDerBase64(); var pem = VM.GetPublicCertPemBase64(); _crtHref = der is null ? null : $"data:application/x-x509-ca-cert;base64,{der}"; _pemHref = pem is null ? null : $"data:application/x-pem-file;base64,{pem}"; }
+    private async Task Refresh() { await VM.LoadCertificateStateAsync(); BuildDownloadLinks(); StateHasChanged(); }
+    private async Task SaveSettings() { await VM.SaveCertificateSettingsAsync(); BuildDownloadLinks(); StateHasChanged(); }
+    private async Task Regenerate() { await VM.RegenerateCertificateNowAsync(); BuildDownloadLinks(); StateHasChanged(); }
+    private async Task OnCertFileSelected(InputFileChangeEventArgs e) { _pendingCertName = e.File.Name; using var ms = new MemoryStream(); await e.File.OpenReadStream(MaxCertUploadSize).CopyToAsync(ms); _pendingCert = ms.ToArray(); }
+    private async Task OnKeyFileSelected(InputFileChangeEventArgs e) { _pendingKeyName = e.File.Name; using var ms = new MemoryStream(); await e.File.OpenReadStream(MaxCertUploadSize).CopyToAsync(ms); _pendingKey = ms.ToArray(); }
+    private async Task Import() { if (_pendingCert is null) return; if (await VM.ImportCustomCertificateAsync(_pendingCert, _pendingKey)) { _pendingCert = null; _pendingCertName = ""; _pendingKey = null; _pendingKeyName = ""; } BuildDownloadLinks(); StateHasChanged(); }
+}

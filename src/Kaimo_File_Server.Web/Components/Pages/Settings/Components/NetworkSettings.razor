@@ -1,0 +1,26 @@
+
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AssetProvider Icons
+
+<div class="detail-section">
+    <span class="detail-label">IP-Adressen</span>
+    <p class="settings-description">Adressen, unter denen dieser Server erreichbar ist.</p>
+    <div class="stat-hero"><span class="stat-hero-value">@(VM.PublicIpLoading ? "…" : (VM.PublicIp ?? "—"))</span><span class="stat-hero-unit">@(VM.PublicIpLoading ? "globale IP wird ermittelt" : VM.PublicIp is not null ? "globale (öffentliche) IP" : "globale IP nicht verfügbar")</span></div>
+    <div class="info-card">
+        <div class="info-row"><span class="info-key">Hostname</span><span class="info-val">@VM.HostName</span></div>
+        <div class="info-row"><span class="info-key">Globale IP</span><span class="info-val @(VM.PublicIp is null ? "is-muted" : "")">@(VM.PublicIpLoading ? "wird ermittelt…" : (VM.PublicIp ?? "nicht verfügbar"))</span></div>
+    </div>
+    <span class="detail-label settings-subheading">Lokale Adressen</span>
+    @if (VM.NetworkAddresses.Count == 0) { <p class="settings-empty">Keine lokalen Netzwerkadressen gefunden.</p> }
+    else
+    {
+        <div class="info-card">@foreach (var addr in VM.NetworkAddresses) { <div class="info-row"><span class="info-key">@addr.Address <span class="settings-hint">@addr.InterfaceName</span></span><span class="info-badge">@addr.Family</span></div> }</div>
+    }
+    <div class="settings-actions"><button class="btn-icon" title="Aktualisieren" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button></div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+    private async Task Refresh() { VM.RefreshSystemInfo(); await VM.LoadPublicIpAsync(force: true); StateHasChanged(); }
+}
+

@@ -1,0 +1,58 @@
+
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AssetProvider Icons
+
+<div class="detail-section">
+    <span class="detail-label">@Resources.Web_Settings_ContextMenu_Detail</span>
+    <p class="settings-description">@Resources.Web_Settings_ContextMenu_Desc</p>
+    <div class="settings-row settings-row-spaced">
+        <select class="edit-input context-scope" @bind="SelectedScope">
+            @foreach (var scope in SettingsViewModel.ContextScopes) { <option value="@scope">@ScopeName(scope)</option> }
+        </select>
+    </div>
+    <div class="ctx-list">
+        @foreach (var cmd in VM.ScopeCommandsOrdered)
+        {
+            var assigned = VM.IsAssigned(cmd.Id);
+            <div class="ctx-item @(assigned ? "" : "ctx-item--off")">
+                <label class="ctx-item-label">
+                    <input type="checkbox" checked="@assigned" @onchange="() => VM.ToggleCommand(cmd.Id)" />
+                    @Icons.SVG(cmd.Icon, new SvgOptions(Width: 14, Height: 14))
+                    <span>@cmd.DisplayLabel</span>
+                </label>
+                <span class="ctx-item-actions">
+                    <button class="btn-icon btn-icon--small" title="@Resources.Web_Settings_CtxMoveUp" disabled="@(!assigned)" @onclick="() => VM.MoveUp(cmd.Id)">↑</button>
+                    <button class="btn-icon btn-icon--small" title="@Resources.Web_Settings_CtxMoveDown" disabled="@(!assigned)" @onclick="() => VM.MoveDown(cmd.Id)">↓</button>
+                </span>
+            </div>
+        }
+    </div>
+    <div class="settings-row settings-actions">
+        <button class="btn-primary" @onclick="Save">@Resources.Web_Settings_Button_Save</button>
+        <button class="btn-icon" title="@Resources.Web_Settings_CtxReset" @onclick="Reset">
+            @Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+    private ContextMenuScope SelectedScope { get => VM.SelectedScope; set { VM.SelectScope(value); VM.ClearMessages(); } }
+    private async Task Save() { await VM.SaveContextMenuAsync(); StateHasChanged(); }
+    private void Reset() { VM.ResetScopeToDefault(); VM.ClearMessages(); StateHasChanged(); }
+    private static string ScopeName(ContextMenuScope scope) => scope switch
+    {
+        ContextMenuScope.Background => Resources.Web_Settings_CtxScope_Background,
+        ContextMenuScope.Folder => Resources.Web_Settings_CtxScope_Folder,
+        ContextMenuScope.Archive => Resources.Web_Settings_CtxScope_Archive,
+        ContextMenuScope.Image => Resources.Web_Settings_CtxScope_Image,
+        ContextMenuScope.Video => Resources.Web_Settings_CtxScope_Video,
+        ContextMenuScope.Audio => Resources.Web_Settings_CtxScope_Audio,
+        ContextMenuScope.Document => Resources.Web_Settings_CtxScope_Document,
+        ContextMenuScope.OtherFile => Resources.Web_Settings_CtxScope_OtherFile,
+        ContextMenuScope.MultiSelection => Resources.Web_Settings_CtxScope_Multi,
+        _ => scope.ToString()
+    };
+}
+

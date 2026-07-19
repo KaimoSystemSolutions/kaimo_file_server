@@ -4,7 +4,7 @@
 
 /* -- User List (nicht bis zum Boden) -- */
 
-.user-list-container {
+::deep .user-list-container {
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow: hidden;
@@ -13,7 +13,7 @@
     overflow-y: auto;
 }
 
-.user-list-row {
+::deep .user-list-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 160px) minmax(96px, auto);
     align-items: center;
@@ -23,15 +23,15 @@
     gap: 12px;
 }
 
-    .user-list-row:last-child {
+    ::deep .user-list-row:last-child {
         border-bottom: none;
     }
 
-    .user-list-row:hover {
+    ::deep .user-list-row:hover {
         background: var(--bg-hover);
     }
 
-.user-list-header {
+::deep .user-list-header {
     background: var(--bg-tertiary);
     font-size: 11px;
     font-weight: 600;
@@ -43,27 +43,27 @@
     z-index: 1;
 }
 
-    .user-list-header:hover {
+    ::deep .user-list-header:hover {
         background: var(--bg-tertiary);
     }
 
-.user-list-selectable {
+::deep .user-list-selectable {
     cursor: pointer;
 }
 
-.user-list-selected {
+::deep .user-list-selected {
     background: var(--accent-selected) !important;
     border-left: 3px solid var(--accent);
     padding-left: 13px;
 }
 
-    .user-list-selected:hover {
+    ::deep .user-list-selected:hover {
         background: var(--accent-selected) !important;
     }
 
 /* -- Zellen -- */
 
-.user-cell-name {
+::deep .user-cell-name {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -74,7 +74,7 @@
     font-size: 13px;
 }
 
-.user-cell-username {
+::deep .user-cell-username {
     font-size: 13px;
     color: var(--text-secondary);
     min-width: 0;
@@ -83,7 +83,7 @@
     white-space: nowrap;
 }
 
-.user-cell-status {
+::deep .user-cell-status {
     display: flex;
     justify-content: flex-end;
     align-items: center;
@@ -91,7 +91,7 @@
 
 /* -- Status Badge -- */
 
-.status-badge {
+::deep .status-badge {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -102,28 +102,28 @@
     letter-spacing: 0.02em;
 }
 
-.status-badge--active {
+::deep .status-badge--active {
     background: var(--success-subtle);
     color: var(--success);
 }
 
-.status-badge--disabled {
+::deep .status-badge--disabled {
     background: var(--danger-subtle);
     color: var(--danger);
 }
 
-.status-dot {
+::deep .status-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
 }
 
-.status-dot--active {
+::deep .status-dot--active {
     background: var(--success);
 }
 
-.status-dot--disabled {
+::deep .status-dot--disabled {
     background: var(--danger);
 }
 
@@ -136,32 +136,32 @@
 
 /* -- Toggle Switch -- */
 
-.toggle-row {
+::deep .toggle-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 4px 0;
 }
 
-.toggle-label-text {
+::deep .toggle-label-text {
     font-size: 13px;
     color: var(--text-primary);
 }
 
-.toggle-switch {
+::deep .toggle-switch {
     position: relative;
     width: 40px;
     height: 22px;
     flex-shrink: 0;
 }
 
-    .toggle-switch input {
+    ::deep .toggle-switch input {
         opacity: 0;
         width: 0;
         height: 0;
     }
 
-.toggle-slider {
+::deep .toggle-slider {
     position: absolute;
     cursor: pointer;
     inset: 0;
@@ -170,7 +170,7 @@
     transition: background 0.2s;
 }
 
-    .toggle-slider::before {
+    ::deep .toggle-slider::before {
         content: "";
         position: absolute;
         height: 16px;
@@ -182,29 +182,29 @@
         transition: transform 0.2s;
     }
 
-.toggle-switch input:checked + .toggle-slider {
+::deep .toggle-switch input:checked + .toggle-slider {
     background: var(--accent);
 }
 
-    .toggle-switch input:checked + .toggle-slider::before {
+    ::deep .toggle-switch input:checked + .toggle-slider::before {
         transform: translateX(18px);
     }
 
 /* -- Detail-Section für neue Felder -- */
 
-.detail-field-grid {
+::deep .detail-field-grid {
     display: flex;
     flex-direction: column;
     gap: 14px;
 }
 
-.detail-field {
+::deep .detail-field {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-.detail-field-label {
+::deep .detail-field-label {
     font-size: 13px;
     font-weight: 600;
     letter-spacing: 0.01em;
@@ -214,7 +214,7 @@
 /* Read-only display box: a filled block (distinct from the bordered
    .edit-input fields) so view mode is never confused with edit mode,
    and the many user/role/group parameters stay clearly separated. */
-.detail-field-value {
+::deep .detail-field-value {
     display: block;
     font-size: 12px;
     color: var(--text-primary);
@@ -227,7 +227,7 @@
     min-height: 28px;
 }
 
-.detail-field-value--empty {
+::deep .detail-field-value--empty {
     color: var(--text-tertiary);
     font-style: italic;
 }
@@ -247,8 +247,8 @@
 
 /* -- Edit / create labels: match the view-mode field labels
    (bigger, sentence-case heading style instead of tiny uppercase) -- */
-.form-group label,
-.detail-label {
+::deep .form-group label,
+::deep .detail-label {
     font-size: 13px;
     font-weight: 600;
     text-transform: none;
@@ -258,23 +258,23 @@
 
 /* -- Edit / create inputs: same size as the read-only view boxes
    (identical font, padding, line-height and min-height) -- */
-.edit-input,
-.form-group input,
-.multi-select-display {
+::deep .edit-input,
+::deep .form-group input,
+::deep .multi-select-display {
     font-size: 12px;
     line-height: 1.4;
     padding: 5px 10px;
     min-height: 28px;
 }
 
-select.edit-input {
+::deep select.edit-input {
     font-size: 12px;
     line-height: 1.4;
     padding: 5px 32px 5px 10px;
     min-height: 28px;
 }
 
-.multi-select-text {
+::deep .multi-select-text {
     font-size: 12px;
 }
 

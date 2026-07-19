@@ -1,0 +1,17 @@
+@using Kaimo_File_Server.Core.Language
+
+<div class="detail-section">
+    <span class="detail-label">@Resources.Web_Settings_Logging_Detail</span>
+    <p class="settings-description">@Resources.Web_Settings_Logging_Desc</p>
+    <div class="settings-row">
+        <select class="edit-input settings-select" @bind="VM.LogLevel">
+            @foreach (var level in SettingsViewModel.LogLevels) { <option value="@level">@level</option> }
+        </select>
+        <button class="btn-primary" @onclick="Save">@Resources.Web_Settings_Button_Save</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+    private async Task Save() { await VM.SaveLoggingAsync(); StateHasChanged(); }
+}

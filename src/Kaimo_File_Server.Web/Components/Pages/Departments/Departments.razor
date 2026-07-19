@@ -1,40 +1,43 @@
-﻿@page "/departments"
+
+@page "/departments"
 @using Kaimo_File_Server.Core.Domain
 @using Kaimo_File_Server.Core.Domain.Department
 @using Kaimo_File_Server.Core.Domain.Identity
 @using Kaimo_File_Server.Core.Security
 @using Kaimo_File_Server.Core.Helpers
+@using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.Components.Pages.Departments.Components
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Kaimo_File_Server.Web.Services
 @inject DepartmentViewModel VM
 @inject AssetProvider Assets
 
-<PageTitle>Kaimo Files – Abteilungen</PageTitle>
+<PageTitle>@Resources.Web_Dept_PageTitle</PageTitle>
 
 @if (VM.IsLoading)
 {
     <div class="loading-state">
         <div class="spinner"></div>
-        <p>Lade...</p>
+        <p>@Resources.Web_Common_Loading</p>
     </div>
 }
 else if (!VM.CanAccessPage)
 {
-    <div class="page-header"><div><h1>Abteilungen</h1></div></div>
-    <div class="error-banner">Keine Berechtigung für die Abteilungsverwaltung.</div>
+    <div class="page-header"><div><h1>@Resources.Web_Dept_Heading</h1></div></div>
+    <div class="error-banner">@Resources.Web_Dept_NoPermission</div>
 }
 else
 {
     <div class="page-header">
         <div>
-            <h1>Abteilungen</h1>
-            <p class="subtitle">@VM.Departments.Count Abteilungen</p>
+            <h1>@Resources.Web_Dept_Heading</h1>
+            <p class="subtitle">@string.Format(Resources.Web_Dept_Count, VM.Departments.Count)</p>
         </div>
         <div style="display: flex; gap: 4px; align-items: center;">
             @if (VM.CanEdit)
             {
-                <button class="btn-icon" title="Abteilung erstellen" @onclick="() => VM.StartCreate()">
+                <button class="btn-icon" title="@Resources.Web_Dept_CreateTitle" @onclick="() => VM.StartCreate()">
                     @Assets.SVG("plus.svg", new SvgOptions(Width: 20, Height: 20, StrokeWidth: 2f))
                 </button>
             }
@@ -45,23 +48,23 @@ else
     @if (VM.IsCreating)
     {
         <div class="create-form-card">
-            <h3>Neue Abteilung erstellen</h3>
+            <h3>@Resources.Web_Dept_NewDepartment</h3>
             <div class="create-form-fields">
                 <div class="form-group">
-                    <label>Abteilungsname</label>
-                    <input type="text" class="edit-input" placeholder="z.B. Vertrieb"
+                    <label>@Resources.Web_Dept_Label_Name</label>
+                    <input type="text" class="edit-input" placeholder="@Resources.Web_Dept_Placeholder_Name"
                            @bind="VM.CreateName" @bind:event="oninput"
                            @onkeydown="HandleCreateKeyDown" />
                 </div>
                 <div class="form-group">
-                    <label>Beschreibung</label>
-                    <input type="text" class="edit-input" placeholder="Optional"
+                    <label>@Resources.Web_Admin_Label_Description</label>
+                    <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Optional"
                            @bind="VM.CreateDescription" @bind:event="oninput" />
                 </div>
                 <div class="form-group">
-                    <label>Elternabteilung</label>
+                    <label>@Resources.Web_Dept_Label_Parent</label>
                     <select class="edit-input" @bind="CreateParentIdString">
-                        <option value="">— Keine (Oberste Ebene) —</option>
+                        <option value="">@Resources.Web_Dept_NoParent</option>
                         @foreach (var dept in VM.Departments)
                         {
                             <option value="@dept.Id">@dept.Name</option>
@@ -75,9 +78,9 @@ else
             }
             <div class="create-form-actions">
                 <button class="btn-primary" @onclick="Create" disabled="@VM.IsSaving">
-                    @(VM.IsSaving ? "Erstellt…" : "Erstellen")
+                    @(VM.IsSaving ? Resources.Web_Common_Creating : Resources.Web_Common_Create)
                 </button>
-                <button class="btn-secondary" @onclick="() => VM.CancelCreate()">Abbrechen</button>
+                <button class="btn-secondary" @onclick="() => VM.CancelCreate()">@Resources.Web_Common_Cancel</button>
             </div>
         </div>
     }
@@ -89,90 +92,7 @@ else
 
     <div class="admin-content">
 
-        @* ════════════ TREE LIST ════════════ *@
-        <div class="admin-list">
-            @if (!VM.Departments.Any())
-            {
-                <div class="empty-state"><p>Keine Abteilungen vorhanden.</p></div>
-            }
-            else
-            {
-                var treeNodes = VM.GetTreeOrderedDepartments();
-
-                <div class="dept-tree">
-                    @foreach (var node in treeNodes)
-                    {
-                        var dept = node.Department;
-                        var isSelected = VM.Selected?.Id == dept.Id;
-                        var isGlobal = VM.IsGlobalDepartment(dept);
-                        var isCollapsed = VM.IsCollapsed(dept.Id);
-
-                        <div class="dept-tree-row @(isSelected ? "dept-tree-row--selected" : "")"
-                             @onclick="() => Select(dept)">
-
-                            @* -- Guide lines: sit directly in row for align-items:stretch -- *@
-                            @for (var col = 0; col < node.Depth; col++)
-                            {
-                                @if (col < node.Depth - 1)
-                                {
-                                    <span class="dept-tree-guide @(node.AncestorContinues[col] ? "dept-tree-guide--vert" : "")"></span>
-                                }
-                                else
-                                {
-                                    <span class="dept-tree-guide @(node.IsLastChild ? "dept-tree-guide--corner" : "dept-tree-guide--tee")"></span>
-                                }
-                            }
-
-                            @* -- Content: toggle + icon + name + badge -- *@
-                            <div class="dept-tree-row-content">
-                                @if (node.HasChildren)
-                                {
-                                    <button class="dept-tree-toggle @(isCollapsed ? "" : "dept-tree-toggle--open")"
-                                            @onclick="() => ToggleCollapse(dept.Id)" @onclick:stopPropagation="true"
-                                            title="@(isCollapsed ? "Aufklappen" : "Zuklappen")">
-                                        @Assets.SVG("chevron_right.svg", new SvgOptions(
-                                            Width: 14, Height: 14,
-                                            Color: "currentColor", StrokeWidth: 2f))
-                                    </button>
-                                }
-                                else
-                                {
-                                    <span class="dept-tree-toggle-spacer"></span>
-                                }
-
-                                <span class="dept-tree-icon">
-                                    @if (isGlobal)
-                                    {
-                                        @Assets.SVG("compass.svg", new SvgOptions(
-                                            Width: 18, Height: 18,
-                                            Color: isSelected ? "var(--accent)" : "var(--text-tertiary)",
-                                            StrokeWidth: 1.5f))
-                                    }
-                                    else
-                                    {
-                                        @Assets.SVG("folder.svg", new SvgOptions(
-                                            Width: 18, Height: 18,
-                                            Color: isSelected ? "var(--accent)" : "var(--text-tertiary)",
-                                            Fill: isSelected ? "var(--accent-subtle)" : "none",
-                                            StrokeWidth: 1.5f))
-                                    }
-                                </span>
-
-                                <span class="dept-tree-name @(isSelected ? "dept-tree-name--selected" : "")">
-                                    @dept.Name
-                                </span>
-
-                                @if (node.HasChildren)
-                                {
-                                    var childCount = VM.Departments.Count(d => d.ParentDepartmentId == dept.Id);
-                                    <span class="dept-tree-badge" title="@childCount Unterabteilungen">@childCount</span>
-                                }
-                            </div>
-                        </div>
-                    }
-                </div>
-            }
-        </div>
+        <DepartmentTree VM="VM" OnChanged="StateHasChanged" />
 
         @* ════════════ DETAIL ════════════ *@
         @if (VM.Selected is not null)
@@ -188,42 +108,42 @@ else
                 {
                     @* -------- EDIT MODE -------- *@
                     <div class="detail-header">
-                        <h3>Abteilung bearbeiten</h3>
+                        <h3>@Resources.Web_Dept_EditDepartment</h3>
                         <span class="detail-subtitle">@VM.Selected.Name</span>
                     </div>
 
                     <div class="detail-field-grid">
                         <div class="form-group">
-                            <label>Name</label>
+                            <label>@Resources.Web_Common_Name</label>
                             <input type="text" class="edit-input" @bind="VM.EditName" />
                         </div>
                         <div class="form-group">
-                            <label>Beschreibung</label>
-                            <input type="text" class="edit-input" placeholder="Optional"
+                            <label>@Resources.Web_Admin_Label_Description</label>
+                            <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Optional"
                                    @bind="VM.EditDescription" @bind:event="oninput" />
                         </div>
                         <div class="form-group">
-                            <label>Erbt von (Elternabteilung)</label>
+                            <label>@Resources.Web_Dept_Label_InheritsFrom</label>
                             <select class="edit-input" @bind="EditParentIdString">
-                                <option value="">— Keine (Oberste Ebene) —</option>
+                                <option value="">@Resources.Web_Dept_NoParent</option>
                                 @foreach (var dept in VM.AvailableParents)
                                 {
                                     <option value="@dept.Id">@dept.Name</option>
                                 }
                             </select>
-                            <span class="form-hint">Erbt Admin-Rechte und Default-Berechtigungen von der Elternabteilung.</span>
+                            <span class="form-hint">@Resources.Web_Dept_InheritHint</span>
                         </div>
                     </div>
 
                     @* -- Default File Permission -- *@
                     <div class="detail-section" style="margin-top: 16px;">
-                        <span class="detail-label">Standard-Dateiberechtigung</span>
+                        <span class="detail-label">@Resources.Web_Dept_DefaultFilePerm</span>
                         <p class="form-hint" style="margin-bottom: 8px;">
                             Wird als virtueller Allow-Layer im ACL-System ausgewertet.
-                            Alle Abteilungsmitglieder erhalten diese Rechte auf den zugeordneten Freigaben.
+                        @Resources.Web_Dept_DefaultFilePermHint
                         </p>
                         <div class="toggle-row" style="margin-bottom: 12px;">
-                            <span class="toggle-label-text">Eigene Berechtigung definieren</span>
+<span class="toggle-label-text">@Resources.Web_Dept_DefineOwnPerm</span>
                             <label class="toggle-switch">
                                 <input type="checkbox" @bind="VM.EditHasOwnPermission" />
                                 <span class="toggle-slider"></span>
@@ -249,17 +169,17 @@ else
                         }
                         else
                         {
-                            <span class="detail-field-value detail-field-value--empty">Keine Elternabteilung — keine Default-Berechtigung.</span>
+<span class="detail-field-value detail-field-value--empty">@Resources.Web_Dept_NoParentNoPerm</span>
                         }
                     </div>
 
                     @* -- Members (M:N) -- *@
                     <div class="detail-section" style="margin-top: 16px;">
-                        <span class="detail-label">Mitglieder (Benutzer)</span>
+<span class="detail-label">@Resources.Web_Dept_Label_Members</span>
                         <div class="multi-select @(membersOpen ? "open" : "")">
                             <div class="multi-select-display" @onclick="() => membersOpen = !membersOpen">
                                 <span class="multi-select-text">
-                                    @Checked(VM.EditMembers.Where(m => m.IsChecked).Select(m => m.Item.Name), "Keine Mitglieder")
+@Checked(VM.EditMembers.Where(m => m.IsChecked).Select(m => m.Item.Name), Resources.Web_Common_NoMembers)
                                 </span>
                                 @Assets.SVG("chevron_down.svg", new SvgOptions(
                                     Width: 14, Height: 14, Color: "currentColor",
@@ -277,6 +197,7 @@ else
                                             <span class="multi-select-hint">@item.Item.Username</span>
                                         </label>
                                     }
+
                                 </div>
                             }
                         </div>
@@ -284,14 +205,14 @@ else
 
                     @* -- Groups (direct FK) -- *@
                     <div class="detail-section" style="margin-top: 16px;">
-                        <span class="detail-label">Zugeordnete Gruppen</span>
+<span class="detail-label">@Resources.Web_Dept_Label_AssignedGroups</span>
                         <p class="form-hint" style="margin-bottom: 4px;">
-                            Jede Gruppe gehört genau einer Abteilung. Abgewählte Gruppen werden auf Global zurückgesetzt.
+@Resources.Web_Dept_GroupsHint
                         </p>
                         <div class="multi-select @(groupsOpen ? "open" : "")">
                             <div class="multi-select-display" @onclick="() => groupsOpen = !groupsOpen">
                                 <span class="multi-select-text">
-                                    @Checked(VM.EditGroups.Where(g => g.IsChecked).Select(g => g.Item.Name), "Keine Gruppen")
+@Checked(VM.EditGroups.Where(g => g.IsChecked).Select(g => g.Item.Name), Resources.Web_Common_NoGroupsAssigned)
                                 </span>
                                 @Assets.SVG("chevron_down.svg", new SvgOptions(
                                     Width: 14, Height: 14, Color: "currentColor",
@@ -317,14 +238,14 @@ else
 
                     @* -- Shares (direct FK) -- *@
                     <div class="detail-section" style="margin-top: 16px;">
-                        <span class="detail-label">Zugeordnete Freigaben</span>
+<span class="detail-label">@Resources.Web_Dept_Label_AssignedShares</span>
                         <p class="form-hint" style="margin-bottom: 4px;">
-                            Jede Freigabe gehört genau einer Abteilung. Abgewählte Freigaben werden auf Global zurückgesetzt.
+@Resources.Web_Dept_SharesHint
                         </p>
                         <div class="multi-select @(sharesOpen ? "open" : "")">
                             <div class="multi-select-display" @onclick="() => sharesOpen = !sharesOpen">
                                 <span class="multi-select-text">
-                                    @Checked(VM.EditShares.Where(s => s.IsChecked).Select(s => s.Item.Name), "Keine Freigaben")
+@Checked(VM.EditShares.Where(s => s.IsChecked).Select(s => s.Item.Name), Resources.Web_Common_NoSharesAvailable)
                                 </span>
                                 @Assets.SVG("chevron_down.svg", new SvgOptions(
                                     Width: 14, Height: 14, Color: "currentColor",
@@ -345,7 +266,7 @@ else
                                     }
                                     @if (!VM.EditShares.Any())
                                     {
-                                        <span class="empty-hint">Keine Freigaben vorhanden</span>
+<span class="empty-hint">@Resources.Web_Dept_NoSharesAvailable</span>
                                     }
                                 </div>
                             }
@@ -358,9 +279,9 @@ else
                     }
                     <div class="detail-actions">
                         <button class="btn-primary" @onclick="Save" disabled="@VM.IsSaving">
-                            @(VM.IsSaving ? "Speichert…" : "Speichern")
+@(VM.IsSaving ? Resources.Web_Common_Saving : Resources.Web_Common_Save)
                         </button>
-                        <button class="btn-secondary" @onclick="CancelEdit" disabled="@VM.IsSaving">Abbrechen</button>
+<button class="btn-secondary" @onclick="CancelEdit" disabled="@VM.IsSaving">@Resources.Web_Common_Cancel</button>
                     </div>
                 }
                 else
@@ -369,7 +290,7 @@ else
                     <div class="detail-header">
                         <h3>@VM.Selected.Name</h3>
                         <span class="detail-subtitle">
-                            @(VM.IsGlobalDepartment(VM.Selected) ? "Globale Abteilung" : "Abteilung")
+@(VM.IsGlobalDepartment(VM.Selected) ? Resources.Web_Dept_GlobalDepartment : Resources.Web_Admin_Label_Department)
                         </span>
                     </div>
 
@@ -377,49 +298,50 @@ else
                         @if (!string.IsNullOrWhiteSpace(VM.Selected.Description))
                         {
                             <div class="detail-field">
-                                <span class="detail-field-label">Beschreibung</span>
+<span class="detail-field-label">@Resources.Web_Admin_Label_Description</span>
                                 <span class="detail-field-value">@VM.Selected.Description</span>
                             </div>
                         }
                         <div class="detail-field">
-                            <span class="detail-field-label">Erbt von</span>
+<span class="detail-field-label">@Resources.Web_Dept_Label_InheritsFromView</span>
                             @if (VM.Selected.ParentDepartmentId.HasValue)
                             {
                                 <span class="detail-field-value">@VM.GetParentName(VM.Selected.ParentDepartmentId)</span>
                             }
                             else
                             {
-                                <span class="detail-field-value detail-field-value--empty">Keine (Oberste Ebene)</span>
+<span class="detail-field-value detail-field-value--empty">@Resources.Web_Dept_NoParentTopLevel</span>
                             }
                         </div>
                         <div class="detail-field">
-                            <span class="detail-field-label">Mitglieder (@VM.Members.Count)</span>
+<span class="detail-field-label">@string.Format(Resources.Web_Dept_Label_MembersCount, VM.Members.Count)</span>
                             <span class="detail-field-value">
-                                @(VM.Members.Any() ? Format(VM.Members.Select(u => u.Name), 8) : "Keine Mitglieder")
+@(VM.Members.Any() ? Format(VM.Members.Select(u => u.Name), 8) : Resources.Web_Common_NoMembers)
                             </span>
                         </div>
                         <div class="detail-field">
-                            <span class="detail-field-label">Gruppen (@VM.Groups.Count)</span>
+<span class="detail-field-label">@string.Format(Resources.Web_Dept_Label_GroupsCount, VM.Groups.Count)</span>
                             <span class="detail-field-value">
-                                @(VM.Groups.Any() ? Format(VM.Groups.Select(g => g.Name), 5) : "Keine Gruppen zugeordnet")
+@(VM.Groups.Any() ? Format(VM.Groups.Select(g => g.Name), 5) : Resources.Web_Dept_NoGroupsAssigned)
                             </span>
                         </div>
                         <div class="detail-field">
-                            <span class="detail-field-label">Freigaben (@VM.Shares.Count)</span>
+<span class="detail-field-label">@string.Format(Resources.Web_Dept_Label_SharesCount, VM.Shares.Count)</span>
                             <span class="detail-field-value">
-                                @(VM.Shares.Any() ? Format(VM.Shares.Select(s => s.Name), 5) : "Keine Freigaben zugeordnet")
+@(VM.Shares.Any() ? Format(VM.Shares.Select(s => s.Name), 5) : Resources.Web_Dept_NoSharesAssigned)
                             </span>
                         </div>
 
                         @* -- Effective Permission -- *@
                         <div class="detail-field">
-                            <span class="detail-field-label">Standard-Dateiberechtigung</span>
+<span class="detail-field-label">@Resources.Web_Dept_DefaultFilePerm</span>
                             <span class="detail-field-value">
                                 @if (VM.PermInfo is not null)
                                 {
+
                                     @if (VM.PermInfo.HasNoDefault)
                                     {
-                                        <span class="detail-field-value--empty">Keine Default-Berechtigung</span>
+<span class="detail-field-value--empty">@Resources.Web_Dept_NoDefaultPerm</span>
                                     }
                                     else
                                     {
@@ -458,25 +380,25 @@ else
                     <div class="detail-actions">
                         @if (VM.CanEdit && !VM.IsGlobalDepartment(VM.Selected))
                         {
-                            <button class="btn-secondary" @onclick="Edit">Bearbeiten</button>
+<button class="btn-secondary" @onclick="Edit">@Resources.Web_Common_Edit</button>
                         }
                         @if (VM.CanDelete && !VM.IsGlobalDepartment(VM.Selected))
                         {
                             @if (VM.IsConfirmingDelete)
                             {
                                 <div class="confirm-delete">
-                                    <p>Abteilung wirklich löschen? Gruppen und Freigaben werden auf Global zurückgesetzt.</p>
+<p>@Resources.Web_Dept_ConfirmDelete</p>
                                     <div style="display: flex; gap: 8px;">
                                         <button class="btn-danger-outline" @onclick="ConfirmDelete" disabled="@VM.IsSaving">
                                             @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
                                         </button>
-                                        <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">Abbrechen</button>
+<button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">@Resources.Web_Common_Cancel</button>
                                     </div>
                                 </div>
                             }
                             else
                             {
-                                <button class="btn-danger-outline" @onclick="() => VM.RequestDelete()">Abteilung löschen</button>
+<button class="btn-danger-outline" @onclick="() => VM.RequestDelete()">@Resources.Web_Dept_DeleteDepartment</button>
                             }
                         }
                     </div>
@@ -484,54 +406,4 @@ else
             </div>
         }
     </div>
-}
-
-@code {
-    private bool membersOpen, groupsOpen, sharesOpen;
-
-    private string CreateParentIdString
-    {
-        get => VM.CreateParentId?.ToString() ?? "";
-        set => VM.CreateParentId = Guid.TryParse(value, out var id) ? id : null;
-    }
-
-    private string EditParentIdString
-    {
-        get => VM.EditParentId?.ToString() ?? "";
-        set => VM.EditParentId = Guid.TryParse(value, out var id) ? id : (Guid?)null;
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await VM.LoadAsync();
-            StateHasChanged();
-        }
-    }
-
-    private async Task Select(Department dept) { CloseDropdowns(); await VM.SelectAsync(dept); StateHasChanged(); }
-    private async Task Edit() { CloseDropdowns(); await VM.StartEditAsync(); StateHasChanged(); }
-    private async Task Save() { CloseDropdowns(); await VM.SaveAsync(); StateHasChanged(); }
-    private async Task Create() { await VM.CreateAsync(); StateHasChanged(); }
-    private async Task ConfirmDelete() { await VM.ConfirmDeleteAsync(); StateHasChanged(); }
-    private void CancelEdit() { CloseDropdowns(); VM.CancelEdit(); StateHasChanged(); }
-    private void ToggleCollapse(Guid id) { VM.ToggleCollapse(id); StateHasChanged(); }
-    private async Task HandleCreateKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") await Create(); }
-    private void CloseDropdowns() { membersOpen = false; groupsOpen = false; sharesOpen = false; }
-
-    private static string Checked(IEnumerable<string> names, string fallback)
-    {
-        var list = names.ToList();
-        return list.Count > 0 ? string.Join(", ", list) : fallback;
-    }
-
-    private static string Format(IEnumerable<string> items, int max)
-    {
-        var list = items.ToList();
-        if (list.Count == 0) return "";
-        var visible = string.Join(", ", list.Take(max));
-        if (list.Count > max) visible += $" +{list.Count - max} weitere";
-        return visible;
-    }
 }

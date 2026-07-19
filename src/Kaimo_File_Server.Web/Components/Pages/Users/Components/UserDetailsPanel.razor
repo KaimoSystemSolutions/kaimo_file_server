@@ -1,0 +1,273 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Security
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AssetProvider Icons
+
+@* ------------ USER DETAIL ------------ *@
+                    @if (VM.SelectedUser is not null)
+                    {
+                        @if (VM.IsEditing)
+                        {
+                            <div class="detail-header">
+<h3>@Resources.Web_Admin_EditUser</h3>
+                                <span class="detail-subtitle">@VM.SelectedUser.Username</span>
+                            </div>
+                            <div class="detail-field-grid">
+                                <div class="form-group">
+                                    <label>Name</label>
+
+                                    <input type="text" class="edit-input" @bind="VM.EditUserName" />
+                                </div>
+                                <div class="form-group">
+                                    <label>E-Mail</label>
+                                    <input type="email" class="edit-input" placeholder="z.B. max@firma.de"
+                                           @bind="VM.EditUserEmail" @bind:event="oninput" />
+                                </div>
+                                <div class="form-group">
+<label>@Resources.Web_Admin_Label_Description</label>
+                                    <input type="text" class="edit-input" placeholder="Optional"
+                                           @bind="VM.EditUserDescription" @bind:event="oninput" />
+                                </div>
+                                @if (VM.CanResetPasswordForSelected)
+                                {
+                                    <div class="form-group">
+<label>@Resources.Web_Admin_Label_NewPassword</label>
+                                        <input type="password" class="edit-input" placeholder="Leer lassen = unverändert"
+                                               @bind="VM.NewPassword" @bind:event="oninput" />
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(VM.NewPassword))
+                                    {
+                                        <div class="form-group">
+<label>@Resources.Web_Admin_Label_ConfirmPassword</label>
+
+<input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_ConfirmPassword"
+                                                   @bind="VM.ConfirmPassword" @bind:event="oninput" />
+                                        </div>
+                                    }
+                                }
+                                <div class="create-form-toggles">
+                                    <div class="toggle-row">
+                                        <span class="toggle-label-text">Konto aktiviert</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" @bind="VM.EditUserIsEnabled" />
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="toggle-row">
+<span class="toggle-label-text">@Resources.Web_Admin_Toggle_CanChangePassword</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" @bind="VM.EditUserCanChangePassword" />
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+<label>@Resources.Web_Admin_Label_Groups</label>
+                                    <div class="multi-select @(groupsOpen ? "open" : "")">
+
+                                        <div class="multi-select-display" @onclick="() => groupsOpen = !groupsOpen">
+                                            <span class="multi-select-text">
+@Checked(VM.EditUserGroups.Where(g => g.IsChecked).Select(g => g.Item.Name), Resources.Web_Common_NoGroupsAssigned)
+                                            </span>
+                                            @Icons.SVG("chevron_down_transparent.svg", new SvgOptions(
+                                                    Width: 14,
+                                                    Height: 14,
+                                                    StrokeWidth: 2f,
+                                                    CssClass: "multi-select-chevron"
+                                                ))
+                                        </div>
+                                        @if (groupsOpen)
+                                        {
+                                            <div class="multi-select-backdrop" @onclick="() => groupsOpen = false"></div>
+                                            <div class="multi-select-dropdown">
+                                                @foreach (var item in VM.EditUserGroups)
+                                                {
+                                                    <label class="multi-select-option">
+                                                        <input type="checkbox" @bind="item.IsChecked" />
+                                                        <span>@item.Item.Name</span>
+                                                        <span class="multi-select-hint">@VM.GetDepartmentName(item.Item.DepartmentId)</span>
+                                                    </label>
+                                                }
+                                                @if (!VM.EditUserGroups.Any())
+                                                {
+<span class="empty-hint">@Resources.Web_Common_NoGroups</span>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="form-group">
+<label>@Resources.Web_Admin_Label_Roles</label>
+                                    <div class="multi-select @(rolesOpen ? "open" : "")">
+                                        <div class="multi-select-display" @onclick="() => rolesOpen = !rolesOpen">
+                                            <span class="multi-select-text">
+@Checked(VM.EditUserRoles.Where(r => r.IsChecked).Select(r => r.Item.Name), Resources.Web_Common_NoRolesAssigned)
+                                            </span>
+                                            @Icons.SVG("chevron_down_transparent.svg", new SvgOptions(
+                                                    Width: 14,
+                                                    Height: 14,
+                                                    StrokeWidth: 2f,
+                                                    CssClass: "multi-select-chevron"
+                                                ))
+                                        </div>
+                                        @if (rolesOpen)
+                                        {
+                                            <div class="multi-select-backdrop" @onclick="() => rolesOpen = false"></div>
+                                            <div class="multi-select-dropdown">
+                                                @foreach (var item in VM.EditUserRoles)
+                                                {
+                                                    <label class="multi-select-option">
+                                                        <input type="checkbox" @bind="item.IsChecked" />
+                                                        <span>@item.Item.Name</span>
+                                                    </label>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            @if (VM.ErrorMessage is not null)
+                            {
+                                <div class="error-banner" style="margin: 12px 0;">@VM.ErrorMessage</div>
+                            }
+                            <div class="detail-actions">
+                                <button class="btn-primary" @onclick="SaveUser" disabled="@VM.IsSaving">
+                                    @(VM.IsSaving ? "Speichert…" : "Speichern")
+                                </button>
+<button class="btn-secondary" @onclick="CancelEdit" disabled="@VM.IsSaving">@Resources.Web_Common_Cancel</button>
+                            </div>
+
+                        }
+                        else
+                        {
+                            <div class="detail-header">
+                                <h3>@VM.SelectedUser.Name</h3>
+                                <span class="detail-subtitle">@VM.SelectedUser.Username</span>
+                            </div>
+                            <div class="detail-field-grid">
+                                <div class="detail-field">
+                                    <span class="detail-field-label">Status</span>
+                                    <span class="detail-field-value">
+                                        @if (VM.SelectedUser.IsEnabled)
+                                        {
+<span class="status-badge status-badge--active"><span class="status-dot status-dot--active"></span>@Resources.Web_Common_Active</span>
+                                        }
+                                        else
+                                        {
+<span class="status-badge status-badge--disabled"><span class="status-dot status-dot--disabled"></span>@Resources.Web_Common_Disabled</span>
+                                        }
+                                    </span>
+                                </div>
+                                <div class="detail-field">
+                                    <span class="detail-field-label">E-Mail</span>
+                                    <span class="detail-field-value">
+                                        @(string.IsNullOrWhiteSpace(VM.SelectedUser.Email) ? "Nicht angegeben" : VM.SelectedUser.Email)
+                                    </span>
+                                </div>
+                                <div class="detail-field">
+<span class="detail-field-label">@Resources.Web_Admin_Label_Description</span>
+                                    <span class="detail-field-value">
+@(string.IsNullOrWhiteSpace(VM.SelectedUser.Description) ? Resources.Web_Admin_NoDescription : VM.SelectedUser.Description)
+                                    </span>
+                                </div>
+                                <div class="detail-field">
+<span class="detail-field-label">@Resources.Web_Admin_Label_PasswordChange</span>
+<span class="detail-field-value">@(VM.SelectedUser.CanChangePassword ? Resources.Web_Admin_PasswordChange_Allowed : Resources.Web_Admin_PasswordChange_Locked)</span>
+                                </div>
+                                <div class="detail-field">
+<span class="detail-field-label">@Resources.Web_Admin_Label_Departments</span>
+                                    <span class="detail-field-value">
+@(VM.UserDepartments.Any() ? Format(VM.UserDepartments.Select(d => d.Name), 5) : Resources.Web_Common_NoDepartments)
+                                    </span>
+                                </div>
+                                <div class="detail-field">
+
+<span class="detail-field-label">@Resources.Web_Admin_Label_Roles</span>
+                                    <span class="detail-field-value">
+@(VM.UserRoles.Any() ? Format(VM.UserRoles.Select(r => r.Name), 5) : Resources.Web_Common_NoRolesAssigned)
+                                    </span>
+                                </div>
+                                <div class="detail-field">
+<span class="detail-field-label">@Resources.Web_Admin_Label_Groups</span>
+                                    <span class="detail-field-value">
+@(VM.UserGroups.Any() ? Format(VM.UserGroups.Select(g => g.Name), 5) : Resources.Web_Common_NoGroupsAssigned)
+                                    </span>
+                                </div>
+                                <div class="detail-field">
+                                    <span class="detail-field-label">ID</span>
+                                    <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">@VM.SelectedUser.Id</span>
+                                </div>
+                            </div>
+
+                            @if (VM.UserScopedAssignments.Any())
+                            {
+                                <div class="detail-section" style="margin-top: 16px;">
+<span class="detail-label">@Resources.Web_Admin_ScopedAssignments</span>
+                                    <div class="scoped-assignments-list">
+                                        @foreach (var a in VM.UserScopedAssignments)
+                                        {
+                                            <div class="scoped-assignment-row">
+
+                                                <div class="scoped-assignment-info">
+                                                    <span class="scoped-assignment-role">@a.RoleName</span>
+                                                    <span class="scoped-assignment-scope">@FormatScopeType(a.ScopeType): @a.ScopeName</span>
+                                                </div>
+                                                @if (VM.CanManageRoles)
+                                                {
+<button class="btn-icon btn-icon--small" title="@Resources.Web_Admin_RemoveAssignment"
+                                                            @onclick="() => DeleteAssignment(a.AssignmentId)">
+                                                        @Icons.SVG("cross.svg", new SvgOptions(
+                                                                Width: 14,
+                                                                Height: 14,
+                                                                Color: "var(--danger)",
+                                                                StrokeWidth: 2f
+                                                            ))
+                                                    </button>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="detail-actions">
+                                @if (VM.CanEditSelectedUser)
+                                {
+<button class="btn-secondary" @onclick="EditUser">@Resources.Web_Common_Edit</button>
+                                }
+                                @if (VM.CanDeleteSelectedUser)
+                                {
+                                    @if (VM.IsConfirmingDelete)
+                                    {
+                                        <div class="confirm-delete">
+<p>@Resources.Web_Admin_ConfirmDeleteUser</p>
+                                            <div style="display: flex; gap: 8px;">
+                                                <button class="btn-danger-outline" @onclick="ConfirmDeleteUser" disabled="@VM.IsSaving">
+                                                    @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
+                                                </button>
+<button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">@Resources.Web_Common_Cancel</button>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+<button class="btn-danger-outline" @onclick="() => VM.RequestDeleteUser()">@Resources.Web_Admin_DeleteUser</button>
+                                    }
+                                }
+                            </div>
+                        }
+                    }
+@code {
+    [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private bool groupsOpen, rolesOpen;
+    private async Task EditUser() { await VM.StartEditUserAsync(); StateHasChanged(); }
+    private async Task SaveUser() { await VM.SaveUserAsync(); await OnChanged.InvokeAsync(); }
+    private void CancelEdit() { groupsOpen = rolesOpen = false; VM.CancelEdit(); StateHasChanged(); }
+    private async Task ConfirmDeleteUser() { await VM.ConfirmDeleteUserAsync(); await OnChanged.InvokeAsync(); }
+    private async Task DeleteAssignment(Guid id) { await VM.DeleteAssignmentAsync(id); StateHasChanged(); }
+    private static string Checked(IEnumerable<string> names, string fallback) { var list = names.ToList(); return list.Count > 0 ? string.Join(", ", list) : fallback; }
+    private static string Format(IEnumerable<string> items, int max) { var list = items.ToList(); if (list.Count == 0) return ""; var visible = string.Join(", ", list.Take(max)); if (list.Count > max) visible += " " + string.Format(Resources.Web_Common_MoreItems, list.Count - max); return visible; }
+    private static string FormatScopeType(ScopeType type) => type switch { ScopeType.Global => Resources.Web_Admin_ScopeType_Global, ScopeType.Department => Resources.Web_Admin_ScopeType_Department, ScopeType.Share => Resources.Web_Admin_ScopeType_Share, _ => type.ToString() };
+}

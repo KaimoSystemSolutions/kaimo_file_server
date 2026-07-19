@@ -1,0 +1,158 @@
+@using Kaimo_File_Server.Core.Helpers
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.ViewModels
+
+@* -- Create User Form -- *@
+    @if (VM.IsCreatingUser)
+    {
+        <div class="create-form-card">
+            <h3>@Resources.Web_Admin_NewUser</h3>
+            <div class="create-form-fields">
+                <div class="form-group">
+                    <label>@Resources.Web_Admin_Label_Department</label>
+                    <select class="edit-input" @bind="CreateUserDepartmentId">
+                        @if (!VM.AuthorizedDepartmentsForCreate.Any())
+                        {
+                            <option value="">@Resources.Web_Admin_NoDepartments</option>
+                        }
+                        else
+                        {
+                            @foreach (var dept in VM.AuthorizedDepartmentsForCreate)
+                            {
+                                <option value="@dept.Id">@dept.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>@Resources.Web_Admin_Label_DisplayName</label>
+                    <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_DisplayName"
+                           @bind="VM.CreateUserName" @bind:event="oninput" />
+                </div>
+                <div class="form-group">
+                    <label>@Resources.Web_Admin_Label_Username</label>
+                    <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Username"
+                           @bind="VM.CreateUserUsername" @bind:event="oninput" />
+                </div>
+                <div class="form-group">
+                    <label>@Resources.Web_Admin_Label_Email</label>
+                    <input type="email" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Email"
+                           @bind="VM.CreateUserEmail" @bind:event="oninput" />
+                </div>
+                <div class="form-group">
+                    <label>@Resources.Web_Admin_Label_Description</label>
+                    <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Optional"
+                           @bind="VM.CreateUserDescription" @bind:event="oninput" />
+                </div>
+                <div class="form-group">
+                    <label>@Resources.Web_Admin_Label_Password</label>
+                    <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Password"
+                           @bind="VM.CreateUserPassword" @bind:event="oninput" />
+                </div>
+                <div class="create-form-toggles">
+                    <div class="toggle-row">
+                        <span class="toggle-label-text">@Resources.Web_Admin_Toggle_AccountEnabled</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" @bind="VM.CreateUserIsEnabled" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-row">
+
+                        <span class="toggle-label-text">@Resources.Web_Admin_Toggle_CanChangePassword</span>
+                        <label class="toggle-switch">
+
+                            <input type="checkbox" @bind="VM.CreateUserCanChangePassword" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            @if (VM.ErrorMessage is not null)
+            {
+                <div class="error-banner" style="margin-top: 12px;">@VM.ErrorMessage</div>
+            }
+            <div class="create-form-actions">
+                <button class="btn-primary" @onclick="CreateUser" disabled="@VM.IsSaving">
+                    @(VM.IsSaving ? Resources.Web_Common_Creating : Resources.Web_Common_Create)
+                </button>
+                <button class="btn-secondary" @onclick="Cancel">@Resources.Web_Common_Cancel</button>
+            </div>
+        </div>
+    }
+
+    @* -- Create Group Form (with Department selector) -- *@
+    @if (VM.IsCreatingGroup)
+    {
+        <div class="create-form-card">
+            <h3>@Resources.Web_Admin_NewGroup</h3>
+            <div class="create-form-fields">
+                <div class="form-group">
+                    <label>@Resources.Web_Admin_Label_GroupName</label>
+                    <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_GroupName"
+                           @bind="VM.CreateGroupName" @bind:event="oninput"
+                           @onkeydown="HandleCreateGroupKeyDown" />
+                </div>
+                <div class="form-group">
+                    <label>@Resources.Web_Admin_Label_Department</label>
+                    <select class="edit-input" @bind="CreateGroupDepartmentId">
+                        @foreach (var dept in VM.AllDepartments)
+                        {
+                            <option value="@dept.Id">@dept.Name</option>
+                        }
+                    </select>
+                    <span class="form-hint">@Resources.Web_Admin_GroupDeptHint</span>
+                </div>
+            </div>
+            @if (VM.ErrorMessage is not null)
+            {
+                <div class="error-banner" style="margin-top: 12px;">@VM.ErrorMessage</div>
+            }
+            <div class="create-form-actions">
+                <button class="btn-primary" @onclick="CreateGroup" disabled="@VM.IsSaving">
+                    @(VM.IsSaving ? Resources.Web_Common_Creating : Resources.Web_Common_Create)
+                </button>
+                <button class="btn-secondary" @onclick="Cancel">@Resources.Web_Common_Cancel</button>
+            </div>
+        </div>
+    }
+
+    @* -- Create Role Form -- *@
+    @if (VM.IsCreatingRole)
+    {
+        <div class="create-form-card">
+            <h3>@Resources.Web_Admin_NewRole</h3>
+            <div class="create-form-fields">
+                <div class="form-group">
+                    <label>@Resources.Web_Admin_Label_RoleName</label>
+                    <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_RoleName"
+                           @bind="VM.CreateRoleName" @bind:event="oninput"
+                           @onkeydown="HandleCreateRoleKeyDown" />
+                </div>
+            </div>
+            @if (VM.ErrorMessage is not null)
+            {
+                <div class="error-banner" style="margin-top: 12px;">@VM.ErrorMessage</div>
+            }
+            <div class="create-form-actions">
+                <button class="btn-primary" @onclick="CreateRole" disabled="@VM.IsSaving">
+                    @(VM.IsSaving ? Resources.Web_Common_Creating : Resources.Web_Common_Create)
+                </button>
+                <button class="btn-secondary" @onclick="Cancel">@Resources.Web_Common_Cancel</button>
+            </div>
+        </div>
+    }
+
+@code {
+    [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private string CreateUserDepartmentId { get => VM.CreateUserDepartmentId?.ToString() ?? ""; set => VM.CreateUserDepartmentId = Guid.TryParse(value, out var id) ? id : null; }
+    private string CreateGroupDepartmentId { get => VM.CreateGroupDepartmentId.ToString(); set => VM.CreateGroupDepartmentId = Guid.TryParse(value, out var id) ? id : WellKnownDepartments.GlobalId; }
+    private async Task CreateUser() { await VM.CreateUserAsync(); await OnChanged.InvokeAsync(); }
+    private async Task CreateGroup() { await VM.CreateGroupAsync(); await OnChanged.InvokeAsync(); }
+    private async Task CreateRole() { await VM.CreateRoleAsync(); await OnChanged.InvokeAsync(); }
+    private async Task HandleCreateGroupKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") await CreateGroup(); }
+    private async Task HandleCreateRoleKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") await CreateRole(); }
+    private async Task Cancel() { VM.CancelCreate(); await OnChanged.InvokeAsync(); }
+}
+

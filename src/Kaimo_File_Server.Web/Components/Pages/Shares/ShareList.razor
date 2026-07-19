@@ -1,57 +1,31 @@
 @page "/"
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Pages.Acl
+@using Kaimo_File_Server.Web.Components.Pages.Shares.Components
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject ShareListViewModel VM
 @inject NavigationManager Nav
 @inject AssetProvider Assets
 
-<PageTitle>Shares - Kaimo Files</PageTitle>
+<PageTitle>@Resources.Web_Nav_Shares - Kaimo Files</PageTitle>
 
 <div class="page-header">
     <div>
-        <h1>Shares</h1>
+        <h1>@Resources.Web_Nav_Shares</h1>
         <p class="subtitle">@string.Format(Resources.Web_ShareList_Welcome, VM.CurrentUserName)</p>
     </div>
-    <div style="display: flex; gap: 0.5rem;">
-        @if (VM.CanCreateShare)
-        {
-            <button class="btn-icon" title="Share erstellen" @onclick="ToggleCreate">
-                @Assets.SVG("plus.svg", new SvgOptions(Width: 20, Height: 20, StrokeWidth: 2))
-            </button>
-        }
-    </div>
+    @if (VM.CanCreateShare)
+    {
+        <button class="btn-icon" title="@Resources.Web_ShareList_CreateShare" @onclick="ToggleCreate">
+            @Assets.SVG("plus.svg", new SvgOptions(Width: 20, Height: 20, StrokeWidth: 2))
+        </button>
+    }
 </div>
-
-@* -- Create Form -- *@
 
 @if (VM.IsCreating && VM.CanCreateShare)
 {
-    <div class="create-form-card">
-        <h3>@Resources.Web_ShareList_CreateTitle</h3>
-        <div class="create-form-fields">
-            <div class="form-group">
-                <label>@Resources.Web_ShareList_Label_Name</label>
-                <input class="edit-input"
-                       type="text"
-                       placeholder=@Resources.Web_ShareList_CreatePlaceholder
-                       @bind="VM.NewShareName"
-                       @bind:event="oninput"
-                       @onkeydown="HandleCreateKeyDown" />
-            </div>
-        </div>
-        @if (VM.CreateErrorMessage is not null)
-        {
-            <div class="error-banner" style="margin-top: 12px; margin-bottom: 0;">@VM.CreateErrorMessage</div>
-        }
-        <div class="create-form-actions">
-            <button class="btn-primary" @onclick="CreateShare">@Resources.Web_Button_Create</button>
-            <button class="btn-secondary" @onclick="() => { VM.IsCreating = false; }">@Resources.Web_Button_Cancel</button>
-        </div>
-    </div>
+    <ShareCreateForm VM="VM" OnChanged="StateHasChanged" />
 }
-
-@* -- Content -- *@
 
 @if (VM.IsLoading)
 {
@@ -74,38 +48,13 @@ else if (!VM.Shares.Any())
 else
 {
     <div class="admin-content">
-        @* -- Share List -- *@
         <div class="admin-list">
-            <div class="share-grid">
-                @foreach (var share in VM.Shares)
-                {
-                    var isSelected = VM.SelectedShare?.Id == share.Id;
-                    var isDisabled = !share.IsEnabled;
-
-                    <div class="share-card @(isSelected ? "share-card--selected" : "") @(isDisabled ? "share-card--disabled" : "")"
-                         @onclick="() => HandleCardClick(share)"
-                         @ondblclick='() => Nav.NavigateTo("files/" + share.Name)'
-                         >
-                        <div class="share-icon">
-                            @Assets.SVG("folder.svg", new SvgOptions(
-                                Width: 32, Height: 32,
-                                Color: isDisabled ? "var(--text-tertiary)" : "var(--folder-stroke)",
-                                Fill: isDisabled ? "transparent" : "var(--folder-fill)"))
-                        </div>
-                        <div class="share-info">
-                            <span class="share-name">@share.Name</span>
-                            <span class="share-path">@share.Path</span>
-                            @if (isDisabled)
-                            {
-                                <span class="share-badge share-badge--disabled">@Resources.Web_ShareList_Status_Disabled</span>
-                            }
-                        </div>
-                    </div>
-                }
-            </div>
+            <ShareCardList Shares="VM.Shares"
+                           SelectedShare="VM.SelectedShare"
+                           OnSelected="HandleCardClick"
+                           OnOpened="OpenShare" />
         </div>
 
-        @* -- Detail Panel mit Tabs -- *@
         @if (VM.SelectedShare is not null && VM.CanManageShare(VM.SelectedShare.Id))
         {
             <div class="admin-detail">
@@ -114,265 +63,40 @@ else
                     <span class="detail-subtitle">@Resources.Web_ShareList_DetailSubtitle</span>
                 </div>
 
-                @* -- Tab-Navigation -- *@
                 <div class="detail-tabs">
-                    <button class="detail-tab @(_activeTab == DetailTab.Settings ? "detail-tab--active" : "")"
-                            @onclick="() => SwitchTab(DetailTab.Settings)">
+                    <button class="detail-tab @(_activeTab == ShareDetailTab.Settings ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(ShareDetailTab.Settings)">
                         @Assets.SVG("settings.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                         @Resources.Web_ShareList_Tab_General
                     </button>
-                    <button class="detail-tab @(_activeTab == DetailTab.Access ? "detail-tab--active" : "")"
-                            @onclick="() => SwitchTab(DetailTab.Access)">
+                    <button class="detail-tab @(_activeTab == ShareDetailTab.Access ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(ShareDetailTab.Access)">
                         @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                         @Resources.Web_ShareList_Tab_Visibility
                     </button>
-                    <button class="detail-tab @(_activeTab == DetailTab.Acl ? "detail-tab--active" : "")"
-                            @onclick="() => SwitchTab(DetailTab.Acl)">
+                    <button class="detail-tab @(_activeTab == ShareDetailTab.Acl ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(ShareDetailTab.Acl)">
                         @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                         @Resources.Web_ShareList_Tab_ACL
                     </button>
                 </div>
 
-                @* -- Tab: Allgemein -- *@
-                @if (_activeTab == DetailTab.Settings)
+                @switch (_activeTab)
                 {
-                    @if (VM.EditSuccessMessage is not null)
-                    {
-                        <div class="success-banner">@VM.EditSuccessMessage</div>
-                    }
-                    @if (VM.EditErrorMessage is not null)
-                    {
-                        <div class="error-banner">@VM.EditErrorMessage</div>
-                    }
-
-                    <div class="detail-section">
-                        <span class="detail-label">@Resources.Web_ShareList_Label_Name</span>
-                        <div class="detail-rename-row">
-                            <input class="edit-input"
-                                   type="text"
-                                   @bind="VM.EditShareName"
-                                   @bind:event="oninput"
-                                   disabled="@VM.IsRenaming" />
-                            <button class="btn-primary"
-                                    @onclick="RenameShare"
-                                    disabled="@(VM.EditShareName.Trim() == VM.SelectedShare.Name || VM.IsRenaming)">
-                                @(VM.IsRenaming ? "…" : Resources.Web_Action_Rename)
-                            </button>
+                    case ShareDetailTab.Settings:
+                        <ShareSettingsPanel VM="VM" OnDeleted="HandleShareDeleted" />
+                        break;
+                    case ShareDetailTab.Access:
+                        <ShareAccessPanel VM="VM" IsLoaded="_accessLoaded" />
+                        break;
+                    case ShareDetailTab.Acl:
+                        <div class="detail-section">
+                            <p class="share-help-text">@Resources.Web_ShareList_AclDescription</p>
+                            <AclEditor @key="@_aclEditorKey" Path="" ShareId="@VM.SelectedShare.Id" IsDirectory="true" />
                         </div>
-                    </div>
-
-                    <div class="detail-section">
-                        <span class="detail-label">@Resources.Web_ShareList_Label_Path</span>
-                        <span class="detail-value">@VM.SelectedShare.Path</span>
-                    </div>
-
-                    <div class="detail-section">
-                        <span class="detail-label">@Resources.Web_ShareList_Label_Status</span>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <span class="detail-value">
-                                @(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)
-                            </span>
-                            <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" @onclick="ToggleShareEnabled">
-                                @(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="detail-section">
-                        <span class="detail-label">@Resources.Web_ShareList_Label_RecycleBin</span>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <span class="detail-value">
-                                @(VM.SelectedShare.IsRecycleEnabled ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)
-                            </span>
-                            <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" @onclick="ToggleRecycleEnabled">
-                                @(VM.SelectedShare.IsRecycleEnabled ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="detail-actions">
-                        @if (!VM.ShowDeleteConfirm)
-                        {
-                            <button class="btn-danger-outline" @onclick="() => VM.ShowDeleteConfirm = true">
-                                @Resources.Web_ShareList_DeleteShare
-                            </button>
-                        }
-                        else
-                        {
-                            <div class="confirm-delete">
-                                <p>@string.Format(Resources.Web_ShareList_DeleteConfirm, @VM.SelectedShare.Name)</p>
-                                <div style="display: flex; gap: 8px;">
-                                    <button class="btn-danger-outline" @onclick="DeleteShare">@Resources.Web_ShareList_DeletePermanently</button>
-                                    <button class="btn-secondary" @onclick="() => VM.ShowDeleteConfirm = false">@Resources.Web_Button_Cancel</button>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                }
-
-                @* -- Tab: Sichtbarkeit -- *@
-                @if (_activeTab == DetailTab.Access)
-                {
-                    @if (VM.AccessErrorMessage is not null)
-                    {
-                        <div class="error-banner">@VM.AccessErrorMessage</div>
-                    }
-
-                    <div class="detail-section">
-                        <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
-                            @Resources.Web_ShareList_VisibilityDescription
-                        </p>
-
-                        @if (!_accessLoaded)
-                        {
-                            <div class="loading-state" style="padding: 24px 0;">
-                                <div class="spinner"></div>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="form-group" style="margin-bottom: 14px;">
-                                <label>@Resources.Web_ShareList_VisibilityHeader</label>
-                                <div class="detail-section">
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <span class="detail-value">
-                                            @(VM.SelectedShare.IsShareHidden ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)
-                                        </span>
-                                        <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px;" @onclick="ToggleShareHidden">
-                                            @(VM.SelectedShare.IsShareHidden ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                }
-
-                @if (_activeTab == DetailTab.Acl)
-                {
-                    <div class="detail-section">
-                        <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 12px;">
-                            @Resources.Web_ShareList_AclDescription
-                        </p>
-                        <AclEditor @key="@_aclEditorKey" Path="" ShareId="@VM.SelectedShare.Id" IsDirectory="true" />
-                    </div>
+                        break;
                 }
             </div>
         }
     </div>
-}
-
-
-@code {
-    private enum DetailTab { Settings, Access, Acl }
-
-    private DetailTab _activeTab = DetailTab.Settings;
-    private string _aclEditorKey = "";
-    private bool _accessLoaded;
-    private bool _accessUsersOpen;
-    private bool _accessGroupsOpen;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await VM.LoadAsync();
-            StateHasChanged();
-        }
-    }
-
-    private void HandleCardClick(ShareDefinition share)
-    {
-        if (VM.CanManageShare(share.Id))
-        {
-            _activeTab = DetailTab.Settings;
-            _accessLoaded = false;
-            _accessUsersOpen = false;
-            _accessGroupsOpen = false;
-            VM.SelectShare(share);
-            StateHasChanged();
-        }
-        else
-        {
-            Nav.NavigateTo($"/files/{share.Name}");
-        }
-    }
-
-    private async Task SwitchTab(DetailTab tab)
-    {
-        _activeTab = tab;
-        _accessUsersOpen = false;
-        _accessGroupsOpen = false;
-
-        if (tab == DetailTab.Access && !_accessLoaded)
-        {
-            await VM.LoadAccessAsync();
-            _accessLoaded = true;
-        }
-
-        if (tab == DetailTab.Acl)
-        {
-            _aclEditorKey = $"{VM.SelectedShare?.Name}_{DateTime.UtcNow.Ticks}";
-        }
-
-        StateHasChanged();
-    }
-
-    private void ToggleCreate()
-    {
-        VM.DeselectShare();
-        _activeTab = DetailTab.Settings;
-        _accessLoaded = false;
-        _accessUsersOpen = false;
-        _accessGroupsOpen = false;
-        VM.IsCreating = !VM.IsCreating;
-        StateHasChanged();
-    }
-
-    private void OpenShare(string name) => Nav.NavigateTo($"/files/{name}");
-
-    private async Task CreateShare()
-    {
-        if (!VM.CanCreateShare) return;
-        await VM.CreateShareAsync();
-        StateHasChanged();
-    }
-
-    private async Task HandleCreateKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") await CreateShare();
-    }
-
-    private async Task RenameShare()
-    {
-        await VM.RenameShareAsync();
-        StateHasChanged();
-    }
-
-    private async Task ToggleShareEnabled()
-    {
-        await VM.ToggleShareEnabledAsync();
-        StateHasChanged();
-    }
-
-    private async Task ToggleRecycleEnabled()
-    {
-        await VM.ToggleRecycleEnabledAsync();
-        StateHasChanged();
-    }
-
-    private async Task ToggleShareHidden()
-    {
-        await VM.ToggleShareHiddenAsync();
-        StateHasChanged();
-    }
-
-    private async Task DeleteShare()
-    {
-        await VM.DeleteShareAsync();
-        _activeTab = DetailTab.Settings;
-        _accessLoaded = false;
-        StateHasChanged();
-    }
-
 }

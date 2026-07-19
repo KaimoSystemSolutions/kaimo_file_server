@@ -1,0 +1,22 @@
+.user-list-container { max-height: 600px; overflow: hidden auto; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-secondary); }
+.user-list-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 160px) minmax(96px, auto); align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+.user-list-row:last-child { border-bottom: none; }
+.user-list-row:hover { background: var(--bg-hover); }
+.user-list-header { position: sticky; top: 0; z-index: 1; background: var(--bg-tertiary); color: var(--text-tertiary); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.user-list-header:hover { background: var(--bg-tertiary); }
+.user-list-selectable { cursor: pointer; }
+.user-list-selected { padding-left: 13px; border-left: 3px solid var(--accent); background: var(--accent-selected) !important; }
+.user-cell-name { display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.user-cell-username { min-width: 0; overflow: hidden; color: var(--text-secondary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.user-cell-status { display: flex; align-items: center; justify-content: flex-end; }
+.status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+.status-badge--active { background: var(--success-subtle); color: var(--success); }
+.status-badge--disabled { background: var(--danger-subtle); color: var(--danger); }
+.status-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; }
+.status-dot--active { background: var(--success); }
+.status-dot--disabled { background: var(--danger); }
+
+@media (max-width: 768px) {
+    .user-list-row { grid-template-columns: minmax(0, 1fr) minmax(96px, auto); }
+    .user-cell-username { display: none; }
+}
