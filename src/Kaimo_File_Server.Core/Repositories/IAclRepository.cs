@@ -68,5 +68,14 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <param name="oldRelativePath">The current relative path prefix.</param>
         /// <param name="newRelativePath">The replacement path prefix.</param>
         Task RenameFileMetadataPathsAsync(Guid shareId, string oldRelativePath, string newRelativePath);
+
+        /// <summary>
+        /// Removes metadata at a path and every descendant. ACL rows are removed by
+        /// the database cascade from file_metadata.
+        /// </summary>
+        Task<int> DeleteFileMetadataPathsAsync(Guid shareId, string relativePath);
+
+        /// <summary>Removes all file metadata (and cascading ACL rows) for a share.</summary>
+        Task<int> DeleteShareFileMetadataAsync(Guid shareId);
     }
 }

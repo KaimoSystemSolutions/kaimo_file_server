@@ -16,8 +16,8 @@ namespace Kaimo_File_Server.Infrastructure.Services
     /// This adapter therefore opens a fresh DI scope for every call, resolves the
     /// scoped service inside it, and disposes the scope once the operation
     /// completes — exactly the pattern <see cref="Core.Security.AclService"/> uses.
-    /// Every returned value (streams are fully buffered, lists are materialised)
-    /// is safe to use after the scope is gone.
+    /// Every returned value (streams own their memory or temporary file; lists are
+    /// materialised) is safe to use after the scope is gone.
     /// </summary>
     public sealed class ScopedFileVersionService : IFileVersionService
     {
@@ -41,8 +41,8 @@ namespace Kaimo_File_Server.Infrastructure.Services
         {
             using var scope = _serviceProvider.CreateScope();
             var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
-            // FileVersionService returns a fully buffered MemoryStream, so it
-            // remains usable after the scope (and its DbContext) is disposed.
+            // The returned seekable stream owns all resources it needs and remains
+            // usable after the scope (and its DbContext) is disposed.
             return await svc.ReadVersionAsync(shareId, filePath, snapshotTimestampUtc);
         }
 
@@ -80,6 +80,27 @@ namespace Kaimo_File_Server.Infrastructure.Services
             using var scope = _serviceProvider.CreateScope();
             var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
             return await svc.ApplyRetentionAsync(shareId, filePath, maxVersions, maxAge);
+        }
+
+        public async Task RenamePathAsync(Guid shareId, string oldPath, string newPath)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
+            await svc.RenamePathAsync(shareId, oldPath, newPath);
+        }
+
+        public async Task<int> DeletePathAsync(Guid shareId, string path)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
+            return await svc.DeletePathAsync(shareId, path);
+        }
+
+        public async Task<int> DeleteShareAsync(Guid shareId)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
+            return await svc.DeleteShareAsync(shareId);
         }
     }
 }

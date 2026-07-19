@@ -82,8 +82,8 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <param name="shareId">The share the file belongs to.</param>
         /// <param name="filePath">The normalised relative file path.</param>
         /// <param name="cutoff">Versions older than this UTC date are removed.</param>
-        /// <returns>The number of deleted version records.</returns>
-        Task<int> DeleteOlderThanAsync(Guid shareId, string filePath, DateTime cutoff);
+        /// <returns>The deleted rows, used for physical blob garbage collection.</returns>
+        Task<List<FileVersion>> DeleteOlderThanAsync(Guid shareId, string filePath, DateTime cutoff);
 
         /// <summary>
         /// Trims excess versions beyond <paramref name="maxCount"/>,
@@ -92,8 +92,28 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <param name="shareId">The share the file belongs to.</param>
         /// <param name="filePath">The normalised relative file path.</param>
         /// <param name="maxCount">Maximum number of versions to keep.</param>
-        /// <returns>The number of deleted version records.</returns>
-        Task<int> TrimToMaxVersionsAsync(Guid shareId, string filePath, int maxCount);
+        /// <returns>The deleted rows, used for physical blob garbage collection.</returns>
+        Task<List<FileVersion>> TrimToMaxVersionsAsync(Guid shareId, string filePath, int maxCount);
+
+        /// <summary>
+        /// Deletes every version at <paramref name="path"/> or below it and returns
+        /// the removed rows so their content-addressed blobs can be garbage-collected.
+        /// </summary>
+        Task<List<FileVersion>> DeletePathAsync(Guid shareId, string path);
+
+        /// <summary>
+        /// Renames a file or directory version-history prefix. Existing destination
+        /// history is removed and returned because a replace-style filesystem rename
+        /// has displaced that object.
+        /// </summary>
+        Task<List<FileVersion>> RenamePathAsync(
+            Guid shareId, string oldPath, string newPath);
+
+        /// <summary>Deletes all version rows belonging to a share.</summary>
+        Task<List<FileVersion>> DeleteShareAsync(Guid shareId);
+
+        /// <summary>Whether any remaining version row references a physical blob.</summary>
+        Task<bool> IsStoragePathReferencedAsync(string storagePath);
 
         /// <summary>
         /// Checks whether a version with the given content hash already exists.

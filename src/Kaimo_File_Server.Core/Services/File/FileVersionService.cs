@@ -32,6 +32,10 @@ namespace Kaimo_File_Server.Core.Services.File;
 /// </summary>
 public class FileVersionService : IFileVersionService
 {
+    private const long InMemoryReadLimitBytes = 8L * 1024 * 1024;
+    private static readonly SemaphoreSlim[] BlobLocks = Enumerable.Range(0, 64)
+        .Select(_ => new SemaphoreSlim(1, 1))
+        .ToArray();
     private readonly IFileVersionRepository _versionRepo;
     private readonly string _versionStorageRoot;
     private readonly int _defaultMaxVersions;
@@ -75,47 +79,69 @@ public class FileVersionService : IFileVersionService
         var blobRelativePath = HashToPath(hash);
         var blobFullPath = Path.Combine(_versionStorageRoot, blobRelativePath);
         long compressedSize;
+        var createdBlob = false;
+        FileVersion version;
+        int versionNumber;
 
-        if (!System.IO.File.Exists(blobFullPath))
+        var blobLock = GetBlobLock(blobFullPath);
+        await blobLock.WaitAsync();
+        try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(blobFullPath)!);
+            if (!System.IO.File.Exists(blobFullPath))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(blobFullPath)!);
 
-            await using var fs = new FileStream(
-                blobFullPath, FileMode.CreateNew,
-                FileAccess.Write, FileShare.None, 4096, true);
-            await using var gzip = new GZipStream(fs, CompressionLevel.Optimal, leaveOpen: true);
+                await using var fs = new FileStream(
+                    blobFullPath, FileMode.CreateNew,
+                    FileAccess.Write, FileShare.None, 4096, true);
+                await using var gzip = new GZipStream(fs, CompressionLevel.Optimal, leaveOpen: true);
 
-            await content.CopyToAsync(gzip);
-            await gzip.FlushAsync();
+                await content.CopyToAsync(gzip);
+                await gzip.FlushAsync();
 
-            compressedSize = fs.Length;
+                compressedSize = fs.Length;
+                createdBlob = true;
+            }
+            else
+            {
+                compressedSize = new FileInfo(blobFullPath).Length;
+            }
+
+            content.Position = 0;
+
+            // 4. Create version record while holding the blob stripe. A concurrent
+            // delete cannot reclaim the blob between the existence check and insert.
+            versionNumber = await _versionRepo.GetMaxVersionNumberAsync(shareId, normalizedPath) + 1;
+            var now = TruncateToSeconds(_timeProvider.GetUtcNow().UtcDateTime);
+
+            // If a version at this exact second already exists, bump to next free second
+            while (await _versionRepo.GetVersionAsync(shareId, normalizedPath, now) != null)
+                now = now.AddSeconds(1);
+
+            version = new FileVersion(
+                shareId: shareId,
+                filePath: normalizedPath,
+                snapshotTimestampUtc: now,
+                storagePath: blobRelativePath,
+                contentHash: hash,
+                size: content.Length,
+                createdBy: userId,
+                versionNumber: versionNumber);
+
+            await _versionRepo.CreateAsync(version);
         }
-        else
+        catch
         {
-            compressedSize = new FileInfo(blobFullPath).Length;
+            // The filesystem write precedes the DB insert. If the insert fails,
+            // reclaim the blob unless another version already references it.
+            if (createdBlob && !await _versionRepo.IsStoragePathReferencedAsync(blobRelativePath))
+                System.IO.File.Delete(blobFullPath);
+            throw;
         }
-
-        content.Position = 0;
-
-        // 4. Create version record
-        var versionNumber = await _versionRepo.GetMaxVersionNumberAsync(shareId, normalizedPath) + 1;
-        var now = TruncateToSeconds(_timeProvider.GetUtcNow().UtcDateTime);
-
-        // If a version at this exact second already exists, bump to next free second
-        while (await _versionRepo.GetVersionAsync(shareId, normalizedPath, now) != null)
-            now = now.AddSeconds(1);
-
-        var version = new FileVersion(
-            shareId: shareId,
-            filePath: normalizedPath,
-            snapshotTimestampUtc: now,
-            storagePath: blobRelativePath,
-            contentHash: hash,
-            size: content.Length,
-            createdBy: userId,
-            versionNumber: versionNumber);
-
-        await _versionRepo.CreateAsync(version);
+        finally
+        {
+            blobLock.Release();
+        }
 
         if (_logger.IsEnabled(LogLevel.Debug))
             _logger.LogDebug(LogEvents.FileVersionCreated, LogMessages.FileVersionCreated,
@@ -143,17 +169,39 @@ public class FileVersionService : IFileVersionService
             throw new FileNotFoundException(
                 $"Version blob missing: {version.StoragePath}");
 
-        // Decompress into MemoryStream for seekable access
-        var ms = new MemoryStream();
-        await using (var fs = new FileStream(
-            blobFullPath, FileMode.Open,
-            FileAccess.Read, FileShare.Read, 4096, true))
-        await using (var gzip = new GZipStream(fs, CompressionMode.Decompress))
+        // Keep small snapshots fast in memory, but spill large snapshots to a
+        // delete-on-close seekable file so concurrent downloads cannot exhaust RAM.
+        Stream output;
+        if (version.Size <= InMemoryReadLimitBytes)
         {
-            await gzip.CopyToAsync(ms);
+            output = new MemoryStream((int)Math.Max(version.Size, 0));
         }
-        ms.Position = 0;
-        return ms;
+        else
+        {
+            var readCache = Path.Combine(_versionStorageRoot, ".read-cache");
+            Directory.CreateDirectory(readCache);
+            output = new FileStream(
+                Path.Combine(readCache, Guid.NewGuid().ToString("N") + ".tmp"),
+                FileMode.CreateNew, FileAccess.ReadWrite,
+                FileShare.Read | FileShare.Delete, 81920,
+                FileOptions.Asynchronous | FileOptions.SequentialScan | FileOptions.DeleteOnClose);
+        }
+
+        try
+        {
+            await using var fs = new FileStream(
+                blobFullPath, FileMode.Open,
+                FileAccess.Read, FileShare.Read | FileShare.Delete, 4096, true);
+            await using var gzip = new GZipStream(fs, CompressionMode.Decompress);
+            await gzip.CopyToAsync(output);
+            output.Position = 0;
+            return output;
+        }
+        catch
+        {
+            await output.DisposeAsync();
+            throw;
+        }
     }
 
     public async Task<List<FileVersion>> GetVersionsAsync(Guid shareId, string filePath)
@@ -193,21 +241,50 @@ public class FileVersionService : IFileVersionService
         Guid shareId, string filePath, int? maxVersions = null, TimeSpan? maxAge = null)
     {
         var normalizedPath = ShareRelativePath.Normalize(filePath);
-        int deleted = 0;
+        var removed = new List<FileVersion>();
 
         var effectiveMax = maxVersions ?? _defaultMaxVersions;
         var effectiveAge = maxAge ?? _defaultMaxAge;
 
         if (effectiveMax > 0)
-            deleted += await _versionRepo.TrimToMaxVersionsAsync(shareId, normalizedPath, effectiveMax);
+            removed.AddRange(await _versionRepo.TrimToMaxVersionsAsync(
+                shareId, normalizedPath, effectiveMax));
 
         if (effectiveAge.HasValue)
         {
             var cutoff = _timeProvider.GetUtcNow().UtcDateTime - effectiveAge.Value;
-            deleted += await _versionRepo.DeleteOlderThanAsync(shareId, normalizedPath, cutoff);
+            removed.AddRange(await _versionRepo.DeleteOlderThanAsync(
+                shareId, normalizedPath, cutoff));
         }
 
-        return deleted;
+        await DeleteUnreferencedBlobsAsync(removed);
+        return removed.Count;
+    }
+
+    public async Task RenamePathAsync(Guid shareId, string oldPath, string newPath)
+    {
+        var oldNormalized = ShareRelativePath.Normalize(oldPath);
+        var newNormalized = ShareRelativePath.Normalize(newPath);
+        if (string.Equals(oldNormalized, newNormalized, StringComparison.Ordinal)) return;
+
+        var displaced = await _versionRepo.RenamePathAsync(
+            shareId, oldNormalized, newNormalized);
+        await DeleteUnreferencedBlobsAsync(displaced);
+    }
+
+    public async Task<int> DeletePathAsync(Guid shareId, string path)
+    {
+        var removed = await _versionRepo.DeletePathAsync(
+            shareId, ShareRelativePath.Normalize(path));
+        await DeleteUnreferencedBlobsAsync(removed);
+        return removed.Count;
+    }
+
+    public async Task<int> DeleteShareAsync(Guid shareId)
+    {
+        var removed = await _versionRepo.DeleteShareAsync(shareId);
+        await DeleteUnreferencedBlobsAsync(removed);
+        return removed.Count;
     }
 
     // ------------------ Helpers ------------------
@@ -228,6 +305,60 @@ public class FileVersionService : IFileVersionService
         var dir1 = hash[..2];
         var dir2 = hash[2..4];
         return Path.Combine(dir1, dir2, hash + ".bin.gz");
+    }
+
+    private async Task DeleteUnreferencedBlobsAsync(IEnumerable<FileVersion> removed)
+    {
+        foreach (var storagePath in removed.Select(v => v.StoragePath).Distinct(StringComparer.Ordinal))
+            await DeleteBlobIfUnreferencedAsync(storagePath);
+    }
+
+    private async Task DeleteBlobIfUnreferencedAsync(string storagePath)
+    {
+        var fullPath = Path.GetFullPath(Path.Combine(_versionStorageRoot, storagePath));
+        var root = Path.GetFullPath(_versionStorageRoot)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Version blob path escaped the storage root.");
+
+        var blobLock = GetBlobLock(fullPath);
+        await blobLock.WaitAsync();
+        try
+        {
+            if (await _versionRepo.IsStoragePathReferencedAsync(storagePath)) return;
+            System.IO.File.Delete(fullPath);
+            RemoveEmptyParentDirectories(Path.GetDirectoryName(fullPath), root);
+        }
+        catch (Exception ex)
+        {
+            // The DB is authoritative. Do not turn an already completed user-file
+            // operation into a failure when an external process temporarily locks a blob.
+            _logger.LogWarning(ex, "Failed to delete unreferenced version blob {StoragePath}", storagePath);
+        }
+        finally
+        {
+            blobLock.Release();
+        }
+    }
+
+    private static SemaphoreSlim GetBlobLock(string fullPath)
+    {
+        var hash = (uint)StringComparer.OrdinalIgnoreCase.GetHashCode(fullPath);
+        return BlobLocks[hash % (uint)BlobLocks.Length];
+    }
+
+    private static void RemoveEmptyParentDirectories(string? directory, string rootWithSeparator)
+    {
+        var root = rootWithSeparator.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        while (!string.IsNullOrEmpty(directory)
+               && !string.Equals(directory, root, StringComparison.OrdinalIgnoreCase)
+               && Directory.Exists(directory)
+               && !Directory.EnumerateFileSystemEntries(directory).Any())
+        {
+            Directory.Delete(directory);
+            directory = Path.GetDirectoryName(directory);
+        }
     }
 
     /// <summary>

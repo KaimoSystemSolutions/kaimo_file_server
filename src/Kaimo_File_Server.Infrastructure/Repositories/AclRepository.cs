@@ -76,33 +76,59 @@ public class AclRepository : IAclRepository
         if (affected.Count == 0)
             return;
 
+        var affectedIds = affected.Select(m => m.Id).ToHashSet();
+        var targetPaths = affected
+            .Select(meta => meta.Path == oldNormalized
+                ? newNormalized
+                : newNormalized + meta.Path.Substring(oldNormalized.Length))
+            .ToList();
+
+        // A replace-style rename displaces the destination object. Keep the source
+        // object's owner and ACL, and remove stale/watcher-created destination rows.
+        var displaced = await _db.FileMetadata
+            .Where(m => m.ShareId == shareId
+                        && targetPaths.Contains(m.Path)
+                        && !affectedIds.Contains(m.Id))
+            .ToListAsync();
+
+        if (displaced.Count > 0)
+        {
+            _db.FileMetadata.RemoveRange(displaced);
+            await _db.SaveChangesAsync();
+        }
+
         foreach (var meta in affected)
         {
             var targetPath = meta.Path == oldNormalized
                 ? newNormalized
                 : newNormalized + meta.Path.Substring(oldNormalized.Length);
-
-            // A concurrent watcher/indexer may have already picked up the OS rename
-            // (from _handle.MoveAsync) and created a metadata row at the target path
-            // before we arrive here. In that case, that row is the "current" one —
-            // we discard our stale source row instead of colliding.
-            var existingAtTarget = await _db.FileMetadata
-                .FirstOrDefaultAsync(m => m.ShareId == shareId
-                                          && m.Path == targetPath
-                                          && m.Id != meta.Id);
-
-            if (existingAtTarget is not null)
-            {
-                _db.FileMetadata.Remove(meta);
-            }
-            else
-            {
-                meta.Path = targetPath;
-            }
+            meta.Path = targetPath;
+            meta.Name = ShareRelativePath.GetFileName(targetPath);
         }
 
         await _db.SaveChangesAsync();
     }
+
+    public async Task<int> DeleteFileMetadataPathsAsync(Guid shareId, string relativePath)
+    {
+        var normalized = ShareRelativePath.Normalize(relativePath);
+        var prefix = normalized.Length == 0 ? "" : normalized + "/";
+
+        var query = _db.FileMetadata.Where(m => m.ShareId == shareId);
+        query = normalized.Length == 0
+            ? query
+            : query.Where(m => m.Path == normalized || m.Path.StartsWith(prefix));
+
+        var rows = await query.ToListAsync();
+        if (rows.Count == 0) return 0;
+
+        _db.FileMetadata.RemoveRange(rows);
+        await _db.SaveChangesAsync();
+        return rows.Count;
+    }
+
+    public Task<int> DeleteShareFileMetadataAsync(Guid shareId)
+        => DeleteFileMetadataPathsAsync(shareId, "");
 
     public async Task DeleteAsync(Guid entryId)
     {

@@ -62,49 +62,43 @@ public class ElasticSearchService : ISearchService
 
     public async Task onFileCreated(string absolutePath, Task<Stream> fileData, CancellationToken ct = default)
     {
-        _ = Task.Run(async () =>
+        try
         {
-            try
-            {
-                await IndexDocumentIfNotExistsAsync(absolutePath, fileData);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Indexing failed for {Path}", absolutePath);
-            }
-        });
+            await IndexDocumentIfNotExistsAsync(absolutePath, fileData, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Indexing failed for {Path}", absolutePath);
+        }
     }
 
     public async Task onFileDeleted(string absolutePath)
     {
-        _ = Task.Run(async () =>
+        try
         {
-            try
-            {
-                var response = await _client.DeleteByQueryAsync<FileDocument>(IndexName, d => d
+            var response = await _client.DeleteByQueryAsync<FileDocument>(IndexName, d => d
                     .Query(q => q
                         .Term(t => t
                             .Field("absolutePath")
                             .Value(absolutePath)
                         )
                     )
-                );
+            );
 
-                if (response.Deleted == 0)
-                    _logger.LogWarning("No document found for path '{Path}'", absolutePath);
-                else
-                    _logger.LogDebug("Removed document for '{Path}' from the index", absolutePath);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Deletion failed for {Path}", absolutePath);
-            }
-        });
+            if (response.Deleted == 0)
+                _logger.LogWarning("No document found for path '{Path}'", absolutePath);
+            else
+                _logger.LogDebug("Removed document for '{Path}' from the index", absolutePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Deletion failed for {Path}", absolutePath);
+        }
     }
 
     public Task onDirectoryCreated(string absolutePath)
     {
-        _ = Task.Run(async () =>
+        return Task.Run(async () =>
         {
             try
             {
@@ -124,7 +118,6 @@ public class ElasticSearchService : ISearchService
                 _logger.LogError(ex, "Directory indexing failed for {Path}", absolutePath);
             }
         });
-        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -187,7 +180,7 @@ public class ElasticSearchService : ISearchService
 
     public async Task onDirectoryDeleted(string absolutePath)
     {
-        _ = Task.Run(async () =>
+        await Task.Run(async () =>
         {
             try
             {
@@ -227,7 +220,7 @@ public class ElasticSearchService : ISearchService
 
     public Task onFileRenamed(string oldAbsolutePath, string newAbsolutePath)
     {
-        _ = Task.Run(async () =>
+        return Task.Run(async () =>
         {
             try
             {
@@ -253,12 +246,11 @@ public class ElasticSearchService : ISearchService
                 _logger.LogError(ex, "Index rename failed for file '{Old}'", oldAbsolutePath);
             }
         });
-        return Task.CompletedTask;
     }
 
     public Task onDirectoryRenamed(string oldAbsolutePath, string newAbsolutePath)
     {
-        _ = Task.Run(async () =>
+        return Task.Run(async () =>
         {
             try
             {
@@ -340,7 +332,6 @@ public class ElasticSearchService : ISearchService
                     oldAbsolutePath);
             }
         });
-        return Task.CompletedTask;
     }
 
     /// <summary>

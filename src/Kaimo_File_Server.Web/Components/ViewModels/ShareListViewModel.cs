@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
@@ -26,6 +27,7 @@ public partial class ShareListViewModel
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<ShareListViewModel> _logger;
     private readonly string _storagePath;
+    private readonly IFileVersionService? _versionService;
 
     public ShareListViewModel(
         IShareRepository shareRepo,
@@ -40,7 +42,8 @@ public partial class ShareListViewModel
         ShareLockManager lockManager,
         AuthenticationStateProvider authState,
         ILogger<ShareListViewModel> logger,
-        string storagePath)
+        string storagePath,
+        IFileVersionService? versionService = null)
     {
         _shareRepo = shareRepo;
         _userRepo = userRepo;
@@ -55,6 +58,7 @@ public partial class ShareListViewModel
         _authState = authState;
         _logger = logger;
         _storagePath = storagePath.TrimEnd('/');
+        _versionService = versionService;
     }
 
     // -- State --
@@ -560,6 +564,11 @@ public partial class ShareListViewModel
         try
         {
             var name = SelectedShare.Name;
+            // Delete share-scoped lifecycle data before dropping the definition;
+            // version cleanup also reclaims blobs that are no longer referenced.
+            if (_versionService != null)
+                await _versionService.DeleteShareAsync(SelectedShare.Id);
+            await _aclService.DeleteShareMetadataAsync(SelectedShare.Id);
             await _shareRepo.DeleteAsync(SelectedShare.Id);
             _lockManager.RemoveLock(name);
 

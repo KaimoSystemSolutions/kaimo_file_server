@@ -72,5 +72,14 @@ namespace Kaimo_File_Server.Core.Services.File
         /// Can be called periodically by a background job.
         /// </summary>
         Task<int> ApplyRetentionAsync(Guid shareId, string filePath, int? maxVersions = null, TimeSpan? maxAge = null);
+
+        /// <summary>Moves a file or directory's complete version history to a new path.</summary>
+        Task RenamePathAsync(Guid shareId, string oldPath, string newPath);
+
+        /// <summary>Deletes all versions at a file/directory path and reclaims unused blobs.</summary>
+        Task<int> DeletePathAsync(Guid shareId, string path);
+
+        /// <summary>Deletes all versions for a share and reclaims unused blobs.</summary>
+        Task<int> DeleteShareAsync(Guid shareId);
     }
 }

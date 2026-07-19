@@ -310,6 +310,102 @@ public class FileServiceTests
     }
 
     [Fact]
+    public async Task DeleteFileAsync_PermanentDelete_CleansMetadataAndVersions()
+    {
+        var versions = new Mock<IFileVersionService>();
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, null, _shareId, versions.Object);
+        var ctx = CreateContext();
+        _storageMock.Setup(s => s.IsDirectoryAsync("folder")).ReturnsAsync(true);
+        AllowAccess(FilePermission.Delete);
+
+        await sut.DeleteFileAsync("folder", ctx, isRecycleEnabled: false);
+
+        _aclMock.Verify(a => a.DeleteAclAsync(_shareId, "folder"), Times.Once);
+        versions.Verify(v => v.DeletePathAsync(_shareId, "folder"), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteFileAsync_RecycleMove_RenamesMetadataAndVersionsToActualPath()
+    {
+        var versions = new Mock<IFileVersionService>();
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, null, _shareId, versions.Object);
+        var ctx = CreateContext();
+        _storageMock.Setup(s => s.IsDirectoryAsync("doc.txt")).ReturnsAsync(false);
+        _storageMock.Setup(s => s.MoveAsync("doc.txt", ".RECYCLE_BIN/doc.txt"))
+            .ReturnsAsync(".RECYCLE_BIN/doc_20260719.txt");
+        AllowAccess(FilePermission.Delete);
+
+        await sut.DeleteFileAsync("doc.txt", ctx, isRecycleEnabled: true);
+
+        _aclMock.Verify(a => a.RenameAclPathAsync(
+            _shareId, "doc.txt", ".RECYCLE_BIN/doc_20260719.txt"), Times.Once);
+        versions.Verify(v => v.RenamePathAsync(
+            _shareId, "doc.txt", ".RECYCLE_BIN/doc_20260719.txt"), Times.Once);
+    }
+
+    [Fact]
+    public async Task NotifyExternalDeleteAsync_CleansMetadataAndVersions()
+    {
+        var versions = new Mock<IFileVersionService>();
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, null, _shareId, versions.Object);
+
+        await sut.NotifyExternalDeleteAsync("folder", isDirectory: true);
+
+        _aclMock.Verify(a => a.DeleteAclAsync(_shareId, "folder"), Times.Once);
+        versions.Verify(v => v.DeletePathAsync(_shareId, "folder"), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteOnClose_CleansMetadataAndVersions()
+    {
+        var versions = new Mock<IFileVersionService>();
+        var handle = new Mock<IStorageHandle>();
+        var deleteOnClose = false;
+        handle.SetupGet(h => h.IsDirectory).Returns(false);
+        handle.SetupGet(h => h.AbsolutePath).Returns("C:/share/doc.txt");
+        handle.SetupGet(h => h.DeleteOnClose).Returns(() => deleteOnClose);
+        handle.Setup(h => h.MarkDeleteOnClose()).Callback(() => deleteOnClose = true);
+        handle.Setup(h => h.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        _storageMock.Setup(s => s.ExistsAsync("doc.txt")).ReturnsAsync(true);
+        _storageMock.Setup(s => s.IsDirectoryAsync("doc.txt")).ReturnsAsync(false);
+        _storageMock.Setup(s => s.OpenAsync(
+                "doc.txt", OpenMode.Open, AccessIntent.Read, ShareIntent.Delete,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(handle.Object);
+        AllowAccess(FilePermission.ListReadData);
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, null, _shareId, versions.Object);
+
+        var opened = await sut.OpenAsync(
+            "doc.txt", OpenMode.Open, AccessIntent.Read, ShareIntent.Delete, CreateContext());
+        opened.Session.MarkDeleteOnClose();
+        await opened.Session.DisposeAsync();
+
+        _aclMock.Verify(a => a.DeleteAclAsync(_shareId, "doc.txt"), Times.Once);
+        versions.Verify(v => v.DeletePathAsync(_shareId, "doc.txt"), Times.Once);
+    }
+
+    [Fact]
+    public async Task RenameAsync_RenamesMetadataAndCompleteVersionHistory()
+    {
+        var versions = new Mock<IFileVersionService>();
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, null, _shareId, versions.Object);
+        var ctx = CreateContext();
+        _storageMock.Setup(s => s.IsDirectoryAsync("old")).ReturnsAsync(true);
+        AllowAccess(FilePermission.Delete);
+        AllowAccess(FilePermission.CreateWriteData);
+
+        await sut.RenameAsync("old", "new", ctx);
+
+        _aclMock.Verify(a => a.RenameAclPathAsync(_shareId, "old", "new"), Times.Once);
+        versions.Verify(v => v.RenamePathAsync(_shareId, "old", "new"), Times.Once);
+    }
+
+    [Fact]
     public async Task DeleteFileAsync_WithoutAccess_ThrowsUnauthorized()
     {
         var ctx = CreateContext();

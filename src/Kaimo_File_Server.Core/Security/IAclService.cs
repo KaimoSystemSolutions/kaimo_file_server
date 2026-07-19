@@ -9,6 +9,7 @@ namespace Kaimo_File_Server.Core.Security
 
         Task RenameAclPathAsync(Guid shareId, string oldRelativePath, string newRelativePath);
         Task DeleteAclAsync(Guid shareId, string relativePath);
+        Task DeleteShareMetadataAsync(Guid shareId);
 
         /// <summary>
         /// Batch access check — evaluates permission for multiple items in a single

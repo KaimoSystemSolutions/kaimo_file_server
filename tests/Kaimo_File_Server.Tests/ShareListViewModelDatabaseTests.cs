@@ -2,6 +2,7 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Tests.Infrastructure;
 using Kaimo_File_Server.Web.Components.ViewModels;
@@ -29,6 +30,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     private readonly Mock<IManagementAuthService> _mgmtAuth = new();
     private readonly Mock<IAclService> _aclService = new();
     private readonly Mock<IStorageEngine> _storage = new();
+    private readonly Mock<IFileVersionService> _versions = new();
     private readonly ShareLockManager _lockManager = new();
     private readonly string _storagePath;
 
@@ -64,7 +66,8 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
             _storage.Object, _lockManager,
             AuthStateFor(actor.Username),
             NullLogger<ShareListViewModel>.Instance,
-            _storagePath);
+            _storagePath,
+            _versions.Object);
     }
 
     private async Task<(ShareListViewModel Sut, ShareDefinition Share)> LoadAndSelectAsync(
@@ -269,6 +272,8 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         var ok = await sut.DeleteShareAsync();
 
         Assert.True(ok);
+        _aclService.Verify(a => a.DeleteShareMetadataAsync(seeded.Id), Times.Once);
+        _versions.Verify(v => v.DeleteShareAsync(seeded.Id), Times.Once);
         await using var db = NewContext();
         Assert.False(await db.ShareDefinitions.AnyAsync(s => s.Id == seeded.Id));
     }

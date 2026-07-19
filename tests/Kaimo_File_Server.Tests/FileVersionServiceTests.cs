@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services.File;
 using System.IO.Compression;
 using System.Security.Cryptography;
+using Moq;
 using Xunit;
 
 namespace Kaimo_File_Server.Tests;
@@ -173,6 +174,29 @@ public class FileVersionServiceTests : IDisposable
         Assert.Equal(0, version.Size);
     }
 
+    [Fact]
+    public async Task CreateVersionAsync_DbInsertFailure_RemovesNewBlob()
+    {
+        var repo = new Mock<IFileVersionRepository>();
+        repo.Setup(r => r.ExistsWithHashAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(false);
+        repo.Setup(r => r.GetMaxVersionNumberAsync(It.IsAny<Guid>(), It.IsAny<string>()))
+            .ReturnsAsync(0);
+        repo.Setup(r => r.GetVersionAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTime>()))
+            .ReturnsAsync((FileVersion?)null);
+        repo.Setup(r => r.CreateAsync(It.IsAny<FileVersion>()))
+            .ThrowsAsync(new IOException("database unavailable"));
+        repo.Setup(r => r.IsStoragePathReferencedAsync(It.IsAny<string>()))
+            .ReturnsAsync(false);
+        var root = Path.Combine(_versionRoot, "failed-insert");
+        var service = new FileVersionService(repo.Object, root, timeProvider: _time);
+
+        await Assert.ThrowsAsync<IOException>(() =>
+            service.CreateVersionAsync(ShareA, "doc.txt", ToStream("orphan candidate")));
+
+        Assert.Empty(Directory.GetFiles(root, "*.bin.gz", SearchOption.AllDirectories));
+    }
+
     // ═══════════════════════════════════════════
     //  Version Reading
     // ═══════════════════════════════════════════
@@ -241,6 +265,25 @@ public class FileVersionServiceTests : IDisposable
         Assert.True(stream.CanSeek);
         Assert.True(stream.CanRead);
         Assert.Equal(0, stream.Position);
+    }
+
+    [Fact]
+    public async Task ReadVersionAsync_LargeVersion_UsesDeleteOnCloseReadCache()
+    {
+        var data = new byte[9 * 1024 * 1024];
+        new Random(42).NextBytes(data);
+        var version = await _sut.CreateVersionAsync(ShareA, "large.bin", ToStream(data));
+
+        var stream = await _sut.ReadVersionAsync(
+            ShareA, "large.bin", version!.SnapshotTimestampUtc);
+
+        Assert.True(stream.CanSeek);
+        Assert.IsType<FileStream>(stream);
+        var cacheDir = Path.Combine(_versionRoot, ".read-cache");
+        Assert.Single(Directory.GetFiles(cacheDir, "*.tmp"));
+
+        await stream.DisposeAsync();
+        Assert.Empty(Directory.GetFiles(cacheDir, "*.tmp"));
     }
 
     // ═══════════════════════════════════════════
@@ -440,6 +483,70 @@ public class FileVersionServiceTests : IDisposable
 
         var remaining = await highMaxService.GetVersionsAsync(ShareA, "doc.txt");
         Assert.True(remaining.Count <= 3);
+
+        var blobs = Directory.GetFiles(
+            Path.Combine(_versionRoot, "ret"), "*.bin.gz", SearchOption.AllDirectories);
+        Assert.Equal(3, blobs.Length);
+    }
+
+    [Fact]
+    public async Task DeletePathAsync_RemovesDirectoryHistoryAndUnreferencedBlobs()
+    {
+        await _sut.CreateVersionAsync(ShareA, "folder/a.txt", ToStream("A"));
+        _time.Advance(TimeSpan.FromSeconds(1));
+        await _sut.CreateVersionAsync(ShareA, "folder/nested/b.txt", ToStream("B"));
+        _time.Advance(TimeSpan.FromSeconds(1));
+        await _sut.CreateVersionAsync(ShareA, "keep.txt", ToStream("keep"));
+
+        var deleted = await _sut.DeletePathAsync(ShareA, "folder");
+
+        Assert.Equal(2, deleted);
+        Assert.Empty(await _sut.GetFolderSnapshotAsync(ShareA, "folder", DateTime.MaxValue));
+        Assert.Single(await _sut.GetVersionsAsync(ShareA, "keep.txt"));
+        Assert.Single(Directory.GetFiles(_versionRoot, "*.bin.gz", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task DeletePathAsync_KeepsBlobWhileAnotherVersionReferencesIt()
+    {
+        var a = await _sut.CreateVersionAsync(ShareA, "a.txt", ToStream("shared"));
+        _time.Advance(TimeSpan.FromSeconds(1));
+        await _sut.CreateVersionAsync(ShareA, "b.txt", ToStream("shared"));
+        var blob = Path.Combine(_versionRoot, a!.StoragePath);
+
+        await _sut.DeletePathAsync(ShareA, "a.txt");
+        Assert.True(File.Exists(blob));
+
+        await _sut.DeletePathAsync(ShareA, "b.txt");
+        Assert.False(File.Exists(blob));
+    }
+
+    [Fact]
+    public async Task RenamePathAsync_MovesCompleteDirectoryHistory()
+    {
+        await _sut.CreateVersionAsync(ShareA, "old/a.txt", ToStream("A"));
+        _time.Advance(TimeSpan.FromSeconds(1));
+        await _sut.CreateVersionAsync(ShareA, "old/nested/b.txt", ToStream("B"));
+
+        await _sut.RenamePathAsync(ShareA, "old", "new");
+
+        Assert.Empty(await _sut.GetFolderSnapshotAsync(ShareA, "old", DateTime.MaxValue));
+        Assert.Single(await _sut.GetVersionsAsync(ShareA, "new/a.txt"));
+        Assert.Single(await _sut.GetVersionsAsync(ShareA, "new/nested/b.txt"));
+    }
+
+    [Fact]
+    public async Task DeleteShareAsync_RemovesOnlyThatShareAndKeepsSharedBlobReferencedElsewhere()
+    {
+        var a = await _sut.CreateVersionAsync(ShareA, "doc.txt", ToStream("shared"));
+        _time.Advance(TimeSpan.FromSeconds(1));
+        await _sut.CreateVersionAsync(ShareB, "doc.txt", ToStream("shared"));
+        var blob = Path.Combine(_versionRoot, a!.StoragePath);
+
+        Assert.Equal(1, await _sut.DeleteShareAsync(ShareA));
+        Assert.Empty(await _sut.GetVersionsAsync(ShareA, "doc.txt"));
+        Assert.Single(await _sut.GetVersionsAsync(ShareB, "doc.txt"));
+        Assert.True(File.Exists(blob));
     }
 
     // ═══════════════════════════════════════════
@@ -559,28 +666,60 @@ public class MockFileVersionRepository : IFileVersionRepository
         return Task.FromResult(max ?? 0);
     }
 
-    public Task<int> DeleteOlderThanAsync(Guid shareId, string filePath, DateTime cutoff)
+    public Task<List<FileVersion>> DeleteOlderThanAsync(Guid shareId, string filePath, DateTime cutoff)
     {
         var toRemove = _versions
             .Where(v => v.ShareId == shareId && v.FilePath == filePath && v.SnapshotTimestampUtc < cutoff)
             .ToList();
         foreach (var v in toRemove) _versions.Remove(v);
-        return Task.FromResult(toRemove.Count);
+        return Task.FromResult(toRemove);
     }
 
-    public Task<int> TrimToMaxVersionsAsync(Guid shareId, string filePath, int maxCount)
+    public Task<List<FileVersion>> TrimToMaxVersionsAsync(Guid shareId, string filePath, int maxCount)
     {
         var ordered = _versions
             .Where(v => v.ShareId == shareId && v.FilePath == filePath)
             .OrderByDescending(v => v.SnapshotTimestampUtc)
             .ToList();
 
-        if (ordered.Count <= maxCount) return Task.FromResult(0);
+        if (ordered.Count <= maxCount) return Task.FromResult(new List<FileVersion>());
 
         var toRemove = ordered.Skip(maxCount).ToList();
         foreach (var v in toRemove) _versions.Remove(v);
-        return Task.FromResult(toRemove.Count);
+        return Task.FromResult(toRemove);
     }
+
+    public Task<List<FileVersion>> DeletePathAsync(Guid shareId, string path)
+    {
+        var prefix = path.Length == 0 ? "" : path + "/";
+        var removed = _versions.Where(v => v.ShareId == shareId
+            && (path.Length == 0 || v.FilePath == path || v.FilePath.StartsWith(prefix))).ToList();
+        foreach (var version in removed) _versions.Remove(version);
+        return Task.FromResult(removed);
+    }
+
+    public Task<List<FileVersion>> RenamePathAsync(Guid shareId, string oldPath, string newPath)
+    {
+        var oldPrefix = oldPath + "/";
+        var newPrefix = newPath + "/";
+        var source = _versions.Where(v => v.ShareId == shareId
+            && (v.FilePath == oldPath || v.FilePath.StartsWith(oldPrefix))).ToList();
+        var displaced = _versions.Where(v => v.ShareId == shareId
+            && (v.FilePath == newPath || v.FilePath.StartsWith(newPrefix))
+            && !source.Contains(v)).ToList();
+        foreach (var version in displaced) _versions.Remove(version);
+        foreach (var version in source)
+            version.FilePath = version.FilePath == oldPath
+                ? newPath
+                : newPath + version.FilePath.Substring(oldPath.Length);
+        return Task.FromResult(displaced);
+    }
+
+    public Task<List<FileVersion>> DeleteShareAsync(Guid shareId)
+        => DeletePathAsync(shareId, "");
+
+    public Task<bool> IsStoragePathReferencedAsync(string storagePath)
+        => Task.FromResult(_versions.Any(v => v.StoragePath == storagePath));
 
     public Task<bool> ExistsWithHashAsync(Guid shareId, string filePath, string contentHash)
     {

@@ -81,17 +81,9 @@ public class FileService : IFileService
             var oldAbs = _handle.AbsolutePath;
             var newAbs = _owner._storage.ToAbsolutePath(newRel);
             await _handle.MoveAsync(newAbs, newRel, replaceExisting, ct);
-
-            // Keep the ACL records aligned with the new path.
-            await _owner._acl.RenameAclPathAsync(_owner._shareId, oldRel, newRel);
-
-            // Keep the search index aligned with the new path.
-            if (isDir)
-                _owner.onDirectoryRenamed(oldAbs, newAbs);
-            else
-                _owner.onFileRenamed(oldAbs, newAbs);
-
             RelativePath = newRel;
+            await _owner.ApplyRenameSideEffectsAsync(
+                oldRel, newRel, isDir, oldAbs, newAbs, bestEffort: false);
         }
 
         public async ValueTask DisposeAsync()
@@ -133,19 +125,19 @@ public class FileService : IFileService
             {
                 if (deleting)
                 {
-                    if (isDir) _owner.onDirectoryDeleted(abs);
-                    else _owner.onFileDeleted(abs);
+                    await _owner.ApplyDeleteSideEffectsAsync(
+                        rel, isDir, abs, bestEffort: true);
                 }
                 else if (_isNewFile && isDir)
                 {
-                    _owner.onDirectoryCreated(abs);
+                    await _owner.onDirectoryCreated(abs);
                 }
                 else if (isDirty && !isDir)
                 {
                     // Re-open through storage for search indexing — closed stream
                     // means no race with the SMB session. The Task<Stream> contract
                     // your search hook expects is preserved.
-                    _owner.OnFileCreated(abs, _owner._storage.ReadAsync(rel));
+                    await _owner.OnFileCreated(abs, _owner._storage.ReadAsync(rel));
                 }
             }
             catch (Exception ex)
@@ -247,25 +239,87 @@ public class FileService : IFileService
         }
     }
 
+    private async Task ApplyDeleteSideEffectsAsync(
+        string relativePath, bool isDirectory, string absolutePath, bool bestEffort)
+    {
+        var failures = new List<Exception>();
 
-    public void OnFileCreated(string absolutePath, Task<Stream> fileData)
-    {
-        _searchService?.onFileCreated(absolutePath, fileData);
-    }
-    
-    public void onDirectoryCreated(string absolutePath)
-    {
-        _searchService?.onDirectoryCreated(absolutePath);
+        try { await _acl.DeleteAclAsync(_shareId, relativePath); }
+        catch (Exception ex) { failures.Add(ex); }
+
+        if (_versionService != null)
+        {
+            try { await _versionService.DeletePathAsync(_shareId, relativePath); }
+            catch (Exception ex) { failures.Add(ex); }
+        }
+
+        if (_searchService != null)
+        {
+            try
+            {
+                if (isDirectory) await _searchService.onDirectoryDeleted(absolutePath);
+                else await _searchService.onFileDeleted(absolutePath);
+            }
+            catch (Exception ex) { failures.Add(ex); }
+        }
+
+        if (failures.Count == 0) return;
+        var aggregate = new AggregateException(
+            $"One or more delete side effects failed for '{relativePath}'.", failures);
+        if (!bestEffort) throw aggregate;
+        _logger.LogWarning(aggregate, "Delete lifecycle cleanup failed for {Path}", relativePath);
     }
 
-    public void onFileDeleted(string absolutePath)
+    private async Task ApplyRenameSideEffectsAsync(
+        string oldRelativePath, string newRelativePath, bool isDirectory,
+        string oldAbsolutePath, string newAbsolutePath, bool bestEffort)
     {
-        _searchService?.onFileDeleted(absolutePath);
+        var failures = new List<Exception>();
+
+        try { await _acl.RenameAclPathAsync(_shareId, oldRelativePath, newRelativePath); }
+        catch (Exception ex) { failures.Add(ex); }
+
+        if (_versionService != null)
+        {
+            try { await _versionService.RenamePathAsync(_shareId, oldRelativePath, newRelativePath); }
+            catch (Exception ex) { failures.Add(ex); }
+        }
+
+        if (_searchService != null)
+        {
+            try
+            {
+                if (isDirectory) await _searchService.onDirectoryRenamed(oldAbsolutePath, newAbsolutePath);
+                else await _searchService.onFileRenamed(oldAbsolutePath, newAbsolutePath);
+            }
+            catch (Exception ex) { failures.Add(ex); }
+        }
+
+        if (failures.Count == 0) return;
+        var aggregate = new AggregateException(
+            $"One or more rename side effects failed for '{oldRelativePath}' -> '{newRelativePath}'.",
+            failures);
+        if (!bestEffort) throw aggregate;
+        _logger.LogWarning(aggregate, "Rename lifecycle cleanup failed for {OldPath} -> {NewPath}",
+            oldRelativePath, newRelativePath);
     }
+
+
+    public Task OnFileCreated(string absolutePath, Task<Stream> fileData)
+        => _searchService?.onFileCreated(absolutePath, fileData) ?? DrainStreamAsync(fileData);
+
+    public Task onDirectoryCreated(string absolutePath)
+        => _searchService?.onDirectoryCreated(absolutePath) ?? Task.CompletedTask;
+
+    public Task onFileDeleted(string absolutePath)
+        => _searchService?.onFileDeleted(absolutePath) ?? Task.CompletedTask;
     
-    public void onDirectoryDeleted(string absolutePath)
+    public Task onDirectoryDeleted(string absolutePath)
+        => _searchService?.onDirectoryDeleted(absolutePath) ?? Task.CompletedTask;
+
+    private static async Task DrainStreamAsync(Task<Stream> streamTask)
     {
-        _searchService?.onDirectoryDeleted(absolutePath);
+        await using var stream = await streamTask;
     }
 
     public void onFileRenamed(string oldAbsolutePath, string newAbsolutePath)
@@ -332,13 +386,7 @@ public class FileService : IFileService
     {
         var rel = ShareRelativePath.Normalize(path);
         var abs = _storage.ToAbsolutePath(rel);
-        if (_searchService == null) return;
-        try
-        {
-            if (isDirectory) await _searchService.onDirectoryDeleted(abs);
-            else await _searchService.onFileDeleted(abs);
-        }
-        catch (Exception ex) { _logger.LogWarning(LogEvents.FileSearchHookFailed, ex, LogMessages.FileSearchHookFailed, rel); }
+        await ApplyDeleteSideEffectsAsync(rel, isDirectory, abs, bestEffort: true);
     }
 
     public async Task NotifyExternalRenameAsync(string oldPath, string newPath, bool isDirectory)
@@ -348,19 +396,8 @@ public class FileService : IFileService
         var oldAbs = _storage.ToAbsolutePath(oldRel);
         var newAbs = _storage.ToAbsolutePath(newRel);
 
-        // Keep ACL records aligned with the new path (mirrors FileSession.RenameAsync).
-        try { await _acl.RenameAclPathAsync(_shareId, oldRel, newRel); }
-        catch (Exception ex) { _logger.LogWarning(LogEvents.FileSearchHookFailed, ex, LogMessages.FileSearchHookFailed, newRel); }
-
-        if (_searchService != null)
-        {
-            try
-            {
-                if (isDirectory) await _searchService.onDirectoryRenamed(oldAbs, newAbs);
-                else await _searchService.onFileRenamed(oldAbs, newAbs);
-            }
-            catch (Exception ex) { _logger.LogWarning(LogEvents.FileSearchHookFailed, ex, LogMessages.FileSearchHookFailed, newRel); }
-        }
+        await ApplyRenameSideEffectsAsync(
+            oldRel, newRel, isDirectory, oldAbs, newAbs, bestEffort: true);
     }
 
     // ------------------ ACL helpers ------------------
@@ -514,7 +551,7 @@ public class FileService : IFileService
             }
         }
 
-        OnFileCreated(ToAbsolutePath(path), _storage.ReadAsync(normalized));
+        await OnFileCreated(ToAbsolutePath(path), _storage.ReadAsync(normalized));
     }
 
     public string ToAbsolutePath(string path)
@@ -581,7 +618,7 @@ public class FileService : IFileService
         var normalized = ShareRelativePath.Normalize(path);
         await _storage.CreateDirectory(normalized);
         await RecordOwnerAsync(normalized, isDirectory: true, user);
-        onDirectoryCreated(ToAbsolutePath(path));
+        await onDirectoryCreated(ToAbsolutePath(path));
     }
 
     public async Task DeleteFileAsync(string path, UserContext user, bool isRecycleEnabled)
@@ -594,12 +631,7 @@ public class FileService : IFileService
         var isAlreadyInRecycleBin = normalized.StartsWith(
             RecycleBinFolder, StringComparison.OrdinalIgnoreCase);
 
-        var absolutePath = ToAbsolutePath(path);
-        
-        if(isDir)
-            onDirectoryDeleted(absolutePath);
-        else
-            onFileDeleted(absolutePath);
+        var absolutePath = ToAbsolutePath(normalized);
         
         if (isRecycleEnabled && !isAlreadyInRecycleBin)
         {
@@ -607,12 +639,15 @@ public class FileService : IFileService
             // MoveAsync may append a timestamp suffix on a name collision in the
             // recycle bin — align the ACL with the path that actually landed on disk.
             var actualRecyclePath = await _storage.MoveAsync(normalized, recyclePath);
-            await _acl.RenameAclPathAsync(_shareId, normalized, actualRecyclePath);
+            await ApplyRenameSideEffectsAsync(
+                normalized, actualRecyclePath, isDir,
+                absolutePath, ToAbsolutePath(actualRecyclePath), bestEffort: false);
         }
         else
         {
             await _storage.DeleteAsync(normalized);
-            await _acl.DeleteAclAsync(_shareId, normalized);
+            await ApplyDeleteSideEffectsAsync(
+                normalized, isDir, absolutePath, bestEffort: false);
         }
     }
 
@@ -644,15 +679,14 @@ public class FileService : IFileService
         if (isDir)
         {
             await _storage.RenameDirectoryAsync(oldNormalized, newNormalized);
-            await _acl.RenameAclPathAsync(_shareId, oldNormalized, newNormalized);
-            onDirectoryRenamed(oldAbs, newAbs);
         }
         else
         {
             await _storage.RenameFileAsync(oldNormalized, newNormalized);
-            await _acl.RenameAclPathAsync(_shareId, oldNormalized, newNormalized);
-            onFileRenamed(oldAbs, newAbs);
         }
+
+        await ApplyRenameSideEffectsAsync(
+            oldNormalized, newNormalized, isDir, oldAbs, newAbs, bestEffort: false);
     }
 
     public async Task<long> GetDirectorySizeAsync(string relativePath, UserContext user)
@@ -803,7 +837,7 @@ public class FileService : IFileService
         await using var restored = await _versionService.ReadVersionAsync(_shareId, normalized, snapshotTimestampUtc);
         await _storage.WriteAsync(normalized, restored);
 
-        OnFileCreated(ToAbsolutePath(normalized), _storage.ReadAsync(normalized));
+        await OnFileCreated(ToAbsolutePath(normalized), _storage.ReadAsync(normalized));
     }
 
     public async Task<List<DateTime>> GetFolderSnapshotTimestampsAsync(

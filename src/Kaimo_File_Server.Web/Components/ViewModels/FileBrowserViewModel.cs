@@ -559,13 +559,12 @@ private async Task<OperationResult> MoveInternalAsync(
             relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
 
         await using var stream = await _fileService.ReadFileAsync(relativePath, userContext);
-        using var ms = new MemoryStream();
-        await stream.CopyToAsync(ms);
+        var data = await ReadAllBytesAsync(stream);
 
         var contentType = FileHelper.GetContentType(file.Name);
         var kind = FileHelper.GetPreviewKind(file.Name);
 
-        return (ms.ToArray(), contentType, kind);
+        return (data, contentType, kind);
     }
 
     /// <summary>Maximum file size that can be previewed inline; larger files download instead.</summary>
@@ -655,10 +654,9 @@ private async Task<OperationResult> MoveInternalAsync(
         {
             await using var stream = await _fileService.ReadFileVersionAsync(
                 shareRelativePath, snapshotTimestampUtc, userContext);
-            using var ms = new MemoryStream();
-            await stream.CopyToAsync(ms);
+            var data = await ReadAllBytesAsync(stream);
 
-            return (ms.ToArray(), FileHelper.GetContentType(fileName), FileHelper.GetPreviewKind(fileName));
+            return (data, FileHelper.GetContentType(fileName), FileHelper.GetPreviewKind(fileName));
         }
         catch (Exception ex)
         {
@@ -679,15 +677,24 @@ private async Task<OperationResult> MoveInternalAsync(
         {
             await using var stream = await _fileService.ReadFileVersionAsync(
                 shareRelativePath, snapshotTimestampUtc, userContext);
-            using var ms = new MemoryStream();
-            await stream.CopyToAsync(ms);
-            return ms.ToArray();
+            return await ReadAllBytesAsync(stream);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to read version bytes {Ts} of {Path}", snapshotTimestampUtc, shareRelativePath);
             return null;
         }
+    }
+
+    private static async Task<byte[]> ReadAllBytesAsync(Stream stream)
+    {
+        if (stream.Length > int.MaxValue)
+            throw new IOException("The file is too large to return as a single byte array.");
+
+        var data = GC.AllocateUninitializedArray<byte>((int)stream.Length);
+        stream.Position = 0;
+        await stream.ReadExactlyAsync(data);
+        return data;
     }
 
     /// <summary>

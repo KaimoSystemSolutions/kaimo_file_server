@@ -62,6 +62,11 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
             var share = await db.ShareDefinitions.FindAsync(id);
             if (share != null)
             {
+                var shareAssignments = await db.ScopedRoleAssignments
+                    .Where(a => a.ScopeType == Kaimo_File_Server.Core.Security.ScopeType.Share
+                                && a.ScopeId == id)
+                    .ToListAsync();
+                db.ScopedRoleAssignments.RemoveRange(shareAssignments);
                 db.ShareDefinitions.Remove(share);
                 await db.SaveChangesAsync();
             }

@@ -99,19 +99,14 @@ public class AclService : IAclService
     {
         await using var scope = _serviceProvider.CreateAsyncScope();
         var aclRepo = scope.ServiceProvider.GetRequiredService<IAclRepository>();
+        await aclRepo.DeleteFileMetadataPathsAsync(shareId, relativePath);
+    }
 
-        var aclEntries = await aclRepo.GetAclsForPathsAsync(
-            shareId, new List<string> { relativePath });
-
-        var entryIds = aclEntries
-            .SelectMany(e => e.Acl.Select(a => a.Id))
-            .Distinct()
-            .ToList();
-
-        foreach (var entryGuid in entryIds)
-        {
-            await aclRepo.DeleteAsync(entryGuid);
-        }
+    public async Task DeleteShareMetadataAsync(Guid shareId)
+    {
+        await using var scope = _serviceProvider.CreateAsyncScope();
+        var aclRepo = scope.ServiceProvider.GetRequiredService<IAclRepository>();
+        await aclRepo.DeleteShareFileMetadataAsync(shareId);
     }
 
     // ══════════════════════════════════════════

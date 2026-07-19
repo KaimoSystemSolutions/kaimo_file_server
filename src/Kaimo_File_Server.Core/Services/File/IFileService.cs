@@ -38,13 +38,13 @@ namespace Kaimo_File_Server.Core.Services.File
         
         // ------------ Hooks ------------
 
-        void OnFileCreated(string absolutePath, Task<Stream> fileData);
+        Task OnFileCreated(string absolutePath, Task<Stream> fileData);
         
-        void onDirectoryCreated(string absolutePath);
+        Task onDirectoryCreated(string absolutePath);
 
-        void onFileDeleted(string absolutePath);
+        Task onFileDeleted(string absolutePath);
 
-        void onDirectoryDeleted(string absolutePath);
+        Task onDirectoryDeleted(string absolutePath);
 
         // ---- External-writer close hooks (Samba VFS direct I/O) ----
         // Samba performs the raw I/O natively, then calls these so the same
@@ -99,7 +99,8 @@ namespace Kaimo_File_Server.Core.Services.File
 
         /// <summary>
         /// Reads the content of a specific version of a file. Requires read access.
-        /// The returned stream is fully buffered and seekable.
+        /// The returned stream is seekable; large versions may be backed by a
+        /// delete-on-close temporary file instead of managed memory.
         /// </summary>
         Task<Stream> ReadFileVersionAsync(string path, DateTime snapshotTimestampUtc, UserContext user);
 
