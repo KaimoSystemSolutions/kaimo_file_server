@@ -6,7 +6,8 @@
 // Protocol (one request per connection, tab-separated, with \n):
 //   Authz (response ALLOW|DENY|ERROR):
 //     "CONNECT\t<user>\t<share>"
-//     "OPEN\t<user>\t<share>\t<flags>\t<path>"          flags: r/w/c
+//     "OPEN\t<user>\t<share>\t<flags>\t<path>"          flags: r/w/c/d
+//     "DELETEAUTH\t<user>\t<share>\t<isdir 0|1>\t<path>"
 //   Events (fire-and-forget, response OK):
 //     "CLOSE\t<user>\t<share>\t<path>"                   file written and closed
 //     "MKDIR\t<user>\t<share>\t<path>"                   directory created
@@ -88,11 +89,23 @@ static const char* do_open(const std::string& user, const std::string& share,
     req.set_want_read(flags.find('r') != std::string::npos);
     req.set_want_write(flags.find('w') != std::string::npos);
     req.set_wants_create(flags.find('c') != std::string::npos);
+    req.set_want_delete(flags.find('d') != std::string::npos);
     grpc::ClientContext ctx; ctx.set_deadline(deadline(5));
     AuthorizeReply reply;
     grpc::Status st = g_authz->AuthorizeOpen(&ctx, req, &reply);
     if (!st.ok()) { std::cerr << "kaimo_authd: AuthorizeOpen: " << st.error_message() << std::endl; return "ERROR"; }
     cache_put(cache_key, reply.allow());
+    return reply.allow() ? "ALLOW" : "DENY";
+}
+
+static const char* do_delete(const std::string& user, const std::string& share,
+                             bool isdir, const std::string& path) {
+    AuthorizeDeleteRequest req;
+    req.set_username(user); req.set_share(share); req.set_path(path); req.set_is_directory(isdir);
+    grpc::ClientContext ctx; ctx.set_deadline(deadline(5));
+    AuthorizeReply reply;
+    grpc::Status st = g_authz->AuthorizeDelete(&ctx, req, &reply);
+    if (!st.ok()) { std::cerr << "kaimo_authd: AuthorizeDelete: " << st.error_message() << std::endl; return "ERROR"; }
     return reply.allow() ? "ALLOW" : "DENY";
 }
 
@@ -183,6 +196,9 @@ static void handle_client(int cfd) {
     } else if (line.rfind("OPEN\t", 0) == 0) {
         auto p = split_tabs(line, 5);
         if (p.size() == 5) out = std::string(do_open(p[1], p[2], p[3], p[4], line)) + "\n";
+    } else if (line.rfind("DELETEAUTH\t", 0) == 0) {
+        auto p = split_tabs(line, 5);
+        if (p.size() == 5) out = std::string(do_delete(p[1], p[2], p[3] == "1", p[4])) + "\n";
     } else if (line.rfind("CLOSE\t", 0) == 0) {
         auto p = split_tabs(line, 4);
         if (p.size() == 4) { ev_close(p[1], p[2], p[3]); out = "OK\n"; }

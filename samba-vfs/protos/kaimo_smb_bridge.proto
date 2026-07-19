@@ -50,6 +50,10 @@ service AuthzService {
   // write -> CreateWriteData, read -> ListReadData, create -> Parent-Check.
   // Used by the create_file hook (Open) and readdir filter (read-only).
   rpc AuthorizeOpen(AuthorizeOpenRequest) returns (AuthorizeReply);
+
+  // unlinkat/rmdir authorization. Deleting an item requires Delete on the
+  // target or DeleteSubItems on its parent directory.
+  rpc AuthorizeDelete(AuthorizeDeleteRequest) returns (AuthorizeReply);
 }
 
 message AuthorizeConnectRequest {
@@ -69,6 +73,14 @@ message AuthorizeOpenRequest {
   bool   want_read    = 4; // FILE_READ_DATA requested
   bool   want_write   = 5; // FILE_WRITE_DATA / FILE_APPEND_DATA requested
   bool   wants_create = 6; // create disposition creates new file
+  bool   want_delete  = 7; // DELETE requested on an existing item
+}
+
+message AuthorizeDeleteRequest {
+  string username     = 1;
+  string share        = 2;
+  string path         = 3; // share-relative, forward slashes
+  bool   is_directory = 4;
 }
 
 // Close/Event hooks (Phase 3). Samba performs I/O natively and reports the event

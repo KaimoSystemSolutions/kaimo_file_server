@@ -1,4 +1,5 @@
 using Grpc.Core;
+using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
@@ -127,6 +128,16 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
                 allow = false;
                 reason = "read denied: ListReadData";
             }
+
+            if (allow && request.WantDelete)
+            {
+                var deleteDecision = await CanDeleteAsync(user, share.Id, normalized, isDir);
+                if (!deleteDecision.Allowed)
+                {
+                    allow = false;
+                    reason = deleteDecision.Reason;
+                }
+            }
         }
 
         // ALLOW stays at debug (otherwise the readdir filter floods the log); every
@@ -135,16 +146,70 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         // the ACL allowed it → the rejection is filesystem-side.
         if (allow)
             _logger.LogDebug(
-                "AuthorizeOpen ALLOW: user={User} share={Share} path=[{Path}] r={R} w={W} c={C}",
+                "AuthorizeOpen ALLOW: user={User} share={Share} path=[{Path}] r={R} w={W} c={C} d={D}",
                 request.Username, request.Share, request.Path,
-                request.WantRead, request.WantWrite, request.WantsCreate);
+                request.WantRead, request.WantWrite, request.WantsCreate, request.WantDelete);
         else
             _logger.LogInformation(
-                "AuthorizeOpen DENY: user={User} share={Share} path=[{Path}] r={R} w={W} c={C} — {Reason}",
+                "AuthorizeOpen DENY: user={User} share={Share} path=[{Path}] r={R} w={W} c={C} d={D} — {Reason}",
                 request.Username, request.Share, request.Path,
-                request.WantRead, request.WantWrite, request.WantsCreate, reason);
+                request.WantRead, request.WantWrite, request.WantsCreate, request.WantDelete, reason);
 
         return new AuthorizeReply { Allow = allow, Reason = allow ? "" : reason };
+    }
+
+    /// <summary>
+    /// Authorizes the destructive unlink/rmdir operation before Samba touches the
+    /// filesystem. Windows permits deletion through either Delete on the target or
+    /// DeleteSubItems on the containing directory; Kaimo mirrors those semantics.
+    /// </summary>
+    public override async Task<AuthorizeReply> AuthorizeDelete(
+        AuthorizeDeleteRequest request, ServerCallContext context)
+    {
+        var user = await _auth.ResolveUserContextAsync(request.Username);
+        if (user is null)
+            return Deny($"unknown user '{request.Username}'");
+
+        var share = await _shares.GetByNameAsync(request.Share);
+        if (share is null)
+            return Deny($"unknown share '{request.Share}'");
+
+        string normalized = ShareRelativePath.Normalize(request.Path);
+        if (string.IsNullOrEmpty(normalized) || !ShareRelativePath.IsValid(request.Path))
+            return Deny($"invalid delete path '{request.Path}'");
+
+        var decision = await CanDeleteAsync(
+            user, share.Id, normalized, request.IsDirectory);
+        bool allow = decision.Allowed;
+        string reason = decision.Reason;
+
+        if (allow)
+            _logger.LogDebug(
+                "AuthorizeDelete ALLOW: user={User} share={Share} path=[{Path}] dir={Dir} via={Source}",
+                request.Username, request.Share, normalized, request.IsDirectory,
+                decision.Source);
+        else
+            _logger.LogInformation(
+                "AuthorizeDelete DENY: user={User} share={Share} path=[{Path}] dir={Dir} — {Reason}",
+                request.Username, request.Share, normalized, request.IsDirectory, reason);
+
+        return new AuthorizeReply { Allow = allow, Reason = reason };
+    }
+
+    private async Task<(bool Allowed, string Source, string Reason)> CanDeleteAsync(
+        UserContext user, Guid shareId, string normalized, bool isDirectory)
+    {
+        if (await _acl.HasAccessAsync(
+                user, shareId, normalized, isDirectory, FilePermission.Delete))
+            return (true, "Delete", "");
+
+        string parent = ShareRelativePath.GetParent(normalized);
+        if (await _acl.HasAccessAsync(
+                user, shareId, parent, true, FilePermission.DeleteSubItems))
+            return (true, "DeleteSubItems", "");
+
+        return (false, "none",
+            $"delete denied: target '{normalized}' lacks Delete and parent '{parent}' lacks DeleteSubItems");
     }
 
     private AuthorizeReply Deny(string reason)

@@ -108,13 +108,15 @@ static bool kaimo_authz_connect(const char *service, const char *user)
 }
 
 static bool kaimo_authz_open(const char *user, const char *share, const char *path,
-			     bool want_read, bool want_write, bool wants_create)
+			     bool want_read, bool want_write, bool wants_create,
+			     bool want_delete)
 {
-	char flags[4];
+	char flags[5];
 	int fi = 0;
 	if (want_read)    flags[fi++] = 'r';
 	if (want_write)   flags[fi++] = 'w';
 	if (wants_create) flags[fi++] = 'c';
+	if (want_delete)  flags[fi++] = 'd';
 	flags[fi] = '\0';
 
 	char req[5120];
@@ -124,6 +126,24 @@ static bool kaimo_authz_open(const char *user, const char *share, const char *pa
 
 	int d = kaimo_authz_send(req, (size_t)n);
 	if (d < 0) return kaimo_failmode_allow();
+	return d == 1;
+}
+
+static bool kaimo_authz_delete(const char *user, const char *share,
+			       const char *path, bool is_directory)
+{
+	char req[5120];
+	int n = snprintf(req, sizeof(req), "DELETEAUTH\t%s\t%s\t%d\t%s\n",
+			 user ? user : "", share ? share : "",
+			 is_directory ? 1 : 0, path ? path : "");
+	if (n <= 0 || n >= (int)sizeof(req)) return kaimo_failmode_allow();
+
+	int d = kaimo_authz_send(req, (size_t)n);
+	if (d < 0) {
+		DBG_WARNING("kaimo_bridge: authd unreachable (delete), fail-%s\n",
+			    kaimo_failmode_allow() ? "open" : "closed");
+		return kaimo_failmode_allow();
+	}
 	return d == 1;
 }
 
@@ -473,9 +493,10 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 			 create_disposition == FILE_CREATE ||
 			 create_disposition == FILE_OPEN_IF ||
 			 create_disposition == FILE_OVERWRITE_IF);
+		bool want_delete = (access_mask & SEC_STD_DELETE) != 0;
 
 		if (!kaimo_authz_open(ctx->user, ctx->share, smb_fname->base_name,
-				      want_read, want_write, wants_create)) {
+				      want_read, want_write, wants_create, want_delete)) {
 			DBG_ERR("kaimo_bridge: CREATE DENIED path=[%s] user=[%s]\n",
 				smb_fname->base_name, ctx->user);
 			return NT_STATUS_ACCESS_DENIED;
@@ -543,7 +564,7 @@ static struct dirent *kaimo_readdir(vfs_handle_struct *handle,
 		else
 			snprintf(path, sizeof(path), "%s/%s", dirpath, nm);
 
-		if (kaimo_authz_open(ctx->user, ctx->share, path, true, false, false))
+		if (kaimo_authz_open(ctx->user, ctx->share, path, true, false, false, false))
 			return e; /* readable -> show */
 
 		DBG_INFO("kaimo_bridge: LIST hide [%s] user=[%s]\n", path, ctx->user);
@@ -585,13 +606,23 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 	char path[4096];
 	kaimo_join_path(path, sizeof(path), srcdir_fsp, smb_fname);
 	bool isdir = (flags & AT_REMOVEDIR) != 0;
+	const char *logical = kaimo_share_rel(handle, path);
+
+	/* Authorization must happen before the native unlink/rmdir. The DELETE event
+	 * below is only post-operation bookkeeping and cannot protect the data path. */
+	if (ctx == NULL || !kaimo_authz_delete(ctx->user, ctx->share, logical, isdir)) {
+		DBG_ERR("kaimo_bridge: DELETE DENIED path=[%s] user=[%s]\n",
+			logical, ctx != NULL ? ctx->user : "");
+		errno = EACCES;
+		return -1;
+	}
 
 	int ret = SMB_VFS_NEXT_UNLINKAT(handle, srcdir_fsp, smb_fname, flags);
 
 	if (ret == 0 && ctx != NULL && path[0] != '\0') {
 		char req[5120];
 		int n = snprintf(req, sizeof(req), "DELETE\t%s\t%s\t%d\t%s\n",
-				 ctx->user, ctx->share, isdir ? 1 : 0, path);
+				 ctx->user, ctx->share, isdir ? 1 : 0, logical);
 		if (n > 0 && n < (int)sizeof(req))
 			kaimo_notify_send(req, (size_t)n);
 	}
@@ -743,7 +774,7 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 /* Build marker: bump on every module change so the running image can be
  * identified in the logs (grep "kaimo_bridge build"). This is how we tell whether
  * a rebuild actually picked up the latest source vs. served a cached layer. */
-#define KAIMO_BRIDGE_BUILD "2026-07-19f snapshots verified; logging quieted"
+#define KAIMO_BRIDGE_BUILD "2026-07-19g authorize delete before unlink"
 
 static_decl_vfs;
 NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)

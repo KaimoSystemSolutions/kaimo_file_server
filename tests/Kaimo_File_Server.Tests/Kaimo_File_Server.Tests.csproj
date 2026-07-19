@@ -22,6 +22,7 @@
          patched SQLite native library and is API-compatible with EF Core's provider. -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.9" />
+    <PackageReference Include="Grpc.Core.Api" Version="2.71.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,6 +30,7 @@
     <ProjectReference Include="..\..\src\Kaimo_File_Server.Core\Kaimo_File_Server.Core.csproj" />
 	<ProjectReference Include="..\..\src\Kaimo_File_Server.Infrastructure\Kaimo_File_Server.Infrastructure.csproj" />
 	<ProjectReference Include="..\..\src\Kaimo_File_Server.Web\Kaimo_File_Server.Web.csproj" />
+	<ProjectReference Include="..\..\src\Kaimo_File_Server.SmbBridge\Kaimo_File_Server.SmbBridge.csproj" />
   </ItemGroup>
 
 </Project>
