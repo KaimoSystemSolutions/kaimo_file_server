@@ -110,6 +110,9 @@ public partial class FileBrowser
 
                     if (!result.Success)
                         failedFiles.Add(file.Name);
+                    
+                    StateHasChanged();
+                    await VM.LoadShareAsync(ShareName, SubPath ?? "");
                 }
             }
             catch (OperationCanceledException)

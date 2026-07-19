@@ -128,6 +128,7 @@ public class FileBrowserViewModel
             {
                 result.Add((parts[i], string.Join('/', parts[..(i + 1)])));
             }
+
             return result;
         }
     }
@@ -187,7 +188,7 @@ public class FileBrowserViewModel
             // Hidden shares stay reachable here: ACL enforcement happens in ListAsync.
             if (!CurrentShare.IsEnabled
                 && !await _mgmtAuth.CanManageShareAsync(
-                        userContext, CurrentShare.Id, ManagementPermission.EditShareSettings))
+                    userContext, CurrentShare.Id, ManagementPermission.EditShareSettings))
             {
                 ErrorMessage = Resources.Web_Error_ShareDisabled;
                 Items = [];
@@ -221,6 +222,12 @@ public class FileBrowserViewModel
         }
     }
 
+
+    public async Task CreateFolderAtAsync(string path)
+    {
+        await _fileService.CreateDirectoryAsync(path, await GetCurrentUserContextAsync());
+    }
+
     /// <summary>Create a new sub-folder inside the current directory.</summary>
     public async Task<OperationResult> CreateFolderAsync(string folderName)
     {
@@ -243,11 +250,8 @@ public class FileBrowserViewModel
             if (userContext is null)
                 return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
 
-            var targetPath = string.IsNullOrEmpty(CurrentPath)
-                ? folderName
-                : $"{CurrentPath}/{folderName}/";
+            var targetPath = GetCurrentPath(folderName);
 
-            
             await _fileService.CreateDirectoryAsync(targetPath, userContext);
 
             _logger.LogInformation("Folder created: '{Path}' by {User}",
@@ -286,7 +290,7 @@ public class FileBrowserViewModel
             var relativePath = item.Path;
             if (relativePath.StartsWith(CurrentShare.Path))
                 relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
-            
+
             await _fileService.DeleteFileAsync(relativePath, userContext, CurrentShare.IsRecycleEnabled);
 
             _logger.LogInformation("{Type} deleted: '{Path}' by {User}",
@@ -309,95 +313,116 @@ public class FileBrowserViewModel
             return OperationResult.Fail(Resources.Web_Error_DeleteFailed);
         }
     }
-public async Task<OperationResult> RenameAsync(FileMetadata item, string newName)
-{
-    if (string.IsNullOrWhiteSpace(newName))
-        return OperationResult.Fail(Resources.Web_Rename_NameRequired);
 
-    if (!WindowsFileNameHelper.IsValid(newName))
+    public async Task<OperationResult> RenameAsync(FileMetadata item, string newName)
     {
-        var errors = WindowsFileNameHelper.GetValidationErrors(newName);
-        return OperationResult.Fail(
-            Resources.Web_Name_InvalidChars + string.Join(", ", errors));
+        if (string.IsNullOrWhiteSpace(newName))
+            return OperationResult.Fail(Resources.Web_Rename_NameRequired);
+
+        if (!WindowsFileNameHelper.IsValid(newName))
+        {
+            var errors = WindowsFileNameHelper.GetValidationErrors(newName);
+            return OperationResult.Fail(
+                Resources.Web_Name_InvalidChars + string.Join(", ", errors));
+        }
+
+        if (CurrentShare is null)
+            return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
+
+        var relativePath = item.Path;
+        if (relativePath.StartsWith(CurrentShare.Path))
+            relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
+
+        var parentDir = Kaimo_File_Server.Core.Helpers.ShareRelativePath.GetParent(relativePath);
+        var newRelativePath = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Combine(parentDir, newName);
+
+        return await MoveInternalAsync(item, relativePath, newRelativePath, "renamed");
     }
 
-    if (CurrentShare is null)
-        return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
+    /// <summary>
+    /// Moves an item into a different directory within the same share, keeping its name.
+    /// </summary>
+    /// <param name="item">The item to move.</param>
+    /// <param name="destRelativePath">Share-relative path of the destination directory ("" = share root).</param>
+    public async Task<OperationResult> MoveAsync(FileMetadata item, string destRelativePath)
+    {
+        if (CurrentShare is null)
+            return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
 
-    var relativePath = item.Path;
-    if (relativePath.StartsWith(CurrentShare.Path))
-        relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
+        var relativePath = item.Path;
+        if (relativePath.StartsWith(CurrentShare.Path))
+            relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
 
-    var parentDir = Kaimo_File_Server.Core.Helpers.ShareRelativePath.GetParent(relativePath);
-    var newRelativePath = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Combine(parentDir, newName);
+        var newRelativePath = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Combine(destRelativePath, item.Name);
 
-    return await MoveInternalAsync(item, relativePath, newRelativePath, "renamed");
-}
+        // No-op: dropped onto the folder it's already in
+        var currentParent = Kaimo_File_Server.Core.Helpers.ShareRelativePath.GetParent(relativePath);
+        if (string.Equals(currentParent, destRelativePath.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
+            return OperationResult.Ok();
 
-/// <summary>
-/// Moves an item into a different directory within the same share, keeping its name.
-/// </summary>
-/// <param name="item">The item to move.</param>
-/// <param name="destRelativePath">Share-relative path of the destination directory ("" = share root).</param>
-public async Task<OperationResult> MoveAsync(FileMetadata item, string destRelativePath)
-{
-    if (CurrentShare is null)
-        return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
+        return await MoveInternalAsync(item, relativePath, newRelativePath, "moved");
+    }
 
-    var relativePath = item.Path;
-    if (relativePath.StartsWith(CurrentShare.Path))
-        relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
-
-    var newRelativePath = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Combine(destRelativePath, item.Name);
-
-    // No-op: dropped onto the folder it's already in
-    var currentParent = Kaimo_File_Server.Core.Helpers.ShareRelativePath.GetParent(relativePath);
-    if (string.Equals(currentParent, destRelativePath.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
-        return OperationResult.Ok();
-
-    return await MoveInternalAsync(item, relativePath, newRelativePath, "moved");
-}
-
-/// <summary>
-/// Shared implementation for Rename and Move: both are just "relocate item from
-/// one share-relative path to another" as far as the file service is concerned.
-/// </summary>
-private async Task<OperationResult> MoveInternalAsync(
-    FileMetadata item, string relativePath, string newRelativePath, string logVerb)
-{
-    if (_fileService is null)
-        return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
-
-    try
+    public async Task<List<FileMetadata>> ListDirectoryAsync(string dirPath)
     {
         var userContext = await GetCurrentUserContextAsync();
-        if (userContext is null)
-            return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
-
-        await _fileService.RenameAsync(relativePath, newRelativePath, userContext);
-
-        _logger.LogInformation("{Type} {Verb}: '{OldPath}' -> '{NewPath}' by {User}",
-            item.IsDirectory ? "Directory" : "File",
-            logVerb, relativePath, newRelativePath, userContext.User.Username);
-
-        return OperationResult.Ok();
+        return await _fileService.ListAsync(dirPath, userContext);
     }
-    catch (UnauthorizedAccessException)
+    
+    public async Task CopyAsync(FileMetadata item, string targetPath, CancellationToken cancellationToken)
     {
-        return OperationResult.Fail(Resources.Web_Error_AccessDenied);
+        var userContext = await GetCurrentUserContextAsync();
+        Stream fileToCopy = await _fileService.ReadFileAsync(item.Path, userContext);
+        await _fileService.WriteFileAsync(targetPath, fileToCopy, userContext, cancellationToken);
     }
-    catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+
+    private string GetCurrentPath(string fileName)
     {
-        return OperationResult.Fail(Resources.Web_Error_ItemExists);
+        return string.IsNullOrEmpty(CurrentPath) 
+            ? fileName
+            : $"{CurrentPath}/{fileName}";
     }
-    catch (Exception ex)
+
+    /// <summary>
+    /// Shared implementation for Rename and Move: both are just "relocate item from
+    /// one share-relative path to another" as far as the file service is concerned.
+    /// </summary>
+    private async Task<OperationResult> MoveInternalAsync(
+        FileMetadata item, string relativePath, string newRelativePath, string logVerb)
     {
-        _logger.LogError(ex, "Error relocating '{Path}' to '{NewPath}'", relativePath, newRelativePath);
-        return OperationResult.Fail(logVerb == "moved"
-            ? Resources.Web_Error_MoveFailed
-            : Resources.Web_Error_RenameFailed);
+        if (_fileService is null)
+            return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
+
+        try
+        {
+            var userContext = await GetCurrentUserContextAsync();
+            if (userContext is null)
+                return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
+
+            await _fileService.RenameAsync(relativePath, newRelativePath, userContext);
+
+            _logger.LogInformation("{Type} {Verb}: '{OldPath}' -> '{NewPath}' by {User}",
+                item.IsDirectory ? "Directory" : "File",
+                logVerb, relativePath, newRelativePath, userContext.User.Username);
+
+            return OperationResult.Ok();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return OperationResult.Fail(Resources.Web_Error_AccessDenied);
+        }
+        catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+        {
+            return OperationResult.Fail(Resources.Web_Error_ItemExists);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error relocating '{Path}' to '{NewPath}'", relativePath, newRelativePath);
+            return OperationResult.Fail(logVerb == "moved"
+                ? Resources.Web_Error_MoveFailed
+                : Resources.Web_Error_RenameFailed);
+        }
     }
-}
 
     private async Task<UserContext?> GetCurrentUserContextAsync()
     {
@@ -542,7 +567,7 @@ private async Task<OperationResult> MoveInternalAsync(
 
         return DirectorySizes.TryGetValue(relativePath, out var size) ? size : null;
     }
-    
+
     public async Task<(byte[] Data, string ContentType, PreviewKind Kind)?> ReadFileForPreviewAsync(FileMetadata file)
     {
         if (_fileService is null || CurrentShare is null) return null;
@@ -681,7 +706,8 @@ private async Task<OperationResult> MoveInternalAsync(
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to read version bytes {Ts} of {Path}", snapshotTimestampUtc, shareRelativePath);
+            _logger.LogError(ex, "Failed to read version bytes {Ts} of {Path}", snapshotTimestampUtc,
+                shareRelativePath);
             return null;
         }
     }
@@ -795,7 +821,7 @@ private async Task<OperationResult> MoveInternalAsync(
 
         return ownerId.ToString()[..8] + "…";
     }
-    
+
     public async Task<OperationResult> ArchiveAsync(List<FileMetadata> items, string format)
     {
         if (_fileService is null || CurrentShare is null)
@@ -819,9 +845,7 @@ private async Task<OperationResult> MoveInternalAsync(
                 ? Path.GetFileNameWithoutExtension(items[0].Name) + format
                 : "archiv" + format;
 
-            var targetPath = string.IsNullOrEmpty(CurrentPath)
-                ? archiveName
-                : $"{CurrentPath}/{archiveName}";
+            var targetPath = GetCurrentPath(archiveName);
 
             await _fileService.ArchiveAsync(relativePaths, targetPath, format, userContext);
 
@@ -844,7 +868,7 @@ private async Task<OperationResult> MoveInternalAsync(
             return OperationResult.Fail(Resources.Web_Error_ArchiveFailed);
         }
     }
-    
+
     public async Task<OperationResult> UnzipAsync(FileMetadata file)
     {
         if (_fileService is null || CurrentShare is null)
@@ -891,60 +915,58 @@ private async Task<OperationResult> MoveInternalAsync(
         }
     }
 
-    public async Task<OperationResult> UploadFileAsync(string fileName, Stream fileStream, CancellationToken cancellationToken = default)
+    public async Task<OperationResult> UploadFileAsync(string fileName, Stream fileStream,
+        CancellationToken cancellationToken = default)
     {
+        if (_fileService is null || CurrentShare is null)
+            return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
+
+        if (string.IsNullOrWhiteSpace(fileName))
+            return OperationResult.Fail(Resources.Web_FileName_Missing);
+
+        if (!WindowsFileNameHelper.IsValid(fileName))
+        {
+            var errors = WindowsFileNameHelper.GetValidationErrors(fileName);
+            return OperationResult.Fail(Resources.Web_FileName_InvalidChars + string.Join(", ", errors));
+        }
+
+        var userContext = await GetCurrentUserContextAsync();
+        if (userContext is null)
+            return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
+
+        var targetPath = GetCurrentPath(fileName);
         
-    if (_fileService is null || CurrentShare is null)
-        return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
-
-    if (string.IsNullOrWhiteSpace(fileName))
-        return OperationResult.Fail(Resources.Web_FileName_Missing);
-
-    if (!WindowsFileNameHelper.IsValid(fileName))
-    {
-        var errors = WindowsFileNameHelper.GetValidationErrors(fileName);
-        return OperationResult.Fail(Resources.Web_FileName_InvalidChars + string.Join(", ", errors));
-    }
-
-    var userContext = await GetCurrentUserContextAsync();
-    if (userContext is null)
-        return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
-
-    var targetPath = string.IsNullOrEmpty(CurrentPath)
-        ? fileName
-        : $"{CurrentPath}/{fileName}";
-
-    try
-    {
-        await _fileService.WriteFileAsync(targetPath, fileStream, userContext, cancellationToken);
-
-        _logger.LogInformation("File uploaded: '{Path}' by {User}",
-            targetPath, userContext.User.Username);
-        
-        return OperationResult.Ok();
-    }
-    catch (Exception ex)
-    {
-        // Clean up the partial file
         try
         {
-            await _fileService.DeleteFileAsync(targetPath, userContext, isRecycleEnabled: false);
-            _logger.LogInformation("Cleaned up partial upload: '{Path}'", targetPath);
-        }
-        catch (Exception cleanupEx)
-        {
-            _logger.LogWarning(cleanupEx, "Failed to clean up partial upload: '{Path}'", targetPath);
-        }
+            await _fileService.WriteFileAsync(targetPath, fileStream, userContext, cancellationToken);
+            
+            _logger.LogInformation("File uploaded: '{Path}' by {User}",
+                targetPath, userContext.User.Username);
 
-        return ex switch
+            return OperationResult.Ok();
+        }
+        catch (Exception ex)
         {
-            OperationCanceledException => OperationResult.Fail(Resources.Web_Upload_Aborted),
-            UnauthorizedAccessException => OperationResult.Fail(Resources.Web_Error_AccessDenied),
-            IOException ioEx when ioEx.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase)
-                => OperationResult.Fail(Resources.Web_Error_FileExists),
-            _ => OperationResult.Fail(Resources.Web_Error_UploadFailed)
-        };
-    }
+            // Clean up the partial file
+            try
+            {
+                await _fileService.DeleteFileAsync(targetPath, userContext, isRecycleEnabled: false);
+                _logger.LogInformation("Cleaned up partial upload: '{Path}'", targetPath);
+            }
+            catch (Exception cleanupEx)
+            {
+                _logger.LogWarning(cleanupEx, "Failed to clean up partial upload: '{Path}'", targetPath);
+            }
+
+            return ex switch
+            {
+                OperationCanceledException => OperationResult.Fail(Resources.Web_Upload_Aborted),
+                UnauthorizedAccessException => OperationResult.Fail(Resources.Web_Error_AccessDenied),
+                IOException ioEx when ioEx.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase)
+                    => OperationResult.Fail(Resources.Web_Error_FileExists),
+                _ => OperationResult.Fail(Resources.Web_Error_UploadFailed)
+            };
+        }
     }
 
     public long GetMaxUploadSizeBytes()

@@ -111,7 +111,8 @@ public partial class FileBrowser
             _createFolderError = result.Error;
     }
 
-    // ========== Delete ==========
+    // ========== Key Input detection ==========
+    
     private async Task OnKeyDownItemList(KeyboardEventArgs e)
     {
         if (e.Key == "Delete" && _selectedItems.Count > 0)
@@ -119,8 +120,27 @@ public partial class FileBrowser
 
         if (e.Key == "F2" && _selectedItems.Count == 1)
             await RenameSelected();
-    }
+        
+        // copy/cut/paste
+        if (e.CtrlKey)
+        {
+            if (e.Key == "c")
+                await PutIntoClipboard(false);
+        
+            if (e.Key == "x")
+                await PutIntoClipboard(true);
 
+            if (e.Key == "v")
+                await PasteClipboard();
+        }
+        
+    }
+    
+    
+
+    
+    // ========== Delete ==========
+    
     private async Task OnDeleteKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")

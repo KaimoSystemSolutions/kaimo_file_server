@@ -1,5 +1,5 @@
 namespace Kaimo_File_Server.Web.Services;
-public enum ToastType { Info, Success, Error, Progress }
+public enum ToastType { Info, Success, State, Error, Progress }
 public record ToastMessage(string Id, string Text, ToastType Type, DateTime CreatedAt)
 {
     public int Progress { get; set; }
@@ -48,8 +48,11 @@ public class ToastService
         OnChanged?.Invoke();
     }
 
-    public void Remove(string id)
+    public void Remove(string? id)
     {
+        if(id == null)
+            return;
+        
         _toasts.RemoveAll(t => t.Id == id);
         OnChanged?.Invoke();
     }

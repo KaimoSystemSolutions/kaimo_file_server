@@ -47,6 +47,9 @@
                 if (toast.Type == ToastType.Progress)
                     continue;
 
+                if(toast.Type == ToastType.State)
+                    continue;
+                
                 var delay = toast.Type == ToastType.Error ? 6000 : 4000;
                 var elapsed = (int)(DateTime.Now - toast.CreatedAt).TotalMilliseconds;
                 var remaining = Math.Max(delay - elapsed, 0);

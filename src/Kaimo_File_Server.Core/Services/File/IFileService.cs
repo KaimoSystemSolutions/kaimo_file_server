@@ -25,6 +25,11 @@ namespace Kaimo_File_Server.Core.Services.File
         // ------------ Full Operations ------------
         string ToAbsolutePath(string path);
         Task<Stream> ReadFileAsync(string path, UserContext user);
+        
+        
+        // expects a local path inside the share. so if the storage path was
+        // /storage/general/folder/file.txt
+        // it would expect folder/file.txt
         Task WriteFileAsync(string path, Stream data, UserContext user, CancellationToken cancellationToken = default);
         Task CreateFileAsync(string path, UserContext user);
         Task CreateDirectoryAsync(string path, UserContext user);
