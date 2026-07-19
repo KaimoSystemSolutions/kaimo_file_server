@@ -1,0 +1,16 @@
+@using Kaimo_File_Server.Core.Language
+
+<div class="detail-section">
+    <span class="detail-label">@Resources.Web_Settings_Language_Detail</span>
+    <div class="settings-row">
+        <select class="edit-input settings-select" @bind="VM.SelectedLanguage">
+            @foreach (var lang in SettingsViewModel.AvailableLanguages) { <option value="@lang.Key">@lang.Value</option> }
+        </select>
+        <button class="btn-primary" @onclick="Save">@Resources.Web_Settings_Button_Save</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+    private async Task Save() { await VM.SaveLanguageAsync(); StateHasChanged(); }
+}

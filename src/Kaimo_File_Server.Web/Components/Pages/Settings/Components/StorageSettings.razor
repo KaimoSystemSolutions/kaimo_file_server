@@ -1,0 +1,29 @@
+
+@using System.Globalization
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AssetProvider Icons
+
+<div class="detail-section">
+    <span class="detail-label">Gesamtspeicherauslastung</span>
+    <p class="settings-description">Auslastung des Laufwerks, auf dem die Dateien gespeichert werden.</p>
+    @if (VM.StorageUsage is { Available: true } s)
+    {
+        <div class="stat-hero"><span class="stat-hero-value">@Pct(s.UsedPercent) %</span><span class="stat-hero-unit">belegt · @VM.FormatBytes(s.UsedBytes) von @VM.FormatBytes(s.TotalBytes)</span></div>
+        <div class="usage-bar"><div class="usage-bar-fill @(s.UsedPercent >= 90 ? "is-critical" : "")" style="width: @Pct(s.UsedPercent)%;"></div></div>
+        <div class="info-card">
+            <div class="info-row"><span class="info-key">Frei</span><span class="info-val">@VM.FormatBytes(s.FreeBytes)</span></div>
+            <div class="info-row"><span class="info-key">Gesamt</span><span class="info-val">@VM.FormatBytes(s.TotalBytes)</span></div>
+            <div class="info-row"><span class="info-key">Laufwerk</span><span class="info-val">@s.DriveName</span></div>
+            <div class="info-row"><span class="info-key">Speicherpfad</span><span class="info-val is-muted">@s.StoragePath</span></div>
+        </div>
+    }
+    else { <p class="settings-empty">Speicherinformationen sind nicht verfügbar.</p> }
+    <div class="settings-actions"><button class="btn-icon" title="Aktualisieren" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button></div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+    private static string Pct(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+    private void Refresh() { VM.RefreshSystemInfo(); StateHasChanged(); }
+}
+

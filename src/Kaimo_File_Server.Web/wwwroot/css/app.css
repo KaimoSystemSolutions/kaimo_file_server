@@ -681,7 +681,7 @@ html, body, #app {
 }
 
 .admin-detail {
-    width: 340px;
+    /*width: 340px;*/
     min-width: 280px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);

@@ -1,0 +1,40 @@
+@using Kaimo_File_Server.Core.Language
+
+@if (VM.AccessErrorMessage is not null)
+{
+    <div class="error-banner">@VM.AccessErrorMessage</div>
+}
+
+<div class="detail-section">
+    <p class="share-help-text">@Resources.Web_ShareList_VisibilityDescription</p>
+
+    @if (!IsLoaded)
+    {
+        <div class="loading-state access-loading"><div class="spinner"></div></div>
+    }
+    else if (VM.SelectedShare is not null)
+    {
+        <div class="form-group visibility-group">
+            <label>@Resources.Web_ShareList_VisibilityHeader</label>
+            <div class="detail-section">
+                <div class="detail-value-row">
+                    <span class="detail-value">@(VM.SelectedShare.IsShareHidden ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)</span>
+                    <button class="btn-secondary compact-button" @onclick="ToggleShareHidden">
+                        @(VM.SelectedShare.IsShareHidden ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ShareListViewModel VM { get; set; } = default!;
+    [Parameter] public bool IsLoaded { get; set; }
+
+    private async Task ToggleShareHidden()
+    {
+        await VM.ToggleShareHiddenAsync();
+        StateHasChanged();
+    }
+}

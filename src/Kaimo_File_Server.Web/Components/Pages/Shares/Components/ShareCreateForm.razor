@@ -1,0 +1,50 @@
+@using Kaimo_File_Server.Core.Language
+
+<div class="create-form-card">
+    <h3>@Resources.Web_ShareList_CreateTitle</h3>
+    <div class="create-form-fields">
+        <div class="form-group">
+            <label>@Resources.Web_ShareList_Label_Name</label>
+            <input class="edit-input"
+                   type="text"
+                   placeholder="@Resources.Web_ShareList_CreatePlaceholder"
+                   @bind="VM.NewShareName"
+                   @bind:event="oninput"
+                   @onkeydown="HandleCreateKeyDown" />
+        </div>
+    </div>
+    @if (VM.CreateErrorMessage is not null)
+    {
+        <div class="error-banner create-error">@VM.CreateErrorMessage</div>
+    }
+    <div class="create-form-actions">
+        <button class="btn-primary" @onclick="CreateShare">@Resources.Web_Button_Create</button>
+        <button class="btn-secondary" @onclick="Cancel">@Resources.Web_Button_Cancel</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ShareListViewModel VM { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private async Task CreateShare()
+    {
+        if (!VM.CanCreateShare)
+            return;
+
+        await VM.CreateShareAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task HandleCreateKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await CreateShare();
+    }
+
+    private async Task Cancel()
+    {
+        VM.IsCreating = false;
+        await OnChanged.InvokeAsync();
+    }
+}

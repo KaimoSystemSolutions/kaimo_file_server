@@ -1,0 +1,297 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Security
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AssetProvider Icons
+
+@* ------------ ROLE DETAIL ------------ *@
+                    @if (VM.SelectedRole is not null)
+                    {
+                        @* Role detail remains unchanged — same as original *@
+                        @if (VM.IsEditing)
+                        {
+                            <div class="detail-header">
+<h3>@Resources.Web_Admin_EditRole</h3>
+                                <span class="detail-subtitle">@VM.SelectedRole.Name</span>
+                            </div>
+                            @if (!VM.SelectedRole.IsSystemRole)
+                            {
+                                <div class="detail-section" style="margin-top: 16px;">
+<span class="detail-label">@Resources.Web_Admin_Label_Permissions</span>
+                                    <div class="permission-presets">
+                                        @foreach (var preset in UserListViewModel.PermissionPresets)
+                                        {
+
+                                            var isActive = VM.EditRolePermissions == preset.Permissions;
+                                            <button class="preset-chip @(isActive ? "preset-chip--active" : "")"
+                                                    @onclick="() => VM.ApplyPermissionPreset(preset.Permissions)">
+                                                @preset.Label
+                                            </button>
+                                        }
+<button class="preset-chip" @onclick="() => VM.ApplyPermissionPreset(ManagementPermission.None)">@Resources.Web_Common_None</button>
+                                    </div>
+                                    <div class="permission-groups">
+                                        @foreach (var permGroup in UserListViewModel.PermissionGroups)
+                                        {
+                                            <div class="permission-group">
+                                                <span class="permission-group-label">@permGroup.Label</span>
+                                                <div class="permission-flags">
+                                                    @foreach (var flag in permGroup.Flags)
+                                                    {
+                                                        var isChecked = VM.HasEditPermission(flag.Flag);
+                                                        <label class="permission-flag">
+                                                            <input type="checkbox" checked="@isChecked"
+                                                                   @onchange="e => VM.ToggleEditPermission(flag.Flag, (bool)(e.Value ?? false))" />
+                                                            <span>@flag.Label</span>
+                                                        </label>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="detail-info" style="margin-top: 16px;">
+                                    @Icons.SVG("circle_info.svg", new SvgOptions(
+                                            Width: 14,
+                                            Height: 14,
+                                            Color: "var(--text-tertiary)"
+                                        ))
+<span>@Resources.Web_Admin_SystemRoleHint</span>
+                                </div>
+                            }
+                            @if (VM.ErrorMessage is not null)
+                            {
+                                <div class="error-banner" style="margin: 12px 0;">@VM.ErrorMessage</div>
+                            }
+                            <div class="detail-actions">
+                                <button class="btn-primary" @onclick="SaveRole" disabled="@VM.IsSaving">
+                                    @(VM.IsSaving ? "Speichert…" : "Speichern")
+                                </button>
+<button class="btn-secondary" @onclick="CancelEdit" disabled="@VM.IsSaving">@Resources.Web_Common_Cancel</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="detail-header">
+                                <h3>@VM.SelectedRole.Name</h3>
+<span class="detail-subtitle">@(VM.SelectedRole.IsSystemRole ? Resources.Web_Admin_SystemRole : Resources.Web_Admin_CustomRole)</span>
+                            </div>
+                            <div class="detail-field-grid">
+                                <div class="detail-field">
+<span class="detail-field-label">@Resources.Web_Admin_Label_Permissions</span>
+                                    <span class="detail-field-value">
+                                        @if (VM.SelectedRole.ManagementPermissions == ManagementPermission.None)
+                                        {
+<span class="detail-field-value--empty">@Resources.Web_Admin_NoPermissions</span>
+                                        }
+                                        else
+                                        {
+                                            var activePerms = UserListViewModel.PermissionGroups
+                                                .SelectMany(g => g.Flags)
+                                                .Where(f => (VM.SelectedRole.ManagementPermissions & f.Flag) == f.Flag)
+                                                .Select(f => f.Label)
+                                                .ToList();
+                                            const int previewCount = 3;
+                                            var showAll = _showAllRolePerms || activePerms.Count <= previewCount;
+                                            var visiblePerms = showAll ? activePerms : activePerms.Take(previewCount).ToList();
+
+                                            <div class="permission-tags">
+                                                @foreach (var label in visiblePerms)
+                                                {
+                                                    <span class="permission-tag">@label</span>
+                                                }
+                                                @if (activePerms.Count > previewCount)
+                                                {
+                                                    @if (!showAll)
+                                                    {
+                                                        <span class="permission-tag permission-tag--more" role="button" tabindex="0"
+
+                                                              title="@Resources.Web_Role_ShowAllPermissions"
+                                                              @onclick="() => _showAllRolePerms = true">
+                                                            +@(activePerms.Count - previewCount) …
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="permission-tag permission-tag--more" role="button" tabindex="0"
+                                                              @onclick="() => _showAllRolePerms = false">
+                                                            @Resources.Web_Role_ShowFewerPermissions
+                                                        </span>
+                                                    }
+                                                }
+                                            </div>
+                                        }
+                                    </span>
+                                </div>
+                                <div class="detail-field">
+                                    <span class="detail-field-label">ID</span>
+                                    <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">@VM.SelectedRole.Id</span>
+                                </div>
+                            </div>
+
+                            <div class="detail-section" style="margin-top: 16px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between;">
+<span class="detail-label">@Resources.Web_Admin_DelegatedAssignments</span>
+                                    @if (!VM.IsAddingAssignment && VM.CanManageRoles)
+
+                                    {
+<button class="btn-icon btn-icon--small" title="@Resources.Web_Admin_AddAssignment" @onclick="StartAddAssignment">
+                                            @Icons.SVG("plus.svg", new SvgOptions(
+                                                    Width: 14,
+                                                    Height: 14,
+
+                                                    StrokeWidth: 2f
+                                                ))
+                                        </button>
+                                    }
+                                </div>
+
+                                @if (VM.IsAddingAssignment)
+                                {
+                                    <div class="assignment-form">
+                                        <div class="form-group">
+                                            <label>Zuweisen an</label>
+                                            <div class="toggle-button-group">
+                                                <button class="toggle-btn @(!VM.NewAssignmentPrincipalIsGroup ? "toggle-btn--active" : "")"
+@onclick="() => { VM.NewAssignmentPrincipalIsGroup = false; VM.NewAssignmentPrincipalId = null; }">@Resources.Web_Admin_Label_User</button>
+                                                <button class="toggle-btn @(VM.NewAssignmentPrincipalIsGroup ? "toggle-btn--active" : "")"
+@onclick="() => { VM.NewAssignmentPrincipalIsGroup = true; VM.NewAssignmentPrincipalId = null; }">@Resources.Web_Admin_Label_Group</button>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+<label>@(VM.NewAssignmentPrincipalIsGroup ? Resources.Web_Admin_Label_Group : Resources.Web_Admin_Label_User)</label>
+                                            <select class="edit-input" @bind="SelectedPrincipalIdString">
+                                                <option value="">— Auswählen —</option>
+                                                @if (VM.NewAssignmentPrincipalIsGroup)
+                                                {
+                                                    @foreach (var g in VM.AllGroups) { <option value="@g.Id">@g.Name</option> }
+                                                }
+                                                else
+                                                {
+                                                    @foreach (var u in VM.AllUsers) { <option value="@u.Id">@u.Name (@u.Username)</option> }
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Geltungsbereich</label>
+                                            <select class="edit-input" @bind="SelectedScopeTypeString">
+                                                <option value="Global">Global (systemweit)</option>
+<option value="Department">@Resources.Web_Admin_Scope_Department</option>
+                                                <option value="Share">Freigabe</option>
+                                            </select>
+                                        </div>
+                                        @if (VM.NewAssignmentScopeType == ScopeType.Department)
+                                        {
+                                            <div class="form-group">
+<label>@Resources.Web_Admin_Label_Department</label>
+                                                <select class="edit-input" @bind="SelectedScopeIdString">
+                                                    <option value="">— Auswählen —</option>
+                                                    @foreach (var dept in VM.AllDepartments)
+                                                    {
+                                                        <option value="@dept.Id">@dept.Name</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                        }
+                                        else if (VM.NewAssignmentScopeType == ScopeType.Share)
+                                        {
+                                            <div class="form-group">
+                                                <label>Freigabe-ID</label>
+                                                <input type="text" class="edit-input" placeholder="GUID der Freigabe"
+                                                       @bind="ShareScopeIdInput" @bind:event="oninput" />
+                                            </div>
+                                        }
+                                        @if (VM.ErrorMessage is not null)
+                                        {
+                                            <div class="error-banner" style="margin: 8px 0;">@VM.ErrorMessage</div>
+                                        }
+                                        <div class="create-form-actions" style="margin-top: 8px;">
+                                            <button class="btn-primary" @onclick="CreateAssignment" disabled="@VM.IsSaving">
+                                                @(VM.IsSaving ? "Erstellt…" : "Zuweisen")
+                                            </button>
+<button class="btn-secondary" @onclick="() => VM.CancelAddAssignment()">@Resources.Web_Common_Cancel</button>
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (VM.RoleScopedAssignments.Any())
+                                {
+                                    <div class="scoped-assignments-list">
+                                        @foreach (var a in VM.RoleScopedAssignments)
+                                        {
+                                            <div class="scoped-assignment-row">
+                                                <div class="scoped-assignment-info">
+                                                    <span class="scoped-assignment-principal">@a.PrincipalName</span>
+                                                    <span class="scoped-assignment-scope">@FormatScopeType(a.ScopeType): @a.ScopeName</span>
+                                                </div>
+                                                @if (VM.CanManageRoles)
+                                                {
+                                                    <button class="btn-icon btn-icon--small" title="Entfernen"
+                                                            @onclick="() => DeleteAssignment(a.AssignmentId)">
+                                                        @Icons.SVG("cross.svg", new SvgOptions(
+                                                                Width: 14,
+                                                                Height: 14,
+                                                                Color: "var(--danger)",
+                                                                StrokeWidth: 2f
+                                                            ))
+                                                    </button>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else if (!VM.IsAddingAssignment)
+                                {
+<span class="detail-field-value detail-field-value--empty">@Resources.Web_Admin_NoDelegatedAssignments</span>
+                                }
+                            </div>
+
+                            <div class="detail-actions">
+
+                                @if (VM.CanEditRoleDefinitions && !VM.SelectedRole.IsSystemRole)
+                                {
+<button class="btn-secondary" @onclick="EditRole">@Resources.Web_Common_Edit</button>
+                                }
+                                @if (VM.CanDeleteRoles && !VM.SelectedRole.IsSystemRole)
+                                {
+                                    @if (VM.IsConfirmingDelete)
+                                    {
+                                        <div class="confirm-delete">
+<p>@Resources.Web_Admin_ConfirmDeleteRole</p>
+                                            <div style="display: flex; gap: 8px;">
+                                                <button class="btn-danger-outline" @onclick="ConfirmDeleteRole" disabled="@VM.IsSaving">
+
+                                                    @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
+                                                </button>
+<button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">@Resources.Web_Common_Cancel</button>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+<button class="btn-danger-outline" @onclick="() => VM.RequestDeleteRole()">@Resources.Web_Admin_DeleteRole</button>
+                                    }
+                                }
+                            </div>
+                        }
+                    }
+@code {
+    [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private bool _showAllRolePerms;
+    private string SelectedPrincipalIdString { get => VM.NewAssignmentPrincipalId?.ToString() ?? ""; set => VM.NewAssignmentPrincipalId = Guid.TryParse(value, out var id) ? id : null; }
+    private string SelectedScopeTypeString { get => VM.NewAssignmentScopeType.ToString(); set { VM.NewAssignmentScopeType = Enum.TryParse<ScopeType>(value, out var st) ? st : ScopeType.Global; VM.NewAssignmentScopeId = null; } }
+    private string SelectedScopeIdString { get => VM.NewAssignmentScopeId?.ToString() ?? ""; set => VM.NewAssignmentScopeId = Guid.TryParse(value, out var id) ? id : null; }
+    private string ShareScopeIdInput { get => VM.NewAssignmentScopeId?.ToString() ?? ""; set => VM.NewAssignmentScopeId = Guid.TryParse(value, out var id) ? id : null; }
+    private async Task EditRole() { await VM.StartEditRoleAsync(); StateHasChanged(); }
+    private async Task SaveRole() { await VM.SaveRoleAsync(); await OnChanged.InvokeAsync(); }
+    private void CancelEdit() { VM.CancelEdit(); StateHasChanged(); }
+    private async Task ConfirmDeleteRole() { await VM.ConfirmDeleteRoleAsync(); await OnChanged.InvokeAsync(); }
+    private async Task StartAddAssignment() { VM.StartAddAssignment(); await VM.LoadAssignmentFormDataAsync(); StateHasChanged(); }
+    private async Task CreateAssignment() { await VM.CreateAssignmentAsync(); StateHasChanged(); }
+    private async Task DeleteAssignment(Guid id) { await VM.DeleteAssignmentAsync(id); StateHasChanged(); }
+    private static string FormatScopeType(ScopeType type) => type switch { ScopeType.Global => Resources.Web_Admin_ScopeType_Global, ScopeType.Department => Resources.Web_Admin_ScopeType_Department, ScopeType.Share => Resources.Web_Admin_ScopeType_Share, _ => type.ToString() };
+}

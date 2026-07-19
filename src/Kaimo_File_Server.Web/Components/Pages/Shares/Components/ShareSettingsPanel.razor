@@ -1,0 +1,81 @@
+@using Kaimo_File_Server.Core.Language
+
+@if (VM.EditSuccessMessage is not null)
+{
+    <div class="success-banner">@VM.EditSuccessMessage</div>
+}
+@if (VM.EditErrorMessage is not null)
+{
+    <div class="error-banner">@VM.EditErrorMessage</div>
+}
+
+@if (VM.SelectedShare is not null)
+{
+    <div class="detail-section">
+        <span class="detail-label">@Resources.Web_ShareList_Label_Name</span>
+        <div class="detail-rename-row">
+            <input class="edit-input" type="text" @bind="VM.EditShareName" @bind:event="oninput" disabled="@VM.IsRenaming" />
+            <button class="btn-primary" @onclick="RenameShare"
+                    disabled="@(VM.EditShareName.Trim() == VM.SelectedShare.Name || VM.IsRenaming)">
+                @(VM.IsRenaming ? "…" : Resources.Web_Action_Rename)
+            </button>
+        </div>
+    </div>
+
+    <div class="detail-section">
+        <span class="detail-label">@Resources.Web_ShareList_Label_Path</span>
+        <span class="detail-value">@VM.SelectedShare.Path</span>
+    </div>
+
+    <div class="detail-section">
+        <span class="detail-label">@Resources.Web_ShareList_Label_Status</span>
+        <div class="detail-value-row">
+            <span class="detail-value">@(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)</span>
+            <button class="btn-secondary compact-button" @onclick="ToggleShareEnabled">
+                @(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
+            </button>
+        </div>
+    </div>
+
+    <div class="detail-section">
+        <span class="detail-label">@Resources.Web_ShareList_Label_RecycleBin</span>
+        <div class="detail-value-row">
+            <span class="detail-value">@(VM.SelectedShare.IsRecycleEnabled ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)</span>
+            <button class="btn-secondary compact-button" @onclick="ToggleRecycleEnabled">
+                @(VM.SelectedShare.IsRecycleEnabled ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
+            </button>
+        </div>
+    </div>
+
+    <div class="detail-actions">
+        @if (!VM.ShowDeleteConfirm)
+        {
+            <button class="btn-danger-outline" @onclick="() => VM.ShowDeleteConfirm = true">@Resources.Web_ShareList_DeleteShare</button>
+        }
+        else
+        {
+            <div class="confirm-delete">
+                <p>@string.Format(Resources.Web_ShareList_DeleteConfirm, VM.SelectedShare.Name)</p>
+                <div class="delete-actions">
+                    <button class="btn-danger-outline" @onclick="DeleteShare">@Resources.Web_ShareList_DeletePermanently</button>
+                    <button class="btn-secondary" @onclick="() => VM.ShowDeleteConfirm = false">@Resources.Web_Button_Cancel</button>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public ShareListViewModel VM { get; set; } = default!;
+    [Parameter] public EventCallback OnDeleted { get; set; }
+
+    private async Task RenameShare() { await VM.RenameShareAsync(); StateHasChanged(); }
+    private async Task ToggleShareEnabled() { await VM.ToggleShareEnabledAsync(); StateHasChanged(); }
+    private async Task ToggleRecycleEnabled() { await VM.ToggleRecycleEnabledAsync(); StateHasChanged(); }
+
+    private async Task DeleteShare()
+    {
+        await VM.DeleteShareAsync();
+        await OnDeleted.InvokeAsync();
+    }
+}

@@ -1,0 +1,8 @@
+.detail-section { margin-bottom: 18px; }
+.detail-value { display: block; padding: 5px 10px; background: var(--bg-tertiary); border: 1px solid var(--border-light); border-radius: 6px; color: var(--text-primary); font-size: 12px; line-height: 1.4; word-break: break-word; }
+.detail-value-row { display: flex; align-items: center; gap: 8px; }
+.share-help-text { margin-bottom: 12px; color: var(--text-tertiary); font-size: 12px; }
+.access-loading { padding: 24px 0; }
+.visibility-group { margin-bottom: 14px; }
+.compact-button { padding: 4px 10px; font-size: 12px; }
+.form-group label { font-size: 13px; font-weight: 600; text-transform: none; letter-spacing: 0.01em; color: var(--text-secondary); }

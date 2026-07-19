@@ -1,0 +1,100 @@
+
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Domain.Department
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AssetProvider Icons
+
+@* ════════════ TREE LIST ════════════ *@
+        <div class="admin-list">
+            @if (!VM.Departments.Any())
+            {
+                <div class="empty-state"><p>@Resources.Web_Dept_NoDepartments</p></div>
+            }
+            else
+            {
+                var treeNodes = VM.GetTreeOrderedDepartments();
+
+                <div class="dept-tree">
+                    @foreach (var node in treeNodes)
+                    {
+                        var dept = node.Department;
+                        var isSelected = VM.Selected?.Id == dept.Id;
+                        var isGlobal = VM.IsGlobalDepartment(dept);
+                        var isCollapsed = VM.IsCollapsed(dept.Id);
+
+                        <div class="dept-tree-row @(isSelected ? "dept-tree-row--selected" : "")"
+                             @onclick="() => Select(dept)">
+
+                            @* -- Guide lines: sit directly in row for align-items:stretch -- *@
+                            @for (var col = 0; col < node.Depth; col++)
+                            {
+                                @if (col < node.Depth - 1)
+                                {
+                                    <span class="dept-tree-guide @(node.AncestorContinues[col] ? "dept-tree-guide--vert" : "")"></span>
+                                }
+                                else
+                                {
+                                    <span class="dept-tree-guide @(node.IsLastChild ? "dept-tree-guide--corner" : "dept-tree-guide--tee")"></span>
+                                }
+                            }
+
+                            @* -- Content: toggle + icon + name + badge -- *@
+                            <div class="dept-tree-row-content">
+                                @if (node.HasChildren)
+                                {
+                                    <button class="dept-tree-toggle @(isCollapsed ? "" : "dept-tree-toggle--open")"
+                                            @onclick="() => ToggleCollapse(dept.Id)" @onclick:stopPropagation="true"
+                                            title="@(isCollapsed ? Resources.Web_Dept_Expand : Resources.Web_Dept_Collapse)">
+                                        @Icons.SVG("chevron_right.svg", new SvgOptions(
+                                            Width: 14, Height: 14,
+                                            Color: "currentColor", StrokeWidth: 2f))
+                                    </button>
+                                }
+                                else
+                                {
+
+                                    <span class="dept-tree-toggle-spacer"></span>
+                                }
+
+                                <span class="dept-tree-icon">
+                                    @if (isGlobal)
+                                    {
+                                        @Icons.SVG("compass.svg", new SvgOptions(
+                                            Width: 18, Height: 18,
+                                            Color: isSelected ? "var(--accent)" : "var(--text-tertiary)",
+                                            StrokeWidth: 1.5f))
+                                    }
+                                    else
+                                    {
+                                        @Icons.SVG("folder.svg", new SvgOptions(
+                                            Width: 18, Height: 18,
+                                            Color: isSelected ? "var(--accent)" : "var(--text-tertiary)",
+                                            Fill: isSelected ? "var(--accent-subtle)" : "none",
+                                            StrokeWidth: 1.5f))
+                                    }
+                                </span>
+
+                                <span class="dept-tree-name @(isSelected ? "dept-tree-name--selected" : "")">
+                                    @dept.Name
+                                </span>
+
+                                @if (node.HasChildren)
+                                {
+                                    var childCount = VM.Departments.Count(d => d.ParentDepartmentId == dept.Id);
+                                    <span class="dept-tree-badge" title="@string.Format(Resources.Web_Dept_SubdepartmentCount, childCount)">@childCount</span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+@code {
+    [Parameter, EditorRequired] public DepartmentViewModel VM { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private async Task Select(Department department) { await VM.SelectAsync(department); await OnChanged.InvokeAsync(); }
+    private async Task ToggleCollapse(Guid id) { VM.ToggleCollapse(id); await OnChanged.InvokeAsync(); }
+}
+
