@@ -549,7 +549,7 @@ private async Task<OperationResult> MoveInternalAsync(
 
         // Never buffer an oversized file into memory — the caller shows a download
         // fallback for anything above the cap.
-        //if (file.Size > MaxPreviewSizeBytes) return null;
+        if (file.Size > MaxPreviewSizeBytes) return null;
 
         var userContext = await GetCurrentUserContextAsync();
         if (userContext is null) return null;
