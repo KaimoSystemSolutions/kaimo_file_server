@@ -442,7 +442,6 @@ html, body, #app {
 .file-list {
     border: 1px solid var(--border);
     border-radius: 8px;
-    border-top-left-radius: 0px;
     overflow: hidden;
     background: var(--bg-secondary);
     display: flex;
@@ -477,7 +476,7 @@ html, body, #app {
 }
 
 .file-cell {
-    font-size: 13px;
+    font-size: 11px;
 }
 
 .file-name {
@@ -508,7 +507,6 @@ html, body, #app {
 
 .file-share-path {
     width: 280px;
-    color: var(--text-secondary);
     flex-shrink: 0;
     overflow: hidden;
     white-space: nowrap;
@@ -2171,7 +2169,6 @@ html, body, #app {
 .user-list-container {
     border: 1px solid var(--border);
     border-radius: 8px;
-    border-top-left-radius: 0px;
     overflow: hidden;
     background: var(--bg-secondary);
     display: flex;

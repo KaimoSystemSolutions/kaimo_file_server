@@ -15,7 +15,7 @@ services:
     - "--mode=server"
     - "--frontend-port=57000"
     - "--backend-port=57200"
-    - "--roslyn-worker-port=57418"
+    - "--roslyn-worker-port=57424"
     - "--timeout=60"
     environment:
       DOTNET_USE_POLLING_FILE_WATCHER: "true"
@@ -23,16 +23,16 @@ services:
       RESHARPER_LOG_CONF: "/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
     image: "kaimofileserver:dev"
     ports:
-    - "127.0.0.1:57018:57000"
-    - "127.0.0.1:57218:57200"
-    - "127.0.0.1:57418:57418"
+    - "127.0.0.1:57024:57000"
+    - "127.0.0.1:57224:57200"
+    - "127.0.0.1:57424:57424"
     volumes:
     - "/run/media/rearguardalpha/HDD/programing/kaimo_file_server_core/src/Kaimo_File_Server.Host:/app:rw"
     - "/run/media/rearguardalpha/HDD/programing/kaimo_file_server_core:/src:rw"
     - "/home/rearguardalpha/.nuget/packages:/home/app/.nuget/packages"
     - "/home/rearguardalpha/.local/share/JetBrains/RiderRemoteDebugger/2026.1.2/Linux64:/opt/JetBrains/RiderDebuggerTools"
     - "/run/media/rearguardalpha/HDD/Programs/Rider/bin/backend-log.xml:/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
-    - "/home/rearguardalpha/.cache/JetBrains/Rider2026.1/log/DebuggerWorker/JetBrains.Debugger.Worker.2026_7_17_00_40_34:/var/opt/JetBrains/RiderDebuggerTools:rw"
+    - "/home/rearguardalpha/.cache/JetBrains/Rider2026.1/log/DebuggerWorker/JetBrains.Debugger.Worker.2026_7_19_22_21_06:/var/opt/JetBrains/RiderDebuggerTools:rw"
     working_dir: "/app"
   kaimo_file_server.web:
     build:
@@ -49,7 +49,7 @@ services:
     - "--mode=server"
     - "--frontend-port=57000"
     - "--backend-port=57200"
-    - "--roslyn-worker-port=57419"
+    - "--roslyn-worker-port=57425"
     - "--timeout=60"
     environment:
       ASPNETCORE_STATICWEBASSETS: "/app/bin/Debug/net10.0/Kaimo_File_Server.Web.staticwebassets.runtime.CT.json"
@@ -58,14 +58,48 @@ services:
       RESHARPER_LOG_CONF: "/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
     image: "kaimofileserverweb:dev"
     ports:
-    - "127.0.0.1:57019:57000"
-    - "127.0.0.1:57219:57200"
-    - "127.0.0.1:57419:57419"
+    - "127.0.0.1:57025:57000"
+    - "127.0.0.1:57225:57200"
+    - "127.0.0.1:57425:57425"
     volumes:
     - "/run/media/rearguardalpha/HDD/programing/kaimo_file_server_core/src/Kaimo_File_Server.Web:/app:rw"
     - "/run/media/rearguardalpha/HDD/programing/kaimo_file_server_core:/src:rw"
     - "/home/rearguardalpha/.nuget/packages:/home/app/.nuget/packages"
     - "/home/rearguardalpha/.local/share/JetBrains/RiderRemoteDebugger/2026.1.2/Linux64:/opt/JetBrains/RiderDebuggerTools"
     - "/run/media/rearguardalpha/HDD/Programs/Rider/bin/backend-log.xml:/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
-    - "/home/rearguardalpha/.cache/JetBrains/Rider2026.1/log/DebuggerWorker/JetBrains.Debugger.Worker.2026_7_17_00_40_34:/var/opt/JetBrains/RiderDebuggerTools:rw"
+    - "/home/rearguardalpha/.cache/JetBrains/Rider2026.1/log/DebuggerWorker/JetBrains.Debugger.Worker.2026_7_19_22_21_06:/var/opt/JetBrains/RiderDebuggerTools:rw"
+    working_dir: "/app"
+  kaimo_smb_bridge:
+    build:
+      context: "/run/media/rearguardalpha/HDD/programing/kaimo_file_server_core"
+      dockerfile: "src/Kaimo_File_Server.SmbBridge/Dockerfile"
+      target: "base"
+      args:
+        BUILD_CONFIGURATION: "Debug"
+    command: []
+    entrypoint:
+    - "/opt/JetBrains/RiderDebuggerTools/linux-x64/JetBrains.Debugger.Worker"
+    - "--runtimeconfig"
+    - "/opt/JetBrains/RiderDebuggerTools/JetBrains.Debugger.Worker.runtimeconfig.json"
+    - "--mode=server"
+    - "--frontend-port=57000"
+    - "--backend-port=57200"
+    - "--roslyn-worker-port=57426"
+    - "--timeout=60"
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+      RIDER_DEBUGGER_LOG_DIR: "/var/opt/JetBrains/RiderDebuggerTools"
+      RESHARPER_LOG_CONF: "/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
+    image: "kaimosmbbridge:dev"
+    ports:
+    - "127.0.0.1:57026:57000"
+    - "127.0.0.1:57226:57200"
+    - "127.0.0.1:57426:57426"
+    volumes:
+    - "/run/media/rearguardalpha/HDD/programing/kaimo_file_server_core/src/Kaimo_File_Server.SmbBridge:/app:rw"
+    - "/run/media/rearguardalpha/HDD/programing/kaimo_file_server_core:/src:rw"
+    - "/home/rearguardalpha/.nuget/packages:/home/app/.nuget/packages"
+    - "/home/rearguardalpha/.local/share/JetBrains/RiderRemoteDebugger/2026.1.2/Linux64:/opt/JetBrains/RiderDebuggerTools"
+    - "/run/media/rearguardalpha/HDD/Programs/Rider/bin/backend-log.xml:/etc/opt/JetBrains/RiderDebuggerTools/backend-log.xml"
+    - "/home/rearguardalpha/.cache/JetBrains/Rider2026.1/log/DebuggerWorker/JetBrains.Debugger.Worker.2026_7_19_22_21_06:/var/opt/JetBrains/RiderDebuggerTools:rw"
     working_dir: "/app"
