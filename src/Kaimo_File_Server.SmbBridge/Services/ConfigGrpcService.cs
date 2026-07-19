@@ -13,8 +13,9 @@ namespace Kaimo_File_Server.SmbBridge.Services;
 /// on (re)start.
 ///
 /// The dialect enum is mapped to Samba's tokens here so the shell remains
-/// Samba-agnostic. WS-Discovery/Audit Log are not transported — they have no global
-/// smb.conf parameters in Samba (separate mechanisms).
+/// Samba-agnostic. WS-Discovery and Audit-Log are transported as booleans and
+/// applied by <c>sync-config.sh</c> via their own Samba mechanisms (the <c>wsdd</c>
+/// responder daemon and the <c>full_audit</c> VFS module), not via smb.conf globals.
 /// </summary>
 public sealed class ConfigGrpcService : ConfigService.ConfigServiceBase
 {
@@ -40,11 +41,14 @@ public sealed class ConfigGrpcService : ConfigService.ConfigServiceBase
             RequireSigning = s.RequireSigning,
             RequireEncryption = s.RequireEncryption,
             Enabled = enabled,
+            EnableWsDiscovery = s.EnableWsDiscovery,
+            EnableAuditLog = s.EnableAuditLog,
         };
 
         _logger.LogInformation(
-            "GetProtocolSettings -> min={Min} max={Max} signing={Sign} encrypt={Enc} enabled={Enabled}",
-            reply.MinProtocol, reply.MaxProtocol, reply.RequireSigning, reply.RequireEncryption, reply.Enabled);
+            "GetProtocolSettings -> min={Min} max={Max} signing={Sign} encrypt={Enc} enabled={Enabled} wsdd={Wsdd} audit={Audit}",
+            reply.MinProtocol, reply.MaxProtocol, reply.RequireSigning, reply.RequireEncryption,
+            reply.Enabled, reply.EnableWsDiscovery, reply.EnableAuditLog);
         return reply;
     }
 

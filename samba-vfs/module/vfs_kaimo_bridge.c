@@ -46,12 +46,14 @@ static void kaimo_free_data(void **pptr)
 	}
 }
 
-/* Fail behavior on infrastructure errors: default fail-open (allow),
- * with KAIMO_AUTHZ_FAILCLOSED=1 strictly deny. */
+/* Fail behavior on infrastructure errors (authd/bridge unreachable):
+ * default fail-CLOSED (deny) — a bridge outage must not silently grant access.
+ * Set KAIMO_AUTHZ_FAILOPEN=1 to restore the old permissive behavior (allow on
+ * error), e.g. for availability-over-security dev setups. */
 static bool kaimo_failmode_allow(void)
 {
-	const char *fc = getenv("KAIMO_AUTHZ_FAILCLOSED");
-	return !(fc != NULL && fc[0] == '1');
+	const char *fo = getenv("KAIMO_AUTHZ_FAILOPEN");
+	return fo != NULL && fo[0] == '1';
 }
 
 /* Sends a request line to kaimo_authd and reads the response.
@@ -201,25 +203,27 @@ static bool kaimo_twrp_to_gmt(NTTIME twrp, char *out, size_t out_sz)
 	return strftime(out, out_sz, "@GMT-%Y.%m.%d-%H.%M.%S", &tmv) == 24;
 }
 
-/* If smb_fname carries a timewarp (twrp != 0), ask the bridge to materialize that
- * version (decompressed) inside the share and rewrite base_name to the cache copy,
- * then clear twrp so downstream native ops treat it as an ordinary file.
- *   1  = rewritten to a snapshot copy (bridge already enforced read ACL)
- *   0  = no twrp, nothing to do
- *  -1  = twrp set but version not found / infrastructure error (fail the op) */
-static int kaimo_apply_twrp(vfs_handle_struct *handle, struct smb_filename *smb_fname)
+/* Kill-switch for the openat-based snapshot data-path redirect (default on).
+ * KAIMO_SNAPSHOT_OPENAT=0 falls back to the (insufficient) create_file rewrite. */
+static bool kaimo_snapshot_openat_enabled(void)
 {
-	if (smb_fname == NULL || smb_fname->twrp == 0) return 0;
+	const char *v = getenv("KAIMO_SNAPSHOT_OPENAT");
+	return !(v != NULL && v[0] == '0');
+}
 
-	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
-	if (ctx == NULL || smb_fname->base_name == NULL) return -1;
-
-	char gmt[32];
-	if (!kaimo_twrp_to_gmt(smb_fname->twrp, gmt, sizeof(gmt))) return -1;
+/* Ask the bridge to materialize <gmt>:<logical> into the in-share snapshot cache and
+ * return the share-relative cache path in out.
+ *   1  = ok (out = cache path)
+ *   0  = no such version
+ *  -1  = infrastructure error */
+static int kaimo_snapresolve_rel(struct kaimo_conn_ctx *ctx, const char *gmt,
+				 const char *logical, char *out, size_t outsz)
+{
+	if (ctx == NULL || logical == NULL) return -1;
 
 	char req[6144];
 	int n = snprintf(req, sizeof(req), "SNAPRESOLVE\t%s\t%s\t%s\t%s\n",
-			 ctx->user, ctx->share, gmt, smb_fname->base_name);
+			 ctx->user, ctx->share, gmt, logical);
 	if (n <= 0 || n >= (int)sizeof(req)) return -1;
 
 	char resp[8192];
@@ -234,7 +238,51 @@ static int kaimo_apply_twrp(vfs_handle_struct *handle, struct smb_filename *smb_
 	if (nl != NULL) *nl = '\0';
 	if (p[0] == '\0') return -1;
 
-	char *newname = talloc_strdup(smb_fname, p);
+	strlcpy(out, p, outsz);
+	return 1;
+}
+
+/* Make a path SHARE-RELATIVE for the bridge: some Samba call sites hand us the
+ * absolute connectpath-prefixed path ("/data/storage/<share>/dir/file"), others the
+ * already-relative one ("dir/file"). Strip the connectpath prefix if present, and
+ * normalize a lone "." (share root) to "". MUST be applied identically in every
+ * hook (openat AND stat/lstat) or their snapshot views diverge and Samba rejects the
+ * open on the stat-vs-fd inode mismatch. */
+static const char *kaimo_share_rel(vfs_handle_struct *handle, const char *path)
+{
+	if (path == NULL) return "";
+	const char *cp = handle->conn->connectpath;
+	size_t cplen = (cp != NULL) ? strlen(cp) : 0;
+	if (cplen > 0 && strncmp(path, cp, cplen) == 0) {
+		path += cplen;
+		while (*path == '/') path++;
+	}
+	if (path[0] == '.' && path[1] == '\0') path++; /* "." -> "" */
+	return path;
+}
+
+/* If smb_fname carries a timewarp (twrp != 0), resolve it to the in-share version
+ * copy and rewrite base_name to that copy (used by the path-based stat/lstat hooks,
+ * which have no fd). The actual data-path open is redirected in kaimo_openat.
+ *   1  = rewritten to a snapshot copy (bridge already enforced read ACL)
+ *   0  = no twrp, nothing to do
+ *  -1  = twrp set but version not found / infrastructure error (fail the op) */
+static int kaimo_apply_twrp(vfs_handle_struct *handle, struct smb_filename *smb_fname)
+{
+	if (smb_fname == NULL || smb_fname->twrp == 0) return 0;
+
+	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
+	if (ctx == NULL || smb_fname->base_name == NULL) return -1;
+
+	char gmt[32];
+	if (!kaimo_twrp_to_gmt(smb_fname->twrp, gmt, sizeof(gmt))) return -1;
+
+	const char *logical = kaimo_share_rel(handle, smb_fname->base_name);
+	char cache[6144];
+	if (kaimo_snapresolve_rel(ctx, gmt, logical, cache, sizeof(cache)) != 1)
+		return -1;
+
+	char *newname = talloc_strdup(smb_fname, cache);
 	if (newname == NULL) return -1;
 	smb_fname->base_name = newname;
 	smb_fname->twrp = 0; /* handled -> ordinary file for NEXT_* */
@@ -399,17 +447,22 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 {
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
 
-	/* Phase 5: a timewarp open ("Previous Versions") -> serve the materialized
-	 * version copy. The bridge already enforced the read ACL in ResolveVersion,
-	 * so skip the normal live-file AuthorizeOpen and open the redirected path. */
+	/* Phase 5: a timewarp open ("Previous Versions"). The bridge already enforced
+	 * the read ACL in ResolveVersion, so skip the normal live-file AuthorizeOpen.
+	 * IMPORTANT: keep twrp INTACT and do NOT rewrite base_name here — Samba opens the
+	 * real fd via openat (relative to a parent dirfsp), not via this base_name, so the
+	 * redirect to the version copy must happen in kaimo_openat. Rewriting here is
+	 * ignored for file content (it opens the live file). */
 	if (smb_fname != NULL && smb_fname->twrp != 0) {
-		if (kaimo_apply_twrp(handle, smb_fname) < 0)
-			return NT_STATUS_OBJECT_NAME_NOT_FOUND;
-		return SMB_VFS_NEXT_CREATE_FILE(handle, req, dirfsp, smb_fname, access_mask,
+		NTSTATUS tst = SMB_VFS_NEXT_CREATE_FILE(handle, req, dirfsp, smb_fname, access_mask,
 					       share_access, create_disposition, create_options,
 					       file_attributes, oplock_request, lease,
 					       allocation_size, private_flags, sd, ea_list,
 					       result, pinfo, in_context_blobs, out_context_blobs);
+		DBG_INFO("kaimo_bridge: CREATE twrp [%s] access=0x%08x share=0x%x disp=%u opts=0x%x -> %s\n",
+			 smb_fname->base_name, (unsigned)access_mask, (unsigned)share_access,
+			 (unsigned)create_disposition, (unsigned)create_options, nt_errstr(tst));
+		return tst;
 	}
 
 	if (ctx != NULL && smb_fname != NULL && smb_fname->base_name != NULL) {
@@ -429,11 +482,32 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 		}
 	}
 
-	return SMB_VFS_NEXT_CREATE_FILE(handle, req, dirfsp, smb_fname, access_mask,
+	NTSTATUS status = SMB_VFS_NEXT_CREATE_FILE(handle, req, dirfsp, smb_fname, access_mask,
 				       share_access, create_disposition, create_options,
 				       file_attributes, oplock_request, lease,
 				       allocation_size, private_flags, sd, ea_list,
 				       result, pinfo, in_context_blobs, out_context_blobs);
+
+	/* Reliable directory-create indexing (backlog #8): Samba's SMB2 dir-create
+	 * path does not reliably route through mkdirat, so a folder made over SMB2
+	 * could miss versioning/ownership/search-index stamping. When create_file
+	 * itself CREATED a directory, emit the MKDIR event here. The mkdirat hook
+	 * stays as a fallback and NotifyMkdir is idempotent, so a possible double
+	 * notification is harmless. */
+	if (NT_STATUS_IS_OK(status) && ctx != NULL &&
+	    pinfo != NULL && *pinfo == FILE_WAS_CREATED &&
+	    result != NULL && *result != NULL &&
+	    (*result)->fsp_flags.is_directory &&
+	    smb_fname != NULL && smb_fname->base_name != NULL &&
+	    smb_fname->base_name[0] != '\0') {
+		char mreq[5120];
+		int mn = snprintf(mreq, sizeof(mreq), "MKDIR\t%s\t%s\t%s\n",
+				  ctx->user, ctx->share, smb_fname->base_name);
+		if (mn > 0 && mn < (int)sizeof(mreq))
+			kaimo_notify_send(mreq, (size_t)mn);
+	}
+
+	return status;
 }
 
 /* ---- Directory listing filter: hide entries without read permission (ListAsync) ---- */
@@ -551,7 +625,10 @@ static int kaimo_renameat(vfs_handle_struct *handle,
 	return ret;
 }
 
-/* ---- Mkdir hook: index new directory + ownership (Phase 3) ---- */
+/* ---- Mkdir hook: index new directory + ownership (Phase 3) ----
+ * Fallback path for directory creation; the primary, reliable notification for
+ * SMB2 dir-create now happens in kaimo_create_file (backlog #8). NotifyMkdir is
+ * idempotent, so both firing for one directory is harmless. */
 static int kaimo_mkdirat(vfs_handle_struct *handle,
 			 struct files_struct *dirfsp,
 			 const struct smb_filename *smb_fname,
@@ -573,10 +650,85 @@ static int kaimo_mkdirat(vfs_handle_struct *handle,
 	return ret;
 }
 
+/* ---- openat: the data-path redirect for @GMT opens (Phase 5) ----
+ * This is where Samba obtains the real file descriptor, relative to a parent
+ * dirfsp — NOT via the create_file base_name. So a snapshot open must be redirected
+ * HERE, or the live file is served (that was the "Previous Versions shows current
+ * content / file not found" bug). Mirrors what Samba's own vfs_shadow_copy2 does.
+ *
+ * When smb_fname carries a timewarp we reconstruct the logical share-relative path
+ * (parent fsp path + atname), ask the bridge to materialize that version into the
+ * in-share cache (.kaimo-snapshots/<@GMT>/...), and open the cache copy by absolute
+ * path. Everything else passes straight through untouched (the common, no-snapshot
+ * case pays only a twrp==0 check). Kill-switch: KAIMO_SNAPSHOT_OPENAT=0. */
+static int kaimo_openat(vfs_handle_struct *handle,
+			const struct files_struct *dirfsp,
+			const struct smb_filename *smb_fname,
+			struct files_struct *fsp,
+			const struct vfs_open_how *how)
+{
+	if (smb_fname == NULL || smb_fname->twrp == 0 ||
+	    !kaimo_snapshot_openat_enabled())
+		return SMB_VFS_NEXT_OPENAT(handle, dirfsp, smb_fname, fsp, how);
+
+	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
+	if (ctx == NULL) { errno = ENOENT; return -1; }
+
+	/* "." / ".." refer to the directory itself / its parent. When the parent was
+	 * already redirected, dirfsp's fd points into the snapshot cache, so opening
+	 * these relative to dirfsp via NEXT lands in the cache — don't try to resolve
+	 * them as version paths (that's the [topOrdner/.] / [topOrdner/..] failures). */
+	const char *leaf = smb_fname->base_name;
+	if (leaf != NULL && (strcmp(leaf, ".") == 0 || strcmp(leaf, "..") == 0))
+		return SMB_VFS_NEXT_OPENAT(handle, dirfsp, smb_fname, fsp, how);
+
+	char gmt[32];
+	if (!kaimo_twrp_to_gmt(smb_fname->twrp, gmt, sizeof(gmt))) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	/* Reconstruct the path from parent + atname, then make it SHARE-RELATIVE:
+	 * some openat calls (Samba's realpath / non-widelink verification) arrive with
+	 * the parent fsp carrying the absolute connectpath, yielding an absolute path
+	 * like "/data/storage/<share>/topOrdner". The bridge expects a share-relative
+	 * path ("topOrdner"), so strip the connectpath prefix. A lone "." -> "" (root). */
+	char joined[4096];
+	kaimo_join_path(joined, sizeof(joined),
+			(struct files_struct *)dirfsp, smb_fname);
+
+	const char *logical = kaimo_share_rel(handle, joined);
+
+	char cache_rel[6144];
+	int rr = kaimo_snapresolve_rel(ctx, gmt, logical, cache_rel, sizeof(cache_rel));
+	if (rr != 1) {
+		/* Expected for paths without a version at this snapshot (e.g. desktop.ini,
+		 * thumbnails) — not an error, just "no such version". */
+		DBG_INFO("kaimo_bridge: OPENAT no version [%s@%s]\n", logical, gmt);
+		errno = ENOENT;
+		return -1;
+	}
+
+	char abspath[8192];
+	int n = snprintf(abspath, sizeof(abspath), "%s/%s",
+			 handle->conn->connectpath, cache_rel);
+	if (n <= 0 || n >= (int)sizeof(abspath)) { errno = ENAMETOOLONG; return -1; }
+
+	int fd = openat(AT_FDCWD, abspath, how->flags, how->mode);
+	if (fd < 0)
+		DBG_ERR("kaimo_bridge: OPENAT SNAPSHOT [%s@%s] flags=0x%x -> FAILED errno=%d\n",
+			logical, gmt, (unsigned)how->flags, errno);
+	else
+		DBG_INFO("kaimo_bridge: OPENAT SNAPSHOT [%s@%s] -> [%s] fd=%d\n",
+			 logical, gmt, abspath, fd);
+	return fd;
+}
+
 static struct vfs_fn_pointers kaimo_bridge_fns = {
 	.connect_fn     = kaimo_connect,
 	.disconnect_fn  = kaimo_disconnect,
 	.create_file_fn = kaimo_create_file,
+	.openat_fn      = kaimo_openat,
 	.readdir_fn     = kaimo_readdir,
 	.close_fn       = kaimo_close,
 	.unlinkat_fn    = kaimo_unlinkat,
@@ -588,9 +740,15 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 	.lstat_fn       = kaimo_lstat,
 };
 
+/* Build marker: bump on every module change so the running image can be
+ * identified in the logs (grep "kaimo_bridge build"). This is how we tell whether
+ * a rebuild actually picked up the latest source vs. served a cached layer. */
+#define KAIMO_BRIDGE_BUILD "2026-07-19f snapshots verified; logging quieted"
+
 static_decl_vfs;
 NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)
 {
+	DBG_NOTICE("kaimo_bridge build [%s] loaded\n", KAIMO_BRIDGE_BUILD);
 	return smb_register_vfs(SMB_VFS_INTERFACE_VERSION, "kaimo_bridge",
 				&kaimo_bridge_fns);
 }

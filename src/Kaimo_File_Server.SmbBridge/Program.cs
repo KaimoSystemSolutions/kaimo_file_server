@@ -27,6 +27,11 @@ builder.Services.AddScoped<IConfigRepository, ConfigRepository>();
 
 builder.Services.AddGrpc();
 
+// Phase 5 hardening: bound the @GMT snapshot materialization cache
+// (<share>/.kaimo-snapshots) so it cannot grow without limit. Evicts by age
+// (Snapshots:Cache:TtlHours) and per-share size cap (Snapshots:Cache:MaxBytesPerShare).
+builder.Services.AddHostedService<SnapshotCacheCleanupService>();
+
 // gRPC over HTTP/2 in plaintext (h2c) on internal Docker network — no TLS needed,
 // the bridge is not exposed externally.
 builder.WebHost.ConfigureKestrel(options =>

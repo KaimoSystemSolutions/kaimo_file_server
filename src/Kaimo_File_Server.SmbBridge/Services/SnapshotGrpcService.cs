@@ -33,8 +33,9 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
     // Hidden per-share directory that holds materialized (decompressed) versions.
     // Lives INSIDE the share directory so Samba's path validation accepts the
     // redirect (no wide-link/outside-share issues). Hidden from listings by the
-    // VFS readdir filter (names starting with ".kaimo-").
-    private const string CacheDirName = ".kaimo-snapshots";
+    // VFS readdir filter (names starting with ".kaimo-"). Shared with the evictor
+    // (SnapshotCacheCleanupService) via SnapshotCache.
+    private const string CacheDirName = SnapshotCache.DirName;
 
     private readonly IShareRepository _shares;
     private readonly IAuthenticationLookup _auth;
@@ -61,6 +62,10 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
     {
         var reply = new EnumerateSnapshotsReply();
 
+        _logger.LogInformation(
+            "EnumerateSnapshots ENTER: user={User} share={Share} path=[{Path}]",
+            request.Username, request.Share, request.Path);
+
         var user = await _auth.ResolveUserContextAsync(request.Username);
         var share = await _shares.GetByNameAsync(request.Share);
         if (user is null || share is null)
@@ -72,6 +77,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         }
 
         string normalized = ShareRelativePath.Normalize(request.Path);
+        if (normalized == ".") normalized = ""; // SMB share-root atname -> root
 
         // Don't leak version history of a path the user may not read.
         if (normalized.Length > 0 &&
@@ -112,12 +118,24 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
     {
         var notFound = new ResolveVersionReply { Found = false };
 
+        // Diagnostic: prove whether the VFS module reaches the bridge for a file open,
+        // and with what path/token. (Temporary high-visibility trace for @GMT debugging.)
+        _logger.LogInformation(
+            "ResolveVersion ENTER: user={User} share={Share} path=[{Path}] token={Token}",
+            request.Username, request.Share, request.Path, request.GmtToken);
+
         var user = await _auth.ResolveUserContextAsync(request.Username);
         var share = await _shares.GetByNameAsync(request.Share);
         if (user is null || share is null)
+        {
+            _logger.LogWarning(
+                "ResolveVersion: unknown user/share (user={User} share={Share}) -> notFound",
+                request.Username, request.Share);
             return notFound;
+        }
 
         string normalized = ShareRelativePath.Normalize(request.Path);
+        if (normalized == ".") normalized = ""; // SMB share-root atname -> root
 
         // Reading a version is a read of the file -> ListReadData parity.
         if (!await _acl.HasAccessAsync(user, share.Id, normalized, false, FilePermission.ListReadData))
@@ -136,6 +154,29 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         }
 
         var version = await _versions.GetVersionAtAsync(share.Id, normalized, ts.Value);
+
+        // Point-in-time resolution (the actual @GMT "restore/open" fix). Folder
+        // "Previous Versions" enumerates ONE share-wide timestamp per snapshot (the
+        // @GMT token), which is almost never the exact per-file version time. An
+        // exact-match lookup (GetVersionAtAsync) therefore misses the individual
+        // file, so opening it over SMB failed with OBJECT_NAME_NOT_FOUND (Notepad),
+        // fell back to the live file (Notepad++ showed current content), and made
+        // Windows hide the file-level version list entirely. Resolve a concrete file
+        // with the SAME "newest version at or before the token" semantics the folder
+        // listing uses, so the token consistently maps to the right version.
+        if (version is null && normalized.Length > 0)
+        {
+            var fileVersions = await _versions.GetVersionsAsync(share.Id, normalized);
+            version = fileVersions
+                .Where(v => v.SnapshotTimestampUtc <= ts.Value)
+                .OrderByDescending(v => v.SnapshotTimestampUtc)
+                .FirstOrDefault();
+            _logger.LogInformation(
+                "ResolveVersion: point-in-time lookup path=[{Path}] ts<={Ts:o} -> {Result} (of {Total} versions)",
+                normalized, ts.Value,
+                version is null ? "no match" : $"v#{version.VersionNumber}@{version.SnapshotTimestampUtc:o}",
+                fileVersions.Count);
+        }
 
         // Directory component of a snapshot path. SMB resolves EVERY parent directory
         // with the timewarp too (smbd stats "weqr" before opening "weqr/file"). Those
@@ -156,6 +197,9 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                 try
                 {
                     Directory.CreateDirectory(dirFull);
+                    // Stamp the cache-age marker so the evictor keys off the real
+                    // materialization time, not the historical file mtimes.
+                    SnapshotCache.TouchMarker(share.Path, request.GmtToken);
                     // Eager full-folder materialization. Files opened RELATIVE to a
                     // resolved snapshot directory bypass the timewarp logic (their parent
                     // fsp already points at the cache dir, twrp cleared), so smbd reads
@@ -192,6 +236,9 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                     request.Username, request.Share, request.Path, request.GmtToken, dirRel, under.Count);
                 return new ResolveVersionReply { Found = true, CachePath = dirRel, Size = 0 };
             }
+            _logger.LogWarning(
+                "ResolveVersion: NO version and NOT a historical dir -> notFound. path=[{Path}] token={Token}",
+                request.Path, request.GmtToken);
             return notFound;
         }
 
@@ -201,6 +248,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         try
         {
             cacheRel = await MaterializeVersionAsync(share.Id, share.Path, request.GmtToken, version);
+            // Stamp the cache-age marker (real materialization time) for the evictor.
+            SnapshotCache.TouchMarker(share.Path, request.GmtToken);
         }
         catch (Exception ex)
         {
@@ -210,9 +259,11 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             return notFound;
         }
 
+        string cacheFull = Path.Combine(share.Path, cacheRel.Replace('/', Path.DirectorySeparatorChar));
+        bool cacheExists = System.IO.File.Exists(cacheFull);
         _logger.LogInformation(
-            "ResolveVersion: user={User} share={Share} path=[{Path}] token={Token} -> {Cache} ({Size} B)",
-            request.Username, request.Share, request.Path, request.GmtToken, cacheRel, version.Size);
+            "ResolveVersion: user={User} share={Share} path=[{Path}] token={Token} -> FILE {Cache} ({Size} B, onDisk={Exists})",
+            request.Username, request.Share, request.Path, request.GmtToken, cacheRel, version.Size, cacheExists);
 
         return new ResolveVersionReply
         {

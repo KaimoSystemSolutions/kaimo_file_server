@@ -232,52 +232,151 @@ Phase 0 progress is tracked in [`samba-vfs/README.md`](../samba-vfs/README.md).
 
 ## 9. Open SMB problems (post-Phase-5 backlog)
 
-The migration is functionally complete, but the following items remain. Ordered
-roughly by priority.
+The migration is functionally complete. The list below was **cross-checked against
+the actual code on 2026-07-19** and re-grouped by real priority (P0 = blocks
+production, P1 = correctness/feature gap, P2 = operational hardening, P3 =
+cosmetic/deferred by design). Each item keeps its original A/B/C number for
+traceability and carries a **Status**. Items marked *fixed 2026-07-19* were
+addressed in this pass. The `kaimo_samba` image was rebuilt and driven live during
+this session, so the snapshot path (#1/#2), the audit toggle (#7) and the authz
+change (#14) are **verified against a running Samba**, not just compiled. A running
+build identifies itself in the logs via `kaimo_bridge build [<date+tag>]` (emitted
+by `vfs_kaimo_bridge_init`) — check it after a rebuild to confirm the deployed
+module matches the source.
 
-### A — Validation & hardening (must-do before production)
-1. **@GMT hooks not yet exercised end-to-end.** The C snapshot hooks
-   (`get_shadow_copy_data`, twrp resolve in `create_file`/`stat`/`lstat`) are
-   written against Samba's `shadow_copy2` conventions but compile+run only in the
-   Samba source build. Needs: build the `kaimo_samba` image, drive a real Windows
-   "Previous Versions" → *view* and *restore*, and `smbclient` snapshot ops.
-2. **Folder-level snapshot browsing over SMB.** Only file-level restore is wired
-   (enumerate + open/stat of a versioned file). Browsing a whole folder "as of" a
-   snapshot may need extra path hooks (`openat`/`readdir`/`fstatat` twrp handling).
-   The web UI already does folder snapshots (`GetFolderSnapshotAsync`).
-3. **Snapshot cache lifecycle.** `<share>/.kaimo-snapshots/` grows unbounded — no
-   eviction/TTL/size cap yet, and it is not cleaned when a share/version is deleted.
-4. **`connect` deny still surfaces as `NT_STATUS_UNSUCCESSFUL`** to clients (Samba
-   hardcodes this on VFS connect errors) instead of `ACCESS_DENIED`. Cosmetic.
+> **Note on the old A/B/C grouping:** the previous "A — must-do before production"
+> heading actually mixed a cosmetic item (#4) with three genuine blockers (#1–#3).
+> They are now split by severity below.
 
-### B — Feature parity gaps
-5. **Recycle bin on SMB delete.** Deliberately not implemented (parity with the old
-   path, which also didn't recycle) — but if product wants SMB deletes to land in
-   `.RECYCLE_BIN`, add an `unlinkat` → recycle path.
-6. **Per-user ABE share visibility.** Only the hidden flag (`browseable = no`) is
-   honored; shares a user cannot access are still *listed* (access is denied on
-   connect). Full ABE (hide inaccessible shares in enumeration) is unimplemented.
-7. **WS-Discovery & audit log settings are inert.** `EnableWsDiscovery` /
-   `EnableAuditLog` exist in `SmbProtocolSettings` but are not wired to Samba
-   (would need `wsdd` and the `full_audit` VFS). The UI toggles currently do nothing.
-8. **`mkdirat` close-hook unreliable** in Samba's SMB2 dir-create path → new
-   directories created over SMB may not be indexed/owner-stamped.
-9. **Rapid successive writes may collapse into one version** (version re-read from
-   disk on close, not from the write stream).
+### P0 — Blocks production
 
-### C — Operational / correctness
-10. **Storage write permissions on ACL-less filesystems.** Group-writable
-    (`kaimo` group + `2775`) works, but on filesystems without POSIX ACLs, files
-    later created by web/host (UID 1654) need umask `002` or SMB can read but not
-    overwrite them. Fragile on drvfs/9p dev mounts.
-11. **Elasticsearch indexing system-wide inactive.** SMB writes index via the same
-    `SearchServiceRouter` as web; once ES is re-enabled this should be re-verified.
-12. **`enabled` flag enforced only at TREE_CONNECT.** Disabling SMB blocks new
-    connections but does not drop already-established sessions; smbd keeps
-    listening on 445. Acceptable, but not a hard stop.
-13. **Samba version pinning / ABI 49.** The VFS module is bound to the exact Samba
-    build (`SMB_VFS_INTERFACE_VERSION = 49`); Samba upgrades require a module
-    rebuild. No CI guard for this yet.
-14. **Bridge is a single point of failure & unauthenticated (h2c).** If the bridge
-    is down, authz fails open by default (`KAIMO_AUTHZ_FAILCLOSED=1` to flip).
-    gRPC is plaintext on the internal network with no mTLS.
+- **#14 — Bridge SPOF + unauthenticated h2c + fail-**open** authz.**
+  `kaimo_failmode_allow()` ([`vfs_kaimo_bridge.c`](../samba-vfs/module/vfs_kaimo_bridge.c))
+  previously **allowed** on infrastructure error unless `KAIMO_AUTHZ_FAILCLOSED=1`;
+  the sidecar dials the bridge with `InsecureChannelCredentials()` (plaintext, no
+  mTLS). A bridge outage meant *every* access was granted.
+  **Status: partially fixed 2026-07-19** — default flipped to **fail-closed**
+  (`KAIMO_AUTHZ_FAILOPEN=1` restores the old behavior); `compose` sets it
+  explicitly. mTLS on the gRPC channel and bridge redundancy remain open.
+
+- **#1 (A.1) — @GMT snapshots: verified end-to-end (2026-07-19).** Live Windows +
+  `smbclient` testing now confirms the full path: file- and folder-level "Previous
+  Versions" enumerate correctly, and **View / Copy / Restore return the correct
+  historical content** for every version. `smbclient get` of a versioned file returns
+  the exact per-version bytes.
+  Two real bugs were found and fixed during this pass:
+  - **Point-in-time resolve** (bridge): `ResolveVersion` matched the version by an
+    *exact* timestamp, but folder snapshots enumerate one *share-wide* @GMT token that
+    is almost never a file's exact version time → opens failed. Fixed to "newest
+    version at or before the token" (same semantics as the folder listing).
+  - **openat data-path redirect** (VFS module, see #2).
+  **Known non-issue:** Explorer's *"Open"* button on a file version (which launches
+  Notepad directly on the `\\host\share\@GMT-…\file` path) shows "file not found".
+  This is a **Windows client limitation** — Win32 apps don't reliably resolve the @GMT
+  timewarp token when launched with such a path. The server serves the identical path
+  correctly (`smbclient` + every SMB op returns `NT_STATUS_OK`); *Copy* and *Restore*,
+  the actual Previous-Versions use cases, work. Nothing to fix server-side.
+  **Status: fixed / verified.**
+
+- **#3 (A.3) — Snapshot cache grows unbounded.** `<share>/.kaimo-snapshots/` had no
+  TTL/size cap and was never cleaned on share/version deletion → slow disk fill.
+  **Status: fixed 2026-07-19** — `SnapshotCacheCleanupService` (background service in
+  the bridge) evicts entries by age and enforces a per-share size cap; configurable
+  via `Snapshots:Cache:*`.
+
+### P1 — Correctness / feature gaps
+
+- **#8 (B.8) — `mkdirat` close-hook unreliable** on Samba's SMB2 dir-create path →
+  new directories may not be indexed/owner-stamped.
+  **Status: fixed 2026-07-19** — the `create_file` hook now also emits a `MKDIR`
+  notify when it created a directory (`*pinfo == FILE_WAS_CREATED` +
+  result is a directory), which is the reliable SMB2 path; the `mkdirat` hook stays
+  as a fallback (`NotifyMkdir` is idempotent, so a double notify is harmless).
+  Deployed in the rebuilt image; not isolated-tested on its own (a dedicated
+  new-dir-over-SMB → index/owner-stamp check is still worth running).
+
+- **#7 (B.7) — WS-Discovery & audit-log toggles inert.** `EnableWsDiscovery` /
+  `EnableAuditLog` exist in `SmbProtocolSettings` but were not transported or applied.
+  **Status: fixed / verified 2026-07-19** — added `enable_ws_discovery` /
+  `enable_audit_log` to the `ProtocolSettingsReply`, populated in `ConfigGrpcService`,
+  emitted by `kaimo_configsync`, and applied in `sync-config.sh` (start/stop `wsdd`;
+  toggle the `full_audit` VFS + audit params in the global registry). Image now ships
+  `wsdd` + `procps` (`Dockerfile.vfs`). Audit logging confirmed live (full_audit
+  `user|ip|share|op|...` lines appear).
+  > **⚠️ Footgun found & fixed the same day:** `full_audit` **fails every
+  > `TREE_CONNECT` (incl. IPC$ → all logins broken)** if its `full_audit:success` /
+  > `:failure` op list contains an invalid operation name. The first version used
+  > legacy names (`open`/`rename`/`unlink`/`mkdir`); Samba 4.19 (ABI 49) only accepts
+  > the `*at` names (`openat`/`renameat`/`unlinkat`/`mkdirat`). Since `EnableAuditLog`
+  > defaults to **true**, a fresh system loaded `full_audit` immediately and locked
+  > everyone out. Fix: correct op names **plus** a **self-test guard** in
+  > `sync-config.sh` — after enabling audit it probes a real connect (`smbclient -L`)
+  > and auto-strips `full_audit` if that fails, so the audit toggle can never again
+  > take the whole service down.
+
+- **#11 (C.11) — Elasticsearch indexing system-wide inactive.** ES is commented out in
+  `docker-compose.yml`; SMB writes index through the same `SearchServiceRouter` as web.
+  **Status: OPEN — operational** (re-enable ES, then re-verify SMB indexing).
+
+- **#9 (B.9) — Rapid successive writes may collapse into one version.** The version is
+  re-read from disk on `close`, not captured from the write stream, so multiple writes
+  within one open/close window fold into a single version.
+  **Status: OPEN — needs versioning-path design change** (not a quick fix).
+
+### P2 — Operational hardening
+
+- **#12 (C.12) — `enabled` enforced only at TREE_CONNECT.** Disabling SMB blocked new
+  connects but did not drop established sessions.
+  **Status: fixed 2026-07-19** — `sync-config.sh` now force-closes clients off every
+  registry share via `smbcontrol … close-share` when `enabled=0`. smbd still listens
+  on 445 (by design; a full port teardown would require stopping the container).
+
+- **#10 (C.10) — Storage write perms on ACL-less filesystems.** Works via `kaimo`
+  group + setgid + `umask 002`; fragile on `drvfs`/`9p` dev mounts without POSIX ACLs.
+  **Status: mitigated** (ACL default + create-mask + container `umask 0002` fallback
+  already in place); no further code change — a prod ext4/xfs mount removes the risk.
+
+- **#13 (C.13) — Samba version / ABI-49 pinning, no CI guard.** The module is bound to
+  the exact Samba build (`SMB_VFS_INTERFACE_VERSION`, ABI 49 = Samba 4.19.5); an
+  upgrade needs a module rebuild and nothing guards the version drift.
+  **Status: OPEN** — add a CI check asserting the pinned Samba version in
+  `Dockerfile.src`/`Dockerfile.vfs` matches the expected ABI.
+
+- **#6 (B.6) — Per-user ABE share visibility.** Only the hidden flag (`browseable = no`)
+  is honored; inaccessible shares are still *listed* (access denied on connect).
+  **Status: DEFERRED by design** (Risk 2, decision (b)). Full ABE (option c) remains a
+  later option if hiding inaccessible shares in enumeration becomes a requirement.
+
+### P3 — Cosmetic / by-design
+
+- **#5 (B.5) — No recycle bin on SMB delete.** Deliberate parity with the old path.
+  **Status: DEFERRED by design** — add an `unlinkat` → `.RECYCLE_BIN` path if product
+  requires it.
+
+- **#4 (A.4) — `connect` deny surfaces as `NT_STATUS_UNSUCCESSFUL`** instead of
+  `ACCESS_DENIED` (Samba hardcodes this on VFS connect errors).
+  **Status: OPEN — cosmetic**, low priority.
+
+- **#2 (A.2) — Snapshot file open served the LIVE file (data-path redirect).**
+  Live testing showed that opening a versioned file returned the current content (or
+  `OBJECT_NAME_NOT_FOUND`). Bridge logs proved the version was resolved and materialized
+  correctly (`ResolveVersion … -> FILE … onDisk=True`), so the break was in the VFS
+  module: Samba obtains the real fd via **`openat`** (relative to a parent dirfsp), not
+  via the `create_file` `base_name` the module rewrote — so the redirect was ignored and
+  the live file opened. (Folder listings only *looked* right because they show file
+  names, identical live vs. snapshot.)
+  **Status: fixed / verified 2026-07-19** — added an `openat` hook (`kaimo_openat`)
+  that, for a timewarp open, reconstructs the logical path, asks the bridge to
+  materialize the version, and opens the in-share cache copy by absolute path — the same
+  place Samba's own `vfs_shadow_copy2` redirects. Normal (non-twrp) opens pass straight
+  through (only a `twrp==0` check). Kill-switch `KAIMO_SNAPSHOT_OPENAT=0`.
+  Two follow-on fixes made it robust across Samba's call patterns:
+  - **share-relative normalization** (`kaimo_share_rel`): some `openat`/`stat` calls
+    arrive with the absolute connectpath-prefixed path (Samba's realpath / non-widelink
+    verification) — strip the connectpath so the bridge always gets a share-relative
+    path, applied identically in `openat` and `stat`/`lstat` (or their snapshot views
+    diverge and Samba rejects on the stat-vs-fd inode mismatch).
+  - **`.`/`..` pass-through**: opened relative to the already-redirected dir fsp rather
+    than resolved as version paths.
+  Verified via live Windows (View/Copy/Restore) and `smbclient get`. See the #1 note on
+  Explorer's "Open" button (a Windows client-side limitation, not a server bug).

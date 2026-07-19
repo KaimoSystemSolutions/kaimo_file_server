@@ -63,6 +63,14 @@ services:
     environment:
       # Address of gRPC bridge for NT hash sync (kaimo_authsync).
       KAIMO_BRIDGE_ADDR: kaimo_smb_bridge:5080
+      # Authz fail mode when the bridge/authd is unreachable. Default is fail-CLOSED
+      # (deny) so a bridge outage cannot silently grant access. Set to "1" to fail
+      # OPEN (allow on error) only if availability must trump security in a given env.
+      KAIMO_AUTHZ_FAILOPEN: "0"
+      # @GMT "Previous Versions" data-path redirect (openat hook). "1" = on (serve the
+      # materialized version copy). Set to "0" to disable the redirect at runtime
+      # (no rebuild) if it ever misbehaves — snapshots then fall back to broken/live.
+      KAIMO_SNAPSHOT_OPENAT: "1"
     healthcheck:
       test: ["CMD-SHELL", "/opt/samba/bin/smbclient -L localhost -U kaimotest%Passw0rd! -m SMB3 >/dev/null 2>&1 || exit 1"]
       interval: 15s

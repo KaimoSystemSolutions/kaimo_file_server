@@ -131,9 +131,10 @@ message ListSharesReply {
 // (kaimo_configsync -> sync-config.sh) mirrors values into Samba's global
 // registry config (net conf setparm global). Corresponds to what
 // SmbServer.LoadProtocolSettings() fed into the old .NET SMB Server at
-// (re)start. WS-Discovery/Audit-Log are intentionally NOT included: they have
-// no global smb.conf parameters in Samba (separate mechanisms: wsdd and
-// full_audit VFS).
+// (re)start. WS-Discovery and Audit-Log use separate Samba mechanisms (the `wsdd`
+// responder daemon and the `full_audit` VFS module); they are transported as
+// booleans here and applied by sync-config.sh (start/stop wsdd; toggle full_audit
+// in the global `vfs objects`), not via `server min/max protocol` style globals.
 service ConfigService {
   rpc GetProtocolSettings(GetProtocolSettingsRequest) returns (ProtocolSettingsReply);
 }
@@ -155,6 +156,16 @@ message ProtocolSettingsReply {
   // (deny-all when disabled), so a disabled service accepts no TREE_CONNECT. This
   // field lets the config sync log/reflect the state in the Samba container.
   bool   enabled            = 5;
+
+  // Announce the server via WS-Discovery so it shows up in Windows Explorer's
+  // "Network" view. Applied by sync-config.sh by starting/stopping the `wsdd`
+  // responder daemon (there is no smb.conf parameter for this).
+  bool   enable_ws_discovery = 6;
+
+  // Emit structured SMB security-audit events (connect/open/close/rename/unlink…)
+  // to the server log. Applied by sync-config.sh by toggling the `full_audit` VFS
+  // module in the global `vfs objects` (kaimo_bridge [full_audit]).
+  bool   enable_audit_log    = 7;
 }
 
 // Snapshots / "Previous Versions" over SMB (Phase 5). Windows requests the list

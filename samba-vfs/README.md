@@ -167,9 +167,9 @@ enter the share — same semantics as the earlier `KaimoSharePolicy.AuthorizeCon
 > the shares. `CanAccessShareAsync` therefore denies — **just like the old SMB stack** (faithful
 > parity, not a bug). File access is granted via ACLs/departments, not management roles.
 
-**Fail behavior:** If the sidecar/bridge is unreachable, the module allows by default
-(fail-open, so an outage doesn't lock everything). With `KAIMO_AUTHZ_FAILCLOSED=1`, it strictly
-denies.
+**Fail behavior:** If the sidecar/bridge is unreachable, the module **denies by default**
+(fail-closed — a bridge outage must not silently grant access). Set `KAIMO_AUTHZ_FAILOPEN=1`
+to allow on error instead (availability over security), which was the previous default.
 
 **Known cosmetic issue:** A deny appears client-side as `NT_STATUS_UNSUCCESSFUL` (not
 `ACCESS_DENIED`) — several Samba code paths hardcode this for VFS connect errors. Functionally

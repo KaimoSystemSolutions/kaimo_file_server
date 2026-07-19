@@ -119,6 +119,15 @@ RUN ./configure --without-ad-dc --enable-debug --prefix=/opt/samba \
 FROM sambabuild AS runtime
 ENV DEBIAN_FRONTEND=noninteractive
 
+# WS-Discovery responder (backlog #7): `wsdd` makes the server visible in Windows
+# Explorer's "Network" view; started/stopped by sync-config.sh per the DB toggle.
+# `procps` provides pgrep/pkill used to manage it. The `full_audit` VFS (audit-log
+# toggle) is a standard Samba module already built into /opt/samba by the source
+# build above — no extra package needed.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends wsdd procps \
+    && rm -rf /var/lib/apt/lists/*
+
 # Phase 1: build gRPC C++ clients (authsync/authd/sharesync/configsync) for
 # NT-Hash + share + config sync. Toolchain already present from sambabuild.
 WORKDIR /build/authsync
