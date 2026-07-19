@@ -182,7 +182,10 @@ COPY selftest.sh              /usr/local/bin/selftest.sh
 COPY sync-users.sh            /usr/local/bin/sync-users.sh
 COPY sync-shares.sh           /usr/local/bin/sync-shares.sh
 COPY sync-config.sh           /usr/local/bin/sync-config.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
+                       /usr/local/bin/sync-users.sh /usr/local/bin/sync-shares.sh \
+                       /usr/local/bin/sync-config.sh \
+    && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
              /usr/local/bin/sync-users.sh /usr/local/bin/sync-shares.sh \
              /usr/local/bin/sync-config.sh
 

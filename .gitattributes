@@ -3,6 +3,10 @@
 ###############################################################################
 * text=auto
 
+# Shell scripts are copied into Linux containers. CRLF changes the shebang to
+# e.g. /bin/bash\r and makes Docker report the misleading "no such file" error.
+*.sh text eol=lf
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #

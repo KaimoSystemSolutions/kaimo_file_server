@@ -14,7 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY conf/smb.conf /etc/samba/smb.conf
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY selftest.sh   /usr/local/bin/selftest.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
+    && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh
 
 EXPOSE 445
 
