@@ -3374,5 +3374,95 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Move_BatchPartialFailure", resourceCulture);
             }
         }
+        
+        internal static string Web_Action_Copy {
+            get {
+                return ResourceManager.GetString("Web_Action_Copy", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Action_Cut {
+            get {
+                return ResourceManager.GetString("Web_Action_Cut", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Action_Paste {
+            get {
+                return ResourceManager.GetString("Web_Action_Paste", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Clipboard_Copied {
+            get {
+                return ResourceManager.GetString("Web_Clipboard_Copied", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Clipboard_CopiedBatch {
+            get {
+                return ResourceManager.GetString("Web_Clipboard_CopiedBatch", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Clipboard_Cut {
+            get {
+                return ResourceManager.GetString("Web_Clipboard_Cut", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Clipboard_CutBatch {
+            get {
+                return ResourceManager.GetString("Web_Clipboard_CutBatch", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Copy_Progress {
+            get {
+                return ResourceManager.GetString("Web_Copy_Progress", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Copy_BatchProgress {
+            get {
+                return ResourceManager.GetString("Web_Copy_BatchProgress", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Copy_Success {
+            get {
+                return ResourceManager.GetString("Web_Copy_Success", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Copy_BatchSuccess {
+            get {
+                return ResourceManager.GetString("Web_Copy_BatchSuccess", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_CopyFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_CopyFailed", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_CannotMoveIntoSelf {
+            get {
+                return ResourceManager.GetString("Web_Error_CannotMoveIntoSelf", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Error_CannotPasteIntoSelf {
+            get {
+                return ResourceManager.GetString("Web_Error_CannotPasteIntoSelf", resourceCulture);
+            }
+        }
+        
+        internal static string Web_Paste_PartialFailure {
+            get {
+                return ResourceManager.GetString("Web_Paste_PartialFailure", resourceCulture);
+            }
+        }
     }
 }

@@ -1782,4 +1782,49 @@
   <data name="Web_Move_BatchPartialFailure" xml:space="preserve">
   <value>{0} von {1} Elementen verschoben. Bei einigen Elementen ist ein Fehler aufgetreten.</value>
 </data>
+  <data name="Web_Action_Copy" xml:space="preserve">
+    <value>Kopieren</value>
+  </data>
+  <data name="Web_Action_Cut" xml:space="preserve">
+    <value>Ausschneiden</value>
+  </data>
+  <data name="Web_Action_Paste" xml:space="preserve">
+    <value>Einfügen</value>
+  </data>
+  <data name="Web_Clipboard_Copied" xml:space="preserve">
+    <value>„{0}" in die Zwischenablage kopiert.</value>
+  </data>
+  <data name="Web_Clipboard_CopiedBatch" xml:space="preserve">
+    <value>{0} Elemente in die Zwischenablage kopiert.</value>
+  </data>
+  <data name="Web_Clipboard_Cut" xml:space="preserve">
+    <value>„{0}" in die Zwischenablage ausgeschnitten.</value>
+  </data>
+  <data name="Web_Clipboard_CutBatch" xml:space="preserve">
+    <value>{0} Elemente in die Zwischenablage ausgeschnitten.</value>
+  </data>
+  <data name="Web_Copy_Progress" xml:space="preserve">
+    <value>„{0}" wird kopiert…</value>
+  </data>
+  <data name="Web_Copy_BatchProgress" xml:space="preserve">
+    <value>{0} Elemente werden kopiert…</value>
+  </data>
+  <data name="Web_Copy_Success" xml:space="preserve">
+    <value>„{0}" erfolgreich kopiert.</value>
+  </data>
+  <data name="Web_Copy_BatchSuccess" xml:space="preserve">
+    <value>{0} Elemente erfolgreich kopiert.</value>
+  </data>
+  <data name="Web_Error_CopyFailed" xml:space="preserve">
+    <value>Das Element konnte nicht kopiert werden.</value>
+  </data>
+  <data name="Web_Error_CannotMoveIntoSelf" xml:space="preserve">
+    <value>„{0}" kann nicht in sich selbst oder einen eigenen Unterordner verschoben werden.</value>
+  </data>
+  <data name="Web_Error_CannotPasteIntoSelf" xml:space="preserve">
+    <value>„{0}" kann nicht in sich selbst oder einen eigenen Unterordner eingefügt werden.</value>
+  </data>
+  <data name="Web_Paste_PartialFailure" xml:space="preserve">
+    <value>{0} von {1} Elementen erfolgreich eingefügt.</value>
+  </data>
 </root>

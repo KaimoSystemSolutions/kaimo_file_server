@@ -348,6 +348,10 @@ public async Task<OperationResult> MoveAsync(FileMetadata item, string destRelat
     if (relativePath.StartsWith(CurrentShare.Path))
         relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
 
+    // Guard: a folder can never be moved into itself or one of its own descendants.
+    if (item.IsDirectory && IsInsideOrEqual(destRelativePath, relativePath))
+        return OperationResult.Fail(string.Format(Resources.Web_Error_CannotMoveIntoSelf, item.Name));
+
     var newRelativePath = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Combine(destRelativePath, item.Name);
 
     // No-op: dropped onto the folder it's already in
@@ -516,7 +520,105 @@ private async Task<OperationResult> MoveInternalAsync(
         if (!ct.IsCancellationRequested)
             OnStateChanged?.Invoke();
     }
+   
 
+/// <summary>
+/// Copies an item (file or folder, recursively) into a destination directory within
+/// the same share. Performs a real byte copy via ReadFileAsync/WriteFileAsync — there
+/// is no fast-path server-side copy in IFileService, so this streams through the app.
+/// Auto-renames on a name collision at the destination (Explorer-style "name (2)").
+/// </summary>
+public async Task<OperationResult> CopyAsync(FileMetadata item, string destRelativePath)
+{
+    if (_fileService is null || CurrentShare is null)
+        return OperationResult.Fail(Resources.Web_Error_NoShareLoaded);
+
+    var userContext = await GetCurrentUserContextAsync();
+    if (userContext is null)
+        return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
+
+    if (item.IsDirectory && IsInsideOrEqual(destRelativePath, ToShareRelative(item.Path)))
+        return OperationResult.Fail(string.Format(Resources.Web_Error_CannotPasteIntoSelf, item.Name));
+
+    try
+    {
+        await CopyItemRecursiveAsync(item, destRelativePath, userContext);
+
+        _logger.LogInformation("Copied '{Path}' to '{Target}' by {User}",
+            item.Path, destRelativePath, userContext.User.Username);
+
+        return OperationResult.Ok();
+    }
+    catch (UnauthorizedAccessException)
+    {
+        return OperationResult.Fail(Resources.Web_Error_AccessDenied);
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error copying '{Path}' to '{Target}'", item.Path, destRelativePath);
+        return OperationResult.Fail(Resources.Web_Error_CopyFailed);
+    }
+}
+
+private async Task CopyItemRecursiveAsync(FileMetadata item, string destDir, UserContext userContext)
+{
+    var uniqueName = await GetUniqueNameAsync(destDir, item.Name, item.IsDirectory, userContext);
+    var destPath = Kaimo_File_Server.Core.Helpers.ShareRelativePath.Combine(destDir, uniqueName);
+
+    if (item.IsDirectory)
+    {
+        // NOTE: trailing slash mirrors the convention used in CreateFolderAsync for
+        // nested folders. Verify against your IFileService implementation if creation fails.
+        await _fileService!.CreateDirectoryAsync(destPath + "/", userContext);
+
+        var children = await _fileService.ListAsync(ToShareRelative(item.Path), userContext);
+        foreach (var child in children)
+            await CopyItemRecursiveAsync(child, destPath, userContext);
+    }
+    else
+    {
+        await using var stream = await _fileService!.ReadFileAsync(ToShareRelative(item.Path), userContext);
+        await _fileService.WriteFileAsync(destPath, stream, userContext);
+    }
+}
+
+/// <summary>Resolves a name collision the way Explorer does: "name (2).ext", "name (3).ext", ...</summary>
+private async Task<string> GetUniqueNameAsync(string destDir, string name, bool isDirectory, UserContext userContext)
+{
+    List<FileMetadata> existingItems;
+    try
+    {
+        existingItems = _fileService is null ? new() : await _fileService.ListAsync(destDir, userContext);
+    }
+    catch
+    {
+        return name; // can't list (e.g. brand-new folder) — just try the original name
+    }
+
+    var existingNames = existingItems.Select(i => i.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    if (!existingNames.Contains(name)) return name;
+
+    var baseName = isDirectory ? name : Path.GetFileNameWithoutExtension(name);
+    var extension = isDirectory ? "" : Path.GetExtension(name);
+
+    for (int i = 2; i < 10_000; i++)
+    {
+        var candidate = $"{baseName} ({i}){extension}";
+        if (!existingNames.Contains(candidate)) return candidate;
+    }
+
+    return $"{baseName} ({Guid.NewGuid():N}){extension}"; // pathological fallback
+}
+
+/// <summary>True if destRelativePath equals folderRelativePath or is nested inside it.</summary>
+private static bool IsInsideOrEqual(string destRelativePath, string folderRelativePath)
+{
+    var dest = destRelativePath.TrimEnd('/');
+    var folder = folderRelativePath.TrimEnd('/');
+    return dest.Equals(folder, StringComparison.OrdinalIgnoreCase)
+        || dest.StartsWith(folder + "/", StringComparison.OrdinalIgnoreCase);
+}
+    
     /// <summary>Raises <see cref="OnStateChanged"/> at most once per throttle window.</summary>
     private void PushThrottledStateChange(ref long lastPushTicks)
     {

@@ -110,8 +110,6 @@ public partial class FileBrowser
         else
             _createFolderError = result.Error;
     }
-
-    // ========== Delete ==========
     private async Task OnKeyDownItemList(KeyboardEventArgs e)
     {
         if (e.Key == "Delete" && _selectedItems.Count > 0)
@@ -119,8 +117,25 @@ public partial class FileBrowser
 
         if (e.Key == "F2" && _selectedItems.Count == 1)
             await RenameSelected();
-    }
 
+        if (e.CtrlKey || e.MetaKey) // MetaKey = Cmd on macOS
+        {
+            switch (e.Key.ToLowerInvariant())
+            {
+                case "c":
+                    CopySelected();
+                    break;
+                case "x":
+                    CutSelected();
+                    break;
+                case "v":
+                    await PasteFromClipboard();
+                    break;
+            }
+        }
+    }
+    // ========== Delete ==========
+    
     private async Task OnDeleteKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")

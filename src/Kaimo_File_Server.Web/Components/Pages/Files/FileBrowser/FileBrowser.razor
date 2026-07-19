@@ -35,6 +35,11 @@
                 @onkeydown="OnCreateFolderKeyDown">
             @Assets.SVG("folder.svg", new SvgOptions())
         </button>
+        <button class="btn-icon" title="@Resources.Web_Action_Paste"
+                disabled="@(!CanPasteHere)"
+                @onclick="PasteFromClipboard">
+            @Assets.SVG("paste.svg", new SvgOptions())
+        </button>
         @if (CanManageAcls())
         {
             <button class="btn-icon" title="@Resources.Web_ManagePermissions"
@@ -77,6 +82,16 @@
 
             @Assets.SVG("trash.svg", new SvgOptions(Width: 16, Height: 16))
             <span>@Resources.Web_Action_Delete</span>
+        </button>
+        <button class="toolbar-btn" title="@Resources.Web_Action_Copy"
+                disabled="@(!CanCopySelection)" @onclick="CopySelected">
+            @Assets.SVG("copy.svg", new SvgOptions(Width: 16, Height: 16))
+            <span>@Resources.Web_Action_Copy</span>
+        </button>
+        <button class="toolbar-btn" title="@Resources.Web_Action_Cut"
+                disabled="@(!CanCutSelection)" @onclick="CutSelected">
+            @Assets.SVG("cut.svg", new SvgOptions(Width: 16, Height: 16))
+            <span>@Resources.Web_Action_Cut</span>
         </button>
         <button class="toolbar-btn" title="@Resources.Web_Action_Permissions"
                 disabled="@(!CanAclSelection)" @onclick="AclSelected">
@@ -273,7 +288,7 @@ else
                 var aclCount = CanManageAcls() ? GetAclCount(aclPath) : 0;
             }
             <div
-                class="file-grid-row @(entry.IsDirectory ? "file-row-dir" : "") @(isSelected ? "file-row--selected" : "")"
+                class="file-grid-row @(entry.IsDirectory ? "file-row-dir" : "") @(isSelected ? "file-row--selected" : "") @(IsCutItem(entry) ? "file-row--cut" : "")"
                 data-path="@entry.Path"
                 data-is-dir="@(entry.IsDirectory ? "true" : "false")"
                 @onclick="(e) => OnItemClick(e, entry)"

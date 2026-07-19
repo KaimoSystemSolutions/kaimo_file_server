@@ -18,7 +18,10 @@ namespace Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser;
 public partial class FileBrowser
 {
 // ========== State ==========
-
+    private enum ClipboardMode { None, Copy, Cut }
+    private ClipboardMode _clipboardMode = ClipboardMode.None;
+    private List<FileMetadata> _clipboardItems = new();
+    
     private Dictionary<string, int> _aclCounts = new();
     private bool _showAclPanel;
     private string _aclPath = "";
@@ -171,6 +174,106 @@ public partial class FileBrowser
         if (item.IsDirectory) OpenFolderAcl(item);
         else OpenFileAcl(item);
     }
+
+    // ========== Clipboard (Copy / Cut / Paste) ==========
+
+private bool CanCopySelection => _selectedItems.Count > 0;
+private bool CanCutSelection => _selectedItems.Count > 0;
+internal bool CanPasteHere => _clipboardMode != ClipboardMode.None && _clipboardItems.Count > 0;
+
+private bool IsCutItem(FileMetadata entry)
+    => _clipboardMode == ClipboardMode.Cut && _clipboardItems.Contains(entry);
+
+internal void CopySelected()
+{
+    if (_selectedItems.Count == 0) return;
+    _clipboardItems = _selectedItems.ToList();
+    _clipboardMode = ClipboardMode.Copy;
+
+    Toast.Show(
+        _clipboardItems.Count == 1
+            ? string.Format(Resources.Web_Clipboard_Copied, _clipboardItems[0].Name)
+            : string.Format(Resources.Web_Clipboard_CopiedBatch, _clipboardItems.Count),
+        ToastType.Success);
+
+    StateHasChanged();
+}
+
+internal void CutSelected()
+{
+    if (_selectedItems.Count == 0) return;
+    _clipboardItems = _selectedItems.ToList();
+    _clipboardMode = ClipboardMode.Cut;
+
+    Toast.Show(
+        _clipboardItems.Count == 1
+            ? string.Format(Resources.Web_Clipboard_Cut, _clipboardItems[0].Name)
+            : string.Format(Resources.Web_Clipboard_CutBatch, _clipboardItems.Count),
+        ToastType.Success);
+
+    StateHasChanged(); // so cut items render dimmed immediately
+}
+
+internal async Task PasteFromClipboard()
+{
+    if (!CanPasteHere) return;
+
+    var items = _clipboardItems.ToList();
+    var mode = _clipboardMode;
+    var destPath = VM.CurrentPath;
+
+    var toastId = Toast.Show(
+        mode == ClipboardMode.Cut
+            ? (items.Count == 1
+                ? string.Format(Resources.Web_Move_Progress, items[0].Name)
+                : string.Format(Resources.Web_Move_BatchProgress, items.Count))
+            : (items.Count == 1
+                ? string.Format(Resources.Web_Copy_Progress, items[0].Name)
+                : string.Format(Resources.Web_Copy_BatchProgress, items.Count)),
+        ToastType.Progress);
+
+    var failed = new List<string>();
+    foreach (var item in items)
+    {
+        var result = mode == ClipboardMode.Cut
+            ? await VM.MoveAsync(item, destPath)
+            : await VM.CopyAsync(item, destPath);
+
+        if (!result.Success)
+            failed.Add(item.Name);
+    }
+
+    if (mode == ClipboardMode.Cut)
+    {
+        // The items moved away — nothing left to paste again.
+        _clipboardMode = ClipboardMode.None;
+        _clipboardItems.Clear();
+    }
+    // Copy clipboard is intentionally kept, so the user can paste it elsewhere too.
+
+    if (failed.Count == 0)
+    {
+        Toast.Update(toastId,
+            mode == ClipboardMode.Cut
+                ? (items.Count == 1
+                    ? string.Format(Resources.Web_Move_Success, items[0].Name)
+                    : string.Format(Resources.Web_Move_BatchSuccess, items.Count))
+                : (items.Count == 1
+                    ? string.Format(Resources.Web_Copy_Success, items[0].Name)
+                    : string.Format(Resources.Web_Copy_BatchSuccess, items.Count)),
+            type: ToastType.Success);
+    }
+    else
+    {
+        Toast.Update(toastId,
+            string.Format(Resources.Web_Paste_PartialFailure, items.Count - failed.Count, items.Count),
+            type: ToastType.Error);
+    }
+
+    _selectedItems.Clear();
+    await VM.LoadShareAsync(ShareName, SubPath ?? "");
+    StateHasChanged();
+}
 
 // ---- Drag start/end ----
 

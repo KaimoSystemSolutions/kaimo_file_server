@@ -478,6 +478,8 @@ html, body, #app {
 .file-cell {
     font-size: 13px;
 }
+.file-row--cut { opacity: 0.5; }
+
 
 .file-name {
     flex: 1;
