@@ -116,18 +116,18 @@
         FileMetadata? target, HashSet<FileMetadata> selected) => id switch
     {
         "open" when target is { IsDirectory: true }
-            => () => { ContextNavigateTo(target); return Task.CompletedTask; },
+            => () => {  CloseContextMenu(); ContextNavigateTo(target); return Task.CompletedTask; },
         "open"
-            => async () => { _showContextMenu = false; await FilePreviewComponent.OpenFilePreview(target!); },
+            => async () => {  CloseContextMenu(); await FilePreviewComponent.OpenFilePreview(target!); },
 
         "extract" when scope == ContextMenuScope.MultiSelection
             => async () =>
             {
-                _showContextMenu = false;
+                CloseContextMenu();
                 foreach (var item in selected) await FileBrowser.UnzipFile(item);
             },
         "extract"
-            => async () => { _showContextMenu = false; await FileBrowser.UnzipFile(target!); },
+            => async () => {  CloseContextMenu(); await FileBrowser.UnzipFile(target!); },
 
         "compress.zip" => async () =>
         {
@@ -209,6 +209,7 @@
     public void CloseContextMenu()
     {
         _showContextMenu = false;
+        StateHasChanged();
     }
 
     private void ContextNavigateTo(FileMetadata dir) { CloseContextMenu(); FileBrowser.NavigateTo(dir); }

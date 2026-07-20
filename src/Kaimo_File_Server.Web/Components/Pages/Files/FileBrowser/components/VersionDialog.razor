@@ -7,7 +7,7 @@
 
 @if (_show)
 {
-    <div class="modal-backdrop" @onclick="Close">
+    <div class="modal-backdrop" @onclick="Close" @ref="_dialogRef" @onkeydown="OnKeyDown" tabindex="0">
         <div class="preview-dialog version-dialog" @onclick:stopPropagation="true">
             <div class="preview-header">
                 <span class="preview-title">@_title</span>
@@ -170,6 +170,8 @@
 
     private string _title = "";
 
+    private ElementReference _dialogRef;
+
     public async Task Open(FileMetadata target)
     {
         _target = target;
@@ -200,8 +202,20 @@
         }
 
         _loading = false;
+        _dialogRef.FocusAsync();
         StateHasChanged();
     }
+    
+    
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            Close();
+        }
+        
+    }
+
 
     public void Close()
     {
@@ -240,6 +254,7 @@
 
         var (data, contentType, kind) = result.Value;
         await FilePreviewComponent.OpenPreviewFromDataAsync(data, contentType, kind, name);
+        Close();
     }
 
     private async Task DownloadVersion(string shareRelativePath, DateTime ts, string name)

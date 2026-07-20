@@ -27,41 +27,41 @@
             </div>
             @if (_previewLoading)
             {
-                <div class="preview-loading">
+                <div class="preview-loading" @onkeydown="OnKeyDown" tabindex="0">
                     <div class="preview-spinner"></div>
                     <span class="preview-loading-text">@Resources.Web_File_Loading</span>
                 </div>
             }
             else if (_previewKind == PreviewKind.Image)
             {
-                <div class="preview-image-container">
+                <div class="preview-image-container" @onkeydown="OnKeyDown" tabindex="0">
                     <img class="preview-image" src="@_displayUrl" alt="@_previewFileName" />
                 </div>
             }
             else if (_previewKind == PreviewKind.Video)
             {
-                <div class="preview-media-container">
+                <div class="preview-media-container" @onkeydown="OnKeyDown" tabindex="0">
                     <video class="preview-media" src="@_displayUrl" controls autoplay></video>
                 </div>
             }
             else if (_previewKind == PreviewKind.Audio)
             {
-                <div class="preview-media-container">
+                <div class="preview-media-container" @onkeydown="OnKeyDown" tabindex="0">
                     <audio class="preview-audio" src="@_displayUrl" controls autoplay></audio>
                 </div>
             }
             else if (_previewKind == PreviewKind.Pdf)
             {
-                <iframe class="preview-frame" src="@_displayUrl"></iframe>
+                <iframe class="preview-frame" src="@_displayUrl" @onkeydown="OnKeyDown" tabindex="0"></iframe>
             }
             else if (_previewKind == PreviewKind.Text || _previewKind == PreviewKind.Docx)
             {
                 @* Generated, self-contained HTML — sandbox blocks any script execution. *@
-                <iframe class="preview-frame" src="@_displayUrl" sandbox="allow-same-origin"></iframe>
+                <iframe class="preview-frame" src="@_displayUrl" sandbox="allow-same-origin" @onkeydown="OnKeyDown"  tabindex="0"></iframe>
             }
             else
             {
-                <div class="preview-fallback">
+                <div class="preview-fallback" @onkeydown="OnKeyDown" tabindex="0">
                     @Assets.SVG(FileHelper.GetIcon(_previewFileName), new SvgOptions(Width: 64, Height: 64, StrokeWidth: 1.5f, Color: "var(--text-tertiary)"))
                     <span class="preview-fallback-name">@_previewFileName</span>
                     <span class="preview-fallback-hint">
