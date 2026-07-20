@@ -69,7 +69,7 @@ public partial class FileBrowser
     {
         _selectedItems.Add(item);
         StateHasChanged();
-    }
+    } 
 
     public void RemoveItemFromSelection(FileMetadata item)
     {
@@ -82,7 +82,7 @@ public partial class FileBrowser
         _selectedItems.Clear();
         StateHasChanged();
     }
-
+  
     public bool SelectedItemsContain(FileMetadata fileMetadata)
         => _selectedItems.Contains(fileMetadata);
 

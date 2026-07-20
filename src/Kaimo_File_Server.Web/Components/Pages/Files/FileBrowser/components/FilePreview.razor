@@ -9,7 +9,7 @@
 
 @if (_showFilePreview)
 {
-    <div class="modal-backdrop" @onclick="CloseFilePreview">
+    <div class="modal-backdrop" @ref="_previewRef" @onclick="CloseFilePreview" @onkeydown="OnKeyDown" tabindex="0">
         <div class="preview-dialog" @onclick:stopPropagation="true">
             <div class="preview-header">
                 <span class="preview-title">@_previewFileName</span>
@@ -98,6 +98,8 @@
     private bool _previewTooLarge;
     private bool _showFilePreview;
 
+    private ElementReference _previewRef;
+
     public async Task CloseFilePreview()
     {
         await RevokeUrlsAsync();
@@ -105,6 +107,17 @@
         _showFilePreview = false;
         _displayUrl = "";
         _downloadUrl = "";
+    }
+    
+    
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            _showFilePreview = false;
+            StateHasChanged();
+        }
+        
     }
 
 
@@ -162,6 +175,8 @@
             _previewKind = PreviewKind.Unsupported;
 
         _previewLoading = false;
+        _previewRef.FocusAsync();
+
         StateHasChanged();
     }
 
