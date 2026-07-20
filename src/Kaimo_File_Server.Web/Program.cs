@@ -6,6 +6,7 @@ using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Infrastructure.Logging;
+using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components;
 using Kaimo_File_Server.Web.Components.ViewModels;
@@ -186,5 +187,9 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.UseMiddleware<ConfigLocalizationMiddleware>();
+
+
+app.Services.GetRequiredService<GoogleDriveService>();
+
 
 app.Run();

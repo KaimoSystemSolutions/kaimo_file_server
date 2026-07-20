@@ -50,6 +50,7 @@ public class DepartmentRepository : IDepartmentRepository
             _db.Departments.Remove(dept);
             await _db.SaveChangesAsync();
         }
+        
     }
 
     // ══════════════════════════════════════════

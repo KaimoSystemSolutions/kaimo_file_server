@@ -15,7 +15,7 @@ COPY ["nuget.config", "."]
 COPY ["src/Kaimo_File_Server.Host/Kaimo_File_Server.Host.csproj", "src/Kaimo_File_Server.Host/"]
 COPY ["src/Kaimo_File_Server.Core/Kaimo_File_Server.Core.csproj", "src/Kaimo_File_Server.Core/"]
 COPY ["src/Kaimo_File_Server.Infrastructure/Kaimo_File_Server.Infrastructure.csproj", "src/Kaimo_File_Server.Infrastructure/"]
-COPY ["src/Kaimo_File_Server.Smb/Kaimo_File_Server.Smb.csproj", "src/Kaimo_File_Server.Smb/"]
+#COPY ["src/Kaimo_File_Server.Smb/Kaimo_File_Server.Smb.csproj", "src/Kaimo_File_Server.Smb/"]
 RUN dotnet restore "./src/Kaimo_File_Server.Host/Kaimo_File_Server.Host.csproj"
 # Copy only source code into build image — no tests/, docs/, tools/ and no
 # IDE/build artifacts (additionally kept out by .dockerignore from context).

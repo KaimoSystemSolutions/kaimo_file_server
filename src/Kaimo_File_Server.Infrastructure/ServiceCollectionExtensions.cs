@@ -78,6 +78,9 @@ namespace Kaimo_File_Server.Infrastructure
 
             // -- Seeder --
             services.AddScoped<DatabaseSeeder>();
+            
+            // -- Google Drive --
+            services.AddSingleton<GoogleDriveService>();
 
             return services;
         }

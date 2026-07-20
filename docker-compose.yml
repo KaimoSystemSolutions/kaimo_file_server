@@ -86,6 +86,8 @@ services:
       - 8443:8443
     environment:
       TZ: Europe/Berlin
+      GOOGLE_APPLICATION_CREDENTIALS: /tests/data/logins/google-service-account.json
+        
     # umask 002 -> new files 0664 (group-writable) so that Samba side
     # (group kaimo) can overwrite them. Fallback for filesystems without ACL support
     # (drvfs/9p, Windows dev); on ext4 the default ACLs from the
@@ -93,6 +95,8 @@ services:
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Web.dll"]
     volumes:
       - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
+      - ${LOCATION_GDRIVE_CREDENTIALS:-./tests/data/logins/google-service-account.json}:/data/logins/google-service-account.json:ro
+      
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
