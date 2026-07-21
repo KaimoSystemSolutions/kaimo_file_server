@@ -73,6 +73,8 @@ builder.Services.AddRazorComponents()
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorizationCore();
 
+builder.Services.AddControllers();
+
 // -- JWT --
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<JwtAuthenticationStateProvider>();
@@ -182,14 +184,11 @@ else
 }
 
 app.UseAntiforgery();
-
+app.MapControllers();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.UseMiddleware<ConfigLocalizationMiddleware>();
-
-
-app.Services.GetRequiredService<GoogleDriveService>();
 
 
 app.Run();

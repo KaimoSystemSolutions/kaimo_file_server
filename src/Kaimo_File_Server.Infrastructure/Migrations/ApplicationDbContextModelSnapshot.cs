@@ -198,6 +198,9 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CloudSettings")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("DepartmentId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")

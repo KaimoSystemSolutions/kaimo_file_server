@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Text.Json;
 using Kaimo_File_Server.Core.Helpers;
+using Kaimo_File_Server.Infrastructure.Clouds;
 
 namespace Kaimo_File_Server.Core.Domain
 {
@@ -61,7 +63,10 @@ namespace Kaimo_File_Server.Core.Domain
         /// being permanently removed.
         /// </summary>
         public bool IsRecycleEnabled { get; set; }
-
+        public string? CloudSettings { get; set; }
+        
+        public ICloudConnection? CloudConnection { get; set; }
+        
         /// <summary>EF Core / serialization constructor.</summary>
         internal ShareDefinition() { }
 
@@ -82,7 +87,8 @@ namespace Kaimo_File_Server.Core.Domain
             Guid? departmentId = null,
             bool isEnabled = true,
             bool isShareHidden = false,
-            bool isRecycleEnabled = false)
+            bool isRecycleEnabled = false,
+            string? cloudSettings = null)
         {
             Id = Guid.NewGuid();
 
@@ -98,6 +104,23 @@ namespace Kaimo_File_Server.Core.Domain
             IsShareHidden = isShareHidden;
             IsEnabled = isEnabled;
             IsRecycleEnabled = isRecycleEnabled;
+            CloudSettings = cloudSettings;
         }
     }
+
+
+    public record CloudSettings(
+        string Provider,
+        Dictionary<string, string> Data
+    )
+    {
+        public string Serialize() 
+            => JsonSerializer.Serialize(this);
+        
+        public static CloudSettings Deserialize(string json)
+            => JsonSerializer.Deserialize<CloudSettings>(json)
+               ?? throw new InvalidOperationException("Invalid CloudSettings JSON");
+        
+    };
+    
 }

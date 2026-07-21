@@ -428,6 +428,7 @@ public partial class ShareListViewModel
         }
     }
 
+
     // -- Toggle Share Enabled and Recycle Enabled and Share Hidden --
 
     public async Task<bool> ToggleShareEnabledAsync()
@@ -586,6 +587,17 @@ public partial class ShareListViewModel
         }
     }
 
+    public async Task DisconnectCurrentShareFromCloud()
+    {
+        if(SelectedShare is null)
+            return;
+
+        SelectedShare.CloudConnection?.Dispose();
+        SelectedShare.CloudSettings = null;
+        SelectedShare.CloudConnection = null;
+        await _shareRepo.UpdateAsync(SelectedShare);
+    }
+    
     // -- Access Management --
 
     public async Task LoadAccessAsync()

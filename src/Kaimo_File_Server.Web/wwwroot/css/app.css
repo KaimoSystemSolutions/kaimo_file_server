@@ -681,8 +681,7 @@ html, body, #app {
 }
 
 .admin-detail {
-    /*width: 340px;*/
-    min-width: 280px;
+    width: 450px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -690,6 +689,16 @@ html, body, #app {
     align-self: flex-start;
     position: sticky;
     top: 24px;
+}
+
+.detail-empty {
+    height: 482px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-tertiary);
+    text-align: center;
 }
 
 ::deep .admin-detail {
@@ -3140,6 +3149,28 @@ html, body, #app {
 .search-clear:hover {
     background: var(--border);
     color: var(--text-primary);
+}
+
+/* -- google drive account cloud display -- */
+.drive-login-container {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+}
+
+.cloud-account {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    margin-top: 15px;
+}
+
+.cloud-avatar {
+    border-radius: 50%;
+}
+
+.share-help-text {
+    align-self: center;
 }
 
 /* Dropdown */

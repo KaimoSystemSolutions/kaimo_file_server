@@ -1,0 +1,169 @@
+@using Kaimo_File_Server.Infrastructure.Clouds
+
+@inject NavigationManager Navigation
+@inject ToastService Toast
+
+<div class="detail-section">
+    <span class="detail-label">Cloud Provider</span>
+
+    <select class="edit-input"
+            @bind="_selectedProvider"
+            @bind:after="ProviderChanged"
+            disabled="@(_googleConnection is not null)">
+        <option value="">None</option>
+        <option value="Google">Google Drive</option>
+        <option value="Dropbox">Dropbox</option>
+        <option value="OneDrive">Microsoft OneDrive</option>
+        <option value="Nextcloud">Nextcloud</option>
+    </select>
+</div>
+
+
+@if (_selectedProvider == "Google")
+{
+    <div class="detail-section">
+        <span class="detail-label">Google Drive</span>
+
+        @if (_googleConnection is not null)
+        {
+            <div class="cloud-account">
+                @if (!string.IsNullOrEmpty(_googleUserPhoto))
+                {
+                    <img class="cloud-avatar"
+                         src="@(_googleUserPhoto)"
+                         alt="Google account"/>
+                }
+
+                <span class="share-help-text">
+                    @_googleUserEmail
+                </span>
+                
+                
+                <button class="btn-primary" @onclick="Disconnect">
+                    Unsync
+                </button>
+            </div>
+            
+        }
+        else
+        {
+            <div class="drive-login-container">
+                <button class="btn-primary" @onclick="ConnectGoogle">
+                    Connect with Google
+                </button>
+            </div>
+        }
+    </div>
+}
+
+
+@if (_selectedProvider == "Dropbox")
+{
+    <div class="detail-section">
+        <p class="share-help-text">
+            Dropbox support is not available yet.
+        </p>
+    </div>
+}
+
+
+@if (_selectedProvider == "OneDrive")
+{
+    <div class="detail-section">
+        <p class="share-help-text">
+            OneDrive support is not available yet.
+        </p>
+    </div>
+}
+
+
+@code {
+    [Parameter, EditorRequired]
+    public ShareListViewModel VM { get; set; } = default!;
+
+
+    private string _selectedProvider = "";
+
+    private GoogleDriveConnection? _googleConnection;
+
+    private string? _googleUserEmail;
+    private string? _googleUserPhoto;
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _googleConnection = null;
+        _googleUserEmail = null;
+        _googleUserPhoto = null;
+
+
+        if (VM.SelectedShare?.CloudConnection is GoogleDriveConnection google)
+        {
+            _googleConnection = google;
+            _selectedProvider = "Google";
+
+            await LoadGoogleAccount();
+        }
+        else
+        {
+            _selectedProvider = "";
+        }
+    }
+
+
+    private async Task LoadGoogleAccount()
+    {
+        var aboutRequest =
+            _googleConnection!
+                .Service
+                .About
+                .Get();
+
+
+        aboutRequest.Fields =
+            "user(displayName,emailAddress,photoLink)";
+
+
+        var about =
+            await aboutRequest.ExecuteAsync();
+
+
+        _googleUserEmail =
+            about.User?.EmailAddress;
+
+        _googleUserPhoto =
+            about.User?.PhotoLink;
+    }
+
+
+    private async Task ProviderChanged()
+    {
+        await Task.CompletedTask;
+    }
+
+
+    private void ConnectGoogle()
+    {
+        var shareId =
+            Uri.EscapeDataString(
+                VM.SelectedShare.Id.ToString());
+
+
+        Navigation.NavigateTo(
+            $"/api/google/connect?shareId={shareId}",
+            forceLoad: true);
+    }
+
+    private async Task Disconnect()
+    {
+        await VM.DisconnectCurrentShareFromCloud();
+        
+        _googleConnection = null;
+        _googleUserEmail = null;
+        _googleUserPhoto = null;
+        _selectedProvider = "";
+
+        Toast.Show("Disconnected Cloud Provider from Share");
+        StateHasChanged();
+    }
+}

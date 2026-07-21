@@ -1,13 +1,21 @@
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components;
 
 namespace Kaimo_File_Server.Web.Components.Pages.Shares;
 
 public partial class ShareList
 {
+    
+    [SupplyParameterFromQuery]
+    [Parameter]
+    public string? SuccessfulConnection { get; set; }
+    private bool _handledSuccessfulConnection;
+
     private ShareDetailTab _activeTab = ShareDetailTab.Settings;
     private string _aclEditorKey = "";
     private bool _accessLoaded;
+    
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -16,8 +24,28 @@ public partial class ShareList
             await VM.LoadAsync();
             StateHasChanged();
         }
-    }
+        
+        if (_handledSuccessfulConnection)
+            return;
 
+        if (string.IsNullOrWhiteSpace(SuccessfulConnection))
+            return;
+
+        if (VM.IsLoading)
+            return;
+
+        var share = VM.Shares.FirstOrDefault(s => s.Name == SuccessfulConnection);
+        if (share is null)
+            return;
+
+        _handledSuccessfulConnection = true;
+
+        HandleCardClick(share);
+        SwitchTab(ShareDetailTab.Cloud);
+        StateHasChanged();
+        Toasts.Show("Successfully synced Cloud with Share", ToastType.Success);
+    }
+    
     private void HandleCardClick(ShareDefinition share)
     {
         if (VM.CanManageShare(share.Id))
@@ -71,5 +99,6 @@ internal enum ShareDetailTab
 {
     Settings,
     Access,
-    Acl
+    Acl,
+    Cloud
 }

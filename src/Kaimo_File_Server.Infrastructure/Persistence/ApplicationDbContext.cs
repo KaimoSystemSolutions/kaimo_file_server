@@ -126,6 +126,9 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.IsEnabled).IsRequired();
                 entity.Property(e => e.IsShareHidden).IsRequired();
                 entity.Property(e => e.IsRecycleEnabled).IsRequired();
+                
+                entity.Property(e => e.CloudSettings);
+                entity.Ignore(e => e.CloudConnection);
 
                 // Direct FK to Department (required, default = Global)
                 entity.Property(e => e.DepartmentId)

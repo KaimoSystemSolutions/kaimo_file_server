@@ -1,5 +1,6 @@
 ﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,10 +12,12 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
     public class ShareRepository : IShareRepository
     {
         private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
+        private readonly ICloudProviderFactory _cloudFactory;
 
-        public ShareRepository(IDbContextFactory<ApplicationDbContext> dbFactory)
+        public ShareRepository(IDbContextFactory<ApplicationDbContext> dbFactory,  ICloudProviderFactory cloudFactory)
         {
             _dbFactory = dbFactory;
+            _cloudFactory = cloudFactory;
         }
 
         public async Task<List<ShareDefinition>> GetAllEnabledAsync()
@@ -26,7 +29,14 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
         public async Task<List<ShareDefinition>> GetAllAsync()
         {
             await using var db = await _dbFactory.CreateDbContextAsync();
-            return await db.ShareDefinitions.ToListAsync();
+            
+            List<ShareDefinition> shares = await db.ShareDefinitions.ToListAsync();
+            
+            // establish missing cloud connections
+            foreach (ShareDefinition share in shares)
+                ICloudProviderFactory.initilizeCloud(_cloudFactory, share);
+            
+            return shares;
         }
 
         public async Task<ShareDefinition?> GetByNameAsync(string name)

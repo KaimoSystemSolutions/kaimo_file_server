@@ -6,6 +6,7 @@
 @inject ShareListViewModel VM
 @inject NavigationManager Nav
 @inject AssetProvider Assets
+@inject ToastService Toasts
 
 <PageTitle>@Resources.Web_Nav_Shares - Kaimo Files</PageTitle>
 
@@ -24,7 +25,7 @@
 
 @if (VM.IsCreating && VM.CanCreateShare)
 {
-    <ShareCreateForm VM="VM" OnChanged="StateHasChanged" />
+    <ShareCreateForm VM="VM" OnChanged="StateHasChanged"/>
 }
 
 @if (VM.IsLoading)
@@ -52,12 +53,12 @@ else
             <ShareCardList Shares="VM.Shares"
                            SelectedShare="VM.SelectedShare"
                            OnSelected="HandleCardClick"
-                           OnOpened="OpenShare" />
+                           OnOpened="OpenShare"/>
         </div>
 
-        @if (VM.SelectedShare is not null && VM.CanManageShare(VM.SelectedShare.Id))
-        {
-            <div class="admin-detail">
+        <div class="admin-detail">
+            @if (VM.SelectedShare is not null && VM.CanManageShare(VM.SelectedShare.Id))
+            {
                 <div class="detail-header">
                     <h3>@VM.SelectedShare.Name</h3>
                     <span class="detail-subtitle">@Resources.Web_ShareList_DetailSubtitle</span>
@@ -65,38 +66,48 @@ else
 
                 <div class="detail-tabs">
                     <button class="detail-tab @(_activeTab == ShareDetailTab.Settings ? "detail-tab--active" : "")"
-                            @onclick="() => SwitchTab(ShareDetailTab.Settings)">
-                        @Assets.SVG("settings.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        @Resources.Web_ShareList_Tab_General
-                    </button>
+                            @onclick="() => SwitchTab(ShareDetailTab.Settings)"> @Assets.SVG("settings.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @Resources.Web_ShareList_Tab_General </button>
                     <button class="detail-tab @(_activeTab == ShareDetailTab.Access ? "detail-tab--active" : "")"
-                            @onclick="() => SwitchTab(ShareDetailTab.Access)">
-                        @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        @Resources.Web_ShareList_Tab_Visibility
-                    </button>
+                            @onclick="() => SwitchTab(ShareDetailTab.Access)"> @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @Resources.Web_ShareList_Tab_Visibility </button>
                     <button class="detail-tab @(_activeTab == ShareDetailTab.Acl ? "detail-tab--active" : "")"
-                            @onclick="() => SwitchTab(ShareDetailTab.Acl)">
-                        @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        @Resources.Web_ShareList_Tab_ACL
-                    </button>
+                            @onclick="() => SwitchTab(ShareDetailTab.Acl)"> @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @Resources.Web_ShareList_Tab_ACL </button>
+                    <button class="detail-tab @(_activeTab == ShareDetailTab.Cloud ? "detail-tab--active" : "")"
+                            @onclick="() => SwitchTab(ShareDetailTab.Cloud)"> @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Cloud </button>
                 </div>
 
                 @switch (_activeTab)
                 {
                     case ShareDetailTab.Settings:
-                        <ShareSettingsPanel VM="VM" OnDeleted="HandleShareDeleted" />
+                        <ShareSettingsPanel VM="VM" OnDeleted="HandleShareDeleted"/>
                         break;
                     case ShareDetailTab.Access:
-                        <ShareAccessPanel VM="VM" IsLoaded="_accessLoaded" />
+                        <ShareAccessPanel VM="VM" IsLoaded="_accessLoaded"/>
                         break;
                     case ShareDetailTab.Acl:
                         <div class="detail-section">
                             <p class="share-help-text">@Resources.Web_ShareList_AclDescription</p>
-                            <AclEditor @key="@_aclEditorKey" Path="" ShareId="@VM.SelectedShare.Id" IsDirectory="true" />
+                            <AclEditor @key="@_aclEditorKey"
+                                       Path=""
+                                       ShareId="@VM.SelectedShare.Id"
+                                       IsDirectory="true"/>
                         </div>
                         break;
+                    case ShareDetailTab.Cloud:
+                        <ShareCloudPanel VM="VM" />
+                        break;
                 }
-            </div>
-        }
+            }
+            else
+            {
+                <div class="detail-empty">
+                    @Assets.SVG("folder.svg", new SvgOptions(
+                        Width: 48,
+                        Height: 48,
+                        Color: "var(--text-tertiary)"))
+
+                    <p>Select a share to modify it</p>
+                </div>
+            }
+        </div>
     </div>
 }

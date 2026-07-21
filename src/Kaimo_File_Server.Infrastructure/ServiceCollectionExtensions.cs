@@ -5,6 +5,7 @@ using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
+using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Infrastructure.Repositories;
 using Kaimo_File_Server.Infrastructure.Services;
@@ -79,9 +80,9 @@ namespace Kaimo_File_Server.Infrastructure
             // -- Seeder --
             services.AddScoped<DatabaseSeeder>();
             
-            // -- Google Drive --
-            services.AddSingleton<GoogleDriveService>();
-
+            // -- Cloud --
+            services.AddSingleton<ICloudProviderFactory, CloudProviderFactory>();
+            
             return services;
         }
 
