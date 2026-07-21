@@ -13,11 +13,16 @@
         <div class="share-card @(isSelected ? "share-card--selected" : "") @(isDisabled ? "share-card--disabled" : "")"
              @onclick="() => OnSelected.InvokeAsync(share)"
              @ondblclick="() => OnOpened.InvokeAsync(share.Name)">
+            
             <div class="share-icon">
-                @Icons.SVG("folder.svg", new SvgOptions(
-                    Width: 32, Height: 32,
-                    Color: isDisabled ? "var(--text-tertiary)" : "var(--folder-stroke)",
-                    Fill: isDisabled ? "transparent" : "var(--folder-fill)"))
+                @Icons.SVG(
+                    $"folder{(share.CloudConnection is null ? "" : "_" + share.CloudConnection.getServiceName())}.svg",
+                    new SvgOptions(
+                        Width: 32,
+                        Height: 32,
+                        Color: isDisabled ? "var(--text-tertiary)" : "var(--folder-stroke)",
+                        Fill: isDisabled ? "transparent" : "var(--folder-fill)")
+                )
             </div>
             <div class="share-info">
                 <span class="share-name">@share.Name</span>

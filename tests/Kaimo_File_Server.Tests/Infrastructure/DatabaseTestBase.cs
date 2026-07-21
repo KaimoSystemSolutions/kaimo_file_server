@@ -78,7 +78,7 @@ public abstract class DatabaseTestBase : IDisposable
     // because every context shares one connection, their SaveChanges is visible
     // to any later NewContext() used for assertions.
 
-    protected ShareRepository ShareRepo() => new(DbFactory);
+    protected ShareRepository ShareRepo() => new(DbFactory, null);
     protected UserRepository UserRepo() => new(NewContext());
     protected GroupRepository GroupRepo() => new(NewContext());
     protected RoleRepository RoleRepo() => new(NewContext());
@@ -111,7 +111,7 @@ public abstract class DatabaseTestBase : IDisposable
         services.AddSingleton<IDbContextFactory<ApplicationDbContext>>(DbFactory);
         services.AddTransient(_ => DbFactory.CreateDbContext());
         services.AddTransient<IAclRepository>(sp => new AclRepository(sp.GetRequiredService<ApplicationDbContext>()));
-        services.AddTransient<IShareRepository>(_ => new ShareRepository(DbFactory));
+        services.AddTransient<IShareRepository>(_ => new ShareRepository(DbFactory, null));
         services.AddTransient<IDepartmentRepository>(sp => new DepartmentRepository(sp.GetRequiredService<ApplicationDbContext>()));
         return services.BuildServiceProvider();
     }

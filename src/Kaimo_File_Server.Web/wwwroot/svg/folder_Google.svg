@@ -1,0 +1,6 @@
+<svg class="file-icon" width="20" height="20" viewBox="0 0 24 24"
+     fill="var(--folder-fill)" stroke="var(--folder-stroke)" stroke-width="1.5">
+    <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+    <path d="M7.5 10.5h9L12 17z" fill="none" stroke-width="1" stroke-linejoin="round" />
+    <path d="M9.8 10.5L12 17M14.2 10.5L12 17" fill="none" stroke-width="1" stroke-linecap="round" />
+</svg>

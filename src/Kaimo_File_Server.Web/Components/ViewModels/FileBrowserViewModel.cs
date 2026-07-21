@@ -199,7 +199,7 @@ public class FileBrowserViewModel
                 CurrentPath, shareName, userContext.User.Username);
 
             Items = await _fileService.ListAsync(CurrentPath, userContext);
-
+            
             _logger.LogDebug("Found {Total} items ({Dirs} dirs, {Files} files)",
                 Items.Count, Directories.Count(), Files.Count());
 

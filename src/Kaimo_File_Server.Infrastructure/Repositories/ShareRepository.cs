@@ -12,9 +12,9 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
     public class ShareRepository : IShareRepository
     {
         private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
-        private readonly ICloudProviderFactory _cloudFactory;
+        private readonly ICloudProviderFactory? _cloudFactory;
 
-        public ShareRepository(IDbContextFactory<ApplicationDbContext> dbFactory,  ICloudProviderFactory cloudFactory)
+        public ShareRepository(IDbContextFactory<ApplicationDbContext> dbFactory,  ICloudProviderFactory? cloudFactory)
         {
             _dbFactory = dbFactory;
             _cloudFactory = cloudFactory;
@@ -32,10 +32,13 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
             
             List<ShareDefinition> shares = await db.ShareDefinitions.ToListAsync();
             
+            if (_cloudFactory is null) 
+                return shares;
+            
             // establish missing cloud connections
             foreach (ShareDefinition share in shares)
                 ICloudProviderFactory.initilizeCloud(_cloudFactory, share);
-            
+
             return shares;
         }
 
