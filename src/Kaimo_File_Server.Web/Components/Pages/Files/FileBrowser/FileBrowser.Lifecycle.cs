@@ -38,16 +38,26 @@ public partial class FileBrowser
         VM.OnStateChanged -= OnVmStateChanged;
         VM.OnStateChanged += OnVmStateChanged;
 
-        // Auto-select from search
-        var uri = Nav.ToAbsoluteUri(Nav.Uri);
-        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-        var selectName = query["select"];
-        if (!string.IsNullOrEmpty(selectName))
-        {
-            var item = FindShareItem(selectName);
-            if (item is not null)
-                _selectedItems.Add(item);
-        }
+        TryApplyPendingFileSelection();
+    }
+
+    private void OnFileSelectionRequested()
+    {
+        if (TryApplyPendingFileSelection())
+            _ = InvokeAsync(StateHasChanged);
+    }
+
+    private bool TryApplyPendingFileSelection()
+    {
+        if (!FileSelectionCoordinator.TryConsume(ShareName, SubPath ?? "", out var itemName))
+            return false;
+
+        _selectedItems.Clear();
+        var item = FindShareItem(itemName);
+        if (item is not null)
+            _selectedItems.Add(item);
+
+        return true;
     }
 
     private void OnVmStateChanged() => InvokeAsync(StateHasChanged);
@@ -55,6 +65,7 @@ public partial class FileBrowser
     public void Dispose()
     {
         VM.OnStateChanged -= OnVmStateChanged;
+        FileSelectionCoordinator.SelectionRequested -= OnFileSelectionRequested;
         _dotNetRef?.Dispose();
         UploadCoordinator.OnFilesSelected -= OnFileUploaded;
     }

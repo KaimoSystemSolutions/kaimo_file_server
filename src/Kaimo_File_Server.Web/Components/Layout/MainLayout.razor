@@ -8,6 +8,7 @@
 @inject JwtAuthenticationStateProvider AuthState
 @inject AuthenticationStateProvider AuthStateProvider
 @inject FileUploadCoordinator UploadCoordinator
+@inject FileSelectionCoordinator FileSelectionCoordinator
 @inject AssetProvider Assets
 @inject ISearchService SearchService
 @inject IUserContextFactory UserContextFactory
@@ -223,12 +224,16 @@
         }
         else
         {
-            // Navigate to the containing folder and preselect the file.
+            // Select directly when the containing folder is already open. Otherwise
+            // keep the one-time request until that folder has finished loading.
             var folderPath = (Path.GetDirectoryName(result.SharePath) ?? string.Empty)
                 .Replace('\\', '/').Trim('/');
             url = string.IsNullOrEmpty(folderPath)
-                ? $"/files/{result.ShareName}?select={Uri.EscapeDataString(result.FileName)}"
-                : $"/files/{result.ShareName}/{folderPath}?select={Uri.EscapeDataString(result.FileName)}";
+                ? $"/files/{result.ShareName}"
+                : $"/files/{result.ShareName}/{folderPath}";
+
+            if (FileSelectionCoordinator.RequestSelection(result.ShareName, folderPath, result.FileName))
+                return;
         }
 
         Nav.NavigateTo(url);
