@@ -17,7 +17,7 @@ The most important conclusions are:
 1. No obvious direct stack overflow, heap overflow, use-after-free, or double-free was found during the static review. This is not a formal proof of C/C++ memory safety.
 2. The native implementation still has security-relevant memory/resource failures: allocation failure can disable open authorization, the sidecar has unbounded thread and cache growth, and blocking Unix-socket calls can stall `smbd` workers.
 3. The complete open access mask and rename source/destination/replacement policy are now mapped to Kaimo permissions in source. Native runtime verification and several metadata/security operation checks remain open.
-4. Folder snapshot materialization bypasses the existing per-file ACL filter and places historical content inside the client-visible share namespace.
+4. Folder snapshot materialization now uses the existing per-file ACL filter and a reconciled per-user projection. The cache still resides inside the client-visible share namespace, which remains P0-06.
 5. The local sidecar protocol is not safely framed and assumes one `read()`/`write()` is sufficient for a stream socket.
 6. The gRPC bridge exposes NT hashes and privileged control-plane functions over unauthenticated h2c on the shared Docker network.
 7. Event delivery and synchronization are best-effort rather than durable. Failures can leave version, ACL, metadata, ownership, search, passdb, registry, and runtime state inconsistent.
@@ -226,7 +226,7 @@ Additional implemented behavior:
 
 The mapping was checked against the project's exact pinned [Samba 4.19.5 source archive](https://download.samba.org/pub/samba/stable/samba-4.19.5.tar.gz), including `source3/smbd/smb2_create.c`, `source3/smbd/open.c`, and `libcli/security/security.h`, and against the [MS-SMB2 file access-mask definition](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb2/77b36d0f-6016-458a-a7a0-0f4a72ae1534). This confirmed that the custom VFS receives raw client access before Samba's generic/maximum resolution and that Samba later adds read-attributes access.
 
-Still required: native C/C++ compilation, live SMB access-mask tests, and SET_INFO verification for attributes, EAs, DACL, and owner changes. P0-05 remains responsible for the snapshot authorization gap.
+Still required: native C/C++ compilation, live SMB access-mask tests, and SET_INFO verification for attributes, EAs, DACL, and owner changes. P0-05 is implemented in source; P0-06 remains responsible for isolating the snapshot cache outside the share namespace.
 
 ### P0-04: Rename lacks complete source, destination, and overwrite authorization
 
@@ -267,7 +267,10 @@ If the complete authorization cannot be implemented immediately, return `EACCES`
 
 ### P0-05: Folder snapshot materialization bypasses per-file ACL filtering
 
-**Evidence**
+> **Remediation status (2026-07-22): Implemented and managed-tested; live SMB verification pending.**
+> Folder enumeration/materialization now goes through `IFileService`, checks directories with `isDirectory: true`, filters every historical child, and serves a reconciled per-user cache projection.
+
+**Original evidence (before remediation)**
 
 - `SnapshotGrpcService.ResolveVersion()` calls `_versions.GetFolderSnapshotAsync()` directly.
 - It materializes every returned `FileVersion` under the requested directory.
@@ -284,6 +287,16 @@ A user who may list a directory but has an explicit read deny on a child file ca
 3. Check directory ACLs with `isDirectory: true`, not `false`.
 4. Never place an unreadable file in a cache namespace reachable by the requesting SMB session.
 5. Test inherited allow plus explicit child deny, child allow plus parent restrictions, and ACL revocation after prior materialization.
+
+**Implemented fix and remaining verification**
+
+1. `EnumerateSnapshots` treats paths with exact file versions as files; all other paths, including the share root, use `IFileService.GetFolderSnapshotTimestampsAsync` and its directory ACL check.
+2. `ResolveVersion` routes historical directories through `IFileService.GetFolderSnapshotAsync`, reusing its batch per-file `ListReadData` filter.
+3. Materialized paths are partitioned by immutable user id under `.kaimo-snapshots/<@GMT>/<user-id>/...`; one user's folder projection is never returned to another user.
+4. Before a folder cache path is returned, the bridge deletes files and empty directories in that user's projection that are absent from the freshly ACL-filtered snapshot. This covers ACL revocation after an earlier materialization.
+5. Concrete historical files retain an explicit file (`isDirectory: false`) read check, while directory checks use `isDirectory: true` through the central service.
+6. Invalid traversal paths and invalid version-record paths fail closed before lookup/materialization.
+7. Still required: live Windows/smbclient tests for listing/opening folder snapshots with child denies and revocation. P0-06 still must move or strongly protect the cache itself; per-user namespacing is not a substitute for inaccessible storage.
 
 ### P0-06: Snapshot cache content is inside the SMB share and is only hidden, not access-protected
 
@@ -565,7 +578,7 @@ The module is built against Samba 4.19.5/ABI 49. The source version is pinned, b
 | TREE_CONNECT | SMB enabled flag, user, share lookup, root ACL | Disabled share not checked; bridge trust and identity spoofing |
 | File read | Raw/specific/generic masks map data, attributes, EA, execute/traverse, and read-control independently | Native/live SET_INFO and client compatibility verification pending |
 | File write | Write, append, attributes, EA, DACL, and owner rights are distinct; returned mask is attenuated | Native/live SET_INFO verification and cold-cache performance measurement pending |
-| File create | File parent requires `CreateWriteData`; directory parent requires `CreateAppendData`; future target mask is checked | Fallback mutating VFS paths still require P0-05 inventory |
+| File create | File parent requires `CreateWriteData`; directory parent requires `CreateAppendData`; future target mask is checked | Fallback mutating VFS paths still require a separate completeness inventory |
 | Delete/rmdir | Pre-operation target/parent authorization uses exact dynamic canonical path | Race/handle identity semantics remain |
 | Delete-on-open | Target `Delete` or parent `DeleteSubItems`; granted handle mask is attenuated | Native delete-on-close matrix pending |
 | Rename/move | Pre-op source/destination/replacement authorization plus post-event | Implemented in source; native/runtime verification pending |
@@ -577,8 +590,8 @@ The module is built against Samba 4.19.5/ABI 49. The source version is pinned, b
 | Dynamic shares | Enabled shares mirrored to registry | Errors ignored, disabled window, unvalidated path, active-session semantics |
 | Protocol config | Dialect/signing/encryption/wsdd/audit synchronized | Apply failures can be hidden; polling delay; probe credentials |
 | SMB enable/disable | Connect gate plus periodic close-share | Existing handles and delay; bridge methods do not all enforce state |
-| Snapshot enumeration | GMT tokens returned through VFS | Buffer/count limits, directory flag, per-file visibility |
-| Snapshot resolution | Version lookup and materialization | ACL leak, direct cache access, writable/raw open, races, unbounded work |
+| Snapshot enumeration | GMT tokens returned through VFS; folder timestamps pass through the central directory ACL boundary | Buffer/count limits, directory flag, live per-file visibility verification |
+| Snapshot resolution | File ACL checks plus ACL-filtered, reconciled per-user folder projections | Direct cache access, writable/raw open, races, unbounded work |
 | Recycle bin | Deliberately absent for SMB | Product decision, not memory-safety issue |
 | Share enumeration ABE | Hidden flag only | Per-user share visibility intentionally deferred |
 
@@ -1049,11 +1062,11 @@ This changed the implementation plan materially: a boolean allow/deny result is 
 - Verify SET_INFO operations cannot bypass the opened handle's `WriteAttributes`, `WriteExtAttributes`, `ChangePermissions`, or `TakeOwnership` mask.
 - Benchmark cold-cache authorization for deep paths and `MAXIMUM_ALLOWED`; the current correctness-first implementation can perform multiple ACL evaluations and must remain within the sidecar's five-second deadline.
 - Verify timewarp opens receive the attenuated mask. P1-06 still must force them read-only and avoid raw VFS-stack bypass.
-- Complete P0-05 and verify remaining mutating operations whose authorization is not fully determined by the create/open handle.
+- P0-04/P0-05 were implemented after this entry; verify remaining mutating operations whose authorization is not fully determined by the create/open handle.
 
 Native verification remains unavailable in this environment: Docker is installed but its engine is not running, WSL has no installed distribution, and no local C/C++ compiler is present. The successful managed build does not compile the native VFS or sidecar.
 
-**Next planned finding:** P0-05 — enforce per-file ACL filtering for folder snapshots.
+**Next planned finding:** P0-04 — authorize rename source, destination parent, and replacement target before native mutation.
 
 ### 2026-07-22 — P0-04: Complete rename authorization
 
@@ -1095,6 +1108,48 @@ Native verification remains unavailable in this environment: Docker is installed
 - Exercise a concurrent target-exchange test to confirm the pre/post-RPC identity check fails closed.
 - The Docker CLI is installed, but its engine is not running in this environment; no native result is claimed.
 
+**Next planned finding:** P0-05 — enforce per-file ACL filtering for folder snapshots.
+
+### 2026-07-22 — P0-05: ACL-filtered per-user folder snapshots
+
+**Status:** Implemented and managed-tested; live SMB verification pending.
+
+**Solution implemented**
+
+1. Injected `IFileServiceFactory` into `SnapshotGrpcService` and routed folder timestamp enumeration and point-in-time folder retrieval through the central `IFileService` policy boundary.
+2. Kept concrete-file reads explicit with `isDirectory: false`; folder methods now enforce the folder itself with `isDirectory: true` and batch-filter all returned `FileVersion` children.
+3. Changed materialization paths to `.kaimo-snapshots/<@GMT>/<user-id>/<relative-path>` so one user's filtered projection is never returned to another user.
+4. Added projection reconciliation before returning a snapshot directory: files no longer present in the current ACL-filtered set are deleted and stale empty directories are pruned. This handles ACL revocation after prior materialization.
+5. Added traversal rejection for client paths, validation for version-record paths, and cache-scope containment checks.
+6. Preserved token-level cache markers and cleanup layout, so existing TTL and per-share size eviction continue to operate over the per-user subtrees.
+
+**Files changed**
+
+- `src/Kaimo_File_Server.SmbBridge/Services/SnapshotGrpcService.cs`
+- `src/Kaimo_File_Server.SmbBridge/Services/SnapshotCache.cs`
+- `src/Kaimo_File_Server.SmbBridge/Services/SnapshotCacheCleanupService.cs`
+- `src/Kaimo_File_Server.SmbBridge/Program.cs`
+- `tests/Kaimo_File_Server.Tests/FileServiceFolderSnapshotTests.cs`
+- `tests/Kaimo_File_Server.Tests/SnapshotGrpcServiceAclTests.cs`
+- `samba-vfs/README.md`
+- `docu/samba-bridge-vfs-security-audit.md`
+
+**Validation completed**
+
+- Added two central `FileService` tests for inherited folder allow with explicit child deny and child allow with restricted parent.
+- Added five bridge tests for directory-aware enumeration, per-file materialization filtering, per-user isolation, ACL revocation cleanup, concrete-file denial, and traversal rejection.
+- Focused P0-05 suite: 7 passed, 0 failed, 0 skipped.
+- Full solution suite: 522 passed, 0 failed, 0 skipped.
+
+**Validation still required**
+
+- Run live Windows and `smbclient` folder snapshot browsing with explicit child denies and confirm denied names/content never appear.
+- Materialize as an allowed user, revoke the child ACL, browse again, and confirm the stale child disappears.
+- Browse the same token concurrently as users with different ACL sets and verify each receives only its own projection.
+- P0-06 remains open: the cache is still inside the share and direct client-originated access to `.kaimo-snapshots` is not yet rejected comprehensively.
+
+**Next planned finding:** P0-06 — isolate or comprehensively protect the in-share snapshot cache.
+
 ## 15. Source evidence index
 
 | Finding area | Primary source locations |
@@ -1106,7 +1161,7 @@ Native verification remains unavailable in this environment: Docker is installed
 | Unbounded sidecar threads/cache | `samba-vfs/module/authd.cpp:49-66`, `:183-225`, `:258-262` |
 | World-writable socket | `authd.cpp:241-254` |
 | Partial stream I/O | `vfs_kaimo_bridge.c:89-139`, `:258-304`; `authd.cpp:224-262` |
-| Snapshot ACL leak | `SmbBridge/Services/SnapshotGrpcService.cs:181-237`; `Core/Services/File/FileService.cs:884-899` |
+| Snapshot ACL filtering / original leak | `SmbBridge/Services/SnapshotGrpcService.cs` (`GetFolderSnapshotAsync`, per-user reconciliation); `Core/Services/File/FileService.cs:884-899` |
 | Snapshot raw open | `vfs_kaimo_bridge.c:922-991` |
 | Snapshot materialization races | `SnapshotGrpcService.cs:288-317`; `SnapshotCacheCleanupService.cs` |
 | Disabled share lookup | `Infrastructure/Repositories/ShareRepository.cs:45-49`; bridge service share lookups |

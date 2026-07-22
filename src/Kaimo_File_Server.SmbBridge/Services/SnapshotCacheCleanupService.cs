@@ -4,7 +4,7 @@ namespace Kaimo_File_Server.SmbBridge.Services;
 
 /// <summary>
 /// Background evictor for the in-share snapshot materialization cache
-/// (<c>&lt;share&gt;/.kaimo-snapshots/&lt;@GMT&gt;/…</c>) written by
+/// (<c>&lt;share&gt;/.kaimo-snapshots/&lt;@GMT&gt;/&lt;user-id&gt;/…</c>) written by
 /// <see cref="SnapshotGrpcService"/>. Without it the cache grows unbounded — nothing
 /// removed entries by age or when a share/version was deleted (backlog item A.3).
 ///

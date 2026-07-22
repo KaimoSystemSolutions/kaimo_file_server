@@ -4,7 +4,7 @@ namespace Kaimo_File_Server.SmbBridge.Services;
 
 /// <summary>
 /// Shared constants and helpers for the in-share snapshot materialization cache
-/// (<c>&lt;share&gt;/.kaimo-snapshots/&lt;@GMT&gt;/…</c>) used by
+/// (<c>&lt;share&gt;/.kaimo-snapshots/&lt;@GMT&gt;/&lt;user-id&gt;/…</c>) used by
 /// <see cref="SnapshotGrpcService"/> (writer) and
 /// <see cref="SnapshotCacheCleanupService"/> (evictor).
 ///

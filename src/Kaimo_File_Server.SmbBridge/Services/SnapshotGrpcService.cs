@@ -20,10 +20,9 @@ namespace Kaimo_File_Server.SmbBridge.Services;
 /// which the module then serves natively — the data path stays native, exactly
 /// like live files.
 ///
-/// Thin facade over the already-complete <see cref="IFileVersionService"/>; no
-/// versioning logic is duplicated. ACLs are honored so a user only sees/reads the
-/// snapshots of paths they may read (<see cref="FilePermission.ListReadData"/>),
-/// matching live-file semantics.
+/// Version lookup remains backed by <see cref="IFileVersionService"/>. Folder
+/// projections run through <see cref="IFileService"/> so its directory and
+/// per-child ACL checks are reused without duplicating policy.
 /// </summary>
 public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
 {
@@ -41,6 +40,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
     private readonly IAuthenticationLookup _auth;
     private readonly IAclService _acl;
     private readonly IFileVersionService _versions;
+    private readonly IFileServiceFactory _fileServices;
     private readonly ILogger<SnapshotGrpcService> _logger;
 
     public SnapshotGrpcService(
@@ -48,12 +48,14 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         IAuthenticationLookup auth,
         IAclService acl,
         IFileVersionService versions,
+        IFileServiceFactory fileServices,
         ILogger<SnapshotGrpcService> logger)
     {
         _shares = shares;
         _auth = auth;
         _acl = acl;
         _versions = versions;
+        _fileServices = fileServices;
         _logger = logger;
     }
 
@@ -76,32 +78,55 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             return reply;
         }
 
+        if (!ShareRelativePath.IsValid(request.Path))
+            return reply;
+
         string normalized = ShareRelativePath.Normalize(request.Path);
         if (normalized == ".") normalized = ""; // SMB share-root atname -> root
 
-        // Don't leak version history of a path the user may not read.
-        if (normalized.Length > 0 &&
-            !await _acl.HasAccessAsync(user, share.Id, normalized, false, FilePermission.ListReadData))
-        {
-            _logger.LogInformation(
-                "EnumerateSnapshots DENY: user={User} share={Share} path=[{Path}] -> ListReadData",
-                request.Username, request.Share, request.Path);
-            return reply;
-        }
-
         // A concrete file -> its own version timestamps; a folder or the share
-        // root ("") -> all snapshot timestamps under that prefix.
+        // root ("") -> ACL-aware folder timestamps. A path with exact file
+        // versions is unambiguously a file; otherwise use directory semantics.
         List<DateTime> timestamps;
         if (normalized.Length > 0)
         {
             var fileVersions = await _versions.GetVersionsAsync(share.Id, normalized);
-            timestamps = fileVersions.Count > 0
-                ? fileVersions.Select(v => v.SnapshotTimestampUtc).ToList()
-                : await _versions.GetSnapshotTimestampsAsync(share.Id, normalized);
+            if (fileVersions.Count > 0)
+            {
+                if (!await _acl.HasAccessAsync(
+                        user, share.Id, normalized, false,
+                        FilePermission.ListReadData))
+                    return reply;
+                timestamps = fileVersions
+                    .Select(v => v.SnapshotTimestampUtc)
+                    .ToList();
+            }
+            else
+            {
+                try
+                {
+                    timestamps = await _fileServices
+                        .CreateForShare(share.Id, share.Path)
+                        .GetFolderSnapshotTimestampsAsync(normalized, user);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return reply;
+                }
+            }
         }
         else
         {
-            timestamps = await _versions.GetSnapshotTimestampsAsync(share.Id, "");
+            try
+            {
+                timestamps = await _fileServices
+                    .CreateForShare(share.Id, share.Path)
+                    .GetFolderSnapshotTimestampsAsync("", user);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return reply;
+            }
         }
 
         foreach (var ts in timestamps.Distinct().OrderByDescending(t => t))
@@ -134,17 +159,11 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             return notFound;
         }
 
+        if (!ShareRelativePath.IsValid(request.Path))
+            return notFound;
+
         string normalized = ShareRelativePath.Normalize(request.Path);
         if (normalized == ".") normalized = ""; // SMB share-root atname -> root
-
-        // Reading a version is a read of the file -> ListReadData parity.
-        if (!await _acl.HasAccessAsync(user, share.Id, normalized, false, FilePermission.ListReadData))
-        {
-            _logger.LogInformation(
-                "ResolveVersion DENY: user={User} share={Share} path=[{Path}] -> ListReadData",
-                request.Username, request.Share, request.Path);
-            return notFound;
-        }
 
         var ts = FileVersion.ParseGmtToken(request.GmtToken);
         if (ts is null)
@@ -187,16 +206,39 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         // before the snapshot time (or it's the share root).
         if (version is null)
         {
-            var under = await _versions.GetFolderSnapshotAsync(share.Id, normalized, ts.Value);
+            List<FileVersion> under;
+            try
+            {
+                // P0-05: use the central ACL-aware path. It checks the requested
+                // directory with isDirectory=true and batch-filters every child.
+                under = await _fileServices
+                    .CreateForShare(share.Id, share.Path)
+                    .GetFolderSnapshotAsync(normalized, ts.Value, user);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                _logger.LogInformation(
+                    "ResolveVersion DENY directory: user={User} share={Share} path=[{Path}]",
+                    request.Username, request.Share, request.Path);
+                return notFound;
+            }
+
             if (normalized.Length == 0 || under.Count > 0)
             {
+                string cacheScope = user.User.Id.ToString("N");
                 string dirRel = normalized.Length == 0
-                    ? $"{CacheDirName}/{request.GmtToken}"
-                    : $"{CacheDirName}/{request.GmtToken}/{normalized}";
+                    ? $"{CacheDirName}/{request.GmtToken}/{cacheScope}"
+                    : $"{CacheDirName}/{request.GmtToken}/{cacheScope}/{normalized}";
                 string dirFull = Path.Combine(share.Path, dirRel.Replace('/', Path.DirectorySeparatorChar));
                 try
                 {
                     Directory.CreateDirectory(dirFull);
+                    // A user's projection may contain files materialized before an
+                    // ACL revocation. Remove everything below this directory that
+                    // is not in the freshly filtered snapshot before returning it.
+                    ReconcileUserProjection(
+                        share.Path, request.GmtToken, cacheScope,
+                        normalized, under);
                     // Stamp the cache-age marker so the evictor keys off the real
                     // materialization time, not the historical file mtimes.
                     SnapshotCache.TouchMarker(share.Path, request.GmtToken);
@@ -212,7 +254,9 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                     {
                         try
                         {
-                            await MaterializeVersionAsync(share.Id, share.Path, request.GmtToken, fv);
+                            await MaterializeVersionAsync(
+                                share.Id, share.Path, request.GmtToken,
+                                cacheScope, fv);
                         }
                         catch (Exception ex)
                         {
@@ -242,12 +286,25 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             return notFound;
         }
 
+        // Reading a concrete version is a file read, never a directory check.
+        if (!await _acl.HasAccessAsync(
+                user, share.Id, normalized, false,
+                FilePermission.ListReadData))
+        {
+            _logger.LogInformation(
+                "ResolveVersion DENY file: user={User} share={Share} path=[{Path}]",
+                request.Username, request.Share, request.Path);
+            return notFound;
+        }
+
         // A concrete versioned file: materialize its content (decompressed) with the
         // historical mtime and hand back the in-share cache path.
         string cacheRel;
         try
         {
-            cacheRel = await MaterializeVersionAsync(share.Id, share.Path, request.GmtToken, version);
+            string cacheScope = user.User.Id.ToString("N");
+            cacheRel = await MaterializeVersionAsync(
+                share.Id, share.Path, request.GmtToken, cacheScope, version);
             // Stamp the cache-age marker (real materialization time) for the evictor.
             SnapshotCache.TouchMarker(share.Path, request.GmtToken);
         }
@@ -275,7 +332,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
 
     /// <summary>
     /// Writes one version's decompressed content into the in-share snapshot cache
-    /// (<c>&lt;share&gt;/.kaimo-snapshots/&lt;@GMT&gt;/&lt;filePath&gt;</c>) and stamps
+    /// (<c>&lt;share&gt;/.kaimo-snapshots/&lt;@GMT&gt;/&lt;user-id&gt;/&lt;filePath&gt;</c>) and stamps
     /// the historical modification time onto it. Idempotent: a version is
     /// content-addressed and immutable, so an existing cache file of the right
     /// (uncompressed) size is reused; the mtime is (re)applied every call.
@@ -286,10 +343,18 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
     /// path (forward slashes) the VFS module redirects the open to.
     /// </summary>
     private async Task<string> MaterializeVersionAsync(
-        Guid shareId, string sharePath, string gmtToken, FileVersion v)
+        Guid shareId, string sharePath, string gmtToken,
+        string cacheScope, FileVersion v)
     {
-        string rel = $"{CacheDirName}/{gmtToken}/{v.FilePath}";
-        string full = Path.Combine(sharePath, rel.Replace('/', Path.DirectorySeparatorChar));
+        if (!ShareRelativePath.IsValid(v.FilePath) ||
+            ShareRelativePath.Normalize(v.FilePath).Length == 0)
+            throw new InvalidDataException("Version contains an invalid file path.");
+
+        string normalizedPath = ShareRelativePath.Normalize(v.FilePath);
+        string rel = $"{CacheDirName}/{gmtToken}/{cacheScope}/{normalizedPath}";
+        string scopeRoot = Path.Combine(
+            sharePath, CacheDirName, gmtToken, cacheScope);
+        string full = GetScopedCachePath(scopeRoot, normalizedPath);
 
         var existing = new FileInfo(full);
         if (!existing.Exists || existing.Length != v.Size)
@@ -315,5 +380,68 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             _logger.LogWarning(ex, "SetLastWriteTimeUtc failed for {Path} (non-fatal)", full);
         }
         return rel;
+    }
+
+    private static void ReconcileUserProjection(
+        string sharePath,
+        string gmtToken,
+        string cacheScope,
+        string folderPath,
+        IReadOnlyCollection<FileVersion> readableVersions)
+    {
+        string scopeRoot = Path.Combine(
+            sharePath, CacheDirName, gmtToken, cacheScope);
+        string normalizedFolder = ShareRelativePath.Normalize(folderPath);
+        string folderFull = normalizedFolder.Length == 0
+            ? scopeRoot
+            : Path.Combine(
+                scopeRoot,
+                normalizedFolder.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(folderFull);
+
+        StringComparer pathComparer = OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+        var allowed = readableVersions
+            .Where(v => ShareRelativePath.IsValid(v.FilePath))
+            .Select(v => GetScopedCachePath(scopeRoot, v.FilePath))
+            .ToHashSet(pathComparer);
+
+        foreach (string file in Directory.EnumerateFiles(
+                     folderFull, "*", SearchOption.AllDirectories))
+        {
+            if (!allowed.Contains(Path.GetFullPath(file)))
+                File.Delete(file);
+        }
+
+        // Remove stale empty directories left behind by revoked files, but retain
+        // the requested directory that Samba is about to traverse.
+        foreach (string directory in Directory.EnumerateDirectories(
+                     folderFull, "*", SearchOption.AllDirectories)
+                 .OrderByDescending(path => path.Length))
+        {
+            if (!Directory.EnumerateFileSystemEntries(directory).Any())
+                Directory.Delete(directory);
+        }
+    }
+
+    private static string GetScopedCachePath(
+        string scopeRoot, string relativePath)
+    {
+        string root = Path.GetFullPath(scopeRoot);
+        string candidate = Path.GetFullPath(Path.Combine(
+            root,
+            ShareRelativePath.Normalize(relativePath)
+                .Replace('/', Path.DirectorySeparatorChar)));
+        string prefix = root.EndsWith(Path.DirectorySeparatorChar)
+            ? root
+            : root + Path.DirectorySeparatorChar;
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        if (!candidate.StartsWith(prefix, comparison))
+            throw new InvalidDataException(
+                "Version path escapes the user snapshot cache scope.");
+        return candidate;
     }
 }

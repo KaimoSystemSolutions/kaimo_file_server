@@ -407,19 +407,21 @@ module does it via the bridge instead:
  kaimo_authd ──gRPC EnumerateSnapshots──►   kaimo_authd ──gRPC ResolveVersion──►
                 SmbBridge (.NET)                            SmbBridge (.NET)
                 GetSnapshotTimestamps/GetVersions           GetVersionAt + ReadVersion
-                                                            → materialize decompressed copy
-                                                              into <share>/.kaimo-snapshots/@GMT-…/
+                                                            → ACL-filter + materialize
+                                                              into <share>/.kaimo-snapshots/@GMT-…/<user-id>/
    labels (@GMT tokens)                        base_name rewritten to that copy → native read
 ```
 
 - **Enumeration** (`get_shadow_copy_data_fn`) returns the `@GMT-` labels for the
   file. **Resolution**: a timewarp open/stat (`smb_fname->twrp`) is turned into an
   `@GMT-` token, the bridge materializes that one version **decompressed** into a
-  hidden in-share cache (`<share>/.kaimo-snapshots/@GMT-…/<relpath>`, hidden from
+  per-user hidden cache (`<share>/.kaimo-snapshots/@GMT-…/<user-id>/<relpath>`, hidden from
   listings, reused idempotently) and the module redirects the open there — so the
   **data path stays native**, exactly like live files.
-- **ACL parity:** `EnumerateSnapshots`/`ResolveVersion` require `ListReadData` on
-  the path, so users only see/read snapshots of files they may read.
+- **ACL parity:** concrete files require `ListReadData`; folders go through
+  `IFileService.GetFolderSnapshotAsync`, which checks the directory and batch-filters
+  every historical child. Before returning a folder, the bridge removes stale files
+  from that user's projection, including files revoked after earlier materialization.
 - **.NET:** [`SnapshotGrpcService`](../src/Kaimo_File_Server.SmbBridge/Services/SnapshotGrpcService.cs)
   — thin facade over the already-complete `IFileVersionService`.
 - **C/C++:** `get_shadow_copy_data_fn` + `stat`/`lstat` + `create_file` twrp branch
