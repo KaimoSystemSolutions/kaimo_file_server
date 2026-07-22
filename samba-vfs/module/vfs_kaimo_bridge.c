@@ -228,6 +228,67 @@ static bool kaimo_authz_delete(const char *user, const char *share,
 	return d == 1;
 }
 
+static bool kaimo_authz_rename(const char *user, const char *share,
+			       const char *source_path,
+			       const char *destination_path,
+			       bool source_is_directory,
+			       bool destination_exists,
+			       bool destination_is_directory)
+{
+	TALLOC_CTX *frame = talloc_stackframe();
+	/* Samba calls renameat only after it has accepted replacement of an
+	 * existing destination. At this boundary destination_exists therefore
+	 * also describes the effective replacement intent. */
+	char *req = talloc_asprintf(
+		frame, "RENAMEAUTH\t%s\t%s\t%d\t%d\t%d\t%d\t%s\t%s\n",
+		user ? user : "", share ? share : "",
+		source_is_directory ? 1 : 0,
+		destination_exists ? 1 : 0,
+		destination_is_directory ? 1 : 0,
+		destination_exists ? 1 : 0,
+		source_path ? source_path : "",
+		destination_path ? destination_path : "");
+	size_t len;
+	if (!kaimo_request_ready("RENAMEAUTH", req, &len)) {
+		TALLOC_FREE(frame);
+		return false;
+	}
+
+	int d = kaimo_authz_send(req, len, NULL);
+	TALLOC_FREE(frame);
+	if (d == -2) {
+		DBG_ERR("kaimo_bridge: malformed RENAME authorization response, denied\n");
+		return false;
+	}
+	if (d < 0) {
+		DBG_WARNING("kaimo_bridge: authd unreachable (rename), fail-%s\n",
+			    kaimo_failmode_allow() ? "open" : "closed");
+		return kaimo_failmode_allow();
+	}
+	return d == 1;
+}
+
+/* Read an object relative to the exact directory handle Samba will pass to
+ * renameat. ENOENT is a valid "missing destination" state; every other error
+ * is surfaced so authorization cannot proceed on unknown filesystem state. */
+static int kaimo_rename_stat(vfs_handle_struct *handle,
+			     const struct files_struct *dirfsp,
+			     const struct smb_filename *smb_fname,
+			     SMB_STRUCT_STAT *st,
+			     bool *exists)
+{
+	ZERO_STRUCTP(st);
+	*exists = false;
+	if (SMB_VFS_NEXT_FSTATAT(handle, dirfsp, smb_fname, st,
+				 AT_SYMLINK_NOFOLLOW) == 0) {
+		*exists = true;
+		return 0;
+	}
+	if (errno == ENOENT)
+		return 0;
+	return -1;
+}
+
 static bool kaimo_list_filter_enabled(void)
 {
 	const char *v = getenv("KAIMO_LIST_FILTER");
@@ -832,7 +893,7 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 	return ret;
 }
 
-/* ---- Rename hook: ACL path + search index follow-up (Phase 3) ---- */
+/* ---- Rename hook: pre-op ACL + search index follow-up (Phase 3/P0-04) ---- */
 static int kaimo_renameat(vfs_handle_struct *handle,
 			  struct files_struct *srcdir_fsp,
 			  const struct smb_filename *smb_fname_src,
@@ -851,10 +912,31 @@ static int kaimo_renameat(vfs_handle_struct *handle,
 	const char *oldlogical = kaimo_share_rel(handle, oldp);
 	const char *newlogical = kaimo_share_rel(handle, newp);
 
-	/* P0-04 separately adds pre-rename ACL authorization. P0-02 guarantees here
-	 * that neither lifecycle path is truncated or silently omitted. */
-	char *req = talloc_asprintf(frame, "RENAME\t%s\t%s\t0\t%s\t%s\n",
+	SMB_STRUCT_STAT source_before;
+	SMB_STRUCT_STAT destination_before;
+	bool source_exists = false;
+	bool destination_exists = false;
+	if (kaimo_rename_stat(handle, srcdir_fsp, smb_fname_src,
+			      &source_before, &source_exists) != 0 ||
+	    !source_exists ||
+	    kaimo_rename_stat(handle, dstdir_fsp, smb_fname_dst,
+			      &destination_before, &destination_exists) != 0) {
+		int stat_errno = errno;
+		DBG_ERR("kaimo_bridge: RENAME state inspection failed [%s] -> [%s]\n",
+			oldlogical, newlogical);
+		TALLOC_FREE(frame);
+		errno = stat_errno != 0 ? stat_errno : ENOENT;
+		return -1;
+	}
+
+	bool source_is_directory = S_ISDIR(source_before.st_ex_mode);
+	bool destination_is_directory = destination_exists &&
+		S_ISDIR(destination_before.st_ex_mode);
+
+	/* P0-02 requires exact, prevalidated event paths before mutation. */
+	char *req = talloc_asprintf(frame, "RENAME\t%s\t%s\t%d\t%s\t%s\n",
 				    ctx->user, ctx->share,
+				    source_is_directory ? 1 : 0,
 				    oldlogical, newlogical);
 	size_t len;
 	if (!kaimo_request_ready("RENAME", req, &len)) {
@@ -862,12 +944,57 @@ static int kaimo_renameat(vfs_handle_struct *handle,
 		return -1;
 	}
 
+	/* Authorize the complete move before touching the filesystem: source
+	 * removal, destination-parent creation, and replacement deletion. */
+	errno = 0;
+	if (!kaimo_authz_rename(ctx->user, ctx->share,
+				oldlogical, newlogical,
+				source_is_directory,
+				destination_exists,
+				destination_is_directory)) {
+		int auth_errno = errno;
+		DBG_ERR("kaimo_bridge: RENAME DENIED [%s] -> [%s] user=[%s]\n",
+			oldlogical, newlogical, ctx->user);
+		TALLOC_FREE(frame);
+		errno = (auth_errno == ENOMEM || auth_errno == ENAMETOOLONG)
+			? auth_errno : EACCES;
+		return -1;
+	}
+
+	/* Narrow the RPC TOCTOU window. If either directory entry disappeared,
+	 * appeared, changed type, or was exchanged for another inode while the
+	 * bridge decided, fail closed. renameat itself remains the final atomic
+	 * operation; Samba 4.19.5 exposes no replace flag to this VFS hook. */
+	SMB_STRUCT_STAT source_after;
+	SMB_STRUCT_STAT destination_after;
+	bool source_still_exists = false;
+	bool destination_still_exists = false;
+	if (kaimo_rename_stat(handle, srcdir_fsp, smb_fname_src,
+			      &source_after, &source_still_exists) != 0 ||
+	    kaimo_rename_stat(handle, dstdir_fsp, smb_fname_dst,
+			      &destination_after,
+			      &destination_still_exists) != 0 ||
+	    !source_still_exists ||
+	    destination_exists != destination_still_exists ||
+	    !check_same_dev_ino(&source_before, &source_after) ||
+	    S_ISDIR(source_before.st_ex_mode) !=
+		S_ISDIR(source_after.st_ex_mode) ||
+	    (destination_exists &&
+	     (!check_same_dev_ino(&destination_before, &destination_after) ||
+	      S_ISDIR(destination_before.st_ex_mode) !=
+		S_ISDIR(destination_after.st_ex_mode)))) {
+		DBG_WARNING("kaimo_bridge: RENAME state changed during authorization "
+			    "[%s] -> [%s], retry required\n",
+			    oldlogical, newlogical);
+		TALLOC_FREE(frame);
+		errno = EAGAIN;
+		return -1;
+	}
+
 	int ret = SMB_VFS_NEXT_RENAMEAT(handle, srcdir_fsp, smb_fname_src,
 					dstdir_fsp, smb_fname_dst);
 
 	if (ret == 0 && oldlogical[0] != '\0' && newlogical[0] != '\0') {
-		/* is_directory not reliably known here -> 0 (file); directory
-		 * renames are rare and treated as path updates. */
 		kaimo_notify_send(req, len);
 	}
 	TALLOC_FREE(frame);
@@ -1013,7 +1140,7 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 /* Build marker: bump on every module change so the running image can be
  * identified in the logs (grep "kaimo_bridge build"). This is how we tell whether
  * a rebuild actually picked up the latest source vs. served a cached layer. */
-#define KAIMO_BRIDGE_BUILD "2026-07-22c complete access masks"
+#define KAIMO_BRIDGE_BUILD "2026-07-22d complete rename authorization"
 
 static_decl_vfs;
 NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)

@@ -364,6 +364,100 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         return new AuthorizeReply { Allow = allow, Reason = reason };
     }
 
+    /// <summary>
+    /// Authorizes a rename as one indivisible policy decision: remove the
+    /// source, create the source object type in the destination parent, and,
+    /// when applicable, remove the replacement target. The native VFS hook
+    /// revalidates the filesystem identities after this RPC and before renameat.
+    /// </summary>
+    public override async Task<AuthorizeReply> AuthorizeRename(
+        AuthorizeRenameRequest request, ServerCallContext context)
+    {
+        var user = await _auth.ResolveUserContextAsync(request.Username);
+        if (user is null)
+            return Deny($"unknown user '{request.Username}'");
+
+        var share = await _shares.GetByNameAsync(request.Share);
+        if (share is null)
+            return Deny($"unknown share '{request.Share}'");
+
+        if (!ShareRelativePath.IsValid(request.SourcePath) ||
+            !ShareRelativePath.IsValid(request.DestinationPath))
+            return Deny("invalid rename path");
+
+        string source = ShareRelativePath.Normalize(request.SourcePath);
+        string destination = ShareRelativePath.Normalize(request.DestinationPath);
+        if (string.IsNullOrEmpty(source) || string.IsNullOrEmpty(destination) ||
+            string.Equals(source, destination, StringComparison.Ordinal))
+            return Deny($"invalid rename '{source}' -> '{destination}'");
+
+        // Cross-check the native request against the shared storage view. This
+        // is not the final TOCTOU guard (the VFS performs that immediately
+        // before renameat), but prevents authorization based on stale/type-
+        // confused request metadata.
+        string sourceFull = Path.Combine(share.Path, source);
+        bool sourceExists = File.Exists(sourceFull) || Directory.Exists(sourceFull);
+        bool sourceIsDirectory = sourceExists && Directory.Exists(sourceFull);
+        if (!sourceExists || sourceIsDirectory != request.SourceIsDirectory)
+            return Deny("rename source no longer matches the native request");
+
+        string destinationFull = Path.Combine(share.Path, destination);
+        bool destinationExists = File.Exists(destinationFull) || Directory.Exists(destinationFull);
+        bool destinationIsDirectory = destinationExists && Directory.Exists(destinationFull);
+        if (destinationExists != request.DestinationExists ||
+            (destinationExists &&
+             destinationIsDirectory != request.DestinationIsDirectory))
+            return Deny("rename destination no longer matches the native request");
+
+        if (request.DestinationExists != request.ReplaceIntent)
+            return Deny("rename replacement intent does not match destination state");
+        if (!request.DestinationExists && request.DestinationIsDirectory)
+            return Deny("missing rename destination cannot have an object type");
+
+        string? sourceTraversalDeny = await CheckTraversalAsync(
+            user, share.Id, source);
+        if (sourceTraversalDeny is not null)
+            return Deny(sourceTraversalDeny);
+
+        string? destinationTraversalDeny = await CheckTraversalAsync(
+            user, share.Id, destination);
+        if (destinationTraversalDeny is not null)
+            return Deny(destinationTraversalDeny);
+
+        var sourceDelete = await CanDeleteAsync(
+            user, share.Id, source, request.SourceIsDirectory);
+        if (!sourceDelete.Allowed)
+            return Deny(sourceDelete.Reason);
+
+        string destinationParent = ShareRelativePath.GetParent(destination);
+        FilePermission createPermission = request.SourceIsDirectory
+            ? FilePermission.CreateAppendData
+            : FilePermission.CreateWriteData;
+        if (!await _acl.HasAccessAsync(
+                user, share.Id, destinationParent, true, createPermission))
+            return Deny(
+                $"rename denied: destination parent '{destinationParent}' lacks {createPermission}");
+
+        string replacementSource = "none";
+        if (request.DestinationExists)
+        {
+            var replacementDelete = await CanDeleteAsync(
+                user, share.Id, destination,
+                request.DestinationIsDirectory);
+            if (!replacementDelete.Allowed)
+                return Deny(replacementDelete.Reason);
+            replacementSource = replacementDelete.Source;
+        }
+
+        _logger.LogDebug(
+            "AuthorizeRename ALLOW: user={User} share={Share} source=[{Source}] destination=[{Destination}] dir={Directory} replace={Replace} sourceDelete={SourceDelete} replacementDelete={ReplacementDelete}",
+            request.Username, request.Share, source, destination,
+            request.SourceIsDirectory, request.DestinationExists,
+            sourceDelete.Source, replacementSource);
+
+        return new AuthorizeReply { Allow = true };
+    }
+
     private async Task<(bool Allowed, string Source, string Reason)> CanDeleteAsync(
         UserContext user, Guid shareId, string normalized, bool isDirectory)
     {

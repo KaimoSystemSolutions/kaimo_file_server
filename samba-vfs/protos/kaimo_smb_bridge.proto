@@ -55,6 +55,10 @@ service AuthzService {
   // unlinkat/rmdir authorization. Deleting an item requires Delete on the
   // target or DeleteSubItems on its parent directory.
   rpc AuthorizeDelete(AuthorizeDeleteRequest) returns (AuthorizeReply);
+
+  // renameat authorization. The decision covers source removal, creation in
+  // the destination parent, and deletion of an existing replacement target.
+  rpc AuthorizeRename(AuthorizeRenameRequest) returns (AuthorizeReply);
 }
 
 message AuthorizeConnectRequest {
@@ -91,6 +95,19 @@ message AuthorizeDeleteRequest {
   string share        = 2;
   string path         = 3; // share-relative, forward slashes
   bool   is_directory = 4;
+}
+
+message AuthorizeRenameRequest {
+  string username                 = 1;
+  string share                    = 2;
+  string source_path              = 3; // share-relative, forward slashes
+  string destination_path         = 4; // share-relative, forward slashes
+  bool   source_is_directory      = 5;
+  bool   destination_exists       = 6;
+  bool   destination_is_directory = 7;
+  // At the renameat boundary this means Samba accepted replacing the
+  // destination currently described above. It is false for a missing target.
+  bool   replace_intent           = 8;
 }
 
 // Close/Event hooks (Phase 3). Samba performs I/O natively and reports the event

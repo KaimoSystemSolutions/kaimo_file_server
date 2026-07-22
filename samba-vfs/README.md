@@ -175,9 +175,9 @@ to allow on error instead (availability over security), which was the previous d
 `ACCESS_DENIED`) — several Samba code paths hardcode this for VFS connect errors. Functionally
 access is correctly denied.
 
-**Open (Phase 2b):** File/path ACL on `openat`/`unlink`/`rename` (currently logging only) and
-directory listing filter — performance-sensitive and tied to path reconstruction, so as a separate
-step.
+**Implemented in Phase 2b:** File/path, delete, and rename authorization plus the
+directory listing filter. Native runtime verification of the latest hardening revisions
+remains pending.
 
 ## Phase 2b — File/path ACL + listing filter (Phase 2 complete)
 
@@ -199,6 +199,11 @@ to read/write booleans.
   behavior is not applied to visibility checks. The **sidecar caches** decisions and
   granted masks (TTL 3 s) so large listings don't flood the bridge.
   Disabled with `KAIMO_LIST_FILTER=0`.
+- **`renameat` hook** → gRPC `AuthorizeRename` before mutation. The bridge requires
+  source `Delete` (or source-parent `DeleteSubItems`), file/directory-appropriate create
+  permission on the destination parent, and deletion permission for an existing replacement.
+  The VFS validates source/destination inode and type both before and after the RPC to
+  reject stale or exchanged directory entries.
 
 **Verified:**
 
@@ -228,7 +233,8 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
  smbd VFS hook (pure C)            Sidecar (kaimo_authd)        SmbBridge (.NET)
   close_fn   (file written)    ──"CLOSE\t…"──► NotifyClose ──► FileService.NotifyExternalCloseAsync
   unlinkat_fn(deleted)         ──"DELETE\t…"─► NotifyDelete ─►   → Version (CreateVersionAsync)
-  renameat_fn(renamed)         ──"RENAME\t…"─► NotifyRename ─►   → Ownership (EnsureOwnerAsync)
+  renameat_fn(renamed)  ──"RENAMEAUTH\t…"─► AuthorizeRename
+                        ──"RENAME\t…"─────► NotifyRename ─►   → Ownership (EnsureOwnerAsync)
   mkdirat_fn (directory created) ──"MKDIR\t…"──► NotifyMkdir  ─►   → Search index (SearchServiceRouter)
                                     (fire-and-forget)               → ACL realignment (Rename)
 ```

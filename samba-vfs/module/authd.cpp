@@ -9,6 +9,7 @@
 //     "OPEN\t<user>\t<share>\t<access-hex>\t<create 0|1>\t<dir 0|1>\t<listing 0|1>\t<path>"
 //       -> "ALLOW\t<granted-access-hex>" | "DENY" | "ERROR"
 //     "DELETEAUTH\t<user>\t<share>\t<isdir 0|1>\t<path>"
+//     "RENAMEAUTH\t<user>\t<share>\t<srcdir 0|1>\t<dstexists 0|1>\t<dstdir 0|1>\t<replace 0|1>\t<old>\t<new>"
 //   Events (fire-and-forget, response OK):
 //     "CLOSE\t<user>\t<share>\t<path>"                   file written and closed
 //     "MKDIR\t<user>\t<share>\t<path>"                   directory created
@@ -138,6 +139,33 @@ static const char* do_delete(const std::string& user, const std::string& share,
     return reply.allow() ? "ALLOW" : "DENY";
 }
 
+static const char* do_rename(const std::string& user, const std::string& share,
+                             bool source_is_directory,
+                             bool destination_exists,
+                             bool destination_is_directory,
+                             bool replace_intent,
+                             const std::string& source_path,
+                             const std::string& destination_path) {
+    AuthorizeRenameRequest req;
+    req.set_username(user);
+    req.set_share(share);
+    req.set_source_path(source_path);
+    req.set_destination_path(destination_path);
+    req.set_source_is_directory(source_is_directory);
+    req.set_destination_exists(destination_exists);
+    req.set_destination_is_directory(destination_is_directory);
+    req.set_replace_intent(replace_intent);
+    grpc::ClientContext ctx; ctx.set_deadline(deadline(5));
+    AuthorizeReply reply;
+    grpc::Status st = g_authz->AuthorizeRename(&ctx, req, &reply);
+    if (!st.ok()) {
+        std::cerr << "kaimo_authd: AuthorizeRename: "
+                  << st.error_message() << std::endl;
+        return "ERROR";
+    }
+    return reply.allow() ? "ALLOW" : "DENY";
+}
+
 // ---- Events (best-effort) ----
 static void ev_close(const std::string& user, const std::string& share, const std::string& path) {
     NotifyCloseRequest req; req.set_username(user); req.set_share(share); req.set_path(path);
@@ -248,6 +276,17 @@ static void handle_client(int cfd) {
     } else if (line.rfind("DELETEAUTH\t", 0) == 0) {
         auto p = split_tabs(line, 5);
         if (p.size() == 5) out = std::string(do_delete(p[1], p[2], p[3] == "1", p[4])) + "\n";
+    } else if (line.rfind("RENAMEAUTH\t", 0) == 0) {
+        auto p = split_tabs(line, 9);
+        if (p.size() == 9 &&
+            (p[3] == "0" || p[3] == "1") &&
+            (p[4] == "0" || p[4] == "1") &&
+            (p[5] == "0" || p[5] == "1") &&
+            (p[6] == "0" || p[6] == "1")) {
+            out = std::string(do_rename(
+                p[1], p[2], p[3] == "1", p[4] == "1",
+                p[5] == "1", p[6] == "1", p[7], p[8])) + "\n";
+        }
     } else if (line.rfind("CLOSE\t", 0) == 0) {
         auto p = split_tabs(line, 4);
         if (p.size() == 4) { ev_close(p[1], p[2], p[3]); out = "OK\n"; }

@@ -16,7 +16,7 @@ The most important conclusions are:
 
 1. No obvious direct stack overflow, heap overflow, use-after-free, or double-free was found during the static review. This is not a formal proof of C/C++ memory safety.
 2. The native implementation still has security-relevant memory/resource failures: allocation failure can disable open authorization, the sidecar has unbounded thread and cache growth, and blocking Unix-socket calls can stall `smbd` workers.
-3. The Kaimo file-permission model is only partially mapped to Samba access masks. Rename and several metadata/security operations are not fully authorized.
+3. The complete open access mask and rename source/destination/replacement policy are now mapped to Kaimo permissions in source. Native runtime verification and several metadata/security operation checks remain open.
 4. Folder snapshot materialization bypasses the existing per-file ACL filter and places historical content inside the client-visible share namespace.
 5. The local sidecar protocol is not safely framed and assumes one `read()`/`write()` is sufficient for a stream socket.
 6. The gRPC bridge exposes NT hashes and privileged control-plane functions over unauthenticated h2c on the shared Docker network.
@@ -99,7 +99,7 @@ The review considers:
 ### P0-01: Connection-context allocation failure disables open authorization
 
 > **Remediation status (2026-07-22): Implemented in source; native build/runtime verification pending.**
-> The context is now allocated and populated before `SMB_VFS_NEXT_CONNECT`. An allocation failure returns `ENOMEM` without establishing the next VFS connection, and a downstream connect failure frees the prepared context. P0-01 introduced the build marker `2026-07-22a fail-closed connect context allocation`; the current marker is `2026-07-22c complete access masks` after P0-03.
+> The context is now allocated and populated before `SMB_VFS_NEXT_CONNECT`. An allocation failure returns `ENOMEM` without establishing the next VFS connection, and a downstream connect failure frees the prepared context. P0-01 introduced the build marker `2026-07-22a fail-closed connect context allocation`; the current marker is `2026-07-22d complete rename authorization` after P0-04.
 
 **Original evidence (before remediation)**
 
@@ -127,7 +127,7 @@ Under memory pressure, a valid TREE_CONNECT can continue without per-file open a
 ### P0-02: Fixed-size path truncation can authorize a different object than Samba modifies
 
 > **Remediation status (2026-07-22): Implemented in source; native boundary/runtime verification pending.**
-> All request and reconstructed operation paths are now dynamically allocated, checked against the sidecar's explicit 8191-byte request limit, and canonicalized before authorization/event use. Delete, rename, and mkdir reject local allocation/size failures before their native mutation. P0-02 introduced `2026-07-22b exact dynamic paths`; the current marker is `2026-07-22c complete access masks` after P0-03.
+> All request and reconstructed operation paths are now dynamically allocated, checked against the sidecar's explicit 8191-byte request limit, and canonicalized before authorization/event use. Delete, rename, and mkdir reject local allocation/size failures before their native mutation. P0-02 introduced `2026-07-22b exact dynamic paths`; the current marker is `2026-07-22d complete rename authorization` after P0-04.
 
 **Original evidence (before remediation)**
 
@@ -160,7 +160,7 @@ Samba uses `*at` operations specifically to support directory-handle-relative pa
 ### P0-03: The Samba access mask is not mapped to the complete Kaimo permission model
 
 > **Remediation status (2026-07-22): Implemented in source; managed tests verified; native build/runtime verification pending.**
-> The complete raw SMB desired-access mask now crosses the VFS/sidecar/gRPC boundary. The bridge expands generic rights, maps every supported specific right, resolves `MAXIMUM_ALLOWED` to an attenuated mask, and returns that exact mask to the VFS before Samba continues. The current module build marker is `2026-07-22c complete access masks`.
+> The complete raw SMB desired-access mask now crosses the VFS/sidecar/gRPC boundary. The bridge expands generic rights, maps every supported specific right, resolves `MAXIMUM_ALLOWED` to an attenuated mask, and returns that exact mask to the VFS before Samba continues. P0-03 introduced `2026-07-22c complete access masks`; the current module build marker is `2026-07-22d complete rename authorization`.
 
 **Original evidence (before remediation)**
 
@@ -226,11 +226,14 @@ Additional implemented behavior:
 
 The mapping was checked against the project's exact pinned [Samba 4.19.5 source archive](https://download.samba.org/pub/samba/stable/samba-4.19.5.tar.gz), including `source3/smbd/smb2_create.c`, `source3/smbd/open.c`, and `libcli/security/security.h`, and against the [MS-SMB2 file access-mask definition](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb2/77b36d0f-6016-458a-a7a0-0f4a72ae1534). This confirmed that the custom VFS receives raw client access before Samba's generic/maximum resolution and that Samba later adds read-attributes access.
 
-Still required: native C/C++ compilation, live SMB access-mask tests, and SET_INFO verification for attributes, EAs, DACL, and owner changes. P0-04/P0-05 remain responsible for rename and other mutating VFS operations that are not protected solely by the opened handle's granted mask.
+Still required: native C/C++ compilation, live SMB access-mask tests, and SET_INFO verification for attributes, EAs, DACL, and owner changes. P0-05 remains responsible for the snapshot authorization gap.
 
 ### P0-04: Rename lacks complete source, destination, and overwrite authorization
 
-**Evidence**
+> **Remediation status (2026-07-22): Implemented in source; managed tests verified; native build/runtime verification pending.**
+> `AuthorizeRename` now covers source removal, destination-parent creation, and replacement deletion before the native operation. The VFS revalidates source and destination identities around the RPC. The current build marker is `2026-07-22d complete rename authorization`.
+
+**Original evidence (before remediation)**
 
 - `vfs_kaimo_bridge.c:633-656` invokes `SMB_VFS_NEXT_RENAMEAT()` without a rename authorization RPC.
 - The Core `FileService` requires Delete on the source, CreateWriteData at the destination, and Delete on an overwritten destination.
@@ -252,6 +255,15 @@ An SMB user can potentially rename or move content into a destination where Kaim
 **Temporary containment**
 
 If the complete authorization cannot be implemented immediately, return `EACCES` for rename rather than allowing an operation outside the modeled policy.
+
+**Implemented fix and remaining verification**
+
+1. Added `AuthorizeRenameRequest` with both canonical paths, source type, destination existence/type, and effective replacement intent.
+2. The managed decision checks traversal for both paths, source `Delete` or source-parent `DeleteSubItems`, destination-parent `CreateWriteData`/`CreateAppendData`, and replacement-target `Delete` or parent `DeleteSubItems`.
+3. The bridge cross-checks the native type/existence claims against its shared storage view.
+4. The VFS obtains source/destination state relative to Samba's exact parent directory handles before authorization, then repeats `fstatat` immediately afterward. Appearance, disappearance, type change, or inode exchange returns `EAGAIN` without mutation.
+5. The post-rename event now carries the real source directory type instead of hardcoding file.
+6. Still required: native compilation in the pinned image and live SMB rename tests, including concurrent destination exchange. A minimal syscall race remains between the final revalidation and `renameat`; Samba 4.19.5 does not expose the original replace flag to this VFS hook.
 
 ### P0-05: Folder snapshot materialization bypasses per-file ACL filtering
 
@@ -556,7 +568,7 @@ The module is built against Samba 4.19.5/ABI 49. The source version is pinned, b
 | File create | File parent requires `CreateWriteData`; directory parent requires `CreateAppendData`; future target mask is checked | Fallback mutating VFS paths still require P0-05 inventory |
 | Delete/rmdir | Pre-operation target/parent authorization uses exact dynamic canonical path | Race/handle identity semantics remain |
 | Delete-on-open | Target `Delete` or parent `DeleteSubItems`; granted handle mask is attenuated | Native delete-on-close matrix pending |
-| Rename/move | Native operation and post-event exist | No destination authorization; directory type hardcoded false |
+| Rename/move | Pre-op source/destination/replacement authorization plus post-event | Implemented in source; native/runtime verification pending |
 | Directory listing | Entry-by-entry read authorization with short cache | Unbounded cache, synchronous RPC volume, canonicalization, internal cache namespace |
 | Close lifecycle | Modified files emit close event | Lossy, reads content later by path, concurrent attribution races |
 | Mkdir lifecycle | `create_file` primary event plus `mkdirat` fallback | Fallback authorization and duplicate-event semantics need proof |
@@ -792,7 +804,7 @@ A release should be blocked when any of the following is true:
 - [ ] One canonical checked path routine is used everywhere.
 - [ ] No fixed buffer truncation can change the authorized target.
 - [x] Full access-mask mapping exists in source; native/runtime verification remains pending.
-- [ ] Rename is authorized before mutation.
+- [x] Rename is authorized before mutation (native/runtime verification pending).
 - [ ] All mutating VFS operations are inventoried and covered or explicitly denied.
 - [ ] Snapshot client paths cannot reach the internal cache.
 - [ ] Timewarp opens are read-only and use the VFS stack.
@@ -899,7 +911,7 @@ This order was selected instead of connecting first and rolling back afterward b
 
 - Compile the native module against the pinned Samba 4.19.5 source tree.
 - Run an allocation-failure/fault-injection test proving that TREE_CONNECT fails and no usable share state remains.
-- Run the live Samba connection test and verify the current `2026-07-22c` build marker (`2026-07-22a` was the marker when P0-01 alone was implemented).
+- Run the live Samba connection test and verify the current `2026-07-22d` build marker (`2026-07-22a` was the marker when P0-01 alone was implemented).
 - Run ASan/UBSan as part of the later native hardening test phase.
 
 These checks could not be completed in the current audit environment because neither a Docker daemon nor an installed WSL distribution was available.
@@ -954,14 +966,14 @@ The current 8191-byte cap is an explicit compatibility boundary, not the final p
 - Test deep `dirfsp` paths, multi-byte UTF-8 names at byte boundaries, and two paths sharing the first 4095 bytes where only one is authorized.
 - Verify OPEN/create, list, unlink, rmdir, mkdir, rename, close-event, snapshot enumeration, and snapshot open behavior against the exact same canonical target.
 - Verify `ENOMEM`/`ENAMETOOLONG` mapping through Samba to SMB client-visible statuses.
-- Verify the current `2026-07-22c complete access masks` marker in a running `smbd` log (`2026-07-22b` identifies the P0-02-only revision).
+- Verify the current `2026-07-22d complete rename authorization` marker in a running `smbd` log (`2026-07-22b` identifies the P0-02-only revision).
 
 Native verification is currently unavailable: the Docker CLI is installed but its engine pipe is not running, no WSL distribution is installed, and no local GCC/Clang compiler is available. This is an environment limitation, not a passing native test result.
 
 **Known related work intentionally not folded into P0-02**
 
 - P0-03: complete Samba access-mask-to-Kaimo permission mapping (implemented in source after this entry; native verification remains pending).
-- P0-04: authorize rename source, destination parent, and overwrite target before mutation.
+- P0-04: implemented in source after this entry; native/runtime verification remains pending.
 - P1-03: framed protocol and correct partial/EINTR I/O handling.
 - P1-11/P1-12: durable, authenticated, idempotent lifecycle delivery.
 - P2-01: replace the fixed 128-byte username/share fields in the connection context.
@@ -1025,7 +1037,7 @@ This changed the implementation plan materially: a boolean allow/deny result is 
 - Full solution suite: 501 passed, 0 failed, 0 skipped (24 new P0-03 tests increased the previous total from 477).
 - Ran a structural contract check confirming the old boolean fields are absent from C/C++/C#, protobuf field numbers 4-7 are reserved, all 13 Kaimo permissions are mapped, the sidecar and VFS agree on the OPEN field count/format, and the granted mask is applied before the next VFS create call.
 - Confirmed malformed OPEN ALLOW masks cannot enter the configurable fail-open path.
-- Confirmed the `2026-07-22c complete access masks` source marker.
+- Confirmed the P0-03 revision marker `2026-07-22c complete access masks`; it is superseded by the current P0-04 marker.
 - `git diff --check` completed successfully.
 
 **Validation still required**
@@ -1037,11 +1049,51 @@ This changed the implementation plan materially: a boolean allow/deny result is 
 - Verify SET_INFO operations cannot bypass the opened handle's `WriteAttributes`, `WriteExtAttributes`, `ChangePermissions`, or `TakeOwnership` mask.
 - Benchmark cold-cache authorization for deep paths and `MAXIMUM_ALLOWED`; the current correctness-first implementation can perform multiple ACL evaluations and must remain within the sidecar's five-second deadline.
 - Verify timewarp opens receive the attenuated mask. P1-06 still must force them read-only and avoid raw VFS-stack bypass.
-- Complete P0-04/P0-05 for rename and mutating operations whose authorization is not fully determined by the create/open handle.
+- Complete P0-05 and verify remaining mutating operations whose authorization is not fully determined by the create/open handle.
 
 Native verification remains unavailable in this environment: Docker is installed but its engine is not running, WSL has no installed distribution, and no local C/C++ compiler is present. The successful managed build does not compile the native VFS or sidecar.
 
-**Next planned finding:** P0-04 — authorize rename source, destination parent, and replacement target before native mutation.
+**Next planned finding:** P0-05 — enforce per-file ACL filtering for folder snapshots.
+
+### 2026-07-22 — P0-04: Complete rename authorization
+
+**Status:** Implemented in source; managed authorization tests verified; native build/runtime verification pending.
+
+**Solution implemented**
+
+1. Added `AuthzService.AuthorizeRename` and a request carrying canonical source/destination paths, source type, destination existence/type, and effective replacement intent.
+2. Added the `RENAMEAUTH` sidecar operation with strict boolean-field/count validation and a five-second gRPC deadline.
+3. Added the managed decision for traversal on both paths, source `Delete`/parent `DeleteSubItems`, destination-parent `CreateWriteData` for files or `CreateAppendData` for directories, and replacement-target `Delete`/parent `DeleteSubItems`.
+4. Cross-checked request existence/type data against the bridge's shared-storage view before evaluating ACLs.
+5. Added relative `SMB_VFS_NEXT_FSTATAT` inspection against the same parent handles passed to `SMB_VFS_NEXT_RENAMEAT` before authorization and immediately afterward. Inode exchange, appearance/disappearance, and type changes fail closed with `EAGAIN`.
+6. Moved authorization before the native rename and retained exact prevalidated post-event formatting. Directory rename events now carry the actual type.
+7. Updated the deployment marker to `2026-07-22d complete rename authorization`.
+
+**Files changed**
+
+- `samba-vfs/protos/kaimo_smb_bridge.proto`
+- `samba-vfs/module/authd.cpp`
+- `samba-vfs/module/vfs_kaimo_bridge.c`
+- `src/Kaimo_File_Server.SmbBridge/Services/AuthzGrpcService.cs`
+- `tests/Kaimo_File_Server.Tests/AuthzGrpcServiceRenameTests.cs`
+- `samba-vfs/README.md`
+- `docu/smb-samba-vfs-migration.md`
+- `docu/samba-bridge-vfs-security-audit.md`
+
+**Validation completed**
+
+- Compiled the managed gRPC service against the regenerated protobuf contract.
+- Added fourteen focused tests covering file and directory moves, source denial and source/replacement-parent deletion, destination-parent creation, replacement deletion, stale existence/type state, replacement-intent mismatch, and path traversal.
+- Focused authorization suite: 43 passed, 0 failed, 0 skipped.
+- Full solution suite: 515 passed, 0 failed, 0 skipped.
+- Checked the native signatures and rename call flow against the exact Samba 4.19.5 source pinned by the image.
+
+**Validation still required**
+
+- Compile the VFS module, sidecar, and regenerated C++ protobuf/gRPC stubs in the pinned image.
+- Run live SMB file/directory rename tests for same-parent moves, cross-directory moves, overwrite allow/deny, source-parent `DeleteSubItems`, destination-parent creation denial, and target type mismatches.
+- Exercise a concurrent target-exchange test to confirm the pre/post-RPC identity check fails closed.
+- The Docker CLI is installed, but its engine is not running in this environment; no native result is claimed.
 
 ## 15. Source evidence index
 
@@ -1050,7 +1102,7 @@ Native verification remains unavailable in this environment: Docker is installed
 | Context allocation fail-open | `samba-vfs/module/vfs_kaimo_bridge.c:526-574` |
 | Path reconstruction/truncation | `vfs_kaimo_bridge.c:68-228`, `:320-382`, `:510-522`, `:583-991` |
 | Complete access mapping / original gap | `vfs_kaimo_bridge.c:89-197`, `:583-695`; `authd.cpp:53-130`, `:212-249`; `AuthzGrpcService.cs:25-327`; `Core/Security/FilePermissions.cs` |
-| Rename authorization gap | `vfs_kaimo_bridge.c:836-879`, `Core/Services/File/FileService.cs:53-86`, `:694-719` |
+| Rename authorization / original gap | `vfs_kaimo_bridge.c` (`kaimo_authz_rename`, `kaimo_renameat`); `authd.cpp` (`do_rename`); `AuthzGrpcService.cs` (`AuthorizeRename`) |
 | Unbounded sidecar threads/cache | `samba-vfs/module/authd.cpp:49-66`, `:183-225`, `:258-262` |
 | World-writable socket | `authd.cpp:241-254` |
 | Partial stream I/O | `vfs_kaimo_bridge.c:89-139`, `:258-304`; `authd.cpp:224-262` |
