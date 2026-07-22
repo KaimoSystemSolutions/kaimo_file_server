@@ -31,6 +31,11 @@
 #define DBGC_CLASS DBGC_VFS
 
 #define KAIMO_AUTHD_SOCK_DEFAULT "/var/run/kaimo/authz.sock"
+/* authd currently reads at most 8191 request bytes plus its terminating NUL.
+ * Until the framed protocol from P1-03 replaces the line protocol, reject a
+ * larger request locally instead of truncating it or treating it as an
+ * infrastructure failure that could be allowed by KAIMO_AUTHZ_FAILOPEN. */
+#define KAIMO_AUTHD_MAX_REQUEST 8191
 
 /* Per-connection stored in VFS handle (set at TREE_CONNECT). */
 struct kaimo_conn_ctx {
@@ -54,6 +59,28 @@ static bool kaimo_failmode_allow(void)
 {
 	const char *fo = getenv("KAIMO_AUTHZ_FAILOPEN");
 	return fo != NULL && fo[0] == '1';
+}
+
+/* Validate a fully formatted local sidecar request. A formatting/allocation or
+ * size failure is a local input error, not an infrastructure outage, and must
+ * therefore never be converted into fail-open behavior. */
+static bool kaimo_request_ready(const char *operation, const char *req,
+				size_t *len)
+{
+	if (req == NULL) {
+		DBG_ERR("kaimo_bridge: %s request allocation failed\n", operation);
+		errno = ENOMEM;
+		return false;
+	}
+
+	*len = strlen(req);
+	if (*len == 0 || *len > KAIMO_AUTHD_MAX_REQUEST) {
+		DBG_WARNING("kaimo_bridge: %s request too large (%zu > %d), denied\n",
+			    operation, *len, KAIMO_AUTHD_MAX_REQUEST);
+		errno = ENAMETOOLONG;
+		return false;
+	}
+	return true;
 }
 
 /* Sends a request line to kaimo_authd and reads the response.
@@ -93,12 +120,17 @@ static int kaimo_authz_send(const char *req, size_t len)
 
 static bool kaimo_authz_connect(const char *service, const char *user)
 {
-	char req[512];
-	int n = snprintf(req, sizeof(req), "CONNECT\t%s\t%s\n",
-			 user ? user : "", service ? service : "");
-	if (n <= 0 || n >= (int)sizeof(req)) return kaimo_failmode_allow();
+	TALLOC_CTX *frame = talloc_stackframe();
+	char *req = talloc_asprintf(frame, "CONNECT\t%s\t%s\n",
+				   user ? user : "", service ? service : "");
+	size_t len;
+	if (!kaimo_request_ready("CONNECT", req, &len)) {
+		TALLOC_FREE(frame);
+		return false;
+	}
 
-	int d = kaimo_authz_send(req, (size_t)n);
+	int d = kaimo_authz_send(req, len);
+	TALLOC_FREE(frame);
 	if (d < 0) {
 		DBG_WARNING("kaimo_bridge: authd unreachable (connect), fail-%s\n",
 			    kaimo_failmode_allow() ? "open" : "closed");
@@ -119,12 +151,18 @@ static bool kaimo_authz_open(const char *user, const char *share, const char *pa
 	if (want_delete)  flags[fi++] = 'd';
 	flags[fi] = '\0';
 
-	char req[5120];
-	int n = snprintf(req, sizeof(req), "OPEN\t%s\t%s\t%s\t%s\n",
-			 user ? user : "", share ? share : "", flags, path ? path : "");
-	if (n <= 0 || n >= (int)sizeof(req)) return kaimo_failmode_allow();
+	TALLOC_CTX *frame = talloc_stackframe();
+	char *req = talloc_asprintf(frame, "OPEN\t%s\t%s\t%s\t%s\n",
+				   user ? user : "", share ? share : "",
+				   flags, path ? path : "");
+	size_t len;
+	if (!kaimo_request_ready("OPEN", req, &len)) {
+		TALLOC_FREE(frame);
+		return false;
+	}
 
-	int d = kaimo_authz_send(req, (size_t)n);
+	int d = kaimo_authz_send(req, len);
+	TALLOC_FREE(frame);
 	if (d < 0) return kaimo_failmode_allow();
 	return d == 1;
 }
@@ -132,13 +170,18 @@ static bool kaimo_authz_open(const char *user, const char *share, const char *pa
 static bool kaimo_authz_delete(const char *user, const char *share,
 			       const char *path, bool is_directory)
 {
-	char req[5120];
-	int n = snprintf(req, sizeof(req), "DELETEAUTH\t%s\t%s\t%d\t%s\n",
-			 user ? user : "", share ? share : "",
-			 is_directory ? 1 : 0, path ? path : "");
-	if (n <= 0 || n >= (int)sizeof(req)) return kaimo_failmode_allow();
+	TALLOC_CTX *frame = talloc_stackframe();
+	char *req = talloc_asprintf(frame, "DELETEAUTH\t%s\t%s\t%d\t%s\n",
+				   user ? user : "", share ? share : "",
+				   is_directory ? 1 : 0, path ? path : "");
+	size_t len;
+	if (!kaimo_request_ready("DELETEAUTH", req, &len)) {
+		TALLOC_FREE(frame);
+		return false;
+	}
 
-	int d = kaimo_authz_send(req, (size_t)n);
+	int d = kaimo_authz_send(req, len);
+	TALLOC_FREE(frame);
 	if (d < 0) {
 		DBG_WARNING("kaimo_bridge: authd unreachable (delete), fail-%s\n",
 			    kaimo_failmode_allow() ? "open" : "closed");
@@ -239,16 +282,24 @@ static bool kaimo_snapshot_openat_enabled(void)
 static int kaimo_snapresolve_rel(struct kaimo_conn_ctx *ctx, const char *gmt,
 				 const char *logical, char *out, size_t outsz)
 {
-	if (ctx == NULL || logical == NULL) return -1;
+	if (ctx == NULL || gmt == NULL || logical == NULL || out == NULL || outsz == 0)
+		return -1;
 
-	char req[6144];
-	int n = snprintf(req, sizeof(req), "SNAPRESOLVE\t%s\t%s\t%s\t%s\n",
-			 ctx->user, ctx->share, gmt, logical);
-	if (n <= 0 || n >= (int)sizeof(req)) return -1;
+	TALLOC_CTX *frame = talloc_stackframe();
+	char *req = talloc_asprintf(frame, "SNAPRESOLVE\t%s\t%s\t%s\t%s\n",
+				   ctx->user, ctx->share, gmt, logical);
+	size_t req_len;
+	if (!kaimo_request_ready("SNAPRESOLVE", req, &req_len)) {
+		TALLOC_FREE(frame);
+		return -1;
+	}
 
 	char resp[8192];
-	ssize_t r = kaimo_snap_request(req, (size_t)n, resp, sizeof(resp));
-	if (r <= 0 || strncmp(resp, "OK\t", 3) != 0) return -1;
+	ssize_t r = kaimo_snap_request(req, req_len, resp, sizeof(resp));
+	if (r <= 0 || strncmp(resp, "OK\t", 3) != 0) {
+		TALLOC_FREE(frame);
+		return -1;
+	}
 
 	/* resp = "OK\t<cachepath>\t<size>\n" -> isolate <cachepath> */
 	char *p = resp + 3;
@@ -256,9 +307,18 @@ static int kaimo_snapresolve_rel(struct kaimo_conn_ctx *ctx, const char *gmt,
 	if (tab != NULL) *tab = '\0';
 	char *nl = strchr(p, '\n');
 	if (nl != NULL) *nl = '\0';
-	if (p[0] == '\0') return -1;
+	if (p[0] == '\0') {
+		TALLOC_FREE(frame);
+		return -1;
+	}
 
-	strlcpy(out, p, outsz);
+	if (strlcpy(out, p, outsz) >= outsz) {
+		DBG_WARNING("kaimo_bridge: SNAPRESOLVE cache path too large, denied\n");
+		errno = ENAMETOOLONG;
+		TALLOC_FREE(frame);
+		return -1;
+	}
+	TALLOC_FREE(frame);
 	return 1;
 }
 
@@ -273,7 +333,11 @@ static const char *kaimo_share_rel(vfs_handle_struct *handle, const char *path)
 	if (path == NULL) return "";
 	const char *cp = handle->conn->connectpath;
 	size_t cplen = (cp != NULL) ? strlen(cp) : 0;
-	if (cplen > 0 && strncmp(path, cp, cplen) == 0) {
+	while (cplen > 1 && cp[cplen - 1] == '/') cplen--;
+	/* A byte-prefix alone is insufficient: connectpath=/share must not strip
+	 * the unrelated absolute path /share-backup/file. */
+	if (cplen > 0 && strncmp(path, cp, cplen) == 0 &&
+	    (path[cplen] == '\0' || path[cplen] == '/')) {
 		path += cplen;
 		while (*path == '/') path++;
 	}
@@ -290,6 +354,7 @@ static const char *kaimo_share_rel(vfs_handle_struct *handle, const char *path)
 static int kaimo_apply_twrp(vfs_handle_struct *handle, struct smb_filename *smb_fname)
 {
 	if (smb_fname == NULL || smb_fname->twrp == 0) return 0;
+	errno = 0;
 
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
 	if (ctx == NULL || smb_fname->base_name == NULL) return -1;
@@ -299,6 +364,7 @@ static int kaimo_apply_twrp(vfs_handle_struct *handle, struct smb_filename *smb_
 
 	const char *logical = kaimo_share_rel(handle, smb_fname->base_name);
 	char cache[6144];
+	errno = 0;
 	if (kaimo_snapresolve_rel(ctx, gmt, logical, cache, sizeof(cache)) != 1)
 		return -1;
 
@@ -323,18 +389,24 @@ static int kaimo_get_shadow_copy_data(vfs_handle_struct *handle,
 	const char *path = (fsp != NULL && fsp->fsp_name != NULL &&
 			    fsp->fsp_name->base_name != NULL)
 				? fsp->fsp_name->base_name : "";
+	const char *logical = kaimo_share_rel(handle, path);
 
 	shadow_copy_data->num_volumes = 0;
 	shadow_copy_data->labels = NULL;
 	if (ctx == NULL) return 0;
 
-	char req[5120];
-	int n = snprintf(req, sizeof(req), "SNAPENUM\t%s\t%s\t%s\n",
-			 ctx->user, ctx->share, path);
-	if (n <= 0 || n >= (int)sizeof(req)) { errno = ENOMEM; return -1; }
+	TALLOC_CTX *frame = talloc_stackframe();
+	char *req = talloc_asprintf(frame, "SNAPENUM\t%s\t%s\t%s\n",
+				   ctx->user, ctx->share, logical);
+	size_t req_len;
+	if (!kaimo_request_ready("SNAPENUM", req, &req_len)) {
+		TALLOC_FREE(frame);
+		return -1;
+	}
 
 	char resp[65536];
-	ssize_t r = kaimo_snap_request(req, (size_t)n, resp, sizeof(resp));
+	ssize_t r = kaimo_snap_request(req, req_len, resp, sizeof(resp));
+	TALLOC_FREE(frame);
 	if (r < 0) {
 		/* Infrastructure down -> report "no snapshots" rather than failing
 		 * the whole Properties dialog. */
@@ -372,27 +444,34 @@ static int kaimo_get_shadow_copy_data(vfs_handle_struct *handle,
 
 	shadow_copy_data->num_volumes = i;
 	shadow_copy_data->labels = lbl;
-	DBG_INFO("kaimo_bridge: SNAPENUM path=[%s] -> %d labels\n", path, i);
+	DBG_INFO("kaimo_bridge: SNAPENUM path=[%s] -> %d labels\n", logical, i);
 	return 0;
 }
 
 /* ---- Snapshot-aware stat/lstat: resolve a timewarp path to its version copy ---- */
 static int kaimo_stat(vfs_handle_struct *handle, struct smb_filename *smb_fname)
 {
-	if (kaimo_apply_twrp(handle, smb_fname) < 0) { errno = ENOENT; return -1; }
+	if (kaimo_apply_twrp(handle, smb_fname) < 0) {
+		if (errno != ENOMEM && errno != ENAMETOOLONG) errno = ENOENT;
+		return -1;
+	}
 	return SMB_VFS_NEXT_STAT(handle, smb_fname);
 }
 
 static int kaimo_lstat(vfs_handle_struct *handle, struct smb_filename *smb_fname)
 {
-	if (kaimo_apply_twrp(handle, smb_fname) < 0) { errno = ENOENT; return -1; }
+	if (kaimo_apply_twrp(handle, smb_fname) < 0) {
+		if (errno != ENOMEM && errno != ENAMETOOLONG) errno = ENOENT;
+		return -1;
+	}
 	return SMB_VFS_NEXT_LSTAT(handle, smb_fname);
 }
 
-/* Builds the share-relative path from directory-fsp + at-relative name. */
-static void kaimo_join_path(char *out, size_t n,
-			    struct files_struct *dirfsp,
-			    const struct smb_filename *name)
+/* Builds the complete path from directory-fsp + at-relative name without a
+ * fixed buffer. The caller then canonicalizes it through kaimo_share_rel(). */
+static char *kaimo_join_path(TALLOC_CTX *mem_ctx,
+			     const struct files_struct *dirfsp,
+			     const struct smb_filename *name)
 {
 	const char *dir = (dirfsp != NULL && dirfsp->fsp_name != NULL)
 				? dirfsp->fsp_name->base_name : NULL;
@@ -401,9 +480,8 @@ static void kaimo_join_path(char *out, size_t n,
 	bool root = (dir == NULL) || dir[0] == '\0'
 			|| (dir[0] == '.' && dir[1] == '\0');
 	if (root)
-		snprintf(out, n, "%s", leaf);
-	else
-		snprintf(out, n, "%s/%s", dir, leaf);
+		return talloc_strdup(mem_ctx, leaf);
+	return talloc_asprintf(mem_ctx, "%s/%s", dir, leaf);
 }
 
 /* ---- TREE_CONNECT: authorize + store context (user/share) in handle ---- */
@@ -505,6 +583,8 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 	}
 
 	if (ctx != NULL && smb_fname != NULL && smb_fname->base_name != NULL) {
+		const char *logical = kaimo_share_rel(handle,
+						      smb_fname->base_name);
 		bool want_read  = (access_mask & SEC_FILE_READ_DATA) != 0;
 		bool want_write = (access_mask & (SEC_FILE_WRITE_DATA | SEC_FILE_APPEND_DATA)) != 0;
 		bool wants_create =
@@ -514,10 +594,10 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 			 create_disposition == FILE_OVERWRITE_IF);
 		bool want_delete = (access_mask & SEC_STD_DELETE) != 0;
 
-		if (!kaimo_authz_open(ctx->user, ctx->share, smb_fname->base_name,
+		if (!kaimo_authz_open(ctx->user, ctx->share, logical,
 				      want_read, want_write, wants_create, want_delete)) {
 			DBG_ERR("kaimo_bridge: CREATE DENIED path=[%s] user=[%s]\n",
-				smb_fname->base_name, ctx->user);
+				logical, ctx->user);
 			return NT_STATUS_ACCESS_DENIED;
 		}
 	}
@@ -540,11 +620,15 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 	    (*result)->fsp_flags.is_directory &&
 	    smb_fname != NULL && smb_fname->base_name != NULL &&
 	    smb_fname->base_name[0] != '\0') {
-		char mreq[5120];
-		int mn = snprintf(mreq, sizeof(mreq), "MKDIR\t%s\t%s\t%s\n",
-				  ctx->user, ctx->share, smb_fname->base_name);
-		if (mn > 0 && mn < (int)sizeof(mreq))
-			kaimo_notify_send(mreq, (size_t)mn);
+		TALLOC_CTX *frame = talloc_stackframe();
+		const char *logical = kaimo_share_rel(handle,
+						      smb_fname->base_name);
+		char *mreq = talloc_asprintf(frame, "MKDIR\t%s\t%s\t%s\n",
+					     ctx->user, ctx->share, logical);
+		size_t mlen;
+		if (kaimo_request_ready("MKDIR", mreq, &mlen))
+			kaimo_notify_send(mreq, mlen);
+		TALLOC_FREE(frame);
 	}
 
 	return status;
@@ -558,9 +642,10 @@ static struct dirent *kaimo_readdir(vfs_handle_struct *handle,
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
 	const char *dirpath = (dirfsp != NULL && dirfsp->fsp_name != NULL)
 				? dirfsp->fsp_name->base_name : NULL;
+	const char *logical_dir = (dirpath != NULL)
+				? kaimo_share_rel(handle, dirpath) : NULL;
 	bool filter = kaimo_list_filter_enabled() && ctx != NULL && dirpath != NULL;
-	bool at_root = (dirpath != NULL) &&
-		       (dirpath[0] == '\0' || (dirpath[0] == '.' && dirpath[1] == '\0'));
+	bool at_root = (logical_dir != NULL && logical_dir[0] == '\0');
 
 	for (;;) {
 		struct dirent *e = SMB_VFS_NEXT_READDIR(handle, dirfsp, dirp);
@@ -577,16 +662,25 @@ static struct dirent *kaimo_readdir(vfs_handle_struct *handle,
 		if (strncmp(nm, ".kaimo-", 7) == 0)
 			continue;
 
-		char path[4096];
-		if (at_root)
-			snprintf(path, sizeof(path), "%s", nm);
-		else
-			snprintf(path, sizeof(path), "%s/%s", dirpath, nm);
+		TALLOC_CTX *frame = talloc_stackframe();
+		char *path = at_root
+			? talloc_strdup(frame, nm)
+			: talloc_asprintf(frame, "%s/%s", logical_dir, nm);
+		if (path == NULL) {
+			DBG_ERR("kaimo_bridge: LIST path allocation failed\n");
+			TALLOC_FREE(frame);
+			errno = ENOMEM;
+			return NULL;
+		}
 
-		if (kaimo_authz_open(ctx->user, ctx->share, path, true, false, false, false))
+		if (kaimo_authz_open(ctx->user, ctx->share, path,
+				     true, false, false, false)) {
+			TALLOC_FREE(frame);
 			return e; /* readable -> show */
+		}
 
 		DBG_INFO("kaimo_bridge: LIST hide [%s] user=[%s]\n", path, ctx->user);
+		TALLOC_FREE(frame);
 		/* not readable -> skip, get next entry */
 	}
 }
@@ -598,20 +692,33 @@ static int kaimo_close(vfs_handle_struct *handle, files_struct *fsp)
 	bool modified = (fsp != NULL) && fsp->fsp_flags.modified;
 	bool isdir = (fsp != NULL) && fsp->fsp_flags.is_directory;
 
-	char path[4096];
-	path[0] = '\0';
+	/* The fsp may no longer be valid after NEXT_CLOSE, so preserve the exact
+	 * canonical path before closing. Closing must still proceed on OOM to avoid
+	 * leaking the native descriptor; only the best-effort event is then lost. */
+	TALLOC_CTX *frame = talloc_stackframe();
+	char *path = NULL;
+	char *event_req = NULL;
+	size_t event_len = 0;
+	bool event_ready = false;
 	if (fsp != NULL && fsp->fsp_name != NULL && fsp->fsp_name->base_name != NULL)
-		strlcpy(path, fsp->fsp_name->base_name, sizeof(path));
+		path = talloc_strdup(frame,
+				     kaimo_share_rel(handle,
+						     fsp->fsp_name->base_name));
+	if (modified && !isdir && path == NULL)
+		DBG_WARNING("kaimo_bridge: CLOSE path unavailable; "
+			    "native close will still proceed\n");
+	if (ctx != NULL && modified && !isdir && path != NULL && path[0] != '\0') {
+		event_req = talloc_asprintf(frame, "CLOSE\t%s\t%s\t%s\n",
+					     ctx->user, ctx->share, path);
+		event_ready = kaimo_request_ready("CLOSE", event_req,
+						  &event_len);
+	}
 
 	int ret = SMB_VFS_NEXT_CLOSE(handle, fsp);
 
-	if (ret == 0 && ctx != NULL && modified && !isdir && path[0] != '\0') {
-		char req[5120];
-		int n = snprintf(req, sizeof(req), "CLOSE\t%s\t%s\t%s\n",
-				 ctx->user, ctx->share, path);
-		if (n > 0 && n < (int)sizeof(req))
-			kaimo_notify_send(req, (size_t)n);
-	}
+	if (ret == 0 && event_ready)
+		kaimo_notify_send(event_req, event_len);
+	TALLOC_FREE(frame);
 	return ret;
 }
 
@@ -622,29 +729,46 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 			  int flags)
 {
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
-	char path[4096];
-	kaimo_join_path(path, sizeof(path), srcdir_fsp, smb_fname);
+	TALLOC_CTX *frame = talloc_stackframe();
+	char *path = kaimo_join_path(frame, srcdir_fsp, smb_fname);
+	if (path == NULL) {
+		TALLOC_FREE(frame);
+		errno = ENOMEM;
+		return -1;
+	}
 	bool isdir = (flags & AT_REMOVEDIR) != 0;
 	const char *logical = kaimo_share_rel(handle, path);
 
 	/* Authorization must happen before the native unlink/rmdir. The DELETE event
 	 * below is only post-operation bookkeeping and cannot protect the data path. */
+	errno = 0;
 	if (ctx == NULL || !kaimo_authz_delete(ctx->user, ctx->share, logical, isdir)) {
+		int auth_errno = errno;
 		DBG_ERR("kaimo_bridge: DELETE DENIED path=[%s] user=[%s]\n",
 			logical, ctx != NULL ? ctx->user : "");
-		errno = EACCES;
+		TALLOC_FREE(frame);
+		errno = (auth_errno == ENOMEM || auth_errno == ENAMETOOLONG)
+			? auth_errno : EACCES;
+		return -1;
+	}
+
+	/* Build and validate the exact post-operation event before mutation. This
+	 * ensures a locally unrepresentable path cannot be deleted successfully
+	 * after only a truncated lifecycle path was recorded. */
+	char *req = talloc_asprintf(frame, "DELETE\t%s\t%s\t%d\t%s\n",
+				    ctx->user, ctx->share,
+				    isdir ? 1 : 0, logical);
+	size_t len;
+	if (!kaimo_request_ready("DELETE", req, &len)) {
+		TALLOC_FREE(frame);
 		return -1;
 	}
 
 	int ret = SMB_VFS_NEXT_UNLINKAT(handle, srcdir_fsp, smb_fname, flags);
 
-	if (ret == 0 && ctx != NULL && path[0] != '\0') {
-		char req[5120];
-		int n = snprintf(req, sizeof(req), "DELETE\t%s\t%s\t%d\t%s\n",
-				 ctx->user, ctx->share, isdir ? 1 : 0, logical);
-		if (n > 0 && n < (int)sizeof(req))
-			kaimo_notify_send(req, (size_t)n);
-	}
+	if (ret == 0 && logical[0] != '\0')
+		kaimo_notify_send(req, len);
+	TALLOC_FREE(frame);
 	return ret;
 }
 
@@ -656,22 +780,37 @@ static int kaimo_renameat(vfs_handle_struct *handle,
 			  const struct smb_filename *smb_fname_dst)
 {
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
-	char oldp[4096], newp[4096];
-	kaimo_join_path(oldp, sizeof(oldp), srcdir_fsp, smb_fname_src);
-	kaimo_join_path(newp, sizeof(newp), dstdir_fsp, smb_fname_dst);
+	TALLOC_CTX *frame = talloc_stackframe();
+	char *oldp = kaimo_join_path(frame, srcdir_fsp, smb_fname_src);
+	char *newp = kaimo_join_path(frame, dstdir_fsp, smb_fname_dst);
+	if (ctx == NULL || oldp == NULL || newp == NULL) {
+		TALLOC_FREE(frame);
+		errno = (ctx == NULL) ? EACCES : ENOMEM;
+		return -1;
+	}
+	const char *oldlogical = kaimo_share_rel(handle, oldp);
+	const char *newlogical = kaimo_share_rel(handle, newp);
+
+	/* P0-04 separately adds pre-rename ACL authorization. P0-02 guarantees here
+	 * that neither lifecycle path is truncated or silently omitted. */
+	char *req = talloc_asprintf(frame, "RENAME\t%s\t%s\t0\t%s\t%s\n",
+				    ctx->user, ctx->share,
+				    oldlogical, newlogical);
+	size_t len;
+	if (!kaimo_request_ready("RENAME", req, &len)) {
+		TALLOC_FREE(frame);
+		return -1;
+	}
 
 	int ret = SMB_VFS_NEXT_RENAMEAT(handle, srcdir_fsp, smb_fname_src,
 					dstdir_fsp, smb_fname_dst);
 
-	if (ret == 0 && ctx != NULL && oldp[0] != '\0' && newp[0] != '\0') {
+	if (ret == 0 && oldlogical[0] != '\0' && newlogical[0] != '\0') {
 		/* is_directory not reliably known here -> 0 (file); directory
 		 * renames are rare and treated as path updates. */
-		char req[8192];
-		int n = snprintf(req, sizeof(req), "RENAME\t%s\t%s\t0\t%s\t%s\n",
-				 ctx->user, ctx->share, oldp, newp);
-		if (n > 0 && n < (int)sizeof(req))
-			kaimo_notify_send(req, (size_t)n);
+		kaimo_notify_send(req, len);
 	}
+	TALLOC_FREE(frame);
 	return ret;
 }
 
@@ -685,18 +824,27 @@ static int kaimo_mkdirat(vfs_handle_struct *handle,
 			 mode_t mode)
 {
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
-	char path[4096];
-	kaimo_join_path(path, sizeof(path), dirfsp, smb_fname);
+	TALLOC_CTX *frame = talloc_stackframe();
+	char *path = kaimo_join_path(frame, dirfsp, smb_fname);
+	if (ctx == NULL || path == NULL) {
+		TALLOC_FREE(frame);
+		errno = (ctx == NULL) ? EACCES : ENOMEM;
+		return -1;
+	}
+	const char *logical = kaimo_share_rel(handle, path);
+	char *req = talloc_asprintf(frame, "MKDIR\t%s\t%s\t%s\n",
+				    ctx->user, ctx->share, logical);
+	size_t len;
+	if (!kaimo_request_ready("MKDIR", req, &len)) {
+		TALLOC_FREE(frame);
+		return -1;
+	}
 
 	int ret = SMB_VFS_NEXT_MKDIRAT(handle, dirfsp, smb_fname, mode);
 
-	if (ret == 0 && ctx != NULL && path[0] != '\0') {
-		char req[5120];
-		int n = snprintf(req, sizeof(req), "MKDIR\t%s\t%s\t%s\n",
-				 ctx->user, ctx->share, path);
-		if (n > 0 && n < (int)sizeof(req))
-			kaimo_notify_send(req, (size_t)n);
-	}
+	if (ret == 0 && logical[0] != '\0')
+		kaimo_notify_send(req, len);
+	TALLOC_FREE(frame);
 	return ret;
 }
 
@@ -743,26 +891,37 @@ static int kaimo_openat(vfs_handle_struct *handle,
 	 * the parent fsp carrying the absolute connectpath, yielding an absolute path
 	 * like "/data/storage/<share>/topOrdner". The bridge expects a share-relative
 	 * path ("topOrdner"), so strip the connectpath prefix. A lone "." -> "" (root). */
-	char joined[4096];
-	kaimo_join_path(joined, sizeof(joined),
-			(struct files_struct *)dirfsp, smb_fname);
+	TALLOC_CTX *frame = talloc_stackframe();
+	char *joined = kaimo_join_path(frame, dirfsp, smb_fname);
+	if (joined == NULL) {
+		TALLOC_FREE(frame);
+		errno = ENOMEM;
+		return -1;
+	}
 
 	const char *logical = kaimo_share_rel(handle, joined);
 
 	char cache_rel[6144];
+	errno = 0;
 	int rr = kaimo_snapresolve_rel(ctx, gmt, logical, cache_rel, sizeof(cache_rel));
 	if (rr != 1) {
+		int resolve_errno = errno;
 		/* Expected for paths without a version at this snapshot (e.g. desktop.ini,
 		 * thumbnails) — not an error, just "no such version". */
 		DBG_INFO("kaimo_bridge: OPENAT no version [%s@%s]\n", logical, gmt);
-		errno = ENOENT;
+		TALLOC_FREE(frame);
+		errno = (resolve_errno == ENOMEM || resolve_errno == ENAMETOOLONG)
+			? resolve_errno : ENOENT;
 		return -1;
 	}
 
-	char abspath[8192];
-	int n = snprintf(abspath, sizeof(abspath), "%s/%s",
-			 handle->conn->connectpath, cache_rel);
-	if (n <= 0 || n >= (int)sizeof(abspath)) { errno = ENAMETOOLONG; return -1; }
+	char *abspath = talloc_asprintf(frame, "%s/%s",
+					handle->conn->connectpath, cache_rel);
+	if (abspath == NULL) {
+		TALLOC_FREE(frame);
+		errno = ENOMEM;
+		return -1;
+	}
 
 	int fd = openat(AT_FDCWD, abspath, how->flags, how->mode);
 	if (fd < 0)
@@ -771,6 +930,7 @@ static int kaimo_openat(vfs_handle_struct *handle,
 	else
 		DBG_INFO("kaimo_bridge: OPENAT SNAPSHOT [%s@%s] -> [%s] fd=%d\n",
 			 logical, gmt, abspath, fd);
+	TALLOC_FREE(frame);
 	return fd;
 }
 
@@ -793,7 +953,7 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 /* Build marker: bump on every module change so the running image can be
  * identified in the logs (grep "kaimo_bridge build"). This is how we tell whether
  * a rebuild actually picked up the latest source vs. served a cached layer. */
-#define KAIMO_BRIDGE_BUILD "2026-07-22a fail-closed connect context allocation"
+#define KAIMO_BRIDGE_BUILD "2026-07-22b exact dynamic paths"
 
 static_decl_vfs;
 NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)

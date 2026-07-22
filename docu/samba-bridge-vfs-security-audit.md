@@ -99,7 +99,7 @@ The review considers:
 ### P0-01: Connection-context allocation failure disables open authorization
 
 > **Remediation status (2026-07-22): Implemented in source; native build/runtime verification pending.**
-> The context is now allocated and populated before `SMB_VFS_NEXT_CONNECT`. An allocation failure returns `ENOMEM` without establishing the next VFS connection, and a downstream connect failure frees the prepared context. The module build marker is `2026-07-22a fail-closed connect context allocation`.
+> The context is now allocated and populated before `SMB_VFS_NEXT_CONNECT`. An allocation failure returns `ENOMEM` without establishing the next VFS connection, and a downstream connect failure frees the prepared context. P0-01 introduced the build marker `2026-07-22a fail-closed connect context allocation`; the current marker is `2026-07-22b exact dynamic paths` after P0-02.
 
 **Original evidence (before remediation)**
 
@@ -126,7 +126,10 @@ Under memory pressure, a valid TREE_CONNECT can continue without per-file open a
 
 ### P0-02: Fixed-size path truncation can authorize a different object than Samba modifies
 
-**Evidence**
+> **Remediation status (2026-07-22): Implemented in source; native boundary/runtime verification pending.**
+> All request and reconstructed operation paths are now dynamically allocated, checked against the sidecar's explicit 8191-byte request limit, and canonicalized before authorization/event use. Delete, rename, and mkdir reject local allocation/size failures before their native mutation. The current module build marker is `2026-07-22b exact dynamic paths`.
+
+**Original evidence (before remediation)**
 
 - `kaimo_join_path()` writes into a caller-provided fixed buffer using `snprintf()` but returns no success/truncation status.
 - Delete uses a 4096-byte joined path for the authorization RPC.
@@ -137,13 +140,16 @@ Under memory pressure, a valid TREE_CONNECT can continue without per-file open a
 
 Samba uses `*at` operations specifically to support directory-handle-relative paths. A deeply nested path can be operable through `dirfsp` even when a reconstructed full string exceeds a local buffer. The bridge may authorize the truncated prefix and Samba may then delete or otherwise act on the full path.
 
-**Required fix**
+**Implemented fix and remaining verification**
 
-1. Never authorize a truncated representation.
-2. Replace fixed reconstruction buffers with checked `talloc_asprintf()`/dynamic strings or return `ENAMETOOLONG` before invoking the native operation.
-3. Make the canonical path builder return an explicit status and length.
-4. Use the same canonicalization function for create, open, readdir, close, delete, rename, mkdir, stat, lstat, and snapshot operations.
-5. Prefer stable handle/inode identity over reconstructed path strings where Samba exposes it.
+1. `kaimo_join_path()` now returns an exact `talloc_strdup()`/`talloc_asprintf()` result instead of writing to an unchecked caller buffer.
+2. CONNECT, OPEN, DELETEAUTH, SNAPRESOLVE, SNAPENUM, CLOSE, DELETE, RENAME, and MKDIR messages are dynamically formatted and sent with their exact computed byte length.
+3. `KAIMO_AUTHD_MAX_REQUEST` documents and enforces the current sidecar read limit of 8191 bytes. Allocation and size failures set `ENOMEM`/`ENAMETOOLONG` and are never passed through the configurable infrastructure fail-open behavior.
+4. Create, directory listing, close, delete, rename, mkdir, snapshot enumeration/resolution, and snapshot open paths now pass through the same share-relative canonicalization step. Connectpath stripping now requires a complete path-component boundary, preventing `/share` from incorrectly matching `/share-backup`.
+5. DELETE, RENAME, and MKDIR lifecycle requests are built and validated before `SMB_VFS_NEXT_UNLINKAT`, `SMB_VFS_NEXT_RENAMEAT`, or `SMB_VFS_NEXT_MKDIRAT`. A locally unrepresentable path therefore cannot reach those native mutations.
+6. Snapshot resolver response copying detects overflow, and the absolute snapshot cache path used by `openat()` is now dynamically allocated.
+7. CLOSE preserves and validates its exact path/request before calling the native close. Native close still proceeds if that best-effort event cannot be allocated, because refusing to close would leak a descriptor; durable lifecycle delivery remains tracked separately under P1-11/P1-12.
+8. Still required: compile against Samba 4.19.5 and execute deep-path, exact-boundary, over-boundary, multi-byte UTF-8, and common-prefix attack tests. A future protocol revision should replace reconstructed path identity with a stable Samba handle/inode identity where the end-to-end API can support it.
 
 **Acceptance criteria**
 
@@ -877,29 +883,91 @@ This order was selected instead of connecting first and rolling back afterward b
 
 - Compile the native module against the pinned Samba 4.19.5 source tree.
 - Run an allocation-failure/fault-injection test proving that TREE_CONNECT fails and no usable share state remains.
-- Run the live Samba connection test and verify the `2026-07-22a` build marker.
+- Run the live Samba connection test and verify the current `2026-07-22b` build marker (`2026-07-22a` was the marker when P0-01 alone was implemented).
 - Run ASan/UBSan as part of the later native hardening test phase.
 
 These checks could not be completed in the current audit environment because neither a Docker daemon nor an installed WSL distribution was available.
 
 **Next planned finding:** P0-02 — eliminate fixed-size path truncation so the path authorized by the bridge is always identical to the path Samba modifies.
 
+### 2026-07-22 — P0-02: Exact dynamic authorization and lifecycle paths
+
+**Status:** Implemented in source; native build/runtime and boundary verification pending.
+
+**Original problem**
+
+The VFS reconstructed directory-handle-relative paths into fixed 4096-byte arrays and formatted sidecar messages into fixed 512-8192-byte arrays. Several `snprintf()` results were ignored or converted into configurable infrastructure failure handling. Most critically, delete authorization used the potentially truncated reconstruction while `SMB_VFS_NEXT_UNLINKAT` received the original `dirfsp` and `smb_fname`. A long path could therefore be authorized under one string while Samba mutated a different full path. Listing and lifecycle events had equivalent truncation or silent-drop behavior.
+
+**Solution implemented**
+
+1. Added `KAIMO_AUTHD_MAX_REQUEST = 8191`, matching the largest payload the current sidecar can consume in its 8192-byte read buffer while retaining the terminating NUL.
+2. Added `kaimo_request_ready()`, which calculates the exact formatted length, rejects empty/oversized messages, sets `ENOMEM` or `ENAMETOOLONG`, and deliberately does not consult `KAIMO_AUTHZ_FAILOPEN`. Fail-open is now limited to genuine sidecar infrastructure failures for these paths.
+3. Replaced fixed CONNECT, OPEN, DELETEAUTH, SNAPRESOLVE, and SNAPENUM request arrays with operation-scoped `talloc_stackframe()` plus `talloc_asprintf()` allocations. Every exit releases its frame.
+4. Changed `kaimo_join_path()` from an unchecked `void` buffer writer into a dynamic string-returning function. Its callers explicitly reject allocation failure.
+5. Applied `kaimo_share_rel()` consistently before authorization or lifecycle use in create, readdir, close, unlink, rename, mkdir, snapshot enumeration, snapshot resolution, and snapshot open handling.
+6. Hardened `kaimo_share_rel()` so the connectpath is stripped only on a complete component boundary. For example, connectpath `/data/share` no longer rewrites `/data/share-backup/file` as `-backup/file`.
+7. Reworked `readdir` to construct each candidate path dynamically. Allocation failure ends enumeration with `ENOMEM`; an oversized authorization request is denied/hidden and never exposes the entry through a truncated prefix decision.
+8. Reworked `unlinkat` so the exact dynamic path is authorized and its DELETE event is formatted/validated before `SMB_VFS_NEXT_UNLINKAT`. Local allocation and size errors prevent the mutation; `ENOMEM`/`ENAMETOOLONG` are preserved rather than overwritten with `EACCES`.
+9. Reworked `renameat` and `mkdirat` so exact canonical event paths are formatted and size-validated before their native operations. This change does not claim to solve P0-04: rename still requires a separate source/destination ACL decision before mutation.
+10. Reworked CLOSE to copy and format the exact canonical event path before `SMB_VFS_NEXT_CLOSE`, because Samba may invalidate the FSP afterward. Close intentionally still proceeds if event preparation fails so that the native descriptor is not leaked; durable/retryable event delivery is a separate P1 remediation.
+11. Replaced the fixed snapshot `openat` joined/absolute path buffers with dynamic strings. SNAPRESOLVE response copying now detects an oversized cache path and returns `ENAMETOOLONG` instead of opening a truncated path.
+12. Updated the module build marker to `2026-07-22b exact dynamic paths`.
+
+The current 8191-byte cap is an explicit compatibility boundary, not the final protocol design. P1-03 will replace the one-read line protocol with framed messages, full I/O loops, field limits, and version negotiation. Stable handle/inode-based object identity remains preferable to reconstructed strings but requires a coordinated Samba-to-sidecar API change.
+
+**Files changed**
+
+- `samba-vfs/module/vfs_kaimo_bridge.c`
+- `docu/samba-bridge-vfs-security-audit.md`
+
+**Validation completed**
+
+- Ran a structural source invariant check. It confirmed that the old fixed `path`, `oldp`, `newp`, `joined`, and request-array patterns are absent.
+- The same check confirmed an explicit request-size limit and request validation before `SMB_VFS_NEXT_UNLINKAT`, `SMB_VFS_NEXT_RENAMEAT`, and `SMB_VFS_NEXT_MKDIRAT`.
+- Manually reviewed every new operation-scoped talloc frame and confirmed cleanup on success, denial, allocation/size error, sidecar failure, native-operation failure, and snapshot-resolution failure paths.
+- Confirmed that local request allocation/size errors do not enter the `KAIMO_AUTHZ_FAILOPEN` branch.
+- Confirmed the source contains the `2026-07-22b exact dynamic paths` deployment marker.
+- `git diff --check` completed successfully.
+- The existing .NET solution test suite completed with 477 passed, 0 failed, and 0 skipped. This protects the managed bridge baseline but does not compile or exercise the native VFS module.
+
+**Validation still required**
+
+- Compile the native module against the pinned Samba 4.19.5 source and headers with warnings enabled.
+- Run ASan/UBSan and allocation fault injection over every new dynamic path and cleanup branch.
+- Run live Samba tests with paths below, exactly at, and above the total 8191-byte sidecar request boundary.
+- Test deep `dirfsp` paths, multi-byte UTF-8 names at byte boundaries, and two paths sharing the first 4095 bytes where only one is authorized.
+- Verify OPEN/create, list, unlink, rmdir, mkdir, rename, close-event, snapshot enumeration, and snapshot open behavior against the exact same canonical target.
+- Verify `ENOMEM`/`ENAMETOOLONG` mapping through Samba to SMB client-visible statuses.
+- Verify the `2026-07-22b exact dynamic paths` marker in a running `smbd` log.
+
+Native verification is currently unavailable: the Docker CLI is installed but its engine pipe is not running, no WSL distribution is installed, and no local GCC/Clang compiler is available. This is an environment limitation, not a passing native test result.
+
+**Known related work intentionally not folded into P0-02**
+
+- P0-03: complete Samba access-mask-to-Kaimo permission mapping.
+- P0-04: authorize rename source, destination parent, and overwrite target before mutation.
+- P1-03: framed protocol and correct partial/EINTR I/O handling.
+- P1-11/P1-12: durable, authenticated, idempotent lifecycle delivery.
+- P2-01: replace the fixed 128-byte username/share fields in the connection context.
+
+**Next planned finding:** P0-03 — map the complete Samba access mask to the Kaimo permission model and deny unsupported security-relevant operations.
+
 ## 15. Source evidence index
 
 | Finding area | Primary source locations |
 |---|---|
-| Context allocation fail-open | `samba-vfs/module/vfs_kaimo_bridge.c:409-438`, `:488-504` |
-| Path reconstruction/truncation | `vfs_kaimo_bridge.c:392-407`, `:561-567`, `:600-628` |
-| Incomplete access mapping | `vfs_kaimo_bridge.c:488-503`, `Core/Security/FilePermissions.cs` |
-| Rename authorization gap | `vfs_kaimo_bridge.c:632-656`, `Core/Services/File/FileService.cs:53-86`, `:694-719` |
+| Context allocation fail-open | `samba-vfs/module/vfs_kaimo_bridge.c:488-536` |
+| Path reconstruction/truncation | `vfs_kaimo_bridge.c:67-190`, `:282-344`, `:472-484`, `:545-931` |
+| Incomplete access mapping | `vfs_kaimo_bridge.c:545-596`, `Core/Security/FilePermissions.cs` |
+| Rename authorization gap | `vfs_kaimo_bridge.c:776-819`, `Core/Services/File/FileService.cs:53-86`, `:694-719` |
 | Unbounded sidecar threads/cache | `samba-vfs/module/authd.cpp:49-66`, `:183-225`, `:258-262` |
 | World-writable socket | `authd.cpp:241-254` |
-| Partial stream I/O | `vfs_kaimo_bridge.c:61-92`, `:181-213`; `authd.cpp:183-225` |
+| Partial stream I/O | `vfs_kaimo_bridge.c:86-119`, `:220-266`; `authd.cpp:183-225` |
 | Snapshot ACL leak | `SmbBridge/Services/SnapshotGrpcService.cs:181-237`; `Core/Services/File/FileService.cs:884-899` |
-| Snapshot raw open | `vfs_kaimo_bridge.c:684-755` |
+| Snapshot raw open | `vfs_kaimo_bridge.c:862-931` |
 | Snapshot materialization races | `SnapshotGrpcService.cs:288-317`; `SnapshotCacheCleanupService.cs` |
 | Disabled share lookup | `Infrastructure/Repositories/ShareRepository.cs:45-49`; bridge service share lookups |
-| Event reliability/TOCTOU | `vfs_kaimo_bridge.c:156-174`, `:575-680`; `FileEventGrpcService.cs`; `FileService.cs:341-400` |
+| Event reliability/TOCTOU | `vfs_kaimo_bridge.c:195-219`, `:607-859`; `FileEventGrpcService.cs`; `FileService.cs:341-400` |
 | Rename duplicate destruction | `Infrastructure/Repositories/FileVersionRepository.cs:142-178` |
 | Insecure hash temp file | `samba-vfs/sync-users.sh:17-49` |
 | Sync error handling | `sync-users.sh`, `sync-shares.sh`, `sync-config.sh` |
