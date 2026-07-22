@@ -10,8 +10,8 @@
  *   Phase 3:  Close/Delete/Rename/Mkdir event hooks (versioning/index/ownership).
  *   Phase 5:  @GMT snapshots ("Previous Versions"): get_shadow_copy_data enumerates
  *             version tokens; a timewarp (smb_fname->twrp) on open/stat is resolved
- *             to a materialized, decompressed version copy inside the share, which
- *             is then served natively. Backed by IFileVersionService via the bridge.
+ *             to a materialized, decompressed version copy in an isolated global
+ *             cache outside every share. Backed by IFileVersionService via the bridge.
  *
  * Deliberately pure C without gRPC: gRPC complexity lives in the kaimo_authd
  * sidecar; the module only does simple Unix socket roundtrips (no fork/threads in smbd).
@@ -373,8 +373,8 @@ static bool kaimo_snapshot_openat_enabled(void)
 	return !(v != NULL && v[0] == '0');
 }
 
-/* Ask the bridge to materialize <gmt>:<logical> into the in-share snapshot cache and
- * return the share-relative cache path in out.
+/* Ask the bridge to materialize <gmt>:<logical> into the isolated snapshot cache and
+ * return the cache-root-relative path in out.
  *   1  = ok (out = cache path)
  *   0  = no such version
  *  -1  = infrastructure error */
@@ -444,7 +444,71 @@ static const char *kaimo_share_rel(vfs_handle_struct *handle, const char *path)
 	return path;
 }
 
-/* If smb_fname carries a timewarp (twrp != 0), resolve it to the in-share version
+#define KAIMO_LEGACY_CACHE_DIR ".kaimo-snapshots"
+#define KAIMO_DEFAULT_SNAPSHOT_CACHE_ROOT "/data/storage/.kaimo-snapshots"
+
+/* The old in-share cache name stays permanently reserved. This blocks direct
+ * client access to stale pre-P0-06 materializations during rolling upgrades and
+ * prevents clients from planting a lookalike internal namespace. */
+static bool kaimo_is_reserved_client_path(vfs_handle_struct *handle,
+					  const char *path)
+{
+	const char *logical = kaimo_share_rel(handle, path);
+	while (logical[0] == '.' && logical[1] == '/') logical += 2;
+	while (logical[0] == '/') logical++;
+	size_t reserved_len = strlen(KAIMO_LEGACY_CACHE_DIR);
+	return strncasecmp(logical, KAIMO_LEGACY_CACHE_DIR, reserved_len) == 0 &&
+	       (logical[reserved_len] == '\0' || logical[reserved_len] == '/');
+}
+
+/* The bridge response crosses an unauthenticated control-plane boundary today,
+ * so never treat it as an arbitrary path. Only non-empty relative paths without
+ * empty/dot components are accepted before the fixed local cache root is joined. */
+static bool kaimo_cache_relative_path_valid(const char *path)
+{
+	if (path == NULL || path[0] == '\0' || path[0] == '/' ||
+	    strchr(path, '\\') != NULL)
+		return false;
+	for (const unsigned char *p = (const unsigned char *)path; *p != '\0'; p++) {
+		if (*p < 0x20 || *p == 0x7f) return false;
+	}
+
+	const char *component = path;
+	for (;;) {
+		const char *slash = strchr(component, '/');
+		size_t len = slash != NULL
+			? (size_t)(slash - component) : strlen(component);
+		if (len == 0 || (len == 1 && component[0] == '.') ||
+		    (len == 2 && component[0] == '.' && component[1] == '.'))
+			return false;
+		if (slash == NULL) return true;
+		component = slash + 1;
+	}
+}
+
+static char *kaimo_snapshot_cache_abspath(TALLOC_CTX *mem_ctx,
+					  const char *relative)
+{
+	const char *root = getenv("KAIMO_SNAPSHOT_CACHE_ROOT");
+	if (root == NULL || root[0] == '\0')
+		root = KAIMO_DEFAULT_SNAPSHOT_CACHE_ROOT;
+	if (root[0] != '/' || !kaimo_cache_relative_path_valid(relative)) {
+		DBG_ERR("kaimo_bridge: invalid snapshot cache root/relative path denied\n");
+		errno = EACCES;
+		return NULL;
+	}
+
+	size_t root_len = strlen(root);
+	while (root_len > 1 && root[root_len - 1] == '/') root_len--;
+	char *trimmed_root = talloc_strndup(mem_ctx, root, root_len);
+	if (trimmed_root == NULL) {
+		errno = ENOMEM;
+		return NULL;
+	}
+	return talloc_asprintf(mem_ctx, "%s/%s", trimmed_root, relative);
+}
+
+/* If smb_fname carries a timewarp (twrp != 0), resolve it to the isolated version
  * copy and rewrite base_name to that copy (used by the path-based stat/lstat hooks,
  * which have no fd). The actual data-path open is redirected in kaimo_openat.
  *   1  = rewritten to a snapshot copy (bridge already enforced read ACL)
@@ -467,7 +531,7 @@ static int kaimo_apply_twrp(vfs_handle_struct *handle, struct smb_filename *smb_
 	if (kaimo_snapresolve_rel(ctx, gmt, logical, cache, sizeof(cache)) != 1)
 		return -1;
 
-	char *newname = talloc_strdup(smb_fname, cache);
+	char *newname = kaimo_snapshot_cache_abspath(smb_fname, cache);
 	if (newname == NULL) return -1;
 	smb_fname->base_name = newname;
 	smb_fname->twrp = 0; /* handled -> ordinary file for NEXT_* */
@@ -493,6 +557,10 @@ static int kaimo_get_shadow_copy_data(vfs_handle_struct *handle,
 	shadow_copy_data->num_volumes = 0;
 	shadow_copy_data->labels = NULL;
 	if (ctx == NULL) return 0;
+	if (kaimo_is_reserved_client_path(handle, path)) {
+		errno = EACCES;
+		return -1;
+	}
 
 	TALLOC_CTX *frame = talloc_stackframe();
 	char *req = talloc_asprintf(frame, "SNAPENUM\t%s\t%s\t%s\n",
@@ -550,6 +618,11 @@ static int kaimo_get_shadow_copy_data(vfs_handle_struct *handle,
 /* ---- Snapshot-aware stat/lstat: resolve a timewarp path to its version copy ---- */
 static int kaimo_stat(vfs_handle_struct *handle, struct smb_filename *smb_fname)
 {
+	if (smb_fname != NULL &&
+	    kaimo_is_reserved_client_path(handle, smb_fname->base_name)) {
+		errno = EACCES;
+		return -1;
+	}
 	if (kaimo_apply_twrp(handle, smb_fname) < 0) {
 		if (errno != ENOMEM && errno != ENAMETOOLONG) errno = ENOENT;
 		return -1;
@@ -559,6 +632,11 @@ static int kaimo_stat(vfs_handle_struct *handle, struct smb_filename *smb_fname)
 
 static int kaimo_lstat(vfs_handle_struct *handle, struct smb_filename *smb_fname)
 {
+	if (smb_fname != NULL &&
+	    kaimo_is_reserved_client_path(handle, smb_fname->base_name)) {
+		errno = EACCES;
+		return -1;
+	}
 	if (kaimo_apply_twrp(handle, smb_fname) < 0) {
 		if (errno != ENOMEM && errno != ENAMETOOLONG) errno = ENOENT;
 		return -1;
@@ -662,6 +740,12 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 				  struct smb2_create_blobs *out_context_blobs)
 {
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
+	if (smb_fname != NULL &&
+	    kaimo_is_reserved_client_path(handle, smb_fname->base_name)) {
+		DBG_WARNING("kaimo_bridge: reserved snapshot namespace denied [%s]\n",
+			smb_fname->base_name != NULL ? smb_fname->base_name : "");
+		return NT_STATUS_ACCESS_DENIED;
+	}
 
 	/* Phase 5: a timewarp open ("Previous Versions"). ResolveVersion enforces
 	 * read ACL, and P0-03 additionally maps/attenuates the complete requested
@@ -763,6 +847,10 @@ static struct dirent *kaimo_readdir(vfs_handle_struct *handle,
 				? dirfsp->fsp_name->base_name : NULL;
 	const char *logical_dir = (dirpath != NULL)
 				? kaimo_share_rel(handle, dirpath) : NULL;
+	if (dirpath != NULL && kaimo_is_reserved_client_path(handle, dirpath)) {
+		errno = EACCES;
+		return NULL;
+	}
 	bool filter = kaimo_list_filter_enabled() && ctx != NULL && dirpath != NULL;
 	bool at_root = (logical_dir != NULL && logical_dir[0] == '\0');
 
@@ -776,8 +864,8 @@ static struct dirent *kaimo_readdir(vfs_handle_struct *handle,
 		if (nm[0] == '.' && (nm[1] == '\0' || (nm[1] == '.' && nm[2] == '\0')))
 			return e;
 
-		/* Hide the internal snapshot materialization cache
-		 * (<share>/.kaimo-snapshots) — served via @GMT, never browsed directly. */
+		/* Hide reserved Kaimo internal names. Access to the legacy cache name is
+		 * independently rejected by all path-bearing hooks. */
 		if (strncmp(nm, ".kaimo-", 7) == 0)
 			continue;
 
@@ -859,6 +947,11 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 	}
 	bool isdir = (flags & AT_REMOVEDIR) != 0;
 	const char *logical = kaimo_share_rel(handle, path);
+	if (kaimo_is_reserved_client_path(handle, path)) {
+		TALLOC_FREE(frame);
+		errno = EACCES;
+		return -1;
+	}
 
 	/* Authorization must happen before the native unlink/rmdir. The DELETE event
 	 * below is only post-operation bookkeeping and cannot protect the data path. */
@@ -911,6 +1004,12 @@ static int kaimo_renameat(vfs_handle_struct *handle,
 	}
 	const char *oldlogical = kaimo_share_rel(handle, oldp);
 	const char *newlogical = kaimo_share_rel(handle, newp);
+	if (kaimo_is_reserved_client_path(handle, oldp) ||
+	    kaimo_is_reserved_client_path(handle, newp)) {
+		TALLOC_FREE(frame);
+		errno = EACCES;
+		return -1;
+	}
 
 	SMB_STRUCT_STAT source_before;
 	SMB_STRUCT_STAT destination_before;
@@ -1019,6 +1118,11 @@ static int kaimo_mkdirat(vfs_handle_struct *handle,
 		return -1;
 	}
 	const char *logical = kaimo_share_rel(handle, path);
+	if (kaimo_is_reserved_client_path(handle, path)) {
+		TALLOC_FREE(frame);
+		errno = EACCES;
+		return -1;
+	}
 	char *req = talloc_asprintf(frame, "MKDIR\t%s\t%s\t%s\n",
 				    ctx->user, ctx->share, logical);
 	size_t len;
@@ -1043,32 +1147,55 @@ static int kaimo_mkdirat(vfs_handle_struct *handle,
  *
  * When smb_fname carries a timewarp we reconstruct the logical share-relative path
  * (parent fsp path + atname), ask the bridge to materialize that version into the
- * in-share cache (.kaimo-snapshots/<@GMT>/...), and open the cache copy by absolute
- * path. Everything else passes straight through untouched (the common, no-snapshot
- * case pays only a twrp==0 check). Kill-switch: KAIMO_SNAPSHOT_OPENAT=0. */
+ * isolated cache, and open the cache copy by an internally constructed absolute
+ * path. Ordinary opens also reject the reserved legacy cache namespace before
+ * passing through. Kill-switch: KAIMO_SNAPSHOT_OPENAT=0. */
 static int kaimo_openat(vfs_handle_struct *handle,
 			const struct files_struct *dirfsp,
 			const struct smb_filename *smb_fname,
 			struct files_struct *fsp,
 			const struct vfs_open_how *how)
 {
-	if (smb_fname == NULL || smb_fname->twrp == 0 ||
-	    !kaimo_snapshot_openat_enabled())
+	if (smb_fname == NULL)
 		return SMB_VFS_NEXT_OPENAT(handle, dirfsp, smb_fname, fsp, how);
 
+	TALLOC_CTX *frame = talloc_stackframe();
+	char *joined = kaimo_join_path(frame, dirfsp, smb_fname);
+	if (joined == NULL) {
+		TALLOC_FREE(frame);
+		errno = ENOMEM;
+		return -1;
+	}
+	if (kaimo_is_reserved_client_path(handle, joined)) {
+		TALLOC_FREE(frame);
+		errno = EACCES;
+		return -1;
+	}
+	if (smb_fname->twrp == 0 || !kaimo_snapshot_openat_enabled()) {
+		TALLOC_FREE(frame);
+		return SMB_VFS_NEXT_OPENAT(handle, dirfsp, smb_fname, fsp, how);
+	}
+
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
-	if (ctx == NULL) { errno = ENOENT; return -1; }
+	if (ctx == NULL) {
+		TALLOC_FREE(frame);
+		errno = ENOENT;
+		return -1;
+	}
 
 	/* "." / ".." refer to the directory itself / its parent. When the parent was
 	 * already redirected, dirfsp's fd points into the snapshot cache, so opening
 	 * these relative to dirfsp via NEXT lands in the cache — don't try to resolve
 	 * them as version paths (that's the [topOrdner/.] / [topOrdner/..] failures). */
 	const char *leaf = smb_fname->base_name;
-	if (leaf != NULL && (strcmp(leaf, ".") == 0 || strcmp(leaf, "..") == 0))
+	if (leaf != NULL && (strcmp(leaf, ".") == 0 || strcmp(leaf, "..") == 0)) {
+		TALLOC_FREE(frame);
 		return SMB_VFS_NEXT_OPENAT(handle, dirfsp, smb_fname, fsp, how);
+	}
 
 	char gmt[32];
 	if (!kaimo_twrp_to_gmt(smb_fname->twrp, gmt, sizeof(gmt))) {
+		TALLOC_FREE(frame);
 		errno = ENOENT;
 		return -1;
 	}
@@ -1078,14 +1205,6 @@ static int kaimo_openat(vfs_handle_struct *handle,
 	 * the parent fsp carrying the absolute connectpath, yielding an absolute path
 	 * like "/data/storage/<share>/topOrdner". The bridge expects a share-relative
 	 * path ("topOrdner"), so strip the connectpath prefix. A lone "." -> "" (root). */
-	TALLOC_CTX *frame = talloc_stackframe();
-	char *joined = kaimo_join_path(frame, dirfsp, smb_fname);
-	if (joined == NULL) {
-		TALLOC_FREE(frame);
-		errno = ENOMEM;
-		return -1;
-	}
-
 	const char *logical = kaimo_share_rel(handle, joined);
 
 	char cache_rel[6144];
@@ -1102,11 +1221,11 @@ static int kaimo_openat(vfs_handle_struct *handle,
 		return -1;
 	}
 
-	char *abspath = talloc_asprintf(frame, "%s/%s",
-					handle->conn->connectpath, cache_rel);
+	char *abspath = kaimo_snapshot_cache_abspath(frame, cache_rel);
 	if (abspath == NULL) {
+		int path_errno = errno;
 		TALLOC_FREE(frame);
-		errno = ENOMEM;
+		errno = path_errno != 0 ? path_errno : ENOMEM;
 		return -1;
 	}
 
@@ -1140,7 +1259,7 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 /* Build marker: bump on every module change so the running image can be
  * identified in the logs (grep "kaimo_bridge build"). This is how we tell whether
  * a rebuild actually picked up the latest source vs. served a cached layer. */
-#define KAIMO_BRIDGE_BUILD "2026-07-22d complete rename authorization"
+#define KAIMO_BRIDGE_BUILD "2026-07-22e isolated snapshot cache"
 
 static_decl_vfs;
 NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)

@@ -407,21 +407,27 @@ module does it via the bridge instead:
  kaimo_authd ──gRPC EnumerateSnapshots──►   kaimo_authd ──gRPC ResolveVersion──►
                 SmbBridge (.NET)                            SmbBridge (.NET)
                 GetSnapshotTimestamps/GetVersions           GetVersionAt + ReadVersion
-                                                            → ACL-filter + materialize
-                                                              into <share>/.kaimo-snapshots/@GMT-…/<user-id>/
+                                                            → ACL-filter + materialize into
+                                                              /data/storage/.kaimo-snapshots/<share-id>/@GMT-…/<user-id>/
    labels (@GMT tokens)                        base_name rewritten to that copy → native read
 ```
 
 - **Enumeration** (`get_shadow_copy_data_fn`) returns the `@GMT-` labels for the
   file. **Resolution**: a timewarp open/stat (`smb_fname->twrp`) is turned into an
-  `@GMT-` token, the bridge materializes that one version **decompressed** into a
-  per-user hidden cache (`<share>/.kaimo-snapshots/@GMT-…/<user-id>/<relpath>`, hidden from
-  listings, reused idempotently) and the module redirects the open there — so the
-  **data path stays native**, exactly like live files.
+  `@GMT-` token, the bridge materializes that one version **decompressed** into the
+  global internal cache (`/data/storage/.kaimo-snapshots/<share-id>/@GMT-…/<user-id>/<relpath>`)
+  outside every Samba connectpath. The bridge returns only a cache-root-relative
+  path; the VFS validates all components and joins its independently configured
+  absolute root before redirecting the open.
 - **ACL parity:** concrete files require `ListReadData`; folders go through
   `IFileService.GetFolderSnapshotAsync`, which checks the directory and batch-filters
   every historical child. Before returning a folder, the bridge removes stale files
   from that user's projection, including files revoked after earlier materialization.
+- **Cache isolation:** `Snapshots:Cache:RootPath` and
+  `KAIMO_SNAPSHOT_CACHE_ROOT` must match. Resolution fails closed if that root
+  overlaps a share; `sync-shares.sh` also refuses to publish an overlapping share.
+  The legacy top-level `.kaimo-snapshots` name remains denied in client-facing VFS
+  path hooks while the cleanup service removes recognizable old cache trees.
 - **.NET:** [`SnapshotGrpcService`](../src/Kaimo_File_Server.SmbBridge/Services/SnapshotGrpcService.cs)
   — thin facade over the already-complete `IFileVersionService`.
 - **C/C++:** `get_shadow_copy_data_fn` + `stat`/`lstat` + `create_file` twrp branch

@@ -17,7 +17,7 @@
 //     "RENAME\t<user>\t<share>\t<isdir 0|1>\t<old>\t<new>"
 //   Snapshots (Phase 5, @GMT / "Previous Versions"):
 //     "SNAPENUM\t<user>\t<share>\t<path>"    -> "OK\t<n>\n<tok1>\n<tok2>..."|"ERROR"
-//     "SNAPRESOLVE\t<user>\t<share>\t<@GMT>\t<path>" -> "OK\t<cachepath>\t<size>"|"ERROR"
+//     "SNAPRESOLVE\t<user>\t<share>\t<@GMT>\t<path>" -> "OK\t<cache-root-relative-path>\t<size>"|"ERROR"
 //
 // Each connection is handled in its own thread so slow events
 // (versioning reads the file) don't block authorization requests.

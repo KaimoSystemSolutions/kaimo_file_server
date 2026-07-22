@@ -27,8 +27,8 @@ builder.Services.AddScoped<IConfigRepository, ConfigRepository>();
 
 builder.Services.AddGrpc();
 
-// Phase 5 hardening: bound the @GMT snapshot materialization cache
-// (<share>/.kaimo-snapshots) so it cannot grow without limit. Evicts by age
+// Phase 5 hardening: bound the isolated @GMT snapshot materialization cache
+// (<cache-root>/<share-id>) so it cannot grow without limit. Evicts by age
 // (Snapshots:Cache:TtlHours) and per-share size cap (Snapshots:Cache:MaxBytesPerShare).
 builder.Services.AddHostedService<SnapshotCacheCleanupService>();
 

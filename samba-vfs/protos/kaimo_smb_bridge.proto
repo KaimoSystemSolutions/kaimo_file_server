@@ -248,6 +248,8 @@ message ResolveVersionRequest {
 
 message ResolveVersionReply {
   bool   found      = 1;
-  string cache_path = 2; // share-relative path of the decompressed cache file
+  // Relative to the bridge/VFS shared internal cache root, never to an SMB share.
+  // The native VFS validates every component before joining its configured root.
+  string cache_path = 2;
   int64  size       = 3;
 }

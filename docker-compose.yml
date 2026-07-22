@@ -30,6 +30,10 @@ services:
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
+    environment:
+      # Global internal cache, outside every /data/storage/<share> connectpath.
+      # Must match KAIMO_SNAPSHOT_CACHE_ROOT in the Samba container.
+      Snapshots__Cache__RootPath: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/storage/.kaimo-snapshots}
     volumes:
       - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
 
@@ -71,6 +75,9 @@ services:
       # materialized version copy). Set to "0" to disable the redirect at runtime
       # (no rebuild) if it ever misbehaves — snapshots then fall back to broken/live.
       KAIMO_SNAPSHOT_OPENAT: "1"
+      # Must match Snapshots__Cache__RootPath in kaimo_smb_bridge. This global
+      # directory is a sibling of share roots and is never published by Samba.
+      KAIMO_SNAPSHOT_CACHE_ROOT: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/storage/.kaimo-snapshots}
     healthcheck:
       test: ["CMD-SHELL", "/opt/samba/bin/smbclient -L localhost -U kaimotest%Passw0rd! -m SMB3 >/dev/null 2>&1 || exit 1"]
       interval: 15s
