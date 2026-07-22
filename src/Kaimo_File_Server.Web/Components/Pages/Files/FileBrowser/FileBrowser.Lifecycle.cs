@@ -65,7 +65,7 @@ public partial class FileBrowser
         {
             _jsInitialized = true;
             _dotNetRef = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("initFileUpload", "#file-drop-zone", _dotNetRef);
+            await JS.InvokeVoidAsync("initFileUpload", "#file-drop-zone");
             await JS.InvokeVoidAsync("initInternalDragDrop");
         }
     }

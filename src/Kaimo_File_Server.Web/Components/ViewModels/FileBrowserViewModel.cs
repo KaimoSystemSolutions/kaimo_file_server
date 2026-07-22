@@ -947,6 +947,8 @@ public class FileBrowserViewModel
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Upload failed for '{Path}'", targetPath);
+
             // Clean up the partial file
             try
             {

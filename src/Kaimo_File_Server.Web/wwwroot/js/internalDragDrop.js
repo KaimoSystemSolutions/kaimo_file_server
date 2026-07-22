@@ -1,4 +1,9 @@
 function initInternalDragDrop() {
+    window.kaimoInternalDragDropAbortController?.abort();
+    const controller = new AbortController();
+    window.kaimoInternalDragDropAbortController = controller;
+    const listenerOptions = { signal: controller.signal };
+
     let draggingPaths = [];
 
     function isOsFileDrag(e) {
@@ -26,22 +31,21 @@ function initInternalDragDrop() {
         draggingPaths = (row?.classList.contains('file-row--selected') && selectedRows.length > 0)
             ? Array.from(selectedRows).map(r => r.dataset.path)
             : [row?.dataset.path].filter(Boolean);
-    });
+    }, listenerOptions);
 
     document.addEventListener('dragend', () => {
         draggingPaths = [];
         document.querySelectorAll('.file-row--drop-target')
             .forEach(el => el.classList.remove('file-row--drop-target'));
-    });
+    }, listenerOptions);
 
     document.addEventListener('dragenter', e => {
         if (isOsFileDrag(e)) return;
         const row = e.target.closest('.file-grid-row.file-row-dir');
-        console.log('dragenter', { row, path: row?.dataset.path, canDrop: row && canDropOn(row), draggingPaths });
         if (row && canDropOn(row)) {
             row.classList.add('file-row--drop-target');
         }
-    });
+    }, listenerOptions);
 
     document.addEventListener('dragleave', e => {
         if (isOsFileDrag(e)) return;
@@ -49,11 +53,11 @@ function initInternalDragDrop() {
         if (row && !row.contains(e.relatedTarget)) {
             row.classList.remove('file-row--drop-target');
         }
-    });
+    }, listenerOptions);
 
     document.addEventListener('drop', e => {
         if (isOsFileDrag(e)) return;
         document.querySelectorAll('.file-row--drop-target')
             .forEach(el => el.classList.remove('file-row--drop-target'));
-    });
+    }, listenerOptions);
 }

@@ -250,6 +250,35 @@ public class FileServiceTests
             It.IsAny<string>(), data, It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task WriteFileAsync_SearchFailure_DoesNotFailPersistedUpload()
+    {
+        // Search is a rebuildable side effect. In particular, first-use index
+        // initialization may fail transiently and must not make the web layer delete
+        // a file that storage already persisted successfully.
+        var searchMock = new Mock<ISearchService>();
+        searchMock
+            .Setup(s => s.onFileCreated(
+                It.IsAny<string>(), It.IsAny<Task<Stream>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("search temporarily unavailable"));
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, searchMock.Object, _shareId);
+
+        var ctx = CreateContext();
+        var data = new MemoryStream([1, 2, 3]);
+        var indexedContent = new MemoryStream([1, 2, 3]);
+        _storageMock.Setup(s => s.IsDirectoryAsync(It.IsAny<string>())).ReturnsAsync(false);
+        _storageMock.Setup(s => s.ReadAsync(It.IsAny<string>())).ReturnsAsync(indexedContent);
+        _storageMock.Setup(s => s.ToAbsolutePath("test.txt")).Returns("/storage/test.txt");
+        AllowAccess(FilePermission.CreateWriteData);
+
+        await sut.WriteFileAsync("/test.txt", data, ctx);
+
+        _storageMock.Verify(s => s.WriteAsync(
+            "test.txt", data, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.False(indexedContent.CanRead);
+    }
+
     // ═══════════════════ CreateFileAsync ═══════════════════
 
     [Fact]
