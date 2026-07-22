@@ -200,7 +200,7 @@
                 _isSearching = false;
             }
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             // Expected when typing fast — previous search gets cancelled
         }
