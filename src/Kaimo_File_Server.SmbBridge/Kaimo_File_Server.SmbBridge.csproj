@@ -11,13 +11,12 @@
 
   <ItemGroup>
     <PackageReference Include="Grpc.AspNetCore" Version="2.71.0" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- Gemeinsamer Proto-Vertrag (auch vom Samba-C++-Client genutzt). -->
-    <Protobuf Include="..\..\samba-vfs\protos\kaimo_smb_bridge.proto"
-              GrpcServices="Server"
-              Link="protos\kaimo_smb_bridge.proto" />
+    <Protobuf Include="..\..\samba-vfs\protos\kaimo_smb_bridge.proto" GrpcServices="Server" Link="protos\kaimo_smb_bridge.proto" />
   </ItemGroup>
 
   <ItemGroup>
