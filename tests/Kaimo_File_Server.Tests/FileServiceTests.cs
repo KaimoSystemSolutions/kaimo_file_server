@@ -501,6 +501,8 @@ public class FileServiceTests
             new() { Name = "visible.txt", IsDirectory = false, Path = "dir/visible.txt" },
             new() { Name = "hidden.txt", IsDirectory = false, Path = "dir/hidden.txt" },
         };
+        _storageMock.Setup(s => s.ExistsAsync("dir")).ReturnsAsync(true);
+        _storageMock.Setup(s => s.IsDirectoryAsync("dir")).ReturnsAsync(true);
         _storageMock.Setup(s => s.ListAsync(It.IsAny<string>())).ReturnsAsync(items);
 
         // Allow listing the directory itself
@@ -530,6 +532,35 @@ public class FileServiceTests
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => _sut.ListAsync("dir", ctx));
+
+        _storageMock.Verify(s => s.ExistsAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ListAsync_NonExistentDirectory_ThrowsDirectoryNotFound()
+    {
+        var ctx = CreateContext();
+        AllowAccess(FilePermission.ListReadData);
+        _storageMock.Setup(s => s.ExistsAsync("missing")).ReturnsAsync(false);
+
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(
+            () => _sut.ListAsync("missing", ctx));
+
+        _storageMock.Verify(s => s.ListAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ListAsync_FilePath_ThrowsDirectoryNotFound()
+    {
+        var ctx = CreateContext();
+        AllowAccess(FilePermission.ListReadData);
+        _storageMock.Setup(s => s.ExistsAsync("document.txt")).ReturnsAsync(true);
+        _storageMock.Setup(s => s.IsDirectoryAsync("document.txt")).ReturnsAsync(false);
+
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(
+            () => _sut.ListAsync("document.txt", ctx));
+
+        _storageMock.Verify(s => s.ListAsync(It.IsAny<string>()), Times.Never);
     }
 
     // ═══════════════════ OpenAsync — per-intent ACL enforcement ═══════════════════

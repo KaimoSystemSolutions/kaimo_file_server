@@ -29,6 +29,8 @@ public partial class FileBrowser
         _selectedItems.Clear();
         _sortColumn = null;
         _sortDirection = 0;
+        _showCreateFolder = false;
+        _createFolderError = null;
 
         _contextMenuComponent?.CloseContextMenu();
 
@@ -374,6 +376,6 @@ public partial class FileBrowser
     /// ACL panel, badges and permission actions — and the context-menu entry.
     /// </summary>
     public bool CanManageAcls()
-        => VM.CanManageAcls;
+        => !VM.IsLoading && VM.ErrorMessage is null && VM.CanManageAcls;
 }
 

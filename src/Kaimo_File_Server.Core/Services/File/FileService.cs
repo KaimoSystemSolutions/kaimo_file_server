@@ -436,6 +436,16 @@ public class FileService : IFileService
         if (!await _acl.HasAccessAsync(user, _shareId, normalizedDir, true, FilePermission.ListReadData))
             throw new UnauthorizedAccessException($"List denied for '{normalizedDir}'");
 
+        // Never represent a missing path (or a file path) as an empty directory.
+        // Keep this check after authorization so callers cannot use the different
+        // error types to probe the existence of paths they are not allowed to see.
+        if (!await _storage.ExistsAsync(normalizedDir)
+            || !await _storage.IsDirectoryAsync(normalizedDir))
+        {
+            throw new DirectoryNotFoundException(
+                $"Directory '{normalizedDir}' does not exist.");
+        }
+
         var items = await _storage.ListAsync(normalizedDir);
 
         var itemsToCheck = items
