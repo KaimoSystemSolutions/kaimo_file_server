@@ -98,10 +98,13 @@ The review considers:
 
 ### P0-01: Connection-context allocation failure disables open authorization
 
-**Evidence**
+> **Remediation status (2026-07-22): Implemented in source; native build/runtime verification pending.**
+> The context is now allocated and populated before `SMB_VFS_NEXT_CONNECT`. An allocation failure returns `ENOMEM` without establishing the next VFS connection, and a downstream connect failure frees the prepared context. The module build marker is `2026-07-22a fail-closed connect context allocation`.
 
-- `vfs_kaimo_bridge.c:429-436` allocates `kaimo_conn_ctx` with `malloc()` after the next connect succeeds.
-- If allocation fails, the function still returns a successful connect.
+**Original evidence (before remediation)**
+
+- The original `kaimo_connect` allocated `kaimo_conn_ctx` with `malloc()` after the next connect succeeded.
+- If that allocation failed, the function still returned a successful connect.
 - `create_file` authorizes only when `ctx != NULL`.
 - `readdir` filtering is also disabled when the context is absent.
 
@@ -109,17 +112,17 @@ The review considers:
 
 Under memory pressure, a valid TREE_CONNECT can continue without per-file open authorization or directory filtering. Delete happens to fail closed because its hook rejects a missing context, but read/write/create do not.
 
-**Required fix**
+**Implemented fix and remaining verification**
 
-1. Allocate connection data with Samba-owned lifetime, preferably `talloc_zero(handle->conn, ...)` or the ownership pattern recommended for VFS handle data.
-2. If the allocation or `SMB_VFS_HANDLE_SET_DATA` operation fails, disconnect/undo the next connection and return failure.
-3. Make every authorization hook explicitly fail closed when the connection context is absent.
-4. Add fault-injection tests that force allocation failure at connect and verify that every data operation is denied.
+1. The connection data is allocated with zero-initialized `calloc()` before the next VFS connect and remains owned through the existing `SMB_VFS_HANDLE_SET_DATA`/`kaimo_free_data` lifetime contract.
+2. Allocation failure is now fail-closed before a native share connection exists.
+3. A failed downstream connect frees the prepared context.
+4. Still required: native compilation against Samba 4.19.5, an OOM/fault-injection test, and live verification that the connection is rejected without leaving partial connection state.
 
 **Acceptance criteria**
 
 - A forced allocation failure never results in a usable share connection.
-- No authorization hook treats a missing context as permission to continue.
+- A non-IPC share can never reach an authorization hook after connecting without a valid context.
 
 ### P0-02: Fixed-size path truncation can authorize a different object than Samba modifies
 
@@ -815,7 +818,73 @@ A release should be blocked when any of the following is true:
 
 These should be recorded as architectural decisions before implementing the dependent phases.
 
-## 14. Source evidence index
+## 14. Implementation progress log
+
+This section is the central remediation journal. Every implemented audit item must record:
+
+- The date and finding ID.
+- The original problem and its impact.
+- Exactly what was changed and why that approach was selected.
+- Files and important source locations changed.
+- Validation performed and its result.
+- Remaining validation, limitations, or follow-up work.
+- The next planned finding.
+
+Status values used here and in individual findings:
+
+| Status | Meaning |
+|---|---|
+| Not started | Finding has been documented but no implementation work has begun. |
+| In progress | Implementation or its required tests are actively being developed. |
+| Implemented in source | Source change is complete, but native/integration verification remains. |
+| Verified | Source change and required automated/runtime verification are complete. |
+| Blocked | Progress requires an external dependency or an explicit architecture/product decision. |
+
+### 2026-07-22 — P0-01: Fail-closed connection-context allocation
+
+**Status:** Implemented in source; native build/runtime verification pending.
+
+**Original problem**
+
+`kaimo_connect` originally called `SMB_VFS_NEXT_CONNECT` first and allocated the mandatory `kaimo_conn_ctx` afterward. If `malloc()` failed, the function still returned a successful connection. Later `create_file` and `readdir` logic interpreted the missing context as a reason to skip authorization/filtering, creating an ACL fail-open condition under memory pressure.
+
+**Solution implemented**
+
+1. Declare the connection context before authorization/native connect processing.
+2. Allocate it with zero-initialized `calloc()` before `SMB_VFS_NEXT_CONNECT` for every non-IPC share.
+3. If allocation fails, log the failure, set `errno = ENOMEM`, and return `-1` before a native share connection exists.
+4. Populate the username/share fields before calling the next VFS layer.
+5. If the downstream `SMB_VFS_NEXT_CONNECT` fails, free the prepared context before propagating the failure.
+6. After a successful downstream connect, attach the context through the existing `SMB_VFS_HANDLE_SET_DATA`/`kaimo_free_data` ownership contract.
+7. Preserve the intentional `IPC$` bypass: IPC connections do not receive a file-authorization context because they are not ordinary filesystem shares.
+8. Update the module build marker to `2026-07-22a fail-closed connect context allocation` so the deployed binary can be identified in logs.
+
+This order was selected instead of connecting first and rolling back afterward because it prevents partial native connection state from existing at all when the mandatory security context cannot be created.
+
+**Files changed**
+
+- `samba-vfs/module/vfs_kaimo_bridge.c`
+- `docu/samba-bridge-vfs-security-audit.md`
+
+**Validation completed**
+
+- Verified against the pinned Samba 4.19.5 `SMB_VFS_HANDLE_SET_DATA` macro definition. The macro does not allocate memory and, for a valid handle, attaches the supplied pointer and free callback.
+- Added and executed a structural source invariant check confirming that `calloc()` occurs before `SMB_VFS_NEXT_CONNECT`.
+- The same check confirmed cleanup with `free(ctx)` after a downstream connect failure.
+- `git diff --check` completed successfully.
+
+**Validation still required**
+
+- Compile the native module against the pinned Samba 4.19.5 source tree.
+- Run an allocation-failure/fault-injection test proving that TREE_CONNECT fails and no usable share state remains.
+- Run the live Samba connection test and verify the `2026-07-22a` build marker.
+- Run ASan/UBSan as part of the later native hardening test phase.
+
+These checks could not be completed in the current audit environment because neither a Docker daemon nor an installed WSL distribution was available.
+
+**Next planned finding:** P0-02 — eliminate fixed-size path truncation so the path authorized by the bridge is always identical to the path Samba modifies.
+
+## 15. Source evidence index
 
 | Finding area | Primary source locations |
 |---|---|
@@ -836,7 +905,7 @@ These should be recorded as architectural decisions before implementing the depe
 | Sync error handling | `sync-users.sh`, `sync-shares.sh`, `sync-config.sh` |
 | Unauthenticated h2c | `SmbBridge/Program.cs:28-40`; `authd.cpp` and sync clients; `docker-compose.yml` |
 
-## 15. Final assessment
+## 16. Final assessment
 
 The bridge covers the intended high-level migration phases, and the protobuf surface itself is fully wired. The remaining problem is not missing RPC registration; it is that the native operation model, error behavior, resource management, and snapshot/event trust boundaries do not yet preserve the full Kaimo security and lifecycle semantics.
 

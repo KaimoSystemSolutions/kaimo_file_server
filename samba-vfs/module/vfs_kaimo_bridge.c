@@ -412,6 +412,7 @@ static int kaimo_connect(vfs_handle_struct *handle,
 			 const char *user)
 {
 	bool is_ipc = (service != NULL && strequal(service, "IPC$"));
+	struct kaimo_conn_ctx *ctx = NULL;
 
 	if (!is_ipc && !kaimo_authz_connect(service, user)) {
 		DBG_ERR("kaimo_bridge: CONNECT DENIED share=[%s] user=[%s]\n",
@@ -423,17 +424,35 @@ static int kaimo_connect(vfs_handle_struct *handle,
 	DBG_ERR("kaimo_bridge: CONNECT ALLOW share=[%s] user=[%s]\n",
 		service ? service : "(null)", user ? user : "(null)");
 
+	/* Prepare the mandatory authorization context BEFORE connecting the next
+	 * VFS layer. If allocation fails, no usable share connection may exist:
+	 * create_file/readdir depend on this context for their ACL decisions and
+	 * treating OOM as "no context" would otherwise become a fail-open path.
+	 * IPC$ deliberately has no file-authorization context. */
+	if (!is_ipc) {
+		ctx = calloc(1, sizeof(*ctx));
+		if (ctx == NULL) {
+			DBG_ERR("kaimo_bridge: CONNECT context allocation failed "
+				"share=[%s] user=[%s]\n",
+				service ? service : "(null)",
+				user ? user : "(null)");
+			errno = ENOMEM;
+			return -1;
+		}
+
+		strlcpy(ctx->user, user ? user : "", sizeof(ctx->user));
+		strlcpy(ctx->share, service ? service : "", sizeof(ctx->share));
+	}
+
 	int ret = SMB_VFS_NEXT_CONNECT(handle, service, user);
-	if (ret < 0) return ret;
+	if (ret < 0) {
+		free(ctx);
+		return ret;
+	}
 
 	if (!is_ipc) {
-		struct kaimo_conn_ctx *ctx = malloc(sizeof(*ctx));
-		if (ctx != NULL) {
-			strlcpy(ctx->user, user ? user : "", sizeof(ctx->user));
-			strlcpy(ctx->share, service ? service : "", sizeof(ctx->share));
-			SMB_VFS_HANDLE_SET_DATA(handle, ctx, kaimo_free_data,
-						struct kaimo_conn_ctx, { free(ctx); });
-		}
+		SMB_VFS_HANDLE_SET_DATA(handle, ctx, kaimo_free_data,
+					struct kaimo_conn_ctx, { free(ctx); });
 	}
 	return ret;
 }
@@ -774,7 +793,7 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 /* Build marker: bump on every module change so the running image can be
  * identified in the logs (grep "kaimo_bridge build"). This is how we tell whether
  * a rebuild actually picked up the latest source vs. served a cached layer. */
-#define KAIMO_BRIDGE_BUILD "2026-07-19g authorize delete before unlink"
+#define KAIMO_BRIDGE_BUILD "2026-07-22a fail-closed connect context allocation"
 
 static_decl_vfs;
 NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)
