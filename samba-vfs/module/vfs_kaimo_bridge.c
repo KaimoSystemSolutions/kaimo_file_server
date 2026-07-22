@@ -22,6 +22,7 @@
 #include "include/ntioctl.h" /* struct shadow_copy_data / SHADOW_COPY_LABEL (@GMT) */
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <fcntl.h>
 #include <time.h>
 #include <sys/socket.h>
@@ -36,6 +37,9 @@
  * larger request locally instead of truncating it or treating it as an
  * infrastructure failure that could be allowed by KAIMO_AUTHZ_FAILOPEN. */
 #define KAIMO_AUTHD_MAX_REQUEST 8191
+/* Samba 4.19.5 FILE_GENERIC_ALL after generic expansion. OPEN replies may
+ * contain only these specific file/directory and standard access bits. */
+#define KAIMO_SAMBA_SPECIFIC_ACCESS 0x001f01ffU
 
 /* Per-connection stored in VFS handle (set at TREE_CONNECT). */
 struct kaimo_conn_ctx {
@@ -83,9 +87,12 @@ static bool kaimo_request_ready(const char *operation, const char *req,
 	return true;
 }
 
-/* Sends a request line to kaimo_authd and reads the response.
- * Return: 1 = ALLOW, 0 = DENY, -1 = Infrastructure error. */
-static int kaimo_authz_send(const char *req, size_t len)
+/* Sends a request line to kaimo_authd and reads the response. OPEN replies
+ * carry the exact normalized/attenuated mask as "ALLOW\t<8 hex digits>".
+ * Return: 1 = ALLOW, 0 = DENY, -1 = infrastructure/sidecar error,
+ * -2 = malformed protocol response (always fail closed). */
+static int kaimo_authz_send(const char *req, size_t len,
+			    uint32_t *granted_access)
 {
 	const char *sock_path = getenv("KAIMO_AUTHD_SOCK");
 	if (sock_path == NULL) sock_path = KAIMO_AUTHD_SOCK_DEFAULT;
@@ -113,9 +120,24 @@ static int kaimo_authz_send(const char *req, size_t len)
 	if (r <= 0) return -1;
 	buf[r] = '\0';
 
-	if (strncmp(buf, "ALLOW", 5) == 0) return 1;
+	if (strncmp(buf, "ALLOW", 5) == 0) {
+		if (granted_access != NULL) {
+			char *end = NULL;
+			unsigned long parsed;
+			if (buf[5] != '\t') return -2;
+			errno = 0;
+			parsed = strtoul(buf + 6, &end, 16);
+			if (errno == ERANGE || end != buf + 14 || parsed > UINT32_MAX ||
+			    (((uint32_t)parsed) & ~KAIMO_SAMBA_SPECIFIC_ACCESS) != 0 ||
+			    (*end != '\n' && *end != '\0'))
+				return -2;
+			*granted_access = (uint32_t)parsed;
+		}
+		return 1;
+	}
 	if (strncmp(buf, "DENY", 4) == 0)  return 0;
-	return -1; /* "ERROR" or unexpected */
+	if (strncmp(buf, "ERROR", 5) == 0) return -1;
+	return -2;
 }
 
 static bool kaimo_authz_connect(const char *service, const char *user)
@@ -129,8 +151,12 @@ static bool kaimo_authz_connect(const char *service, const char *user)
 		return false;
 	}
 
-	int d = kaimo_authz_send(req, len);
+	int d = kaimo_authz_send(req, len, NULL);
 	TALLOC_FREE(frame);
+	if (d == -2) {
+		DBG_ERR("kaimo_bridge: malformed CONNECT authorization response, denied\n");
+		return false;
+	}
 	if (d < 0) {
 		DBG_WARNING("kaimo_bridge: authd unreachable (connect), fail-%s\n",
 			    kaimo_failmode_allow() ? "open" : "closed");
@@ -140,29 +166,37 @@ static bool kaimo_authz_connect(const char *service, const char *user)
 }
 
 static bool kaimo_authz_open(const char *user, const char *share, const char *path,
-			     bool want_read, bool want_write, bool wants_create,
-			     bool want_delete)
+			     uint32_t requested_access, bool wants_create,
+			     bool create_directory, bool directory_listing,
+			     uint32_t *granted_access)
 {
-	char flags[5];
-	int fi = 0;
-	if (want_read)    flags[fi++] = 'r';
-	if (want_write)   flags[fi++] = 'w';
-	if (wants_create) flags[fi++] = 'c';
-	if (want_delete)  flags[fi++] = 'd';
-	flags[fi] = '\0';
+	if (granted_access == NULL) {
+		errno = EINVAL;
+		return false;
+	}
+	/* A configured infrastructure fail-open must preserve Samba's original
+	 * requested mask. A valid ALLOW reply replaces it with the server's exact
+	 * normalized/attenuated mask. */
+	*granted_access = requested_access;
 
 	TALLOC_CTX *frame = talloc_stackframe();
-	char *req = talloc_asprintf(frame, "OPEN\t%s\t%s\t%s\t%s\n",
+	char *req = talloc_asprintf(frame, "OPEN\t%s\t%s\t%08x\t%d\t%d\t%d\t%s\n",
 				   user ? user : "", share ? share : "",
-				   flags, path ? path : "");
+				   (unsigned)requested_access, wants_create ? 1 : 0,
+				   create_directory ? 1 : 0,
+				   directory_listing ? 1 : 0, path ? path : "");
 	size_t len;
 	if (!kaimo_request_ready("OPEN", req, &len)) {
 		TALLOC_FREE(frame);
 		return false;
 	}
 
-	int d = kaimo_authz_send(req, len);
+	int d = kaimo_authz_send(req, len, granted_access);
 	TALLOC_FREE(frame);
+	if (d == -2) {
+		DBG_ERR("kaimo_bridge: malformed OPEN authorization response, denied\n");
+		return false;
+	}
 	if (d < 0) return kaimo_failmode_allow();
 	return d == 1;
 }
@@ -180,8 +214,12 @@ static bool kaimo_authz_delete(const char *user, const char *share,
 		return false;
 	}
 
-	int d = kaimo_authz_send(req, len);
+	int d = kaimo_authz_send(req, len, NULL);
 	TALLOC_FREE(frame);
+	if (d == -2) {
+		DBG_ERR("kaimo_bridge: malformed DELETE authorization response, denied\n");
+		return false;
+	}
 	if (d < 0) {
 		DBG_WARNING("kaimo_bridge: authd unreachable (delete), fail-%s\n",
 			    kaimo_failmode_allow() ? "open" : "closed");
@@ -564,13 +602,26 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 {
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
 
-	/* Phase 5: a timewarp open ("Previous Versions"). The bridge already enforced
-	 * the read ACL in ResolveVersion, so skip the normal live-file AuthorizeOpen.
-	 * IMPORTANT: keep twrp INTACT and do NOT rewrite base_name here — Samba opens the
+	/* Phase 5: a timewarp open ("Previous Versions"). ResolveVersion enforces
+	 * read ACL, and P0-03 additionally maps/attenuates the complete requested
+	 * access mask here. IMPORTANT: keep twrp INTACT and do NOT rewrite base_name
+	 * here — Samba opens the
 	 * real fd via openat (relative to a parent dirfsp), not via this base_name, so the
 	 * redirect to the version copy must happen in kaimo_openat. Rewriting here is
 	 * ignored for file content (it opens the live file). */
 	if (smb_fname != NULL && smb_fname->twrp != 0) {
+		uint32_t granted_access = 0;
+		const char *logical = kaimo_share_rel(handle,
+						      smb_fname->base_name);
+		if (ctx == NULL || smb_fname->base_name == NULL ||
+		    !kaimo_authz_open(ctx->user, ctx->share, logical,
+				      access_mask, false, false, false,
+				      &granted_access)) {
+			DBG_ERR("kaimo_bridge: CREATE twrp DENIED path=[%s]\n",
+				logical);
+			return NT_STATUS_ACCESS_DENIED;
+		}
+		access_mask = granted_access;
 		NTSTATUS tst = SMB_VFS_NEXT_CREATE_FILE(handle, req, dirfsp, smb_fname, access_mask,
 					       share_access, create_disposition, create_options,
 					       file_attributes, oplock_request, lease,
@@ -585,21 +636,28 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 	if (ctx != NULL && smb_fname != NULL && smb_fname->base_name != NULL) {
 		const char *logical = kaimo_share_rel(handle,
 						      smb_fname->base_name);
-		bool want_read  = (access_mask & SEC_FILE_READ_DATA) != 0;
-		bool want_write = (access_mask & (SEC_FILE_WRITE_DATA | SEC_FILE_APPEND_DATA)) != 0;
 		bool wants_create =
 			(create_disposition == FILE_SUPERSEDE ||
 			 create_disposition == FILE_CREATE ||
 			 create_disposition == FILE_OPEN_IF ||
 			 create_disposition == FILE_OVERWRITE_IF);
-		bool want_delete = (access_mask & SEC_STD_DELETE) != 0;
+		bool create_directory =
+			(create_options & FILE_DIRECTORY_FILE) != 0;
+		uint32_t granted_access = 0;
 
 		if (!kaimo_authz_open(ctx->user, ctx->share, logical,
-				      want_read, want_write, wants_create, want_delete)) {
+				      access_mask, wants_create, create_directory,
+				      false,
+				      &granted_access)) {
 			DBG_ERR("kaimo_bridge: CREATE DENIED path=[%s] user=[%s]\n",
 				logical, ctx->user);
 			return NT_STATUS_ACCESS_DENIED;
 		}
+
+		/* Do not let Samba's broad POSIX identity recover rights that Kaimo
+		 * removed from a MAXIMUM_ALLOWED request. Generic bits are also
+		 * replaced by the exact specific mask returned by the control plane. */
+		access_mask = granted_access;
 	}
 
 	NTSTATUS status = SMB_VFS_NEXT_CREATE_FILE(handle, req, dirfsp, smb_fname, access_mask,
@@ -673,8 +731,10 @@ static struct dirent *kaimo_readdir(vfs_handle_struct *handle,
 			return NULL;
 		}
 
+		uint32_t granted_access = 0;
 		if (kaimo_authz_open(ctx->user, ctx->share, path,
-				     true, false, false, false)) {
+				     SEC_FILE_READ_DATA, false, false, true,
+				     &granted_access)) {
 			TALLOC_FREE(frame);
 			return e; /* readable -> show */
 		}
@@ -953,7 +1013,7 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 /* Build marker: bump on every module change so the running image can be
  * identified in the logs (grep "kaimo_bridge build"). This is how we tell whether
  * a rebuild actually picked up the latest source vs. served a cached layer. */
-#define KAIMO_BRIDGE_BUILD "2026-07-22b exact dynamic paths"
+#define KAIMO_BRIDGE_BUILD "2026-07-22c complete access masks"
 
 static_decl_vfs;
 NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)

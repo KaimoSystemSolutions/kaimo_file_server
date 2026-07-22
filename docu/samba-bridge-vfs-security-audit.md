@@ -99,7 +99,7 @@ The review considers:
 ### P0-01: Connection-context allocation failure disables open authorization
 
 > **Remediation status (2026-07-22): Implemented in source; native build/runtime verification pending.**
-> The context is now allocated and populated before `SMB_VFS_NEXT_CONNECT`. An allocation failure returns `ENOMEM` without establishing the next VFS connection, and a downstream connect failure frees the prepared context. P0-01 introduced the build marker `2026-07-22a fail-closed connect context allocation`; the current marker is `2026-07-22b exact dynamic paths` after P0-02.
+> The context is now allocated and populated before `SMB_VFS_NEXT_CONNECT`. An allocation failure returns `ENOMEM` without establishing the next VFS connection, and a downstream connect failure frees the prepared context. P0-01 introduced the build marker `2026-07-22a fail-closed connect context allocation`; the current marker is `2026-07-22c complete access masks` after P0-03.
 
 **Original evidence (before remediation)**
 
@@ -127,7 +127,7 @@ Under memory pressure, a valid TREE_CONNECT can continue without per-file open a
 ### P0-02: Fixed-size path truncation can authorize a different object than Samba modifies
 
 > **Remediation status (2026-07-22): Implemented in source; native boundary/runtime verification pending.**
-> All request and reconstructed operation paths are now dynamically allocated, checked against the sidecar's explicit 8191-byte request limit, and canonicalized before authorization/event use. Delete, rename, and mkdir reject local allocation/size failures before their native mutation. The current module build marker is `2026-07-22b exact dynamic paths`.
+> All request and reconstructed operation paths are now dynamically allocated, checked against the sidecar's explicit 8191-byte request limit, and canonicalized before authorization/event use. Delete, rename, and mkdir reject local allocation/size failures before their native mutation. P0-02 introduced `2026-07-22b exact dynamic paths`; the current marker is `2026-07-22c complete access masks` after P0-03.
 
 **Original evidence (before remediation)**
 
@@ -159,7 +159,10 @@ Samba uses `*at` operations specifically to support directory-handle-relative pa
 
 ### P0-03: The Samba access mask is not mapped to the complete Kaimo permission model
 
-**Evidence**
+> **Remediation status (2026-07-22): Implemented in source; managed tests verified; native build/runtime verification pending.**
+> The complete raw SMB desired-access mask now crosses the VFS/sidecar/gRPC boundary. The bridge expands generic rights, maps every supported specific right, resolves `MAXIMUM_ALLOWED` to an attenuated mask, and returns that exact mask to the VFS before Samba continues. The current module build marker is `2026-07-22c complete access masks`.
+
+**Original evidence (before remediation)**
 
 `create_file` currently maps only:
 
@@ -188,9 +191,9 @@ The Kaimo model also defines:
 - Traversal semantics are not explicitly enforced.
 - The documentation's claim of exact ACL parity is therefore too broad.
 
-**Required fix**
+**Implemented fix and remaining verification**
 
-Replace the current read/write/create/delete booleans with a complete operation/access request. At minimum the server must receive either the normalized Samba access mask or explicit requested Kaimo permission bits.
+The former read/write/create/delete booleans have been removed from the wire contract. Their protobuf field numbers are reserved so mixed old/new peers cannot silently reinterpret a request. `AuthorizeOpenRequest` now contains the raw 32-bit access mask plus create-target type and directory-listing context; `AuthorizeReply` contains the exact specific mask that may be granted.
 
 Recommended conceptual mapping:
 
@@ -210,7 +213,20 @@ Recommended conceptual mapping:
 | Delete target | `Delete` |
 | Delete child from directory | `DeleteSubItems` |
 
-The final mapping must be verified against the exact Samba 4.19.5 access-mask state delivered to `create_file` and against all relevant SET_INFO/VFS paths.
+Additional implemented behavior:
+
+1. Generic read/write/execute/all bits are expanded to Samba 4.19.5's exact file generic masks.
+2. `MAXIMUM_ALLOWED` is evaluated permission by permission and returned as a reduced specific mask. The VFS replaces the original request with this mask before `SMB_VFS_NEXT_CREATE_FILE`, preventing Samba's broad POSIX identity from restoring Kaimo-denied rights.
+3. `SYNCHRONIZE` is preserved/ignored as allowed by SMB semantics. `ACCESS_SYSTEM_SECURITY`, reserved bits, malformed masks, malformed ALLOW responses, and granted masks outside Samba's specific-access domain are fail-closed.
+4. Every ancestor directory is checked for `TraverseExecute` before target authorization.
+5. Missing file creation requires `CreateWriteData` on the parent; missing directory creation requires `CreateAppendData` on the parent.
+6. Samba 4.19.5 unconditionally adds `FILE_READ_ATTRIBUTES` to successful FSP opens. The bridge therefore requires `ReadAttributes` for real opens even when the client omitted the bit. The readdir visibility check is explicitly marked as listing-only and does not invent this FSP right.
+7. Delete-on-open retains Windows-compatible target `Delete` or parent `DeleteSubItems` semantics. `FILE_DELETE_CHILD` is accepted only for directories.
+8. Timewarp opens now also pass through the complete access-mask mapping. P1-06 still requires a separate read-only snapshot enforcement and VFS-stack-safe redirect.
+
+The mapping was checked against the project's exact pinned [Samba 4.19.5 source archive](https://download.samba.org/pub/samba/stable/samba-4.19.5.tar.gz), including `source3/smbd/smb2_create.c`, `source3/smbd/open.c`, and `libcli/security/security.h`, and against the [MS-SMB2 file access-mask definition](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb2/77b36d0f-6016-458a-a7a0-0f4a72ae1534). This confirmed that the custom VFS receives raw client access before Samba's generic/maximum resolution and that Samba later adds read-attributes access.
+
+Still required: native C/C++ compilation, live SMB access-mask tests, and SET_INFO verification for attributes, EAs, DACL, and owner changes. P0-04/P0-05 remain responsible for rename and other mutating VFS operations that are not protected solely by the opened handle's granted mask.
 
 ### P0-04: Rename lacks complete source, destination, and overwrite authorization
 
@@ -535,11 +551,11 @@ The module is built against Samba 4.19.5/ABI 49. The source version is pinned, b
 | Protobuf services | All 13 RPC methods have .NET implementations | No protocol-level auth/version capability negotiation |
 | NTLM user sync | Active users and raw NT hashes are exported/imported | Insecure temp storage, no removals, no pagination, corrupt row can abort sync |
 | TREE_CONNECT | SMB enabled flag, user, share lookup, root ACL | Disabled share not checked; bridge trust and identity spoofing |
-| File read | `SEC_FILE_READ_DATA` → `ListReadData` | Attributes, EA, execute/traverse, and security descriptor reads missing |
-| File write | Write and append bits combined → `CreateWriteData` | Append-only semantics and metadata writes missing |
-| File create | Parent `CreateWriteData` check | Directory/add-subdirectory semantics need explicit mapping; fallback paths |
-| Delete/rmdir | Pre-operation target/parent authorization | Fixed-path truncation, canonicalization, race semantics |
-| Delete-on-open | `SEC_STD_DELETE` handled in AuthorizeOpen | Coupled to incomplete access-mask mapping |
+| File read | Raw/specific/generic masks map data, attributes, EA, execute/traverse, and read-control independently | Native/live SET_INFO and client compatibility verification pending |
+| File write | Write, append, attributes, EA, DACL, and owner rights are distinct; returned mask is attenuated | Native/live SET_INFO verification and cold-cache performance measurement pending |
+| File create | File parent requires `CreateWriteData`; directory parent requires `CreateAppendData`; future target mask is checked | Fallback mutating VFS paths still require P0-05 inventory |
+| Delete/rmdir | Pre-operation target/parent authorization uses exact dynamic canonical path | Race/handle identity semantics remain |
+| Delete-on-open | Target `Delete` or parent `DeleteSubItems`; granted handle mask is attenuated | Native delete-on-close matrix pending |
 | Rename/move | Native operation and post-event exist | No destination authorization; directory type hardcoded false |
 | Directory listing | Entry-by-entry read authorization with short cache | Unbounded cache, synchronous RPC volume, canonicalization, internal cache namespace |
 | Close lifecycle | Modified files emit close event | Lossy, reads content later by path, concurrent attribution races |
@@ -775,7 +791,7 @@ A release should be blocked when any of the following is true:
 - [ ] Connection data uses Samba-owned lifetime and fail-closed allocation.
 - [ ] One canonical checked path routine is used everywhere.
 - [ ] No fixed buffer truncation can change the authorized target.
-- [ ] Full access-mask mapping exists.
+- [x] Full access-mask mapping exists in source; native/runtime verification remains pending.
 - [ ] Rename is authorized before mutation.
 - [ ] All mutating VFS operations are inventoried and covered or explicitly denied.
 - [ ] Snapshot client paths cannot reach the internal cache.
@@ -883,7 +899,7 @@ This order was selected instead of connecting first and rolling back afterward b
 
 - Compile the native module against the pinned Samba 4.19.5 source tree.
 - Run an allocation-failure/fault-injection test proving that TREE_CONNECT fails and no usable share state remains.
-- Run the live Samba connection test and verify the current `2026-07-22b` build marker (`2026-07-22a` was the marker when P0-01 alone was implemented).
+- Run the live Samba connection test and verify the current `2026-07-22c` build marker (`2026-07-22a` was the marker when P0-01 alone was implemented).
 - Run ASan/UBSan as part of the later native hardening test phase.
 
 These checks could not be completed in the current audit environment because neither a Docker daemon nor an installed WSL distribution was available.
@@ -938,13 +954,13 @@ The current 8191-byte cap is an explicit compatibility boundary, not the final p
 - Test deep `dirfsp` paths, multi-byte UTF-8 names at byte boundaries, and two paths sharing the first 4095 bytes where only one is authorized.
 - Verify OPEN/create, list, unlink, rmdir, mkdir, rename, close-event, snapshot enumeration, and snapshot open behavior against the exact same canonical target.
 - Verify `ENOMEM`/`ENAMETOOLONG` mapping through Samba to SMB client-visible statuses.
-- Verify the `2026-07-22b exact dynamic paths` marker in a running `smbd` log.
+- Verify the current `2026-07-22c complete access masks` marker in a running `smbd` log (`2026-07-22b` identifies the P0-02-only revision).
 
 Native verification is currently unavailable: the Docker CLI is installed but its engine pipe is not running, no WSL distribution is installed, and no local GCC/Clang compiler is available. This is an environment limitation, not a passing native test result.
 
 **Known related work intentionally not folded into P0-02**
 
-- P0-03: complete Samba access-mask-to-Kaimo permission mapping.
+- P0-03: complete Samba access-mask-to-Kaimo permission mapping (implemented in source after this entry; native verification remains pending).
 - P0-04: authorize rename source, destination parent, and overwrite target before mutation.
 - P1-03: framed protocol and correct partial/EINTR I/O handling.
 - P1-11/P1-12: durable, authenticated, idempotent lifecycle delivery.
@@ -952,22 +968,97 @@ Native verification is currently unavailable: the Docker CLI is installed but it
 
 **Next planned finding:** P0-03 — map the complete Samba access mask to the Kaimo permission model and deny unsupported security-relevant operations.
 
+### 2026-07-22 — P0-03: Complete SMB access-mask authorization and attenuation
+
+**Status:** Implemented in source; managed mapping tests verified; native build/runtime verification pending.
+
+**Original problem**
+
+The native VFS reduced Samba's 32-bit desired-access mask to four booleans (`read`, `write`, `create`, and `delete`). This merged append with full write and omitted execute/traverse, attributes, extended attributes, security descriptor, owner, and directory-delete-child rights. Because Samba runs under a broad shared POSIX identity, any omitted Kaimo check could become an effective authorization bypass. The old contract also could not safely represent `GENERIC_*` or `MAXIMUM_ALLOWED`.
+
+**Samba 4.19.5 behavior verified before implementation**
+
+The exact source version pinned by `Dockerfile.vfs` was downloaded from the official Samba archive and inspected locally:
+
+- `source3/smbd/smb2_create.c` passes the raw SMB2 `DesiredAccess` value into `SMB_VFS_CREATE_FILE`; the custom VFS therefore sees the mask before Samba normalizes it.
+- `source3/smbd/open.c::smbd_calculate_access_mask_fsp` expands generic access and calculates `MAXIMUM_ALLOWED` only inside the next/default VFS implementation.
+- The same file later adds `FILE_READ_ATTRIBUTES` to the FSP access mask even when the client omitted it.
+- `libcli/security/security.h` confirms the exact generic masks and the file/directory bit aliases used by Samba 4.19.5.
+
+This changed the implementation plan materially: a boolean allow/deny result is insufficient. The control plane must return an attenuated specific access mask and the VFS must pass that mask, not the original raw request, to Samba.
+
+**Solution implemented**
+
+1. Replaced the four boolean approximation in `AuthorizeOpenRequest` with `uint32 access_mask`, `wants_create`, `create_directory`, and `directory_listing` fields. Reserved protobuf field numbers 4-7 to prevent unsafe reuse of the old wire layout.
+2. Added `granted_access_mask` to `AuthorizeReply`. CONNECT and DELETE leave it zero; OPEN returns the exact specific mask Samba may grant.
+3. Changed the Unix-socket OPEN message to carry an eight-digit hexadecimal access mask and explicit create/directory/listing flags. The sidecar validates all field forms before issuing gRPC.
+4. Changed the sidecar decision cache to store both allow/deny and the granted mask. A cached `MAXIMUM_ALLOWED` result therefore cannot accidentally become a full raw-mask grant.
+5. Changed native ALLOW parsing to require exactly eight hexadecimal digits, reject bits outside Samba's `0x001F01FF` specific-access domain, and treat malformed protocol responses as fail-closed even when `KAIMO_AUTHZ_FAILOPEN=1`.
+6. Replaced the VFS `access_mask` with `granted_access_mask` before every live and timewarp `SMB_VFS_NEXT_CREATE_FILE` call. This is the enforcement point that prevents the broad POSIX account from restoring rights removed by Kaimo.
+7. Implemented exact Samba 4.19.5 generic expansion for `GENERIC_READ`, `GENERIC_WRITE`, `GENERIC_EXECUTE`, and `GENERIC_ALL`.
+8. Implemented one-to-one mapping for all 13 Kaimo permission bits: data/list, write/add-file, append/add-subdirectory, execute/traverse, read/write attributes, read/write EA, read-control, write-DAC, write-owner, delete, and delete-child.
+9. Implemented `MAXIMUM_ALLOWED` by evaluating each Kaimo permission and building only the allowed specific mask. `SYNCHRONIZE` is retained as the SMB-ignored synchronization bit.
+10. Denied `ACCESS_SYSTEM_SECURITY`, reserved/unknown access bits, and `FILE_DELETE_CHILD` on non-directory objects because the Kaimo model cannot safely represent those requests.
+11. Added explicit `TraverseExecute` checks for each ancestor directory before target access.
+12. Distinguished missing file creation (`CreateWriteData` on the parent) from missing directory creation (`CreateAppendData` on the parent).
+13. Required `ReadAttributes` for actual FSP opens because Samba 4.19.5 grants that bit implicitly. Kept readdir authorization as an explicit listing-only request so visibility still maps only to `ListReadData` plus ancestor traversal.
+14. Preserved delete-on-open's target `Delete` or parent `DeleteSubItems` alternative.
+15. Updated the deployment marker to `2026-07-22c complete access masks`.
+
+**Files changed**
+
+- `samba-vfs/protos/kaimo_smb_bridge.proto`
+- `samba-vfs/module/authd.cpp`
+- `samba-vfs/module/vfs_kaimo_bridge.c`
+- `src/Kaimo_File_Server.SmbBridge/Services/AuthzGrpcService.cs`
+- `tests/Kaimo_File_Server.Tests/AuthzGrpcServiceAccessMaskTests.cs`
+- `tests/Kaimo_File_Server.Tests/AuthzGrpcServiceDeleteTests.cs`
+- `samba-vfs/README.md`
+- `docu/smb-samba-vfs-migration.md`
+- `docu/samba-bridge-vfs-security-audit.md`
+
+**Validation completed**
+
+- Compiled the managed gRPC service against the regenerated protobuf contract.
+- Added focused tests for every supported specific access-bit mapping, append-only behavior, Delete/DeleteSubItems alternatives, directory-only delete-child, Generic Write expansion, `MAXIMUM_ALLOWED` attenuation, implicit read-attributes handling, file/directory parent-create semantics, listing behavior, ancestor traversal, `ACCESS_SYSTEM_SECURITY`, and unknown bits.
+- Focused authorization suite: 29 passed, 0 failed, 0 skipped.
+- Full solution suite: 501 passed, 0 failed, 0 skipped (24 new P0-03 tests increased the previous total from 477).
+- Ran a structural contract check confirming the old boolean fields are absent from C/C++/C#, protobuf field numbers 4-7 are reserved, all 13 Kaimo permissions are mapped, the sidecar and VFS agree on the OPEN field count/format, and the granted mask is applied before the next VFS create call.
+- Confirmed malformed OPEN ALLOW masks cannot enter the configurable fail-open path.
+- Confirmed the `2026-07-22c complete access masks` source marker.
+- `git diff --check` completed successfully.
+
+**Validation still required**
+
+- Compile `vfs_kaimo_bridge.c`, `authd.cpp`, and regenerated C++ protobuf/gRPC stubs inside the pinned Samba 4.19.5 image.
+- Run native parser tests and ASan/UBSan/fuzz cases for malformed OPEN fields, short/long hexadecimal values, overflow, partial responses, invalid granted bits, and cache entries.
+- Run live SMB tests for specific, generic, and `MAXIMUM_ALLOWED` requests and verify the FSP's effective mask is exactly the returned Kaimo mask.
+- Exercise Windows/macOS/Linux client flows for append-only writes, directory creation, traversal denial, attribute/EA reads and writes, DACL changes, ownership changes, delete-on-close, and directory delete-child.
+- Verify SET_INFO operations cannot bypass the opened handle's `WriteAttributes`, `WriteExtAttributes`, `ChangePermissions`, or `TakeOwnership` mask.
+- Benchmark cold-cache authorization for deep paths and `MAXIMUM_ALLOWED`; the current correctness-first implementation can perform multiple ACL evaluations and must remain within the sidecar's five-second deadline.
+- Verify timewarp opens receive the attenuated mask. P1-06 still must force them read-only and avoid raw VFS-stack bypass.
+- Complete P0-04/P0-05 for rename and mutating operations whose authorization is not fully determined by the create/open handle.
+
+Native verification remains unavailable in this environment: Docker is installed but its engine is not running, WSL has no installed distribution, and no local C/C++ compiler is present. The successful managed build does not compile the native VFS or sidecar.
+
+**Next planned finding:** P0-04 — authorize rename source, destination parent, and replacement target before native mutation.
+
 ## 15. Source evidence index
 
 | Finding area | Primary source locations |
 |---|---|
-| Context allocation fail-open | `samba-vfs/module/vfs_kaimo_bridge.c:488-536` |
-| Path reconstruction/truncation | `vfs_kaimo_bridge.c:67-190`, `:282-344`, `:472-484`, `:545-931` |
-| Incomplete access mapping | `vfs_kaimo_bridge.c:545-596`, `Core/Security/FilePermissions.cs` |
-| Rename authorization gap | `vfs_kaimo_bridge.c:776-819`, `Core/Services/File/FileService.cs:53-86`, `:694-719` |
+| Context allocation fail-open | `samba-vfs/module/vfs_kaimo_bridge.c:526-574` |
+| Path reconstruction/truncation | `vfs_kaimo_bridge.c:68-228`, `:320-382`, `:510-522`, `:583-991` |
+| Complete access mapping / original gap | `vfs_kaimo_bridge.c:89-197`, `:583-695`; `authd.cpp:53-130`, `:212-249`; `AuthzGrpcService.cs:25-327`; `Core/Security/FilePermissions.cs` |
+| Rename authorization gap | `vfs_kaimo_bridge.c:836-879`, `Core/Services/File/FileService.cs:53-86`, `:694-719` |
 | Unbounded sidecar threads/cache | `samba-vfs/module/authd.cpp:49-66`, `:183-225`, `:258-262` |
 | World-writable socket | `authd.cpp:241-254` |
-| Partial stream I/O | `vfs_kaimo_bridge.c:86-119`, `:220-266`; `authd.cpp:183-225` |
+| Partial stream I/O | `vfs_kaimo_bridge.c:89-139`, `:258-304`; `authd.cpp:224-262` |
 | Snapshot ACL leak | `SmbBridge/Services/SnapshotGrpcService.cs:181-237`; `Core/Services/File/FileService.cs:884-899` |
-| Snapshot raw open | `vfs_kaimo_bridge.c:862-931` |
+| Snapshot raw open | `vfs_kaimo_bridge.c:922-991` |
 | Snapshot materialization races | `SnapshotGrpcService.cs:288-317`; `SnapshotCacheCleanupService.cs` |
 | Disabled share lookup | `Infrastructure/Repositories/ShareRepository.cs:45-49`; bridge service share lookups |
-| Event reliability/TOCTOU | `vfs_kaimo_bridge.c:195-219`, `:607-859`; `FileEventGrpcService.cs`; `FileService.cs:341-400` |
+| Event reliability/TOCTOU | `vfs_kaimo_bridge.c:233-257`, `:665-919`; `FileEventGrpcService.cs`; `FileService.cs:341-400` |
 | Rename duplicate destruction | `Infrastructure/Repositories/FileVersionRepository.cs:142-178` |
 | Insecure hash temp file | `samba-vfs/sync-users.sh:17-49` |
 | Sync error handling | `sync-users.sh`, `sync-shares.sh`, `sync-config.sh` |

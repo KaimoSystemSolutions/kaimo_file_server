@@ -181,16 +181,23 @@ step.
 
 ## Phase 2b — File/path ACL + listing filter (Phase 2 complete)
 
-**Result: works.** File open (read/write/create) and directory listing follow genuine
-Kaimo ACLs — with **exact parity** to the old `FileService.OpenAsync` and `ListAsync`.
+**Result:** the managed access-mask mapping is implemented and covered by automated
+tests; native Samba runtime verification of the P0-03 revision remains pending.
+File opens and directory listing use genuine Kaimo ACLs without reducing SMB access
+to read/write booleans.
 
 - **`create_file` hook** ([vfs_kaimo_bridge.c](module/vfs_kaimo_bridge.c)) → gRPC `AuthorizeOpen`.
-  The correct seam (not `openat`): full path + access mask, returns clean `ACCESS_DENIED`.
-  Parity logic in [`AuthzGrpcService.AuthorizeOpen`](../src/Kaimo_File_Server.SmbBridge/Services/AuthzGrpcService.cs):
-  write→`CreateWriteData`, read→`ListReadData`, create→`CreateWriteData` on parent; each
-  access type separately; non-existent without create = "not found" (no ACL deny).
+  The correct seam (not `openat`): full path + raw SMB desired-access mask. The bridge
+  expands Samba 4.19.5 generic rights, checks data/list, write, append, traverse,
+  attributes, EA, security-descriptor, owner, delete, and delete-child permissions,
+  then returns the exact specific mask that the VFS passes to Samba. `MAXIMUM_ALLOWED`
+  is attenuated to Kaimo-granted rights instead of being recalculated from the broad
+  POSIX service identity. Missing file creation requires parent `CreateWriteData`;
+  missing directory creation requires parent `CreateAppendData`.
 - **`readdir` hook** → hides entries without read permission (`AuthorizeOpen` read-only per entry).
-  The **sidecar caches** decisions (TTL 3 s) so large listings don't flood the bridge.
+  Listing requests are marked separately so Samba's implicit FSP `ReadAttributes`
+  behavior is not applied to visibility checks. The **sidecar caches** decisions and
+  granted masks (TTL 3 s) so large listings don't flood the bridge.
   Disabled with `KAIMO_LIST_FILTER=0`.
 
 **Verified:**

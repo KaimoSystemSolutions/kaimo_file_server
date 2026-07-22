@@ -6,7 +6,8 @@
 // Protocol (one request per connection, tab-separated, with \n):
 //   Authz (response ALLOW|DENY|ERROR):
 //     "CONNECT\t<user>\t<share>"
-//     "OPEN\t<user>\t<share>\t<flags>\t<path>"          flags: r/w/c/d
+//     "OPEN\t<user>\t<share>\t<access-hex>\t<create 0|1>\t<dir 0|1>\t<listing 0|1>\t<path>"
+//       -> "ALLOW\t<granted-access-hex>" | "DENY" | "ERROR"
 //     "DELETEAUTH\t<user>\t<share>\t<isdir 0|1>\t<path>"
 //   Events (fire-and-forget, response OK):
 //     "CLOSE\t<user>\t<share>\t<path>"                   file written and closed
@@ -20,11 +21,16 @@
 // Each connection is handled in its own thread so slow events
 // (versioning reads the file) don't block authorization requests.
 #include <chrono>
+#include <cerrno>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <iomanip>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -47,22 +53,29 @@ static std::unique_ptr<EventService::Stub> g_events;
 static std::unique_ptr<SnapshotService::Stub> g_snapshot;
 
 // --- TTL decision cache (mutex-protected due to multi-threading) ---
-struct CacheEntry { bool allow; std::chrono::steady_clock::time_point expiry; };
+struct CacheEntry {
+    bool allow;
+    uint32_t granted_access;
+    std::chrono::steady_clock::time_point expiry;
+};
 static std::unordered_map<std::string, CacheEntry> g_cache;
 static std::mutex g_cache_mtx;
 static const auto kCacheTtl = std::chrono::seconds(3);
 
-static bool cache_get(const std::string& key, bool& allow) {
+static bool cache_get(const std::string& key, bool& allow, uint32_t& granted_access) {
     std::lock_guard<std::mutex> lk(g_cache_mtx);
     auto it = g_cache.find(key);
     if (it == g_cache.end()) return false;
     if (std::chrono::steady_clock::now() >= it->second.expiry) { g_cache.erase(it); return false; }
     allow = it->second.allow;
+    granted_access = it->second.granted_access;
     return true;
 }
-static void cache_put(const std::string& key, bool allow) {
+static void cache_put(const std::string& key, bool allow, uint32_t granted_access) {
     std::lock_guard<std::mutex> lk(g_cache_mtx);
-    g_cache[key] = { allow, std::chrono::steady_clock::now() + kCacheTtl };
+    g_cache[key] = {
+        allow, granted_access, std::chrono::steady_clock::now() + kCacheTtl
+    };
 }
 
 static std::chrono::system_clock::time_point deadline(int secs) {
@@ -79,23 +92,39 @@ static const char* do_connect(const std::string& user, const std::string& share)
     return reply.allow() ? "ALLOW" : "DENY";
 }
 
-static const char* do_open(const std::string& user, const std::string& share,
-                           const std::string& flags, const std::string& path,
+static std::string open_result(bool allow, uint32_t granted_access) {
+    if (!allow) return "DENY";
+    std::ostringstream out;
+    out << "ALLOW\t" << std::hex << std::setw(8) << std::setfill('0')
+        << granted_access;
+    return out.str();
+}
+
+static std::string do_open(const std::string& user, const std::string& share,
+                           uint32_t access_mask, bool wants_create,
+                           bool create_directory, bool directory_listing,
+                           const std::string& path,
                            const std::string& cache_key) {
     bool cached;
-    if (cache_get(cache_key, cached)) return cached ? "ALLOW" : "DENY";
+    uint32_t cached_access = 0;
+    if (cache_get(cache_key, cached, cached_access))
+        return open_result(cached, cached_access);
     AuthorizeOpenRequest req;
     req.set_username(user); req.set_share(share); req.set_path(path);
-    req.set_want_read(flags.find('r') != std::string::npos);
-    req.set_want_write(flags.find('w') != std::string::npos);
-    req.set_wants_create(flags.find('c') != std::string::npos);
-    req.set_want_delete(flags.find('d') != std::string::npos);
+    req.set_access_mask(access_mask);
+    req.set_wants_create(wants_create);
+    req.set_create_directory(create_directory);
+    req.set_directory_listing(directory_listing);
     grpc::ClientContext ctx; ctx.set_deadline(deadline(5));
     AuthorizeReply reply;
     grpc::Status st = g_authz->AuthorizeOpen(&ctx, req, &reply);
-    if (!st.ok()) { std::cerr << "kaimo_authd: AuthorizeOpen: " << st.error_message() << std::endl; return "ERROR"; }
-    cache_put(cache_key, reply.allow());
-    return reply.allow() ? "ALLOW" : "DENY";
+    if (!st.ok()) {
+        std::cerr << "kaimo_authd: AuthorizeOpen: " << st.error_message()
+                  << std::endl;
+        return "ERROR";
+    }
+    cache_put(cache_key, reply.allow(), reply.granted_access_mask());
+    return open_result(reply.allow(), reply.granted_access_mask());
 }
 
 static const char* do_delete(const std::string& user, const std::string& share,
@@ -180,6 +209,18 @@ static std::vector<std::string> split_tabs(const std::string& line, size_t max_f
     return parts;
 }
 
+static bool parse_hex_u32(const std::string& text, uint32_t& value) {
+    if (text.size() != 8) return false;
+    char* end = nullptr;
+    errno = 0;
+    unsigned long parsed = std::strtoul(text.c_str(), &end, 16);
+    if (errno == ERANGE || end == text.c_str() || *end != '\0' ||
+        parsed > std::numeric_limits<uint32_t>::max())
+        return false;
+    value = static_cast<uint32_t>(parsed);
+    return true;
+}
+
 static void handle_client(int cfd) {
     char buf[8192];
     ssize_t r = read(cfd, buf, sizeof(buf) - 1);
@@ -194,8 +235,16 @@ static void handle_client(int cfd) {
         auto p = split_tabs(line, 3);
         if (p.size() == 3) out = std::string(do_connect(p[1], p[2])) + "\n";
     } else if (line.rfind("OPEN\t", 0) == 0) {
-        auto p = split_tabs(line, 5);
-        if (p.size() == 5) out = std::string(do_open(p[1], p[2], p[3], p[4], line)) + "\n";
+        auto p = split_tabs(line, 8);
+        uint32_t access_mask = 0;
+        if (p.size() == 8 && parse_hex_u32(p[3], access_mask) &&
+            (p[4] == "0" || p[4] == "1") &&
+            (p[5] == "0" || p[5] == "1") &&
+            (p[6] == "0" || p[6] == "1")) {
+            out = do_open(p[1], p[2], access_mask,
+                          p[4] == "1", p[5] == "1", p[6] == "1",
+                          p[7], line) + "\n";
+        }
     } else if (line.rfind("DELETEAUTH\t", 0) == 0) {
         auto p = split_tabs(line, 5);
         if (p.size() == 5) out = std::string(do_delete(p[1], p[2], p[3] == "1", p[4])) + "\n";

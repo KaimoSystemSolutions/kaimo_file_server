@@ -46,9 +46,10 @@ service AuthzService {
   // Maps to IAuthenticationLookup.CanAccessShareAsync.
   rpc AuthorizeConnect(AuthorizeConnectRequest) returns (AuthorizeReply);
 
-  // File/path access (Phase 2b). Exact parity with FileService.OpenAsync:
-  // write -> CreateWriteData, read -> ListReadData, create -> Parent-Check.
-  // Used by the create_file hook (Open) and readdir filter (read-only).
+  // File/path access (Phase 2b). Transports the complete raw Samba access
+  // mask. The server expands generic/MAXIMUM_ALLOWED access, maps every
+  // security-relevant bit to Kaimo permissions, and returns the exact mask
+  // that the VFS may pass to the next Samba layer.
   rpc AuthorizeOpen(AuthorizeOpenRequest) returns (AuthorizeReply);
 
   // unlinkat/rmdir authorization. Deleting an item requires Delete on the
@@ -64,16 +65,25 @@ message AuthorizeConnectRequest {
 message AuthorizeReply {
   bool   allow  = 1;
   string reason = 2; // optional reason for logging (e.g., "unknown share")
+  // AuthorizeOpen only: normalized/attenuated specific access bits that Samba
+  // may grant. Zero for the other authorization RPCs and for denied requests.
+  uint32 granted_access_mask = 3;
 }
 
 message AuthorizeOpenRequest {
-  string username     = 1;
-  string share        = 2;
-  string path         = 3; // share-relative, forward slashes
-  bool   want_read    = 4; // FILE_READ_DATA requested
-  bool   want_write   = 5; // FILE_WRITE_DATA / FILE_APPEND_DATA requested
-  bool   wants_create = 6; // create disposition creates new file
-  bool   want_delete  = 7; // DELETE requested on an existing item
+  string username = 1;
+  string share    = 2;
+  string path     = 3; // share-relative, forward slashes
+
+  // Removed P0-03 boolean approximation (want_read, want_write,
+  // wants_create, want_delete). Keep its field numbers unavailable so an old
+  // peer cannot be silently interpreted as the new complete contract.
+  reserved 4, 5, 6, 7;
+
+  uint32 access_mask      = 8; // raw SMB2 DesiredAccess received by create_file
+  bool   wants_create     = 9; // disposition can create a missing target
+  bool   create_directory = 10; // missing target is requested as a directory
+  bool   directory_listing = 11; // readdir visibility check, not a Samba FSP open
 }
 
 message AuthorizeDeleteRequest {
