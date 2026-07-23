@@ -41,7 +41,7 @@ public class ContextMenuConfig
         ContextMenuScope.Background => new() { "newfolder", "refresh" },
 
         ContextMenuScope.Folder => new()
-            { "open", "compress.zip", "compress.targz", "rename", "versions", "delete", "permissions", "properties", "newfolder", "refresh" },
+            { "open", "sync", "compress.zip", "compress.targz", "rename", "versions", "delete", "permissions", "properties", "newfolder", "refresh" },
 
         ContextMenuScope.Archive => new()
             { "open", "extract", "rename", "versions", "delete", "permissions", "properties", "newfolder", "refresh" },

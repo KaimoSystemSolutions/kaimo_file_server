@@ -1,0 +1,133 @@
+@using Kaimo_File_Server.Infrastructure.Clouds
+@using Kaimo_File_Server.Core.Language
+@inject NavigationManager Navigation
+@inject ToastService Toast
+
+@if (_isOpen)
+{
+    <div class="modal-backdrop" @onclick="Close">
+        <div class="modal-dialog" @onclick:stopPropagation="true">
+            <h3 class="modal-title">Sync Folder</h3>
+            <p class="share-help-text">@_folderPath</p>
+
+            <div class="detail-section">
+                <span class="detail-label">Cloud Provider</span>
+                <select class="edit-input"
+                        @bind="_selectedProvider"
+                        disabled="@(_googleConnection is not null)">
+                    <option value="">None</option>
+                    <option value="Google">Google Drive</option>
+                    <option value="Dropbox">Dropbox</option>
+                    <option value="OneDrive">Microsoft OneDrive</option>
+                    <option value="Nextcloud">Nextcloud</option>
+                </select>
+            </div>
+
+            @if (_selectedProvider == "Google")
+            {
+                <div class="detail-section">
+                    <span class="detail-label">Google Drive</span>
+
+                    @if (_googleConnection is not null)
+                    {
+                        <div class="cloud-account">
+                            @if (!string.IsNullOrEmpty(_googleUserPhoto))
+                            {
+                                <img class="cloud-avatar" src="@_googleUserPhoto" alt="Google account"/>
+                            }
+                            <span class="share-help-text">@_googleUserEmail</span>
+                            <button class="btn-primary" @onclick="Disconnect">Unsync</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="drive-login-container">
+                            <button class="btn-primary" @onclick="ConnectGoogle">
+                                Sync with Google
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+            else if (_selectedProvider is "Dropbox" or "OneDrive" or "Nextcloud")
+            {
+                <div class="detail-section">
+                    <p class="share-help-text">@_selectedProvider support is not available yet.</p>
+                </div>
+            }
+
+            <div class="modal-actions">
+                <button class="btn btn-secondary" @onclick="Close">@Resources.Web_Button_Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _isOpen;
+    private Guid _shareId;
+    private string _folderPath = "";
+
+    private string _selectedProvider = "";
+    private GoogleDriveConnection? _googleConnection;
+    private string? _googleUserEmail;
+    private string? _googleUserPhoto;
+
+    public async Task Open(Guid shareId, string folderPath)
+    {
+        _shareId = shareId;
+        _folderPath = folderPath;
+        _isOpen = true;
+
+        _selectedProvider = "";
+        _googleConnection = null;
+        _googleUserEmail = null;
+        _googleUserPhoto = null;
+
+        await LoadExistingConnection();
+        StateHasChanged();
+    }
+
+    public void Close()
+    {
+        _isOpen = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadExistingConnection()
+    {
+        // TODO: replace with a real lookup once folder-level connections are
+        // persisted, e.g.:
+        //   var conn = await CloudSync.GetConnectionAsync(_shareId, _folderPath);
+        //   if (conn is GoogleDriveConnection g) { _googleConnection = g; _selectedProvider = "Google"; ... }
+        await Task.CompletedTask;
+    }
+
+    private void ConnectGoogle()
+    {
+        var shareId = Uri.EscapeDataString(_shareId.ToString());
+        var path = Uri.EscapeDataString(_folderPath ?? "");
+
+        // Both shareId and path need to survive the OAuth round trip so the
+        // callback can persist the refresh token against this exact
+        // (share, folder) pair rather than just the share.
+        Navigation.NavigateTo(
+            $"/api/google/connect?shareId={shareId}&path={path}",
+            forceLoad: true);
+    }
+
+    private async Task Disconnect()
+    {
+        // TODO: call a folder-scoped disconnect once it exists, e.g.:
+        //   await CloudSync.DisconnectAsync(_shareId, _folderPath);
+
+        _googleConnection = null;
+        _googleUserEmail = null;
+        _googleUserPhoto = null;
+        _selectedProvider = "";
+
+        Toast.Show("Disconnected Cloud Provider from Folder");
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+}

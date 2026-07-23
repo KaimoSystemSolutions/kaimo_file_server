@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Infrastructure.Clouds;
 
@@ -107,20 +108,39 @@ namespace Kaimo_File_Server.Core.Domain
             CloudSettings = cloudSettings;
         }
     }
-
+    
 
     public record CloudSettings(
-        string Provider,
-        Dictionary<string, string> Data
+        // path -> synced folder data
+        Dictionary<string, SyncedFolder> Folders
     )
     {
-        public string Serialize() 
+        public string Serialize()
             => JsonSerializer.Serialize(this);
-        
+
         public static CloudSettings Deserialize(string json)
             => JsonSerializer.Deserialize<CloudSettings>(json)
                ?? throw new InvalidOperationException("Invalid CloudSettings JSON");
-        
-    };
-    
+    }
+
+    /// <summary>
+    /// A single folder's cloud-sync config. Provider/Data are the persisted part
+    /// (round-tripped through CloudSettings' JSON). Connection is a live,
+    /// in-memory handle built on demand by ICloudProviderFactory — it is never
+    /// serialized and does not survive a reload of the share from the DB.
+    /// </summary>
+    public class SyncedFolder
+    {
+        public string Provider { get; set; } = "";
+        public Dictionary<string, string> Data { get; set; } = new();
+
+        [JsonIgnore]
+        public ICloudConnection? Connection { get; set; }
+
+        public SyncedFolder(string provider, Dictionary<string, string> data)
+        {
+            this.Provider = provider;
+            this.Data = data;
+        }
+    }
 }

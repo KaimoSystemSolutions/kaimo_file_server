@@ -108,6 +108,7 @@
             // Bulk extract only makes sense when every selected item is an archive.
             "extract" when scope == ContextMenuScope.MultiSelection
                 => selected.All(f => !f.IsDirectory && FileHelper.IsArchive(f.Name)),
+                
             _ => true,
         };
 
@@ -120,6 +121,9 @@
         "open"
             => async () => {  CloseContextMenu(); await FilePreviewComponent.OpenFilePreview(target!); },
 
+        "sync" when target is { IsDirectory: true} 
+            => async () => { CloseContextMenu(); await FileBrowser.OpenSyncDialog(target!); },
+        
         "extract" when scope == ContextMenuScope.MultiSelection
             => async () =>
             {
@@ -129,6 +133,7 @@
         "extract"
             => async () => {  CloseContextMenu(); await FileBrowser.UnzipFile(target!); },
 
+        
         "compress.zip" => async () =>
         {
             CloseContextMenu();
@@ -155,7 +160,8 @@
 
         "newfolder" => () => { ContextNewFolder(); return Task.CompletedTask; },
         "refresh" => async () => { await ContextRefresh(); },
-
+        
+        
         _ => () => Task.CompletedTask,
     };
 

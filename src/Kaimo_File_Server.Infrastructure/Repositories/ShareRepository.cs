@@ -36,8 +36,8 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
                 return shares;
             
             // establish missing cloud connections
-            foreach (ShareDefinition share in shares)
-                ICloudProviderFactory.initilizeCloud(_cloudFactory, share);
+            //foreach (ShareDefinition share in shares) 
+            //     ICloudProviderFactory.initilizeCloud(_cloudFactory, share);
 
             return shares;
         }
