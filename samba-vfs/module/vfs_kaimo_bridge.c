@@ -20,6 +20,7 @@
 #include "includes.h"
 #include "smbd/smbd.h"
 #include "include/ntioctl.h" /* struct shadow_copy_data / SHADOW_COPY_LABEL (@GMT) */
+#include "libcli/security/security.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -44,6 +45,17 @@
 /* Samba 4.19.5 FILE_GENERIC_ALL after generic expansion. OPEN replies may
  * contain only these specific file/directory and standard access bits. */
 #define KAIMO_SAMBA_SPECIFIC_ACCESS 0x001f01ffU
+/* Snapshot handles may read data/EA/attributes, traverse/execute, read their
+ * security descriptor, and synchronize. Every right that can mutate the
+ * object or its namespace is excluded. MAXIMUM_ALLOWED is accepted as a
+ * request form, but the control-plane result is clamped to this mask. */
+#define KAIMO_SNAPSHOT_ALLOWED_ACCESS \
+	(FILE_GENERIC_READ | FILE_GENERIC_EXECUTE)
+#define KAIMO_SNAPSHOT_MUTATING_ACCESS \
+	(FILE_WRITE_DATA | FILE_APPEND_DATA | FILE_WRITE_EA | \
+	 FILE_WRITE_ATTRIBUTES | FILE_DELETE_CHILD | DELETE_ACCESS | \
+	 WRITE_DAC_ACCESS | WRITE_OWNER_ACCESS | GENERIC_WRITE_ACCESS | \
+	 GENERIC_ALL_ACCESS)
 
 /* Per-connection stored in VFS handle (set at TREE_CONNECT). */
 struct kaimo_conn_ctx {
@@ -465,12 +477,72 @@ static bool kaimo_twrp_to_gmt(NTTIME twrp, char *out, size_t out_sz)
 	return strftime(out, out_sz, "@GMT-%Y.%m.%d-%H.%M.%S", &tmv) == 24;
 }
 
-/* Kill-switch for the openat-based snapshot data-path redirect (default on).
- * KAIMO_SNAPSHOT_OPENAT=0 falls back to the (insufficient) create_file rewrite. */
+/* Kill-switch for snapshot data-path redirects (default on). Disabled
+ * snapshots fail closed; they must never fall through to live share content. */
 static bool kaimo_snapshot_openat_enabled(void)
 {
 	const char *v = getenv("KAIMO_SNAPSHOT_OPENAT");
 	return !(v != NULL && v[0] == '0');
+}
+
+static bool kaimo_snapshot_create_is_readonly(
+	uint32_t access_mask, uint32_t create_disposition,
+	uint32_t create_options, uint64_t allocation_size,
+	const struct security_descriptor *sd, const struct ea_list *ea_list)
+{
+	if ((access_mask & KAIMO_SNAPSHOT_MUTATING_ACCESS) != 0 ||
+	    create_disposition != FILE_OPEN ||
+	    (create_options & FILE_DELETE_ON_CLOSE) != 0 ||
+	    allocation_size != 0 || sd != NULL || ea_list != NULL) {
+		errno = EROFS;
+		return false;
+	}
+	return true;
+}
+
+static uint32_t kaimo_snapshot_granted_access(
+	uint32_t requested, uint32_t granted)
+{
+	uint32_t expanded = requested;
+
+	if ((expanded & GENERIC_READ_ACCESS) != 0) {
+		expanded &= ~GENERIC_READ_ACCESS;
+		expanded |= FILE_GENERIC_READ;
+	}
+	if ((expanded & GENERIC_EXECUTE_ACCESS) != 0) {
+		expanded &= ~GENERIC_EXECUTE_ACCESS;
+		expanded |= FILE_GENERIC_EXECUTE;
+	}
+	if ((expanded & MAXIMUM_ALLOWED_ACCESS) != 0)
+		expanded |= KAIMO_SNAPSHOT_ALLOWED_ACCESS;
+
+	/* Never add a right merely because the control plane returned a broader
+	 * mask than requested, and never retain a mutating snapshot right. */
+	return granted & expanded & KAIMO_SNAPSHOT_ALLOWED_ACCESS;
+}
+
+static bool kaimo_snapshot_open_how_readonly(
+	const struct vfs_open_how *input, struct vfs_open_how *output)
+{
+	int unsafe_flags = O_CREAT | O_EXCL | O_TRUNC | O_APPEND;
+	if (input == NULL || output == NULL ||
+	    (input->flags & O_ACCMODE) != O_RDONLY ||
+	    (input->flags & unsafe_flags) != 0
+#ifdef O_TMPFILE
+	    || (input->flags & O_TMPFILE) == O_TMPFILE
+#endif
+	    ) {
+		errno = EROFS;
+		return false;
+	}
+
+	/* Defence in depth: even after rejecting write intent, never forward a
+	 * create/truncate/append bit to a lower VFS module. */
+	*output = *input;
+	output->flags &= ~(O_ACCMODE | unsafe_flags);
+	output->flags |= O_RDONLY;
+	output->mode = 0;
+	return true;
 }
 
 /* Ask the bridge to materialize <gmt>:<logical> into the isolated snapshot cache and
@@ -885,6 +957,17 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 		uint32_t granted_access = 0;
 		const char *logical = kaimo_share_rel(handle,
 						      smb_fname->base_name);
+		if (!kaimo_snapshot_create_is_readonly(
+			    access_mask, create_disposition, create_options,
+			    allocation_size, sd, ea_list)) {
+			DBG_WARNING("kaimo_bridge: CREATE twrp write intent denied "
+				    "path=[%s] access=0x%08x disp=%u opts=0x%x\n",
+				    logical != NULL ? logical : "",
+				    (unsigned)access_mask,
+				    (unsigned)create_disposition,
+				    (unsigned)create_options);
+			return NT_STATUS_MEDIA_WRITE_PROTECTED;
+		}
 		if (ctx == NULL || smb_fname->base_name == NULL ||
 		    !kaimo_authz_open(ctx->user, ctx->share, logical,
 				      access_mask, false, false, false,
@@ -893,7 +976,8 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 				logical);
 			return NT_STATUS_ACCESS_DENIED;
 		}
-		access_mask = granted_access;
+		access_mask = kaimo_snapshot_granted_access(
+			access_mask, granted_access);
 		NTSTATUS tst = SMB_VFS_NEXT_CREATE_FILE(handle, req, dirfsp, smb_fname, access_mask,
 					       share_access, create_disposition, create_options,
 					       file_attributes, oplock_request, lease,
@@ -1066,6 +1150,11 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 			  const struct smb_filename *smb_fname,
 			  int flags)
 {
+	if (smb_fname != NULL && smb_fname->twrp != 0) {
+		DBG_WARNING("kaimo_bridge: DELETE twrp denied\n");
+		errno = EROFS;
+		return -1;
+	}
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
 	TALLOC_CTX *frame = talloc_stackframe();
 	char *path = kaimo_join_path(frame, srcdir_fsp, smb_fname);
@@ -1124,6 +1213,12 @@ static int kaimo_renameat(vfs_handle_struct *handle,
 			  struct files_struct *dstdir_fsp,
 			  const struct smb_filename *smb_fname_dst)
 {
+	if ((smb_fname_src != NULL && smb_fname_src->twrp != 0) ||
+	    (smb_fname_dst != NULL && smb_fname_dst->twrp != 0)) {
+		DBG_WARNING("kaimo_bridge: RENAME twrp denied\n");
+		errno = EROFS;
+		return -1;
+	}
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
 	TALLOC_CTX *frame = talloc_stackframe();
 	char *oldp = kaimo_join_path(frame, srcdir_fsp, smb_fname_src);
@@ -1243,6 +1338,11 @@ static int kaimo_mkdirat(vfs_handle_struct *handle,
 			 const struct smb_filename *smb_fname,
 			 mode_t mode)
 {
+	if (smb_fname != NULL && smb_fname->twrp != 0) {
+		DBG_WARNING("kaimo_bridge: MKDIR twrp denied\n");
+		errno = EROFS;
+		return -1;
+	}
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
 	TALLOC_CTX *frame = talloc_stackframe();
 	char *path = kaimo_join_path(frame, dirfsp, smb_fname);
@@ -1292,6 +1392,8 @@ static int kaimo_openat(vfs_handle_struct *handle,
 			struct files_struct *fsp,
 			const struct vfs_open_how *how)
 {
+	struct vfs_open_how readonly_how;
+
 	if (smb_fname == NULL)
 		return SMB_VFS_NEXT_OPENAT(handle, dirfsp, smb_fname, fsp, how);
 
@@ -1307,9 +1409,23 @@ static int kaimo_openat(vfs_handle_struct *handle,
 		errno = EACCES;
 		return -1;
 	}
-	if (smb_fname->twrp == 0 || !kaimo_snapshot_openat_enabled()) {
+	if (smb_fname->twrp == 0) {
 		TALLOC_FREE(frame);
 		return SMB_VFS_NEXT_OPENAT(handle, dirfsp, smb_fname, fsp, how);
+	}
+	if (!kaimo_snapshot_openat_enabled()) {
+		DBG_WARNING("kaimo_bridge: OPENAT twrp denied because snapshot "
+			    "redirect is disabled\n");
+		TALLOC_FREE(frame);
+		errno = EROFS;
+		return -1;
+	}
+	if (!kaimo_snapshot_open_how_readonly(how, &readonly_how)) {
+		DBG_WARNING("kaimo_bridge: OPENAT twrp write flags denied "
+			    "path=[%s] flags=0x%x\n",
+			    joined, how != NULL ? (unsigned)how->flags : 0);
+		TALLOC_FREE(frame);
+		return -1;
 	}
 
 	struct kaimo_conn_ctx *ctx = (struct kaimo_conn_ctx *)handle->data;
@@ -1326,7 +1442,8 @@ static int kaimo_openat(vfs_handle_struct *handle,
 	const char *leaf = smb_fname->base_name;
 	if (leaf != NULL && (strcmp(leaf, ".") == 0 || strcmp(leaf, "..") == 0)) {
 		TALLOC_FREE(frame);
-		return SMB_VFS_NEXT_OPENAT(handle, dirfsp, smb_fname, fsp, how);
+		return SMB_VFS_NEXT_OPENAT(
+			handle, dirfsp, smb_fname, fsp, &readonly_how);
 	}
 
 	char gmt[32];
@@ -1365,10 +1482,31 @@ static int kaimo_openat(vfs_handle_struct *handle,
 		return -1;
 	}
 
-	int fd = openat(AT_FDCWD, abspath, how->flags, how->mode);
+	/* Follow Samba 4.19.5's shadow_copy2 pattern: give the converted name to
+	 * the next VFS module instead of bypassing the stack with a raw syscall.
+	 * The absolute cache path is intentional and validated above; the default
+	 * openat implementation ignores dirfsp for an absolute base_name. */
+	struct smb_filename *snapshot_fname =
+		cp_smb_filename(frame, smb_fname);
+	if (snapshot_fname == NULL) {
+		TALLOC_FREE(frame);
+		errno = ENOMEM;
+		return -1;
+	}
+	snapshot_fname->base_name =
+		talloc_strdup(snapshot_fname, abspath);
+	if (snapshot_fname->base_name == NULL) {
+		TALLOC_FREE(frame);
+		errno = ENOMEM;
+		return -1;
+	}
+	snapshot_fname->twrp = 0;
+
+	int fd = SMB_VFS_NEXT_OPENAT(handle, dirfsp, snapshot_fname, fsp,
+				     &readonly_how);
 	if (fd < 0)
 		DBG_ERR("kaimo_bridge: OPENAT SNAPSHOT [%s@%s] flags=0x%x -> FAILED errno=%d\n",
-			logical, gmt, (unsigned)how->flags, errno);
+			logical, gmt, (unsigned)readonly_how.flags, errno);
 	else
 		DBG_INFO("kaimo_bridge: OPENAT SNAPSHOT [%s@%s] -> [%s] fd=%d\n",
 			 logical, gmt, abspath, fd);
@@ -1395,7 +1533,7 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 /* Build marker: bump on every module change so the running image can be
  * identified in the logs (grep "kaimo_bridge build"). This is how we tell whether
  * a rebuild actually picked up the latest source vs. served a cached layer. */
-#define KAIMO_BRIDGE_BUILD "2026-07-23f bounded VFS local I/O"
+#define KAIMO_BRIDGE_BUILD "2026-07-23g read-only stacked snapshots"
 
 static_decl_vfs;
 NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)

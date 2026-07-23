@@ -17,9 +17,12 @@ The most important conclusions are:
 1. No obvious direct stack overflow, heap overflow, use-after-free, or double-free was found during the static review. This is not a formal proof of C/C++ memory safety.
 2. The native connection sidecar now has bounded worker/descriptor growth,
    receive/send deadlines, and a count/byte-bounded authorization LRU.
-   Blocking client-side Unix-socket operations can still stall `smbd` workers.
+   VFS-side connect, complete request, and complete response I/O now also share
+   strict end-to-end deadlines.
 3. The complete open access mask and rename source/destination/replacement policy are now mapped to Kaimo permissions in source. Native runtime verification and several metadata/security operation checks remain open.
 4. Folder snapshot materialization now uses the existing per-file ACL filter and a reconciled per-user projection. Materialized bytes are stored in an isolated global cache outside every share; overlap is rejected by both the bridge and share synchronizer.
+   Timewarp access is read-only, mutation attempts fail with read-only
+   filesystem semantics, and cache opens pass through the remaining VFS stack.
 5. The local sidecar protocol is versioned and completely framed. Both ends
    handle partial I/O, and VFS-side connect/send/read now share strict monotonic
    end-to-end deadlines.
@@ -450,9 +453,21 @@ enqueue budget. Durable asynchronous event delivery remains P1-11.
 
 ### P1-06: Snapshot opens bypass the VFS stack and do not enforce read-only access
 
+> **Remediation status (2026-07-23): Implemented and verified against the
+> pinned Samba 4.19.5 build and a live SMB3 timewarp regression.**
+
 The timewarp branch skips normal `AuthorizeOpen`, then calls raw `openat(AT_FDCWD, absolutePath, how->flags, how->mode)`. This can preserve write/truncate/create flags and bypass `full_audit` or later VFS modules.
 
 **Fix:** reject all non-read access for timewarp paths, strip unsafe flags defensively, and redirect through the next VFS module using Samba-supported path/FSP handling. Verify behavior against Samba 4.19.5's own shadow-copy modules.
+
+**Implemented fix:** timewarp CREATE requests now accept only `FILE_OPEN`
+without mutating access, allocation, EA, security-descriptor, or
+delete-on-close intent. Granted rights are intersected with both the expanded
+client request and the snapshot read/execute mask. The low-level open rejects
+write/create/truncate/append flags, defensively rebuilds an `O_RDONLY`
+`vfs_open_how`, and calls `SMB_VFS_NEXT_OPENAT` with a validated synthetic
+snapshot filename. Disabled redirects fail closed instead of serving the live
+file. Timewarp delete, rename, and mkdir paths also return `EROFS`.
 
 ### P1-07: Snapshot materialization is non-atomic and only validates file size
 
@@ -1621,6 +1636,50 @@ strict end-to-end deadlines. Completed immediately afterward.
 **Next planned finding:** P1-06 — enforce strictly read-only snapshot opens
 without bypassing the remaining VFS stack.
 
+### 2026-07-23 — P1-06: Read-only, VFS-stack-safe timewarp access
+
+**Status:** Implemented; pinned Samba 4.19.5 compilation and live SMB3
+read/write/mutation regression verified.
+
+**Solution implemented**
+
+1. Rejects explicit write, append, EA/attribute write, delete, DACL/owner
+   change, generic-write/all, create/overwrite, delete-on-close, allocation,
+   EA, and security-descriptor intent before opening a timewarp object.
+2. Expands generic read/execute requests, supports `MAXIMUM_ALLOWED`, and
+   intersects the bridge grant with both the client's request and the fixed
+   read-only snapshot mask.
+3. Rejects mutating POSIX flags and passes a defensively sanitized `O_RDONLY`
+   `vfs_open_how` to the next layer.
+4. Replaced raw `openat(AT_FDCWD, ...)` with `SMB_VFS_NEXT_OPENAT` and a copied,
+   validated Samba filename, following the pinned `vfs_shadow_copy2` pattern.
+5. Returns `EROFS` for timewarp delete, rename, mkdir, and disabled snapshot
+   redirects, preventing fallback to live share content.
+6. Updated the module marker to
+   `2026-07-23g read-only stacked snapshots`.
+
+**Validation completed**
+
+- The real module compiles and links against Samba 4.19.5/ABI 49.
+- A live SMB3 regression reads historical bytes while the live file contains
+  different data.
+- The same regression proves overwrite, delete, rename, and mkdir attempts
+  receive `NT_STATUS_MEDIA_WRITE_PROTECTED`; both live and cached data remain
+  unchanged even though the cache file is POSIX-writable by the SMB user.
+- `full_audit`, placed after `kaimo_bridge`, records the successful historical
+  open, proving the redirect reaches the remaining VFS stack.
+- The existing stalled-sidecar SMB regression still fails closed within its
+  configured 300 ms budget, and `docker compose config --quiet` passes.
+
+**Validation still required / deliberately separate**
+
+- Exercise the Windows Explorer "Previous Versions" dialog and folder browsing
+  against representative production clients.
+- P1-07 remains open for atomic, content-verified materialization.
+
+**Next planned finding:** P1-07 — make snapshot materialization atomic and
+content-verified.
+
 ## 15. Source evidence index
 
 | Finding area | Primary source locations |
@@ -1636,7 +1695,7 @@ without bypassing the remaining VFS stack.
 | Framed local stream protocol / original partial I/O gap | `samba-vfs/module/local_protocol.h`; `vfs_kaimo_bridge.c` (`kaimo_roundtrip`, binary request builders and response parsers); `authd.cpp` (`handle_client`); `samba-vfs/tests/test-local-protocol.cpp`; `test-authd-protocol.py` |
 | Snapshot ACL filtering / original leak | `SmbBridge/Services/SnapshotGrpcService.cs` (`GetFolderSnapshotAsync`, per-user reconciliation); `Core/Services/File/FileService.cs:884-899` |
 | Snapshot cache isolation / original direct path | `SnapshotCache.cs`; `SnapshotGrpcService.cs` (`EnsureIsolatedFromShare`, cache-root-relative paths); `vfs_kaimo_bridge.c` (`kaimo_snapshot_cache_abspath`, reserved namespace checks); `sync-shares.sh`; `docker-compose.yml` |
-| Snapshot raw open | `vfs_kaimo_bridge.c:922-991` |
+| Snapshot read-only/VFS-stack enforcement | `vfs_kaimo_bridge.c` (`kaimo_snapshot_create_is_readonly`, `kaimo_snapshot_granted_access`, `kaimo_snapshot_open_how_readonly`, `kaimo_openat`); `samba-vfs/tests/test-vfs-snapshot-readonly.py` |
 | Snapshot materialization races | `SnapshotGrpcService.cs:288-317`; `SnapshotCacheCleanupService.cs` |
 | Disabled share lookup | `Infrastructure/Repositories/ShareRepository.cs:45-49`; bridge service share lookups |
 | Event reliability/TOCTOU | `vfs_kaimo_bridge.c:233-257`, `:665-919`; `FileEventGrpcService.cs`; `FileService.cs:341-400` |

@@ -450,7 +450,7 @@ container. Files already on disk were touched once at rollout to `g+rwX` and are
 
 ## Phase 5 — Snapshots (@GMT) & Cutover
 
-**Result: implemented (pending end-to-end validation in the Samba build).** Two parts:
+**Result: implemented and validated against the pinned Samba 4.19.5 build.** Two parts:
 
 ### @GMT "Previous Versions" over SMB
 
@@ -494,12 +494,19 @@ module does it via the bridge instead:
 - **C/C++:** `get_shadow_copy_data_fn` + `stat`/`lstat` + `create_file` twrp branch
   in [`vfs_kaimo_bridge.c`](module/vfs_kaimo_bridge.c); `SNAPENUM`/`SNAPRESOLVE`
   handlers in [`authd.cpp`](module/authd.cpp).
+- **Strict read-only behavior:** timewarp opens reject write/create/truncate/
+  append/delete-on-close and metadata mutation intent, attenuate granted access
+  to read/execute rights, and redirect through `SMB_VFS_NEXT_OPENAT`. Delete,
+  rename, and mkdir against a timewarp path fail with read-only-filesystem
+  semantics. Disabling the redirect fails closed rather than exposing live data.
 
-> **Validation status:** the .NET side is build- and unit-tested. The C VFS hooks
-> follow Samba's `shadow_copy2` conventions (ABI 49 timewarp model) but must be
-> exercised against the Samba source build and a real Windows "Previous Versions"
-> dialog; folder-level snapshot **browsing** over SMB (vs. file-level restore) may
-> need additional path hooks and is the most likely area to iterate.
+> **Validation status:** the .NET side is build- and unit-tested. The real C VFS
+> module compiles against Samba 4.19.5/ABI 49. A live SMB3 regression reads
+> historical content, observes the downstream `full_audit` hook, and proves
+> overwrite, delete, rename, and mkdir return `NT_STATUS_MEDIA_WRITE_PROTECTED`
+> without changing live or cached bytes. The Windows Explorer "Previous
+> Versions" dialog and representative folder browsing remain manual production
+> compatibility checks.
 
 ### Cutover
 

@@ -116,7 +116,7 @@ services:
       KAIMO_AUTHD_CACHE_TTL_MS: ${KAIMO_AUTHD_CACHE_TTL_MS:-3000}
       # @GMT "Previous Versions" data-path redirect (openat hook). "1" = on (serve the
       # materialized version copy). Set to "0" to disable the redirect at runtime
-      # (no rebuild) if it ever misbehaves — snapshots then fall back to broken/live.
+      # (no rebuild) if it ever misbehaves; timewarp opens then fail closed.
       KAIMO_SNAPSHOT_OPENAT: "1"
       # Must match Snapshots__Cache__RootPath in kaimo_smb_bridge. This global
       # directory is a sibling of share roots and is never published by Samba.

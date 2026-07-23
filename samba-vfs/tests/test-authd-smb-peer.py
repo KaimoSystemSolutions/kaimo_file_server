@@ -15,6 +15,7 @@ from pathlib import Path
 ROOT = Path(f"/tmp/kaimo-authd-smb-peer-{os.getpid()}")
 RUNTIME_DIRECTORY = ROOT / "run"
 SOCKET_PATH = RUNTIME_DIRECTORY / "authz.sock"
+CREDENTIAL_DIRECTORY = ROOT / "credentials"
 SHARE_PATH = ROOT / "share"
 CONFIG_PATH = ROOT / "smb.conf"
 AUTHD_LOG = ROOT / "authd.log"
@@ -92,6 +93,14 @@ def main() -> int:
     RUNTIME_DIRECTORY.mkdir(mode=0o750)
     os.chown(RUNTIME_DIRECTORY, 0, group_gid)
     RUNTIME_DIRECTORY.chmod(0o750)
+    CREDENTIAL_DIRECTORY.mkdir(mode=0o700)
+    # The bridge endpoint is deliberately absent in this peer-identity test.
+    # Non-empty placeholders are enough to construct the unused TLS channel;
+    # the regression is about the authenticated local smbd -> authd hop.
+    for name in ("ca.crt", "authd.crt", "authd.key"):
+        (CREDENTIAL_DIRECTORY / name).write_text(
+            "unused peer-test credential\n", encoding="utf-8"
+        )
 
     CONFIG_PATH.write_text(
         "\n".join(
@@ -123,6 +132,13 @@ def main() -> int:
             "KAIMO_AUTHD_GROUP": GROUP,
             "KAIMO_AUTHD_PEER_EXECUTABLE": "/opt/samba/sbin/smbd",
             "KAIMO_BRIDGE_ADDR": "127.0.0.1:1",
+            "KAIMO_BRIDGE_CA_CERT": str(CREDENTIAL_DIRECTORY / "ca.crt"),
+            "KAIMO_BRIDGE_RUNTIME_CERT": str(
+                CREDENTIAL_DIRECTORY / "authd.crt"
+            ),
+            "KAIMO_BRIDGE_RUNTIME_KEY": str(
+                CREDENTIAL_DIRECTORY / "authd.key"
+            ),
             "KAIMO_AUTHD_WORKERS": "2",
             "KAIMO_AUTHD_QUEUE_CAPACITY": "8",
             "KAIMO_AUTHD_IO_TIMEOUT_MS": "1000",
@@ -196,7 +212,7 @@ def main() -> int:
     assert "rejected unauthorized local peer" not in authd_output, diagnostics
     assert "cannot claim user" not in authd_output, diagnostics
     assert (
-        "kaimo_bridge build [2026-07-23f bounded VFS local I/O]" in smbd_output
+        "kaimo_bridge build [2026-07-23g read-only stacked snapshots]" in smbd_output
     ), diagnostics
 
     print("live smbd/authd peer-identity test passed")
