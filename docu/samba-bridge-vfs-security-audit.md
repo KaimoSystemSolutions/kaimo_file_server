@@ -19,7 +19,9 @@ The most important conclusions are:
 3. The complete open access mask and rename source/destination/replacement policy are now mapped to Kaimo permissions in source. Native runtime verification and several metadata/security operation checks remain open.
 4. Folder snapshot materialization now uses the existing per-file ACL filter and a reconciled per-user projection. Materialized bytes are stored in an isolated global cache outside every share; overlap is rejected by both the bridge and share synchronizer.
 5. The local sidecar protocol is not safely framed and assumes one `read()`/`write()` is sufficient for a stream socket.
-6. The gRPC bridge exposes NT hashes and privileged control-plane functions over unauthenticated h2c on the shared Docker network.
+6. The gRPC control plane is now isolated on a dedicated internal network and
+   protected by mTLS, per-workload RPC allow-lists, and audited/rate-limited
+   hash export. Native/container runtime verification remains pending.
 7. Event delivery and synchronization are best-effort rather than durable. Failures can leave version, ACL, metadata, ownership, search, passdb, registry, and runtime state inconsistent.
 
 The system should be treated as a **working migration prototype with critical hardening work remaining**, not as a completed production security boundary.
@@ -342,6 +344,17 @@ If the cache must remain inside the share:
 8. Still required: compile against Samba 4.19.5 and run direct-path, overlap, timewarp browse/copy, rolling-upgrade legacy-cache, and multi-user tests. P1-06 remains open for strictly read-only timewarp flags and redirecting through the next VFS layer instead of raw `openat`.
 
 ### P0-07: The gRPC control plane is unauthenticated and exposes NT hashes
+
+> **Remediation status (2026-07-23): Implemented; managed tests, native
+> Samba-image build, and focused mTLS runtime checks verified. Full live SMB
+> regression remains pending.**
+> Compose now isolates the bridge on dedicated SMB-control and bridge-only database
+> networks. Kestrel requires a client certificate chaining to a private CA; all
+> C++ clients use TLS credentials. Separate `auth-sync`, `share-sync`,
+> `config-sync`, and `runtime` certificate identities are authorized against
+> exact RPC method allow-lists. `GetNtHash` is assigned to no current identity.
+> Bulk `ListUsers` export is fixed-window rate-limited and emits request,
+> completion, and rejection audit events without logging hashes or usernames.
 
 **Evidence**
 
@@ -1168,7 +1181,7 @@ Native verification remains unavailable in this environment: Docker is installed
 
 ### 2026-07-22 — P0-06: Isolated snapshot cache
 
-**Status:** Implemented in source; managed and structural checks verified; native build/runtime verification pending.
+**Status:** Implemented; managed/structural checks and the pinned native build verified; live SMB snapshot verification pending.
 
 **Solution implemented**
 
@@ -1207,11 +1220,75 @@ Native verification remains unavailable in this environment: Docker is installed
 
 **Validation still required**
 
-- Compile the VFS module, sidecar, and regenerated protobuf/gRPC stubs in the pinned Samba 4.19.5 image.
 - Run Windows/`smbclient` snapshot browse, copy, restore, direct `.kaimo-snapshots` access, cache/share-overlap, multi-user, and rolling-upgrade legacy-cache tests.
 - P1-06 remains open: timewarp access still needs strict read-only flag enforcement and a stack-safe alternative to raw `openat`.
 
 **Next planned finding:** P0-07 — authenticate and isolate the gRPC control plane and NT-hash export.
+
+### 2026-07-23 — P0-07: Authenticated and isolated gRPC control plane
+
+**Status:** Implemented; native build and focused mTLS runtime checks verified; full live SMB regression pending.
+
+**Solution implemented**
+
+1. Replaced every C++ `InsecureChannelCredentials` use with TLS credentials
+   loaded from read-only certificate/key mounts.
+2. Configured Kestrel for HTTP/2 over TLS with mandatory client certificates,
+   custom-root trust, client-auth EKU validation, and fail-fast startup when
+   certificate material is absent.
+3. Added four exact certificate roles: auth sync may call only `ListUsers`;
+   share sync only `ListShares`; config sync only `GetProtocolSettings`; the
+   runtime sidecar only authorization, event, and snapshot methods. No identity
+   currently receives `GetNtHash`.
+4. Added a non-queuing fixed-window limiter for bulk hash export (default two
+   calls per 60 seconds) plus request/completion/rejection audit logging that
+   excludes usernames and hash bytes.
+5. Split Compose connectivity into an internal `kaimo_smb_control` network and
+   a bridge-only `kaimo_bridge_database` network. PostgreSQL joins that segment
+   plus the separate application DB segment; the bridge shares no network with
+   Web, Adminer, or unrelated application containers.
+6. Mounted only the server key and public client CA into the bridge, and only
+   client identities/public CA into Samba. Web and Adminer receive none of the
+   control-plane material.
+7. Added a git-ignored local-PKI bootstrap script; production can supply
+   externally managed certificates through `KAIMO_SMB_CONTROL_PKI`.
+8. Updated the native build marker to
+   `2026-07-23a authenticated control plane` and replaced the P0-06 reserved
+   namespace's forbidden libc `strncasecmp` call with Samba's `strnequal`, as
+   discovered by the pinned native build.
+
+**Validation completed**
+
+- Focused P0-07 managed suite: 4 passed, 0 failed, 0 skipped; full managed
+  suite: 528 passed, 0 failed, 0 skipped.
+- The pinned Samba 4.19.5 image builds successfully, including all four mTLS
+  C++ clients and the VFS module.
+- A local bridge started on TLS port 5080 with generated development
+  credentials. Auth, share, and config identities completed their allowed RPCs.
+  Presenting the share-sync identity to `ListUsers` returned
+  `PERMISSION_DENIED`.
+- Two immediate hash exports succeeded; the third returned
+  `RESOURCE_EXHAUSTED`. Bridge audit logs recorded request, completion,
+  wrong-role rejection, and rate-limit rejection without usernames or hash
+  bytes.
+- `docker compose config --quiet` succeeds with the isolated network and
+  credential mount topology. Resolved topology checks show the bridge shares
+  zero networks with Web and Adminer, while retaining its Samba-control and
+  bridge-only PostgreSQL paths.
+- Structural search finds no remaining native
+  `grpc::InsecureChannelCredentials()` usage.
+- `git diff --check` reports no whitespace errors.
+
+**Validation still required**
+
+- Verify untrusted/missing-certificate handshake failure explicitly and test
+  production-issued certificate material and rotation.
+- Exercise live NTLM login, ACL, event, share/config sync, and snapshot paths
+  over the authenticated channel.
+- Define certificate issuance, rotation, revocation, and expiry monitoring for
+  the production orchestrator. Bridge high availability remains separate work.
+
+**Next planned finding:** P1-01 — bound sidecar threads and open Unix-socket clients.
 
 ## 15. Source evidence index
 
@@ -1233,7 +1310,7 @@ Native verification remains unavailable in this environment: Docker is installed
 | Rename duplicate destruction | `Infrastructure/Repositories/FileVersionRepository.cs:142-178` |
 | Insecure hash temp file | `samba-vfs/sync-users.sh:17-49` |
 | Sync error handling | `sync-users.sh`, `sync-shares.sh`, `sync-config.sh` |
-| Unauthenticated h2c | `SmbBridge/Program.cs:28-40`; `authd.cpp` and sync clients; `docker-compose.yml` |
+| Authenticated gRPC control plane / original h2c gap | `SmbBridge/Program.cs`; `SmbBridge/Security/*`; `AuthGrpcService.cs`; `bridge_channel.h` and native clients; `docker-compose.yml` |
 
 ## 16. Final assessment
 

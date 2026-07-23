@@ -17,10 +17,12 @@ services:
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.Host/Dockerfile
+    networks:
+      - default
+      - kaimo_database
 
-  # Phase 1: gRPC control plane for Samba. Provides (for now) NT hashes of
-  # Kaimo users from the DB so Samba can check NTLMv2 locally.
-  # Only internally reachable (no port exposed), h2c on :5080.
+  # Samba gRPC control plane. It is reachable only from Samba through the
+  # dedicated internal control network and requires mutually authenticated TLS.
   kaimo_smb_bridge:
     image: ${DOCKER_REGISTRY-}kaimosmbbridge
     container_name: kaimo_smb_bridge
@@ -36,6 +38,14 @@ services:
       Snapshots__Cache__RootPath: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/storage/.kaimo-snapshots}
     volumes:
       - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
+      # Mount only the server identity and public client CA. Client private
+      # keys are available exclusively in the Samba container.
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/ca.crt:/run/secrets/kaimo_bridge_ca.crt:ro
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/server.crt:/run/secrets/kaimo_bridge_server.crt:ro
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/server.key:/run/secrets/kaimo_bridge_server.key:ro
+    networks:
+      - kaimo_bridge_database
+      - kaimo_smb_control
 
   # Real Samba (smbd) + custom VFS module (kaimo_bridge) — the SMB protocol layer
   # since the Phase 5 cutover. It fully replaces the former in-process .NET SMB
@@ -59,6 +69,16 @@ services:
     volumes:
       # Same storage as Host/Web -> Samba performs file I/O directly.
       - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
+      # Separate client identities enforce least privilege per RPC group.
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/ca.crt:/run/secrets/kaimo_bridge_ca.crt:ro
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/auth-sync.crt:/run/secrets/kaimo_bridge_auth_sync.crt:ro
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/auth-sync.key:/run/secrets/kaimo_bridge_auth_sync.key:ro
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/share-sync.crt:/run/secrets/kaimo_bridge_share_sync.crt:ro
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/share-sync.key:/run/secrets/kaimo_bridge_share_sync.key:ro
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/config-sync.crt:/run/secrets/kaimo_bridge_config_sync.crt:ro
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/config-sync.key:/run/secrets/kaimo_bridge_config_sync.key:ro
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/runtime.crt:/run/secrets/kaimo_bridge_runtime.crt:ro
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/runtime.key:/run/secrets/kaimo_bridge_runtime.key:ro
     build:
       context: ./samba-vfs
       dockerfile: Dockerfile.vfs
@@ -78,6 +98,9 @@ services:
       # Must match Snapshots__Cache__RootPath in kaimo_smb_bridge. This global
       # directory is a sibling of share roots and is never published by Samba.
       KAIMO_SNAPSHOT_CACHE_ROOT: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/storage/.kaimo-snapshots}
+    networks:
+      - default
+      - kaimo_smb_control
     healthcheck:
       test: ["CMD-SHELL", "/opt/samba/bin/smbclient -L localhost -U kaimotest%Passw0rd! -m SMB3 >/dev/null 2>&1 || exit 1"]
       interval: 15s
@@ -114,6 +137,9 @@ services:
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.Web/Dockerfile
+    networks:
+      - default
+      - kaimo_database
 
   kaimo_file_server_db:
     container_name: kaimo_file_server_db
@@ -132,6 +158,9 @@ services:
       interval: 2s
       timeout: 5s
       retries: 10
+    networks:
+      - kaimo_database
+      - kaimo_bridge_database
       
   #elasticsearch:
   #  container_name: kaimo_elasticsearch
@@ -171,5 +200,17 @@ services:
     restart: always
     ports:
       - 8080:8080
-  
-
+    networks:
+      - default
+      - kaimo_database
+networks:
+  # No unrelated application service is attached to the gRPC control plane.
+  kaimo_smb_control:
+    internal: true
+  # The bridge reaches PostgreSQL without joining the general application net.
+  kaimo_database:
+    internal: true
+  # Point-to-point trust segment: only PostgreSQL and the SMB bridge join it.
+  # Web/Adminer cannot route to the bridge through their DB segment.
+  kaimo_bridge_database:
+    internal: true

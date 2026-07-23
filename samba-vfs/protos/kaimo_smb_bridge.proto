@@ -11,7 +11,8 @@ option csharp_namespace = "Kaimo_File_Server.SmbBridge.Grpc";
 // (IAuthenticationLookup); Samba receives only the NT-Hashes for local
 // NTLMv2 verification.
 service AuthService {
-  // Single retrieval of NT-Hash (for a future On-Demand pdb module).
+  // Reserved for a future on-demand passdb integration. P0-07 deliberately
+  // assigns this method to no current workload identity.
   rpc GetNtHash(GetNtHashRequest) returns (GetNtHashReply);
 
   // All active users + NT-Hash for tdbsam sync (Phase 1).
@@ -221,10 +222,10 @@ service SnapshotService {
   // only returned when the user may read the path (ListReadData parity).
   rpc EnumerateSnapshots(EnumerateSnapshotsRequest) returns (EnumerateSnapshotsReply);
 
-  // Materialize one version (decompressed) into a cache file INSIDE the share
-  // directory and return its share-relative path + size. The module redirects
-  // the @GMT open/stat there and serves it natively (data path stays native,
-  // just like live files). Idempotent: an already-materialized version is reused.
+  // Materialize one version (decompressed) in the isolated global cache and
+  // return its cache-root-relative path + size. The module redirects the @GMT
+  // open/stat there and serves it natively. Idempotent: an already-materialized
+  // version is reused.
   rpc ResolveVersion(ResolveVersionRequest) returns (ResolveVersionReply);
 }
 

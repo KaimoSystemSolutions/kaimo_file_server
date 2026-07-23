@@ -457,7 +457,7 @@ static bool kaimo_is_reserved_client_path(vfs_handle_struct *handle,
 	while (logical[0] == '.' && logical[1] == '/') logical += 2;
 	while (logical[0] == '/') logical++;
 	size_t reserved_len = strlen(KAIMO_LEGACY_CACHE_DIR);
-	return strncasecmp(logical, KAIMO_LEGACY_CACHE_DIR, reserved_len) == 0 &&
+	return strnequal(logical, KAIMO_LEGACY_CACHE_DIR, reserved_len) &&
 	       (logical[reserved_len] == '\0' || logical[reserved_len] == '/');
 }
 
@@ -1259,7 +1259,7 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 /* Build marker: bump on every module change so the running image can be
  * identified in the logs (grep "kaimo_bridge build"). This is how we tell whether
  * a rebuild actually picked up the latest source vs. served a cached layer. */
-#define KAIMO_BRIDGE_BUILD "2026-07-22e isolated snapshot cache"
+#define KAIMO_BRIDGE_BUILD "2026-07-23a authenticated control plane"
 
 static_decl_vfs;
 NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)

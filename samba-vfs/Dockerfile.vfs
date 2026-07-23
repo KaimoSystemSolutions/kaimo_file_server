@@ -136,6 +136,7 @@ COPY module/authsync.cpp ./
 COPY module/authd.cpp ./
 COPY module/sharesync.cpp ./
 COPY module/configsync.cpp ./
+COPY module/bridge_channel.h ./
 RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
     && protoc --grpc_out=. --plugin=protoc-gen-grpc="$(which grpc_cpp_plugin)" kaimo_smb_bridge.proto \
     && g++ -std=c++17 -O2 \

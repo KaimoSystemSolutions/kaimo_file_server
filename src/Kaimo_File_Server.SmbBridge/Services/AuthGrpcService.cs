@@ -3,6 +3,7 @@ using Grpc.Core;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.SmbBridge.Grpc;
+using Kaimo_File_Server.SmbBridge.Security;
 
 namespace Kaimo_File_Server.SmbBridge.Services;
 
@@ -15,15 +16,18 @@ public sealed class AuthGrpcService : AuthService.AuthServiceBase
 {
     private readonly IAuthenticationLookup _auth;
     private readonly IUserRepository _users;
+    private readonly HashExportRateLimiter _rateLimiter;
     private readonly ILogger<AuthGrpcService> _logger;
 
     public AuthGrpcService(
         IAuthenticationLookup auth,
         IUserRepository users,
+        HashExportRateLimiter rateLimiter,
         ILogger<AuthGrpcService> logger)
     {
         _auth = auth;
         _users = users;
+        _rateLimiter = rateLimiter;
         _logger = logger;
     }
 
@@ -44,6 +48,31 @@ public sealed class AuthGrpcService : AuthService.AuthServiceBase
     public override async Task<ListUsersReply> ListUsers(
         ListUsersRequest request, ServerCallContext context)
     {
+        string clientId =
+            context.GetHttpContext().Items.TryGetValue(
+                ControlPlaneAuthorizationInterceptor.ClientIdItemKey,
+                out object? value)
+            && value is string authenticatedClient
+                ? authenticatedClient
+                : "unknown";
+
+        if (!_rateLimiter.TryAcquire(clientId, out TimeSpan retryAfter))
+        {
+            _logger.LogWarning(
+                "NT-hash export rate limit exceeded for control-plane client {ClientId}; retry after {RetryAfterMs} ms.",
+                clientId,
+                Math.Ceiling(retryAfter.TotalMilliseconds));
+            context.ResponseTrailers.Add(
+                "retry-after-ms",
+                Math.Max(0, (long)Math.Ceiling(retryAfter.TotalMilliseconds)).ToString());
+            throw new RpcException(new Status(
+                StatusCode.ResourceExhausted,
+                "NT-hash export rate limit exceeded."));
+        }
+
+        _logger.LogInformation(
+            "NT-hash export requested by control-plane client {ClientId}.",
+            clientId);
         var reply = new ListUsersReply();
 
         foreach (var user in await _users.GetAllAsync())
@@ -61,7 +90,10 @@ public sealed class AuthGrpcService : AuthService.AuthServiceBase
             });
         }
 
-        _logger.LogInformation("ListUsers: {Count} active users exported.", reply.Users.Count);
+        _logger.LogInformation(
+            "NT-hash export completed for control-plane client {ClientId}: {Count} active users.",
+            clientId,
+            reply.Users.Count);
         return reply;
     }
 }

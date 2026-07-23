@@ -1,7 +1,9 @@
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Search;
+using Kaimo_File_Server.SmbBridge.Security;
 using Kaimo_File_Server.SmbBridge.Services;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 
 // Kaimo SMB Bridge: lean gRPC control plane for the Samba container.
@@ -25,18 +27,37 @@ builder.Services.AddCoreServices(storagePath);
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<IConfigRepository, ConfigRepository>();
 
-builder.Services.AddGrpc();
+var controlPlaneTls = ControlPlaneTls.Load(builder.Configuration);
+builder.Services.AddSingleton(controlPlaneTls);
+builder.Services.AddSingleton<ControlPlaneAuthorizationInterceptor>();
+builder.Services.Configure<HashExportRateLimitOptions>(
+    builder.Configuration.GetSection(HashExportRateLimitOptions.SectionName));
+builder.Services.AddSingleton<HashExportRateLimiter>();
+builder.Services.AddGrpc(options =>
+    options.Interceptors.Add<ControlPlaneAuthorizationInterceptor>());
 
 // Phase 5 hardening: bound the isolated @GMT snapshot materialization cache
 // (<cache-root>/<share-id>) so it cannot grow without limit. Evicts by age
 // (Snapshots:Cache:TtlHours) and per-share size cap (Snapshots:Cache:MaxBytesPerShare).
 builder.Services.AddHostedService<SnapshotCacheCleanupService>();
 
-// gRPC over HTTP/2 in plaintext (h2c) on internal Docker network — no TLS needed,
-// the bridge is not exposed externally.
+// The bridge is reachable only on its dedicated Compose control network, and
+// every connection must also present a client certificate issued by the
+// dedicated control-plane CA. Authorization is narrowed per certificate role
+// by ControlPlaneAuthorizationInterceptor.
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.ListenAnyIP(5080, listen => listen.Protocols = HttpProtocols.Http2);
+    options.ListenAnyIP(5080, listen =>
+    {
+        listen.Protocols = HttpProtocols.Http2;
+        listen.UseHttps(https =>
+        {
+            https.ServerCertificate = controlPlaneTls.ServerCertificate;
+            https.ClientCertificateMode = ClientCertificateMode.RequireCertificate;
+            https.ClientCertificateValidation =
+                controlPlaneTls.ValidateClientCertificate;
+        });
+    });
 });
 
 var app = builder.Build();
@@ -47,6 +68,6 @@ app.MapGrpcService<FileEventGrpcService>();  // Phase 3: Close-Hooks (Version/In
 app.MapGrpcService<ShareGrpcService>();      // Phase 4: Share-Provisioning (ListShares -> net conf)
 app.MapGrpcService<ConfigGrpcService>();     // Phase 4: Protokoll-Settings (GetProtocolSettings -> net conf global) + Enabled-Flag (Phase 5)
 app.MapGrpcService<SnapshotGrpcService>();   // Phase 5: ACL-filtered @GMT snapshots/materialization
-app.MapGet("/", () => "Kaimo SMB Bridge (gRPC/h2c on :5080). Use a gRPC client.");
+app.MapGet("/", () => "Kaimo SMB Bridge (mutually authenticated gRPC on :5080).");
 
 app.Run();

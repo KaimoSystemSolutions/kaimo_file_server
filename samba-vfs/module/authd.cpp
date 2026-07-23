@@ -44,6 +44,7 @@
 #include <unistd.h>
 
 #include <grpcpp/grpcpp.h>
+#include "bridge_channel.h"
 #include "kaimo_smb_bridge.grpc.pb.h"
 
 using namespace kaimo::smb::bridge::v1;
@@ -321,7 +322,18 @@ int main() {
     const char* sock_env = std::getenv("KAIMO_AUTHD_SOCK");
     std::string sock_path = sock_env ? sock_env : "/var/run/kaimo/authz.sock";
 
-    auto channel = grpc::CreateChannel(g_bridge_addr, grpc::InsecureChannelCredentials());
+    std::shared_ptr<grpc::Channel> channel;
+    try {
+        channel = kaimo::control_plane::create_mtls_channel(
+            g_bridge_addr,
+            "KAIMO_BRIDGE_RUNTIME_CERT",
+            "/run/secrets/kaimo_bridge_runtime.crt",
+            "KAIMO_BRIDGE_RUNTIME_KEY",
+            "/run/secrets/kaimo_bridge_runtime.key");
+    } catch (const std::exception& error) {
+        std::cerr << "kaimo_authd: " << error.what() << std::endl;
+        return 1;
+    }
     g_authz = AuthzService::NewStub(channel);
     g_events = EventService::NewStub(channel);
     g_snapshot = SnapshotService::NewStub(channel);

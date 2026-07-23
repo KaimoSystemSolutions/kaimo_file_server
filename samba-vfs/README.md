@@ -96,7 +96,7 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
 **Flow:**
 
 ```
- Kaimo-DB ──► SmbBridge (.NET gRPC, :5080 h2c) ──gRPC ListUsers──► kaimo_authsync (C++)
+ Kaimo-DB ──► SmbBridge (.NET gRPC, :5080 mTLS) ──gRPC ListUsers──► kaimo_authsync (C++)
                  IAuthenticationLookup.GetNtHashAsync                 │  username + NT hash
                  (decrypted, filters disabled/empty)                  ▼
                                                           sync-users.sh ──pdbedit──► Samba's tdbsam
@@ -112,6 +112,14 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
   Samba container** — the last open toolchain risk from Phase 0.
 - **Proto contract:** [`protos/kaimo_smb_bridge.proto`](protos/kaimo_smb_bridge.proto) — defined once,
   generates C# (Bridge) and C++ stubs (authsync).
+- **P0-07 control-plane security:** the bridge accepts only client certificates
+  from its private CA. Four client identities have exact RPC allow-lists:
+  `kaimo-auth-sync` (bulk hash sync only), `kaimo-share-sync`, `kaimo-config-sync`,
+  and `kaimo-samba-runtime` (authorization/events/snapshots). `GetNtHash` is
+  intentionally assigned to no current identity. Bulk hash exports are
+  rate-limited and audited without logging hashes or usernames. Compose places
+  bridge/Samba on a dedicated internal network and mounts no control-plane
+  credentials into Web or Adminer.
 
 **Test (short form):**
 ```bash
@@ -462,13 +470,16 @@ The spike is integrated as service `kaimo_samba` in the central [`../docker-comp
 
 ```bash
 cd ..                       # into the docker-compose.yml directory
+sh samba-vfs/generate-control-plane-certs.sh
 docker compose up -d kaimo_samba          # Samba only
 # or everything together:
 docker compose up -d
 ```
 
-- **Port:** host port **1445** → container 445 (the .NET host keeps 445 for now; on cutover in
-  Phase 5, Samba takes 445).
+- **PKI:** local certificates default to `./secrets/smb-control-plane` and are
+  git-ignored. Production should set `KAIMO_SMB_CONTROL_PKI` to an externally
+  managed directory and rotate the private CA/leaf identities operationally.
+- **Port:** Samba owns host/container port **445** after the Phase-5 cutover.
 - **Storage:** same bind mount `./tests/data/storage:/data/storage` as host/web → Samba does file I/O directly.
 - **Healthcheck:** reports `healthy` once `smbd` accepts connections.
 

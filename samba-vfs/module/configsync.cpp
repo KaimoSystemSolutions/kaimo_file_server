@@ -1,6 +1,6 @@
 // kaimo_configsync - gRPC C++ client for protocol settings (Phase 4).
 //
-// Calls GetProtocolSettings on the .NET bridge (h2c) and outputs ONE tab-separated
+// Calls GetProtocolSettings on the .NET bridge over mTLS and outputs ONE tab-separated
 // line to stdout:
 //   "min<TAB>max<TAB>signing(0|1)<TAB>encrypt(0|1)<TAB>enabled(0|1)<TAB>wsdd(0|1)<TAB>audit(0|1)"
 // The mapping to Samba (net conf setparm global, wsdd daemon, full_audit VFS) is
@@ -15,6 +15,7 @@
 #include <string>
 
 #include <grpcpp/grpcpp.h>
+#include "bridge_channel.h"
 #include "kaimo_smb_bridge.grpc.pb.h"
 
 using kaimo::smb::bridge::v1::ConfigService;
@@ -25,7 +26,18 @@ int main() {
     const char* addr_env = std::getenv("KAIMO_BRIDGE_ADDR");
     std::string addr = addr_env ? addr_env : "kaimo_smb_bridge:5080";
 
-    auto channel = grpc::CreateChannel(addr, grpc::InsecureChannelCredentials());
+    std::shared_ptr<grpc::Channel> channel;
+    try {
+        channel = kaimo::control_plane::create_mtls_channel(
+            addr,
+            "KAIMO_BRIDGE_CONFIG_SYNC_CERT",
+            "/run/secrets/kaimo_bridge_config_sync.crt",
+            "KAIMO_BRIDGE_CONFIG_SYNC_KEY",
+            "/run/secrets/kaimo_bridge_config_sync.key");
+    } catch (const std::exception& error) {
+        std::cerr << "kaimo_configsync: " << error.what() << std::endl;
+        return 1;
+    }
     std::unique_ptr<ConfigService::Stub> stub = ConfigService::NewStub(channel);
 
     grpc::ClientContext ctx;

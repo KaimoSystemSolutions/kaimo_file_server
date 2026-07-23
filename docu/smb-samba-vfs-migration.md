@@ -198,7 +198,7 @@ C++ translation unit with `extern "C"` shim. Since the control plane is **low-fr
 | **2b — Path ACL** ⚠️ | VFS `create_file` → `AuthorizeOpen` with complete access masks; `unlinkat` → `AuthorizeDelete`; `renameat` → `AuthorizeRename` for source/destination/replacement; `readdir` uses listing-only checks | Complete open/delete/rename policy is implemented and managed-tested; native Samba runtime verification of P0-03/P0-04 remains pending |
 | **3 — Close Hooks** ✅ | `close`/`unlinkat`/`renameat`/`mkdirat` → Sidecar → gRPC `EventService` → `FileService.NotifyExternal*` (versioning, ownership, search index, ACL realign) | Parity to `FileSession.DisposeAsync` — **works** (versioning/ownership verified; see [`../samba-vfs/README.md`](../samba-vfs/README.md)) |
 | **4 — Dyn. Shares & Visibility** ✅ | ShareControl sync (`ListShares` → `kaimo_sharesync` → `sync-shares.sh` → `net conf`) ✅; ABE = **hidden flag only** (`browseable`) ✅; Protocol settings from `ISmbConfigStore` (`GetProtocolSettings` → `kaimo_configsync` → `sync-config.sh` → `net conf setparm global`) ✅ | dynamic shares + protocol config live — **works** |
-| **5 — Snapshots & Cutover** ⚠️ | @GMT snapshots via `get_shadow_copy_data` + timewarp resolve; folder projections use `IFileService` per-file ACL filtering; materialized content lives in an isolated global cache partitioned by share/user; `enable/disable SMB` is enforced by the bridge; the old SMB library is removed | P0-05/P0-06 fixed in source and managed/structurally tested; live SMB/native verification and P1 snapshot hardening remain |
+| **5 — Snapshots & Cutover** ⚠️ | @GMT snapshots via `get_shadow_copy_data` + timewarp resolve; folder projections use `IFileService` per-file ACL filtering; materialized content lives in an isolated global cache partitioned by share/user; the gRPC control plane uses an isolated network, mTLS client identities, RPC allow-lists, and audited/rate-limited hash export; `enable/disable SMB` is enforced by the bridge; the old SMB library is removed | P0-05/P0-06/P0-07 fixed in source and managed/structurally tested; live SMB/native verification and P1 snapshot hardening remain |
 
 ---
 
@@ -255,9 +255,12 @@ module matches the source.
   previously **allowed** on infrastructure error unless `KAIMO_AUTHZ_FAILCLOSED=1`;
   the sidecar dials the bridge with `InsecureChannelCredentials()` (plaintext, no
   mTLS). A bridge outage meant *every* access was granted.
-  **Status: partially fixed 2026-07-19** — default flipped to **fail-closed**
-  (`KAIMO_AUTHZ_FAILOPEN=1` restores the old behavior); `compose` sets it
-  explicitly. mTLS on the gRPC channel and bridge redundancy remain open.
+  **Status: transport/authentication fixed 2026-07-23; redundancy remains.**
+  The default is fail-closed (`KAIMO_AUTHZ_FAILOPEN=1` is the explicit emergency
+  override); Compose sets fail-closed, isolates Samba/bridge on a private control
+  network, and keeps bridge DB access on a bridge-only internal DB network. All C++
+  clients use mTLS. Distinct certificate identities are restricted to their
+  exact RPC groups, while bulk NT-hash export is rate-limited and audited.
 
 - **#1 (A.1) — @GMT snapshots: verified end-to-end (2026-07-19).** Live Windows +
   `smbclient` testing now confirms the full path: file- and folder-level "Previous
