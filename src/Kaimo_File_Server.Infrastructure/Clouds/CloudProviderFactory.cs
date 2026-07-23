@@ -11,30 +11,17 @@ public class CloudProviderFactory : ICloudProviderFactory
     {
         _configuration = configuration;
     }
-    
-    public ICloudConnection Create(ShareDefinition share)
+
+    public ICloudConnection Create(Guid shareId, SyncedFolder folder)
     {
-        if (share.CloudSettings is null)
-            throw new InvalidOperationException("No cloud configured");
-
-
-        var settings =
-            CloudSettings.Deserialize(share.CloudSettings);
-
-
-        return settings.Provider switch
+        ICloudConnection connection = folder.Provider.ToLowerInvariant() switch
         {
-            "google" => new GoogleDriveConnection(
-                share,
-                _configuration),
-
-            /*
-            "dropbox" => new DropboxConnection(
-                share,
-                _configuration),
-            */
+            "google" => new GoogleDriveConnection(shareId, folder.Data, _configuration),
             _ => throw new NotSupportedException(
-                settings.Provider)
+                $"Cloud provider '{folder.Provider}' is not supported yet.")
         };
+
+        folder.Connection = connection;
+        return connection;
     }
 }

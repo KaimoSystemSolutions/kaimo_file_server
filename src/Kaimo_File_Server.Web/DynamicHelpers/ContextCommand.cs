@@ -59,6 +59,9 @@ public static class ContextCommandCatalog
     {
         new ContextCommand("open", () => Resources.Context_Menu_Open, "arrow_right.svg",
             ValidScopes: AllSingle),
+        
+        new ContextCommand("sync", () => "Sync", "arrow_right.svg",
+            ValidScopes: new [] { ContextMenuScope.Folder}),
 
         new ContextCommand("extract", () => Resources.Context_Menu_Extract, "file_zip.svg",
             ValidScopes: new[] { ContextMenuScope.Archive, ContextMenuScope.MultiSelection }),

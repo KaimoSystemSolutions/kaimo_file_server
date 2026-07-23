@@ -1,12 +1,9 @@
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
-using Google.Apis.Auth.OAuth2;
-using Google.Apis.Auth.OAuth2.Flows;
-using Google.Apis.Auth.OAuth2.Requests;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Infrastructure.Clouds;
-using Kaimo_File_Server.Web.Components.ViewModels;
 
 namespace Kaimo_File_Server.Web.Controllers;
 
@@ -30,8 +27,25 @@ public class GoogleOAuthController : ControllerBase
 
 
     [HttpGet("connect")]
-    public IActionResult Connect(Guid shareId)
+    public async Task<IActionResult> Connect(Guid shareId, string? path)
     {
+        var normalizedPath = CloudSyncPaths.Normalize(path);
+
+        var share = await _shareRepository.GetByIdAsync(shareId);
+        if (share is null)
+            return NotFound("Share not found");
+
+        var settings = CloudSyncPaths.ParseSettings(share.CloudSettings);
+
+        var conflict = CloudSyncPaths.FindConflict(settings, normalizedPath);
+        if (conflict is not null)
+        {
+            return BadRequest(
+                conflict == normalizedPath
+                    ? "This folder is already synced."
+                    : $"This conflicts with the already-synced folder '{conflict}'.");
+        }
+
         var clientId = _configuration["GoogleOAuth:ClientId"]!;
 
         var redirectUri =
@@ -41,6 +55,7 @@ public class GoogleOAuthController : ControllerBase
                 null,
                 Request.Scheme)!;
 
+        var state = CloudSyncPaths.EncodeState(shareId, normalizedPath);
 
         var authUrl =
             "https://accounts.google.com/o/oauth2/v2/auth" +
@@ -49,11 +64,10 @@ public class GoogleOAuthController : ControllerBase
             $"&client_id={clientId}" +
             $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
             "&response_type=code" +
-            $"&state={shareId}" +
+            $"&state={Uri.EscapeDataString(state)}" +
             "&scope=" +
             Uri.EscapeDataString(
                 "https://www.googleapis.com/auth/drive");
-
 
         return Redirect(authUrl);
     }
@@ -62,6 +76,12 @@ public class GoogleOAuthController : ControllerBase
     [HttpGet("callback")]
     public async Task<IActionResult> Callback(string code, string state)
     {
+        var decodedState = CloudSyncPaths.DecodeState(state);
+        if (decodedState is null)
+            return BadRequest("Invalid state");
+
+        var (shareId, path) = decodedState.Value;
+
         var clientId = _configuration["GoogleOAuth:ClientId"]!;
         var clientSecret = _configuration["GoogleOAuth:ClientSecret"]!;
 
@@ -97,30 +117,99 @@ public class GoogleOAuthController : ControllerBase
 
         var token = await GoogleTokenResponse
             .FromHttpResponse(response.Content);
-        
-        if (!Guid.TryParse(state, out var shareId))
-            return BadRequest("Invalid state");
 
-        ShareDefinition? share = await _shareRepository.GetByIdAsync(shareId);
+        var share = await _shareRepository.GetByIdAsync(shareId);
 
         if (share is null)
             return Redirect("/");
 
-        var settings = new CloudSettings(
-            "google", new()
+        var settings = CloudSyncPaths.ParseSettings(share.CloudSettings);
+
+        // Re-check for conflicts: the share may have changed while the user
+        // was over on Google's consent screen (e.g. an ancestor folder got
+        // synced by someone else in the meantime).
+        var conflict = CloudSyncPaths.FindConflict(settings, path);
+        if (conflict is not null && conflict != path)
+        {
+            var msg = Uri.EscapeDataString(
+                $"'{path}' now conflicts with the already-synced folder '{conflict}'. " +
+                "Nothing was connected.");
+            return Redirect($"/?syncError={msg}");
+        }
+
+        // Append/overwrite this folder's entry; leaves every other synced
+        // folder on the share untouched.
+        settings.Folders[path] = new SyncedFolder(
+            "google",
+            new Dictionary<string, string>
             {
                 ["refreshToken"] = token.RefreshToken,
                 ["scope"] = token.Scope,
             });
 
         share.CloudSettings = settings.Serialize();
-        share.CloudConnection = _cloudFactory.Create(share);
         await _shareRepository.UpdateAsync(share);
-        
+
         var encoded = Uri.EscapeDataString(share.Name);
         return Redirect($"/?successfulConnection={encoded}");
     }
-    
+
+
+    [HttpPost("disconnect")]
+    public async Task<IActionResult> Disconnect(Guid shareId, [FromQuery] string? path)
+    {
+        var normalizedPath = CloudSyncPaths.Normalize(path);
+
+        var share = await _shareRepository.GetByIdAsync(shareId);
+        if (share is null)
+            return NotFound("Share not found");
+
+        var settings = CloudSyncPaths.ParseSettings(share.CloudSettings);
+
+        if (!settings.Folders.Remove(normalizedPath))
+            return NotFound("This folder is not synced.");
+
+        share.CloudSettings = settings.Serialize();
+        await _shareRepository.UpdateAsync(share);
+
+        return Ok();
+    }
+
+
+    [HttpGet("status")]
+    public async Task<IActionResult> Status(Guid shareId, [FromQuery] string? path)
+    {
+        var normalizedPath = CloudSyncPaths.Normalize(path);
+
+        var share = await _shareRepository.GetByIdAsync(shareId);
+        if (share is null)
+            return NotFound("Share not found");
+
+        var settings = CloudSyncPaths.ParseSettings(share.CloudSettings);
+
+        if (settings.Folders.TryGetValue(normalizedPath, out var exact))
+            return Ok(new { path = normalizedPath, relation = "exact", provider = exact.Provider });
+
+        var conflict = CloudSyncPaths.FindConflict(settings, normalizedPath);
+        if (conflict is not null)
+        {
+            var relation = CloudSyncPaths.IsSameOrAncestor(conflict, normalizedPath)
+                ? "ancestor-synced"   // this folder lives inside an already-synced folder
+                : "descendant-synced"; // an already-synced folder lives inside this one
+
+            return Ok(new
+            {
+                path = normalizedPath,
+                relation,
+                conflictPath = conflict,
+                provider = settings.Folders[conflict].Provider
+            });
+        }
+
+        return Ok(new { path = normalizedPath, relation = "none" });
+    }
+
+
     internal sealed class GoogleTokenResponse
     {
         public string AccessToken { get; init; } = null!;
@@ -145,5 +234,4 @@ public class GoogleOAuthController : ControllerBase
             };
         }
     }
-    
 }

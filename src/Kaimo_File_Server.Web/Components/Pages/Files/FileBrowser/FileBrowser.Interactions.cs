@@ -46,6 +46,8 @@ public partial class FileBrowser
     private ElementReference _fileDropZone;
     private bool _jsInitialized = false;
     
+    private SyncDialog? _syncDialogComponent;
+    
     // ========== Copy & Cut ==========
     private HashSet<FileMetadata> _clipboard = new();
     private bool _deleteOnPaste = false;
@@ -57,7 +59,7 @@ public partial class FileBrowser
     private string? _dragOverPath; // Path of the currently hovered drop target, ".." for the parent row
 
     // ========== Toolbar Computed ==========
-
+    
     private bool CanOpenSelection => _selectedItems.Count == 1;
     private bool CanRenameSelection => _selectedItems.Count == 1;
     private bool CanDeleteSelection => _selectedItems.Count > 0;
@@ -396,5 +398,16 @@ public partial class FileBrowser
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
         StateHasChanged();
     }
+    
+    // -- Sync -- 
+    
+    public Task OpenSyncDialog(FileMetadata folder)
+    {
+        if (_syncDialogComponent is null || VM.CurrentShare is null)
+            return Task.CompletedTask;
+
+        return _syncDialogComponent.Open(VM.CurrentShare.Id, folder.Path);
+    }
+    
 }
 
