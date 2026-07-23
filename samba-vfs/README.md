@@ -256,6 +256,15 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
   clients receive `ERROR`; silent clients are closed after
   `KAIMO_AUTHD_IO_TIMEOUT_MS` (default 2000 ms). Events remain
   fire-and-forget.
+- **Local peer security:** `/var/run/kaimo` is `root:kaimo-authd` mode `0750`
+  and `authz.sock` is mode `0660`. Synchronized Samba users are members of the
+  dedicated group, while `authd` authenticates every connection with
+  `SO_PEERCRED`. Non-root callers may only name the passwd user matching their
+  kernel UID. Root-real-ID Samba workers are accepted as session-identity
+  carriers only when they match the configured trusted `smbd` executable
+  identity; unauthorized peers fail closed even if `KAIMO_AUTHZ_FAILOPEN=1`.
+  The group and executable can be set with `KAIMO_AUTHD_GROUP` and
+  `KAIMO_AUTHD_PEER_EXECUTABLE`.
 - **Local wire protocol:** [`local_protocol.h`](module/local_protocol.h)
   defines a 12-byte `KAIM` envelope with protocol version, enum operation,
   request/response kind, structured status, and a big-endian payload length.

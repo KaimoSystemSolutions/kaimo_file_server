@@ -182,10 +182,11 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
 WORKDIR /build/samba-4.19.5
 COPY module/vfs_kaimo_bridge.c module/local_protocol.h source3/modules/
 RUN PYTHONHASHSEED=1 ./buildtools/bin/waf build --targets=vfs_kaimo_bridge \
-    && built="$(find bin -name '*kaimo_bridge*.so' | head -n1)" \
+    && built="bin/modules/vfs/kaimo_bridge.so" \
     && dest="$(find /opt/samba -name '*kaimo_bridge*.so' | head -n1)" \
-    && test -n "$built" && test -n "$dest" \
+    && test -f "$built" && test -n "$dest" \
     && cp "$built" "$dest" \
+    && strings "$dest" | grep -F "kaimo_bridge build [" \
     && echo "updated real module: $dest"
 
 # 5) Config, entrypoint, sync and self-test scripts for self-built Samba.

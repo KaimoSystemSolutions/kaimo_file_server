@@ -11,7 +11,8 @@ import time
 from pathlib import Path
 
 
-SOCKET_PATH = Path("/tmp/kaimo-authd-protocol.sock")
+RUNTIME_DIRECTORY = Path(f"/tmp/kaimo-authd-protocol-{os.getpid()}")
+SOCKET_PATH = RUNTIME_DIRECTORY / "authz.sock"
 HEADER = struct.Struct("!4sBBBBI")
 
 
@@ -82,10 +83,9 @@ def assert_unknown_version_is_rejected() -> None:
 
 
 def main() -> int:
-    try:
-        SOCKET_PATH.unlink()
-    except FileNotFoundError:
-        pass
+    RUNTIME_DIRECTORY.mkdir(mode=0o750)
+    RUNTIME_DIRECTORY.chmod(0o750)
+    os.chown(RUNTIME_DIRECTORY, 0, 0)
 
     environment = os.environ.copy()
     environment.update(
@@ -94,6 +94,8 @@ def main() -> int:
             "KAIMO_AUTHD_WORKERS": "1",
             "KAIMO_AUTHD_QUEUE_CAPACITY": "4",
             "KAIMO_AUTHD_IO_TIMEOUT_MS": "500",
+            "KAIMO_AUTHD_GROUP": "root",
+            "KAIMO_AUTHD_PEER_EXECUTABLE": os.path.realpath("/proc/self/exe"),
         }
     )
     process = subprocess.Popen(
@@ -123,6 +125,7 @@ def main() -> int:
             SOCKET_PATH.unlink()
         except FileNotFoundError:
             pass
+        RUNTIME_DIRECTORY.rmdir()
 
 
 if __name__ == "__main__":

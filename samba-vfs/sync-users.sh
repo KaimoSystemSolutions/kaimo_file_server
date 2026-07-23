@@ -36,6 +36,9 @@ while IFS=$'\t' read -r user nthash; do
     # per-user identity: the primary UID/group stays, kaimo is added
     # only as secondary group. The entrypoint creates the group.
     usermod -aG "${KAIMO_STORAGE_GROUP:-kaimo}" "$user" 2>/dev/null || true
+    # P1-04: membership grants traversal/connect to the private authd socket.
+    # authd still verifies SO_PEERCRED, the smbd executable, and this user's UID.
+    usermod -aG "${KAIMO_AUTHD_GROUP:-kaimo-authd}" "$user" 2>/dev/null || true
     uid="$(id -u "$user" 2>/dev/null)" || continue
     printf '%s:%s:%s:%s:[U          ]:%s:\n' "$user" "$uid" "$LM" "$nthash" "$LCT" >> "$SMBPASSWD"
     count=$((count + 1))

@@ -24,6 +24,14 @@ if ! getent group "$STORAGE_GID" >/dev/null 2>&1; then
 fi
 export KAIMO_STORAGE_GROUP="$(getent group "$STORAGE_GID" | cut -d: -f1)"
 export KAIMO_STORAGE_GID
+
+# P1-04: only authenticated smbd workers may reach the local authorization
+# sidecar. This group grants connect permission to the private Unix socket; it
+# is deliberately separate from the broad storage-write group.
+export KAIMO_AUTHD_GROUP="${KAIMO_AUTHD_GROUP:-kaimo-authd}"
+if ! getent group "$KAIMO_AUTHD_GROUP" >/dev/null 2>&1; then
+    groupadd --system "$KAIMO_AUTHD_GROUP"
+fi
 find "$STORAGE" -mindepth 1 -maxdepth 1 -type d -not -name '.*' -print0 2>/dev/null |
     while IFS= read -r -d '' d; do
         chgrp -R "$STORAGE_GID" "$d" 2>/dev/null || true
@@ -51,6 +59,7 @@ if ! id "$TEST_USER" >/dev/null 2>&1; then
     useradd -M -s /usr/sbin/nologin "$TEST_USER"
 fi
 usermod -aG "${KAIMO_STORAGE_GROUP:-kaimo}" "$TEST_USER" 2>/dev/null || true
+usermod -aG "$KAIMO_AUTHD_GROUP" "$TEST_USER" 2>/dev/null || true
 
 printf '%s\n%s\n' "$TEST_PASS" "$TEST_PASS" | smbpasswd -s -a "$TEST_USER" >/dev/null 2>&1 || \
 printf '%s\n%s\n' "$TEST_PASS" "$TEST_PASS" | smbpasswd -s "$TEST_USER" >/dev/null 2>&1 || true
@@ -101,7 +110,7 @@ done
 
 # --- Phase 2: Start authorization sidecar (Unix socket <-> gRPC) ---
 # The VFS module (connect hook) asks here "may <user> access <share>?".
-mkdir -p /var/run/kaimo
+install -d -m 0750 -o root -g "$KAIMO_AUTHD_GROUP" /var/run/kaimo
 export KAIMO_AUTHD_SOCK="${KAIMO_AUTHD_SOCK:-/var/run/kaimo/authz.sock}"
 echo "[entrypoint] Starting kaimo_authd (Authz sidecar) ..."
 kaimo_authd &

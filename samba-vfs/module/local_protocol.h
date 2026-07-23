@@ -56,7 +56,8 @@ enum kaimo_local_status {
 	KAIMO_LOCAL_STATUS_DENY = 3,
 	KAIMO_LOCAL_STATUS_NOT_FOUND = 4,
 	KAIMO_LOCAL_STATUS_ERROR = 5,
-	KAIMO_LOCAL_STATUS_OVERLOADED = 6
+	KAIMO_LOCAL_STATUS_OVERLOADED = 6,
+	KAIMO_LOCAL_STATUS_UNAUTHORIZED_PEER = 7
 };
 
 struct kaimo_local_frame_header {
@@ -387,7 +388,7 @@ static inline int kaimo_local_read_frame_header(
 	    header[5] > KAIMO_LOCAL_OP_MAX ||
 	    (header[6] != KAIMO_LOCAL_KIND_REQUEST &&
 	     header[6] != KAIMO_LOCAL_KIND_RESPONSE) ||
-	    header[7] > KAIMO_LOCAL_STATUS_OVERLOADED) {
+	    header[7] > KAIMO_LOCAL_STATUS_UNAUTHORIZED_PEER) {
 		errno = EPROTO;
 		return -1;
 	}

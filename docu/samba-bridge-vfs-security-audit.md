@@ -419,6 +419,14 @@ The tab/newline protocol also has no escaping. User, share, path, token, or futu
 
 ### P1-04: The Unix socket is world-writable and trusts claimed identity
 
+> **Remediation status (2026-07-23): Implemented and live-tested.** The socket
+> now lives in a root-owned `0750` directory, is published as `0660` for the
+> dedicated `kaimo-authd` group, and every accepted connection is authenticated
+> with `SO_PEERCRED`. Non-root callers may only claim the passwd identity
+> matching their kernel UID; only a verified root `smbd` worker may carry the
+> Samba-authenticated session username. Unauthorized peers receive a structured
+> response and fail closed even when infrastructure fail-open is enabled.
+
 `chmod(..., 0666)` permits every local process to submit requests. The sidecar does not inspect peer credentials and accepts `username` from the payload.
 
 **Fix:** mode `0660`, dedicated service group, private directory permissions, `SO_PEERCRED` verification, and a design where the peer cannot choose an arbitrary Kaimo identity independently of the authenticated Samba session.
@@ -1465,17 +1473,90 @@ fragmentation runtime tests, and the existing saturation regression verified.
 
 **Validation still required / deliberately separate**
 
-- Run live SMB connect/open/list/delete/rename/event and snapshot operations
-  over the framed local channel; the native compile and negative runtime tests
-  do not replace full Windows/`smbclient` behavior verification.
-- P1-04 remains open for Unix-socket permissions, peer credentials, and binding
-  the claimed Kaimo identity to the authenticated Samba session.
+- Live `smbclient` connect/list through the real VFS module was completed as
+  part of P1-04. Open/delete/rename/event and snapshot behavior still needs the
+  broader live SMB/Windows verification tracked separately.
+- P1-04 was completed immediately afterward with private socket permissions,
+  kernel peer credentials, and peer/session identity binding.
 - P1-05 remains open for nonblocking VFS-side connect and strict end-to-end
   deadlines; complete I/O loops fix correctness but do not themselves bound a
   stalled client call.
 
 **Next planned finding:** P1-04 — restrict the Unix socket and authenticate the
-local peer/session identity.
+local peer/session identity. Completed immediately afterward.
+
+### 2026-07-23 — P1-04: Private socket and authenticated local peers
+
+**Status:** Implemented; pinned native build, negative peer-security tests, a
+real `smbd` → VFS → `authd` connect/list test, and the managed regression suite
+verified.
+
+**Solution implemented**
+
+1. Replaced the world-writable socket with `/var/run/kaimo` owned by
+   `root:kaimo-authd` at mode `0750` and `authz.sock` at mode `0660`.
+   Startup canonicalizes the parent (including `/var/run` → `/run`), validates
+   its owner, group, and permissions, and only removes a stale path when it is
+   an expected-owner Unix socket.
+2. Added the dedicated `kaimo-authd` service group to container startup and to
+   synchronized Samba users. The test account follows the same membership
+   model.
+3. Captured `pid`, `uid`, and `gid` with `SO_PEERCRED` before a connection can
+   enter the bounded worker queue.
+4. Bound every non-root request username to the exact UID returned by
+   `getpwnam_r`. A group member can therefore submit its own identity but
+   cannot claim another Samba/Kaimo user.
+5. Treated the root-real-ID Samba worker as a trusted session carrier only
+   after validating the configured peer executable as a root-owned,
+   non-group/other-writable regular file. Dumpable root peers are matched by
+   executable device/inode. Samba intentionally makes authenticated workers
+   non-dumpable, so an `EACCES`/`EPERM` fallback additionally requires kernel
+   UID 0 and Samba's exact `/proc/<pid>/stat` process-name forms (`smbd`,
+   `smbd: …`, or `smbd[…]`) without granting the container `SYS_PTRACE`.
+6. Added structured `UNAUTHORIZED_PEER` protocol responses. The VFS maps this
+   status to a hard deny independently of `KAIMO_AUTHZ_FAILOPEN`; event-only
+   requests from unauthorized peers are discarded.
+7. Added startup validation for the trusted peer executable and configuration
+   knobs `KAIMO_AUTHD_GROUP` and `KAIMO_AUTHD_PEER_EXECUTABLE`.
+8. Fixed the image build to copy the unambiguous Waf runtime artifact
+   `bin/modules/vfs/kaimo_bridge.so`. The previous `find | head` could select
+   the old `.inst.so` stub even though the real module compiled. The build now
+   also requires the real module's embedded build marker.
+9. Updated the module marker to
+   `2026-07-23e authenticated local peer`.
+
+**Validation completed**
+
+- The pinned Samba 4.19.5 image builds successfully; native protocol/cache
+  tests pass and the installed module contains the real P1-04 build marker.
+- The peer-security runtime regression verifies directory `0750`, socket
+  `0660`, an accepted matching non-root UID, rejection of a mismatched claimed
+  user, denial without socket-group access, and rejection of an untrusted root
+  executable.
+- An isolated live Samba regression authenticates a real SMB user, loads the
+  real `kaimo_bridge.so`, passes its `CONNECT` frame through `authd`, and
+  completes `smbclient ls`. The downstream bridge is intentionally absent and
+  fail-open is enabled, proving that the local authenticated-peer path itself
+  succeeded.
+- The framed-protocol regression passes unchanged.
+- The saturation regression passes with 2 workers, queue capacity 3, 40 silent
+  clients, a stable 23 threads, descriptors returning from 13 to 8, and 35
+  predictable overload rejections.
+- User synchronization tests verify all synchronized users are added to both
+  storage and `kaimo-authd` groups.
+- `docker compose config --quiet` succeeds.
+- Full managed solution suite: 528 passed, 0 failed, 0 skipped.
+
+**Validation still required / deliberately separate**
+
+- Exercise the full open/delete/rename/event/snapshot matrix from Windows and
+  representative production clients. P1-04's actual connect/list path is
+  covered, but it does not replace that broader compatibility run.
+- P1-05 remains open for nonblocking VFS-side connect and strict end-to-end
+  deadlines.
+
+**Next planned finding:** P1-05 — bound all VFS-side local socket operations by
+strict end-to-end deadlines.
 
 ## 15. Source evidence index
 
@@ -1487,7 +1568,7 @@ local peer/session identity.
 | Rename authorization / original gap | `vfs_kaimo_bridge.c` (`kaimo_authz_rename`, `kaimo_renameat`); `authd.cpp` (`do_rename`); `AuthzGrpcService.cs` (`AuthorizeRename`) |
 | Bounded sidecar workers / original detached-thread gap | `samba-vfs/module/authd.cpp` (`BoundedClientQueue`, socket deadlines, worker startup, overload rejection); `samba-vfs/tests/test-authd-capacity.py` |
 | Bounded authorization cache / original growth gap | `samba-vfs/module/decision_cache.h`; `authd.cpp` (cache configuration and sampled counters); `samba-vfs/tests/test-decision-cache.cpp` |
-| World-writable socket | `authd.cpp:241-254` |
+| Private authenticated Unix socket / original world-writable gap | `samba-vfs/module/authd.cpp` (`configure_expected_peer_executable`, `inspect_peer`, `peer_matches_username`, secure socket publication); `entrypoint.vfs.sh`; `sync-users.sh`; `docker-compose.yml`; `samba-vfs/tests/test-authd-peer-security.py`; `test-authd-smb-peer.py` |
 | Framed local stream protocol / original partial I/O gap | `samba-vfs/module/local_protocol.h`; `vfs_kaimo_bridge.c` (`kaimo_roundtrip`, binary request builders and response parsers); `authd.cpp` (`handle_client`); `samba-vfs/tests/test-local-protocol.cpp`; `test-authd-protocol.py` |
 | Snapshot ACL filtering / original leak | `SmbBridge/Services/SnapshotGrpcService.cs` (`GetFolderSnapshotAsync`, per-user reconciliation); `Core/Services/File/FileService.cs:884-899` |
 | Snapshot cache isolation / original direct path | `SnapshotCache.cs`; `SnapshotGrpcService.cs` (`EnsureIsolatedFromShare`, cache-root-relative paths); `vfs_kaimo_bridge.c` (`kaimo_snapshot_cache_abspath`, reserved namespace checks); `sync-shares.sh`; `docker-compose.yml` |

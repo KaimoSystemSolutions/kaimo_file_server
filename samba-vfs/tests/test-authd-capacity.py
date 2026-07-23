@@ -12,7 +12,8 @@ import time
 from pathlib import Path
 
 
-SOCKET_PATH = Path("/tmp/kaimo-authd-capacity.sock")
+RUNTIME_DIRECTORY = Path(f"/tmp/kaimo-authd-capacity-{os.getpid()}")
+SOCKET_PATH = RUNTIME_DIRECTORY / "authz.sock"
 WORKERS = 2
 QUEUE_CAPACITY = 3
 CLIENT_COUNT = 40
@@ -35,10 +36,9 @@ def wait_for_socket(process: subprocess.Popen[str]) -> None:
 
 
 def main() -> int:
-    try:
-        SOCKET_PATH.unlink()
-    except FileNotFoundError:
-        pass
+    RUNTIME_DIRECTORY.mkdir(mode=0o750)
+    RUNTIME_DIRECTORY.chmod(0o750)
+    os.chown(RUNTIME_DIRECTORY, 0, 0)
 
     environment = os.environ.copy()
     environment.update(
@@ -47,6 +47,8 @@ def main() -> int:
             "KAIMO_AUTHD_WORKERS": str(WORKERS),
             "KAIMO_AUTHD_QUEUE_CAPACITY": str(QUEUE_CAPACITY),
             "KAIMO_AUTHD_IO_TIMEOUT_MS": "500",
+            "KAIMO_AUTHD_GROUP": "root",
+            "KAIMO_AUTHD_PEER_EXECUTABLE": os.path.realpath("/proc/self/exe"),
         }
     )
 
@@ -149,6 +151,7 @@ def main() -> int:
             SOCKET_PATH.unlink()
         except FileNotFoundError:
             pass
+        RUNTIME_DIRECTORY.rmdir()
 
 
 if __name__ == "__main__":

@@ -96,6 +96,10 @@ services:
       KAIMO_AUTHD_WORKERS: ${KAIMO_AUTHD_WORKERS:-16}
       KAIMO_AUTHD_QUEUE_CAPACITY: ${KAIMO_AUTHD_QUEUE_CAPACITY:-64}
       KAIMO_AUTHD_IO_TIMEOUT_MS: ${KAIMO_AUTHD_IO_TIMEOUT_MS:-2000}
+      # P1-04: private local control socket. Synced Samba users receive this as
+      # a secondary group; authd additionally verifies SO_PEERCRED + smbd inode.
+      KAIMO_AUTHD_GROUP: kaimo-authd
+      KAIMO_AUTHD_PEER_EXECUTABLE: /opt/samba/sbin/smbd
       # P1-02: bounded LRU authorization cache. TTL is also the documented
       # maximum ACL-revocation delay for an already cached open decision.
       KAIMO_AUTHD_CACHE_MAX_ENTRIES: ${KAIMO_AUTHD_CACHE_MAX_ENTRIES:-10000}
