@@ -145,10 +145,10 @@ enter the share — same semantics as the earlier `KaimoSharePolicy.AuthorizeCon
 
 ```
  smbd VFS connect hook (kaimo_bridge.so, pure C)
-   │  Unix socket:  "CONNECT\t<user>\t<share>"
+   │  Unix socket: binary v1 frame (op=CONNECT, length-prefixed user/share)
    ▼
  kaimo_authd (sidecar, C++)  ──gRPC AuthorizeConnect──►  SmbBridge (.NET)
-   │  "ALLOW" / "DENY"                                     CanAccessShareAsync(shareId, userId)
+   │  framed ALLOW / DENY status                            CanAccessShareAsync(shareId, userId)
    ▼
  allow -> SMB_VFS_NEXT_CONNECT   |   deny -> errno=EACCES, TREE_CONNECT fails
 ```
@@ -239,12 +239,12 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
 
 ```
  smbd VFS hook (pure C)            Sidecar (kaimo_authd)        SmbBridge (.NET)
-  close_fn   (file written)    ──"CLOSE\t…"──► NotifyClose ──► FileService.NotifyExternalCloseAsync
-  unlinkat_fn(deleted)         ──"DELETE\t…"─► NotifyDelete ─►   → Version (CreateVersionAsync)
-  renameat_fn(renamed)  ──"RENAMEAUTH\t…"─► AuthorizeRename
-                        ──"RENAME\t…"─────► NotifyRename ─►   → Ownership (EnsureOwnerAsync)
-  mkdirat_fn (directory created) ──"MKDIR\t…"──► NotifyMkdir  ─►   → Search index (SearchServiceRouter)
-                                    (fire-and-forget)               → ACL realignment (Rename)
+  close_fn   (file written)    ──framed CLOSE──► NotifyClose ──► FileService.NotifyExternalCloseAsync
+  unlinkat_fn(deleted)         ──framed DELETE─► NotifyDelete ─►   → Version (CreateVersionAsync)
+  renameat_fn(renamed)  ──framed RENAME_AUTH─► AuthorizeRename
+                        ──framed RENAME───────► NotifyRename ─►   → Ownership (EnsureOwnerAsync)
+  mkdirat_fn (directory created) ──framed MKDIR──► NotifyMkdir ─►   → Search index (SearchServiceRouter)
+                                      (fire-and-forget)             → ACL realignment (Rename)
 ```
 
 - **.NET:** new `FileService.NotifyExternal{Close,Delete,Rename,Mkdir}Async` (in Core) use the
@@ -256,6 +256,14 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
   clients receive `ERROR`; silent clients are closed after
   `KAIMO_AUTHD_IO_TIMEOUT_MS` (default 2000 ms). Events remain
   fire-and-forget.
+- **Local wire protocol:** [`local_protocol.h`](module/local_protocol.h)
+  defines a 12-byte `KAIM` envelope with protocol version, enum operation,
+  request/response kind, structured status, and a big-endian payload length.
+  Requests are capped at 8 KiB and responses at 64 KiB before payload reads or
+  allocations. Every variable field is a length-prefixed, NUL-free UTF-8
+  string; exact schema consumption rejects missing or trailing fields.
+  Both C and C++ endpoints use complete read/write loops, so Unix stream
+  fragmentation and partial I/O cannot change message boundaries.
 - **Authorization cache:** open decisions use a mutex-protected LRU capped by
   both entry count (`KAIMO_AUTHD_CACHE_MAX_ENTRIES`, default 10,000) and an
   accounted memory budget (`KAIMO_AUTHD_CACHE_MAX_BYTES`, default 8 MiB).

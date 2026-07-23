@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import socket
+import struct
 import subprocess
 import sys
 import time
@@ -15,6 +16,7 @@ SOCKET_PATH = Path("/tmp/kaimo-authd-capacity.sock")
 WORKERS = 2
 QUEUE_CAPACITY = 3
 CLIENT_COUNT = 40
+HEADER = struct.Struct("!4sBBBBI")
 
 
 def proc_count(pid: int, name: str) -> int:
@@ -76,8 +78,25 @@ def main() -> int:
         for client in clients:
             client.setblocking(False)
             try:
-                if client.recv(16) == b"ERROR\n":
-                    rejected += 1
+                response = bytearray()
+                while len(response) != HEADER.size:
+                    chunk = client.recv(HEADER.size - len(response))
+                    if not chunk:
+                        break
+                    response.extend(chunk)
+                if len(response) == HEADER.size:
+                    magic, version, operation, kind, status, length = HEADER.unpack(
+                        response
+                    )
+                    if (
+                        magic == b"KAIM"
+                        and version == 1
+                        and operation == 0
+                        and kind == 2
+                        and status == 6
+                        and length == 0
+                    ):
+                        rejected += 1
             except BlockingIOError:
                 pass
 

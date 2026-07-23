@@ -405,6 +405,12 @@ Expired cache entries are removed only when the exact key is requested again. Un
 
 ### P1-03: Unix stream framing and partial I/O are incorrect
 
+> **Remediation status (2026-07-23): Implemented and native-tested.** The VFS
+> and sidecar now share a versioned binary envelope with enum operations and
+> statuses, fixed request/response limits, length-prefixed UTF-8 fields, exact
+> schema validation, and complete read/write loops. Fragmented, truncated,
+> oversized, and wrong-version runtime cases are covered.
+
 The native module assumes one `write()` sends the entire request. The sidecar assumes one `read()` receives the entire request. Replies are also written once. Stream sockets do not preserve application messages and may return partial reads/writes.
 
 The tab/newline protocol also has no escaping. User, share, path, token, or future fields containing delimiters change the parsed message.
@@ -996,7 +1002,11 @@ The VFS reconstructed directory-handle-relative paths into fixed 4096-byte array
 11. Replaced the fixed snapshot `openat` joined/absolute path buffers with dynamic strings. SNAPRESOLVE response copying now detects an oversized cache path and returns `ENAMETOOLONG` instead of opening a truncated path.
 12. Updated the module build marker to `2026-07-22b exact dynamic paths`.
 
-The current 8191-byte cap is an explicit compatibility boundary, not the final protocol design. P1-03 will replace the one-read line protocol with framed messages, full I/O loops, field limits, and version negotiation. Stable handle/inode-based object identity remains preferable to reconstructed strings but requires a coordinated Samba-to-sidecar API change.
+The original 8191-byte cap was an explicit compatibility boundary, not the
+final protocol design. P1-03 subsequently replaced the one-read line protocol
+with framed messages, full I/O loops, field limits, and explicit versioning.
+Stable handle/inode-based object identity remains preferable to reconstructed
+strings but requires a coordinated Samba-to-sidecar API change.
 
 **Files changed**
 
@@ -1339,8 +1349,8 @@ Native verification remains unavailable in this environment: Docker is installed
 
 - Run mixed live SMB authorization, event, and snapshot load to tune the
   production worker/queue values and observe latency under saturation.
-- P1-03 remains open: the local stream still needs length-prefixed framing and
-  full partial-I/O handling.
+- P1-03 was completed afterward with length-prefixed framing and full
+  partial-I/O handling.
 - P1-05 remains open: VFS-side connect/write/read operations still need their
   own strict end-to-end deadline; P1-01 bounds the server side only.
 
@@ -1392,9 +1402,80 @@ Native verification remains unavailable in this environment: Docker is installed
 - A future ACL-change notification may invalidate matching entries
   immediately; until then, the configured TTL is the explicit revocation
   bound.
-- P1-03 framing and P1-05 VFS-side deadlines remain separate next steps.
+- P1-03 was completed immediately afterward. P1-05 VFS-side deadlines remain
+  a separate next step.
 
 **Next planned finding:** P1-03 — replace the local stream protocol with bounded, complete framing.
+
+### 2026-07-23 — P1-03: Versioned, bounded local stream framing
+
+**Status:** Implemented; deterministic protocol tests, pinned native build,
+fragmentation runtime tests, and the existing saturation regression verified.
+
+**Solution implemented**
+
+1. Added one C/C++-compatible local protocol definition with a fixed 12-byte
+   `KAIM` header: protocol version, enum operation, request/response kind,
+   structured status, and unsigned big-endian payload length.
+2. Replaced all tab/newline request and response messages for connect, open,
+   delete authorization, rename authorization, lifecycle events, and snapshot
+   enumeration/resolution with operation-specific binary schemas.
+3. Encoded every variable field as a 32-bit length plus UTF-8 bytes. Parsers
+   reject overlong fields, embedded NULs, invalid UTF-8, invalid booleans,
+   missing fields, and trailing fields. Tabs and newlines are now ordinary
+   field content instead of protocol delimiters.
+4. Kept the request payload boundary at 8 KiB and added an explicit 64 KiB
+   response boundary. `authd` validates headers and payload size before its
+   bounded request allocation; the VFS validates response size against both
+   the protocol maximum and caller capacity before reading payload bytes.
+5. Added shared retrying `read_exact` and `write_all` loops that handle
+   `EINTR`, short reads/writes, EOF in the middle of a frame, and
+   `MSG_NOSIGNAL`.
+6. Required every response to match the request operation. Queue saturation
+   now returns a valid framed `OVERLOADED` response with operation `NONE`;
+   malformed protocol responses remain distinguishable from infrastructure
+   failures and always fail closed.
+7. Converted OPEN granted masks to a binary `uint32`, snapshot sizes to
+   `uint64`, and snapshot lists to a bounded count plus length-prefixed tokens.
+   The VFS verifies the declared snapshot count against all received records
+   before publishing labels.
+8. Added deterministic serializer/parser, boundary, full-write, and
+   byte-fragmentation tests plus an `authd` runtime regression for fragmented,
+   truncated, oversized, and wrong-version frames.
+9. Updated the module build marker to
+   `2026-07-23d framed local protocol`.
+
+**Validation completed**
+
+- The shared protocol unit binary passes during the native image build,
+  including one-byte fragmentation, 64 KiB full-write/read, delimiter
+  preservation, embedded-NUL rejection, invalid-UTF-8 rejection, and request
+  size enforcement.
+- The pinned Samba 4.19.5 image builds successfully. `kaimo_authd`, all C++
+  gRPC clients, and `vfs_kaimo_bridge.so` compile and link.
+- The container runtime protocol test passes for one-byte request
+  fragmentation, truncated payloads, an 8,193-byte request declaration, and an
+  unsupported protocol version.
+- The P1-01 saturation test still passes with the framed overload response:
+  with 2 workers, queue capacity 3, and 40 silent clients, thread count stayed
+  at 23, server descriptors peaked at 13 and returned to 8, and 35 clients
+  received `OVERLOADED`.
+- Full managed solution suite: 528 passed, 0 failed, 0 skipped.
+- `git diff --check` reports no whitespace errors.
+
+**Validation still required / deliberately separate**
+
+- Run live SMB connect/open/list/delete/rename/event and snapshot operations
+  over the framed local channel; the native compile and negative runtime tests
+  do not replace full Windows/`smbclient` behavior verification.
+- P1-04 remains open for Unix-socket permissions, peer credentials, and binding
+  the claimed Kaimo identity to the authenticated Samba session.
+- P1-05 remains open for nonblocking VFS-side connect and strict end-to-end
+  deadlines; complete I/O loops fix correctness but do not themselves bound a
+  stalled client call.
+
+**Next planned finding:** P1-04 — restrict the Unix socket and authenticate the
+local peer/session identity.
 
 ## 15. Source evidence index
 
@@ -1407,7 +1488,7 @@ Native verification remains unavailable in this environment: Docker is installed
 | Bounded sidecar workers / original detached-thread gap | `samba-vfs/module/authd.cpp` (`BoundedClientQueue`, socket deadlines, worker startup, overload rejection); `samba-vfs/tests/test-authd-capacity.py` |
 | Bounded authorization cache / original growth gap | `samba-vfs/module/decision_cache.h`; `authd.cpp` (cache configuration and sampled counters); `samba-vfs/tests/test-decision-cache.cpp` |
 | World-writable socket | `authd.cpp:241-254` |
-| Partial stream I/O | `vfs_kaimo_bridge.c:89-139`, `:258-304`; `authd.cpp:224-262` |
+| Framed local stream protocol / original partial I/O gap | `samba-vfs/module/local_protocol.h`; `vfs_kaimo_bridge.c` (`kaimo_roundtrip`, binary request builders and response parsers); `authd.cpp` (`handle_client`); `samba-vfs/tests/test-local-protocol.cpp`; `test-authd-protocol.py` |
 | Snapshot ACL filtering / original leak | `SmbBridge/Services/SnapshotGrpcService.cs` (`GetFolderSnapshotAsync`, per-user reconciliation); `Core/Services/File/FileService.cs:884-899` |
 | Snapshot cache isolation / original direct path | `SnapshotCache.cs`; `SnapshotGrpcService.cs` (`EnsureIsolatedFromShare`, cache-root-relative paths); `vfs_kaimo_bridge.c` (`kaimo_snapshot_cache_abspath`, reserved namespace checks); `sync-shares.sh`; `docker-compose.yml` |
 | Snapshot raw open | `vfs_kaimo_bridge.c:922-991` |

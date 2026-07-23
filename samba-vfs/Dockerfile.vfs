@@ -138,7 +138,9 @@ COPY module/sharesync.cpp ./
 COPY module/configsync.cpp ./
 COPY module/bridge_channel.h ./
 COPY module/decision_cache.h ./
+COPY module/local_protocol.h ./
 COPY tests/test-decision-cache.cpp ./
+COPY tests/test-local-protocol.cpp ./
 RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
     && protoc --grpc_out=. --plugin=protoc-gen-grpc="$(which grpc_cpp_plugin)" kaimo_smb_bridge.proto \
     && g++ -std=c++17 -O2 \
@@ -165,6 +167,10 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
        test-decision-cache.cpp -o /tmp/test-decision-cache \
     && /tmp/test-decision-cache \
     && rm /tmp/test-decision-cache \
+    && g++ -std=c++17 -O2 -pthread -I. \
+       test-local-protocol.cpp -o /tmp/test-local-protocol \
+    && /tmp/test-local-protocol \
+    && rm /tmp/test-local-protocol \
     && test -x /usr/local/bin/kaimo_authsync \
     && test -x /usr/local/bin/kaimo_authd \
     && test -x /usr/local/bin/kaimo_sharesync \
@@ -174,7 +180,7 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
 # This is the layer that reruns on a module edit -> a single object + relink.
 # The installed .so is located by name (not a hardcoded path) and overwritten.
 WORKDIR /build/samba-4.19.5
-COPY module/vfs_kaimo_bridge.c source3/modules/vfs_kaimo_bridge.c
+COPY module/vfs_kaimo_bridge.c module/local_protocol.h source3/modules/
 RUN PYTHONHASHSEED=1 ./buildtools/bin/waf build --targets=vfs_kaimo_bridge \
     && built="$(find bin -name '*kaimo_bridge*.so' | head -n1)" \
     && dest="$(find /opt/samba -name '*kaimo_bridge*.so' | head -n1)" \

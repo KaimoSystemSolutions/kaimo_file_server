@@ -3,21 +3,10 @@
 // Bridges Unix socket (from VFS module, pure C) <-> gRPC (to .NET bridge).
 // This keeps the smbd VFS module free from gRPC/threads/fork issues.
 //
-// Protocol (one request per connection, tab-separated, with \n):
-//   Authz (response ALLOW|DENY|ERROR):
-//     "CONNECT\t<user>\t<share>"
-//     "OPEN\t<user>\t<share>\t<access-hex>\t<create 0|1>\t<dir 0|1>\t<listing 0|1>\t<path>"
-//       -> "ALLOW\t<granted-access-hex>" | "DENY" | "ERROR"
-//     "DELETEAUTH\t<user>\t<share>\t<isdir 0|1>\t<path>"
-//     "RENAMEAUTH\t<user>\t<share>\t<srcdir 0|1>\t<dstexists 0|1>\t<dstdir 0|1>\t<replace 0|1>\t<old>\t<new>"
-//   Events (fire-and-forget, response OK):
-//     "CLOSE\t<user>\t<share>\t<path>"                   file written and closed
-//     "MKDIR\t<user>\t<share>\t<path>"                   directory created
-//     "DELETE\t<user>\t<share>\t<isdir 0|1>\t<path>"
-//     "RENAME\t<user>\t<share>\t<isdir 0|1>\t<old>\t<new>"
-//   Snapshots (Phase 5, @GMT / "Previous Versions"):
-//     "SNAPENUM\t<user>\t<share>\t<path>"    -> "OK\t<n>\n<tok1>\n<tok2>..."|"ERROR"
-//     "SNAPRESOLVE\t<user>\t<share>\t<@GMT>\t<path>" -> "OK\t<cache-root-relative-path>\t<size>"|"ERROR"
+// The local protocol is a versioned, length-prefixed binary envelope. Every
+// request and response has an explicit operation enum, status, and bounded
+// payload. Variable strings are individually length-prefixed, so path or
+// identity bytes cannot alter field boundaries.
 //
 // Connections are handled by a fixed-size worker pool. Accepted descriptors
 // wait in a bounded queue; excess clients receive ERROR and are closed. Socket
@@ -31,15 +20,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <deque>
-#include <iomanip>
 #include <iostream>
-#include <limits>
 #include <memory>
 #include <mutex>
-#include <sstream>
 #include <string>
 #include <thread>
-#include <unordered_map>
 #include <vector>
 
 #include <sys/socket.h>
@@ -52,6 +37,7 @@
 #include "bridge_channel.h"
 #include "decision_cache.h"
 #include "kaimo_smb_bridge.grpc.pb.h"
+#include "local_protocol.h"
 
 using namespace kaimo::smb::bridge::v1;
 
@@ -171,32 +157,32 @@ static bool configure_client_deadlines(int client_fd, size_t timeout_ms) {
 }
 
 // ---- Authz ----
-static const char* do_connect(const std::string& user, const std::string& share) {
+static uint8_t do_connect(const std::string& user, const std::string& share) {
     AuthorizeConnectRequest req; req.set_username(user); req.set_share(share);
     grpc::ClientContext ctx; ctx.set_deadline(deadline(5));
     AuthorizeReply reply;
     grpc::Status st = g_authz->AuthorizeConnect(&ctx, req, &reply);
-    if (!st.ok()) { std::cerr << "kaimo_authd: AuthorizeConnect: " << st.error_message() << std::endl; return "ERROR"; }
-    return reply.allow() ? "ALLOW" : "DENY";
+    if (!st.ok()) { std::cerr << "kaimo_authd: AuthorizeConnect: " << st.error_message() << std::endl; return KAIMO_LOCAL_STATUS_ERROR; }
+    return reply.allow() ? KAIMO_LOCAL_STATUS_ALLOW : KAIMO_LOCAL_STATUS_DENY;
 }
 
-static std::string open_result(bool allow, uint32_t granted_access) {
-    if (!allow) return "DENY";
-    std::ostringstream out;
-    out << "ALLOW\t" << std::hex << std::setw(8) << std::setfill('0')
-        << granted_access;
-    return out.str();
-}
+struct OpenResult {
+    uint8_t status;
+    uint32_t granted_access;
+};
 
-static std::string do_open(const std::string& user, const std::string& share,
-                           uint32_t access_mask, bool wants_create,
-                           bool create_directory, bool directory_listing,
-                           const std::string& path,
-                           const std::string& cache_key) {
+static OpenResult do_open(const std::string& user, const std::string& share,
+                          uint32_t access_mask, bool wants_create,
+                          bool create_directory, bool directory_listing,
+                          const std::string& path,
+                          const std::string& cache_key) {
     bool cached;
     uint32_t cached_access = 0;
     if (cache_get(cache_key, cached, cached_access))
-        return open_result(cached, cached_access);
+        return {
+            cached ? KAIMO_LOCAL_STATUS_ALLOW : KAIMO_LOCAL_STATUS_DENY,
+            cached_access
+        };
     AuthorizeOpenRequest req;
     req.set_username(user); req.set_share(share); req.set_path(path);
     req.set_access_mask(access_mask);
@@ -209,30 +195,33 @@ static std::string do_open(const std::string& user, const std::string& share,
     if (!st.ok()) {
         std::cerr << "kaimo_authd: AuthorizeOpen: " << st.error_message()
                   << std::endl;
-        return "ERROR";
+        return {KAIMO_LOCAL_STATUS_ERROR, 0};
     }
     cache_put(cache_key, reply.allow(), reply.granted_access_mask());
-    return open_result(reply.allow(), reply.granted_access_mask());
+    return {
+        reply.allow() ? KAIMO_LOCAL_STATUS_ALLOW : KAIMO_LOCAL_STATUS_DENY,
+        reply.granted_access_mask()
+    };
 }
 
-static const char* do_delete(const std::string& user, const std::string& share,
-                             bool isdir, const std::string& path) {
+static uint8_t do_delete(const std::string& user, const std::string& share,
+                         bool isdir, const std::string& path) {
     AuthorizeDeleteRequest req;
     req.set_username(user); req.set_share(share); req.set_path(path); req.set_is_directory(isdir);
     grpc::ClientContext ctx; ctx.set_deadline(deadline(5));
     AuthorizeReply reply;
     grpc::Status st = g_authz->AuthorizeDelete(&ctx, req, &reply);
-    if (!st.ok()) { std::cerr << "kaimo_authd: AuthorizeDelete: " << st.error_message() << std::endl; return "ERROR"; }
-    return reply.allow() ? "ALLOW" : "DENY";
+    if (!st.ok()) { std::cerr << "kaimo_authd: AuthorizeDelete: " << st.error_message() << std::endl; return KAIMO_LOCAL_STATUS_ERROR; }
+    return reply.allow() ? KAIMO_LOCAL_STATUS_ALLOW : KAIMO_LOCAL_STATUS_DENY;
 }
 
-static const char* do_rename(const std::string& user, const std::string& share,
-                             bool source_is_directory,
-                             bool destination_exists,
-                             bool destination_is_directory,
-                             bool replace_intent,
-                             const std::string& source_path,
-                             const std::string& destination_path) {
+static uint8_t do_rename(const std::string& user, const std::string& share,
+                         bool source_is_directory,
+                         bool destination_exists,
+                         bool destination_is_directory,
+                         bool replace_intent,
+                         const std::string& source_path,
+                         const std::string& destination_path) {
     AuthorizeRenameRequest req;
     req.set_username(user);
     req.set_share(share);
@@ -248,9 +237,9 @@ static const char* do_rename(const std::string& user, const std::string& share,
     if (!st.ok()) {
         std::cerr << "kaimo_authd: AuthorizeRename: "
                   << st.error_message() << std::endl;
-        return "ERROR";
+        return KAIMO_LOCAL_STATUS_ERROR;
     }
-    return reply.allow() ? "ALLOW" : "DENY";
+    return reply.allow() ? KAIMO_LOCAL_STATUS_ALLOW : KAIMO_LOCAL_STATUS_DENY;
 }
 
 // ---- Events (best-effort) ----
@@ -278,8 +267,9 @@ static void ev_rename(const std::string& user, const std::string& share, bool is
 }
 
 // ---- Snapshots (Phase 5, @GMT / "Previous Versions") ----
-static std::string do_snapenum(const std::string& user, const std::string& share,
-                               const std::string& path) {
+static uint8_t do_snapenum(const std::string& user, const std::string& share,
+                           const std::string& path,
+                           std::vector<std::string>& tokens) {
     EnumerateSnapshotsRequest req;
     req.set_username(user); req.set_share(share); req.set_path(path);
     grpc::ClientContext ctx; ctx.set_deadline(deadline(10));
@@ -287,15 +277,22 @@ static std::string do_snapenum(const std::string& user, const std::string& share
     grpc::Status st = g_snapshot->EnumerateSnapshots(&ctx, req, &reply);
     if (!st.ok()) {
         std::cerr << "kaimo_authd: EnumerateSnapshots: " << st.error_message() << std::endl;
-        return "ERROR\n";
+        return KAIMO_LOCAL_STATUS_ERROR;
     }
-    std::string out = "OK\t" + std::to_string(reply.gmt_tokens_size()) + "\n";
-    for (const auto& t : reply.gmt_tokens()) out += t + "\n";
-    return out;
+    tokens.reserve(static_cast<size_t>(reply.gmt_tokens_size()));
+    for (const auto& token : reply.gmt_tokens()) tokens.push_back(token);
+    return KAIMO_LOCAL_STATUS_OK;
 }
 
-static std::string do_snapresolve(const std::string& user, const std::string& share,
-                                  const std::string& token, const std::string& path) {
+struct SnapshotResolveResult {
+    uint8_t status;
+    std::string cache_path;
+    uint64_t size;
+};
+
+static SnapshotResolveResult do_snapresolve(
+    const std::string& user, const std::string& share,
+    const std::string& token, const std::string& path) {
     ResolveVersionRequest req;
     req.set_username(user); req.set_share(share);
     req.set_gmt_token(token); req.set_path(path);
@@ -304,109 +301,194 @@ static std::string do_snapresolve(const std::string& user, const std::string& sh
     grpc::Status st = g_snapshot->ResolveVersion(&ctx, req, &reply);
     if (!st.ok()) {
         std::cerr << "kaimo_authd: ResolveVersion: " << st.error_message() << std::endl;
-        return "ERROR\n";
+        return {KAIMO_LOCAL_STATUS_ERROR, {}, 0};
     }
-    if (!reply.found()) return "ERROR\n";
-    return "OK\t" + reply.cache_path() + "\t" + std::to_string(reply.size()) + "\n";
+    if (!reply.found()) return {KAIMO_LOCAL_STATUS_NOT_FOUND, {}, 0};
+    if (reply.size() < 0) {
+        std::cerr << "kaimo_authd: ResolveVersion returned a negative size"
+                  << std::endl;
+        return {KAIMO_LOCAL_STATUS_ERROR, {}, 0};
+    }
+    return {
+        KAIMO_LOCAL_STATUS_OK,
+        reply.cache_path(),
+        static_cast<uint64_t>(reply.size())
+    };
 }
 
-// Splits into up to max fields; the last field takes the rest.
-static std::vector<std::string> split_tabs(const std::string& line, size_t max_fields) {
-    std::vector<std::string> parts;
-    size_t start = 0;
-    while (parts.size() + 1 < max_fields) {
-        auto tab = line.find('\t', start);
-        if (tab == std::string::npos) break;
-        parts.push_back(line.substr(start, tab - start));
-        start = tab + 1;
-    }
-    parts.push_back(line.substr(start));
-    return parts;
-}
-
-static bool parse_hex_u32(const std::string& text, uint32_t& value) {
-    if (text.size() != 8) return false;
-    char* end = nullptr;
-    errno = 0;
-    unsigned long parsed = std::strtoul(text.c_str(), &end, 16);
-    if (errno == ERANGE || end == text.c_str() || *end != '\0' ||
-        parsed > std::numeric_limits<uint32_t>::max())
-        return false;
-    value = static_cast<uint32_t>(parsed);
+static bool read_string(kaimo_local_reader& reader, std::string& value) {
+    const uint8_t* bytes = nullptr;
+    uint32_t length = 0;
+    if (!kaimo_local_reader_string(&reader, &bytes, &length)) return false;
+    value.assign(reinterpret_cast<const char*>(bytes), length);
     return true;
 }
 
-static void handle_client(int cfd) {
-    char buf[8192];
-    ssize_t r = read(cfd, buf, sizeof(buf) - 1);
-    if (r <= 0) {
-        if (r < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+static bool read_boolean(kaimo_local_reader& reader, bool& value) {
+    uint8_t encoded = 0;
+    if (!kaimo_local_reader_u8(&reader, &encoded) || encoded > 1) return false;
+    value = encoded == 1;
+    return true;
+}
+
+static void note_receive_failure() {
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
             uint64_t count = ++g_receive_timeouts;
             if (should_log_counter(count)) {
                 std::cerr << "kaimo_authd: receive deadline expired; total="
                           << count << std::endl;
             }
-        }
+    }
+}
+
+static void handle_client(int cfd) {
+    kaimo_local_frame_header frame{};
+    if (kaimo_local_read_frame_header(cfd, &frame) != 0) {
+        note_receive_failure();
         close(cfd);
         return;
     }
-    buf[r] = '\0';
-    std::string line(buf);
-    auto nl = line.find('\n');
-    if (nl != std::string::npos) line.resize(nl);
 
-    std::string out = "ERROR\n"; // default; snapshot handlers set a full multi-line reply
-    if (line.rfind("CONNECT\t", 0) == 0) {
-        auto p = split_tabs(line, 3);
-        if (p.size() == 3) out = std::string(do_connect(p[1], p[2])) + "\n";
-    } else if (line.rfind("OPEN\t", 0) == 0) {
-        auto p = split_tabs(line, 8);
-        uint32_t access_mask = 0;
-        if (p.size() == 8 && parse_hex_u32(p[3], access_mask) &&
-            (p[4] == "0" || p[4] == "1") &&
-            (p[5] == "0" || p[5] == "1") &&
-            (p[6] == "0" || p[6] == "1")) {
-            out = do_open(p[1], p[2], access_mask,
-                          p[4] == "1", p[5] == "1", p[6] == "1",
-                          p[7], line) + "\n";
-        }
-    } else if (line.rfind("DELETEAUTH\t", 0) == 0) {
-        auto p = split_tabs(line, 5);
-        if (p.size() == 5) out = std::string(do_delete(p[1], p[2], p[3] == "1", p[4])) + "\n";
-    } else if (line.rfind("RENAMEAUTH\t", 0) == 0) {
-        auto p = split_tabs(line, 9);
-        if (p.size() == 9 &&
-            (p[3] == "0" || p[3] == "1") &&
-            (p[4] == "0" || p[4] == "1") &&
-            (p[5] == "0" || p[5] == "1") &&
-            (p[6] == "0" || p[6] == "1")) {
-            out = std::string(do_rename(
-                p[1], p[2], p[3] == "1", p[4] == "1",
-                p[5] == "1", p[6] == "1", p[7], p[8])) + "\n";
-        }
-    } else if (line.rfind("CLOSE\t", 0) == 0) {
-        auto p = split_tabs(line, 4);
-        if (p.size() == 4) { ev_close(p[1], p[2], p[3]); out = "OK\n"; }
-    } else if (line.rfind("MKDIR\t", 0) == 0) {
-        auto p = split_tabs(line, 4);
-        if (p.size() == 4) { ev_mkdir(p[1], p[2], p[3]); out = "OK\n"; }
-    } else if (line.rfind("DELETE\t", 0) == 0) {
-        auto p = split_tabs(line, 5);
-        if (p.size() == 5) { ev_delete(p[1], p[2], p[3] == "1", p[4]); out = "OK\n"; }
-    } else if (line.rfind("RENAME\t", 0) == 0) {
-        auto p = split_tabs(line, 6);
-        if (p.size() == 6) { ev_rename(p[1], p[2], p[3] == "1", p[4], p[5]); out = "OK\n"; }
-    } else if (line.rfind("SNAPENUM\t", 0) == 0) {
-        auto p = split_tabs(line, 4);
-        if (p.size() == 4) out = do_snapenum(p[1], p[2], p[3]);
-    } else if (line.rfind("SNAPRESOLVE\t", 0) == 0) {
-        auto p = split_tabs(line, 5);
-        if (p.size() == 5) out = do_snapresolve(p[1], p[2], p[3], p[4]);
-    } else {
-        std::cerr << "kaimo_authd: unknown request: " << line << std::endl;
+    if (frame.kind != KAIMO_LOCAL_KIND_REQUEST ||
+        frame.status != KAIMO_LOCAL_STATUS_NONE ||
+        frame.operation == KAIMO_LOCAL_OP_NONE) {
+        close(cfd);
+        return;
     }
 
-    (void)write(cfd, out.c_str(), out.size());
+    std::vector<uint8_t> request(frame.payload_length);
+    if (frame.payload_length != 0 &&
+        kaimo_local_read_exact(cfd, request.data(), request.size()) != 0) {
+        note_receive_failure();
+        close(cfd);
+        return;
+    }
+
+    kaimo_local_reader input;
+    kaimo_local_reader_init(&input, request.data(), request.size());
+    std::vector<uint8_t> response(KAIMO_LOCAL_MAX_RESPONSE_PAYLOAD);
+    kaimo_local_builder output;
+    kaimo_local_builder_init(&output, response.data(), response.size());
+    uint8_t status = KAIMO_LOCAL_STATUS_ERROR;
+    std::string user, share, path, old_path, new_path, token;
+    bool first = false, second = false, third = false, fourth = false;
+    uint32_t access_mask = 0;
+
+    switch (frame.operation) {
+    case KAIMO_LOCAL_OP_CONNECT:
+        if (read_string(input, user) && read_string(input, share) &&
+            kaimo_local_reader_finished(&input))
+            status = do_connect(user, share);
+        break;
+    case KAIMO_LOCAL_OP_OPEN:
+        if (read_string(input, user) && read_string(input, share) &&
+            kaimo_local_reader_u32(&input, &access_mask) &&
+            read_boolean(input, first) && read_boolean(input, second) &&
+            read_boolean(input, third) && read_string(input, path) &&
+            kaimo_local_reader_finished(&input)) {
+            std::string cache_key(
+                reinterpret_cast<const char*>(request.data()), request.size());
+            OpenResult result = do_open(user, share, access_mask, first,
+                                        second, third, path, cache_key);
+            status = result.status;
+            if (status == KAIMO_LOCAL_STATUS_ALLOW)
+                kaimo_local_builder_u32(&output, result.granted_access);
+        }
+        break;
+    case KAIMO_LOCAL_OP_DELETE_AUTH:
+        if (read_string(input, user) && read_string(input, share) &&
+            read_boolean(input, first) && read_string(input, path) &&
+            kaimo_local_reader_finished(&input))
+            status = do_delete(user, share, first, path);
+        break;
+    case KAIMO_LOCAL_OP_RENAME_AUTH:
+        if (read_string(input, user) && read_string(input, share) &&
+            read_boolean(input, first) && read_boolean(input, second) &&
+            read_boolean(input, third) && read_boolean(input, fourth) &&
+            read_string(input, old_path) && read_string(input, new_path) &&
+            kaimo_local_reader_finished(&input))
+            status = do_rename(user, share, first, second, third, fourth,
+                               old_path, new_path);
+        break;
+    case KAIMO_LOCAL_OP_CLOSE:
+        if (read_string(input, user) && read_string(input, share) &&
+            read_string(input, path) && kaimo_local_reader_finished(&input)) {
+            ev_close(user, share, path);
+            status = KAIMO_LOCAL_STATUS_OK;
+        }
+        break;
+    case KAIMO_LOCAL_OP_MKDIR:
+        if (read_string(input, user) && read_string(input, share) &&
+            read_string(input, path) && kaimo_local_reader_finished(&input)) {
+            ev_mkdir(user, share, path);
+            status = KAIMO_LOCAL_STATUS_OK;
+        }
+        break;
+    case KAIMO_LOCAL_OP_DELETE:
+        if (read_string(input, user) && read_string(input, share) &&
+            read_boolean(input, first) && read_string(input, path) &&
+            kaimo_local_reader_finished(&input)) {
+            ev_delete(user, share, first, path);
+            status = KAIMO_LOCAL_STATUS_OK;
+        }
+        break;
+    case KAIMO_LOCAL_OP_RENAME:
+        if (read_string(input, user) && read_string(input, share) &&
+            read_boolean(input, first) && read_string(input, old_path) &&
+            read_string(input, new_path) &&
+            kaimo_local_reader_finished(&input)) {
+            ev_rename(user, share, first, old_path, new_path);
+            status = KAIMO_LOCAL_STATUS_OK;
+        }
+        break;
+    case KAIMO_LOCAL_OP_SNAPSHOT_ENUMERATE:
+        if (read_string(input, user) && read_string(input, share) &&
+            read_string(input, path) && kaimo_local_reader_finished(&input)) {
+            std::vector<std::string> tokens;
+            status = do_snapenum(user, share, path, tokens);
+            if (status == KAIMO_LOCAL_STATUS_OK &&
+                tokens.size() <= UINT32_MAX) {
+                kaimo_local_builder_u32(
+                    &output, static_cast<uint32_t>(tokens.size()));
+                for (const auto& snapshot_token : tokens)
+                    kaimo_local_builder_string(&output,
+                                                snapshot_token.c_str());
+                if (!output.valid) {
+                    output.length = 0;
+                    status = KAIMO_LOCAL_STATUS_ERROR;
+                }
+            } else if (status == KAIMO_LOCAL_STATUS_OK) {
+                status = KAIMO_LOCAL_STATUS_ERROR;
+            }
+        }
+        break;
+    case KAIMO_LOCAL_OP_SNAPSHOT_RESOLVE:
+        if (read_string(input, user) && read_string(input, share) &&
+            read_string(input, token) && read_string(input, path) &&
+            kaimo_local_reader_finished(&input)) {
+            SnapshotResolveResult result =
+                do_snapresolve(user, share, token, path);
+            status = result.status;
+            if (status == KAIMO_LOCAL_STATUS_OK &&
+                (!kaimo_local_builder_string(
+                     &output, result.cache_path.c_str()) ||
+                 !kaimo_local_builder_u64(&output, result.size))) {
+                output.length = 0;
+                status = KAIMO_LOCAL_STATUS_ERROR;
+            }
+        }
+        break;
+    default:
+        break;
+    }
+
+    if (!output.valid && status != KAIMO_LOCAL_STATUS_ERROR) {
+        output.length = 0;
+        status = KAIMO_LOCAL_STATUS_ERROR;
+    }
+    (void)kaimo_local_send_frame(
+        cfd, frame.operation, KAIMO_LOCAL_KIND_RESPONSE, status,
+        response.data(), output.length);
     close(cfd);
 }
 
@@ -510,9 +592,9 @@ int main() {
         }
 
         if (!client_queue.try_push(cfd)) {
-            static const char overload_reply[] = "ERROR\n";
-            (void)send(cfd, overload_reply, sizeof(overload_reply) - 1,
-                       MSG_NOSIGNAL);
+            (void)kaimo_local_send_frame(
+                cfd, KAIMO_LOCAL_OP_NONE, KAIMO_LOCAL_KIND_RESPONSE,
+                KAIMO_LOCAL_STATUS_OVERLOADED, nullptr, 0);
             close(cfd);
             uint64_t count = ++g_overload_rejections;
             if (should_log_counter(count)) {
