@@ -113,13 +113,13 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
 - **Proto contract:** [`protos/kaimo_smb_bridge.proto`](protos/kaimo_smb_bridge.proto) — defined once,
   generates C# (Bridge) and C++ stubs (authsync).
 - **P0-07 control-plane security:** the bridge accepts only client certificates
-  from its private CA. Four client identities have exact RPC allow-lists:
-  `kaimo-auth-sync` (bulk hash sync only), `kaimo-share-sync`, `kaimo-config-sync`,
-  and `kaimo-samba-runtime` (authorization/events/snapshots). `GetNtHash` is
-  intentionally assigned to no current identity. Bulk hash exports are
-  rate-limited and audited without logging hashes or usernames. Compose places
-  bridge/Samba on a dedicated internal network and mounts no control-plane
-  credentials into Web or Adminer.
+  from its private CA. The Samba container uses one `kaimo-samba` workload
+  identity because its helper processes share one container and credential
+  mount. The bridge still has an explicit allow-list of required RPC methods;
+  `GetNtHash` is intentionally not allowed. Bulk hash exports are rate-limited
+  and audited without logging hashes or usernames. Compose places bridge/Samba
+  on a dedicated internal network and mounts no control-plane credentials into
+  Web or Adminer.
 
 **Test (short form):**
 ```bash
@@ -179,9 +179,17 @@ enter the share — same semantics as the earlier `KaimoSharePolicy.AuthorizeCon
 (fail-closed — a bridge outage must not silently grant access). Set `KAIMO_AUTHZ_FAILOPEN=1`
 to allow on error instead (availability over security), which was the previous default.
 
-**Known cosmetic issue:** A deny appears client-side as `NT_STATUS_UNSUCCESSFUL` (not
-`ACCESS_DENIED`) — several Samba code paths hardcode this for VFS connect errors. Functionally
-access is correctly denied.
+**Windows-compatible denial:** The pinned Samba build carries a narrow patch that
+maps the VFS hook's `EACCES` to `NT_STATUS_ACCESS_DENIED`. Without it, Samba
+hardcodes `NT_STATUS_UNSUCCESSFUL`, which Windows renders as "A device attached
+to the system is not functioning" and may retry as a transient error. The
+focused `test-vfs-connect-status.py` regression test verifies the denial status
+and a sub-1.5-second response.
+
+Windows can offer its normal credential dialog for `ACCESS_DENIED` when no
+existing SMB session fixes the identity. Windows still permits only one username
+per server name at a time; switching users while another share on the same host
+is connected requires disconnecting that session or using a separate DNS alias.
 
 **Implemented in Phase 2b:** File/path, delete, and rename authorization plus the
 directory listing filter. Native runtime verification of the latest hardening revisions
@@ -226,9 +234,8 @@ to read/write booleans.
 > check as `OpenAsync`). It is set in [`../docker-compose.yml`](../docker-compose.yml). Without
 > it, the bridge treats existing files as "not found" and allows too much.
 
-**Still open for later phases:** Snapshots/@GMT (Phase 5), recycle bin/versioning/search index on
-close hooks (Phase 3), and consistent `NT_STATUS_ACCESS_DENIED` on connect (currently
-`NT_STATUS_UNSUCCESSFUL`, Samba-internal).
+**Still open for later phases:** Snapshots/@GMT (Phase 5) and recycle
+bin/versioning/search index on close hooks (Phase 3).
 
 ## Phase 3 — Close hooks (versioning, ownership, search index)
 
@@ -509,8 +516,9 @@ docker compose up -d
 - **PKI:** local certificates default to `./secrets/smb-control-plane` and are
   generated automatically by the one-shot `kaimo_smb_pki_init` service and are
   git-ignored. Production should set `KAIMO_SMB_CONTROL_PKI` to an externally
-  managed directory with `bridge/` and `samba/` subdirectories and rotate the
-  private CA/leaf identities operationally.
+  managed directory with `bridge/{ca.crt,server.crt,server.key}` and
+  `samba/{ca.crt,samba.crt,samba.key}` and rotate the private CA/leaf identities
+  operationally.
 - **Port:** Samba owns host/container port **445** after the Phase-5 cutover.
 - **Storage:** same bind mount `./tests/data/storage:/data/storage` as host/web → Samba does file I/O directly.
 - **Healthcheck:** reports `healthy` once `smbd` accepts connections.

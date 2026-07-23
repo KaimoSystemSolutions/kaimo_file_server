@@ -1,0 +1,22 @@
+diff --git a/source3/smbd/smb2_service.c b/source3/smbd/smb2_service.c
+index 776246b..0dd34fe 100644
+--- a/source3/smbd/smb2_service.c
++++ b/source3/smbd/smb2_service.c
+@@ -625,9 +625,14 @@ static NTSTATUS make_connection_snum(
+ 
+ 	if (SMB_VFS_CONNECT(conn, lp_const_servicename(snum),
+ 			    conn->session_info->unix_info->unix_name) < 0) {
++		int connect_errno = errno;
++
+ 		DBG_WARNING("SMB_VFS_CONNECT for service '%s' at '%s' failed: %s\n",
+ 			    lp_const_servicename(snum), conn->connectpath,
+-			    strerror(errno));
+-		status = NT_STATUS_UNSUCCESSFUL;
++			    strerror(connect_errno));
++		status = map_nt_error_from_unix(connect_errno);
++		if (NT_STATUS_IS_OK(status)) {
++			status = NT_STATUS_UNSUCCESSFUL;
++		}
+ 		goto err_root_exit;
+ 	}
+ 

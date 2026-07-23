@@ -31,9 +31,9 @@ int main() {
         channel = kaimo::control_plane::create_mtls_channel(
             addr,
             "KAIMO_BRIDGE_CONFIG_SYNC_CERT",
-            "/run/secrets/kaimo-control-plane/config-sync.crt",
+            "/run/secrets/kaimo-control-plane/samba.crt",
             "KAIMO_BRIDGE_CONFIG_SYNC_KEY",
-            "/run/secrets/kaimo-control-plane/config-sync.key");
+            "/run/secrets/kaimo-control-plane/samba.key");
     } catch (const std::exception& error) {
         std::cerr << "kaimo_configsync: " << error.what() << std::endl;
         return 1;

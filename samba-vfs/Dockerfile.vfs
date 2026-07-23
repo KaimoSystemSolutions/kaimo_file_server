@@ -49,7 +49,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources \
     && apt-get update \
     && apt-get build-dep -y samba \
-    && apt-get install -y --no-install-recommends build-essential python3 \
+    && apt-get install -y --no-install-recommends build-essential patch python3 \
        samba-common-bin smbclient acl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -62,6 +62,14 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build/samba-4.19.5
+
+# Samba otherwise converts every failure from a VFS connect hook to the generic
+# NT_STATUS_UNSUCCESSFUL. Preserve EACCES as NT_STATUS_ACCESS_DENIED so Windows
+# treats an ACL denial like a normal file-server denial instead of reporting
+# "A device attached to the system is not functioning."
+COPY patches/0001-map-vfs-connect-errno.patch /tmp/
+RUN patch -p1 < /tmp/0001-map-vfs-connect-errno.patch \
+    && grep -F "map_nt_error_from_unix(connect_errno)" source3/smbd/smb2_service.c
 
 # 1) Register module in build system (template: vfs_fake_perms). Constant strings.
 RUN cat >> source3/modules/wscript_build <<'PYEOF'

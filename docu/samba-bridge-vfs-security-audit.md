@@ -352,9 +352,10 @@ If the cache must remain inside the share:
 > regression remains pending.**
 > Compose now isolates the bridge on dedicated SMB-control and bridge-only database
 > networks. Kestrel requires a client certificate chaining to a private CA; all
-> C++ clients use TLS credentials. Separate `auth-sync`, `share-sync`,
-> `config-sync`, and `runtime` certificate identities are authorized against
-> exact RPC method allow-lists. `GetNtHash` is assigned to no current identity.
+> C++ clients use TLS credentials. They share one `kaimo-samba` workload
+> certificate because all helpers run in the same container and can read the
+> same credential mount. The bridge enforces an explicit RPC method allow-list;
+> `GetNtHash` is not allowed.
 > Bulk `ListUsers` export is fixed-window rate-limited and emits request,
 > completion, and rejection audit events without logging hashes or usernames.
 
@@ -1267,10 +1268,9 @@ Native verification remains unavailable in this environment: Docker is installed
 2. Configured Kestrel for HTTP/2 over TLS with mandatory client certificates,
    custom-root trust, client-auth EKU validation, and fail-fast startup when
    certificate material is absent.
-3. Added four exact certificate roles: auth sync may call only `ListUsers`;
-   share sync only `ListShares`; config sync only `GetProtocolSettings`; the
-   runtime sidecar only authorization, event, and snapshot methods. No identity
-   currently receives `GetNtHash`.
+3. Added one `kaimo-samba` client certificate for the helpers that share the
+   Samba container and credential mount. The bridge allows only the required
+   sync, authorization, event, and snapshot RPCs. `GetNtHash` remains denied.
 4. Added a non-queuing fixed-window limiter for bulk hash export (default two
    calls per 60 seconds) plus request/completion/rejection audit logging that
    excludes usernames and hash bytes.
@@ -1279,8 +1279,8 @@ Native verification remains unavailable in this environment: Docker is installed
    plus the separate application DB segment; the bridge shares no network with
    Web, Adminer, or unrelated application containers.
 6. Mounted only the server key and public client CA into the bridge, and only
-   client identities/public CA into Samba. Web and Adminer receive none of the
-   control-plane material.
+   the Samba workload key/public CA into Samba. Web and Adminer receive none of
+   the control-plane material.
 7. Added a git-ignored local-PKI bootstrap script; production can supply
    externally managed certificates through `KAIMO_SMB_CONTROL_PKI`.
 8. Updated the native build marker to
@@ -1290,18 +1290,17 @@ Native verification remains unavailable in this environment: Docker is installed
 
 **Validation completed**
 
-- Focused P0-07 managed suite: 4 passed, 0 failed, 0 skipped; full managed
+- Focused P0-07 managed suite: 3 passed, 0 failed, 0 skipped; full managed
   suite: 528 passed, 0 failed, 0 skipped.
-- The pinned Samba 4.19.5 image builds successfully, including all four mTLS
-  C++ clients and the VFS module.
+- The pinned Samba 4.19.5 image builds successfully, including all mTLS C++
+  clients using the shared Samba workload certificate and the VFS module.
 - A local bridge started on TLS port 5080 with generated development
-  credentials. Auth, share, and config identities completed their allowed RPCs.
-  Presenting the share-sync identity to `ListUsers` returned
-  `PERMISSION_DENIED`.
+  credentials. Auth, share, config, and runtime clients completed their allowed
+  RPCs with the shared workload identity. `GetNtHash` remained denied.
 - Two immediate hash exports succeeded; the third returned
   `RESOURCE_EXHAUSTED`. Bridge audit logs recorded request, completion,
-  wrong-role rejection, and rate-limit rejection without usernames or hash
-  bytes.
+  unassigned-method rejection, and rate-limit rejection without usernames or
+  hash bytes.
 - `docker compose config --quiet` succeeds with the isolated network and
   credential mount topology. Resolved topology checks show the bridge shares
   zero networks with Web and Adminer, while retaining its Samba-control and
@@ -1569,6 +1568,7 @@ strict end-to-end deadlines.
 | Bounded sidecar workers / original detached-thread gap | `samba-vfs/module/authd.cpp` (`BoundedClientQueue`, socket deadlines, worker startup, overload rejection); `samba-vfs/tests/test-authd-capacity.py` |
 | Bounded authorization cache / original growth gap | `samba-vfs/module/decision_cache.h`; `authd.cpp` (cache configuration and sampled counters); `samba-vfs/tests/test-decision-cache.cpp` |
 | Private authenticated Unix socket / original world-writable gap | `samba-vfs/module/authd.cpp` (`configure_expected_peer_executable`, `inspect_peer`, `peer_matches_username`, secure socket publication); `entrypoint.vfs.sh`; `sync-users.sh`; `docker-compose.yml`; `samba-vfs/tests/test-authd-peer-security.py`; `test-authd-smb-peer.py` |
+| Windows-compatible TREE_CONNECT denial | `samba-vfs/patches/0001-map-vfs-connect-errno.patch`; `Dockerfile.vfs`; `samba-vfs/tests/test-vfs-connect-status.py` |
 | Framed local stream protocol / original partial I/O gap | `samba-vfs/module/local_protocol.h`; `vfs_kaimo_bridge.c` (`kaimo_roundtrip`, binary request builders and response parsers); `authd.cpp` (`handle_client`); `samba-vfs/tests/test-local-protocol.cpp`; `test-authd-protocol.py` |
 | Snapshot ACL filtering / original leak | `SmbBridge/Services/SnapshotGrpcService.cs` (`GetFolderSnapshotAsync`, per-user reconciliation); `Core/Services/File/FileService.cs:884-899` |
 | Snapshot cache isolation / original direct path | `SnapshotCache.cs`; `SnapshotGrpcService.cs` (`EnsureIsolatedFromShare`, cache-root-relative paths); `vfs_kaimo_bridge.c` (`kaimo_snapshot_cache_abspath`, reserved namespace checks); `sync-shares.sh`; `docker-compose.yml` |

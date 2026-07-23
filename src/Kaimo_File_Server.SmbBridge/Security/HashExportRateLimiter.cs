@@ -12,8 +12,8 @@ public sealed class HashExportRateLimitOptions
 }
 
 /// <summary>
-/// Small fixed-window limiter for the single, CA-constrained hash-sync
-/// identity. No queue is used: excess exports fail closed.
+/// Small fixed-window limiter for the CA-constrained Samba workload identity.
+/// No queue is used: excess exports fail closed.
 /// </summary>
 public sealed class HashExportRateLimiter
 {

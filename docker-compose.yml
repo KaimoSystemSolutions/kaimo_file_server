@@ -81,7 +81,7 @@ services:
     volumes:
       # Same storage as Host/Web -> Samba performs file I/O directly.
       - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
-      # Separate client identities enforce least privilege per RPC group.
+      # Mount the single Samba workload identity and public control-plane CA.
       - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
     build:
       context: ./samba-vfs

@@ -797,9 +797,9 @@ int main() {
         channel = kaimo::control_plane::create_mtls_channel(
             g_bridge_addr,
             "KAIMO_BRIDGE_RUNTIME_CERT",
-            "/run/secrets/kaimo-control-plane/runtime.crt",
+            "/run/secrets/kaimo-control-plane/samba.crt",
             "KAIMO_BRIDGE_RUNTIME_KEY",
-            "/run/secrets/kaimo-control-plane/runtime.key");
+            "/run/secrets/kaimo-control-plane/samba.key");
     } catch (const std::exception& error) {
         std::cerr << "kaimo_authd: " << error.what() << std::endl;
         return 1;

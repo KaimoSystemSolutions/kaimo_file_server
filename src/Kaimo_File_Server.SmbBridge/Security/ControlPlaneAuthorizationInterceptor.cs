@@ -4,8 +4,8 @@ using Grpc.Core.Interceptors;
 namespace Kaimo_File_Server.SmbBridge.Security;
 
 /// <summary>
-/// Enforces the per-client RPC allow-list after the TLS handshake has validated
-/// the certificate chain.
+/// Enforces the Samba workload's RPC allow-list after the TLS handshake has
+/// validated the certificate chain.
 /// </summary>
 public sealed class ControlPlaneAuthorizationInterceptor(
     ILogger<ControlPlaneAuthorizationInterceptor> logger) : Interceptor

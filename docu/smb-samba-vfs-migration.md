@@ -259,8 +259,10 @@ module matches the source.
   The default is fail-closed (`KAIMO_AUTHZ_FAILOPEN=1` is the explicit emergency
   override); Compose sets fail-closed, isolates Samba/bridge on a private control
   network, and keeps bridge DB access on a bridge-only internal DB network. All C++
-  clients use mTLS. Distinct certificate identities are restricted to their
-  exact RPC groups, while bulk NT-hash export is rate-limited and audited.
+  clients use mTLS with one shared Samba workload identity and an explicit
+  server-side RPC allow-list, while bulk NT-hash export is rate-limited and
+  audited. Separate client certificates would not create a meaningful boundary
+  while all helpers share the same container and credential mount.
 
 - **#1 (A.1) — @GMT snapshots: verified end-to-end (2026-07-19).** Live Windows +
   `smbclient` testing now confirms the full path: file- and folder-level "Previous
@@ -357,9 +359,12 @@ module matches the source.
   **Status: DEFERRED by design** — add an `unlinkat` → `.RECYCLE_BIN` path if product
   requires it.
 
-- **#4 (A.4) — `connect` deny surfaces as `NT_STATUS_UNSUCCESSFUL`** instead of
-  `ACCESS_DENIED` (Samba hardcodes this on VFS connect errors).
-  **Status: OPEN — cosmetic**, low priority.
+- **#4 (A.4) — `connect` deny surfaced as `NT_STATUS_UNSUCCESSFUL`** instead of
+  `ACCESS_DENIED` because Samba hardcoded the generic status for VFS connect
+  errors. **Status: fixed / verified 2026-07-23.** The pinned Samba source now
+  maps the hook's preserved `errno`; Kaimo's `EACCES` therefore becomes
+  `NT_STATUS_ACCESS_DENIED`. A focused live `smbclient` regression reproduces
+  the old status and verifies the new denial in under 1.5 seconds.
 
 - **#2 (A.2) — Snapshot file open served the LIVE file (data-path redirect).**
   Live testing showed that opening a versioned file returned the current content (or
