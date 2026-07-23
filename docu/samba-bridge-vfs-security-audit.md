@@ -15,7 +15,9 @@ However, the current implementation is **not yet complete or safe enough to act 
 The most important conclusions are:
 
 1. No obvious direct stack overflow, heap overflow, use-after-free, or double-free was found during the static review. This is not a formal proof of C/C++ memory safety.
-2. The native implementation still has security-relevant memory/resource failures: allocation failure can disable open authorization, the sidecar has unbounded thread and cache growth, and blocking Unix-socket calls can stall `smbd` workers.
+2. The native connection sidecar now has bounded worker/descriptor growth,
+   receive/send deadlines, and a count/byte-bounded authorization LRU.
+   Blocking client-side Unix-socket operations can still stall `smbd` workers.
 3. The complete open access mask and rename source/destination/replacement policy are now mapped to Kaimo permissions in source. Native runtime verification and several metadata/security operation checks remain open.
 4. Folder snapshot materialization now uses the existing per-file ACL filter and a reconciled per-user projection. Materialized bytes are stored in an isolated global cache outside every share; overlap is rejected by both the bridge and share synchronizer.
 5. The local sidecar protocol is not safely framed and assumes one `read()`/`write()` is sufficient for a stream socket.
@@ -380,11 +382,22 @@ A compromised peer container can retrieve NT hashes for offline cracking/pass-th
 
 ### P1-01: Unbounded detached threads allow memory and file-descriptor exhaustion
 
+> **Remediation status (2026-07-23): Implemented and native-load-tested.**
+> `authd` now uses a fixed worker pool and bounded accepted-client queue.
+> Accepted sockets receive configurable send/receive deadlines; excess clients
+> receive `ERROR` and are closed without allocating another thread.
+
 `authd` accepts each Unix-socket connection and starts a detached `std::thread`. The first `read()` has no receive timeout. A local client can open connections without sending data, consuming one thread, stack, and file descriptor per connection.
 
 **Fix:** use a bounded worker pool or event loop, enforce connection and request deadlines, cap concurrent clients, and reject excess load predictably.
 
 ### P1-02: The authorization cache grows without a global bound
+
+> **Remediation status (2026-07-23): Implemented and native-tested.** The
+> decision cache is now an LRU bounded by both entry count and a conservative
+> accounted byte budget. Expired entries are removed on lookup and by periodic
+> opportunistic sweeps. The configured TTL is the documented maximum
+> revocation delay for a cached decision.
 
 Expired cache entries are removed only when the exact key is requested again. Unique file paths therefore accumulate indefinitely even though the advertised TTL is three seconds.
 
@@ -1290,6 +1303,99 @@ Native verification remains unavailable in this environment: Docker is installed
 
 **Next planned finding:** P1-01 — bound sidecar threads and open Unix-socket clients.
 
+### 2026-07-23 — P1-01: Bounded authd workers and client deadlines
+
+**Status:** Implemented; pinned native build and isolated saturation runtime test verified.
+
+**Solution implemented**
+
+1. Replaced detached per-connection threads with a fixed pool
+   (`KAIMO_AUTHD_WORKERS`, default 16, accepted range 1–256).
+2. Added a bounded FIFO for accepted descriptors
+   (`KAIMO_AUTHD_QUEUE_CAPACITY`, default 64, range 1–4096). When full, the
+   accept loop writes the protocol's fail-closed `ERROR` response and closes
+   the descriptor.
+3. Applied `SO_RCVTIMEO` and `SO_SNDTIMEO` to every accepted socket
+   (`KAIMO_AUTHD_IO_TIMEOUT_MS`, default 2000 ms, range 100–60000), so a client
+   that never sends a request cannot hold a worker indefinitely.
+4. Accepted descriptors use `SOCK_CLOEXEC`; deadline-setup failures close the
+   connection. Invalid resource-limit configuration fails sidecar startup.
+5. Added logarithmically sampled overload and receive-timeout counters to avoid
+   turning an attack into unbounded log volume.
+6. Added a container runtime regression test that saturates the Unix socket
+   with silent clients and measures `/proc` thread/descriptor counts.
+7. Updated the image build marker to `2026-07-23b bounded authd workers`.
+
+**Validation completed**
+
+- Pinned Samba 4.19.5 image builds successfully with the new sidecar.
+- Capacity test with 2 workers, queue capacity 3, and 40 silent clients:
+  thread count remained constant at 23 (including gRPC runtime threads), server
+  descriptors peaked at 13, 35 overload clients received `ERROR`, and
+  descriptors returned to the baseline of 8 after receive deadlines.
+- `KAIMO_AUTHD_WORKERS=0` fails startup with exit code 1.
+
+**Validation still required / deliberately separate**
+
+- Run mixed live SMB authorization, event, and snapshot load to tune the
+  production worker/queue values and observe latency under saturation.
+- P1-03 remains open: the local stream still needs length-prefixed framing and
+  full partial-I/O handling.
+- P1-05 remains open: VFS-side connect/write/read operations still need their
+  own strict end-to-end deadline; P1-01 bounds the server side only.
+
+**Next planned finding:** P1-02 — bound and expire the authorization cache globally.
+
+### 2026-07-23 — P1-02: Bounded authorization decision cache
+
+**Status:** Implemented; deterministic native unit tests and pinned image build verified.
+
+**Solution implemented**
+
+1. Replaced the global `unordered_map` with a mutex-protected LRU abstraction
+   that updates recency on hits and updates.
+2. Added a hard entry cap (`KAIMO_AUTHD_CACHE_MAX_ENTRIES`, default 10,000)
+   and a conservative accounted memory cap
+   (`KAIMO_AUTHD_CACHE_MAX_BYTES`, default 8 MiB). The budget includes two
+   owned key strings plus fixed node/allocation allowance; bucket reservation
+   is also limited by the byte budget.
+3. Entries that would individually exceed the byte budget are never cached.
+   New entries evict least-recently-used decisions until both caps are
+   satisfied.
+4. Expired entries are removed exactly on lookup and by an opportunistic full
+   sweep on the first operation after each interval of at most one second, so
+   expired unique paths cannot accumulate beyond the hard caps.
+5. Made the TTL configurable (`KAIMO_AUTHD_CACHE_TTL_MS`, default 3000,
+   accepted range 100–10,000 ms). This TTL is the documented maximum
+   ACL-revocation delay for an already cached open decision.
+6. Added monotonic hit, miss, eviction, expiration, and oversize-skip
+   statistics. Cache occupancy/bytes/hit ratio and pressure counters are
+   logarithmically sampled into logs.
+7. Added deterministic native tests for LRU order, entry eviction, byte-budget
+   eviction, oversize skipping, and expiry.
+8. Updated the image build marker to `2026-07-23c bounded authz cache`.
+
+**Validation completed**
+
+- Native decision-cache test binary passes during the Samba image build.
+- The pinned Samba 4.19.5 image, authd, gRPC clients, and VFS module compile.
+- The P1-01 saturation regression still passes against the cache-enabled
+  image: constant thread count, bounded descriptors, 35/40 predictable
+  overload rejections, and descriptor recovery after receive deadlines.
+- `KAIMO_AUTHD_CACHE_TTL_MS=10001` fails startup with exit code 1 instead of
+  silently exceeding the documented revocation bound.
+
+**Validation still required / deliberately separate**
+
+- Tune entry/byte limits using production directory-listing cardinality and
+  observe hit/eviction rates under live SMB load.
+- A future ACL-change notification may invalidate matching entries
+  immediately; until then, the configured TTL is the explicit revocation
+  bound.
+- P1-03 framing and P1-05 VFS-side deadlines remain separate next steps.
+
+**Next planned finding:** P1-03 — replace the local stream protocol with bounded, complete framing.
+
 ## 15. Source evidence index
 
 | Finding area | Primary source locations |
@@ -1298,7 +1404,8 @@ Native verification remains unavailable in this environment: Docker is installed
 | Path reconstruction/truncation | `vfs_kaimo_bridge.c:68-228`, `:320-382`, `:510-522`, `:583-991` |
 | Complete access mapping / original gap | `vfs_kaimo_bridge.c:89-197`, `:583-695`; `authd.cpp:53-130`, `:212-249`; `AuthzGrpcService.cs:25-327`; `Core/Security/FilePermissions.cs` |
 | Rename authorization / original gap | `vfs_kaimo_bridge.c` (`kaimo_authz_rename`, `kaimo_renameat`); `authd.cpp` (`do_rename`); `AuthzGrpcService.cs` (`AuthorizeRename`) |
-| Unbounded sidecar threads/cache | `samba-vfs/module/authd.cpp:49-66`, `:183-225`, `:258-262` |
+| Bounded sidecar workers / original detached-thread gap | `samba-vfs/module/authd.cpp` (`BoundedClientQueue`, socket deadlines, worker startup, overload rejection); `samba-vfs/tests/test-authd-capacity.py` |
+| Bounded authorization cache / original growth gap | `samba-vfs/module/decision_cache.h`; `authd.cpp` (cache configuration and sampled counters); `samba-vfs/tests/test-decision-cache.cpp` |
 | World-writable socket | `authd.cpp:241-254` |
 | Partial stream I/O | `vfs_kaimo_bridge.c:89-139`, `:258-304`; `authd.cpp:224-262` |
 | Snapshot ACL filtering / original leak | `SmbBridge/Services/SnapshotGrpcService.cs` (`GetFolderSnapshotAsync`, per-user reconciliation); `Core/Services/File/FileService.cs:884-899` |

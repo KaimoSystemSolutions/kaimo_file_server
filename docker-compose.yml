@@ -91,6 +91,16 @@ services:
       # (deny) so a bridge outage cannot silently grant access. Set to "1" to fail
       # OPEN (allow on error) only if availability must trump security in a given env.
       KAIMO_AUTHZ_FAILOPEN: "0"
+      # P1-01: fixed authd concurrency and bounded accepted-client queue.
+      # Silent local clients lose their worker after the I/O deadline.
+      KAIMO_AUTHD_WORKERS: ${KAIMO_AUTHD_WORKERS:-16}
+      KAIMO_AUTHD_QUEUE_CAPACITY: ${KAIMO_AUTHD_QUEUE_CAPACITY:-64}
+      KAIMO_AUTHD_IO_TIMEOUT_MS: ${KAIMO_AUTHD_IO_TIMEOUT_MS:-2000}
+      # P1-02: bounded LRU authorization cache. TTL is also the documented
+      # maximum ACL-revocation delay for an already cached open decision.
+      KAIMO_AUTHD_CACHE_MAX_ENTRIES: ${KAIMO_AUTHD_CACHE_MAX_ENTRIES:-10000}
+      KAIMO_AUTHD_CACHE_MAX_BYTES: ${KAIMO_AUTHD_CACHE_MAX_BYTES:-8388608}
+      KAIMO_AUTHD_CACHE_TTL_MS: ${KAIMO_AUTHD_CACHE_TTL_MS:-3000}
       # @GMT "Previous Versions" data-path redirect (openat hook). "1" = on (serve the
       # materialized version copy). Set to "0" to disable the redirect at runtime
       # (no rebuild) if it ever misbehaves — snapshots then fall back to broken/live.

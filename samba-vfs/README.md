@@ -250,8 +250,22 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
 - **.NET:** new `FileService.NotifyExternal{Close,Delete,Rename,Mkdir}Async` (in Core) use the
   **already wired** version/ownership/search services — identical results as web uploads.
   Facade: [`FileEventGrpcService`](../src/Kaimo_File_Server.SmbBridge/Services/FileEventGrpcService.cs).
-- **Sidecar** is now **multi-threaded** (one thread per connection) so slow events
-  (versioning reads the file) don't block authz requests. Events are fire-and-forget.
+- **Sidecar** uses a fixed worker pool (`KAIMO_AUTHD_WORKERS`, default 16)
+  and a bounded accepted-client queue (`KAIMO_AUTHD_QUEUE_CAPACITY`, default
+  64), so slow events do not create unbounded threads or descriptors. Excess
+  clients receive `ERROR`; silent clients are closed after
+  `KAIMO_AUTHD_IO_TIMEOUT_MS` (default 2000 ms). Events remain
+  fire-and-forget.
+- **Authorization cache:** open decisions use a mutex-protected LRU capped by
+  both entry count (`KAIMO_AUTHD_CACHE_MAX_ENTRIES`, default 10,000) and an
+  accounted memory budget (`KAIMO_AUTHD_CACHE_MAX_BYTES`, default 8 MiB).
+  Expired entries are removed on lookup and by an opportunistic sweep on the
+  first cache operation after each one-second interval; oversize keys are not
+  cached, and hit/miss/occupancy/eviction/skip counters are sampled into the
+  sidecar log.
+  `KAIMO_AUTHD_CACHE_TTL_MS` defaults to 3000 ms and is the documented
+  maximum ACL-revocation delay for a cached decision (accepted range
+  100–10,000 ms).
 - **Recycle bin** deliberately **not** implemented: the old SMB path (`MarkDeleteOnClose`) also doesn't recycle —
   recycle only exists in web `DeleteFileAsync`. So this is faithful parity.
 

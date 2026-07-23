@@ -19,13 +19,18 @@
 //     "SNAPENUM\t<user>\t<share>\t<path>"    -> "OK\t<n>\n<tok1>\n<tok2>..."|"ERROR"
 //     "SNAPRESOLVE\t<user>\t<share>\t<@GMT>\t<path>" -> "OK\t<cache-root-relative-path>\t<size>"|"ERROR"
 //
-// Each connection is handled in its own thread so slow events
-// (versioning reads the file) don't block authorization requests.
+// Connections are handled by a fixed-size worker pool. Accepted descriptors
+// wait in a bounded queue; excess clients receive ERROR and are closed. Socket
+// receive/send deadlines ensure a client that sends nothing cannot pin a worker
+// indefinitely.
+#include <atomic>
 #include <chrono>
 #include <cerrno>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -45,6 +50,7 @@
 
 #include <grpcpp/grpcpp.h>
 #include "bridge_channel.h"
+#include "decision_cache.h"
 #include "kaimo_smb_bridge.grpc.pb.h"
 
 using namespace kaimo::smb::bridge::v1;
@@ -53,35 +59,115 @@ static std::string g_bridge_addr;
 static std::unique_ptr<AuthzService::Stub> g_authz;
 static std::unique_ptr<EventService::Stub> g_events;
 static std::unique_ptr<SnapshotService::Stub> g_snapshot;
+static std::unique_ptr<kaimo::authd::DecisionCache> g_cache;
+static std::atomic<uint64_t> g_overload_rejections{0};
+static std::atomic<uint64_t> g_receive_timeouts{0};
+static std::atomic<uint64_t> g_cache_evictions{0};
+static std::atomic<uint64_t> g_cache_oversize_skips{0};
+static std::atomic<uint64_t> g_cache_requests{0};
 
-// --- TTL decision cache (mutex-protected due to multi-threading) ---
-struct CacheEntry {
-    bool allow;
-    uint32_t granted_access;
-    std::chrono::steady_clock::time_point expiry;
+class BoundedClientQueue {
+public:
+    explicit BoundedClientQueue(size_t capacity) : capacity_(capacity) {}
+
+    bool try_push(int client_fd) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (clients_.size() >= capacity_) return false;
+        clients_.push_back(client_fd);
+        ready_.notify_one();
+        return true;
+    }
+
+    int pop() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        ready_.wait(lock, [this] { return !clients_.empty(); });
+        int client_fd = clients_.front();
+        clients_.pop_front();
+        return client_fd;
+    }
+
+private:
+    const size_t capacity_;
+    std::mutex mutex_;
+    std::condition_variable ready_;
+    std::deque<int> clients_;
 };
-static std::unordered_map<std::string, CacheEntry> g_cache;
-static std::mutex g_cache_mtx;
-static const auto kCacheTtl = std::chrono::seconds(3);
+
+static bool should_log_counter(uint64_t count) {
+    return count == 1 || (count & (count - 1)) == 0;
+}
 
 static bool cache_get(const std::string& key, bool& allow, uint32_t& granted_access) {
-    std::lock_guard<std::mutex> lk(g_cache_mtx);
-    auto it = g_cache.find(key);
-    if (it == g_cache.end()) return false;
-    if (std::chrono::steady_clock::now() >= it->second.expiry) { g_cache.erase(it); return false; }
-    allow = it->second.allow;
-    granted_access = it->second.granted_access;
-    return true;
+    bool hit = g_cache->get(key, allow, granted_access);
+    uint64_t requests = ++g_cache_requests;
+    if (requests >= 1024 && should_log_counter(requests)) {
+        auto stats = g_cache->stats();
+        std::cerr << "kaimo_authd: authorization cache requests=" << requests
+                  << " hits=" << stats.hits
+                  << " misses=" << stats.misses
+                  << " entries=" << stats.entries
+                  << " bytes=" << stats.accounted_bytes
+                  << " expired=" << stats.expired << std::endl;
+    }
+    return hit;
 }
 static void cache_put(const std::string& key, bool allow, uint32_t granted_access) {
-    std::lock_guard<std::mutex> lk(g_cache_mtx);
-    g_cache[key] = {
-        allow, granted_access, std::chrono::steady_clock::now() + kCacheTtl
-    };
+    auto result = g_cache->put(key, allow, granted_access);
+    if (result.evicted > 0) {
+        uint64_t total = g_cache_evictions.fetch_add(result.evicted) +
+                         result.evicted;
+        if (should_log_counter(total)) {
+            std::cerr << "kaimo_authd: authorization cache evictions="
+                      << total << std::endl;
+        }
+    }
+    if (result.skipped_oversize) {
+        uint64_t total = ++g_cache_oversize_skips;
+        if (should_log_counter(total)) {
+            std::cerr << "kaimo_authd: authorization cache oversize skips="
+                      << total << std::endl;
+        }
+    }
 }
 
 static std::chrono::system_clock::time_point deadline(int secs) {
     return std::chrono::system_clock::now() + std::chrono::seconds(secs);
+}
+
+static bool read_bounded_size(const char* environment_name,
+                              size_t default_value,
+                              size_t minimum,
+                              size_t maximum,
+                              size_t& value) {
+    const char* configured = std::getenv(environment_name);
+    if (!configured || configured[0] == '\0') {
+        value = default_value;
+        return true;
+    }
+
+    char* end = nullptr;
+    errno = 0;
+    unsigned long long parsed = std::strtoull(configured, &end, 10);
+    if (errno == ERANGE || end == configured || *end != '\0' ||
+        parsed < minimum || parsed > maximum) {
+        std::cerr << "kaimo_authd: invalid " << environment_name
+                  << " (expected " << minimum << ".." << maximum << ")"
+                  << std::endl;
+        return false;
+    }
+
+    value = static_cast<size_t>(parsed);
+    return true;
+}
+
+static bool configure_client_deadlines(int client_fd, size_t timeout_ms) {
+    struct timeval timeout;
+    timeout.tv_sec = static_cast<time_t>(timeout_ms / 1000);
+    timeout.tv_usec = static_cast<suseconds_t>((timeout_ms % 1000) * 1000);
+    return setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO,
+                      &timeout, sizeof(timeout)) == 0 &&
+           setsockopt(client_fd, SOL_SOCKET, SO_SNDTIMEO,
+                      &timeout, sizeof(timeout)) == 0;
 }
 
 // ---- Authz ----
@@ -253,7 +339,17 @@ static bool parse_hex_u32(const std::string& text, uint32_t& value) {
 static void handle_client(int cfd) {
     char buf[8192];
     ssize_t r = read(cfd, buf, sizeof(buf) - 1);
-    if (r <= 0) { close(cfd); return; }
+    if (r <= 0) {
+        if (r < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            uint64_t count = ++g_receive_timeouts;
+            if (should_log_counter(count)) {
+                std::cerr << "kaimo_authd: receive deadline expired; total="
+                          << count << std::endl;
+            }
+        }
+        close(cfd);
+        return;
+    }
     buf[r] = '\0';
     std::string line(buf);
     auto nl = line.find('\n');
@@ -317,6 +413,31 @@ static void handle_client(int cfd) {
 int main() {
     signal(SIGPIPE, SIG_IGN);
 
+    size_t worker_count = 0;
+    size_t queue_capacity = 0;
+    size_t io_timeout_ms = 0;
+    size_t cache_max_entries = 0;
+    size_t cache_max_bytes = 0;
+    size_t cache_ttl_ms = 0;
+    if (!read_bounded_size("KAIMO_AUTHD_WORKERS", 16, 1, 256,
+                           worker_count) ||
+        !read_bounded_size("KAIMO_AUTHD_QUEUE_CAPACITY", 64, 1, 4096,
+                           queue_capacity) ||
+        !read_bounded_size("KAIMO_AUTHD_IO_TIMEOUT_MS", 2000, 100, 60000,
+                           io_timeout_ms) ||
+        !read_bounded_size("KAIMO_AUTHD_CACHE_MAX_ENTRIES", 10000, 1, 1000000,
+                           cache_max_entries) ||
+        !read_bounded_size("KAIMO_AUTHD_CACHE_MAX_BYTES", 8388608, 1024,
+                           1073741824, cache_max_bytes) ||
+        !read_bounded_size("KAIMO_AUTHD_CACHE_TTL_MS", 3000, 100, 10000,
+                           cache_ttl_ms)) {
+        return 1;
+    }
+    g_cache = std::make_unique<kaimo::authd::DecisionCache>(
+        std::chrono::milliseconds(cache_ttl_ms),
+        cache_max_entries,
+        cache_max_bytes);
+
     const char* addr_env = std::getenv("KAIMO_BRIDGE_ADDR");
     g_bridge_addr = addr_env ? addr_env : "kaimo_smb_bridge:5080";
     const char* sock_env = std::getenv("KAIMO_AUTHD_SOCK");
@@ -353,12 +474,52 @@ int main() {
     chmod(sock_path.c_str(), 0666);
     if (listen(sfd, 128) != 0) { std::cerr << "kaimo_authd: listen() failed" << std::endl; return 1; }
 
-    std::cerr << "kaimo_authd: ready. socket=" << sock_path << " bridge=" << g_bridge_addr << std::endl;
+    BoundedClientQueue client_queue(queue_capacity);
+    std::vector<std::thread> workers;
+    workers.reserve(worker_count);
+    for (size_t i = 0; i < worker_count; ++i) {
+        workers.emplace_back([&client_queue] {
+            for (;;) handle_client(client_queue.pop());
+        });
+    }
+
+    std::cerr << "kaimo_authd: ready. socket=" << sock_path
+              << " bridge=" << g_bridge_addr
+              << " workers=" << worker_count
+              << " queue=" << queue_capacity
+              << " io_timeout_ms=" << io_timeout_ms
+              << " cache_entries=" << cache_max_entries
+              << " cache_bytes=" << cache_max_bytes
+              << " cache_ttl_ms=" << cache_ttl_ms << std::endl;
 
     for (;;) {
-        int cfd = accept(sfd, nullptr, nullptr);
-        if (cfd < 0) continue;
-        std::thread(handle_client, cfd).detach();
+        int cfd = accept4(sfd, nullptr, nullptr, SOCK_CLOEXEC);
+        if (cfd < 0) {
+            if (errno != EINTR) {
+                std::cerr << "kaimo_authd: accept() failed: "
+                          << std::strerror(errno) << std::endl;
+            }
+            continue;
+        }
+
+        if (!configure_client_deadlines(cfd, io_timeout_ms)) {
+            std::cerr << "kaimo_authd: failed to set client socket deadlines"
+                      << std::endl;
+            close(cfd);
+            continue;
+        }
+
+        if (!client_queue.try_push(cfd)) {
+            static const char overload_reply[] = "ERROR\n";
+            (void)send(cfd, overload_reply, sizeof(overload_reply) - 1,
+                       MSG_NOSIGNAL);
+            close(cfd);
+            uint64_t count = ++g_overload_rejections;
+            if (should_log_counter(count)) {
+                std::cerr << "kaimo_authd: worker queue full; rejected="
+                          << count << std::endl;
+            }
+        }
     }
     return 0;
 }

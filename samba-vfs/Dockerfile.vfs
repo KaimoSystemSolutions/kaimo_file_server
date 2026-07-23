@@ -137,6 +137,8 @@ COPY module/authd.cpp ./
 COPY module/sharesync.cpp ./
 COPY module/configsync.cpp ./
 COPY module/bridge_channel.h ./
+COPY module/decision_cache.h ./
+COPY tests/test-decision-cache.cpp ./
 RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
     && protoc --grpc_out=. --plugin=protoc-gen-grpc="$(which grpc_cpp_plugin)" kaimo_smb_bridge.proto \
     && g++ -std=c++17 -O2 \
@@ -159,6 +161,10 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
        $(pkg-config --cflags grpc++ protobuf) \
        $(pkg-config --libs grpc++ protobuf) \
        -o /usr/local/bin/kaimo_configsync \
+    && g++ -std=c++17 -O2 -pthread -I. \
+       test-decision-cache.cpp -o /tmp/test-decision-cache \
+    && /tmp/test-decision-cache \
+    && rm /tmp/test-decision-cache \
     && test -x /usr/local/bin/kaimo_authsync \
     && test -x /usr/local/bin/kaimo_authd \
     && test -x /usr/local/bin/kaimo_sharesync \
