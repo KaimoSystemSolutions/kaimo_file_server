@@ -96,7 +96,9 @@ public sealed class AuthzGrpcServiceDeleteTests : IDisposable
     [Fact]
     public async Task AuthorizeOpen_DeleteOnlyWithReadPermission_IsDenied()
     {
-        Allow("docs/report.txt", isDirectory: false, FilePermission.ListReadData);
+        Allow("", isDirectory: true, FilePermission.TraverseExecute);
+        Allow("docs", isDirectory: true, FilePermission.TraverseExecute);
+        Allow("docs/report.txt", isDirectory: false, FilePermission.ReadAttributes);
         Deny(FilePermission.Delete);
         Deny(FilePermission.DeleteSubItems);
 
@@ -106,7 +108,7 @@ public sealed class AuthzGrpcServiceDeleteTests : IDisposable
                 Username = "alice",
                 Share = "share",
                 Path = "docs/report.txt",
-                WantDelete = true
+                AccessMask = 0x00010000
             },
             null!);
 

@@ -175,23 +175,35 @@ to allow on error instead (availability over security), which was the previous d
 `ACCESS_DENIED`) — several Samba code paths hardcode this for VFS connect errors. Functionally
 access is correctly denied.
 
-**Open (Phase 2b):** File/path ACL on `openat`/`unlink`/`rename` (currently logging only) and
-directory listing filter — performance-sensitive and tied to path reconstruction, so as a separate
-step.
+**Implemented in Phase 2b:** File/path, delete, and rename authorization plus the
+directory listing filter. Native runtime verification of the latest hardening revisions
+remains pending.
 
 ## Phase 2b — File/path ACL + listing filter (Phase 2 complete)
 
-**Result: works.** File open (read/write/create) and directory listing follow genuine
-Kaimo ACLs — with **exact parity** to the old `FileService.OpenAsync` and `ListAsync`.
+**Result:** the managed access-mask mapping is implemented and covered by automated
+tests; native Samba runtime verification of the P0-03 revision remains pending.
+File opens and directory listing use genuine Kaimo ACLs without reducing SMB access
+to read/write booleans.
 
 - **`create_file` hook** ([vfs_kaimo_bridge.c](module/vfs_kaimo_bridge.c)) → gRPC `AuthorizeOpen`.
-  The correct seam (not `openat`): full path + access mask, returns clean `ACCESS_DENIED`.
-  Parity logic in [`AuthzGrpcService.AuthorizeOpen`](../src/Kaimo_File_Server.SmbBridge/Services/AuthzGrpcService.cs):
-  write→`CreateWriteData`, read→`ListReadData`, create→`CreateWriteData` on parent; each
-  access type separately; non-existent without create = "not found" (no ACL deny).
+  The correct seam (not `openat`): full path + raw SMB desired-access mask. The bridge
+  expands Samba 4.19.5 generic rights, checks data/list, write, append, traverse,
+  attributes, EA, security-descriptor, owner, delete, and delete-child permissions,
+  then returns the exact specific mask that the VFS passes to Samba. `MAXIMUM_ALLOWED`
+  is attenuated to Kaimo-granted rights instead of being recalculated from the broad
+  POSIX service identity. Missing file creation requires parent `CreateWriteData`;
+  missing directory creation requires parent `CreateAppendData`.
 - **`readdir` hook** → hides entries without read permission (`AuthorizeOpen` read-only per entry).
-  The **sidecar caches** decisions (TTL 3 s) so large listings don't flood the bridge.
+  Listing requests are marked separately so Samba's implicit FSP `ReadAttributes`
+  behavior is not applied to visibility checks. The **sidecar caches** decisions and
+  granted masks (TTL 3 s) so large listings don't flood the bridge.
   Disabled with `KAIMO_LIST_FILTER=0`.
+- **`renameat` hook** → gRPC `AuthorizeRename` before mutation. The bridge requires
+  source `Delete` (or source-parent `DeleteSubItems`), file/directory-appropriate create
+  permission on the destination parent, and deletion permission for an existing replacement.
+  The VFS validates source/destination inode and type both before and after the RPC to
+  reject stale or exchanged directory entries.
 
 **Verified:**
 
@@ -221,7 +233,8 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
  smbd VFS hook (pure C)            Sidecar (kaimo_authd)        SmbBridge (.NET)
   close_fn   (file written)    ──"CLOSE\t…"──► NotifyClose ──► FileService.NotifyExternalCloseAsync
   unlinkat_fn(deleted)         ──"DELETE\t…"─► NotifyDelete ─►   → Version (CreateVersionAsync)
-  renameat_fn(renamed)         ──"RENAME\t…"─► NotifyRename ─►   → Ownership (EnsureOwnerAsync)
+  renameat_fn(renamed)  ──"RENAMEAUTH\t…"─► AuthorizeRename
+                        ──"RENAME\t…"─────► NotifyRename ─►   → Ownership (EnsureOwnerAsync)
   mkdirat_fn (directory created) ──"MKDIR\t…"──► NotifyMkdir  ─►   → Search index (SearchServiceRouter)
                                     (fire-and-forget)               → ACL realignment (Rename)
 ```
@@ -394,19 +407,27 @@ module does it via the bridge instead:
  kaimo_authd ──gRPC EnumerateSnapshots──►   kaimo_authd ──gRPC ResolveVersion──►
                 SmbBridge (.NET)                            SmbBridge (.NET)
                 GetSnapshotTimestamps/GetVersions           GetVersionAt + ReadVersion
-                                                            → materialize decompressed copy
-                                                              into <share>/.kaimo-snapshots/@GMT-…/
+                                                            → ACL-filter + materialize into
+                                                              /data/storage/.kaimo-snapshots/<share-id>/@GMT-…/<user-id>/
    labels (@GMT tokens)                        base_name rewritten to that copy → native read
 ```
 
 - **Enumeration** (`get_shadow_copy_data_fn`) returns the `@GMT-` labels for the
   file. **Resolution**: a timewarp open/stat (`smb_fname->twrp`) is turned into an
-  `@GMT-` token, the bridge materializes that one version **decompressed** into a
-  hidden in-share cache (`<share>/.kaimo-snapshots/@GMT-…/<relpath>`, hidden from
-  listings, reused idempotently) and the module redirects the open there — so the
-  **data path stays native**, exactly like live files.
-- **ACL parity:** `EnumerateSnapshots`/`ResolveVersion` require `ListReadData` on
-  the path, so users only see/read snapshots of files they may read.
+  `@GMT-` token, the bridge materializes that one version **decompressed** into the
+  global internal cache (`/data/storage/.kaimo-snapshots/<share-id>/@GMT-…/<user-id>/<relpath>`)
+  outside every Samba connectpath. The bridge returns only a cache-root-relative
+  path; the VFS validates all components and joins its independently configured
+  absolute root before redirecting the open.
+- **ACL parity:** concrete files require `ListReadData`; folders go through
+  `IFileService.GetFolderSnapshotAsync`, which checks the directory and batch-filters
+  every historical child. Before returning a folder, the bridge removes stale files
+  from that user's projection, including files revoked after earlier materialization.
+- **Cache isolation:** `Snapshots:Cache:RootPath` and
+  `KAIMO_SNAPSHOT_CACHE_ROOT` must match. Resolution fails closed if that root
+  overlaps a share; `sync-shares.sh` also refuses to publish an overlapping share.
+  The legacy top-level `.kaimo-snapshots` name remains denied in client-facing VFS
+  path hooks while the cleanup service removes recognizable old cache trees.
 - **.NET:** [`SnapshotGrpcService`](../src/Kaimo_File_Server.SmbBridge/Services/SnapshotGrpcService.cs)
   — thin facade over the already-complete `IFileVersionService`.
 - **C/C++:** `get_shadow_copy_data_fn` + `stat`/`lstat` + `create_file` twrp branch

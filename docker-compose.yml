@@ -30,6 +30,10 @@ services:
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
+    environment:
+      # Global internal cache, outside every /data/storage/<share> connectpath.
+      # Must match KAIMO_SNAPSHOT_CACHE_ROOT in the Samba container.
+      Snapshots__Cache__RootPath: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/storage/.kaimo-snapshots}
     volumes:
       - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
 
@@ -71,6 +75,9 @@ services:
       # materialized version copy). Set to "0" to disable the redirect at runtime
       # (no rebuild) if it ever misbehaves — snapshots then fall back to broken/live.
       KAIMO_SNAPSHOT_OPENAT: "1"
+      # Must match Snapshots__Cache__RootPath in kaimo_smb_bridge. This global
+      # directory is a sibling of share roots and is never published by Samba.
+      KAIMO_SNAPSHOT_CACHE_ROOT: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/storage/.kaimo-snapshots}
     healthcheck:
       test: ["CMD-SHELL", "/opt/samba/bin/smbclient -L localhost -U kaimotest%Passw0rd! -m SMB3 >/dev/null 2>&1 || exit 1"]
       interval: 15s
@@ -126,30 +133,30 @@ services:
       timeout: 5s
       retries: 10
       
-  elasticsearch:
-    container_name: kaimo_elasticsearch
-    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
-    environment:
-      TZ: Europe/Berlin
-      discovery.type: single-node
-      xpack.security.enabled: "false"
-      ES_JAVA_OPTS: "-Xms2g -Xmx2g"
-      # Dev machine: disk can fill more before ES blocks shard allocation.
-      # Default is 85/90/95% -> on a nearly full C:
-      # otherwise every shard remains "unassigned" and the cluster turns red.
-      cluster.routing.allocation.disk.watermark.low: "95%"
-      cluster.routing.allocation.disk.watermark.high: "97%"
-      cluster.routing.allocation.disk.watermark.flood_stage: "98%"
-    volumes:
-      - ${LOCATION_ES:-./tests/data/elastic_search}:/usr/share/elasticsearch/data
-    ports:
-      - "9200:9200"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsSL 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s' || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 30s
+  #elasticsearch:
+  #  container_name: kaimo_elasticsearch
+  #  image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
+  #  environment:
+  #    TZ: Europe/Berlin
+  #    discovery.type: single-node
+  #    xpack.security.enabled: "false"
+  #    ES_JAVA_OPTS: "-Xms2g -Xmx2g"
+  #    # Dev machine: disk can fill more before ES blocks shard allocation.
+  #    # Default is 85/90/95% -> on a nearly full C:
+  #    # otherwise every shard remains "unassigned" and the cluster turns red.
+  #    cluster.routing.allocation.disk.watermark.low: "95%"
+  #    cluster.routing.allocation.disk.watermark.high: "97%"
+  #    cluster.routing.allocation.disk.watermark.flood_stage: "98%"
+  #  volumes:
+  #    - ${LOCATION_ES:-./tests/data/elastic_search}:/usr/share/elasticsearch/data
+  #  ports:
+  #    - "9200:9200"
+  #  healthcheck:
+  #    test: ["CMD-SHELL", "curl -fsSL 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s' || exit 1"]
+  #    interval: 5s
+  #    timeout: 5s
+  #    retries: 30
+  #    start_period: 30s
 
       # Reserve Memory Addresses for files straight away. Elastic search loads up files on demand later on 
       # sudo sysctl -w vm.max_map_count=262144

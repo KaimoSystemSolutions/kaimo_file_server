@@ -529,7 +529,7 @@ public class FileSystemStorage : IStorageEngine
         var entries = new List<FileMetadata>();
 
         if (!Directory.Exists(fullPath))
-            return Task.FromResult(entries);
+            throw new DirectoryNotFoundException($"Directory '{normalized}' does not exist.");
 
         foreach (var dir in Directory.GetDirectories(fullPath))
         {

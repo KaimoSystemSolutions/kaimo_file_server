@@ -29,6 +29,8 @@ public partial class FileBrowser
         _selectedItems.Clear();
         _sortColumn = null;
         _sortDirection = 0;
+        _showCreateFolder = false;
+        _createFolderError = null;
 
         _contextMenuComponent?.CloseContextMenu();
 
@@ -38,16 +40,26 @@ public partial class FileBrowser
         VM.OnStateChanged -= OnVmStateChanged;
         VM.OnStateChanged += OnVmStateChanged;
 
-        // Auto-select from search
-        var uri = Nav.ToAbsoluteUri(Nav.Uri);
-        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-        var selectName = query["select"];
-        if (!string.IsNullOrEmpty(selectName))
-        {
-            var item = FindShareItem(selectName);
-            if (item is not null)
-                _selectedItems.Add(item);
-        }
+        TryApplyPendingFileSelection();
+    }
+
+    private void OnFileSelectionRequested()
+    {
+        if (TryApplyPendingFileSelection())
+            _ = InvokeAsync(StateHasChanged);
+    }
+
+    private bool TryApplyPendingFileSelection()
+    {
+        if (!FileSelectionCoordinator.TryConsume(ShareName, SubPath ?? "", out var itemName))
+            return false;
+
+        _selectedItems.Clear();
+        var item = FindShareItem(itemName);
+        if (item is not null)
+            _selectedItems.Add(item);
+
+        return true;
     }
 
     private void OnVmStateChanged() => InvokeAsync(StateHasChanged);
@@ -55,6 +67,7 @@ public partial class FileBrowser
     public void Dispose()
     {
         VM.OnStateChanged -= OnVmStateChanged;
+        FileSelectionCoordinator.SelectionRequested -= OnFileSelectionRequested;
         _dotNetRef?.Dispose();
         UploadCoordinator.OnFilesSelected -= OnFileUploaded;
     }
@@ -65,7 +78,7 @@ public partial class FileBrowser
         {
             _jsInitialized = true;
             _dotNetRef = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("initFileUpload", "#file-drop-zone", _dotNetRef);
+            await JS.InvokeVoidAsync("initFileUpload", "#file-drop-zone");
             await JS.InvokeVoidAsync("initInternalDragDrop");
         }
     }
@@ -363,6 +376,6 @@ public partial class FileBrowser
     /// ACL panel, badges and permission actions — and the context-menu entry.
     /// </summary>
     public bool CanManageAcls()
-        => VM.CanManageAcls;
+        => !VM.IsLoading && VM.ErrorMessage is null && VM.CanManageAcls;
 }
 

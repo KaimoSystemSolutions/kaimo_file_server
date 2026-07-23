@@ -19,6 +19,58 @@ namespace Kaimo_File_Server.SmbBridge.Services;
 /// </summary>
 public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
 {
+    // MS-SMB2 2.2.13.1 and Samba 4.19.5 libcli/security/security.h.
+    // Directory-specific aliases use the same numeric bits as their file
+    // counterparts (LIST/READ_DATA, ADD_FILE/WRITE_DATA, etc.).
+    private const uint FileReadData = 0x00000001;
+    private const uint FileWriteData = 0x00000002;
+    private const uint FileAppendData = 0x00000004;
+    private const uint FileReadEa = 0x00000008;
+    private const uint FileWriteEa = 0x00000010;
+    private const uint FileExecute = 0x00000020;
+    private const uint FileDeleteChild = 0x00000040;
+    private const uint FileReadAttributes = 0x00000080;
+    private const uint FileWriteAttributes = 0x00000100;
+    private const uint DeleteAccess = 0x00010000;
+    private const uint ReadControl = 0x00020000;
+    private const uint WriteDac = 0x00040000;
+    private const uint WriteOwner = 0x00080000;
+    private const uint Synchronize = 0x00100000;
+    private const uint SystemSecurity = 0x01000000;
+    private const uint MaximumAllowed = 0x02000000;
+    private const uint GenericAll = 0x10000000;
+    private const uint GenericExecute = 0x20000000;
+    private const uint GenericWrite = 0x40000000;
+    private const uint GenericRead = 0x80000000;
+    private const uint GenericBits = GenericAll | GenericExecute | GenericWrite | GenericRead;
+
+    // Exact Samba 4.19.5 file_generic_mapping outputs.
+    private const uint FileGenericAll = 0x001F01FF;
+    private const uint FileGenericRead = 0x00120089;
+    private const uint FileGenericWrite = 0x00120116;
+    private const uint FileGenericExecute = 0x001200A0;
+    private const uint SupportedSpecificAccess = FileGenericAll;
+
+    private static readonly AccessRule[] AccessRules =
+    [
+        new(FileReadData, FilePermission.ListReadData, "ListReadData"),
+        new(FileWriteData, FilePermission.CreateWriteData, "CreateWriteData"),
+        new(FileAppendData, FilePermission.CreateAppendData, "CreateAppendData"),
+        new(FileReadEa, FilePermission.ReadExtAttributes, "ReadExtAttributes"),
+        new(FileWriteEa, FilePermission.WriteExtAttributes, "WriteExtAttributes"),
+        new(FileExecute, FilePermission.TraverseExecute, "TraverseExecute"),
+        new(FileDeleteChild, FilePermission.DeleteSubItems, "DeleteSubItems"),
+        new(FileReadAttributes, FilePermission.ReadAttributes, "ReadAttributes"),
+        new(FileWriteAttributes, FilePermission.WriteAttributes, "WriteAttributes"),
+        new(DeleteAccess, FilePermission.Delete, "Delete"),
+        new(ReadControl, FilePermission.ReadPermissions, "ReadPermissions"),
+        new(WriteDac, FilePermission.ChangePermissions, "ChangePermissions"),
+        new(WriteOwner, FilePermission.TakeOwnership, "TakeOwnership")
+    ];
+
+    private readonly record struct AccessRule(
+        uint Mask, FilePermission Permission, string Name);
+
     private readonly IUserRepository _users;
     private readonly IShareRepository _shares;
     private readonly IAuthenticationLookup _auth;
@@ -70,12 +122,10 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     }
 
     /// <summary>
-    /// File/path authorization — mirrors <c>FileService.OpenAsync</c> exactly:
-    /// non-existent + create → parent needs <c>CreateWriteData</c>; existent →
-    /// write needs <c>CreateWriteData</c>, every non-pure-write open additionally
-    /// needs <c>ListReadData</c> (read is checked independently). Non-existent
-    /// files without create intent are not an ACL deny (Samba treats that as
-    /// "not found").
+    /// Complete SMB desired-access authorization. Generic access is expanded
+    /// exactly as Samba 4.19.5 does. Every specific security-relevant bit is
+    /// checked independently, and MAXIMUM_ALLOWED is converted into an
+    /// attenuated specific mask that the VFS passes to Samba.
     /// </summary>
     public override async Task<AuthorizeReply> AuthorizeOpen(
         AuthorizeOpenRequest request, ServerCallContext context)
@@ -88,74 +138,192 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         if (share is null)
             return Deny($"unknown share '{request.Share}'");
 
+        if (!ShareRelativePath.IsValid(request.Path))
+            return Deny($"invalid open path '{request.Path}'");
+
         string normalized = ShareRelativePath.Normalize(request.Path);
         string full = Path.Combine(share.Path, normalized);
         bool exists = File.Exists(full) || Directory.Exists(full);
-        bool isDir = Directory.Exists(full);
+        bool isDir = exists ? Directory.Exists(full) : request.CreateDirectory;
 
-        bool allow;
-        string reason = "";
-        if (!exists)
+        uint expanded = ExpandGenericAccess(request.AccessMask);
+        uint unsupported = expanded &
+            ~(SupportedSpecificAccess | MaximumAllowed | SystemSecurity);
+        if (unsupported != 0)
+            return Deny($"unsupported access-mask bits 0x{unsupported:X8}");
+
+        if ((expanded & SystemSecurity) != 0)
+            return Deny("ACCESS_SYSTEM_SECURITY is unsupported by the Kaimo ACL model");
+
+        bool wantsMaximum = (expanded & MaximumAllowed) != 0;
+        uint specific = expanded & ~MaximumAllowed;
+
+        string? traversalDeny = await CheckTraversalAsync(
+            user, share.Id, normalized);
+        if (traversalDeny is not null)
+            return Deny(traversalDeny);
+
+        if (!exists && request.WantsCreate)
         {
-            // No target + no create intent → "not found", no ACL deny.
-            if (!request.WantsCreate)
+            string parent = ShareRelativePath.GetParent(normalized);
+            FilePermission createPermission = request.CreateDirectory
+                ? FilePermission.CreateAppendData
+                : FilePermission.CreateWriteData;
+            if (!await _acl.HasAccessAsync(
+                    user, share.Id, parent, true, createPermission))
+                return Deny(
+                    $"create denied: parent '{parent}' lacks {createPermission}");
+        }
+
+        // Samba 4.19.5 unconditionally adds FILE_READ_ATTRIBUTES to a
+        // successfully opened FSP. Require it here even if the client omitted
+        // the bit, otherwise the broad POSIX identity would over-grant Kaimo.
+        // readdir visibility checks do not create an FSP and are exempt.
+        if (!request.DirectoryListing)
+            specific |= FileReadAttributes;
+
+        AccessDecision decision = wantsMaximum
+            ? await CalculateMaximumAllowedAsync(user, share.Id, normalized, isDir)
+            : await RequireSpecificAccessAsync(
+                user, share.Id, normalized, isDir, specific);
+
+        bool allow = decision.Allowed;
+        uint granted = allow ? decision.GrantedMask : 0;
+        string reason = decision.Reason;
+
+        if (allow)
+        {
+            // Preserve a requested SYNCHRONIZE bit. MAXIMUM_ALLOWED receives it
+            // as well because SMB clients may set/ignore it freely.
+            if ((specific & Synchronize) != 0 || wantsMaximum)
+                granted |= Synchronize;
+        }
+
+        if (allow)
+            _logger.LogDebug(
+                "AuthorizeOpen ALLOW: user={User} share={Share} path=[{Path}] requested=0x{Requested:X8} granted=0x{Granted:X8} create={Create} dir={Dir} listing={Listing}",
+                request.Username, request.Share, request.Path,
+                request.AccessMask, granted, request.WantsCreate,
+                request.CreateDirectory, request.DirectoryListing);
+        else
+            _logger.LogInformation(
+                "AuthorizeOpen DENY: user={User} share={Share} path=[{Path}] requested=0x{Requested:X8} create={Create} dir={Dir} listing={Listing} — {Reason}",
+                request.Username, request.Share, request.Path,
+                request.AccessMask, request.WantsCreate,
+                request.CreateDirectory, request.DirectoryListing, reason);
+
+        return new AuthorizeReply
+        {
+            Allow = allow,
+            Reason = allow ? "" : reason,
+            GrantedAccessMask = granted
+        };
+    }
+
+    private readonly record struct AccessDecision(
+        bool Allowed, uint GrantedMask, string Reason);
+
+    private static uint ExpandGenericAccess(uint accessMask)
+    {
+        uint expanded = accessMask & ~GenericBits;
+        if ((accessMask & GenericAll) != 0)
+            expanded |= FileGenericAll;
+        if ((accessMask & GenericRead) != 0)
+            expanded |= FileGenericRead;
+        if ((accessMask & GenericWrite) != 0)
+            expanded |= FileGenericWrite;
+        if ((accessMask & GenericExecute) != 0)
+            expanded |= FileGenericExecute;
+        return expanded;
+    }
+
+    private async Task<string?> CheckTraversalAsync(
+        UserContext user, Guid shareId, string normalized)
+    {
+        var hierarchy = ShareRelativePath.BuildHierarchy(normalized);
+        // The last component is the target. Every preceding component is a
+        // directory that Samba traverses, including the share root.
+        for (int i = 0; i < hierarchy.Count - 1; i++)
+        {
+            string ancestor = hierarchy[i];
+            if (!await _acl.HasAccessAsync(
+                    user, shareId, ancestor, true,
+                    FilePermission.TraverseExecute))
+                return $"traverse denied: ancestor '{ancestor}' lacks TraverseExecute";
+        }
+        return null;
+    }
+
+    private async Task<AccessDecision> RequireSpecificAccessAsync(
+        UserContext user, Guid shareId, string normalized,
+        bool isDirectory, uint specific)
+    {
+        foreach (AccessRule rule in AccessRules)
+        {
+            if ((specific & rule.Mask) == 0)
+                continue;
+
+            if (rule.Mask == FileDeleteChild && !isDirectory)
+                return new(false, 0,
+                    "FILE_DELETE_CHILD is valid only for directories");
+
+            bool allowed;
+            string reason;
+            if (rule.Mask == DeleteAccess)
             {
-                allow = true;
+                var deleteDecision = await CanDeleteAsync(
+                    user, shareId, normalized, isDirectory);
+                allowed = deleteDecision.Allowed;
+                reason = deleteDecision.Reason;
             }
             else
             {
-                string parent = ShareRelativePath.GetParent(normalized);
-                allow = await _acl.HasAccessAsync(
-                    user, share.Id, parent, true, FilePermission.CreateWriteData);
-                if (!allow) reason = $"create denied: parent '{parent}' lacks CreateWriteData";
+                allowed = await _acl.HasAccessAsync(
+                    user, shareId, normalized, isDirectory,
+                    rule.Permission);
+                reason = $"access denied: {rule.Name}";
             }
+
+            if (!allowed)
+                return new(false, 0, reason);
         }
-        else
+
+        return new(true, specific, "");
+    }
+
+    private async Task<AccessDecision> CalculateMaximumAllowedAsync(
+        UserContext user, Guid shareId, string normalized, bool isDirectory)
+    {
+        uint granted = 0;
+        foreach (AccessRule rule in AccessRules)
         {
-            allow = true;
-            if (request.WantWrite &&
-                !await _acl.HasAccessAsync(user, share.Id, normalized, isDir, FilePermission.CreateWriteData))
+            if (rule.Mask == FileDeleteChild && !isDirectory)
+                continue;
+
+            bool allowed;
+            if (rule.Mask == DeleteAccess)
             {
-                allow = false;
-                reason = "write denied: CreateWriteData";
+                var deleteDecision = await CanDeleteAsync(
+                    user, shareId, normalized, isDirectory);
+                allowed = deleteDecision.Allowed;
+            }
+            else
+            {
+                allowed = await _acl.HasAccessAsync(
+                    user, shareId, normalized, isDirectory,
+                    rule.Permission);
             }
 
-            // Every non-pure-write open reads the entry (also delete-only).
-            bool wantsRead = request.WantRead || !request.WantWrite;
-            if (allow && wantsRead &&
-                !await _acl.HasAccessAsync(user, share.Id, normalized, isDir, FilePermission.ListReadData))
-            {
-                allow = false;
-                reason = "read denied: ListReadData";
-            }
-
-            if (allow && request.WantDelete)
-            {
-                var deleteDecision = await CanDeleteAsync(user, share.Id, normalized, isDir);
-                if (!deleteDecision.Allowed)
-                {
-                    allow = false;
-                    reason = deleteDecision.Reason;
-                }
-            }
+            if (allowed)
+                granted |= rule.Mask;
         }
 
-        // ALLOW stays at debug (otherwise the readdir filter floods the log); every
-        // DENY comes at info WITH reason → so it's immediately visible whether (and
-        // why) the ACL blocks a write. If there's NO DENY line here for a failed write,
-        // the ACL allowed it → the rejection is filesystem-side.
-        if (allow)
-            _logger.LogDebug(
-                "AuthorizeOpen ALLOW: user={User} share={Share} path=[{Path}] r={R} w={W} c={C} d={D}",
-                request.Username, request.Share, request.Path,
-                request.WantRead, request.WantWrite, request.WantsCreate, request.WantDelete);
-        else
-            _logger.LogInformation(
-                "AuthorizeOpen DENY: user={User} share={Share} path=[{Path}] r={R} w={W} c={C} d={D} — {Reason}",
-                request.Username, request.Share, request.Path,
-                request.WantRead, request.WantWrite, request.WantsCreate, request.WantDelete, reason);
+        // Samba will add this right to the FSP even if the client omitted it.
+        if ((granted & FileReadAttributes) == 0)
+            return new(false, 0,
+                "maximum access denied: Samba would grant FILE_READ_ATTRIBUTES but Kaimo denies ReadAttributes");
 
-        return new AuthorizeReply { Allow = allow, Reason = allow ? "" : reason };
+        return new(true, granted, "");
     }
 
     /// <summary>
@@ -194,6 +362,100 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
                 request.Username, request.Share, normalized, request.IsDirectory, reason);
 
         return new AuthorizeReply { Allow = allow, Reason = reason };
+    }
+
+    /// <summary>
+    /// Authorizes a rename as one indivisible policy decision: remove the
+    /// source, create the source object type in the destination parent, and,
+    /// when applicable, remove the replacement target. The native VFS hook
+    /// revalidates the filesystem identities after this RPC and before renameat.
+    /// </summary>
+    public override async Task<AuthorizeReply> AuthorizeRename(
+        AuthorizeRenameRequest request, ServerCallContext context)
+    {
+        var user = await _auth.ResolveUserContextAsync(request.Username);
+        if (user is null)
+            return Deny($"unknown user '{request.Username}'");
+
+        var share = await _shares.GetByNameAsync(request.Share);
+        if (share is null)
+            return Deny($"unknown share '{request.Share}'");
+
+        if (!ShareRelativePath.IsValid(request.SourcePath) ||
+            !ShareRelativePath.IsValid(request.DestinationPath))
+            return Deny("invalid rename path");
+
+        string source = ShareRelativePath.Normalize(request.SourcePath);
+        string destination = ShareRelativePath.Normalize(request.DestinationPath);
+        if (string.IsNullOrEmpty(source) || string.IsNullOrEmpty(destination) ||
+            string.Equals(source, destination, StringComparison.Ordinal))
+            return Deny($"invalid rename '{source}' -> '{destination}'");
+
+        // Cross-check the native request against the shared storage view. This
+        // is not the final TOCTOU guard (the VFS performs that immediately
+        // before renameat), but prevents authorization based on stale/type-
+        // confused request metadata.
+        string sourceFull = Path.Combine(share.Path, source);
+        bool sourceExists = File.Exists(sourceFull) || Directory.Exists(sourceFull);
+        bool sourceIsDirectory = sourceExists && Directory.Exists(sourceFull);
+        if (!sourceExists || sourceIsDirectory != request.SourceIsDirectory)
+            return Deny("rename source no longer matches the native request");
+
+        string destinationFull = Path.Combine(share.Path, destination);
+        bool destinationExists = File.Exists(destinationFull) || Directory.Exists(destinationFull);
+        bool destinationIsDirectory = destinationExists && Directory.Exists(destinationFull);
+        if (destinationExists != request.DestinationExists ||
+            (destinationExists &&
+             destinationIsDirectory != request.DestinationIsDirectory))
+            return Deny("rename destination no longer matches the native request");
+
+        if (request.DestinationExists != request.ReplaceIntent)
+            return Deny("rename replacement intent does not match destination state");
+        if (!request.DestinationExists && request.DestinationIsDirectory)
+            return Deny("missing rename destination cannot have an object type");
+
+        string? sourceTraversalDeny = await CheckTraversalAsync(
+            user, share.Id, source);
+        if (sourceTraversalDeny is not null)
+            return Deny(sourceTraversalDeny);
+
+        string? destinationTraversalDeny = await CheckTraversalAsync(
+            user, share.Id, destination);
+        if (destinationTraversalDeny is not null)
+            return Deny(destinationTraversalDeny);
+
+        var sourceDelete = await CanDeleteAsync(
+            user, share.Id, source, request.SourceIsDirectory);
+        if (!sourceDelete.Allowed)
+            return Deny(sourceDelete.Reason);
+
+        string destinationParent = ShareRelativePath.GetParent(destination);
+        FilePermission createPermission = request.SourceIsDirectory
+            ? FilePermission.CreateAppendData
+            : FilePermission.CreateWriteData;
+        if (!await _acl.HasAccessAsync(
+                user, share.Id, destinationParent, true, createPermission))
+            return Deny(
+                $"rename denied: destination parent '{destinationParent}' lacks {createPermission}");
+
+        string replacementSource = "none";
+        if (request.DestinationExists)
+        {
+            var replacementDelete = await CanDeleteAsync(
+                user, share.Id, destination,
+                request.DestinationIsDirectory);
+            if (!replacementDelete.Allowed)
+                return Deny(replacementDelete.Reason);
+            replacementSource = replacementDelete.Source;
+        }
+
+        _logger.LogDebug(
+            "AuthorizeRename ALLOW: user={User} share={Share} source=[{Source}] destination=[{Destination}] dir={Directory} replace={Replace} sourceDelete={SourceDelete} replacementDelete={ReplacementDelete}",
+            request.Username, request.Share, source, destination,
+            request.SourceIsDirectory, request.DestinationExists,
+            sourceDelete.Source, replacementSource);
+
+        return new AuthorizeReply { Allow = true };
     }
 
     private async Task<(bool Allowed, string Source, string Reason)> CanDeleteAsync(

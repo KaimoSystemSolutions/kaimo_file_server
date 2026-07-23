@@ -143,4 +143,3 @@ public partial class FileBrowser
             : items.OrderBy(keySelector);
     }
 }
-

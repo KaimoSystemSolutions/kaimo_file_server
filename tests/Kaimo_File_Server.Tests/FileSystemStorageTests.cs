@@ -410,10 +410,10 @@ public class FileSystemStorageTests : IDisposable
     }
 
     [Fact]
-    public async Task ListAsync_NonExistentDirectory_ReturnsEmptyList()
+    public async Task ListAsync_NonExistentDirectory_ThrowsDirectoryNotFound()
     {
-        var items = await _sut.ListAsync("nope");
-        Assert.Empty(items);
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(
+            () => _sut.ListAsync("nope"));
     }
 
     [Fact]

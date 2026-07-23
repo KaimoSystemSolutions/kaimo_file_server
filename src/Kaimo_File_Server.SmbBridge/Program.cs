@@ -27,8 +27,8 @@ builder.Services.AddScoped<IConfigRepository, ConfigRepository>();
 
 builder.Services.AddGrpc();
 
-// Phase 5 hardening: bound the @GMT snapshot materialization cache
-// (<share>/.kaimo-snapshots) so it cannot grow without limit. Evicts by age
+// Phase 5 hardening: bound the isolated @GMT snapshot materialization cache
+// (<cache-root>/<share-id>) so it cannot grow without limit. Evicts by age
 // (Snapshots:Cache:TtlHours) and per-share size cap (Snapshots:Cache:MaxBytesPerShare).
 builder.Services.AddHostedService<SnapshotCacheCleanupService>();
 
@@ -46,7 +46,7 @@ app.MapGrpcService<AuthzGrpcService>();      // Phase 2: Autorisierung (Connect/
 app.MapGrpcService<FileEventGrpcService>();  // Phase 3: Close-Hooks (Version/Index/Ownership)
 app.MapGrpcService<ShareGrpcService>();      // Phase 4: Share-Provisioning (ListShares -> net conf)
 app.MapGrpcService<ConfigGrpcService>();     // Phase 4: Protokoll-Settings (GetProtocolSettings -> net conf global) + Enabled-Flag (Phase 5)
-app.MapGrpcService<SnapshotGrpcService>();   // Phase 5: @GMT Snapshots (EnumerateSnapshots/ResolveVersion -> IFileVersionService)
+app.MapGrpcService<SnapshotGrpcService>();   // Phase 5: ACL-filtered @GMT snapshots/materialization
 app.MapGet("/", () => "Kaimo SMB Bridge (gRPC/h2c on :5080). Use a gRPC client.");
 
 app.Run();

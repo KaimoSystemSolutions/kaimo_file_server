@@ -11,6 +11,7 @@
 # Exit 0 only on successful retrieval from bridge (for retry loop in entrypoint).
 set -uo pipefail
 export PATH=/opt/samba/sbin:/opt/samba/bin:$PATH
+CACHE_ROOT="$(readlink -m "${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/storage/.kaimo-snapshots}")"
 
 OUT="$(kaimo_sharesync 2>>/tmp/sharesync.err)"
 rc=$?
@@ -27,6 +28,16 @@ declare -A want_path=()
 declare -A want_hidden=()
 while IFS=$'\t' read -r name path hidden; do
     [ -z "${name:-}" ] && continue
+    canonical_path="$(readlink -m "$path")"
+    # The snapshot cache must never be published as a share, nor may a broad
+    # share contain it. Excluding an unsafe definition from desired state also
+    # removes a previously published registry share during the reconciliation.
+    if [ "$canonical_path" = "$CACHE_ROOT" ] ||
+       [[ "$canonical_path/" == "$CACHE_ROOT/"* ]] ||
+       [[ "$CACHE_ROOT/" == "$canonical_path/"* ]]; then
+        echo "[sync-shares] REJECTED unsafe share/cache overlap: $name -> $canonical_path" >&2
+        continue
+    fi
     want_path["$name"]="$path"
     want_hidden["$name"]="${hidden:-0}"
 done <<< "$OUT"

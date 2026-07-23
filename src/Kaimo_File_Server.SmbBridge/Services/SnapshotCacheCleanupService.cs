@@ -3,8 +3,8 @@ using Kaimo_File_Server.Core.Repositories;
 namespace Kaimo_File_Server.SmbBridge.Services;
 
 /// <summary>
-/// Background evictor for the in-share snapshot materialization cache
-/// (<c>&lt;share&gt;/.kaimo-snapshots/&lt;@GMT&gt;/…</c>) written by
+/// Background evictor for the isolated snapshot materialization cache
+/// (<c>&lt;cache-root&gt;/&lt;share-id&gt;/&lt;@GMT&gt;/&lt;user-id&gt;/…</c>) written by
 /// <see cref="SnapshotGrpcService"/>. Without it the cache grows unbounded — nothing
 /// removed entries by age or when a share/version was deleted (backlog item A.3).
 ///
@@ -15,9 +15,7 @@ namespace Kaimo_File_Server.SmbBridge.Services;
 ///   2. <b>Size cap</b> — if a share's cache still exceeds
 ///      <c>Snapshots:Cache:MaxBytesPerShare</c>, delete oldest token directories first
 ///      until it fits.
-/// Also removes stray cache roots for shares that no longer exist is handled
-/// implicitly: only existing shares are enumerated, and a deleted share's directory
-/// tree is removed with the share by the repository/storage layer.
+/// It also removes legacy in-share caches and cache roots belonging to deleted shares.
 ///
 /// All eviction is safe: the cache is a rebuildable, content-addressed projection of
 /// <see cref="IFileVersionService"/>; a re-requested version is simply re-materialized.
@@ -27,6 +25,7 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
     private readonly IServiceScopeFactory _scopes;
     private readonly IConfiguration _config;
     private readonly ILogger<SnapshotCacheCleanupService> _logger;
+    private readonly string _cacheRoot;
 
     public SnapshotCacheCleanupService(
         IServiceScopeFactory scopes,
@@ -35,6 +34,7 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
     {
         _scopes = scopes;
         _config = config;
+        _cacheRoot = SnapshotCache.ConfiguredRoot(config);
         _logger = logger;
     }
 
@@ -86,16 +86,38 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
         long cap = MaxBytesPerShare;
         DateTime cutoff = DateTime.UtcNow - ttl;
 
-        int evictedTtl = 0, evictedSize = 0;
+        int evictedTtl = 0, evictedSize = 0, evictedLegacy = 0, evictedOrphan = 0;
+        var activeShareIds = shares.Select(s => s.Id.ToString("N"))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var share in shares)
         {
             ct.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(share.Path)) continue;
 
-            string root = SnapshotCache.RootFor(share.Path);
+            // P0-06 upgrade cleanup: old releases wrote decompressed historical
+            // content below the client-visible share. The VFS denies this reserved
+            // namespace immediately; the sweeper removes the stale bytes as well.
+            string legacyRoot = Path.Combine(
+                share.Path, SnapshotCache.LegacyDirName);
+            if (LooksLikeManagedLegacyCache(legacyRoot) && TryDeleteDir(legacyRoot))
+                evictedLegacy++;
+
+            try
+            {
+                SnapshotCache.EnsureIsolatedFromShare(_cacheRoot, share.Path);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex,
+                    "Snapshot cache overlaps share {Share}; skipping cache sweep for it.",
+                    share.Name);
+                continue;
+            }
+
+            string root = SnapshotCache.ShareRootFor(_cacheRoot, share.Id);
             if (!Directory.Exists(root)) continue;
 
-            // Token dirs are the immediate children of .kaimo-snapshots (the "@GMT-…").
+            // Token dirs are the immediate children of a share-id cache root.
             var tokens = new List<(string dir, DateTime cachedAt, long size)>();
             foreach (var dir in SafeEnumerateDirectories(root))
             {
@@ -124,16 +146,46 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
             }
         }
 
-        if (evictedTtl > 0 || evictedSize > 0)
+        // The cache no longer lives inside a share tree, so explicitly remove
+        // projections whose share definition has been deleted.
+        if (Directory.Exists(_cacheRoot))
+        {
+            foreach (string root in SafeEnumerateDirectories(_cacheRoot))
+            {
+                ct.ThrowIfCancellationRequested();
+                if (!activeShareIds.Contains(Path.GetFileName(root)) &&
+                    TryDeleteDir(root))
+                    evictedOrphan++;
+            }
+        }
+
+        if (evictedTtl > 0 || evictedSize > 0 ||
+            evictedLegacy > 0 || evictedOrphan > 0)
             _logger.LogInformation(
-                "Snapshot cache sweep: evicted {Ttl} by TTL (> {Hours:0.#}h), {Size} by size cap ({Cap} B/share).",
-                evictedTtl, ttl.TotalHours, evictedSize, cap);
+                "Snapshot cache sweep: evicted {Ttl} by TTL (> {Hours:0.#}h), {Size} by size cap ({Cap} B/share), {Legacy} legacy roots, {Orphan} orphan share roots.",
+                evictedTtl, ttl.TotalHours, evictedSize, cap,
+                evictedLegacy, evictedOrphan);
     }
 
     private static IEnumerable<string> SafeEnumerateDirectories(string root)
     {
         try { return Directory.EnumerateDirectories(root); }
         catch { return Array.Empty<string>(); }
+    }
+
+    private static bool LooksLikeManagedLegacyCache(string root)
+    {
+        if (!Directory.Exists(root)) return false;
+        try
+        {
+            return Directory.EnumerateDirectories(root, "@GMT-*")
+                .Any(tokenDir => File.Exists(Path.Combine(
+                    tokenDir, SnapshotCache.MarkerName)));
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private bool TryDeleteDir(string dir)

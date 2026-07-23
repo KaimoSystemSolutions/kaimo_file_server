@@ -436,6 +436,16 @@ public class FileService : IFileService
         if (!await _acl.HasAccessAsync(user, _shareId, normalizedDir, true, FilePermission.ListReadData))
             throw new UnauthorizedAccessException($"List denied for '{normalizedDir}'");
 
+        // Never represent a missing path (or a file path) as an empty directory.
+        // Keep this check after authorization so callers cannot use the different
+        // error types to probe the existence of paths they are not allowed to see.
+        if (!await _storage.ExistsAsync(normalizedDir)
+            || !await _storage.IsDirectoryAsync(normalizedDir))
+        {
+            throw new DirectoryNotFoundException(
+                $"Directory '{normalizedDir}' does not exist.");
+        }
+
         var items = await _storage.ListAsync(normalizedDir);
 
         var itemsToCheck = items
@@ -552,7 +562,26 @@ public class FileService : IFileService
             }
         }
 
-        await OnFileCreated(ToAbsolutePath(path), _storage.ReadAsync(normalized));
+        // Search indexing is a derived, rebuildable side effect. A transient search
+        // outage must not turn a successfully persisted upload into a failed write
+        // (the web layer would otherwise delete the file as "partial"). This matches
+        // the best-effort semantics used by session close and the SMB bridge.
+        var fileData = _storage.ReadAsync(normalized);
+        try
+        {
+            await OnFileCreated(ToAbsolutePath(normalized), fileData);
+        }
+        catch (Exception ex)
+        {
+            // The search implementation may fail before it takes ownership of the
+            // eagerly opened stream. Dispose it here as a safe, idempotent fallback.
+            try { await DrainStreamAsync(fileData); }
+            catch { /* the indexing failure is the useful diagnostic */ }
+
+            _logger.LogWarning(
+                LogEvents.FileSearchHookFailed, ex,
+                LogMessages.FileSearchHookFailed, normalized);
+        }
     }
 
     public string ToAbsolutePath(string path)

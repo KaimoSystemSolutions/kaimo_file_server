@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
@@ -163,7 +164,7 @@ public class FileBrowserViewModel
 
             CurrentPath = cleanSub;
 
-            if (CurrentPath.Contains("..") || CurrentPath.Contains('\0'))
+            if (!ShareRelativePath.IsValid(CurrentPath))
             {
                 ErrorMessage = Resources.Web_Error_InvalidPath;
                 Items = [];
@@ -205,14 +206,22 @@ public class FileBrowserViewModel
 
             _ = LoadDirectorySizesInBackgroundAsync();
         }
+        catch (DirectoryNotFoundException)
+        {
+            ErrorMessage = Resources.Web_Error_FileOrFolderNotFound;
+            CanManageAcls = false;
+            Items = [];
+        }
         catch (UnauthorizedAccessException)
         {
             ErrorMessage = Resources.Web_Error_AccessDenied;
+            CanManageAcls = false;
             Items = [];
         }
         catch (Exception ex)
         {
             ErrorMessage = Resources.Web_Error_LoadFilesFailed;
+            CanManageAcls = false;
             _logger.LogError(ex, "Error loading share {ShareName} path {SubPath}", shareName, subPath);
             Items = [];
         }
@@ -947,6 +956,8 @@ public class FileBrowserViewModel
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Upload failed for '{Path}'", targetPath);
+
             // Clean up the partial file
             try
             {

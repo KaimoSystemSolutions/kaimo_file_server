@@ -22,6 +22,7 @@ public partial class FileBrowser
     protected override void OnInitialized()
     {
         UploadCoordinator.OnFilesSelected += OnFileUploaded;
+        FileSelectionCoordinator.SelectionRequested += OnFileSelectionRequested;
     }
 
     [JSInvokable]

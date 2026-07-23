@@ -8,6 +8,7 @@
 @inject JwtAuthenticationStateProvider AuthState
 @inject AuthenticationStateProvider AuthStateProvider
 @inject FileUploadCoordinator UploadCoordinator
+@inject FileSelectionCoordinator FileSelectionCoordinator
 @inject AssetProvider Assets
 @inject ISearchService SearchService
 @inject IUserContextFactory UserContextFactory
@@ -73,7 +74,7 @@
             </div>
         </div>
     </nav> 
-    <InputFile id="global-file-input" OnChange="OnFilesSelected" style="display:none" multiple />
+    <InputFile @key="_fileInputKey" id="global-file-input" OnChange="OnFilesSelected" style="display:none" multiple />
     <main class="main">
         <div class="search-bar-container">
             <div class="search-bar @(_searchResults.Any() ? "has-results" : "")">
@@ -143,8 +144,7 @@
     private string _initials = "";
     private string _searchQuery = "";
     
-    private InputFile? _inputFile;
-    private ElementReference _inputElement;
+    private int _fileInputKey;
     
     private List<FileDocument> _searchResults = new();
     private bool _dropdownVisible;
@@ -201,7 +201,7 @@
                 _isSearching = false;
             }
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             // Expected when typing fast — previous search gets cancelled
         }
@@ -224,12 +224,16 @@
         }
         else
         {
-            // Navigate to the containing folder and preselect the file.
+            // Select directly when the containing folder is already open. Otherwise
+            // keep the one-time request until that folder has finished loading.
             var folderPath = (Path.GetDirectoryName(result.SharePath) ?? string.Empty)
                 .Replace('\\', '/').Trim('/');
             url = string.IsNullOrEmpty(folderPath)
-                ? $"/files/{result.ShareName}?select={Uri.EscapeDataString(result.FileName)}"
-                : $"/files/{result.ShareName}/{folderPath}?select={Uri.EscapeDataString(result.FileName)}";
+                ? $"/files/{result.ShareName}"
+                : $"/files/{result.ShareName}/{folderPath}";
+
+            if (FileSelectionCoordinator.RequestSelection(result.ShareName, folderPath, result.FileName))
+                return;
         }
 
         Nav.NavigateTo(url);
@@ -266,12 +270,23 @@
     private async void TriggerFileDialog()
     {
         // Click the hidden input to open the file dialog
-        await JS.InvokeVoidAsync("document.querySelector('input[type=file]').click");
+        await JS.InvokeVoidAsync("document.getElementById('global-file-input').click");
     }
 
     private async Task OnFilesSelected(InputFileChangeEventArgs e)
     {
-        await UploadCoordinator.NotifyFilesSelected(e);
+        try
+        {
+            await UploadCoordinator.NotifyFilesSelected(e);
+        }
+        finally
+        {
+            // Browsers do not raise change when the same file is selected twice.
+            // Recreate the InputFile only after all BrowserFile streams were consumed.
+            // This stays entirely inside Blazor and does not depend on a cached JS file.
+            _fileInputKey++;
+            StateHasChanged();
+        }
     }
 
     public void Dispose()

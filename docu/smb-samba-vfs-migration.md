@@ -195,10 +195,10 @@ C++ translation unit with `extern "C"` shim. Since the control plane is **low-fr
 | **0 — Spike/PoC** ✅ | `samba-vfs/` container: Live Registry shares + `kaimo_bridge` module intercepting Connect/Open/Disconnect | Toolchain + ABI binding + Live shares **proven** — see [`../samba-vfs/README.md`](../samba-vfs/README.md) |
 | **1 — Auth** ✅ | `.proto` + .NET gRPC bridge (`GetNtHash`/`ListUsers` via `IAuthenticationLookup`); C++ client `kaimo_authsync` syncs NT hashes to Samba's `tdbsam` | real NTLMv2 login against Kaimo user **works** — see [`../samba-vfs/README.md`](../samba-vfs/README.md) |
 | **2a — Connect Auth** ✅ | VFS `connect` hook → Sidecar `kaimo_authd` (Unix socket) → gRPC `AuthorizeConnect` → `CanAccessShareAsync` | Share access per real Kaimo ACLs — **works** (dept-based allow/deny verified) |
-| **2b — Open/Path ACL** ✅ | VFS `create_file` hook → gRPC `AuthorizeOpen` (exact `OpenAsync` parity) + `readdir` filter (`ListAsync` parity, sidecar cache) | File open (read/write/create) and listing per real ACLs — **works** (write-deny, per-file-deny + hiding verified) |
+| **2b — Path ACL** ⚠️ | VFS `create_file` → `AuthorizeOpen` with complete access masks; `unlinkat` → `AuthorizeDelete`; `renameat` → `AuthorizeRename` for source/destination/replacement; `readdir` uses listing-only checks | Complete open/delete/rename policy is implemented and managed-tested; native Samba runtime verification of P0-03/P0-04 remains pending |
 | **3 — Close Hooks** ✅ | `close`/`unlinkat`/`renameat`/`mkdirat` → Sidecar → gRPC `EventService` → `FileService.NotifyExternal*` (versioning, ownership, search index, ACL realign) | Parity to `FileSession.DisposeAsync` — **works** (versioning/ownership verified; see [`../samba-vfs/README.md`](../samba-vfs/README.md)) |
 | **4 — Dyn. Shares & Visibility** ✅ | ShareControl sync (`ListShares` → `kaimo_sharesync` → `sync-shares.sh` → `net conf`) ✅; ABE = **hidden flag only** (`browseable`) ✅; Protocol settings from `ISmbConfigStore` (`GetProtocolSettings` → `kaimo_configsync` → `sync-config.sh` → `net conf setparm global`) ✅ | dynamic shares + protocol config live — **works** |
-| **5 — Snapshots & Cutover** ✅ | @GMT snapshots via `get_shadow_copy_data` + timewarp resolve (`SnapshotService` → `IFileVersionService`); `enable/disable SMB` now enforced by the bridge `connect` hook (deny-all when `services.smb.enabled=false`); `Kaimo_File_Server.Smb` **removed** (host runs `SambaSmbControlService` for status only); Samba owns port 445 | **old lib removed, migration complete** |
+| **5 — Snapshots & Cutover** ⚠️ | @GMT snapshots via `get_shadow_copy_data` + timewarp resolve; folder projections use `IFileService` per-file ACL filtering; materialized content lives in an isolated global cache partitioned by share/user; `enable/disable SMB` is enforced by the bridge; the old SMB library is removed | P0-05/P0-06 fixed in source and managed/structurally tested; live SMB/native verification and P1 snapshot hardening remain |
 
 ---
 
@@ -278,11 +278,12 @@ module matches the source.
   the actual Previous-Versions use cases, work. Nothing to fix server-side.
   **Status: fixed / verified.**
 
-- **#3 (A.3) — Snapshot cache grows unbounded.** `<share>/.kaimo-snapshots/` had no
+- **#3 (A.3) — Snapshot cache grows unbounded.** The former `<share>/.kaimo-snapshots/` cache had no
   TTL/size cap and was never cleaned on share/version deletion → slow disk fill.
   **Status: fixed 2026-07-19** — `SnapshotCacheCleanupService` (background service in
   the bridge) evicts entries by age and enforces a per-share size cap; configurable
-  via `Snapshots:Cache:*`.
+  via `Snapshots:Cache:*`. P0-06 later moved the bounded cache to the isolated global
+  `<cache-root>/<share-id>/...` layout and added explicit orphan/legacy cleanup.
 
 ### P1 — Correctness / feature gaps
 
@@ -367,7 +368,7 @@ module matches the source.
   names, identical live vs. snapshot.)
   **Status: fixed / verified 2026-07-19** — added an `openat` hook (`kaimo_openat`)
   that, for a timewarp open, reconstructs the logical path, asks the bridge to
-  materialize the version, and opens the in-share cache copy by absolute path — the same
+  materialize the version, and opens the isolated cache copy by absolute path — the same
   place Samba's own `vfs_shadow_copy2` redirects. Normal (non-twrp) opens pass straight
   through (only a `twrp==0` check). Kill-switch `KAIMO_SNAPSHOT_OPENAT=0`.
   Two follow-on fixes made it robust across Samba's call patterns:

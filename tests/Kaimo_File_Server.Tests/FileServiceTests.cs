@@ -250,6 +250,35 @@ public class FileServiceTests
             It.IsAny<string>(), data, It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact]
+    public async Task WriteFileAsync_SearchFailure_DoesNotFailPersistedUpload()
+    {
+        // Search is a rebuildable side effect. In particular, first-use index
+        // initialization may fail transiently and must not make the web layer delete
+        // a file that storage already persisted successfully.
+        var searchMock = new Mock<ISearchService>();
+        searchMock
+            .Setup(s => s.onFileCreated(
+                It.IsAny<string>(), It.IsAny<Task<Stream>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("search temporarily unavailable"));
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, searchMock.Object, _shareId);
+
+        var ctx = CreateContext();
+        var data = new MemoryStream([1, 2, 3]);
+        var indexedContent = new MemoryStream([1, 2, 3]);
+        _storageMock.Setup(s => s.IsDirectoryAsync(It.IsAny<string>())).ReturnsAsync(false);
+        _storageMock.Setup(s => s.ReadAsync(It.IsAny<string>())).ReturnsAsync(indexedContent);
+        _storageMock.Setup(s => s.ToAbsolutePath("test.txt")).Returns("/storage/test.txt");
+        AllowAccess(FilePermission.CreateWriteData);
+
+        await sut.WriteFileAsync("/test.txt", data, ctx);
+
+        _storageMock.Verify(s => s.WriteAsync(
+            "test.txt", data, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.False(indexedContent.CanRead);
+    }
+
     // ═══════════════════ CreateFileAsync ═══════════════════
 
     [Fact]
@@ -472,6 +501,8 @@ public class FileServiceTests
             new() { Name = "visible.txt", IsDirectory = false, Path = "dir/visible.txt" },
             new() { Name = "hidden.txt", IsDirectory = false, Path = "dir/hidden.txt" },
         };
+        _storageMock.Setup(s => s.ExistsAsync("dir")).ReturnsAsync(true);
+        _storageMock.Setup(s => s.IsDirectoryAsync("dir")).ReturnsAsync(true);
         _storageMock.Setup(s => s.ListAsync(It.IsAny<string>())).ReturnsAsync(items);
 
         // Allow listing the directory itself
@@ -501,6 +532,35 @@ public class FileServiceTests
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => _sut.ListAsync("dir", ctx));
+
+        _storageMock.Verify(s => s.ExistsAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ListAsync_NonExistentDirectory_ThrowsDirectoryNotFound()
+    {
+        var ctx = CreateContext();
+        AllowAccess(FilePermission.ListReadData);
+        _storageMock.Setup(s => s.ExistsAsync("missing")).ReturnsAsync(false);
+
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(
+            () => _sut.ListAsync("missing", ctx));
+
+        _storageMock.Verify(s => s.ListAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ListAsync_FilePath_ThrowsDirectoryNotFound()
+    {
+        var ctx = CreateContext();
+        AllowAccess(FilePermission.ListReadData);
+        _storageMock.Setup(s => s.ExistsAsync("document.txt")).ReturnsAsync(true);
+        _storageMock.Setup(s => s.IsDirectoryAsync("document.txt")).ReturnsAsync(false);
+
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(
+            () => _sut.ListAsync("document.txt", ctx));
+
+        _storageMock.Verify(s => s.ListAsync(It.IsAny<string>()), Times.Never);
     }
 
     // ═══════════════════ OpenAsync — per-intent ACL enforcement ═══════════════════

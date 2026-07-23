@@ -3,44 +3,109 @@ using System.Globalization;
 namespace Kaimo_File_Server.SmbBridge.Services;
 
 /// <summary>
-/// Shared constants and helpers for the in-share snapshot materialization cache
-/// (<c>&lt;share&gt;/.kaimo-snapshots/&lt;@GMT&gt;/…</c>) used by
-/// <see cref="SnapshotGrpcService"/> (writer) and
-/// <see cref="SnapshotCacheCleanupService"/> (evictor).
+/// Shared constants and path helpers for the snapshot materialization cache used
+/// by <see cref="SnapshotGrpcService"/> and
+/// <see cref="SnapshotCacheCleanupService"/>.
 ///
-/// Eviction cannot key off the cached files' mtimes: materialization deliberately
-/// stamps the <em>historical</em> modification time (so Windows "Previous Versions"
-/// can tell versions apart), which may be years in the past. Instead, each @GMT
-/// token directory carries a <see cref="MarkerName"/> file whose contents record the
-/// real wall-clock UTC time the version was materialized — that is the basis for
-/// TTL/size eviction. The marker name is <c>.kaimo-</c>-prefixed so the VFS
-/// <c>readdir</c> filter already hides it from SMB listings.
+/// The cache root is global and MUST be outside every client-visible share. Its
+/// layout is
+/// <c>&lt;cache-root&gt;/&lt;share-id&gt;/&lt;@GMT&gt;/&lt;user-id&gt;/…</c>.
+/// Using immutable ids prevents share-name and user-name collisions while keeping
+/// every path returned to the VFS relative to the configured cache root.
+///
+/// Eviction cannot key off cached file mtimes because materialization deliberately
+/// stamps historical modification times. Each @GMT token directory therefore has
+/// a marker recording its real materialization time.
 /// </summary>
 internal static class SnapshotCache
 {
-    /// <summary>Hidden per-share directory holding materialized (decompressed) versions.</summary>
-    internal const string DirName = ".kaimo-snapshots";
+    /// <summary>Old in-share namespace, reserved while legacy caches are removed.</summary>
+    internal const string LegacyDirName = ".kaimo-snapshots";
 
-    /// <summary>Per-@GMT-token marker file recording the real materialization time (UTC).</summary>
+    /// <summary>Default global cache root shared by the bridge and Samba containers.</summary>
+    internal const string DefaultRoot = "/data/storage/.kaimo-snapshots";
+
+    /// <summary>Per-@GMT-token marker file recording real materialization time (UTC).</summary>
     internal const string MarkerName = ".kaimo-cached-at";
 
-    /// <summary>Absolute path of a share's snapshot cache root.</summary>
-    internal static string RootFor(string sharePath) => Path.Combine(sharePath, DirName);
+    internal static string ConfiguredRoot(IConfiguration config)
+    {
+        string configured = config["Snapshots:Cache:RootPath"] ?? DefaultRoot;
+        if (string.IsNullOrWhiteSpace(configured) || !Path.IsPathRooted(configured))
+            throw new InvalidOperationException(
+                "Snapshots:Cache:RootPath must be an absolute path outside every SMB share.");
+        return Path.GetFullPath(configured);
+    }
+
+    /// <summary>Absolute root of one share's isolated cache projection.</summary>
+    internal static string ShareRootFor(string cacheRoot, Guid shareId) =>
+        Path.Combine(Path.GetFullPath(cacheRoot), shareId.ToString("N"));
+
+    /// <summary>Cache-root-relative prefix returned to the native VFS.</summary>
+    internal static string RelativeShareRootFor(Guid shareId) =>
+        shareId.ToString("N");
+
+    /// <summary>Creates each security boundary in a user projection as 0750.</summary>
+    internal static string EnsureUserScope(
+        string cacheRoot, Guid shareId, string gmtToken, string userScope)
+    {
+        string root = Path.GetFullPath(cacheRoot);
+        EnsureDirectory(root);
+        string shareRoot = ShareRootFor(root, shareId);
+        EnsureDirectory(shareRoot);
+        string tokenRoot = Path.Combine(shareRoot, gmtToken);
+        EnsureDirectory(tokenRoot);
+        string userRoot = Path.Combine(tokenRoot, userScope);
+        EnsureDirectory(userRoot);
+        return userRoot;
+    }
 
     /// <summary>
-    /// Ensures the marker file for a given @GMT token directory exists, stamping it
-    /// with the current UTC time on first creation. Best-effort: never throws (a
-    /// missing marker only makes the evictor fall back to filesystem timestamps).
+    /// Fails closed if the configured cache and a client-visible share overlap in
+    /// either direction. This prevents an unusual/root-level share definition from
+    /// accidentally publishing the otherwise global internal cache.
     /// </summary>
-    internal static void TouchMarker(string sharePath, string gmtToken)
+    internal static void EnsureIsolatedFromShare(string cacheRoot, string sharePath)
+    {
+        string cache = Path.GetFullPath(cacheRoot);
+        string share = Path.GetFullPath(sharePath);
+        if (IsSameOrDescendant(cache, share) || IsSameOrDescendant(share, cache))
+            throw new InvalidOperationException(
+                $"Snapshot cache '{cache}' overlaps SMB share '{share}'.");
+    }
+
+    /// <summary>Create a 0750 cache directory for bridge owner + Samba storage group.</summary>
+    internal static void EnsureDirectory(string path)
+    {
+        Directory.CreateDirectory(path);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(path,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                UnixFileMode.GroupRead | UnixFileMode.GroupExecute);
+        }
+    }
+
+    /// <summary>
+    /// Ensures the marker for a token exists. Best-effort: a missing marker only
+    /// makes the evictor fall back to filesystem timestamps.
+    /// </summary>
+    internal static void TouchMarker(string cacheRoot, Guid shareId, string gmtToken)
     {
         try
         {
-            string dir = Path.Combine(RootFor(sharePath), gmtToken);
-            Directory.CreateDirectory(dir);
+            EnsureDirectory(cacheRoot);
+            string shareRoot = ShareRootFor(cacheRoot, shareId);
+            EnsureDirectory(shareRoot);
+            string dir = Path.Combine(shareRoot, gmtToken);
+            EnsureDirectory(dir);
             string marker = Path.Combine(dir, MarkerName);
             if (!File.Exists(marker))
-                File.WriteAllText(marker, DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+            {
+                File.WriteAllText(marker,
+                    DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+                SetReadOnlyProjectionMode(marker);
+            }
         }
         catch
         {
@@ -48,10 +113,19 @@ internal static class SnapshotCache
         }
     }
 
+    internal static void SetReadOnlyProjectionMode(string path)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(path,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite |
+                UnixFileMode.GroupRead);
+        }
+    }
+
     /// <summary>
-    /// Reads the recorded materialization time of a @GMT token directory. Falls back
-    /// to the directory's creation time, then its last-write time, if the marker is
-    /// absent or unreadable.
+    /// Reads the recorded materialization time of a token directory. Falls back to
+    /// directory creation time when the marker is absent or unreadable.
     /// </summary>
     internal static DateTime CachedAtUtc(string gmtTokenDir)
     {
@@ -68,21 +142,30 @@ internal static class SnapshotCache
         }
         catch
         {
-            // fall through to filesystem timestamps
+            // Fall through to the filesystem timestamp.
         }
 
         try
         {
-            // Creation time ≈ when we first materialized this token (we only ever
-            // set the *write* time to the historical snapshot value, never creation,
-            // so LastWriteTime must NOT be used as the cache-age basis here). If the
-            // filesystem reports a bogus/epoch creation time this over-retains the
-            // entry (safe direction); the marker file fixes it on the next resolve.
             return Directory.GetCreationTimeUtc(gmtTokenDir);
         }
         catch
         {
             return DateTime.UtcNow;
         }
+    }
+
+    private static bool IsSameOrDescendant(string parent, string candidate)
+    {
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        if (string.Equals(parent, candidate, comparison))
+            return true;
+
+        string prefix = parent.EndsWith(Path.DirectorySeparatorChar)
+            ? parent
+            : parent + Path.DirectorySeparatorChar;
+        return candidate.StartsWith(prefix, comparison);
     }
 }

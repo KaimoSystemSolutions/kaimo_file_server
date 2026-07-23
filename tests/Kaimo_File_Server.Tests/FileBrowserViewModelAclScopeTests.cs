@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
@@ -101,5 +102,20 @@ public class FileBrowserViewModelAclScopeTests
         // No ACL-count query may run for a user who cannot manage this share's ACLs.
         _dbFactory.Verify(
             f => f.CreateDbContextAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task LoadShareAsync_WhenDirectoryDoesNotExist_ShowsNotFoundAndDisablesActions()
+    {
+        Authorize(true);
+        _fileService
+            .Setup(s => s.ListAsync("missing", It.IsAny<UserContext>()))
+            .ThrowsAsync(new DirectoryNotFoundException());
+
+        await _sut.LoadShareAsync("share", "missing");
+
+        Assert.Equal(Resources.Web_Error_FileOrFolderNotFound, _sut.ErrorMessage);
+        Assert.Empty(_sut.Items);
+        Assert.False(_sut.CanManageAcls);
     }
 }
