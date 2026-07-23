@@ -179,6 +179,15 @@ enter the share — same semantics as the earlier `KaimoSharePolicy.AuthorizeCon
 (fail-closed — a bridge outage must not silently grant access). Set `KAIMO_AUTHZ_FAILOPEN=1`
 to allow on error instead (availability over security), which was the previous default.
 
+**VFS-side deadlines:** Every local authorization roundtrip uses one absolute
+monotonic budget across nonblocking `connect`, complete request transmission,
+and complete response reception. The defaults are 6000 ms for authorization
+(`KAIMO_VFS_AUTH_TIMEOUT_MS`) and 32000 ms for snapshot operations
+(`KAIMO_VFS_SNAPSHOT_TIMEOUT_MS`). Best-effort lifecycle notifications do not
+wait for a gRPC result and have an independent 250 ms local enqueue budget
+(`KAIMO_VFS_EVENT_TIMEOUT_MS`). Accepted values are 10-60,000 ms; invalid
+values fall back to the bounded defaults and are logged.
+
 **Windows-compatible denial:** The pinned Samba build carries a narrow patch that
 maps the VFS hook's `EACCES` to `NT_STATUS_ACCESS_DENIED`. Without it, Samba
 hardcodes `NT_STATUS_UNSUCCESSFUL`, which Windows renders as "A device attached
@@ -280,6 +289,12 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
   string; exact schema consumption rejects missing or trailing fields.
   Both C and C++ endpoints use complete read/write loops, so Unix stream
   fragmentation and partial I/O cannot change message boundaries.
+- **VFS client deadlines:** the module opens its local client socket as
+  nonblocking and uses a single monotonic deadline for connect, all partial
+  writes, and all partial reads. Authorization, snapshot, and best-effort event
+  traffic have separate budgets, so a stalled sidecar cannot indefinitely pin
+  an `smbd` worker and event enqueue cannot consume an authorization-sized
+  timeout.
 - **Authorization cache:** open decisions use a mutex-protected LRU capped by
   both entry count (`KAIMO_AUTHD_CACHE_MAX_ENTRIES`, default 10,000) and an
   accounted memory budget (`KAIMO_AUTHD_CACHE_MAX_BYTES`, default 8 MiB).

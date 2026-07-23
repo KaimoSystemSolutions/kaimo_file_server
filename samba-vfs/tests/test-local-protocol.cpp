@@ -2,6 +2,8 @@
 
 #include <array>
 #include <cassert>
+#include <cerrno>
+#include <chrono>
 #include <cstring>
 #include <string>
 #include <thread>
@@ -123,11 +125,68 @@ static void test_rejects_embedded_nul_and_trailing_fields()
 	assert(!kaimo_local_reader_string(&reader, &value, &length));
 }
 
+static void test_absolute_receive_deadline()
+{
+	int sockets[2];
+	assert(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
+	std::thread writer([&] {
+		const std::array<uint8_t, 4> bytes{1, 2, 3, 4};
+		for (uint8_t byte : bytes) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(35));
+			if (send(sockets[0], &byte, 1, MSG_NOSIGNAL) != 1)
+				break;
+		}
+		close(sockets[0]);
+	});
+
+	struct kaimo_local_deadline deadline;
+	assert(kaimo_local_deadline_init(&deadline, 80) == 0);
+	std::array<uint8_t, 4> received{};
+	auto started = std::chrono::steady_clock::now();
+	errno = 0;
+	assert(kaimo_local_read_exact_until(
+		       sockets[1], received.data(), received.size(),
+		       &deadline) == -1);
+	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+		std::chrono::steady_clock::now() - started);
+	assert(errno == ETIMEDOUT);
+	assert(elapsed.count() >= 50);
+	assert(elapsed.count() < 250);
+	close(sockets[1]);
+	writer.join();
+}
+
+static void test_absolute_send_deadline()
+{
+	int sockets[2];
+	assert(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
+	int send_buffer = 1024;
+	assert(setsockopt(sockets[0], SOL_SOCKET, SO_SNDBUF, &send_buffer,
+			  sizeof(send_buffer)) == 0);
+	std::vector<uint8_t> payload(2 * 1024 * 1024, 0x5a);
+	struct kaimo_local_deadline deadline;
+	assert(kaimo_local_deadline_init(&deadline, 80) == 0);
+	auto started = std::chrono::steady_clock::now();
+	errno = 0;
+	assert(kaimo_local_write_all_until(
+		       sockets[0], payload.data(), payload.size(),
+		       &deadline) == -1);
+	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+		std::chrono::steady_clock::now() - started);
+	assert(errno == ETIMEDOUT);
+	assert(elapsed.count() >= 50);
+	assert(elapsed.count() < 250);
+	close(sockets[0]);
+	close(sockets[1]);
+}
+
 int main()
 {
 	test_binary_fields();
 	test_fragmented_frame_read();
 	test_write_all_and_frame_bounds();
 	test_rejects_embedded_nul_and_trailing_fields();
+	test_absolute_receive_deadline();
+	test_absolute_send_deadline();
 	return 0;
 }

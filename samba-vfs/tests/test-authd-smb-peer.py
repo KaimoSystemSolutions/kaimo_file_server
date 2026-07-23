@@ -196,7 +196,7 @@ def main() -> int:
     assert "rejected unauthorized local peer" not in authd_output, diagnostics
     assert "cannot claim user" not in authd_output, diagnostics
     assert (
-        "kaimo_bridge build [2026-07-23e authenticated local peer]" in smbd_output
+        "kaimo_bridge build [2026-07-23f bounded VFS local I/O]" in smbd_output
     ), diagnostics
 
     print("live smbd/authd peer-identity test passed")

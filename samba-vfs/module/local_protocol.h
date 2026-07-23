@@ -21,7 +21,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <poll.h>
 #include <sys/socket.h>
+#include <time.h>
 
 #define KAIMO_LOCAL_PROTOCOL_VERSION 1U
 #define KAIMO_LOCAL_HEADER_SIZE 12U
@@ -80,6 +82,83 @@ struct kaimo_local_reader {
 	size_t offset;
 	bool valid;
 };
+
+struct kaimo_local_deadline {
+	struct timespec expires_at;
+};
+
+static inline int kaimo_local_deadline_init(
+	struct kaimo_local_deadline *deadline, uint32_t timeout_ms)
+{
+	if (deadline == NULL || timeout_ms == 0 ||
+	    clock_gettime(CLOCK_MONOTONIC, &deadline->expires_at) != 0)
+		return -1;
+	deadline->expires_at.tv_sec += (time_t)(timeout_ms / 1000U);
+	deadline->expires_at.tv_nsec +=
+		(long)(timeout_ms % 1000U) * 1000000L;
+	if (deadline->expires_at.tv_nsec >= 1000000000L) {
+		deadline->expires_at.tv_sec++;
+		deadline->expires_at.tv_nsec -= 1000000000L;
+	}
+	return 0;
+}
+
+static inline int kaimo_local_deadline_remaining_ms(
+	const struct kaimo_local_deadline *deadline)
+{
+	struct timespec now;
+	int64_t seconds;
+	int64_t nanoseconds;
+	int64_t remaining_ms;
+
+	if (deadline == NULL ||
+	    clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+		return -1;
+	seconds = (int64_t)deadline->expires_at.tv_sec -
+		  (int64_t)now.tv_sec;
+	nanoseconds = (int64_t)deadline->expires_at.tv_nsec -
+		      (int64_t)now.tv_nsec;
+	remaining_ms = seconds * 1000 + nanoseconds / 1000000;
+	if (seconds >= 0 && nanoseconds > 0 &&
+	    (nanoseconds % 1000000) != 0)
+		remaining_ms++;
+	if (remaining_ms <= 0) {
+		errno = ETIMEDOUT;
+		return 0;
+	}
+	if (remaining_ms > INT32_MAX)
+		return INT32_MAX;
+	return (int)remaining_ms;
+}
+
+static inline int kaimo_local_wait_until(
+	int fd, short events, const struct kaimo_local_deadline *deadline)
+{
+	for (;;) {
+		int timeout_ms = kaimo_local_deadline_remaining_ms(deadline);
+		if (timeout_ms <= 0)
+			return -1;
+		struct pollfd descriptor = {
+			.fd = fd,
+			.events = events,
+			.revents = 0
+		};
+		int result = poll(&descriptor, 1, timeout_ms);
+		if (result > 0) {
+			if ((descriptor.revents &
+			     (events | POLLERR | POLLHUP)) != 0)
+				return 0;
+			errno = descriptor.revents & POLLNVAL ? EBADF : EIO;
+			return -1;
+		}
+		if (result == 0) {
+			errno = ETIMEDOUT;
+			return -1;
+		}
+		if (errno != EINTR)
+			return -1;
+	}
+}
 
 static inline void kaimo_local_put_be32(uint8_t *destination, uint32_t value)
 {
@@ -344,6 +423,58 @@ static inline int kaimo_local_read_exact(int fd, void *data, size_t length)
 	return 0;
 }
 
+static inline int kaimo_local_write_all_until(
+	int fd, const void *data, size_t length,
+	const struct kaimo_local_deadline *deadline)
+{
+	const uint8_t *cursor = (const uint8_t *)data;
+	while (length != 0) {
+		if (kaimo_local_wait_until(fd, POLLOUT, deadline) != 0)
+			return -1;
+		ssize_t written = send(
+			fd, cursor, length, MSG_NOSIGNAL | MSG_DONTWAIT);
+		if (written < 0) {
+			if (errno == EINTR || errno == EAGAIN ||
+			    errno == EWOULDBLOCK)
+				continue;
+			return -1;
+		}
+		if (written == 0) {
+			errno = EPIPE;
+			return -1;
+		}
+		cursor += (size_t)written;
+		length -= (size_t)written;
+	}
+	return 0;
+}
+
+static inline int kaimo_local_read_exact_until(
+	int fd, void *data, size_t length,
+	const struct kaimo_local_deadline *deadline)
+{
+	uint8_t *cursor = (uint8_t *)data;
+	size_t received = 0;
+	while (received != length) {
+		if (kaimo_local_wait_until(fd, POLLIN, deadline) != 0)
+			return -1;
+		ssize_t result = recv(
+			fd, cursor + received, length - received, MSG_DONTWAIT);
+		if (result < 0) {
+			if (errno == EINTR || errno == EAGAIN ||
+			    errno == EWOULDBLOCK)
+				continue;
+			return -1;
+		}
+		if (result == 0) {
+			errno = received == 0 ? ECONNRESET : EPROTO;
+			return -1;
+		}
+		received += (size_t)result;
+	}
+	return 0;
+}
+
 static inline int kaimo_local_send_frame(int fd, uint8_t operation,
 					uint8_t kind, uint8_t status,
 					const uint8_t *payload,
@@ -381,6 +512,73 @@ static inline int kaimo_local_read_frame_header(
 {
 	uint8_t header[KAIMO_LOCAL_HEADER_SIZE];
 	if (kaimo_local_read_exact(fd, header, sizeof(header)) != 0)
+		return -1;
+
+	if (memcmp(header, "KAIM", 4) != 0 ||
+	    header[4] != KAIMO_LOCAL_PROTOCOL_VERSION ||
+	    header[5] > KAIMO_LOCAL_OP_MAX ||
+	    (header[6] != KAIMO_LOCAL_KIND_REQUEST &&
+	     header[6] != KAIMO_LOCAL_KIND_RESPONSE) ||
+	    header[7] > KAIMO_LOCAL_STATUS_UNAUTHORIZED_PEER) {
+		errno = EPROTO;
+		return -1;
+	}
+
+	frame->operation = header[5];
+	frame->kind = header[6];
+	frame->status = header[7];
+	frame->payload_length = kaimo_local_get_be32(header + 8);
+	size_t maximum = frame->kind == KAIMO_LOCAL_KIND_REQUEST
+		? KAIMO_LOCAL_MAX_REQUEST_PAYLOAD
+		: KAIMO_LOCAL_MAX_RESPONSE_PAYLOAD;
+	if (frame->payload_length > maximum) {
+		errno = EMSGSIZE;
+		return -1;
+	}
+	return 0;
+}
+
+static inline int kaimo_local_send_frame_until(
+	int fd, uint8_t operation, uint8_t kind, uint8_t status,
+	const uint8_t *payload, size_t payload_length,
+	const struct kaimo_local_deadline *deadline)
+{
+	uint8_t header[KAIMO_LOCAL_HEADER_SIZE] = {
+		'K', 'A', 'I', 'M',
+		KAIMO_LOCAL_PROTOCOL_VERSION,
+		operation,
+		kind,
+		status,
+		0, 0, 0, 0
+	};
+	size_t maximum = kind == KAIMO_LOCAL_KIND_REQUEST
+		? KAIMO_LOCAL_MAX_REQUEST_PAYLOAD
+		: KAIMO_LOCAL_MAX_RESPONSE_PAYLOAD;
+
+	if ((kind != KAIMO_LOCAL_KIND_REQUEST &&
+	     kind != KAIMO_LOCAL_KIND_RESPONSE) ||
+	    operation > KAIMO_LOCAL_OP_MAX ||
+	    payload_length > maximum ||
+	    payload_length > UINT32_MAX ||
+	    (payload_length != 0 && payload == NULL)) {
+		errno = EMSGSIZE;
+		return -1;
+	}
+	kaimo_local_put_be32(header + 8, (uint32_t)payload_length);
+	if (kaimo_local_write_all_until(
+		    fd, header, sizeof(header), deadline) != 0)
+		return -1;
+	return kaimo_local_write_all_until(
+		fd, payload, payload_length, deadline);
+}
+
+static inline int kaimo_local_read_frame_header_until(
+	int fd, struct kaimo_local_frame_header *frame,
+	const struct kaimo_local_deadline *deadline)
+{
+	uint8_t header[KAIMO_LOCAL_HEADER_SIZE];
+	if (kaimo_local_read_exact_until(
+		    fd, header, sizeof(header), deadline) != 0)
 		return -1;
 
 	if (memcmp(header, "KAIM", 4) != 0 ||

@@ -26,6 +26,7 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <time.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 
@@ -35,6 +36,11 @@
 #define DBGC_CLASS DBGC_VFS
 
 #define KAIMO_AUTHD_SOCK_DEFAULT "/var/run/kaimo/authz.sock"
+#define KAIMO_VFS_AUTH_TIMEOUT_MS_DEFAULT 6000U
+#define KAIMO_VFS_SNAPSHOT_TIMEOUT_MS_DEFAULT 32000U
+#define KAIMO_VFS_EVENT_TIMEOUT_MS_DEFAULT 250U
+#define KAIMO_VFS_TIMEOUT_MS_MIN 10U
+#define KAIMO_VFS_TIMEOUT_MS_MAX 60000U
 /* Samba 4.19.5 FILE_GENERIC_ALL after generic expansion. OPEN replies may
  * contain only these specific file/directory and standard access bits. */
 #define KAIMO_SAMBA_SPECIFIC_ACCESS 0x001f01ffU
@@ -49,6 +55,11 @@ struct kaimo_local_request {
 	uint8_t payload[KAIMO_LOCAL_MAX_REQUEST_PAYLOAD];
 	struct kaimo_local_builder builder;
 };
+
+static uint32_t kaimo_auth_timeout_ms = KAIMO_VFS_AUTH_TIMEOUT_MS_DEFAULT;
+static uint32_t kaimo_snapshot_timeout_ms =
+	KAIMO_VFS_SNAPSHOT_TIMEOUT_MS_DEFAULT;
+static uint32_t kaimo_event_timeout_ms = KAIMO_VFS_EVENT_TIMEOUT_MS_DEFAULT;
 
 static void kaimo_free_data(void **pptr)
 {
@@ -86,22 +97,67 @@ static bool kaimo_request_ready(const char *operation,
 	return true;
 }
 
-static int kaimo_authd_connect(void)
+static uint32_t kaimo_read_timeout_ms(
+	const char *name, uint32_t default_value)
+{
+	const char *configured = getenv(name);
+	char *end = NULL;
+	unsigned long parsed;
+
+	if (configured == NULL || configured[0] == '\0')
+		return default_value;
+	errno = 0;
+	parsed = strtoul(configured, &end, 10);
+	if (errno != 0 || end == configured || *end != '\0' ||
+	    parsed < KAIMO_VFS_TIMEOUT_MS_MIN ||
+	    parsed > KAIMO_VFS_TIMEOUT_MS_MAX) {
+		DBG_WARNING("kaimo_bridge: invalid %s=[%s], using %u ms\n",
+			    name, configured, default_value);
+		return default_value;
+	}
+	return (uint32_t)parsed;
+}
+
+static int kaimo_authd_connect(
+	const struct kaimo_local_deadline *deadline)
 {
 	const char *sock_path = getenv("KAIMO_AUTHD_SOCK");
 	if (sock_path == NULL)
 		sock_path = KAIMO_AUTHD_SOCK_DEFAULT;
 
-	int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
 	if (fd < 0)
 		return -1;
 
 	struct sockaddr_un addr;
 	memset(&addr, 0, sizeof(addr));
 	addr.sun_family = AF_UNIX;
-	strlcpy(addr.sun_path, sock_path, sizeof(addr.sun_path));
-	if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
+	if (strlcpy(addr.sun_path, sock_path, sizeof(addr.sun_path)) >=
+	    sizeof(addr.sun_path)) {
 		close(fd);
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+	if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) == 0)
+		return fd;
+	if (errno != EINPROGRESS && errno != EAGAIN) {
+		close(fd);
+		return -1;
+	}
+	if (kaimo_local_wait_until(fd, POLLOUT, deadline) != 0) {
+		close(fd);
+		return -1;
+	}
+	int socket_error = 0;
+	socklen_t socket_error_size = sizeof(socket_error);
+	if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &socket_error,
+		       &socket_error_size) != 0) {
+		close(fd);
+		return -1;
+	}
+	if (socket_error != 0) {
+		close(fd);
+		errno = socket_error;
 		return -1;
 	}
 	return fd;
@@ -114,21 +170,26 @@ static int kaimo_authd_connect(void)
 static int kaimo_roundtrip(uint8_t operation,
 			   const struct kaimo_local_request *request,
 			   struct kaimo_local_frame_header *response,
-			   uint8_t *payload, size_t payload_capacity)
+			   uint8_t *payload, size_t payload_capacity,
+			   uint32_t timeout_ms)
 {
-	int fd = kaimo_authd_connect();
+	struct kaimo_local_deadline deadline;
+	if (kaimo_local_deadline_init(&deadline, timeout_ms) != 0)
+		return -1;
+	int fd = kaimo_authd_connect(&deadline);
 	if (fd < 0)
 		return -1;
 
-	if (kaimo_local_send_frame(
+	if (kaimo_local_send_frame_until(
 		    fd, operation, KAIMO_LOCAL_KIND_REQUEST,
 		    KAIMO_LOCAL_STATUS_NONE, request->payload,
-		    request->builder.length) != 0) {
+		    request->builder.length, &deadline) != 0) {
 		close(fd);
 		return -1;
 	}
 
-	if (kaimo_local_read_frame_header(fd, response) != 0) {
+	if (kaimo_local_read_frame_header_until(
+		    fd, response, &deadline) != 0) {
 		int saved_errno = errno;
 		close(fd);
 		return (saved_errno == EPROTO || saved_errno == EMSGSIZE) ? -2 : -1;
@@ -145,7 +206,8 @@ static int kaimo_roundtrip(uint8_t operation,
 		return -2;
 	}
 	if (response->payload_length != 0 &&
-	    kaimo_local_read_exact(fd, payload, response->payload_length) != 0) {
+	    kaimo_local_read_exact_until(
+		    fd, payload, response->payload_length, &deadline) != 0) {
 		int saved_errno = errno;
 		close(fd);
 		return saved_errno == EPROTO ? -2 : -1;
@@ -165,7 +227,8 @@ static int kaimo_authz_send(uint8_t operation,
 	struct kaimo_local_frame_header response;
 	uint8_t payload[4];
 	int result = kaimo_roundtrip(operation, request, &response,
-				     payload, sizeof(payload));
+				     payload, sizeof(payload),
+				     kaimo_auth_timeout_ms);
 	if (result != 0)
 		return result;
 
@@ -351,18 +414,23 @@ static bool kaimo_list_filter_enabled(void)
 	return !(v != NULL && v[0] == '0'); /* default: on */
 }
 
-/* Fire-and-forget notification to kaimo_authd (no response expected by this
- * caller), so SMB Close/Delete/Rename doesn't wait for gRPC processing. */
+/* Best-effort notification to kaimo_authd (no response expected by this
+ * caller). Its deliberately small, independent budget bounds the local
+ * enqueue cost; SMB Close/Delete/Rename never wait for gRPC processing. */
 static void kaimo_notify_send(
 	uint8_t operation, const struct kaimo_local_request *request)
 {
-	int fd = kaimo_authd_connect();
+	struct kaimo_local_deadline deadline;
+	if (kaimo_local_deadline_init(
+		    &deadline, kaimo_event_timeout_ms) != 0)
+		return;
+	int fd = kaimo_authd_connect(&deadline);
 	if (fd < 0)
 		return;
-	(void)kaimo_local_send_frame(
+	(void)kaimo_local_send_frame_until(
 		fd, operation, KAIMO_LOCAL_KIND_REQUEST,
 		KAIMO_LOCAL_STATUS_NONE, request->payload,
-		request->builder.length);
+		request->builder.length, &deadline);
 	close(fd);
 }
 
@@ -376,7 +444,8 @@ static int kaimo_snap_request(
 	size_t payload_capacity)
 {
 	int result = kaimo_roundtrip(
-		operation, request, response, payload, payload_capacity);
+		operation, request, response, payload, payload_capacity,
+		kaimo_snapshot_timeout_ms);
 	if (result != 0)
 		return result;
 	if ((response->status == KAIMO_LOCAL_STATUS_ERROR ||
@@ -1326,12 +1395,24 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 /* Build marker: bump on every module change so the running image can be
  * identified in the logs (grep "kaimo_bridge build"). This is how we tell whether
  * a rebuild actually picked up the latest source vs. served a cached layer. */
-#define KAIMO_BRIDGE_BUILD "2026-07-23e authenticated local peer"
+#define KAIMO_BRIDGE_BUILD "2026-07-23f bounded VFS local I/O"
 
 static_decl_vfs;
 NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)
 {
+	kaimo_auth_timeout_ms = kaimo_read_timeout_ms(
+		"KAIMO_VFS_AUTH_TIMEOUT_MS",
+		KAIMO_VFS_AUTH_TIMEOUT_MS_DEFAULT);
+	kaimo_snapshot_timeout_ms = kaimo_read_timeout_ms(
+		"KAIMO_VFS_SNAPSHOT_TIMEOUT_MS",
+		KAIMO_VFS_SNAPSHOT_TIMEOUT_MS_DEFAULT);
+	kaimo_event_timeout_ms = kaimo_read_timeout_ms(
+		"KAIMO_VFS_EVENT_TIMEOUT_MS",
+		KAIMO_VFS_EVENT_TIMEOUT_MS_DEFAULT);
 	DBG_NOTICE("kaimo_bridge build [%s] loaded\n", KAIMO_BRIDGE_BUILD);
+	DBG_NOTICE("kaimo_bridge: local deadlines auth=%u ms snapshot=%u ms event=%u ms\n",
+		   kaimo_auth_timeout_ms, kaimo_snapshot_timeout_ms,
+		   kaimo_event_timeout_ms);
 	return smb_register_vfs(SMB_VFS_INTERFACE_VERSION, "kaimo_bridge",
 				&kaimo_bridge_fns);
 }

@@ -20,7 +20,9 @@ The most important conclusions are:
    Blocking client-side Unix-socket operations can still stall `smbd` workers.
 3. The complete open access mask and rename source/destination/replacement policy are now mapped to Kaimo permissions in source. Native runtime verification and several metadata/security operation checks remain open.
 4. Folder snapshot materialization now uses the existing per-file ACL filter and a reconciled per-user projection. Materialized bytes are stored in an isolated global cache outside every share; overlap is rejected by both the bridge and share synchronizer.
-5. The local sidecar protocol is not safely framed and assumes one `read()`/`write()` is sufficient for a stream socket.
+5. The local sidecar protocol is versioned and completely framed. Both ends
+   handle partial I/O, and VFS-side connect/send/read now share strict monotonic
+   end-to-end deadlines.
 6. The gRPC control plane is now isolated on a dedicated internal network and
    protected by mTLS, per-workload RPC allow-lists, and audited/rate-limited
    hash export. Native/container runtime verification remains pending.
@@ -434,9 +436,17 @@ The tab/newline protocol also has no escaping. User, share, path, token, or futu
 
 ### P1-05: Native calls can block `smbd` workers for infrastructure timeouts
 
+> **Remediation status (2026-07-23): Implemented and native/live-tested.**
+> VFS clients now use nonblocking Unix sockets and one absolute monotonic
+> deadline across connect, complete frame transmission, and complete response
+> reception. Authorization, snapshot, and best-effort event traffic have
+> separate bounded budgets.
+
 Authorization and notification paths perform synchronous `connect()`/`write()`/`read()` calls without socket-level deadlines. gRPC deadlines in `authd` limit some downstream work, but a full backlog, stalled sidecar, or local socket failure can still block before the gRPC deadline applies.
 
-**Fix:** nonblocking connect with poll/deadline, send/receive timeouts, strict end-to-end budgets, and separate authorization from asynchronous event delivery.
+**Implemented fix:** nonblocking connect with `poll`, deadline-aware complete
+send/receive loops, strict end-to-end budgets, and a separate short event
+enqueue budget. Durable asynchronous event delivery remains P1-11.
 
 ### P1-06: Snapshot opens bypass the VFS stack and do not enforce read-only access
 
@@ -1358,8 +1368,8 @@ Native verification remains unavailable in this environment: Docker is installed
   production worker/queue values and observe latency under saturation.
 - P1-03 was completed afterward with length-prefixed framing and full
   partial-I/O handling.
-- P1-05 remains open: VFS-side connect/write/read operations still need their
-  own strict end-to-end deadline; P1-01 bounds the server side only.
+- P1-05 was completed afterward with VFS-side nonblocking I/O and strict
+  end-to-end deadlines; P1-01 remains the complementary server-side bound.
 
 **Next planned finding:** P1-02 — bound and expire the authorization cache globally.
 
@@ -1409,8 +1419,8 @@ Native verification remains unavailable in this environment: Docker is installed
 - A future ACL-change notification may invalidate matching entries
   immediately; until then, the configured TTL is the explicit revocation
   bound.
-- P1-03 was completed immediately afterward. P1-05 VFS-side deadlines remain
-  a separate next step.
+- P1-03 and P1-05 were completed afterward; framing correctness and
+  VFS-side end-to-end deadlines are both covered.
 
 **Next planned finding:** P1-03 — replace the local stream protocol with bounded, complete framing.
 
@@ -1477,9 +1487,8 @@ fragmentation runtime tests, and the existing saturation regression verified.
   broader live SMB/Windows verification tracked separately.
 - P1-04 was completed immediately afterward with private socket permissions,
   kernel peer credentials, and peer/session identity binding.
-- P1-05 remains open for nonblocking VFS-side connect and strict end-to-end
-  deadlines; complete I/O loops fix correctness but do not themselves bound a
-  stalled client call.
+- P1-05 was completed afterward with nonblocking VFS-side connect and one
+  strict deadline across complete framed send/receive operations.
 
 **Next planned finding:** P1-04 — restrict the Unix socket and authenticate the
 local peer/session identity. Completed immediately afterward.
@@ -1551,11 +1560,66 @@ verified.
 - Exercise the full open/delete/rename/event/snapshot matrix from Windows and
   representative production clients. P1-04's actual connect/list path is
   covered, but it does not replace that broader compatibility run.
-- P1-05 remains open for nonblocking VFS-side connect and strict end-to-end
-  deadlines.
+- P1-05 was completed immediately afterward with nonblocking VFS-side connect
+  and strict end-to-end deadlines.
 
 **Next planned finding:** P1-05 — bound all VFS-side local socket operations by
-strict end-to-end deadlines.
+strict end-to-end deadlines. Completed immediately afterward.
+
+### 2026-07-23 — P1-05: Strict VFS-side end-to-end deadlines
+
+**Status:** Implemented; deterministic native deadline tests, pinned Samba
+4.19.5 build, and a real stalled-sidecar SMB runtime regression verified.
+
+**Solution implemented**
+
+1. Added absolute `CLOCK_MONOTONIC` deadlines to the shared local-protocol
+   helpers. Deadline-aware complete read/write loops use `poll` plus
+   `MSG_DONTWAIT`; partial progress never resets the budget.
+2. Opened every VFS-side Unix client socket with `SOCK_NONBLOCK |
+   SOCK_CLOEXEC`. An in-progress connect waits only for the remaining budget
+   and verifies completion through `SO_ERROR`.
+3. Applied the same deadline instance to connect, the complete request frame,
+   the complete response header, and the complete response payload.
+4. Added independent configurable budgets:
+   `KAIMO_VFS_AUTH_TIMEOUT_MS` (6000 ms),
+   `KAIMO_VFS_SNAPSHOT_TIMEOUT_MS` (32000 ms), and
+   `KAIMO_VFS_EVENT_TIMEOUT_MS` (250 ms). Values outside 10-60,000 ms fall
+   back to logged bounded defaults.
+5. Kept lifecycle notification delivery separate from authorization:
+   notifications wait only for their short local enqueue budget and never for
+   the downstream gRPC result. Durable spooling/acknowledgement remains P1-11.
+6. Rejects overlong Unix-socket paths instead of silently truncating the
+   configured endpoint.
+7. Updated the module marker to
+   `2026-07-23f bounded VFS local I/O`.
+
+**Validation completed**
+
+- The shared native protocol test now proves a silent/slow receiver cannot
+  extend the receive deadline by making partial progress and proves a blocked
+  sender exits within the same absolute budget.
+- The pinned Samba 4.19.5 image builds successfully; native protocol/cache
+  tests pass and the real VFS module compiles and links.
+- A live regression loads the real module in `smbd`, connects it to a fake
+  sidecar that accepts but never responds, and sets a 300 ms authorization
+  budget. The SMB request failed closed with `NT_STATUS_ACCESS_DENIED` in
+  0.364 seconds rather than pinning the worker.
+- The normal immediate-denial regression still returns
+  `NT_STATUS_ACCESS_DENIED` in 0.050 seconds, and the authenticated
+  `smbd` -> VFS -> `authd` peer-identity regression passes with the new module.
+- `docker compose config --quiet` passes. The managed test project passes:
+  527 passed, 0 failed, 0 skipped.
+
+**Validation still required / deliberately separate**
+
+- Run sustained mixed authorization/snapshot/event load to tune production
+  budgets and alerting.
+- P1-11 remains open for durable event delivery; P1-05 only guarantees that a
+  local enqueue attempt cannot block an `smbd` worker indefinitely.
+
+**Next planned finding:** P1-06 — enforce strictly read-only snapshot opens
+without bypassing the remaining VFS stack.
 
 ## 15. Source evidence index
 
