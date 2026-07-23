@@ -501,15 +501,16 @@ The spike is integrated as service `kaimo_samba` in the central [`../docker-comp
 
 ```bash
 cd ..                       # into the docker-compose.yml directory
-sh samba-vfs/generate-control-plane-certs.sh
 docker compose up -d kaimo_samba          # Samba only
 # or everything together:
 docker compose up -d
 ```
 
 - **PKI:** local certificates default to `./secrets/smb-control-plane` and are
+  generated automatically by the one-shot `kaimo_smb_pki_init` service and are
   git-ignored. Production should set `KAIMO_SMB_CONTROL_PKI` to an externally
-  managed directory and rotate the private CA/leaf identities operationally.
+  managed directory with `bridge/` and `samba/` subdirectories and rotate the
+  private CA/leaf identities operationally.
 - **Port:** Samba owns host/container port **445** after the Phase-5 cutover.
 - **Storage:** same bind mount `./tests/data/storage:/data/storage` as host/web → Samba does file I/O directly.
 - **Healthcheck:** reports `healthy` once `smbd` accepts connections.

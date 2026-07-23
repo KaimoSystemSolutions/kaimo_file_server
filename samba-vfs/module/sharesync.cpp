@@ -27,9 +27,9 @@ int main() {
         channel = kaimo::control_plane::create_mtls_channel(
             addr,
             "KAIMO_BRIDGE_SHARE_SYNC_CERT",
-            "/run/secrets/kaimo_bridge_share_sync.crt",
+            "/run/secrets/kaimo-control-plane/share-sync.crt",
             "KAIMO_BRIDGE_SHARE_SYNC_KEY",
-            "/run/secrets/kaimo_bridge_share_sync.key");
+            "/run/secrets/kaimo-control-plane/share-sync.key");
     } catch (const std::exception& error) {
         std::cerr << "kaimo_sharesync: " << error.what() << std::endl;
         return 1;

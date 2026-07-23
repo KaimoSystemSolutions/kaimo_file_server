@@ -1,4 +1,16 @@
 services:
+  # One-shot bootstrap for local development. It creates the complete mTLS PKI
+  # on the first Compose start and becomes a no-op when all files already exist.
+  # Externally managed production PKI can use the same directory layout.
+  kaimo_smb_pki_init:
+    image: ${DOCKER_REGISTRY-}kaimosmbpki
+    build:
+      context: ./samba-vfs
+      dockerfile: Dockerfile.pki
+    volumes:
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}:/pki
+    restart: "no"
+
   kaimo_file_server.host:
     image: ${DOCKER_REGISTRY-}kaimofileserver
     container_name: kaimo_file_server
@@ -32,6 +44,8 @@ services:
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
+      kaimo_smb_pki_init:
+        condition: service_completed_successfully
     environment:
       # Global internal cache, outside every /data/storage/<share> connectpath.
       # Must match KAIMO_SNAPSHOT_CACHE_ROOT in the Samba container.
@@ -40,9 +54,7 @@ services:
       - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
       # Mount only the server identity and public client CA. Client private
       # keys are available exclusively in the Samba container.
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/ca.crt:/run/secrets/kaimo_bridge_ca.crt:ro
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/server.crt:/run/secrets/kaimo_bridge_server.crt:ro
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/server.key:/run/secrets/kaimo_bridge_server.key:ro
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/bridge:/run/secrets/kaimo-control-plane:ro
     networks:
       - kaimo_bridge_database
       - kaimo_smb_control
@@ -70,15 +82,7 @@ services:
       # Same storage as Host/Web -> Samba performs file I/O directly.
       - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
       # Separate client identities enforce least privilege per RPC group.
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/ca.crt:/run/secrets/kaimo_bridge_ca.crt:ro
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/auth-sync.crt:/run/secrets/kaimo_bridge_auth_sync.crt:ro
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/auth-sync.key:/run/secrets/kaimo_bridge_auth_sync.key:ro
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/share-sync.crt:/run/secrets/kaimo_bridge_share_sync.crt:ro
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/share-sync.key:/run/secrets/kaimo_bridge_share_sync.key:ro
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/config-sync.crt:/run/secrets/kaimo_bridge_config_sync.crt:ro
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/config-sync.key:/run/secrets/kaimo_bridge_config_sync.key:ro
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/runtime.crt:/run/secrets/kaimo_bridge_runtime.crt:ro
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/runtime.key:/run/secrets/kaimo_bridge_runtime.key:ro
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
     build:
       context: ./samba-vfs
       dockerfile: Dockerfile.vfs

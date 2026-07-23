@@ -40,9 +40,9 @@ int main() {
         channel = kaimo::control_plane::create_mtls_channel(
             addr,
             "KAIMO_BRIDGE_AUTH_SYNC_CERT",
-            "/run/secrets/kaimo_bridge_auth_sync.crt",
+            "/run/secrets/kaimo-control-plane/auth-sync.crt",
             "KAIMO_BRIDGE_AUTH_SYNC_KEY",
-            "/run/secrets/kaimo_bridge_auth_sync.key");
+            "/run/secrets/kaimo-control-plane/auth-sync.key");
     } catch (const std::exception& error) {
         std::cerr << "kaimo_authsync: " << error.what() << std::endl;
         return 1;

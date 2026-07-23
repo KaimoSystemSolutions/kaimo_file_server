@@ -41,7 +41,7 @@ inline std::shared_ptr<grpc::Channel> create_mtls_channel(
     const char* key_default) {
     grpc::SslCredentialsOptions credentials;
     credentials.pem_root_certs = read_credential(credential_path(
-        "KAIMO_BRIDGE_CA_CERT", "/run/secrets/kaimo_bridge_ca.crt"));
+        "KAIMO_BRIDGE_CA_CERT", "/run/secrets/kaimo-control-plane/ca.crt"));
     credentials.pem_cert_chain = read_credential(credential_path(
         certificate_environment, certificate_default));
     credentials.pem_private_key = read_credential(credential_path(
