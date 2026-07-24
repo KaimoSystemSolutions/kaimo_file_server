@@ -5,7 +5,7 @@ services:
   kaimo_smb_pki_init:
     image: ${DOCKER_REGISTRY-}kaimosmbpki
     build:
-      context: ./samba-vfs
+      context: ./src/samba-vfs
       dockerfile: Dockerfile.pki
     volumes:
       - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}:/pki
@@ -17,7 +17,7 @@ services:
     # umask 002 -> newly created files become 0664 (group-writable) so that the
     # Samba side (group kaimo) can overwrite them. Fallback for filesystems without ACL
     # support (drvfs/9p on Windows dev machine); on ext4 the default ACLs from the
-    # Samba entrypoint handle this. See samba-vfs/README.md (Storage Ownership).
+    # Samba entrypoint handle this. See src/samba-vfs/README.md (Storage Ownership).
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Host.dll"]
     volumes:
       - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
@@ -64,7 +64,7 @@ services:
   # server (removed with the Kaimo_File_Server.Smb project); Samba owns port 445.
   # Auth/ACLs/versioning/shares/protocol settings and @GMT "Previous Versions" run
   # through the gRPC control plane (kaimo_smb_bridge); the data path stays native.
-  # Details: samba-vfs/README.md and docu/smb-samba-vfs-migration.md
+  # Details: src/samba-vfs/README.md and docu/smb-samba-vfs-migration.md
   kaimo_samba:
     image: ${DOCKER_REGISTRY-}kaimosamba
     container_name: kaimo_samba
@@ -84,7 +84,7 @@ services:
       # Mount the single Samba workload identity and public control-plane CA.
       - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
     build:
-      context: ./samba-vfs
+      context: ./src/samba-vfs
       dockerfile: Dockerfile.vfs
     depends_on:
       - kaimo_smb_bridge
@@ -144,7 +144,7 @@ services:
     # umask 002 -> new files 0664 (group-writable) so that Samba side
     # (group kaimo) can overwrite them. Fallback for filesystems without ACL support
     # (drvfs/9p, Windows dev); on ext4 the default ACLs from the
-    # Samba entrypoint handle this. See samba-vfs/README.md (Storage Ownership).
+    # Samba entrypoint handle this. See src/samba-vfs/README.md (Storage Ownership).
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Web.dll"]
     volumes:
       - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage

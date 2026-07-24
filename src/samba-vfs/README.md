@@ -1,6 +1,6 @@
 # samba-vfs — Phase-0-Spike (Proof-of-Concept)
 
-Goal of this directory: **prove that the Samba+VFS approach is viable**, before investing further. See overall plan: [`../docu/smb-samba-vfs-migration.md`](../docu/smb-samba-vfs-migration.md).
+Goal of this directory: **prove that the Samba+VFS approach is viable**, before investing further. See overall plan: [`../../docu/smb-samba-vfs-migration.md`](../../docu/smb-samba-vfs-migration.md).
 
 Phase 0 clarifies the two biggest unknowns:
 
@@ -10,7 +10,7 @@ Phase 0 clarifies the two biggest unknowns:
 | B | Custom VFS module against exact Samba ABI build **and** load from smbd | ✅ **proven** |
 
 **Conclusion Phase 0: the approach is viable.** Both core unknowns are resolved. The path forward
-(Phases 1–5) is described in the [overall plan](../docu/smb-samba-vfs-migration.md).
+(Phases 1–5) is described in the [overall plan](../../docu/smb-samba-vfs-migration.md).
 
 ---
 
@@ -364,7 +364,7 @@ replaces the FileSystemWatcher/`SyncFromDb()` mechanism from
 accessible via `\\host\share`). The **hard** share access is decided unchanged by the Phase 2a
 `connect` hook based on genuine Kaimo ACLs. Full per-user ABE (`valid users` per share)
 was deliberately **not** implemented — it would overlap with the `connect` hook and duplicate
-ACL logic. Details/rationale: [Risk 2 in overall plan](../docu/smb-samba-vfs-migration.md#risk-2--dynamic-share-visibility-per-user--trickiest-point).
+ACL logic. Details/rationale: [Risk 2 in overall plan](../../docu/smb-samba-vfs-migration.md#risk-2--dynamic-share-visibility-per-user--trickiest-point).
 
 **Test (after web UI/DB contains shares):**
 ```bash
@@ -565,4 +565,4 @@ docker compose logs kaimo_samba | grep "kaimo_bridge:"
 ## Next steps (after Phase 0)
 
 Phase 1 (Auth) — `.proto` + gRPC `GetNtHash`/`ResolveUser` in .NET, custom `pdb` module; then
-access/I/O hooks (Phase 2). Details in [overall plan](../docu/smb-samba-vfs-migration.md#6-implementation-in-phases).
+access/I/O hooks (Phase 2). Details in [overall plan](../../docu/smb-samba-vfs-migration.md#6-implementation-in-phases).

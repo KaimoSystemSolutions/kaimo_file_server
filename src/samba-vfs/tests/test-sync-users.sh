@@ -6,7 +6,7 @@
 # collapses (SID derived from UID + getpwuid lookup) and auth/connect breaks.
 # Core assertion here: EACH user gets their OWN UID.
 #
-# Usage:  bash samba-vfs/tests/test-sync-users.sh   (Exit 0 = OK, 1 = FAIL)
+# Usage:  bash src/samba-vfs/tests/test-sync-users.sh   (Exit 0 = OK, 1 = FAIL)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,7 +1,7 @@
 # Samba Bridge and VFS Security, Memory-Safety, and Coverage Audit
 
 > **Audit date:** 2026-07-22  
-> **Scope:** `samba-vfs`, `Kaimo_File_Server.SmbBridge`, the relevant Core/Infrastructure lifecycle code, Samba synchronization scripts, container wiring, and the shared gRPC contract  
+> **Scope:** `src/samba-vfs`, `Kaimo_File_Server.SmbBridge`, the relevant Core/Infrastructure lifecycle code, Samba synchronization scripts, container wiring, and the shared gRPC contract
 > **Audit type:** Static code and architecture review, supported by the available .NET test suite  
 > **Repository state:** No production source files were changed as part of the audit  
 > **Overall result:** Not ready for production as a security boundary without the P0/P1 remediation described below
@@ -37,21 +37,21 @@ The system should be treated as a **working migration prototype with critical ha
 
 ### 2.1 Native Samba components
 
-- `samba-vfs/module/vfs_kaimo_bridge.c`
-- `samba-vfs/module/authd.cpp`
-- `samba-vfs/module/authsync.cpp`
-- `samba-vfs/module/sharesync.cpp`
-- `samba-vfs/module/configsync.cpp`
-- `samba-vfs/protos/kaimo_smb_bridge.proto`
+- `src/samba-vfs/module/vfs_kaimo_bridge.c`
+- `src/samba-vfs/module/authd.cpp`
+- `src/samba-vfs/module/authsync.cpp`
+- `src/samba-vfs/module/sharesync.cpp`
+- `src/samba-vfs/module/configsync.cpp`
+- `src/samba-vfs/protos/kaimo_smb_bridge.proto`
 
 ### 2.2 Synchronization and container components
 
-- `samba-vfs/sync-users.sh`
-- `samba-vfs/sync-shares.sh`
-- `samba-vfs/sync-config.sh`
-- `samba-vfs/entrypoint.vfs.sh`
-- `samba-vfs/conf/smb.conf.vfs`
-- `samba-vfs/Dockerfile.vfs`
+- `src/samba-vfs/sync-users.sh`
+- `src/samba-vfs/sync-shares.sh`
+- `src/samba-vfs/sync-config.sh`
+- `src/samba-vfs/entrypoint.vfs.sh`
+- `src/samba-vfs/conf/smb.conf.vfs`
+- `src/samba-vfs/Dockerfile.vfs`
 - `docker-compose.yml`
 
 ### 2.3 .NET bridge and lifecycle components
@@ -992,7 +992,7 @@ This order was selected instead of connecting first and rolling back afterward b
 
 **Files changed**
 
-- `samba-vfs/module/vfs_kaimo_bridge.c`
+- `src/samba-vfs/module/vfs_kaimo_bridge.c`
 - `docu/samba-bridge-vfs-security-audit.md`
 
 **Validation completed**
@@ -1044,7 +1044,7 @@ strings but requires a coordinated Samba-to-sidecar API change.
 
 **Files changed**
 
-- `samba-vfs/module/vfs_kaimo_bridge.c`
+- `src/samba-vfs/module/vfs_kaimo_bridge.c`
 - `docu/samba-bridge-vfs-security-audit.md`
 
 **Validation completed**
@@ -1118,13 +1118,13 @@ This changed the implementation plan materially: a boolean allow/deny result is 
 
 **Files changed**
 
-- `samba-vfs/protos/kaimo_smb_bridge.proto`
-- `samba-vfs/module/authd.cpp`
-- `samba-vfs/module/vfs_kaimo_bridge.c`
+- `src/samba-vfs/protos/kaimo_smb_bridge.proto`
+- `src/samba-vfs/module/authd.cpp`
+- `src/samba-vfs/module/vfs_kaimo_bridge.c`
 - `src/Kaimo_File_Server.SmbBridge/Services/AuthzGrpcService.cs`
 - `tests/Kaimo_File_Server.Tests/AuthzGrpcServiceAccessMaskTests.cs`
 - `tests/Kaimo_File_Server.Tests/AuthzGrpcServiceDeleteTests.cs`
-- `samba-vfs/README.md`
+- `src/samba-vfs/README.md`
 - `docu/smb-samba-vfs-migration.md`
 - `docu/samba-bridge-vfs-security-audit.md`
 
@@ -1170,12 +1170,12 @@ Native verification remains unavailable in this environment: Docker is installed
 
 **Files changed**
 
-- `samba-vfs/protos/kaimo_smb_bridge.proto`
-- `samba-vfs/module/authd.cpp`
-- `samba-vfs/module/vfs_kaimo_bridge.c`
+- `src/samba-vfs/protos/kaimo_smb_bridge.proto`
+- `src/samba-vfs/module/authd.cpp`
+- `src/samba-vfs/module/vfs_kaimo_bridge.c`
 - `src/Kaimo_File_Server.SmbBridge/Services/AuthzGrpcService.cs`
 - `tests/Kaimo_File_Server.Tests/AuthzGrpcServiceRenameTests.cs`
-- `samba-vfs/README.md`
+- `src/samba-vfs/README.md`
 - `docu/smb-samba-vfs-migration.md`
 - `docu/samba-bridge-vfs-security-audit.md`
 
@@ -1217,7 +1217,7 @@ Native verification remains unavailable in this environment: Docker is installed
 - `src/Kaimo_File_Server.SmbBridge/Program.cs`
 - `tests/Kaimo_File_Server.Tests/FileServiceFolderSnapshotTests.cs`
 - `tests/Kaimo_File_Server.Tests/SnapshotGrpcServiceAclTests.cs`
-- `samba-vfs/README.md`
+- `src/samba-vfs/README.md`
 - `docu/samba-bridge-vfs-security-audit.md`
 
 **Validation completed**
@@ -1254,16 +1254,16 @@ Native verification remains unavailable in this environment: Docker is installed
 
 - `docker-compose.yml`
 - `.env.example`
-- `samba-vfs/protos/kaimo_smb_bridge.proto`
-- `samba-vfs/module/vfs_kaimo_bridge.c`
-- `samba-vfs/module/authd.cpp`
-- `samba-vfs/sync-shares.sh`
+- `src/samba-vfs/protos/kaimo_smb_bridge.proto`
+- `src/samba-vfs/module/vfs_kaimo_bridge.c`
+- `src/samba-vfs/module/authd.cpp`
+- `src/samba-vfs/sync-shares.sh`
 - `src/Kaimo_File_Server.SmbBridge/Services/SnapshotGrpcService.cs`
 - `src/Kaimo_File_Server.SmbBridge/Services/SnapshotCache.cs`
 - `src/Kaimo_File_Server.SmbBridge/Services/SnapshotCacheCleanupService.cs`
 - `src/Kaimo_File_Server.SmbBridge/appsettings.json`
 - `tests/Kaimo_File_Server.Tests/SnapshotGrpcServiceAclTests.cs`
-- `samba-vfs/README.md`
+- `src/samba-vfs/README.md`
 - `docu/smb-samba-vfs-migration.md`
 - `docu/samba-bridge-vfs-security-audit.md`
 
@@ -1684,23 +1684,23 @@ content-verified.
 
 | Finding area | Primary source locations |
 |---|---|
-| Context allocation fail-open | `samba-vfs/module/vfs_kaimo_bridge.c:526-574` |
+| Context allocation fail-open | `src/samba-vfs/module/vfs_kaimo_bridge.c:526-574` |
 | Path reconstruction/truncation | `vfs_kaimo_bridge.c:68-228`, `:320-382`, `:510-522`, `:583-991` |
 | Complete access mapping / original gap | `vfs_kaimo_bridge.c:89-197`, `:583-695`; `authd.cpp:53-130`, `:212-249`; `AuthzGrpcService.cs:25-327`; `Core/Security/FilePermissions.cs` |
 | Rename authorization / original gap | `vfs_kaimo_bridge.c` (`kaimo_authz_rename`, `kaimo_renameat`); `authd.cpp` (`do_rename`); `AuthzGrpcService.cs` (`AuthorizeRename`) |
-| Bounded sidecar workers / original detached-thread gap | `samba-vfs/module/authd.cpp` (`BoundedClientQueue`, socket deadlines, worker startup, overload rejection); `samba-vfs/tests/test-authd-capacity.py` |
-| Bounded authorization cache / original growth gap | `samba-vfs/module/decision_cache.h`; `authd.cpp` (cache configuration and sampled counters); `samba-vfs/tests/test-decision-cache.cpp` |
-| Private authenticated Unix socket / original world-writable gap | `samba-vfs/module/authd.cpp` (`configure_expected_peer_executable`, `inspect_peer`, `peer_matches_username`, secure socket publication); `entrypoint.vfs.sh`; `sync-users.sh`; `docker-compose.yml`; `samba-vfs/tests/test-authd-peer-security.py`; `test-authd-smb-peer.py` |
-| Windows-compatible TREE_CONNECT denial | `samba-vfs/patches/0001-map-vfs-connect-errno.patch`; `Dockerfile.vfs`; `samba-vfs/tests/test-vfs-connect-status.py` |
-| Framed local stream protocol / original partial I/O gap | `samba-vfs/module/local_protocol.h`; `vfs_kaimo_bridge.c` (`kaimo_roundtrip`, binary request builders and response parsers); `authd.cpp` (`handle_client`); `samba-vfs/tests/test-local-protocol.cpp`; `test-authd-protocol.py` |
+| Bounded sidecar workers / original detached-thread gap | `src/samba-vfs/module/authd.cpp` (`BoundedClientQueue`, socket deadlines, worker startup, overload rejection); `src/samba-vfs/tests/test-authd-capacity.py` |
+| Bounded authorization cache / original growth gap | `src/samba-vfs/module/decision_cache.h`; `authd.cpp` (cache configuration and sampled counters); `src/samba-vfs/tests/test-decision-cache.cpp` |
+| Private authenticated Unix socket / original world-writable gap | `src/samba-vfs/module/authd.cpp` (`configure_expected_peer_executable`, `inspect_peer`, `peer_matches_username`, secure socket publication); `entrypoint.vfs.sh`; `sync-users.sh`; `docker-compose.yml`; `src/samba-vfs/tests/test-authd-peer-security.py`; `test-authd-smb-peer.py` |
+| Windows-compatible TREE_CONNECT denial | `src/samba-vfs/patches/0001-map-vfs-connect-errno.patch`; `Dockerfile.vfs`; `src/samba-vfs/tests/test-vfs-connect-status.py` |
+| Framed local stream protocol / original partial I/O gap | `src/samba-vfs/module/local_protocol.h`; `vfs_kaimo_bridge.c` (`kaimo_roundtrip`, binary request builders and response parsers); `authd.cpp` (`handle_client`); `src/samba-vfs/tests/test-local-protocol.cpp`; `test-authd-protocol.py` |
 | Snapshot ACL filtering / original leak | `SmbBridge/Services/SnapshotGrpcService.cs` (`GetFolderSnapshotAsync`, per-user reconciliation); `Core/Services/File/FileService.cs:884-899` |
 | Snapshot cache isolation / original direct path | `SnapshotCache.cs`; `SnapshotGrpcService.cs` (`EnsureIsolatedFromShare`, cache-root-relative paths); `vfs_kaimo_bridge.c` (`kaimo_snapshot_cache_abspath`, reserved namespace checks); `sync-shares.sh`; `docker-compose.yml` |
-| Snapshot read-only/VFS-stack enforcement | `vfs_kaimo_bridge.c` (`kaimo_snapshot_create_is_readonly`, `kaimo_snapshot_granted_access`, `kaimo_snapshot_open_how_readonly`, `kaimo_openat`); `samba-vfs/tests/test-vfs-snapshot-readonly.py` |
+| Snapshot read-only/VFS-stack enforcement | `vfs_kaimo_bridge.c` (`kaimo_snapshot_create_is_readonly`, `kaimo_snapshot_granted_access`, `kaimo_snapshot_open_how_readonly`, `kaimo_openat`); `src/samba-vfs/tests/test-vfs-snapshot-readonly.py` |
 | Snapshot materialization races | `SnapshotGrpcService.cs:288-317`; `SnapshotCacheCleanupService.cs` |
 | Disabled share lookup | `Infrastructure/Repositories/ShareRepository.cs:45-49`; bridge service share lookups |
 | Event reliability/TOCTOU | `vfs_kaimo_bridge.c:233-257`, `:665-919`; `FileEventGrpcService.cs`; `FileService.cs:341-400` |
 | Rename duplicate destruction | `Infrastructure/Repositories/FileVersionRepository.cs:142-178` |
-| Insecure hash temp file | `samba-vfs/sync-users.sh:17-49` |
+| Insecure hash temp file | `src/samba-vfs/sync-users.sh:17-49` |
 | Sync error handling | `sync-users.sh`, `sync-shares.sh`, `sync-config.sh` |
 | Authenticated gRPC control plane / original h2c gap | `SmbBridge/Program.cs`; `SmbBridge/Security/*`; `AuthGrpcService.cs`; `bridge_channel.h` and native clients; `docker-compose.yml` |
 
