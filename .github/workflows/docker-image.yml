@@ -23,21 +23,73 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      # 1. Kaimo_File_Server.Host
       - name: Extract metadata (tags, labels) for Docker
-        id: meta
+        id: meta_host
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
           images: kaimosystem/kaimo_file_server
 
       - name: Build and push Docker image
-        id: push
+        id: push_host
         uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
         with:
           context: .
           file: ./src/Kaimo_File_Server.Host/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta_host.outputs.tags }}
+          labels: ${{ steps.meta_host.outputs.labels }}
+
+      # 2. Kaimo_File_Server.Web
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta_web
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: kaimosystem/kaimo_file_server.web
+
+      - name: Build and push Docker image
+        id: push_web
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          context: .
+          file: ./src/Kaimo_File_Server.Web/Dockerfile
+          push: true
+          tags: ${{ steps.meta_web.outputs.tags }}
+          labels: ${{ steps.meta_web.outputs.labels }}
+
+      # 3. Kaimo_File_Server.Samba
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta_samba
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: kaimosystem/kaimo_file_server.samba
+
+      - name: Build and push Docker image
+        id: push_samba
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          context: .
+          file: ./samba-vfs/Dockerfile.vfs
+          push: true
+          tags: ${{ steps.meta_samba.outputs.tags }}
+          labels: ${{ steps.meta_samba.outputs.labels }}
+
+      # 4. Kaimo_File_Server.Samba
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta_samba_bridge
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: kaimosystem/kaimo_file_server.samba_bridge
+
+      - name: Build and push Docker image
+        id: push_samba_bridge
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+        with:
+          context: .
+          file: ./src/Kaimo_File_Server.SmbBridge/Dockerfile
+          push: true
+          tags: ${{ steps.meta_samba_bridge.outputs.tags }}
+          labels: ${{ steps.meta_samba_bridge.outputs.labels }}
 
       #- name: Generate artifact attestation
       #  uses: actions/attest@v4
