@@ -70,21 +70,24 @@ The actual I/O remains native (`SMB_VFS_NEXT_*`) — the file lands directly on 
 ### Build & test
 
 ```bash
-# Prerequisite: source image with Samba source tree (one-time, caches the download)
-#   docker build -f Dockerfile.src -t kaimo-samba-src:4.19.5 .
-# Build Samba + module from one source (~7 min: 2:30 build, 4:10 install)
+# Default: slim production runtime. Samba source, compiler and waf build tree
+# remain in cached intermediate stages and are not part of this image.
 docker build -f Dockerfile.vfs -t kaimo-samba-spike:vfs .
 docker run -d --name kaimo-samba-vfs -p 1446:445 kaimo-samba-spike:vfs
 # Force file op and verify hooks in log
 docker exec kaimo-samba-vfs bash /usr/local/bin/selftest.sh
 docker logs kaimo-samba-vfs 2>&1 | grep "kaimo_bridge:"
+
+# Optional: unstripped native build environment for diagnostics/debugging.
+docker build -f Dockerfile.vfs --target build-runtime -t kaimo-samba-build:vfs .
 ```
 
 Files: [`Dockerfile.vfs`](Dockerfile.vfs), [`module/vfs_kaimo_bridge.c`](module/vfs_kaimo_bridge.c),
 [`conf/smb.conf.vfs`](conf/smb.conf.vfs), [`entrypoint.vfs.sh`](entrypoint.vfs.sh).
 
-> The intermediate image `kaimo-samba-src:4.19.5` (see [`Dockerfile.src`](Dockerfile.src)) only caches
-> the unpacked Samba source tree, so the module build doesn't re-download on each iteration.
+> The default runtime strips installed ELF files and installs only automatically detected
+> shared-library packages. Build `--target build-runtime` when native symbols, compiler,
+> Samba sources or waf object files are required.
 
 ---
 
