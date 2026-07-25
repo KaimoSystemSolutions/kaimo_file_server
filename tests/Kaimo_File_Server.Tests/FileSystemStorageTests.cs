@@ -552,9 +552,6 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
             null, [rootPath, Guid.Empty, (IServiceProvider?)null], null)!;
     }
 
-    public string getRootPath()
-        => _rootPath;
-
     public Task<Stream> ReadAsync(string path)
         => Invoke<Stream>("ReadAsync", path);
 

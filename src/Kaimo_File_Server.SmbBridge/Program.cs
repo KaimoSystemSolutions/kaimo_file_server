@@ -3,6 +3,7 @@ using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.SmbBridge.Security;
 using Kaimo_File_Server.SmbBridge.Services;
+using Kaimo_File_Server.Core.Storage;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 
@@ -19,8 +20,13 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // the NoOp fallback (Phase 3: SMB writes are indexed like web uploads).
 builder.Services.AddElasticSearch(builder.Configuration);
 
-var storagePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
-builder.Services.AddCoreServices(storagePath);
+
+
+var baseStoragePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
+var applicationDataPath = builder.Configuration.GetValue<string>("Storage:ApplicationDataPath") ?? "/data/kaimo-system";
+var poolStoragePaths = Directory.GetDirectories(baseStoragePath).Select(path => path).ToList();
+
+builder.Services.AddCoreServices(poolStoragePaths, applicationDataPath);
 
 // Config store (like in Host): needed transitively by ILoginService/ManagementAuth
 // and therefore registered for DI validation.

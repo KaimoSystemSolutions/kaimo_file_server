@@ -21,7 +21,7 @@ public interface ISystemInfoService
     Task<string?> GetPublicIpAsync(CancellationToken ct = default);
 
     /// <summary>Total/used/free space of the drive that hosts the storage root.</summary>
-    StorageUsageInfo GetStorageUsage();
+    List<StorageUsageInfo> GetStorageUsage();
 
     /// <summary>Memory currently used by this (the running tool's) process.</summary>
     MemoryUsageInfo GetMemoryUsage();

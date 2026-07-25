@@ -11,7 +11,7 @@
 # Exit 0 only on successful retrieval from bridge (for retry loop in entrypoint).
 set -uo pipefail
 export PATH=/opt/samba/sbin:/opt/samba/bin:$PATH
-CACHE_ROOT="$(readlink -m "${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/storage/.kaimo-snapshots}")"
+CACHE_ROOT="$(readlink -m "${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}")"
 
 OUT="$(kaimo_sharesync 2>>/tmp/sharesync.err)"
 rc=$?

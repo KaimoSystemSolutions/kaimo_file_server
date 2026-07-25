@@ -87,20 +87,21 @@ namespace Kaimo_File_Server.Infrastructure
         }
 
         /// <summary>
-        /// Registers Core services that depend on a storage root path:
-        /// ACL repository, file metadata repository, file service factory,
-        /// root storage engine, file versioning, and the share lock manager.
+        /// Registers Core services. Live share I/O is always created from the
+        /// absolute path persisted on the corresponding ShareDefinition. The
+        /// application data path is used only for internal, non-share data.
         ///
         /// Call this once from every host AFTER <see cref="AddInfrastructure"/>.
         /// </summary>
         public static IServiceCollection AddCoreServices(
-            this IServiceCollection services, string storagePath)
+            this IServiceCollection services, IReadOnlyList<string> poolStoragePaths, string applicationDataPath)
         {
             // Disabled search
             services.TryAddSingleton<ISearchService, NoOpSearchService>();
 
-            // -- System info (IP / storage / RAM for the settings page) --
-            services.AddSingleton<ISystemInfoService>(_ => new SystemInfoService(storagePath));
+            // -- System info (IP / first configured pool / RAM for settings) --
+            services.AddSingleton<ISystemInfoService>(_ =>
+                new SystemInfoService(poolStoragePaths));
 
             // -- ACL + Metadata --
             services.AddScoped<IAclRepository, AclRepository>();
@@ -110,11 +111,13 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddSingleton<IFileServiceFactory, FileServiceFactory>();
 
             // -- Root StorageEngine (share-agnostic, used by Web UI for raw I/O) --
-            services.AddSingleton<IStorageEngine>(sp =>
-                new FileSystemStorage(storagePath, Guid.Empty, sp));
+            //services.AddSingleton<IStorageEngine>(sp =>
+            //    new FileSystemStorage(storagePath, Guid.Empty, sp));
 
-            // -- Versioning --
-            var versionStoragePath = Path.Combine(storagePath, ".versions");
+
+            // -- Versioning (internal data, intentionally outside all shares) --
+            var versionStoragePath = Path.Combine(
+                applicationDataPath, ".versions");
 
             services.AddScoped<IFileVersionService>(sp =>
                 new FileVersionService(

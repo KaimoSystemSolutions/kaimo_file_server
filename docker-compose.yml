@@ -20,7 +20,9 @@ services:
     # Samba entrypoint handle this. See src/samba-vfs/README.md (Storage Ownership).
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Host.dll"]
     volumes:
-      - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
+      - ${LOCATION_STORAGE:-./tests/data/storage/pool01}:/data/storage/pool01
+      - ${LOCATION_STORAGE2:-./tests/data/storage/pool02}:/data/storage/pool02
+      - ${LOCATION_APP_DATA:-./tests/data/system}:/data/kaimo-system
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
@@ -47,11 +49,13 @@ services:
       kaimo_smb_pki_init:
         condition: service_completed_successfully
     environment:
-      # Global internal cache, outside every /data/storage/<share> connectpath.
+      # Global internal cache, outside every configured share path.
       # Must match KAIMO_SNAPSHOT_CACHE_ROOT in the Samba container.
-      Snapshots__Cache__RootPath: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/storage/.kaimo-snapshots}
+      Snapshots__Cache__RootPath: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}
     volumes:
-      - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
+      - ${LOCATION_STORAGE:-./tests/data/storage/pool01}:/data/storage/pool01
+      - ${LOCATION_STORAGE2:-./tests/data/storage/pool02}:/data/storage/pool02
+      - ${LOCATION_APP_DATA:-./tests/data/system}:/data/kaimo-system
       # Mount only the server identity and public client CA. Client private
       # keys are available exclusively in the Samba container.
       - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/bridge:/run/secrets/kaimo-control-plane:ro
@@ -80,7 +84,9 @@ services:
       - 445:445
     volumes:
       # Same storage as Host/Web -> Samba performs file I/O directly.
-      - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
+      - ${LOCATION_STORAGE:-./tests/data/storage/pool01}:/data/storage/pool01
+      - ${LOCATION_STORAGE2:-./tests/data/storage/pool02}:/data/storage/pool02
+      - ${LOCATION_APP_DATA:-./tests/data/system}:/data/kaimo-system
       # Mount the single Samba workload identity and public control-plane CA.
       - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
     build:
@@ -118,9 +124,9 @@ services:
       # materialized version copy). Set to "0" to disable the redirect at runtime
       # (no rebuild) if it ever misbehaves; timewarp opens then fail closed.
       KAIMO_SNAPSHOT_OPENAT: "1"
-      # Must match Snapshots__Cache__RootPath in kaimo_smb_bridge. This global
-      # directory is a sibling of share roots and is never published by Samba.
-      KAIMO_SNAPSHOT_CACHE_ROOT: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/storage/.kaimo-snapshots}
+      # Must match Snapshots__Cache__RootPath in kaimo_smb_bridge. This internal
+      # directory is outside all share pools and is never published by Samba.
+      KAIMO_SNAPSHOT_CACHE_ROOT: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}
     networks:
       - default
       - kaimo_smb_control
@@ -147,7 +153,9 @@ services:
     # Samba entrypoint handle this. See src/samba-vfs/README.md (Storage Ownership).
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Web.dll"]
     volumes:
-      - ${LOCATION_STORAGE:-./tests/data/storage}:/data/storage
+      - ${LOCATION_STORAGE:-./tests/data/storage/pool01}:/data/storage/pool01
+      - ${LOCATION_STORAGE2:-./tests/data/storage/pool02}:/data/storage/pool02
+      - ${LOCATION_APP_DATA:-./tests/data/system}:/data/kaimo-system
       - ${LOCATION_GDRIVE_CREDENTIALS:-./tests/data/logins/google-service-account.json}:/data/logins/google-service-account.json:ro
       
     depends_on:

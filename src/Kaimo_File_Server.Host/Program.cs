@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Infrastructure.Logging;
@@ -20,9 +21,12 @@ builder.AddDynamicLogLevel();
 //    indexed -> search never returns hits for SMB-served files.
 builder.Services.AddElasticSearch(builder.Configuration);
 
-// -- Core Services (FileService, AclService, StorageEngine) --
-var storagePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
-builder.Services.AddCoreServices(storagePath);
+// -- Core Services. Share I/O resolves through ShareDefinition.Path. --
+var baseStoragePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
+var applicationDataPath = builder.Configuration.GetValue<string>("Storage:ApplicationDataPath") ?? "/data/kaimo-system";
+var poolStoragePaths = Directory.GetDirectories(baseStoragePath).Select(path => path).ToList();
+
+builder.Services.AddCoreServices(poolStoragePaths, applicationDataPath);
 
 // -- Config store (desired-state flags for data services, shared with the Web UI) --
 builder.Services.AddMemoryCache();

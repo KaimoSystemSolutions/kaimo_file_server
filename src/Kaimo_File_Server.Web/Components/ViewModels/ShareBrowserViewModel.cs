@@ -2,7 +2,6 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
-using Kaimo_File_Server.Core.Storage;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
@@ -16,7 +15,6 @@ public partial class ShareBrowserViewModel
     private readonly IAclService _aclService;
     private readonly IManagementAuthService _mgmtAuth;
     private readonly IUserContextFactory _userContextFactory;
-    private readonly IStorageEngine _storage;
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<ShareBrowserViewModel> _logger;
 
@@ -25,7 +23,6 @@ public partial class ShareBrowserViewModel
         IAclService aclService,
         IManagementAuthService mgmtAuth,
         IUserContextFactory userContextFactory,
-        IStorageEngine storage,
         AuthenticationStateProvider authState,
         ILogger<ShareBrowserViewModel> logger)
     {
@@ -33,7 +30,6 @@ public partial class ShareBrowserViewModel
         _aclService = aclService;
         _mgmtAuth = mgmtAuth;
         _userContextFactory = userContextFactory;
-        _storage = storage;
         _authState = authState;
         _logger = logger;
     }

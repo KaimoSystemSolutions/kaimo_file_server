@@ -1782,4 +1782,31 @@
   <data name="Web_Move_BatchPartialFailure" xml:space="preserve">
   <value>{0} von {1} Elementen verschoben. Bei einigen Elementen ist ein Fehler aufgetreten.</value>
 </data>
+  <data name="Web_ShareList_Label_StoragePool" xml:space="preserve">
+  <value>Speicherpool</value>
+</data>
+  <data name="Web_ShareList_Action_MovePool" xml:space="preserve">
+  <value>Verschieben</value>
+</data>
+  <data name="Web_ShareList_StoragePoolUnconfigured" xml:space="preserve">
+  <value>Aktueller Pfad (Pool nicht konfiguriert)</value>
+</data>
+  <data name="Web_Share_StoragePoolChanged" xml:space="preserve">
+  <value>Share wurde in den Speicherpool „{0}“ verschoben.</value>
+</data>
+  <data name="Web_Share_StoragePoolUnchanged" xml:space="preserve">
+  <value>Der Share verwendet bereits diesen Speicherpool.</value>
+</data>
+  <data name="Web_Error_StoragePoolRequired" xml:space="preserve">
+  <value>Bitte einen gültigen Speicherpool auswählen.</value>
+</data>
+  <data name="Web_Error_StoragePoolDestinationExists" xml:space="preserve">
+  <value>Im ausgewählten Speicherpool existiert bereits eine Datei oder ein Ordner mit diesem Share-Namen.</value>
+</data>
+  <data name="Web_Error_StoragePoolMoveFailed" xml:space="preserve">
+  <value>Der Share konnte nicht in den ausgewählten Speicherpool verschoben werden. Bitte das Serverprotokoll prüfen.</value>
+</data>
+  <data name="Web_Error_SharePathMissing" xml:space="preserve">
+  <value>Der für diesen Share gespeicherte Pfad existiert nicht.</value>
+</data>
 </root>

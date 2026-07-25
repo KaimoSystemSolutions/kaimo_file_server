@@ -28,6 +28,31 @@
     </div>
 
     <div class="detail-section">
+        <span class="detail-label">@Resources.Web_ShareList_Label_StoragePool</span>
+        <div class="detail-value-row">
+            <select class="edit-input"
+                    @bind="VM.EditSharePoolPath"
+                    disabled="@VM.IsMovingPool">
+                @if (VM.GetPoolNameForShare(VM.SelectedShare) is null)
+                {
+                    <option value="@VM.EditSharePoolPath">
+                        @Resources.Web_ShareList_StoragePoolUnconfigured
+                    </option>
+                }
+                @foreach (var pool in VM.StoragePools)
+                {
+                    <option value="@pool.Path">@pool.Name — @pool.Path</option>
+                }
+            </select>
+            <button class="btn-primary compact-button"
+                    @onclick="ChangeStoragePool"
+                    disabled="@VM.IsMovingPool">
+                @(VM.IsMovingPool ? "…" : Resources.Web_ShareList_Action_MovePool)
+            </button>
+        </div>
+    </div>
+
+    <div class="detail-section">
         <span class="detail-label">@Resources.Web_ShareList_Label_Status</span>
         <div class="detail-value-row">
             <span class="detail-value">@(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)</span>
@@ -70,6 +95,7 @@
     [Parameter] public EventCallback OnDeleted { get; set; }
 
     private async Task RenameShare() { await VM.RenameShareAsync(); StateHasChanged(); }
+    private async Task ChangeStoragePool() { await VM.ChangeStoragePoolAsync(); StateHasChanged(); }
     private async Task ToggleShareEnabled() { await VM.ToggleShareEnabledAsync(); StateHasChanged(); }
     private async Task ToggleRecycleEnabled() { await VM.ToggleRecycleEnabledAsync(); StateHasChanged(); }
 

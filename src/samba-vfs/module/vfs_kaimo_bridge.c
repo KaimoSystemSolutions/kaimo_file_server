@@ -625,7 +625,7 @@ static const char *kaimo_share_rel(vfs_handle_struct *handle, const char *path)
 }
 
 #define KAIMO_LEGACY_CACHE_DIR ".kaimo-snapshots"
-#define KAIMO_DEFAULT_SNAPSHOT_CACHE_ROOT "/data/storage/.kaimo-snapshots"
+#define KAIMO_DEFAULT_SNAPSHOT_CACHE_ROOT "/data/kaimo-system/.kaimo-snapshots"
 
 /* The old in-share cache name stays permanently reserved. This blocks direct
  * client access to stale pre-P0-06 materializations during rolling upgrades and
