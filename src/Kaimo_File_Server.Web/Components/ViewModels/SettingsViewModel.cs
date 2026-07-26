@@ -755,7 +755,7 @@ public class SettingsViewModel
         if (!CanManageSettings) return;
         HostName = _sysInfo.HostName;
         NetworkAddresses = _sysInfo.GetNetworkAddresses();
-        StorageUsage = _sysInfo.GetStorageUsage();
+        //StorageUsage = _sysInfo.GetStorageUsage();
         MemoryUsage = _sysInfo.GetMemoryUsage();
     }
 

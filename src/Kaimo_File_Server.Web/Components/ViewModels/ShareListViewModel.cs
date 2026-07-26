@@ -4,7 +4,6 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
-using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Search;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
@@ -15,6 +14,11 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 
 public partial class ShareListViewModel
 {
+    private static readonly StringComparer PathComparer =
+        OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+
     private readonly IShareRepository _shareRepo;
     private readonly IUserRepository _userRepo;
     private readonly IGroupRepository _groupRepo;
@@ -58,6 +62,10 @@ public partial class ShareListViewModel
         _authState = authState;
         _logger = logger;
         _storagePools = storagePools;
+        StoragePools = storagePools
+            .Select(path => new StoragePoolItem(GetPoolDisplayName(path), path))
+            .ToList();
+        NewSharePoolPath = storagePools.FirstOrDefault() ?? string.Empty;
         _versionService = versionService;
         _searchService = searchService;
     }
@@ -72,6 +80,7 @@ public partial class ShareListViewModel
 
     public bool IsCreating { get; set; }
     public string NewShareName { get; set; } = "";
+    public string NewSharePoolPath { get; set; }
     public string? CreateErrorMessage { get; private set; }
 
     // -- Edit --
@@ -83,6 +92,9 @@ public partial class ShareListViewModel
     public string? EditSuccessMessage { get; private set; }
     public bool ShowDeleteConfirm { get; set; }
     public bool IsRenaming { get; private set; }
+    public bool IsMovingPool { get; private set; }
+
+    public IReadOnlyList<StoragePoolItem> StoragePools { get; }
 
     // -- Access --
 
@@ -246,21 +258,26 @@ public partial class ShareListViewModel
 
         var normalized = Path.GetFullPath(candidate);
         return _storagePools
-            .Select(pool => pool.Path)
             .FirstOrDefault(path =>
-                StorageOptions.PathComparer.Equals(Path.GetFullPath(path), normalized));
+                PathComparer.Equals(Path.GetFullPath(path), normalized));
     }
 
     private static string BuildSharePath(string poolPath, string name)
         => Path.Combine(poolPath, name);
+
+    private static string GetPoolDisplayName(string poolPath)
+    {
+        var normalized = Path.TrimEndingDirectorySeparator(Path.GetFullPath(poolPath));
+        return Path.GetFileName(normalized);
+    }
 
     public string? GetPoolNameForShare(ShareDefinition share)
     {
         var parent = Path.GetDirectoryName(Path.GetFullPath(share.Path));
         if (parent is null) return null;
 
-        return _storagePools.FirstOrDefault(pool =>
-            StorageOptions.PathComparer.Equals(Path.GetFullPath(pool.Path), parent))?.Name;
+        return StoragePools.FirstOrDefault(pool =>
+            PathComparer.Equals(Path.GetFullPath(pool.Path), parent))?.Name;
     }
 
     // -- Create --
@@ -340,7 +357,7 @@ public partial class ShareListViewModel
             _logger.LogInformation("Share '{ShareName}' created", name);
 
             NewShareName = "";
-            NewSharePoolPath = _storagePools.FirstOrDefault()?.Path ?? string.Empty;
+            NewSharePoolPath = _storagePools.FirstOrDefault() ?? string.Empty;
             IsCreating = false;
             await LoadAsync();
             return true;
@@ -366,7 +383,7 @@ public partial class ShareListViewModel
         SelectedShare = share;
         EditShareName = share.Name;
         EditSharePoolPath = Path.GetDirectoryName(Path.GetFullPath(share.Path))
-            ?? _storagePools.FirstOrDefault()?.Path
+            ?? _storagePools.FirstOrDefault()
             ?? string.Empty;
         EditErrorMessage = null;
         EditSuccessMessage = null;
@@ -433,12 +450,12 @@ public partial class ShareListViewModel
                     ?? throw new InvalidOperationException("Share path has no parent directory.");
                 var newFullPath = Path.Combine(parentPath, newName);
 
-                if (!StorageOptions.PathComparer.Equals(oldFullPath, newFullPath)
+                if (!PathComparer.Equals(oldFullPath, newFullPath)
                     && (Directory.Exists(newFullPath) || File.Exists(newFullPath)))
                     throw new IOException($"Destination '{newFullPath}' already exists.");
 
                 var directoryMoved = Directory.Exists(oldFullPath)
-                    && !StorageOptions.PathComparer.Equals(oldFullPath, newFullPath);
+                    && !PathComparer.Equals(oldFullPath, newFullPath);
                 if (directoryMoved)
                     Directory.Move(oldFullPath, newFullPath);
 
@@ -460,7 +477,7 @@ public partial class ShareListViewModel
                 }
 
                 if (_searchService is not null
-                    && !StorageOptions.PathComparer.Equals(oldFullPath, newFullPath))
+                    && !PathComparer.Equals(oldFullPath, newFullPath))
                 {
                     try
                     {
@@ -538,7 +555,7 @@ public partial class ShareListViewModel
         var sourceParent = Path.GetDirectoryName(sourcePath);
 
         if (sourceParent is not null
-            && StorageOptions.PathComparer.Equals(
+            && PathComparer.Equals(
                 Path.GetFullPath(sourceParent), Path.GetFullPath(targetPoolPath)))
         {
             EditSuccessMessage = Resources.Web_Share_StoragePoolUnchanged;
@@ -625,7 +642,7 @@ public partial class ShareListViewModel
 
                 EditSuccessMessage = string.Format(
                     Resources.Web_Share_StoragePoolChanged,
-                    _storagePools.First(p => StorageOptions.PathComparer.Equals(
+                    StoragePools.First(p => PathComparer.Equals(
                         Path.GetFullPath(p.Path), Path.GetFullPath(targetPoolPath))).Name);
 
                 await LoadAsync();
@@ -942,4 +959,6 @@ public partial class ShareListViewModel
         if (AllGroups.Any(g => g.Id == principalId)) return "group";
         return "unknown";
     }
+
+    public sealed record StoragePoolItem(string Name, string Path);
 }
