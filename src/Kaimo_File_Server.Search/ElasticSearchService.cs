@@ -7,8 +7,10 @@ using Elastic.Clients.Elasticsearch.Core.Search;
 using Elastic.Clients.Elasticsearch.IndexManagement;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
+using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
-using Kaimo_File_Server.Core.Storage;
+using Kaimo_File_Server.Core.Repositories;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Search;
@@ -38,7 +40,7 @@ public class ElasticSearchService : ISearchService
 
     private readonly ElasticsearchClient _client;
     private readonly ILogger<ElasticSearchService> _logger;
-    private readonly IStorageEngine _storage;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly SearchAclFilter _aclFilter;
 
     private enum ExistsResult
@@ -51,12 +53,12 @@ public class ElasticSearchService : ISearchService
     public ElasticSearchService(
         ElasticsearchClient client,
         ILogger<ElasticSearchService> logger,
-        IStorageEngine storage,
+        IServiceScopeFactory scopeFactory,
         SearchAclFilter aclFilter)
     {
         _client = client;
         _logger = logger;
-        _storage = storage;
+        _scopeFactory = scopeFactory;
         _aclFilter = aclFilter;
     }
 
@@ -102,10 +104,13 @@ public class ElasticSearchService : ISearchService
         {
             try
             {
-                var doc = BuildDirectoryDocument(absolutePath);
+                var share = await ResolveShareAsync(absolutePath);
+                var doc = share is null
+                    ? null
+                    : BuildDirectoryDocument(absolutePath, share);
                 if (doc is null)
                 {
-                    // Share-root directory (or the storage root itself) — not a
+                    // Share-root directory (or a path outside every share) — not a
                     // searchable folder within a share, so nothing to index.
                     _logger.LogDebug("Directory create (not indexed): '{Path}'", absolutePath);
                     return;
@@ -122,28 +127,21 @@ public class ElasticSearchService : ISearchService
 
     /// <summary>
     /// Builds an index document describing a directory: name only, no content.
-    /// Returns <c>null</c> for the storage root and for share-root directories —
-    /// only folders *inside* a share are searchable entities.
+    /// Returns <c>null</c> for share-root directories. Only folders *inside* a
+    /// share are searchable entities.
     /// </summary>
-    private FileDocument? BuildDirectoryDocument(string absolutePath)
+    private static FileDocument? BuildDirectoryDocument(
+        string absolutePath, ShareDefinition share)
     {
-        string rootPath = _storage.getRootPath();
-        string relativePath = Path.GetRelativePath(rootPath, absolutePath);
-
-        var segments = relativePath.Split(
-            Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
-        // segments.Length < 2  →  storage root ("." / "") or a share root.
-        if (segments.Length < 2)
+        string sharePath = Path.GetRelativePath(share.Path, absolutePath);
+        if (sharePath is "." or "")
             return null;
-
-        string shareName = segments[0];
-        string sharePath = Path.GetRelativePath(Path.Combine(rootPath, shareName), absolutePath);
 
         return new FileDocument
         {
             Id = GetStableId(absolutePath),
             FileName = Path.GetFileName(absolutePath.TrimEnd(Path.DirectorySeparatorChar)),
-            ShareName = shareName,
+            ShareName = share.Name,
             AbsolutePath = absolutePath,
             SharePath = sharePath,
             Content = string.Empty,
@@ -225,6 +223,9 @@ public class ElasticSearchService : ISearchService
             try
             {
                 string oldId = GetStableId(oldAbsolutePath);
+                var share = await ResolveShareAsync(newAbsolutePath)
+                    ?? throw new InvalidOperationException(
+                        $"No share definition contains '{newAbsolutePath}'.");
 
                 var existing = await _client.GetAsync<FileDocument>(oldId, g => g.Index(IndexName));
                 if (!existing.Found || existing.Source is null)
@@ -235,7 +236,8 @@ public class ElasticSearchService : ISearchService
                     return;
                 }
 
-                var updated = BuildRenamedDocument(existing.Source, newAbsolutePath);
+                var updated = BuildRenamedDocument(
+                    existing.Source, newAbsolutePath, share);
                 await ReplaceDocumentAsync(oldId, updated);
 
                 _logger.LogDebug("Index updated (file): '{Old}' -> '{New}'",
@@ -257,6 +259,9 @@ public class ElasticSearchService : ISearchService
                 string oldPrefix = oldAbsolutePath.TrimEnd(Path.DirectorySeparatorChar)
                                    + Path.DirectorySeparatorChar;
                 string newBase = newAbsolutePath.TrimEnd(Path.DirectorySeparatorChar);
+                var share = await ResolveShareAsync(newAbsolutePath)
+                    ?? throw new InvalidOperationException(
+                        $"No share definition contains '{newAbsolutePath}'.");
 
                 int processed = 0;
                 // Safety guard against any unexpected non-shrinking result set.
@@ -300,7 +305,7 @@ public class ElasticSearchService : ISearchService
 
                         string newAbs = newBase + Path.DirectorySeparatorChar + remainder;
 
-                        var updated = BuildRenamedDocument(doc, newAbs);
+                        var updated = BuildRenamedDocument(doc, newAbs, share);
                         await ReplaceDocumentAsync(doc.Id, updated);
                         processed++;
                     }
@@ -317,7 +322,8 @@ public class ElasticSearchService : ISearchService
                 var ownDoc = await _client.GetAsync<FileDocument>(oldDirId, g => g.Index(IndexName));
                 if (ownDoc.Found && ownDoc.Source is not null)
                 {
-                    var updatedOwn = BuildRenamedDocument(ownDoc.Source, newAbsolutePath);
+                    var updatedOwn = BuildRenamedDocument(
+                        ownDoc.Source, newAbsolutePath, share);
                     await ReplaceDocumentAsync(oldDirId, updatedOwn);
                     processed++;
                 }
@@ -339,18 +345,18 @@ public class ElasticSearchService : ISearchService
     /// name, share-relative path, file name and type from the new absolute path,
     /// while preserving the indexed content and original creation time.
     /// </summary>
-    private FileDocument BuildRenamedDocument(FileDocument source, string newAbsolutePath)
+    private static FileDocument BuildRenamedDocument(
+        FileDocument source,
+        string newAbsolutePath,
+        ShareDefinition share)
     {
-        string rootPath = _storage.getRootPath();
-        string relativePath = Path.GetRelativePath(rootPath, newAbsolutePath);
-        string shareName = relativePath.Split(Path.DirectorySeparatorChar)[0];
-        string sharePath = Path.GetRelativePath(Path.Combine(rootPath, shareName), newAbsolutePath);
+        string sharePath = Path.GetRelativePath(share.Path, newAbsolutePath);
 
         return new FileDocument
         {
             Id = GetStableId(newAbsolutePath),
             FileName = Path.GetFileName(newAbsolutePath),
-            ShareName = shareName,
+            ShareName = share.Name,
             AbsolutePath = newAbsolutePath,
             SharePath = sharePath,
             Content = source.Content,
@@ -626,9 +632,22 @@ public class ElasticSearchService : ISearchService
         return ExistsResult.DoesntExist;
     }
 
-    private async Task IndexDocumentIfNotExistsAsync(string absolutePath, Task<Stream> fileData, CancellationToken ct = default)
+    private async Task IndexDocumentIfNotExistsAsync(
+        string absolutePath,
+        Task<Stream> fileData,
+        CancellationToken ct = default,
+        ShareDefinition? knownShare = null)
     {
         string fileName = Path.GetFileName(absolutePath);
+        var share = knownShare ?? await ResolveShareAsync(absolutePath);
+        if (share is null)
+        {
+            await using var unused = await fileData;
+            _logger.LogWarning(
+                "Indexing skipped because no share definition contains '{Path}'",
+                absolutePath);
+            return;
+        }
 
         // IMPORTANT: dispose the read stream immediately. Leaving the FileStream
         // open keeps an OS handle on the file, which on Windows-backed bind mounts
@@ -639,16 +658,13 @@ public class ElasticSearchService : ISearchService
             content = await ContentProvider.GetContent(fileStream);
         }
 
-        string rootPath = _storage.getRootPath();
-        string relativePath = Path.GetRelativePath(rootPath, absolutePath);
-        string shareName = relativePath.Split(Path.DirectorySeparatorChar)[0];
-        string sharePath = Path.GetRelativePath(Path.Combine(rootPath, shareName), absolutePath);
+        string sharePath = Path.GetRelativePath(share.Path, absolutePath);
 
         FileDocument document = new FileDocument
         {
             Id = GetStableId(absolutePath),
             FileName = fileName,
-            ShareName = shareName,
+            ShareName = share.Name,
             AbsolutePath = absolutePath,
             SharePath = sharePath,
             Content = content,
@@ -687,7 +703,7 @@ public class ElasticSearchService : ISearchService
     }
 
     /// <summary>
-    /// Re-indexes every file currently on disk under the storage root. Used to
+    /// Re-indexes every file currently on disk under the persisted share paths. Used to
     /// catch up files that arrived while indexing was off, or were added out of
     /// band (e.g. directly on the volume). Already-indexed, unchanged files are
     /// skipped by the existing dedupe check, so a reindex is cheap to repeat.
@@ -699,10 +715,6 @@ public class ElasticSearchService : ISearchService
         // Ensure the index exists with the correct (n-gram) mapping before writing.
         await InitializeAsync(ct);
 
-        string rootPath = _storage.getRootPath();
-        if (!Directory.Exists(rootPath))
-            return;
-
         var options = new EnumerationOptions
         {
             RecurseSubdirectories = true,
@@ -710,33 +722,43 @@ public class ElasticSearchService : ISearchService
             AttributesToSkip = FileAttributes.System
         };
 
-        var files = Directory.EnumerateFiles(rootPath, "*", options)
-            .Where(p => !IsHiddenRelative(rootPath, p))
+        using var scope = _scopeFactory.CreateScope();
+        var shares = await scope.ServiceProvider
+            .GetRequiredService<IShareRepository>()
+            .GetAllEnabledAsync();
+
+        var existingShares = shares.Where(s => Directory.Exists(s.Path)).ToList();
+        var files = existingShares
+            .SelectMany(share => Directory.EnumerateFiles(share.Path, "*", options)
+                .Where(path => !IsHiddenRelative(share.Path, path))
+                .Select(path => (Share: share, Path: path)))
             .ToList();
 
         // Directories are indexed too (by name), so folders show up in search.
         // Share-root directories are excluded via BuildDirectoryDocument (they are
         // not searchable entities inside a share).
-        var dirs = Directory.EnumerateDirectories(rootPath, "*", options)
-            .Where(p => !IsHiddenRelative(rootPath, p))
+        var dirs = existingShares
+            .SelectMany(share => Directory.EnumerateDirectories(share.Path, "*", options)
+                .Where(path => !IsHiddenRelative(share.Path, path))
+                .Select(path => (Share: share, Path: path)))
             .ToList();
 
         int total = files.Count + dirs.Count;
         int done = 0;
         progress?.Report((0, total));
 
-        foreach (var absolutePath in files)
+        foreach (var file in files)
         {
             ct.ThrowIfCancellationRequested();
             try
             {
                 Task<Stream> data = Task.FromResult<Stream>(new FileStream(
-                    absolutePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true));
-                await IndexDocumentIfNotExistsAsync(absolutePath, data, ct);
+                    file.Path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true));
+                await IndexDocumentIfNotExistsAsync(file.Path, data, ct, file.Share);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Reindex: indexing failed for '{Path}'", absolutePath);
+                _logger.LogWarning(ex, "Reindex: indexing failed for '{Path}'", file.Path);
             }
 
             done++;
@@ -744,18 +766,19 @@ public class ElasticSearchService : ISearchService
                 progress?.Report((done, total));
         }
 
-        foreach (var absolutePath in dirs)
+        foreach (var directory in dirs)
         {
             ct.ThrowIfCancellationRequested();
             try
             {
-                var doc = BuildDirectoryDocument(absolutePath);
+                var doc = BuildDirectoryDocument(directory.Path, directory.Share);
                 if (doc is not null)
                     await IndexDirectoryDocumentAsync(doc, ct);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Reindex: indexing failed for directory '{Path}'", absolutePath);
+                _logger.LogWarning(ex,
+                    "Reindex: indexing failed for directory '{Path}'", directory.Path);
             }
 
             done++;
@@ -775,6 +798,41 @@ public class ElasticSearchService : ISearchService
             if (segment.StartsWith('.')) return true;
         return false;
     }
+
+    private async Task<ShareDefinition?> ResolveShareAsync(string absolutePath)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var shares = await scope.ServiceProvider
+            .GetRequiredService<IShareRepository>()
+            .GetAllAsync();
+
+        var fullPath = Path.GetFullPath(absolutePath);
+        return shares
+            .Where(share => IsPathWithinShare(fullPath, share.Path))
+            .OrderByDescending(share => Path.GetFullPath(share.Path).Length)
+            .FirstOrDefault();
+    }
+
+    private static bool IsPathWithinShare(string fullPath, string sharePath)
+    {
+        var fullSharePath = Path.GetFullPath(sharePath).TrimEnd(
+            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        if (string.Equals(
+                fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                fullSharePath,
+                PathComparison))
+            return true;
+
+        return fullPath.StartsWith(
+            fullSharePath + Path.DirectorySeparatorChar,
+            PathComparison);
+    }
+
+    private static StringComparison PathComparison =>
+        OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
 
     private static string GetStableId(string absolutePath)
     {

@@ -1,6 +1,6 @@
 // kaimo_sharesync - gRPC C++ client for share provisioning (Phase 4).
 //
-// Calls ListShares on the .NET bridge (h2c) and outputs one line
+// Calls ListShares on the .NET bridge over mTLS and outputs one line
 // "name<TAB>path<TAB>hidden(0|1)" per enabled share to stdout. The actual
 // reconciliation in Samba's registry (net conf addshare/setparm/delshare) is
 // handled by the shell script sync-shares.sh. Mirror to kaimo_authsync (NT-Hash sync).
@@ -11,6 +11,7 @@
 #include <string>
 
 #include <grpcpp/grpcpp.h>
+#include "bridge_channel.h"
 #include "kaimo_smb_bridge.grpc.pb.h"
 
 using kaimo::smb::bridge::v1::ShareService;
@@ -21,7 +22,18 @@ int main() {
     const char* addr_env = std::getenv("KAIMO_BRIDGE_ADDR");
     std::string addr = addr_env ? addr_env : "kaimo_smb_bridge:5080";
 
-    auto channel = grpc::CreateChannel(addr, grpc::InsecureChannelCredentials());
+    std::shared_ptr<grpc::Channel> channel;
+    try {
+        channel = kaimo::control_plane::create_mtls_channel(
+            addr,
+            "KAIMO_BRIDGE_SHARE_SYNC_CERT",
+            "/run/secrets/kaimo-control-plane/samba.crt",
+            "KAIMO_BRIDGE_SHARE_SYNC_KEY",
+            "/run/secrets/kaimo-control-plane/samba.key");
+    } catch (const std::exception& error) {
+        std::cerr << "kaimo_sharesync: " << error.what() << std::endl;
+        return 1;
+    }
     std::unique_ptr<ShareService::Stub> stub = ShareService::NewStub(channel);
 
     grpc::ClientContext ctx;

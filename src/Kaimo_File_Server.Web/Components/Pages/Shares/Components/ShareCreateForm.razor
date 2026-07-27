@@ -12,6 +12,15 @@
                    @bind:event="oninput"
                    @onkeydown="HandleCreateKeyDown" />
         </div>
+        <div class="form-group">
+            <label>@Resources.Web_ShareList_Label_StoragePool</label>
+            <select class="edit-input" @bind="VM.NewSharePoolPath">
+                @foreach (var pool in VM.StoragePools)
+                {
+                    <option value="@pool.Path">@pool.Name — @pool.Path</option>
+                }
+            </select>
+        </div>
     </div>
     @if (VM.CreateErrorMessage is not null)
     {

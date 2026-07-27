@@ -3,6 +3,53 @@
     <Build />
   </Project>
 
+  <Folder Name="/src/samba-vfs/">
+    <File Path="src/samba-vfs/Dockerfile" />
+    <File Path="src/samba-vfs/Dockerfile.pki" />
+    <File Path="src/samba-vfs/Dockerfile.src" />
+    <File Path="src/samba-vfs/Dockerfile.vfs" />
+    <File Path="src/samba-vfs/README.md" />
+    <File Path="src/samba-vfs/entrypoint.sh" />
+    <File Path="src/samba-vfs/entrypoint.vfs.sh" />
+    <File Path="src/samba-vfs/generate-control-plane-certs.sh" />
+    <File Path="src/samba-vfs/selftest.sh" />
+    <File Path="src/samba-vfs/sync-config.sh" />
+    <File Path="src/samba-vfs/sync-shares.sh" />
+    <File Path="src/samba-vfs/sync-users.sh" />
+    <Folder Name="conf">
+      <File Path="src/samba-vfs/conf/smb.conf" />
+      <File Path="src/samba-vfs/conf/smb.conf.vfs" />
+    </Folder>
+    <Folder Name="module">
+      <File Path="src/samba-vfs/module/authd.cpp" />
+      <File Path="src/samba-vfs/module/authsync.cpp" />
+      <File Path="src/samba-vfs/module/bridge_channel.h" />
+      <File Path="src/samba-vfs/module/configsync.cpp" />
+      <File Path="src/samba-vfs/module/decision_cache.h" />
+      <File Path="src/samba-vfs/module/local_protocol.h" />
+      <File Path="src/samba-vfs/module/sharesync.cpp" />
+      <File Path="src/samba-vfs/module/vfs_kaimo_bridge.c" />
+    </Folder>
+    <Folder Name="patches">
+      <File Path="src/samba-vfs/patches/0001-map-vfs-connect-errno.patch" />
+    </Folder>
+    <Folder Name="protos">
+      <File Path="src/samba-vfs/protos/kaimo_smb_bridge.proto" />
+    </Folder>
+    <Folder Name="tests">
+      <File Path="src/samba-vfs/tests/test-authd-capacity.py" />
+      <File Path="src/samba-vfs/tests/test-authd-peer-security.py" />
+      <File Path="src/samba-vfs/tests/test-authd-protocol.py" />
+      <File Path="src/samba-vfs/tests/test-authd-smb-peer.py" />
+      <File Path="src/samba-vfs/tests/test-decision-cache.cpp" />
+      <File Path="src/samba-vfs/tests/test-local-protocol.cpp" />
+      <File Path="src/samba-vfs/tests/test-sync-users.sh" />
+      <File Path="src/samba-vfs/tests/test-vfs-connect-status.py" />
+      <File Path="src/samba-vfs/tests/test-vfs-io-deadline.py" />
+      <File Path="src/samba-vfs/tests/test-vfs-snapshot-readonly.py" />
+    </Folder>
+  </Folder>
+
   <Project Path="src/Kaimo_File_Server.Search/Kaimo_File_Server.Search.csproj" />
   <Project Path="src/Kaimo_File_Server.Core/Kaimo_File_Server.Core.csproj" />
   <Project Path="src/Kaimo_File_Server.Host/Kaimo_File_Server.Host.csproj" />

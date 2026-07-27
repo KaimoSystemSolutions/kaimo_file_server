@@ -16,7 +16,7 @@
 
   <ItemGroup>
     <!-- Gemeinsamer Proto-Vertrag (auch vom Samba-C++-Client genutzt). -->
-    <Protobuf Include="..\..\samba-vfs\protos\kaimo_smb_bridge.proto" GrpcServices="Server" Link="protos\kaimo_smb_bridge.proto" />
+    <Protobuf Include="..\samba-vfs\protos\kaimo_smb_bridge.proto" GrpcServices="Server" Link="protos\kaimo_smb_bridge.proto" />
   </ItemGroup>
 
   <ItemGroup>

@@ -29,16 +29,8 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
 {
     private readonly Mock<IManagementAuthService> _mgmtAuth = new();
     private readonly Mock<IAclService> _aclService = new();
-    private readonly Mock<IStorageEngine> _storage = new();
     private readonly Mock<IFileVersionService> _versions = new();
     private readonly ShareLockManager _lockManager = new();
-    private readonly string _storagePath;
-
-    public ShareListViewModelDatabaseTests()
-    {
-        _storagePath = Path.Combine(Path.GetTempPath(), "kaimo-tests", Guid.NewGuid().ToString("N"));
-        _storage.Setup(s => s.CreateDirectoryAsync(It.IsAny<string>())).Returns(Task.CompletedTask);
-    }
 
     /// <summary>
     /// Builds the SUT for an actor who is an unrestricted (Global) share admin — the
@@ -63,10 +55,10 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
             ShareRepo(), UserRepo(), GroupRepo(), AclRepo(), FileMetadataRepo(),
             _aclService.Object, _mgmtAuth.Object,
             UserContextFactoryFor((actor.Username, ctx)).Object,
-            _storage.Object, _lockManager,
+            _lockManager,
             AuthStateFor(actor.Username),
             NullLogger<ShareListViewModel>.Instance,
-            _storagePath,
+            _storagePools,
             _versions.Object);
     }
 
@@ -152,10 +144,10 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
             ShareRepo(), UserRepo(), GroupRepo(), AclRepo(), FileMetadataRepo(),
             _aclService.Object, _mgmtAuth.Object,
             UserContextFactoryFor((actor.Username, ctx)).Object,
-            _storage.Object, _lockManager,
+            _lockManager,
             AuthStateFor(actor.Username),
             NullLogger<ShareListViewModel>.Instance,
-            _storagePath);
+            _storagePools);
     }
 
     [Fact]
@@ -225,7 +217,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         await using var db = NewContext();
         var row = await db.ShareDefinitions.FindAsync(seeded.Id);
         Assert.Equal("newname", row!.Name);
-        Assert.EndsWith("/newname", row.Path); // path rebuilt from the new name
+        Assert.Equal("newname", Path.GetFileName(row.Path)); // only final component changed
     }
 
     [Fact]
@@ -297,7 +289,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         Assert.NotNull(sut.CreateErrorMessage);
         await using var db = NewContext();
         Assert.Empty(await db.ShareDefinitions.ToListAsync());
-        _storage.Verify(s => s.CreateDirectoryAsync(It.IsAny<string>()), Times.Never);
+        Assert.False(Directory.Exists(Path.Combine(_storagePath, name)));
     }
 
     [Fact]
@@ -343,6 +335,33 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         Assert.Equal(actor.Id, ownerAcl.PrincipalId);
         Assert.Equal(AclEntryType.Allow, ownerAcl.EntryType);
         Assert.Equal(FilePermission.FullControl, ownerAcl.Permissions & FilePermission.FullControl);
+        CleanupPools();
+    }
+
+
+
+    [Fact]
+    public async Task ChangeStoragePoolAsync_MovesDataAndPersistsNewSharePath()
+    {
+        var actor = SeedUser("admin");
+        var source = Path.Combine(_storagePools[0].Path, "docs");
+        Directory.CreateDirectory(source);
+        await File.WriteAllTextAsync(Path.Combine(source, "important.txt"), "content");
+        var seeded = SeedShare("docs", source);
+        var (sut, _) = await LoadAndSelectAsync(seeded, actor);
+        sut.EditSharePoolPath = _storagePools[1].Path;
+
+        var ok = await sut.ChangeStoragePoolAsync();
+
+        Assert.True(ok);
+        var destination = Path.Combine(_storagePools[1].Path, "docs");
+        Assert.False(Directory.Exists(source));
+        Assert.Equal("content", await File.ReadAllTextAsync(
+            Path.Combine(destination, "important.txt")));
+
+        await using var db = NewContext();
+        Assert.Equal(destination, (await db.ShareDefinitions.FindAsync(seeded.Id))!.Path);
+        CleanupPools();
     }
 
     [Fact]
@@ -358,10 +377,10 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
             ShareRepo(), UserRepo(), GroupRepo(), AclRepo(), FileMetadataRepo(),
             _aclService.Object, _mgmtAuth.Object,
             UserContextFactoryFor().Object,
-            _storage.Object, _lockManager,
+            _lockManager,
             AuthStateFor("ghost"),
             NullLogger<ShareListViewModel>.Instance,
-            _storagePath);
+            _storagePools);
 
         sut.NewShareName = "docs";
         var ok = await sut.CreateShareAsync();

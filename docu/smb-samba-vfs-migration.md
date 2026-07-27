@@ -10,7 +10,7 @@
 > **Concerns:** Replacement of SMB protocol layer in Kaimo File Server
 > **Related:** `src/Kaimo_File_Server.Smb/` (to be replaced),
 > `src/Kaimo_File_Server.SmbBridge/` (new gRPC control plane), `docker-compose.yml`,
-> [`../samba-vfs/README.md`](../samba-vfs/README.md) (Phase 0/1 results)
+> [`../src/samba-vfs/README.md`](../src/samba-vfs/README.md) (Phase 0/1 results)
 
 ---
 
@@ -120,12 +120,12 @@ because it has the same volume mounted — just like host and web do today.
    Thin facade on existing core services. Reuse:
    `IFileServiceFactory.CreateForShare(shareId, path)`, `IFileService.OpenAsync/ListAsync/…`,
    `IAuthenticationLookup.GetNtHashAsync/ResolveUserContextAsync`, `IAclService`, `IFileVersionService`.
-2. **C Project `samba-vfs/`**: VFS module `kaimo_bridge` (C + C++ translation unit for gRPC client with
+2. **C Project `src/samba-vfs/`**: VFS module `kaimo_bridge` (C + C++ translation unit for gRPC client with
    `extern "C"` shim), custom `pdb` module, ShareControl daemon, `smb.conf` template with
    `config backend = registry`, entrypoint.
 3. **Shared `.proto` files** — defined once, generated for .NET (`Grpc.Tools`) and C/C++
    (`protoc` + `grpc_cpp_plugin`).
-4. **`samba-vfs/Dockerfile`** + new compose service `kaimo_samba` (port 445, mount `/data/storage`);
+4. **`src/samba-vfs/Dockerfile`** + new compose service `kaimo_samba` (port 445, mount `/data/storage`);
    port 445 moves from host to Samba container.
 
 ---
@@ -192,13 +192,13 @@ C++ translation unit with `extern "C"` shim. Since the control plane is **low-fr
 
 | Phase | Content | Goal |
 |---|---|---|
-| **0 — Spike/PoC** ✅ | `samba-vfs/` container: Live Registry shares + `kaimo_bridge` module intercepting Connect/Open/Disconnect | Toolchain + ABI binding + Live shares **proven** — see [`../samba-vfs/README.md`](../samba-vfs/README.md) |
-| **1 — Auth** ✅ | `.proto` + .NET gRPC bridge (`GetNtHash`/`ListUsers` via `IAuthenticationLookup`); C++ client `kaimo_authsync` syncs NT hashes to Samba's `tdbsam` | real NTLMv2 login against Kaimo user **works** — see [`../samba-vfs/README.md`](../samba-vfs/README.md) |
-| **2a — Connect Auth** ✅ | VFS `connect` hook → Sidecar `kaimo_authd` (Unix socket) → gRPC `AuthorizeConnect` → `CanAccessShareAsync` | Share access per real Kaimo ACLs — **works** (dept-based allow/deny verified) |
+| **0 — Spike/PoC** ✅ | `src/samba-vfs/` container: Live Registry shares + `kaimo_bridge` module intercepting Connect/Open/Disconnect | Toolchain + ABI binding + Live shares **proven** — see [`../src/samba-vfs/README.md`](../src/samba-vfs/README.md) |
+| **1 — Auth** ✅ | `.proto` + .NET gRPC bridge (`GetNtHash`/`ListUsers` via `IAuthenticationLookup`); C++ client `kaimo_authsync` syncs NT hashes to Samba's `tdbsam` | real NTLMv2 login against Kaimo user **works** — see [`../src/samba-vfs/README.md`](../src/samba-vfs/README.md) |
+| **2a — Connect Auth** ✅ | VFS `connect` hook → bounded-worker Sidecar `kaimo_authd` (Unix socket) → gRPC `AuthorizeConnect` → `CanAccessShareAsync`; open-decision LRU is bounded by entries/bytes and TTL | Share access per real Kaimo ACLs — **works** (dept-based allow/deny verified); P1-01/P1-02 resource bounds are native-tested |
 | **2b — Path ACL** ⚠️ | VFS `create_file` → `AuthorizeOpen` with complete access masks; `unlinkat` → `AuthorizeDelete`; `renameat` → `AuthorizeRename` for source/destination/replacement; `readdir` uses listing-only checks | Complete open/delete/rename policy is implemented and managed-tested; native Samba runtime verification of P0-03/P0-04 remains pending |
-| **3 — Close Hooks** ✅ | `close`/`unlinkat`/`renameat`/`mkdirat` → Sidecar → gRPC `EventService` → `FileService.NotifyExternal*` (versioning, ownership, search index, ACL realign) | Parity to `FileSession.DisposeAsync` — **works** (versioning/ownership verified; see [`../samba-vfs/README.md`](../samba-vfs/README.md)) |
+| **3 — Close Hooks** ✅ | `close`/`unlinkat`/`renameat`/`mkdirat` → Sidecar → gRPC `EventService` → `FileService.NotifyExternal*` (versioning, ownership, search index, ACL realign) | Parity to `FileSession.DisposeAsync` — **works** (versioning/ownership verified; see [`../src/samba-vfs/README.md`](../src/samba-vfs/README.md)) |
 | **4 — Dyn. Shares & Visibility** ✅ | ShareControl sync (`ListShares` → `kaimo_sharesync` → `sync-shares.sh` → `net conf`) ✅; ABE = **hidden flag only** (`browseable`) ✅; Protocol settings from `ISmbConfigStore` (`GetProtocolSettings` → `kaimo_configsync` → `sync-config.sh` → `net conf setparm global`) ✅ | dynamic shares + protocol config live — **works** |
-| **5 — Snapshots & Cutover** ⚠️ | @GMT snapshots via `get_shadow_copy_data` + timewarp resolve; folder projections use `IFileService` per-file ACL filtering; materialized content lives in an isolated global cache partitioned by share/user; `enable/disable SMB` is enforced by the bridge; the old SMB library is removed | P0-05/P0-06 fixed in source and managed/structurally tested; live SMB/native verification and P1 snapshot hardening remain |
+| **5 — Snapshots & Cutover** ⚠️ | @GMT snapshots via `get_shadow_copy_data` + timewarp resolve; folder projections use `IFileService` per-file ACL filtering; materialized content lives in an isolated global cache partitioned by share/user; the gRPC control plane uses an isolated network, mTLS client identities, RPC allow-lists, and audited/rate-limited hash export; `enable/disable SMB` is enforced by the bridge; the old SMB library is removed | P0-05/P0-06/P0-07 fixed; P0-07 focused mTLS runtime verified; broad live SMB regression and P1 snapshot hardening remain |
 
 ---
 
@@ -226,7 +226,7 @@ The rest is well-scoped integration work because Kaimo's core logic in `Core`/
 > **Recommendation: Phase 0 first** — it clarifies the two biggest unknowns (build toolchain +
 > live registry shares) with minimal effort before larger investment.
 
-Phase 0 progress is tracked in [`samba-vfs/README.md`](../samba-vfs/README.md).
+Phase 0 progress is tracked in [`src/samba-vfs/README.md`](../src/samba-vfs/README.md).
 
 ---
 
@@ -251,13 +251,18 @@ module matches the source.
 ### P0 — Blocks production
 
 - **#14 — Bridge SPOF + unauthenticated h2c + fail-**open** authz.**
-  `kaimo_failmode_allow()` ([`vfs_kaimo_bridge.c`](../samba-vfs/module/vfs_kaimo_bridge.c))
+  `kaimo_failmode_allow()` ([`vfs_kaimo_bridge.c`](../src/samba-vfs/module/vfs_kaimo_bridge.c))
   previously **allowed** on infrastructure error unless `KAIMO_AUTHZ_FAILCLOSED=1`;
   the sidecar dials the bridge with `InsecureChannelCredentials()` (plaintext, no
   mTLS). A bridge outage meant *every* access was granted.
-  **Status: partially fixed 2026-07-19** — default flipped to **fail-closed**
-  (`KAIMO_AUTHZ_FAILOPEN=1` restores the old behavior); `compose` sets it
-  explicitly. mTLS on the gRPC channel and bridge redundancy remain open.
+  **Status: transport/authentication fixed 2026-07-23; redundancy remains.**
+  The default is fail-closed (`KAIMO_AUTHZ_FAILOPEN=1` is the explicit emergency
+  override); Compose sets fail-closed, isolates Samba/bridge on a private control
+  network, and keeps bridge DB access on a bridge-only internal DB network. All C++
+  clients use mTLS with one shared Samba workload identity and an explicit
+  server-side RPC allow-list, while bulk NT-hash export is rate-limited and
+  audited. Separate client certificates would not create a meaningful boundary
+  while all helpers share the same container and credential mount.
 
 - **#1 (A.1) — @GMT snapshots: verified end-to-end (2026-07-19).** Live Windows +
   `smbclient` testing now confirms the full path: file- and folder-level "Previous
@@ -354,9 +359,12 @@ module matches the source.
   **Status: DEFERRED by design** — add an `unlinkat` → `.RECYCLE_BIN` path if product
   requires it.
 
-- **#4 (A.4) — `connect` deny surfaces as `NT_STATUS_UNSUCCESSFUL`** instead of
-  `ACCESS_DENIED` (Samba hardcodes this on VFS connect errors).
-  **Status: OPEN — cosmetic**, low priority.
+- **#4 (A.4) — `connect` deny surfaced as `NT_STATUS_UNSUCCESSFUL`** instead of
+  `ACCESS_DENIED` because Samba hardcoded the generic status for VFS connect
+  errors. **Status: fixed / verified 2026-07-23.** The pinned Samba source now
+  maps the hook's preserved `errno`; Kaimo's `EACCES` therefore becomes
+  `NT_STATUS_ACCESS_DENIED`. A focused live `smbclient` regression reproduces
+  the old status and verifies the new denial in under 1.5 seconds.
 
 - **#2 (A.2) — Snapshot file open served the LIVE file (data-path redirect).**
   Live testing showed that opening a versioned file returned the current content (or

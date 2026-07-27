@@ -1,7 +1,7 @@
 # Samba Bridge and VFS Security, Memory-Safety, and Coverage Audit
 
 > **Audit date:** 2026-07-22  
-> **Scope:** `samba-vfs`, `Kaimo_File_Server.SmbBridge`, the relevant Core/Infrastructure lifecycle code, Samba synchronization scripts, container wiring, and the shared gRPC contract  
+> **Scope:** `src/samba-vfs`, `Kaimo_File_Server.SmbBridge`, the relevant Core/Infrastructure lifecycle code, Samba synchronization scripts, container wiring, and the shared gRPC contract
 > **Audit type:** Static code and architecture review, supported by the available .NET test suite  
 > **Repository state:** No production source files were changed as part of the audit  
 > **Overall result:** Not ready for production as a security boundary without the P0/P1 remediation described below
@@ -15,11 +15,20 @@ However, the current implementation is **not yet complete or safe enough to act 
 The most important conclusions are:
 
 1. No obvious direct stack overflow, heap overflow, use-after-free, or double-free was found during the static review. This is not a formal proof of C/C++ memory safety.
-2. The native implementation still has security-relevant memory/resource failures: allocation failure can disable open authorization, the sidecar has unbounded thread and cache growth, and blocking Unix-socket calls can stall `smbd` workers.
+2. The native connection sidecar now has bounded worker/descriptor growth,
+   receive/send deadlines, and a count/byte-bounded authorization LRU.
+   VFS-side connect, complete request, and complete response I/O now also share
+   strict end-to-end deadlines.
 3. The complete open access mask and rename source/destination/replacement policy are now mapped to Kaimo permissions in source. Native runtime verification and several metadata/security operation checks remain open.
 4. Folder snapshot materialization now uses the existing per-file ACL filter and a reconciled per-user projection. Materialized bytes are stored in an isolated global cache outside every share; overlap is rejected by both the bridge and share synchronizer.
-5. The local sidecar protocol is not safely framed and assumes one `read()`/`write()` is sufficient for a stream socket.
-6. The gRPC bridge exposes NT hashes and privileged control-plane functions over unauthenticated h2c on the shared Docker network.
+   Timewarp access is read-only, mutation attempts fail with read-only
+   filesystem semantics, and cache opens pass through the remaining VFS stack.
+5. The local sidecar protocol is versioned and completely framed. Both ends
+   handle partial I/O, and VFS-side connect/send/read now share strict monotonic
+   end-to-end deadlines.
+6. The gRPC control plane is now isolated on a dedicated internal network and
+   protected by mTLS, per-workload RPC allow-lists, and audited/rate-limited
+   hash export. Native/container runtime verification remains pending.
 7. Event delivery and synchronization are best-effort rather than durable. Failures can leave version, ACL, metadata, ownership, search, passdb, registry, and runtime state inconsistent.
 
 The system should be treated as a **working migration prototype with critical hardening work remaining**, not as a completed production security boundary.
@@ -28,21 +37,21 @@ The system should be treated as a **working migration prototype with critical ha
 
 ### 2.1 Native Samba components
 
-- `samba-vfs/module/vfs_kaimo_bridge.c`
-- `samba-vfs/module/authd.cpp`
-- `samba-vfs/module/authsync.cpp`
-- `samba-vfs/module/sharesync.cpp`
-- `samba-vfs/module/configsync.cpp`
-- `samba-vfs/protos/kaimo_smb_bridge.proto`
+- `src/samba-vfs/module/vfs_kaimo_bridge.c`
+- `src/samba-vfs/module/authd.cpp`
+- `src/samba-vfs/module/authsync.cpp`
+- `src/samba-vfs/module/sharesync.cpp`
+- `src/samba-vfs/module/configsync.cpp`
+- `src/samba-vfs/protos/kaimo_smb_bridge.proto`
 
 ### 2.2 Synchronization and container components
 
-- `samba-vfs/sync-users.sh`
-- `samba-vfs/sync-shares.sh`
-- `samba-vfs/sync-config.sh`
-- `samba-vfs/entrypoint.vfs.sh`
-- `samba-vfs/conf/smb.conf.vfs`
-- `samba-vfs/Dockerfile.vfs`
+- `src/samba-vfs/sync-users.sh`
+- `src/samba-vfs/sync-shares.sh`
+- `src/samba-vfs/sync-config.sh`
+- `src/samba-vfs/entrypoint.vfs.sh`
+- `src/samba-vfs/conf/smb.conf.vfs`
+- `src/samba-vfs/Dockerfile.vfs`
 - `docker-compose.yml`
 
 ### 2.3 .NET bridge and lifecycle components
@@ -343,6 +352,18 @@ If the cache must remain inside the share:
 
 ### P0-07: The gRPC control plane is unauthenticated and exposes NT hashes
 
+> **Remediation status (2026-07-23): Implemented; managed tests, native
+> Samba-image build, and focused mTLS runtime checks verified. Full live SMB
+> regression remains pending.**
+> Compose now isolates the bridge on dedicated SMB-control and bridge-only database
+> networks. Kestrel requires a client certificate chaining to a private CA; all
+> C++ clients use TLS credentials. They share one `kaimo-samba` workload
+> certificate because all helpers run in the same container and can read the
+> same credential mount. The bridge enforces an explicit RPC method allow-list;
+> `GetNtHash` is not allowed.
+> Bulk `ListUsers` export is fixed-window rate-limited and emits request,
+> completion, and rejection audit events without logging hashes or usernames.
+
 **Evidence**
 
 - The bridge listens on all interfaces on port 5080 using plaintext HTTP/2.
@@ -367,17 +388,34 @@ A compromised peer container can retrieve NT hashes for offline cracking/pass-th
 
 ### P1-01: Unbounded detached threads allow memory and file-descriptor exhaustion
 
+> **Remediation status (2026-07-23): Implemented and native-load-tested.**
+> `authd` now uses a fixed worker pool and bounded accepted-client queue.
+> Accepted sockets receive configurable send/receive deadlines; excess clients
+> receive `ERROR` and are closed without allocating another thread.
+
 `authd` accepts each Unix-socket connection and starts a detached `std::thread`. The first `read()` has no receive timeout. A local client can open connections without sending data, consuming one thread, stack, and file descriptor per connection.
 
 **Fix:** use a bounded worker pool or event loop, enforce connection and request deadlines, cap concurrent clients, and reject excess load predictably.
 
 ### P1-02: The authorization cache grows without a global bound
 
+> **Remediation status (2026-07-23): Implemented and native-tested.** The
+> decision cache is now an LRU bounded by both entry count and a conservative
+> accounted byte budget. Expired entries are removed on lookup and by periodic
+> opportunistic sweeps. The configured TTL is the documented maximum
+> revocation delay for a cached decision.
+
 Expired cache entries are removed only when the exact key is requested again. Unique file paths therefore accumulate indefinitely even though the advertised TTL is three seconds.
 
 **Fix:** implement a size-bounded LRU/clock cache, periodic expiry, metrics, and a hard maximum memory budget. ACL changes should also support explicit invalidation or a documented maximum revocation delay.
 
 ### P1-03: Unix stream framing and partial I/O are incorrect
+
+> **Remediation status (2026-07-23): Implemented and native-tested.** The VFS
+> and sidecar now share a versioned binary envelope with enum operations and
+> statuses, fixed request/response limits, length-prefixed UTF-8 fields, exact
+> schema validation, and complete read/write loops. Fragmented, truncated,
+> oversized, and wrong-version runtime cases are covered.
 
 The native module assumes one `write()` sends the entire request. The sidecar assumes one `read()` receives the entire request. Replies are also written once. Stream sockets do not preserve application messages and may return partial reads/writes.
 
@@ -387,21 +425,49 @@ The tab/newline protocol also has no escaping. User, share, path, token, or futu
 
 ### P1-04: The Unix socket is world-writable and trusts claimed identity
 
+> **Remediation status (2026-07-23): Implemented and live-tested.** The socket
+> now lives in a root-owned `0750` directory, is published as `0660` for the
+> dedicated `kaimo-authd` group, and every accepted connection is authenticated
+> with `SO_PEERCRED`. Non-root callers may only claim the passwd identity
+> matching their kernel UID; only a verified root `smbd` worker may carry the
+> Samba-authenticated session username. Unauthorized peers receive a structured
+> response and fail closed even when infrastructure fail-open is enabled.
+
 `chmod(..., 0666)` permits every local process to submit requests. The sidecar does not inspect peer credentials and accepts `username` from the payload.
 
 **Fix:** mode `0660`, dedicated service group, private directory permissions, `SO_PEERCRED` verification, and a design where the peer cannot choose an arbitrary Kaimo identity independently of the authenticated Samba session.
 
 ### P1-05: Native calls can block `smbd` workers for infrastructure timeouts
 
+> **Remediation status (2026-07-23): Implemented and native/live-tested.**
+> VFS clients now use nonblocking Unix sockets and one absolute monotonic
+> deadline across connect, complete frame transmission, and complete response
+> reception. Authorization, snapshot, and best-effort event traffic have
+> separate bounded budgets.
+
 Authorization and notification paths perform synchronous `connect()`/`write()`/`read()` calls without socket-level deadlines. gRPC deadlines in `authd` limit some downstream work, but a full backlog, stalled sidecar, or local socket failure can still block before the gRPC deadline applies.
 
-**Fix:** nonblocking connect with poll/deadline, send/receive timeouts, strict end-to-end budgets, and separate authorization from asynchronous event delivery.
+**Implemented fix:** nonblocking connect with `poll`, deadline-aware complete
+send/receive loops, strict end-to-end budgets, and a separate short event
+enqueue budget. Durable asynchronous event delivery remains P1-11.
 
 ### P1-06: Snapshot opens bypass the VFS stack and do not enforce read-only access
+
+> **Remediation status (2026-07-23): Implemented and verified against the
+> pinned Samba 4.19.5 build and a live SMB3 timewarp regression.**
 
 The timewarp branch skips normal `AuthorizeOpen`, then calls raw `openat(AT_FDCWD, absolutePath, how->flags, how->mode)`. This can preserve write/truncate/create flags and bypass `full_audit` or later VFS modules.
 
 **Fix:** reject all non-read access for timewarp paths, strip unsafe flags defensively, and redirect through the next VFS module using Samba-supported path/FSP handling. Verify behavior against Samba 4.19.5's own shadow-copy modules.
+
+**Implemented fix:** timewarp CREATE requests now accept only `FILE_OPEN`
+without mutating access, allocation, EA, security-descriptor, or
+delete-on-close intent. Granted rights are intersected with both the expanded
+client request and the snapshot read/execute mask. The low-level open rejects
+write/create/truncate/append flags, defensively rebuilds an `O_RDONLY`
+`vfs_open_how`, and calls `SMB_VFS_NEXT_OPENAT` with a validated synthetic
+snapshot filename. Disabled redirects fail closed instead of serving the live
+file. Timewarp delete, rename, and mkdir paths also return `EROFS`.
 
 ### P1-07: Snapshot materialization is non-atomic and only validates file size
 
@@ -603,7 +669,7 @@ The module is built against Samba 4.19.5/ABI 49. The source version is pinned, b
 | Mkdir lifecycle | `create_file` primary event plus `mkdirat` fallback | Fallback authorization and duplicate-event semantics need proof |
 | Delete lifecycle | Metadata/version/search cleanup event | Event loss; no durable reconciliation |
 | Rename lifecycle | ACL/version/search path update event | Not idempotent; wrong directory flag; event loss |
-| Dynamic shares | Enabled shares mirrored to registry | Errors ignored, disabled window, unvalidated path, active-session semantics |
+| Dynamic shares | Enabled shares mirrored to registry; path changes/removals close stale sessions | Errors ignored, polling delay, unvalidated path |
 | Protocol config | Dialect/signing/encryption/wsdd/audit synchronized | Apply failures can be hidden; polling delay; probe credentials |
 | SMB enable/disable | Connect gate plus periodic close-share | Existing handles and delay; bridge methods do not all enforce state |
 | Snapshot enumeration | GMT tokens returned through VFS; folder timestamps pass through the central directory ACL boundary | Buffer/count limits, directory flag, live per-file visibility verification |
@@ -926,7 +992,7 @@ This order was selected instead of connecting first and rolling back afterward b
 
 **Files changed**
 
-- `samba-vfs/module/vfs_kaimo_bridge.c`
+- `src/samba-vfs/module/vfs_kaimo_bridge.c`
 - `docu/samba-bridge-vfs-security-audit.md`
 
 **Validation completed**
@@ -970,11 +1036,15 @@ The VFS reconstructed directory-handle-relative paths into fixed 4096-byte array
 11. Replaced the fixed snapshot `openat` joined/absolute path buffers with dynamic strings. SNAPRESOLVE response copying now detects an oversized cache path and returns `ENAMETOOLONG` instead of opening a truncated path.
 12. Updated the module build marker to `2026-07-22b exact dynamic paths`.
 
-The current 8191-byte cap is an explicit compatibility boundary, not the final protocol design. P1-03 will replace the one-read line protocol with framed messages, full I/O loops, field limits, and version negotiation. Stable handle/inode-based object identity remains preferable to reconstructed strings but requires a coordinated Samba-to-sidecar API change.
+The original 8191-byte cap was an explicit compatibility boundary, not the
+final protocol design. P1-03 subsequently replaced the one-read line protocol
+with framed messages, full I/O loops, field limits, and explicit versioning.
+Stable handle/inode-based object identity remains preferable to reconstructed
+strings but requires a coordinated Samba-to-sidecar API change.
 
 **Files changed**
 
-- `samba-vfs/module/vfs_kaimo_bridge.c`
+- `src/samba-vfs/module/vfs_kaimo_bridge.c`
 - `docu/samba-bridge-vfs-security-audit.md`
 
 **Validation completed**
@@ -1048,13 +1118,13 @@ This changed the implementation plan materially: a boolean allow/deny result is 
 
 **Files changed**
 
-- `samba-vfs/protos/kaimo_smb_bridge.proto`
-- `samba-vfs/module/authd.cpp`
-- `samba-vfs/module/vfs_kaimo_bridge.c`
+- `src/samba-vfs/protos/kaimo_smb_bridge.proto`
+- `src/samba-vfs/module/authd.cpp`
+- `src/samba-vfs/module/vfs_kaimo_bridge.c`
 - `src/Kaimo_File_Server.SmbBridge/Services/AuthzGrpcService.cs`
 - `tests/Kaimo_File_Server.Tests/AuthzGrpcServiceAccessMaskTests.cs`
 - `tests/Kaimo_File_Server.Tests/AuthzGrpcServiceDeleteTests.cs`
-- `samba-vfs/README.md`
+- `src/samba-vfs/README.md`
 - `docu/smb-samba-vfs-migration.md`
 - `docu/samba-bridge-vfs-security-audit.md`
 
@@ -1100,12 +1170,12 @@ Native verification remains unavailable in this environment: Docker is installed
 
 **Files changed**
 
-- `samba-vfs/protos/kaimo_smb_bridge.proto`
-- `samba-vfs/module/authd.cpp`
-- `samba-vfs/module/vfs_kaimo_bridge.c`
+- `src/samba-vfs/protos/kaimo_smb_bridge.proto`
+- `src/samba-vfs/module/authd.cpp`
+- `src/samba-vfs/module/vfs_kaimo_bridge.c`
 - `src/Kaimo_File_Server.SmbBridge/Services/AuthzGrpcService.cs`
 - `tests/Kaimo_File_Server.Tests/AuthzGrpcServiceRenameTests.cs`
-- `samba-vfs/README.md`
+- `src/samba-vfs/README.md`
 - `docu/smb-samba-vfs-migration.md`
 - `docu/samba-bridge-vfs-security-audit.md`
 
@@ -1147,7 +1217,7 @@ Native verification remains unavailable in this environment: Docker is installed
 - `src/Kaimo_File_Server.SmbBridge/Program.cs`
 - `tests/Kaimo_File_Server.Tests/FileServiceFolderSnapshotTests.cs`
 - `tests/Kaimo_File_Server.Tests/SnapshotGrpcServiceAclTests.cs`
-- `samba-vfs/README.md`
+- `src/samba-vfs/README.md`
 - `docu/samba-bridge-vfs-security-audit.md`
 
 **Validation completed**
@@ -1168,7 +1238,7 @@ Native verification remains unavailable in this environment: Docker is installed
 
 ### 2026-07-22 — P0-06: Isolated snapshot cache
 
-**Status:** Implemented in source; managed and structural checks verified; native build/runtime verification pending.
+**Status:** Implemented; managed/structural checks and the pinned native build verified; live SMB snapshot verification pending.
 
 **Solution implemented**
 
@@ -1184,16 +1254,16 @@ Native verification remains unavailable in this environment: Docker is installed
 
 - `docker-compose.yml`
 - `.env.example`
-- `samba-vfs/protos/kaimo_smb_bridge.proto`
-- `samba-vfs/module/vfs_kaimo_bridge.c`
-- `samba-vfs/module/authd.cpp`
-- `samba-vfs/sync-shares.sh`
+- `src/samba-vfs/protos/kaimo_smb_bridge.proto`
+- `src/samba-vfs/module/vfs_kaimo_bridge.c`
+- `src/samba-vfs/module/authd.cpp`
+- `src/samba-vfs/sync-shares.sh`
 - `src/Kaimo_File_Server.SmbBridge/Services/SnapshotGrpcService.cs`
 - `src/Kaimo_File_Server.SmbBridge/Services/SnapshotCache.cs`
 - `src/Kaimo_File_Server.SmbBridge/Services/SnapshotCacheCleanupService.cs`
 - `src/Kaimo_File_Server.SmbBridge/appsettings.json`
 - `tests/Kaimo_File_Server.Tests/SnapshotGrpcServiceAclTests.cs`
-- `samba-vfs/README.md`
+- `src/samba-vfs/README.md`
 - `docu/smb-samba-vfs-migration.md`
 - `docu/samba-bridge-vfs-security-audit.md`
 
@@ -1207,33 +1277,432 @@ Native verification remains unavailable in this environment: Docker is installed
 
 **Validation still required**
 
-- Compile the VFS module, sidecar, and regenerated protobuf/gRPC stubs in the pinned Samba 4.19.5 image.
 - Run Windows/`smbclient` snapshot browse, copy, restore, direct `.kaimo-snapshots` access, cache/share-overlap, multi-user, and rolling-upgrade legacy-cache tests.
 - P1-06 remains open: timewarp access still needs strict read-only flag enforcement and a stack-safe alternative to raw `openat`.
 
 **Next planned finding:** P0-07 — authenticate and isolate the gRPC control plane and NT-hash export.
 
+### 2026-07-23 — P0-07: Authenticated and isolated gRPC control plane
+
+**Status:** Implemented; native build and focused mTLS runtime checks verified; full live SMB regression pending.
+
+**Solution implemented**
+
+1. Replaced every C++ `InsecureChannelCredentials` use with TLS credentials
+   loaded from read-only certificate/key mounts.
+2. Configured Kestrel for HTTP/2 over TLS with mandatory client certificates,
+   custom-root trust, client-auth EKU validation, and fail-fast startup when
+   certificate material is absent.
+3. Added one `kaimo-samba` client certificate for the helpers that share the
+   Samba container and credential mount. The bridge allows only the required
+   sync, authorization, event, and snapshot RPCs. `GetNtHash` remains denied.
+4. Added a non-queuing fixed-window limiter for bulk hash export (default two
+   calls per 60 seconds) plus request/completion/rejection audit logging that
+   excludes usernames and hash bytes.
+5. Split Compose connectivity into an internal `kaimo_smb_control` network and
+   a bridge-only `kaimo_bridge_database` network. PostgreSQL joins that segment
+   plus the separate application DB segment; the bridge shares no network with
+   Web, Adminer, or unrelated application containers.
+6. Mounted only the server key and public client CA into the bridge, and only
+   the Samba workload key/public CA into Samba. Web and Adminer receive none of
+   the control-plane material.
+7. Added a git-ignored local-PKI bootstrap script; production can supply
+   externally managed certificates through `KAIMO_SMB_CONTROL_PKI`.
+8. Updated the native build marker to
+   `2026-07-23a authenticated control plane` and replaced the P0-06 reserved
+   namespace's forbidden libc `strncasecmp` call with Samba's `strnequal`, as
+   discovered by the pinned native build.
+
+**Validation completed**
+
+- Focused P0-07 managed suite: 3 passed, 0 failed, 0 skipped; full managed
+  suite: 528 passed, 0 failed, 0 skipped.
+- The pinned Samba 4.19.5 image builds successfully, including all mTLS C++
+  clients using the shared Samba workload certificate and the VFS module.
+- A local bridge started on TLS port 5080 with generated development
+  credentials. Auth, share, config, and runtime clients completed their allowed
+  RPCs with the shared workload identity. `GetNtHash` remained denied.
+- Two immediate hash exports succeeded; the third returned
+  `RESOURCE_EXHAUSTED`. Bridge audit logs recorded request, completion,
+  unassigned-method rejection, and rate-limit rejection without usernames or
+  hash bytes.
+- `docker compose config --quiet` succeeds with the isolated network and
+  credential mount topology. Resolved topology checks show the bridge shares
+  zero networks with Web and Adminer, while retaining its Samba-control and
+  bridge-only PostgreSQL paths.
+- Structural search finds no remaining native
+  `grpc::InsecureChannelCredentials()` usage.
+- `git diff --check` reports no whitespace errors.
+
+**Validation still required**
+
+- Verify untrusted/missing-certificate handshake failure explicitly and test
+  production-issued certificate material and rotation.
+- Exercise live NTLM login, ACL, event, share/config sync, and snapshot paths
+  over the authenticated channel.
+- Define certificate issuance, rotation, revocation, and expiry monitoring for
+  the production orchestrator. Bridge high availability remains separate work.
+
+**Next planned finding:** P1-01 — bound sidecar threads and open Unix-socket clients.
+
+### 2026-07-23 — P1-01: Bounded authd workers and client deadlines
+
+**Status:** Implemented; pinned native build and isolated saturation runtime test verified.
+
+**Solution implemented**
+
+1. Replaced detached per-connection threads with a fixed pool
+   (`KAIMO_AUTHD_WORKERS`, default 16, accepted range 1–256).
+2. Added a bounded FIFO for accepted descriptors
+   (`KAIMO_AUTHD_QUEUE_CAPACITY`, default 64, range 1–4096). When full, the
+   accept loop writes the protocol's fail-closed `ERROR` response and closes
+   the descriptor.
+3. Applied `SO_RCVTIMEO` and `SO_SNDTIMEO` to every accepted socket
+   (`KAIMO_AUTHD_IO_TIMEOUT_MS`, default 2000 ms, range 100–60000), so a client
+   that never sends a request cannot hold a worker indefinitely.
+4. Accepted descriptors use `SOCK_CLOEXEC`; deadline-setup failures close the
+   connection. Invalid resource-limit configuration fails sidecar startup.
+5. Added logarithmically sampled overload and receive-timeout counters to avoid
+   turning an attack into unbounded log volume.
+6. Added a container runtime regression test that saturates the Unix socket
+   with silent clients and measures `/proc` thread/descriptor counts.
+7. Updated the image build marker to `2026-07-23b bounded authd workers`.
+
+**Validation completed**
+
+- Pinned Samba 4.19.5 image builds successfully with the new sidecar.
+- Capacity test with 2 workers, queue capacity 3, and 40 silent clients:
+  thread count remained constant at 23 (including gRPC runtime threads), server
+  descriptors peaked at 13, 35 overload clients received `ERROR`, and
+  descriptors returned to the baseline of 8 after receive deadlines.
+- `KAIMO_AUTHD_WORKERS=0` fails startup with exit code 1.
+
+**Validation still required / deliberately separate**
+
+- Run mixed live SMB authorization, event, and snapshot load to tune the
+  production worker/queue values and observe latency under saturation.
+- P1-03 was completed afterward with length-prefixed framing and full
+  partial-I/O handling.
+- P1-05 was completed afterward with VFS-side nonblocking I/O and strict
+  end-to-end deadlines; P1-01 remains the complementary server-side bound.
+
+**Next planned finding:** P1-02 — bound and expire the authorization cache globally.
+
+### 2026-07-23 — P1-02: Bounded authorization decision cache
+
+**Status:** Implemented; deterministic native unit tests and pinned image build verified.
+
+**Solution implemented**
+
+1. Replaced the global `unordered_map` with a mutex-protected LRU abstraction
+   that updates recency on hits and updates.
+2. Added a hard entry cap (`KAIMO_AUTHD_CACHE_MAX_ENTRIES`, default 10,000)
+   and a conservative accounted memory cap
+   (`KAIMO_AUTHD_CACHE_MAX_BYTES`, default 8 MiB). The budget includes two
+   owned key strings plus fixed node/allocation allowance; bucket reservation
+   is also limited by the byte budget.
+3. Entries that would individually exceed the byte budget are never cached.
+   New entries evict least-recently-used decisions until both caps are
+   satisfied.
+4. Expired entries are removed exactly on lookup and by an opportunistic full
+   sweep on the first operation after each interval of at most one second, so
+   expired unique paths cannot accumulate beyond the hard caps.
+5. Made the TTL configurable (`KAIMO_AUTHD_CACHE_TTL_MS`, default 3000,
+   accepted range 100–10,000 ms). This TTL is the documented maximum
+   ACL-revocation delay for an already cached open decision.
+6. Added monotonic hit, miss, eviction, expiration, and oversize-skip
+   statistics. Cache occupancy/bytes/hit ratio and pressure counters are
+   logarithmically sampled into logs.
+7. Added deterministic native tests for LRU order, entry eviction, byte-budget
+   eviction, oversize skipping, and expiry.
+8. Updated the image build marker to `2026-07-23c bounded authz cache`.
+
+**Validation completed**
+
+- Native decision-cache test binary passes during the Samba image build.
+- The pinned Samba 4.19.5 image, authd, gRPC clients, and VFS module compile.
+- The P1-01 saturation regression still passes against the cache-enabled
+  image: constant thread count, bounded descriptors, 35/40 predictable
+  overload rejections, and descriptor recovery after receive deadlines.
+- `KAIMO_AUTHD_CACHE_TTL_MS=10001` fails startup with exit code 1 instead of
+  silently exceeding the documented revocation bound.
+
+**Validation still required / deliberately separate**
+
+- Tune entry/byte limits using production directory-listing cardinality and
+  observe hit/eviction rates under live SMB load.
+- A future ACL-change notification may invalidate matching entries
+  immediately; until then, the configured TTL is the explicit revocation
+  bound.
+- P1-03 and P1-05 were completed afterward; framing correctness and
+  VFS-side end-to-end deadlines are both covered.
+
+**Next planned finding:** P1-03 — replace the local stream protocol with bounded, complete framing.
+
+### 2026-07-23 — P1-03: Versioned, bounded local stream framing
+
+**Status:** Implemented; deterministic protocol tests, pinned native build,
+fragmentation runtime tests, and the existing saturation regression verified.
+
+**Solution implemented**
+
+1. Added one C/C++-compatible local protocol definition with a fixed 12-byte
+   `KAIM` header: protocol version, enum operation, request/response kind,
+   structured status, and unsigned big-endian payload length.
+2. Replaced all tab/newline request and response messages for connect, open,
+   delete authorization, rename authorization, lifecycle events, and snapshot
+   enumeration/resolution with operation-specific binary schemas.
+3. Encoded every variable field as a 32-bit length plus UTF-8 bytes. Parsers
+   reject overlong fields, embedded NULs, invalid UTF-8, invalid booleans,
+   missing fields, and trailing fields. Tabs and newlines are now ordinary
+   field content instead of protocol delimiters.
+4. Kept the request payload boundary at 8 KiB and added an explicit 64 KiB
+   response boundary. `authd` validates headers and payload size before its
+   bounded request allocation; the VFS validates response size against both
+   the protocol maximum and caller capacity before reading payload bytes.
+5. Added shared retrying `read_exact` and `write_all` loops that handle
+   `EINTR`, short reads/writes, EOF in the middle of a frame, and
+   `MSG_NOSIGNAL`.
+6. Required every response to match the request operation. Queue saturation
+   now returns a valid framed `OVERLOADED` response with operation `NONE`;
+   malformed protocol responses remain distinguishable from infrastructure
+   failures and always fail closed.
+7. Converted OPEN granted masks to a binary `uint32`, snapshot sizes to
+   `uint64`, and snapshot lists to a bounded count plus length-prefixed tokens.
+   The VFS verifies the declared snapshot count against all received records
+   before publishing labels.
+8. Added deterministic serializer/parser, boundary, full-write, and
+   byte-fragmentation tests plus an `authd` runtime regression for fragmented,
+   truncated, oversized, and wrong-version frames.
+9. Updated the module build marker to
+   `2026-07-23d framed local protocol`.
+
+**Validation completed**
+
+- The shared protocol unit binary passes during the native image build,
+  including one-byte fragmentation, 64 KiB full-write/read, delimiter
+  preservation, embedded-NUL rejection, invalid-UTF-8 rejection, and request
+  size enforcement.
+- The pinned Samba 4.19.5 image builds successfully. `kaimo_authd`, all C++
+  gRPC clients, and `vfs_kaimo_bridge.so` compile and link.
+- The container runtime protocol test passes for one-byte request
+  fragmentation, truncated payloads, an 8,193-byte request declaration, and an
+  unsupported protocol version.
+- The P1-01 saturation test still passes with the framed overload response:
+  with 2 workers, queue capacity 3, and 40 silent clients, thread count stayed
+  at 23, server descriptors peaked at 13 and returned to 8, and 35 clients
+  received `OVERLOADED`.
+- Full managed solution suite: 528 passed, 0 failed, 0 skipped.
+- `git diff --check` reports no whitespace errors.
+
+**Validation still required / deliberately separate**
+
+- Live `smbclient` connect/list through the real VFS module was completed as
+  part of P1-04. Open/delete/rename/event and snapshot behavior still needs the
+  broader live SMB/Windows verification tracked separately.
+- P1-04 was completed immediately afterward with private socket permissions,
+  kernel peer credentials, and peer/session identity binding.
+- P1-05 was completed afterward with nonblocking VFS-side connect and one
+  strict deadline across complete framed send/receive operations.
+
+**Next planned finding:** P1-04 — restrict the Unix socket and authenticate the
+local peer/session identity. Completed immediately afterward.
+
+### 2026-07-23 — P1-04: Private socket and authenticated local peers
+
+**Status:** Implemented; pinned native build, negative peer-security tests, a
+real `smbd` → VFS → `authd` connect/list test, and the managed regression suite
+verified.
+
+**Solution implemented**
+
+1. Replaced the world-writable socket with `/var/run/kaimo` owned by
+   `root:kaimo-authd` at mode `0750` and `authz.sock` at mode `0660`.
+   Startup canonicalizes the parent (including `/var/run` → `/run`), validates
+   its owner, group, and permissions, and only removes a stale path when it is
+   an expected-owner Unix socket.
+2. Added the dedicated `kaimo-authd` service group to container startup and to
+   synchronized Samba users. The test account follows the same membership
+   model.
+3. Captured `pid`, `uid`, and `gid` with `SO_PEERCRED` before a connection can
+   enter the bounded worker queue.
+4. Bound every non-root request username to the exact UID returned by
+   `getpwnam_r`. A group member can therefore submit its own identity but
+   cannot claim another Samba/Kaimo user.
+5. Treated the root-real-ID Samba worker as a trusted session carrier only
+   after validating the configured peer executable as a root-owned,
+   non-group/other-writable regular file. Dumpable root peers are matched by
+   executable device/inode. Samba intentionally makes authenticated workers
+   non-dumpable, so an `EACCES`/`EPERM` fallback additionally requires kernel
+   UID 0 and Samba's exact `/proc/<pid>/stat` process-name forms (`smbd`,
+   `smbd: …`, or `smbd[…]`) without granting the container `SYS_PTRACE`.
+6. Added structured `UNAUTHORIZED_PEER` protocol responses. The VFS maps this
+   status to a hard deny independently of `KAIMO_AUTHZ_FAILOPEN`; event-only
+   requests from unauthorized peers are discarded.
+7. Added startup validation for the trusted peer executable and configuration
+   knobs `KAIMO_AUTHD_GROUP` and `KAIMO_AUTHD_PEER_EXECUTABLE`.
+8. Fixed the image build to copy the unambiguous Waf runtime artifact
+   `bin/modules/vfs/kaimo_bridge.so`. The previous `find | head` could select
+   the old `.inst.so` stub even though the real module compiled. The build now
+   also requires the real module's embedded build marker.
+9. Updated the module marker to
+   `2026-07-23e authenticated local peer`.
+
+**Validation completed**
+
+- The pinned Samba 4.19.5 image builds successfully; native protocol/cache
+  tests pass and the installed module contains the real P1-04 build marker.
+- The peer-security runtime regression verifies directory `0750`, socket
+  `0660`, an accepted matching non-root UID, rejection of a mismatched claimed
+  user, denial without socket-group access, and rejection of an untrusted root
+  executable.
+- An isolated live Samba regression authenticates a real SMB user, loads the
+  real `kaimo_bridge.so`, passes its `CONNECT` frame through `authd`, and
+  completes `smbclient ls`. The downstream bridge is intentionally absent and
+  fail-open is enabled, proving that the local authenticated-peer path itself
+  succeeded.
+- The framed-protocol regression passes unchanged.
+- The saturation regression passes with 2 workers, queue capacity 3, 40 silent
+  clients, a stable 23 threads, descriptors returning from 13 to 8, and 35
+  predictable overload rejections.
+- User synchronization tests verify all synchronized users are added to both
+  storage and `kaimo-authd` groups.
+- `docker compose config --quiet` succeeds.
+- Full managed solution suite: 528 passed, 0 failed, 0 skipped.
+
+**Validation still required / deliberately separate**
+
+- Exercise the full open/delete/rename/event/snapshot matrix from Windows and
+  representative production clients. P1-04's actual connect/list path is
+  covered, but it does not replace that broader compatibility run.
+- P1-05 was completed immediately afterward with nonblocking VFS-side connect
+  and strict end-to-end deadlines.
+
+**Next planned finding:** P1-05 — bound all VFS-side local socket operations by
+strict end-to-end deadlines. Completed immediately afterward.
+
+### 2026-07-23 — P1-05: Strict VFS-side end-to-end deadlines
+
+**Status:** Implemented; deterministic native deadline tests, pinned Samba
+4.19.5 build, and a real stalled-sidecar SMB runtime regression verified.
+
+**Solution implemented**
+
+1. Added absolute `CLOCK_MONOTONIC` deadlines to the shared local-protocol
+   helpers. Deadline-aware complete read/write loops use `poll` plus
+   `MSG_DONTWAIT`; partial progress never resets the budget.
+2. Opened every VFS-side Unix client socket with `SOCK_NONBLOCK |
+   SOCK_CLOEXEC`. An in-progress connect waits only for the remaining budget
+   and verifies completion through `SO_ERROR`.
+3. Applied the same deadline instance to connect, the complete request frame,
+   the complete response header, and the complete response payload.
+4. Added independent configurable budgets:
+   `KAIMO_VFS_AUTH_TIMEOUT_MS` (6000 ms),
+   `KAIMO_VFS_SNAPSHOT_TIMEOUT_MS` (32000 ms), and
+   `KAIMO_VFS_EVENT_TIMEOUT_MS` (250 ms). Values outside 10-60,000 ms fall
+   back to logged bounded defaults.
+5. Kept lifecycle notification delivery separate from authorization:
+   notifications wait only for their short local enqueue budget and never for
+   the downstream gRPC result. Durable spooling/acknowledgement remains P1-11.
+6. Rejects overlong Unix-socket paths instead of silently truncating the
+   configured endpoint.
+7. Updated the module marker to
+   `2026-07-23f bounded VFS local I/O`.
+
+**Validation completed**
+
+- The shared native protocol test now proves a silent/slow receiver cannot
+  extend the receive deadline by making partial progress and proves a blocked
+  sender exits within the same absolute budget.
+- The pinned Samba 4.19.5 image builds successfully; native protocol/cache
+  tests pass and the real VFS module compiles and links.
+- A live regression loads the real module in `smbd`, connects it to a fake
+  sidecar that accepts but never responds, and sets a 300 ms authorization
+  budget. The SMB request failed closed with `NT_STATUS_ACCESS_DENIED` in
+  0.364 seconds rather than pinning the worker.
+- The normal immediate-denial regression still returns
+  `NT_STATUS_ACCESS_DENIED` in 0.050 seconds, and the authenticated
+  `smbd` -> VFS -> `authd` peer-identity regression passes with the new module.
+- `docker compose config --quiet` passes. The managed test project passes:
+  527 passed, 0 failed, 0 skipped.
+
+**Validation still required / deliberately separate**
+
+- Run sustained mixed authorization/snapshot/event load to tune production
+  budgets and alerting.
+- P1-11 remains open for durable event delivery; P1-05 only guarantees that a
+  local enqueue attempt cannot block an `smbd` worker indefinitely.
+
+**Next planned finding:** P1-06 — enforce strictly read-only snapshot opens
+without bypassing the remaining VFS stack.
+
+### 2026-07-23 — P1-06: Read-only, VFS-stack-safe timewarp access
+
+**Status:** Implemented; pinned Samba 4.19.5 compilation and live SMB3
+read/write/mutation regression verified.
+
+**Solution implemented**
+
+1. Rejects explicit write, append, EA/attribute write, delete, DACL/owner
+   change, generic-write/all, create/overwrite, delete-on-close, allocation,
+   EA, and security-descriptor intent before opening a timewarp object.
+2. Expands generic read/execute requests, supports `MAXIMUM_ALLOWED`, and
+   intersects the bridge grant with both the client's request and the fixed
+   read-only snapshot mask.
+3. Rejects mutating POSIX flags and passes a defensively sanitized `O_RDONLY`
+   `vfs_open_how` to the next layer.
+4. Replaced raw `openat(AT_FDCWD, ...)` with `SMB_VFS_NEXT_OPENAT` and a copied,
+   validated Samba filename, following the pinned `vfs_shadow_copy2` pattern.
+5. Returns `EROFS` for timewarp delete, rename, mkdir, and disabled snapshot
+   redirects, preventing fallback to live share content.
+6. Updated the module marker to
+   `2026-07-23g read-only stacked snapshots`.
+
+**Validation completed**
+
+- The real module compiles and links against Samba 4.19.5/ABI 49.
+- A live SMB3 regression reads historical bytes while the live file contains
+  different data.
+- The same regression proves overwrite, delete, rename, and mkdir attempts
+  receive `NT_STATUS_MEDIA_WRITE_PROTECTED`; both live and cached data remain
+  unchanged even though the cache file is POSIX-writable by the SMB user.
+- `full_audit`, placed after `kaimo_bridge`, records the successful historical
+  open, proving the redirect reaches the remaining VFS stack.
+- The existing stalled-sidecar SMB regression still fails closed within its
+  configured 300 ms budget, and `docker compose config --quiet` passes.
+
+**Validation still required / deliberately separate**
+
+- Exercise the Windows Explorer "Previous Versions" dialog and folder browsing
+  against representative production clients.
+- P1-07 remains open for atomic, content-verified materialization.
+
+**Next planned finding:** P1-07 — make snapshot materialization atomic and
+content-verified.
+
 ## 15. Source evidence index
 
 | Finding area | Primary source locations |
 |---|---|
-| Context allocation fail-open | `samba-vfs/module/vfs_kaimo_bridge.c:526-574` |
+| Context allocation fail-open | `src/samba-vfs/module/vfs_kaimo_bridge.c:526-574` |
 | Path reconstruction/truncation | `vfs_kaimo_bridge.c:68-228`, `:320-382`, `:510-522`, `:583-991` |
 | Complete access mapping / original gap | `vfs_kaimo_bridge.c:89-197`, `:583-695`; `authd.cpp:53-130`, `:212-249`; `AuthzGrpcService.cs:25-327`; `Core/Security/FilePermissions.cs` |
 | Rename authorization / original gap | `vfs_kaimo_bridge.c` (`kaimo_authz_rename`, `kaimo_renameat`); `authd.cpp` (`do_rename`); `AuthzGrpcService.cs` (`AuthorizeRename`) |
-| Unbounded sidecar threads/cache | `samba-vfs/module/authd.cpp:49-66`, `:183-225`, `:258-262` |
-| World-writable socket | `authd.cpp:241-254` |
-| Partial stream I/O | `vfs_kaimo_bridge.c:89-139`, `:258-304`; `authd.cpp:224-262` |
+| Bounded sidecar workers / original detached-thread gap | `src/samba-vfs/module/authd.cpp` (`BoundedClientQueue`, socket deadlines, worker startup, overload rejection); `src/samba-vfs/tests/test-authd-capacity.py` |
+| Bounded authorization cache / original growth gap | `src/samba-vfs/module/decision_cache.h`; `authd.cpp` (cache configuration and sampled counters); `src/samba-vfs/tests/test-decision-cache.cpp` |
+| Private authenticated Unix socket / original world-writable gap | `src/samba-vfs/module/authd.cpp` (`configure_expected_peer_executable`, `inspect_peer`, `peer_matches_username`, secure socket publication); `entrypoint.vfs.sh`; `sync-users.sh`; `docker-compose.yml`; `src/samba-vfs/tests/test-authd-peer-security.py`; `test-authd-smb-peer.py` |
+| Windows-compatible TREE_CONNECT denial | `src/samba-vfs/patches/0001-map-vfs-connect-errno.patch`; `Dockerfile.vfs`; `src/samba-vfs/tests/test-vfs-connect-status.py` |
+| Framed local stream protocol / original partial I/O gap | `src/samba-vfs/module/local_protocol.h`; `vfs_kaimo_bridge.c` (`kaimo_roundtrip`, binary request builders and response parsers); `authd.cpp` (`handle_client`); `src/samba-vfs/tests/test-local-protocol.cpp`; `test-authd-protocol.py` |
 | Snapshot ACL filtering / original leak | `SmbBridge/Services/SnapshotGrpcService.cs` (`GetFolderSnapshotAsync`, per-user reconciliation); `Core/Services/File/FileService.cs:884-899` |
 | Snapshot cache isolation / original direct path | `SnapshotCache.cs`; `SnapshotGrpcService.cs` (`EnsureIsolatedFromShare`, cache-root-relative paths); `vfs_kaimo_bridge.c` (`kaimo_snapshot_cache_abspath`, reserved namespace checks); `sync-shares.sh`; `docker-compose.yml` |
-| Snapshot raw open | `vfs_kaimo_bridge.c:922-991` |
+| Snapshot read-only/VFS-stack enforcement | `vfs_kaimo_bridge.c` (`kaimo_snapshot_create_is_readonly`, `kaimo_snapshot_granted_access`, `kaimo_snapshot_open_how_readonly`, `kaimo_openat`); `src/samba-vfs/tests/test-vfs-snapshot-readonly.py` |
 | Snapshot materialization races | `SnapshotGrpcService.cs:288-317`; `SnapshotCacheCleanupService.cs` |
 | Disabled share lookup | `Infrastructure/Repositories/ShareRepository.cs:45-49`; bridge service share lookups |
 | Event reliability/TOCTOU | `vfs_kaimo_bridge.c:233-257`, `:665-919`; `FileEventGrpcService.cs`; `FileService.cs:341-400` |
 | Rename duplicate destruction | `Infrastructure/Repositories/FileVersionRepository.cs:142-178` |
-| Insecure hash temp file | `samba-vfs/sync-users.sh:17-49` |
+| Insecure hash temp file | `src/samba-vfs/sync-users.sh:17-49` |
 | Sync error handling | `sync-users.sh`, `sync-shares.sh`, `sync-config.sh` |
-| Unauthenticated h2c | `SmbBridge/Program.cs:28-40`; `authd.cpp` and sync clients; `docker-compose.yml` |
+| Authenticated gRPC control plane / original h2c gap | `SmbBridge/Program.cs`; `SmbBridge/Security/*`; `AuthGrpcService.cs`; `bridge_channel.h` and native clients; `docker-compose.yml` |
 
 ## 16. Final assessment
 

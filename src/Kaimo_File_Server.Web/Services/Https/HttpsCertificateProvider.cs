@@ -39,7 +39,7 @@ public sealed class HttpsCertificateProvider : IHttpsCertificateProvider
         ISystemInfoService sysInfo,
         IDataProtectionProvider dataProtection,
         TimeProvider time,
-        string storageRoot,
+        string certPath,
         ILogger<HttpsCertificateProvider> logger)
     {
         _scopeFactory = scopeFactory;
@@ -47,7 +47,7 @@ public sealed class HttpsCertificateProvider : IHttpsCertificateProvider
         _protector = dataProtection.CreateProtector(ProtectorPurpose);
         _time = time;
         _logger = logger;
-        _certDir = Path.Combine(storageRoot, ".certs");
+        _certDir = Path.Combine(certPath, ".certs");
     }
 
     /// <summary>The certificate currently served, or null before initialization.</summary>

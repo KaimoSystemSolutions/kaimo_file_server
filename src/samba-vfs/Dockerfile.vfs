@@ -49,12 +49,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources \
     && apt-get update \
     && apt-get build-dep -y samba \
-    && apt-get install -y --no-install-recommends build-essential python3 \
+    && apt-get install -y --no-install-recommends build-essential patch python3 \
        samba-common-bin smbclient acl \
     && rm -rf /var/lib/apt/lists/*
 
 # Toolchain for the gRPC C++ sidecar clients. Installed here (rarely changes) so a
-# module edit in the runtime stage never re-triggers this apt install.
+# module edit in the build-runtime stage never re-triggers this apt install.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        protobuf-compiler protobuf-compiler-grpc \
@@ -62,6 +62,14 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build/samba-4.19.5
+
+# Samba otherwise converts every failure from a VFS connect hook to the generic
+# NT_STATUS_UNSUCCESSFUL. Preserve EACCES as NT_STATUS_ACCESS_DENIED so Windows
+# treats an ACL denial like a normal file-server denial instead of reporting
+# "A device attached to the system is not functioning."
+COPY patches/0001-map-vfs-connect-errno.patch /tmp/
+RUN patch -p1 < /tmp/0001-map-vfs-connect-errno.patch \
+    && grep -F "map_nt_error_from_unix(connect_errno)" source3/smbd/smb2_service.c
 
 # 1) Register module in build system (template: vfs_fake_perms). Constant strings.
 RUN cat >> source3/modules/wscript_build <<'PYEOF'
@@ -80,11 +88,11 @@ RUN sed -i "s/default_shared_modules.extend(\['vfs_recycle'/default_shared_modul
     && grep -n "vfs_kaimo_bridge" source3/wscript
 
 # 3) CONSTANT build-time stub of the module. The real implementation is compiled
-#    in the runtime stage. This only needs to be a registrable, compilable VFS
+#    in the build-runtime stage. This only needs to be a registrable, compilable VFS
 #    module so configure/make/install complete and produce all object files +
 #    private libs the real module later links against (same ABI).
 RUN cat > source3/modules/vfs_kaimo_bridge.c <<'CEOF'
-/* Build-time stub -- replaced by the real module in the runtime stage.
+/* Build-time stub -- replaced by the real module in the build-runtime stage.
  * See the header of Dockerfile.vfs for why this exists. */
 #include "includes.h"
 #include "smbd/smbd.h"
@@ -105,19 +113,22 @@ NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)
 CEOF
 
 # 4) Build and install Samba to /opt/samba (incl. the stub module). The waf build
-#    tree under bin/ is kept in the IMAGE (no cache mount, no clean) so the runtime
-#    stage inherits a fully configured tree with all object files and can relink a
-#    single module target without reconfiguring. This makes the base image large
-#    (~1-2 GB of build tree); acceptable for a dev iteration base. If final image
-#    size matters, add a slim stage that copies only /opt/samba + /usr/local/bin.
+#    tree under bin/ is kept in the build image (no cache mount, no clean) so the
+#    build-runtime stage inherits a fully configured tree with all object files and
+#    can relink a single module target without reconfiguring. The large build tree
+#    is intentionally excluded from the slim production stage.
 RUN ./configure --without-ad-dc --enable-debug --prefix=/opt/samba \
     && PYTHONHASHSEED=1 make -j"$(nproc)" \
     && PYTHONHASHSEED=1 make install \
     && find /opt/samba -name '*kaimo_bridge*.so' | sed 's/^/installed stub module: /'
 
-# ---------- Stage 3: runtime (cheap; reruns on source edits) ----------
-FROM sambabuild AS runtime
+# ---------- Stage 3: build-runtime (cheap; reruns on source edits) ----------
+# This remains a build image on purpose. The final runtime stage below copies
+# only the installed Samba tree, Kaimo helpers/scripts and required shared
+# libraries; compiler, source tree and waf object files never reach production.
+FROM sambabuild AS build-runtime
 ENV DEBIAN_FRONTEND=noninteractive
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # WS-Discovery responder (backlog #7): `wsdd` makes the server visible in Windows
 # Explorer's "Network" view; started/stopped by sync-config.sh per the DB toggle.
@@ -136,6 +147,11 @@ COPY module/authsync.cpp ./
 COPY module/authd.cpp ./
 COPY module/sharesync.cpp ./
 COPY module/configsync.cpp ./
+COPY module/bridge_channel.h ./
+COPY module/decision_cache.h ./
+COPY module/local_protocol.h ./
+COPY tests/test-decision-cache.cpp ./
+COPY tests/test-local-protocol.cpp ./
 RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
     && protoc --grpc_out=. --plugin=protoc-gen-grpc="$(which grpc_cpp_plugin)" kaimo_smb_bridge.proto \
     && g++ -std=c++17 -O2 \
@@ -158,6 +174,14 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
        $(pkg-config --cflags grpc++ protobuf) \
        $(pkg-config --libs grpc++ protobuf) \
        -o /usr/local/bin/kaimo_configsync \
+    && g++ -std=c++17 -O2 -pthread -I. \
+       test-decision-cache.cpp -o /tmp/test-decision-cache \
+    && /tmp/test-decision-cache \
+    && rm /tmp/test-decision-cache \
+    && g++ -std=c++17 -O2 -pthread -I. \
+       test-local-protocol.cpp -o /tmp/test-local-protocol \
+    && /tmp/test-local-protocol \
+    && rm /tmp/test-local-protocol \
     && test -x /usr/local/bin/kaimo_authsync \
     && test -x /usr/local/bin/kaimo_authd \
     && test -x /usr/local/bin/kaimo_sharesync \
@@ -167,12 +191,13 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
 # This is the layer that reruns on a module edit -> a single object + relink.
 # The installed .so is located by name (not a hardcoded path) and overwritten.
 WORKDIR /build/samba-4.19.5
-COPY module/vfs_kaimo_bridge.c source3/modules/vfs_kaimo_bridge.c
+COPY module/vfs_kaimo_bridge.c module/local_protocol.h source3/modules/
 RUN PYTHONHASHSEED=1 ./buildtools/bin/waf build --targets=vfs_kaimo_bridge \
-    && built="$(find bin -name '*kaimo_bridge*.so' | head -n1)" \
+    && built="bin/modules/vfs/kaimo_bridge.so" \
     && dest="$(find /opt/samba -name '*kaimo_bridge*.so' | head -n1)" \
-    && test -n "$built" && test -n "$dest" \
+    && test -f "$built" && test -n "$dest" \
     && cp "$built" "$dest" \
+    && strings "$dest" | grep -F "kaimo_bridge build [" \
     && echo "updated real module: $dest"
 
 # 5) Config, entrypoint, sync and self-test scripts for self-built Samba.
@@ -182,12 +207,62 @@ COPY selftest.sh              /usr/local/bin/selftest.sh
 COPY sync-users.sh            /usr/local/bin/sync-users.sh
 COPY sync-shares.sh           /usr/local/bin/sync-shares.sh
 COPY sync-config.sh           /usr/local/bin/sync-config.sh
+COPY tests/test-vfs-io-deadline.py /usr/local/bin/test-vfs-io-deadline.py
+COPY tests/test-vfs-snapshot-readonly.py /usr/local/bin/test-vfs-snapshot-readonly.py
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
                        /usr/local/bin/sync-users.sh /usr/local/bin/sync-shares.sh \
                        /usr/local/bin/sync-config.sh \
+                       /usr/local/bin/test-vfs-io-deadline.py \
+                       /usr/local/bin/test-vfs-snapshot-readonly.py \
     && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
              /usr/local/bin/sync-users.sh /usr/local/bin/sync-shares.sh \
-             /usr/local/bin/sync-config.sh
+             /usr/local/bin/sync-config.sh \
+             /usr/local/bin/test-vfs-io-deadline.py \
+             /usr/local/bin/test-vfs-snapshot-readonly.py
+
+# Package the installed runtime separately. Stripping is intentionally performed
+# on the copy only: `docker build --target build-runtime` still yields the full
+# unstripped tree for native diagnostics, while the default image stays small.
+#
+# The runtime package list is derived from every installed Samba/helper ELF file.
+# This follows Samba feature/configuration changes automatically and avoids a
+# brittle hand-maintained list of dozens of transitive shared-library packages.
+RUN set -eux; \
+    mkdir -p /runtime/opt /runtime/usr/local; \
+    cp -a /opt/samba /runtime/opt/samba; \
+    cp -a /usr/local/bin /runtime/usr/local/bin; \
+    find /runtime/opt/samba /runtime/usr/local/bin -type f \
+        \( -perm /111 -o -name '*.so' -o -name '*.so.*' \) -print0 \
+      | while IFS= read -r -d '' file_path; do \
+            file -b "$file_path" | grep -q ELF || continue; \
+            ldd "$file_path" 2>/dev/null || true; \
+            strip --strip-unneeded "$file_path" 2>/dev/null || true; \
+        done \
+      | awk '/=> \/(lib|usr\/lib)/ { print $(NF-1) } /^\/(lib|usr\/lib)/ { print $1 }' \
+      | xargs -r -n1 readlink -f \
+      | sort -u > /tmp/runtime-libraries.txt; \
+    { \
+        printf '%s\n' acl ca-certificates login passwd procps sysvinit-utils wsdd; \
+        while IFS= read -r library_path; do \
+            owner="$(dpkg-query -S "$library_path" | head -n1)"; \
+            printf '%s\n' "${owner%%:*}"; \
+        done < /tmp/runtime-libraries.txt; \
+    } | sort -u > /runtime/runtime-packages.txt; \
+    test -s /runtime/runtime-packages.txt; \
+    du -sh /runtime/opt/samba /runtime/usr/local/bin; \
+    cat /runtime/runtime-packages.txt
+
+# ---------- Stage 4: slim production runtime ----------
+FROM ubuntu:24.04 AS runtime
+ENV DEBIAN_FRONTEND=noninteractive
+
+COPY --from=build-runtime /runtime/runtime-packages.txt /tmp/runtime-packages.txt
+RUN apt-get update \
+    && xargs -r apt-get install -y --no-install-recommends < /tmp/runtime-packages.txt \
+    && rm -rf /var/lib/apt/lists/* /tmp/runtime-packages.txt
+
+COPY --from=build-runtime /runtime/opt/samba/ /opt/samba/
+COPY --from=build-runtime /runtime/usr/local/bin/ /usr/local/bin/
 
 EXPOSE 445
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

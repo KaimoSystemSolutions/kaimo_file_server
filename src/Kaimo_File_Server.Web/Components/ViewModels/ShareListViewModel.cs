@@ -4,7 +4,7 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
-using Kaimo_File_Server.Core.Storage;
+using Kaimo_File_Server.Search;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
@@ -14,6 +14,11 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 
 public partial class ShareListViewModel
 {
+    private static readonly StringComparer PathComparer =
+        OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+
     private readonly IShareRepository _shareRepo;
     private readonly IUserRepository _userRepo;
     private readonly IGroupRepository _groupRepo;
@@ -22,12 +27,12 @@ public partial class ShareListViewModel
     private readonly IAclService _aclService;
     private readonly IManagementAuthService _mgmtAuth;
     private readonly IUserContextFactory _userContextFactory;
-    private readonly IStorageEngine _storage;
     private readonly ShareLockManager _lockManager;
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<ShareListViewModel> _logger;
-    private readonly string _storagePath;
+    private readonly IReadOnlyList<string> _storagePools;
     private readonly IFileVersionService? _versionService;
+    private readonly ISearchService? _searchService;
 
     public ShareListViewModel(
         IShareRepository shareRepo,
@@ -38,12 +43,12 @@ public partial class ShareListViewModel
         IAclService aclService,
         IManagementAuthService mgmtAuth,
         IUserContextFactory userContextFactory,
-        IStorageEngine storage,
         ShareLockManager lockManager,
         AuthenticationStateProvider authState,
         ILogger<ShareListViewModel> logger,
-        string storagePath,
-        IFileVersionService? versionService = null)
+        IReadOnlyList<string> storagePools,
+        IFileVersionService? versionService = null,
+        ISearchService? searchService = null)
     {
         _shareRepo = shareRepo;
         _userRepo = userRepo;
@@ -53,12 +58,16 @@ public partial class ShareListViewModel
         _aclService = aclService;
         _mgmtAuth = mgmtAuth;
         _userContextFactory = userContextFactory;
-        _storage = storage;
         _lockManager = lockManager;
         _authState = authState;
         _logger = logger;
-        _storagePath = storagePath.TrimEnd('/');
+        _storagePools = storagePools;
+        StoragePools = storagePools
+            .Select(path => new StoragePoolItem(GetPoolDisplayName(path), path))
+            .ToList();
+        NewSharePoolPath = storagePools.FirstOrDefault() ?? string.Empty;
         _versionService = versionService;
+        _searchService = searchService;
     }
 
     // -- State --
@@ -71,16 +80,21 @@ public partial class ShareListViewModel
 
     public bool IsCreating { get; set; }
     public string NewShareName { get; set; } = "";
+    public string NewSharePoolPath { get; set; }
     public string? CreateErrorMessage { get; private set; }
 
     // -- Edit --
 
     public ShareDefinition? SelectedShare { get; private set; }
     public string EditShareName { get; set; } = "";
+    public string EditSharePoolPath { get; set; } = "";
     public string? EditErrorMessage { get; private set; }
     public string? EditSuccessMessage { get; private set; }
     public bool ShowDeleteConfirm { get; set; }
     public bool IsRenaming { get; private set; }
+    public bool IsMovingPool { get; private set; }
+
+    public IReadOnlyList<StoragePoolItem> StoragePools { get; }
 
     // -- Access --
 
@@ -237,7 +251,34 @@ public partial class ShareListViewModel
         return true;
     }
 
-    private string BuildSharePath(string name) => $"{_storagePath}/{name}";
+    private string? GetConfiguredPoolPath(string candidate)
+    {
+        if (string.IsNullOrWhiteSpace(candidate))
+            return null;
+
+        var normalized = Path.GetFullPath(candidate);
+        return _storagePools
+            .FirstOrDefault(path =>
+                PathComparer.Equals(Path.GetFullPath(path), normalized));
+    }
+
+    private static string BuildSharePath(string poolPath, string name)
+        => Path.Combine(poolPath, name);
+
+    private static string GetPoolDisplayName(string poolPath)
+    {
+        var normalized = Path.TrimEndingDirectorySeparator(Path.GetFullPath(poolPath));
+        return Path.GetFileName(normalized);
+    }
+
+    public string? GetPoolNameForShare(ShareDefinition share)
+    {
+        var parent = Path.GetDirectoryName(Path.GetFullPath(share.Path));
+        if (parent is null) return null;
+
+        return StoragePools.FirstOrDefault(pool =>
+            PathComparer.Equals(Path.GetFullPath(pool.Path), parent))?.Name;
+    }
 
     // -- Create --
 
@@ -251,6 +292,13 @@ public partial class ShareListViewModel
 
         try
         {
+            var poolPath = GetConfiguredPoolPath(NewSharePoolPath);
+            if (poolPath is null)
+            {
+                CreateErrorMessage = Resources.Web_Error_StoragePoolRequired;
+                return false;
+            }
+
             var existing = await _shareRepo.GetByNameAsync(name);
             if (existing is not null)
             { CreateErrorMessage = Resources.Web_Error_ShareExists; return false; }
@@ -272,9 +320,16 @@ public partial class ShareListViewModel
                 return false;
             }
 
-            var share = new ShareDefinition(name, BuildSharePath(name));
+            var sharePath = BuildSharePath(poolPath, name);
+            if (Directory.Exists(sharePath) || File.Exists(sharePath))
+            {
+                CreateErrorMessage = Resources.Web_Error_StoragePoolDestinationExists;
+                return false;
+            }
+
+            var share = new ShareDefinition(name, sharePath);
+            Directory.CreateDirectory(share.Path);
             await _shareRepo.CreateAsync(share);
-            await _storage.CreateDirectoryAsync(name);
 
             // Root-FileMetadata persistieren (Path == "", Konvention aus
             // ShareRelativePath) und die Owner-FullControl-ACL daran hängen.
@@ -302,6 +357,7 @@ public partial class ShareListViewModel
             _logger.LogInformation("Share '{ShareName}' created", name);
 
             NewShareName = "";
+            NewSharePoolPath = _storagePools.FirstOrDefault() ?? string.Empty;
             IsCreating = false;
             await LoadAsync();
             return true;
@@ -326,6 +382,9 @@ public partial class ShareListViewModel
 
         SelectedShare = share;
         EditShareName = share.Name;
+        EditSharePoolPath = Path.GetDirectoryName(Path.GetFullPath(share.Path))
+            ?? _storagePools.FirstOrDefault()
+            ?? string.Empty;
         EditErrorMessage = null;
         EditSuccessMessage = null;
         ShowDeleteConfirm = false;
@@ -337,6 +396,7 @@ public partial class ShareListViewModel
     {
         SelectedShare = null;
         EditShareName = "";
+        EditSharePoolPath = "";
         EditErrorMessage = null;
         EditSuccessMessage = null;
         ShowDeleteConfirm = false;
@@ -383,17 +443,53 @@ public partial class ShareListViewModel
 
             try
             {
-                // 1. Physischen Ordner umbenennen
-                var oldFullPath = Path.Combine(_storagePath, oldName);
-                var newFullPath = Path.Combine(_storagePath, newName);
+                // The persisted share path is the source of truth. Keep the
+                // current pool and only replace the final directory component.
+                var oldFullPath = Path.GetFullPath(SelectedShare.Path);
+                var parentPath = Path.GetDirectoryName(oldFullPath)
+                    ?? throw new InvalidOperationException("Share path has no parent directory.");
+                var newFullPath = Path.Combine(parentPath, newName);
 
-                if (Directory.Exists(oldFullPath))
+                if (!PathComparer.Equals(oldFullPath, newFullPath)
+                    && (Directory.Exists(newFullPath) || File.Exists(newFullPath)))
+                    throw new IOException($"Destination '{newFullPath}' already exists.");
+
+                var directoryMoved = Directory.Exists(oldFullPath)
+                    && !PathComparer.Equals(oldFullPath, newFullPath);
+                if (directoryMoved)
                     Directory.Move(oldFullPath, newFullPath);
 
-                // 2. ShareDefinition in DB updaten
-                SelectedShare.Name = newName;
-                SelectedShare.Path = BuildSharePath(newName);
-                await _shareRepo.UpdateAsync(SelectedShare);
+                // 2. ShareDefinition in DB updaten. If persistence fails, put
+                // the directory back so the old persisted path remains valid.
+                try
+                {
+                    SelectedShare.Name = newName;
+                    SelectedShare.Path = newFullPath;
+                    await _shareRepo.UpdateAsync(SelectedShare);
+                }
+                catch
+                {
+                    SelectedShare.Name = oldName;
+                    SelectedShare.Path = oldFullPath;
+                    if (directoryMoved && Directory.Exists(newFullPath))
+                        Directory.Move(newFullPath, oldFullPath);
+                    throw;
+                }
+
+                if (_searchService is not null
+                    && !PathComparer.Equals(oldFullPath, newFullPath))
+                {
+                    try
+                    {
+                        await _searchService.onDirectoryRenamed(oldFullPath, newFullPath);
+                    }
+                    catch (Exception searchEx)
+                    {
+                        _logger.LogWarning(searchEx,
+                            "Share '{ShareName}' renamed, but its search index could not be updated",
+                            newName);
+                    }
+                }
 
                 // 4. Lock-Key umbenennen
                 _lockManager.RenameLock(oldName, newName);
@@ -407,7 +503,11 @@ public partial class ShareListViewModel
                 // Re-select mit neuen Daten
                 var updated = Shares.FirstOrDefault(s => s.Id == SelectedShare.Id);
                 if (updated is not null)
+                {
                     SelectedShare = updated;
+                    EditSharePoolPath = Path.GetDirectoryName(
+                        Path.GetFullPath(updated.Path)) ?? EditSharePoolPath;
+                }
 
                 return true;
             }
@@ -426,6 +526,229 @@ public partial class ShareListViewModel
         {
             IsRenaming = false;
         }
+    }
+
+    // -- Change storage pool --
+
+    public async Task<bool> ChangeStoragePoolAsync()
+    {
+        if (SelectedShare is null) return false;
+
+        EditErrorMessage = null;
+        EditSuccessMessage = null;
+
+        if (!await CanManageSelectedShareAsync(ManagementPermission.EditShareSettings))
+        {
+            EditErrorMessage = Resources.Web_Error_NoPermission;
+            return false;
+        }
+
+        var targetPoolPath = GetConfiguredPoolPath(EditSharePoolPath);
+        if (targetPoolPath is null)
+        {
+            EditErrorMessage = Resources.Web_Error_StoragePoolRequired;
+            return false;
+        }
+
+        var sourcePath = Path.GetFullPath(SelectedShare.Path);
+        var destinationPath = BuildSharePath(targetPoolPath, SelectedShare.Name);
+        var sourceParent = Path.GetDirectoryName(sourcePath);
+
+        if (sourceParent is not null
+            && PathComparer.Equals(
+                Path.GetFullPath(sourceParent), Path.GetFullPath(targetPoolPath)))
+        {
+            EditSuccessMessage = Resources.Web_Share_StoragePoolUnchanged;
+            return true;
+        }
+
+        if (!Directory.Exists(sourcePath))
+        {
+            EditErrorMessage = Resources.Web_Error_SharePathMissing;
+            return false;
+        }
+
+        if (Directory.Exists(destinationPath) || File.Exists(destinationPath))
+        {
+            EditErrorMessage = Resources.Web_Error_StoragePoolDestinationExists;
+            return false;
+        }
+
+        var shareLock = _lockManager.GetLock(SelectedShare.Name);
+        IsMovingPool = true;
+        try
+        {
+            if (!await shareLock.WaitAsync(TimeSpan.FromSeconds(30)))
+            {
+                EditErrorMessage = Resources.Web_Error_ShareInUse;
+                return false;
+            }
+
+            try
+            {
+                var sourceWasCopied = await MoveDirectoryAcrossPoolsAsync(
+                    sourcePath, destinationPath);
+
+                try
+                {
+                    SelectedShare.Path = destinationPath;
+                    await _shareRepo.UpdateAsync(SelectedShare);
+                }
+                catch
+                {
+                    // Keep the persisted path usable when the DB update fails.
+                    SelectedShare.Path = sourcePath;
+                    if (sourceWasCopied)
+                        Directory.Delete(destinationPath, recursive: true);
+                    else
+                        Directory.Move(destinationPath, sourcePath);
+                    throw;
+                }
+
+                if (sourceWasCopied)
+                {
+                    try
+                    {
+                        Directory.Delete(sourcePath, recursive: true);
+                    }
+                    catch (Exception cleanupEx)
+                    {
+                        // The DB already points at the complete target copy. A
+                        // stale source copy is safe and can be removed manually.
+                        _logger.LogWarning(cleanupEx,
+                            "Share '{ShareName}' moved successfully, but old path '{SourcePath}' could not be removed",
+                            SelectedShare.Name, sourcePath);
+                    }
+                }
+
+                if (_searchService is not null)
+                {
+                    try
+                    {
+                        await _searchService.onDirectoryRenamed(
+                            sourcePath, destinationPath);
+                    }
+                    catch (Exception searchEx)
+                    {
+                        _logger.LogWarning(searchEx,
+                            "Share '{ShareName}' moved, but its search index could not be updated",
+                            SelectedShare.Name);
+                    }
+                }
+
+                _logger.LogInformation(
+                    "Share '{ShareName}' moved from '{SourcePath}' to storage pool '{PoolPath}'",
+                    SelectedShare.Name, sourcePath, targetPoolPath);
+
+                EditSuccessMessage = string.Format(
+                    Resources.Web_Share_StoragePoolChanged,
+                    StoragePools.First(p => PathComparer.Equals(
+                        Path.GetFullPath(p.Path), Path.GetFullPath(targetPoolPath))).Name);
+
+                await LoadAsync();
+                var updated = Shares.FirstOrDefault(s => s.Id == SelectedShare.Id);
+                if (updated is not null)
+                {
+                    SelectedShare = updated;
+                    EditSharePoolPath = targetPoolPath;
+                }
+
+                return true;
+            }
+            finally
+            {
+                shareLock.Release();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Error moving share '{ShareName}' from '{SourcePath}' to '{DestinationPath}'",
+                SelectedShare.Name, sourcePath, destinationPath);
+            EditErrorMessage = Resources.Web_Error_StoragePoolMoveFailed;
+            return false;
+        }
+        finally
+        {
+            IsMovingPool = false;
+        }
+    }
+
+    /// <returns>
+    /// <c>true</c> when a cross-filesystem copy was required and the source still
+    /// exists; <c>false</c> when an atomic directory rename moved the source.
+    /// </returns>
+    private static async Task<bool> MoveDirectoryAcrossPoolsAsync(
+        string sourcePath, string destinationPath)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)
+            ?? throw new InvalidOperationException("Destination has no parent directory."));
+
+        try
+        {
+            Directory.Move(sourcePath, destinationPath);
+            return false;
+        }
+        catch (IOException)
+        {
+            // A rename cannot cross filesystem/mount boundaries. Copy into a
+            // private staging directory first, publish it atomically in the
+            // target pool, then remove the old share only after the copy exists.
+        }
+
+        var stagingPath = destinationPath + ".kaimo-moving-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            await CopyDirectoryAsync(sourcePath, stagingPath);
+            Directory.Move(stagingPath, destinationPath);
+            return true;
+        }
+        catch
+        {
+            if (Directory.Exists(stagingPath))
+                Directory.Delete(stagingPath, recursive: true);
+            throw;
+        }
+    }
+
+    private static async Task CopyDirectoryAsync(string sourcePath, string destinationPath)
+    {
+        Directory.CreateDirectory(destinationPath);
+
+        foreach (var entry in new DirectoryInfo(sourcePath).EnumerateFileSystemInfos())
+        {
+            var destinationEntry = Path.Combine(destinationPath, entry.Name);
+
+            // Preserve links as links. Following a link could copy data outside
+            // the share or recurse forever through a directory cycle.
+            if (entry.LinkTarget is not null)
+            {
+                if (entry is DirectoryInfo)
+                    Directory.CreateSymbolicLink(destinationEntry, entry.LinkTarget);
+                else
+                    File.CreateSymbolicLink(destinationEntry, entry.LinkTarget);
+                continue;
+            }
+
+            if (entry is DirectoryInfo directory)
+            {
+                await CopyDirectoryAsync(directory.FullName, destinationEntry);
+                continue;
+            }
+
+            await using var source = new FileStream(
+                entry.FullName, FileMode.Open, FileAccess.Read, FileShare.Read,
+                bufferSize: 1024 * 1024, useAsync: true);
+            await using var destination = new FileStream(
+                destinationEntry, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                bufferSize: 1024 * 1024, useAsync: true);
+            await source.CopyToAsync(destination);
+            File.SetLastWriteTimeUtc(
+                destinationEntry, File.GetLastWriteTimeUtc(entry.FullName));
+        }
+
+        Directory.SetLastWriteTimeUtc(
+            destinationPath, Directory.GetLastWriteTimeUtc(sourcePath));
     }
 
 
@@ -636,4 +959,6 @@ public partial class ShareListViewModel
         if (AllGroups.Any(g => g.Id == principalId)) return "group";
         return "unknown";
     }
+
+    public sealed record StoragePoolItem(string Name, string Path);
 }

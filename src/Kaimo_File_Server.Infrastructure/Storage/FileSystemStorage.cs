@@ -235,9 +235,6 @@ public class FileSystemStorage : IStorageEngine
         return full;
     }
 
-    public string getRootPath()
-        => _rootPath;
-
     // ------------------ Read / Write / Delete ------------------
 
     public Task<Stream> ReadAsync(string path)

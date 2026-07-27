@@ -1,6 +1,6 @@
 # samba-vfs — Phase-0-Spike (Proof-of-Concept)
 
-Goal of this directory: **prove that the Samba+VFS approach is viable**, before investing further. See overall plan: [`../docu/smb-samba-vfs-migration.md`](../docu/smb-samba-vfs-migration.md).
+Goal of this directory: **prove that the Samba+VFS approach is viable**, before investing further. See overall plan: [`../../docu/smb-samba-vfs-migration.md`](../../docu/smb-samba-vfs-migration.md).
 
 Phase 0 clarifies the two biggest unknowns:
 
@@ -10,7 +10,7 @@ Phase 0 clarifies the two biggest unknowns:
 | B | Custom VFS module against exact Samba ABI build **and** load from smbd | ✅ **proven** |
 
 **Conclusion Phase 0: the approach is viable.** Both core unknowns are resolved. The path forward
-(Phases 1–5) is described in the [overall plan](../docu/smb-samba-vfs-migration.md).
+(Phases 1–5) is described in the [overall plan](../../docu/smb-samba-vfs-migration.md).
 
 ---
 
@@ -70,21 +70,24 @@ The actual I/O remains native (`SMB_VFS_NEXT_*`) — the file lands directly on 
 ### Build & test
 
 ```bash
-# Prerequisite: source image with Samba source tree (one-time, caches the download)
-#   docker build -f Dockerfile.src -t kaimo-samba-src:4.19.5 .
-# Build Samba + module from one source (~7 min: 2:30 build, 4:10 install)
+# Default: slim production runtime. Samba source, compiler and waf build tree
+# remain in cached intermediate stages and are not part of this image.
 docker build -f Dockerfile.vfs -t kaimo-samba-spike:vfs .
 docker run -d --name kaimo-samba-vfs -p 1446:445 kaimo-samba-spike:vfs
 # Force file op and verify hooks in log
 docker exec kaimo-samba-vfs bash /usr/local/bin/selftest.sh
 docker logs kaimo-samba-vfs 2>&1 | grep "kaimo_bridge:"
+
+# Optional: unstripped native build environment for diagnostics/debugging.
+docker build -f Dockerfile.vfs --target build-runtime -t kaimo-samba-build:vfs .
 ```
 
 Files: [`Dockerfile.vfs`](Dockerfile.vfs), [`module/vfs_kaimo_bridge.c`](module/vfs_kaimo_bridge.c),
 [`conf/smb.conf.vfs`](conf/smb.conf.vfs), [`entrypoint.vfs.sh`](entrypoint.vfs.sh).
 
-> The intermediate image `kaimo-samba-src:4.19.5` (see [`Dockerfile.src`](Dockerfile.src)) only caches
-> the unpacked Samba source tree, so the module build doesn't re-download on each iteration.
+> The default runtime strips installed ELF files and installs only automatically detected
+> shared-library packages. Build `--target build-runtime` when native symbols, compiler,
+> Samba sources or waf object files are required.
 
 ---
 
@@ -96,7 +99,7 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
 **Flow:**
 
 ```
- Kaimo-DB ──► SmbBridge (.NET gRPC, :5080 h2c) ──gRPC ListUsers──► kaimo_authsync (C++)
+ Kaimo-DB ──► SmbBridge (.NET gRPC, :5080 mTLS) ──gRPC ListUsers──► kaimo_authsync (C++)
                  IAuthenticationLookup.GetNtHashAsync                 │  username + NT hash
                  (decrypted, filters disabled/empty)                  ▼
                                                           sync-users.sh ──pdbedit──► Samba's tdbsam
@@ -112,6 +115,14 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
   Samba container** — the last open toolchain risk from Phase 0.
 - **Proto contract:** [`protos/kaimo_smb_bridge.proto`](protos/kaimo_smb_bridge.proto) — defined once,
   generates C# (Bridge) and C++ stubs (authsync).
+- **P0-07 control-plane security:** the bridge accepts only client certificates
+  from its private CA. The Samba container uses one `kaimo-samba` workload
+  identity because its helper processes share one container and credential
+  mount. The bridge still has an explicit allow-list of required RPC methods;
+  `GetNtHash` is intentionally not allowed. Bulk hash exports are rate-limited
+  and audited without logging hashes or usernames. Compose places bridge/Samba
+  on a dedicated internal network and mounts no control-plane credentials into
+  Web or Adminer.
 
 **Test (short form):**
 ```bash
@@ -137,10 +148,10 @@ enter the share — same semantics as the earlier `KaimoSharePolicy.AuthorizeCon
 
 ```
  smbd VFS connect hook (kaimo_bridge.so, pure C)
-   │  Unix socket:  "CONNECT\t<user>\t<share>"
+   │  Unix socket: binary v1 frame (op=CONNECT, length-prefixed user/share)
    ▼
  kaimo_authd (sidecar, C++)  ──gRPC AuthorizeConnect──►  SmbBridge (.NET)
-   │  "ALLOW" / "DENY"                                     CanAccessShareAsync(shareId, userId)
+   │  framed ALLOW / DENY status                            CanAccessShareAsync(shareId, userId)
    ▼
  allow -> SMB_VFS_NEXT_CONNECT   |   deny -> errno=EACCES, TREE_CONNECT fails
 ```
@@ -171,9 +182,26 @@ enter the share — same semantics as the earlier `KaimoSharePolicy.AuthorizeCon
 (fail-closed — a bridge outage must not silently grant access). Set `KAIMO_AUTHZ_FAILOPEN=1`
 to allow on error instead (availability over security), which was the previous default.
 
-**Known cosmetic issue:** A deny appears client-side as `NT_STATUS_UNSUCCESSFUL` (not
-`ACCESS_DENIED`) — several Samba code paths hardcode this for VFS connect errors. Functionally
-access is correctly denied.
+**VFS-side deadlines:** Every local authorization roundtrip uses one absolute
+monotonic budget across nonblocking `connect`, complete request transmission,
+and complete response reception. The defaults are 6000 ms for authorization
+(`KAIMO_VFS_AUTH_TIMEOUT_MS`) and 32000 ms for snapshot operations
+(`KAIMO_VFS_SNAPSHOT_TIMEOUT_MS`). Best-effort lifecycle notifications do not
+wait for a gRPC result and have an independent 250 ms local enqueue budget
+(`KAIMO_VFS_EVENT_TIMEOUT_MS`). Accepted values are 10-60,000 ms; invalid
+values fall back to the bounded defaults and are logged.
+
+**Windows-compatible denial:** The pinned Samba build carries a narrow patch that
+maps the VFS hook's `EACCES` to `NT_STATUS_ACCESS_DENIED`. Without it, Samba
+hardcodes `NT_STATUS_UNSUCCESSFUL`, which Windows renders as "A device attached
+to the system is not functioning" and may retry as a transient error. The
+focused `test-vfs-connect-status.py` regression test verifies the denial status
+and a sub-1.5-second response.
+
+Windows can offer its normal credential dialog for `ACCESS_DENIED` when no
+existing SMB session fixes the identity. Windows still permits only one username
+per server name at a time; switching users while another share on the same host
+is connected requires disconnecting that session or using a separate DNS alias.
 
 **Implemented in Phase 2b:** File/path, delete, and rename authorization plus the
 directory listing filter. Native runtime verification of the latest hardening revisions
@@ -218,9 +246,8 @@ to read/write booleans.
 > check as `OpenAsync`). It is set in [`../docker-compose.yml`](../docker-compose.yml). Without
 > it, the bridge treats existing files as "not found" and allows too much.
 
-**Still open for later phases:** Snapshots/@GMT (Phase 5), recycle bin/versioning/search index on
-close hooks (Phase 3), and consistent `NT_STATUS_ACCESS_DENIED` on connect (currently
-`NT_STATUS_UNSUCCESSFUL`, Samba-internal).
+**Still open for later phases:** Snapshots/@GMT (Phase 5) and recycle
+bin/versioning/search index on close hooks (Phase 3).
 
 ## Phase 3 — Close hooks (versioning, ownership, search index)
 
@@ -231,19 +258,56 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
 
 ```
  smbd VFS hook (pure C)            Sidecar (kaimo_authd)        SmbBridge (.NET)
-  close_fn   (file written)    ──"CLOSE\t…"──► NotifyClose ──► FileService.NotifyExternalCloseAsync
-  unlinkat_fn(deleted)         ──"DELETE\t…"─► NotifyDelete ─►   → Version (CreateVersionAsync)
-  renameat_fn(renamed)  ──"RENAMEAUTH\t…"─► AuthorizeRename
-                        ──"RENAME\t…"─────► NotifyRename ─►   → Ownership (EnsureOwnerAsync)
-  mkdirat_fn (directory created) ──"MKDIR\t…"──► NotifyMkdir  ─►   → Search index (SearchServiceRouter)
-                                    (fire-and-forget)               → ACL realignment (Rename)
+  close_fn   (file written)    ──framed CLOSE──► NotifyClose ──► FileService.NotifyExternalCloseAsync
+  unlinkat_fn(deleted)         ──framed DELETE─► NotifyDelete ─►   → Version (CreateVersionAsync)
+  renameat_fn(renamed)  ──framed RENAME_AUTH─► AuthorizeRename
+                        ──framed RENAME───────► NotifyRename ─►   → Ownership (EnsureOwnerAsync)
+  mkdirat_fn (directory created) ──framed MKDIR──► NotifyMkdir ─►   → Search index (SearchServiceRouter)
+                                      (fire-and-forget)             → ACL realignment (Rename)
 ```
 
 - **.NET:** new `FileService.NotifyExternal{Close,Delete,Rename,Mkdir}Async` (in Core) use the
   **already wired** version/ownership/search services — identical results as web uploads.
   Facade: [`FileEventGrpcService`](../src/Kaimo_File_Server.SmbBridge/Services/FileEventGrpcService.cs).
-- **Sidecar** is now **multi-threaded** (one thread per connection) so slow events
-  (versioning reads the file) don't block authz requests. Events are fire-and-forget.
+- **Sidecar** uses a fixed worker pool (`KAIMO_AUTHD_WORKERS`, default 16)
+  and a bounded accepted-client queue (`KAIMO_AUTHD_QUEUE_CAPACITY`, default
+  64), so slow events do not create unbounded threads or descriptors. Excess
+  clients receive `ERROR`; silent clients are closed after
+  `KAIMO_AUTHD_IO_TIMEOUT_MS` (default 2000 ms). Events remain
+  fire-and-forget.
+- **Local peer security:** `/var/run/kaimo` is `root:kaimo-authd` mode `0750`
+  and `authz.sock` is mode `0660`. Synchronized Samba users are members of the
+  dedicated group, while `authd` authenticates every connection with
+  `SO_PEERCRED`. Non-root callers may only name the passwd user matching their
+  kernel UID. Root-real-ID Samba workers are accepted as session-identity
+  carriers only when they match the configured trusted `smbd` executable
+  identity; unauthorized peers fail closed even if `KAIMO_AUTHZ_FAILOPEN=1`.
+  The group and executable can be set with `KAIMO_AUTHD_GROUP` and
+  `KAIMO_AUTHD_PEER_EXECUTABLE`.
+- **Local wire protocol:** [`local_protocol.h`](module/local_protocol.h)
+  defines a 12-byte `KAIM` envelope with protocol version, enum operation,
+  request/response kind, structured status, and a big-endian payload length.
+  Requests are capped at 8 KiB and responses at 64 KiB before payload reads or
+  allocations. Every variable field is a length-prefixed, NUL-free UTF-8
+  string; exact schema consumption rejects missing or trailing fields.
+  Both C and C++ endpoints use complete read/write loops, so Unix stream
+  fragmentation and partial I/O cannot change message boundaries.
+- **VFS client deadlines:** the module opens its local client socket as
+  nonblocking and uses a single monotonic deadline for connect, all partial
+  writes, and all partial reads. Authorization, snapshot, and best-effort event
+  traffic have separate budgets, so a stalled sidecar cannot indefinitely pin
+  an `smbd` worker and event enqueue cannot consume an authorization-sized
+  timeout.
+- **Authorization cache:** open decisions use a mutex-protected LRU capped by
+  both entry count (`KAIMO_AUTHD_CACHE_MAX_ENTRIES`, default 10,000) and an
+  accounted memory budget (`KAIMO_AUTHD_CACHE_MAX_BYTES`, default 8 MiB).
+  Expired entries are removed on lookup and by an opportunistic sweep on the
+  first cache operation after each one-second interval; oversize keys are not
+  cached, and hit/miss/occupancy/eviction/skip counters are sampled into the
+  sidecar log.
+  `KAIMO_AUTHD_CACHE_TTL_MS` defaults to 3000 ms and is the documented
+  maximum ACL-revocation delay for a cached decision (accepted range
+  100–10,000 ms).
 - **Recycle bin** deliberately **not** implemented: the old SMB path (`MarkDeleteOnClose`) also doesn't recycle —
   recycle only exists in web `DeleteFileAsync`. So this is faithful parity.
 
@@ -295,7 +359,9 @@ replaces the FileSystemWatcher/`SyncFromDb()` mechanism from
   is reachable) and then every 60 s — same as user sync.
 - **Reconciliation** in `sync-shares.sh` is idempotent: new shares → `net conf addshare`,
   changed (path/visibility) → `net conf setparm`, removed/disabled → `net conf delshare`.
-  `global` is never touched.
+  A path change or removal additionally runs `smbcontrol smbd close-share` so an
+  existing client cannot remain attached to the old service path. `global` is
+  never touched.
 
 ### Visibility (ABE) — Decision: hidden flag only
 
@@ -303,7 +369,7 @@ replaces the FileSystemWatcher/`SyncFromDb()` mechanism from
 accessible via `\\host\share`). The **hard** share access is decided unchanged by the Phase 2a
 `connect` hook based on genuine Kaimo ACLs. Full per-user ABE (`valid users` per share)
 was deliberately **not** implemented — it would overlap with the `connect` hook and duplicate
-ACL logic. Details/rationale: [Risk 2 in overall plan](../docu/smb-samba-vfs-migration.md#risk-2--dynamic-share-visibility-per-user--trickiest-point).
+ACL logic. Details/rationale: [Risk 2 in overall plan](../../docu/smb-samba-vfs-migration.md#risk-2--dynamic-share-visibility-per-user--trickiest-point).
 
 **Test (after web UI/DB contains shares):**
 ```bash
@@ -389,7 +455,7 @@ container. Files already on disk were touched once at rollout to `g+rwX` and are
 
 ## Phase 5 — Snapshots (@GMT) & Cutover
 
-**Result: implemented (pending end-to-end validation in the Samba build).** Two parts:
+**Result: implemented and validated against the pinned Samba 4.19.5 build.** Two parts:
 
 ### @GMT "Previous Versions" over SMB
 
@@ -433,12 +499,19 @@ module does it via the bridge instead:
 - **C/C++:** `get_shadow_copy_data_fn` + `stat`/`lstat` + `create_file` twrp branch
   in [`vfs_kaimo_bridge.c`](module/vfs_kaimo_bridge.c); `SNAPENUM`/`SNAPRESOLVE`
   handlers in [`authd.cpp`](module/authd.cpp).
+- **Strict read-only behavior:** timewarp opens reject write/create/truncate/
+  append/delete-on-close and metadata mutation intent, attenuate granted access
+  to read/execute rights, and redirect through `SMB_VFS_NEXT_OPENAT`. Delete,
+  rename, and mkdir against a timewarp path fail with read-only-filesystem
+  semantics. Disabling the redirect fails closed rather than exposing live data.
 
-> **Validation status:** the .NET side is build- and unit-tested. The C VFS hooks
-> follow Samba's `shadow_copy2` conventions (ABI 49 timewarp model) but must be
-> exercised against the Samba source build and a real Windows "Previous Versions"
-> dialog; folder-level snapshot **browsing** over SMB (vs. file-level restore) may
-> need additional path hooks and is the most likely area to iterate.
+> **Validation status:** the .NET side is build- and unit-tested. The real C VFS
+> module compiles against Samba 4.19.5/ABI 49. A live SMB3 regression reads
+> historical content, observes the downstream `full_audit` hook, and proves
+> overwrite, delete, rename, and mkdir return `NT_STATUS_MEDIA_WRITE_PROTECTED`
+> without changing live or cached bytes. The Windows Explorer "Previous
+> Versions" dialog and representative folder browsing remain manual production
+> compatibility checks.
 
 ### Cutover
 
@@ -467,8 +540,13 @@ docker compose up -d kaimo_samba          # Samba only
 docker compose up -d
 ```
 
-- **Port:** host port **1445** → container 445 (the .NET host keeps 445 for now; on cutover in
-  Phase 5, Samba takes 445).
+- **PKI:** local certificates default to `./secrets/smb-control-plane` and are
+  generated automatically by the one-shot `kaimo_smb_pki_init` service and are
+  git-ignored. Production should set `KAIMO_SMB_CONTROL_PKI` to an externally
+  managed directory with `bridge/{ca.crt,server.crt,server.key}` and
+  `samba/{ca.crt,samba.crt,samba.key}` and rotate the private CA/leaf identities
+  operationally.
+- **Port:** Samba owns host/container port **445** after the Phase-5 cutover.
 - **Storage:** same bind mount `./tests/data/storage:/data/storage` as host/web → Samba does file I/O directly.
 - **Healthcheck:** reports `healthy` once `smbd` accepts connections.
 
@@ -492,4 +570,4 @@ docker compose logs kaimo_samba | grep "kaimo_bridge:"
 ## Next steps (after Phase 0)
 
 Phase 1 (Auth) — `.proto` + gRPC `GetNtHash`/`ResolveUser` in .NET, custom `pdb` module; then
-access/I/O hooks (Phase 2). Details in [overall plan](../docu/smb-samba-vfs-migration.md#6-implementation-in-phases).
+access/I/O hooks (Phase 2). Details in [overall plan](../../docu/smb-samba-vfs-migration.md#6-implementation-in-phases).

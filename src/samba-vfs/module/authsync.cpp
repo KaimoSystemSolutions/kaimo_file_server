@@ -1,6 +1,6 @@
 // kaimo_authsync - gRPC C++ client for NT-Hash sync.
 //
-// Calls ListUsers on the .NET bridge (h2c) and outputs one line
+// Calls ListUsers on the .NET bridge over mTLS and outputs one line
 // "username<TAB>NTHASHHEX" per active user to stdout. The import into Samba's
 // tdbsam is handled by the shell script sync-users.sh.
 //
@@ -13,6 +13,7 @@
 #include <string>
 
 #include <grpcpp/grpcpp.h>
+#include "bridge_channel.h"
 #include "kaimo_smb_bridge.grpc.pb.h"
 
 using kaimo::smb::bridge::v1::AuthService;
@@ -34,7 +35,18 @@ int main() {
     const char* addr_env = std::getenv("KAIMO_BRIDGE_ADDR");
     std::string addr = addr_env ? addr_env : "kaimo_smb_bridge:5080";
 
-    auto channel = grpc::CreateChannel(addr, grpc::InsecureChannelCredentials());
+    std::shared_ptr<grpc::Channel> channel;
+    try {
+        channel = kaimo::control_plane::create_mtls_channel(
+            addr,
+            "KAIMO_BRIDGE_AUTH_SYNC_CERT",
+            "/run/secrets/kaimo-control-plane/samba.crt",
+            "KAIMO_BRIDGE_AUTH_SYNC_KEY",
+            "/run/secrets/kaimo-control-plane/samba.key");
+    } catch (const std::exception& error) {
+        std::cerr << "kaimo_authsync: " << error.what() << std::endl;
+        return 1;
+    }
     std::unique_ptr<AuthService::Stub> stub = AuthService::NewStub(channel);
 
     grpc::ClientContext ctx;

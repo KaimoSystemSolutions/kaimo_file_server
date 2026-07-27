@@ -87,20 +87,21 @@ namespace Kaimo_File_Server.Infrastructure
         }
 
         /// <summary>
-        /// Registers Core services that depend on a storage root path:
-        /// ACL repository, file metadata repository, file service factory,
-        /// root storage engine, file versioning, and the share lock manager.
+        /// Registers Core services. Live share I/O is always created from the
+        /// absolute path persisted on the corresponding ShareDefinition. The
+        /// application data path is used only for internal, non-share data.
         ///
         /// Call this once from every host AFTER <see cref="AddInfrastructure"/>.
         /// </summary>
         public static IServiceCollection AddCoreServices(
-            this IServiceCollection services, string storagePath)
+            this IServiceCollection services, IReadOnlyList<string> poolStoragePaths, string applicationDataPath)
         {
             // Disabled search
             services.TryAddSingleton<ISearchService, NoOpSearchService>();
 
-            // -- System info (IP / storage / RAM for the settings page) --
-            services.AddSingleton<ISystemInfoService>(_ => new SystemInfoService(storagePath));
+            // -- System info (IP / first configured pool / RAM for settings) --
+            services.AddSingleton<ISystemInfoService>(_ =>
+                new SystemInfoService(poolStoragePaths));
 
             // -- ACL + Metadata --
             services.AddScoped<IAclRepository, AclRepository>();
@@ -110,11 +111,13 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddSingleton<IFileServiceFactory, FileServiceFactory>();
 
             // -- Root StorageEngine (share-agnostic, used by Web UI for raw I/O) --
-            services.AddSingleton<IStorageEngine>(sp =>
-                new FileSystemStorage(storagePath, Guid.Empty, sp));
+            //services.AddSingleton<IStorageEngine>(sp =>
+            //    new FileSystemStorage(storagePath, Guid.Empty, sp));
+            VolumeMountManager.TrySetVolumeMounts(GetActiveStorageMounts());
 
-            // -- Versioning --
-            var versionStoragePath = Path.Combine(storagePath, ".versions");
+            // -- Versioning (internal data, intentionally outside all shares) --
+            var versionStoragePath = Path.Combine(
+                applicationDataPath, ".versions");
 
             services.AddScoped<IFileVersionService>(sp =>
                 new FileVersionService(
@@ -203,6 +206,37 @@ namespace Kaimo_File_Server.Infrastructure
                     await Task.Delay(3000);
                 }
             }
+        }
+
+        public static List<string> GetAllActiveMounts()
+        {
+            List<string> result = [];
+
+            static IEnumerable<string> GetMountedPaths()
+            {
+                foreach (var line in File.ReadLines("/proc/mounts"))
+                {
+                    var parts = line.Split(' ');
+                    if (parts.Length >= 2)
+                        yield return Unescape(parts[1]); // Feld 2 = Mountpoint
+                }
+            }
+
+            static string Unescape(string path) =>
+                path.Replace("\\040", " ")
+                    .Replace("\\011", "\t")
+                    .Replace("\\012", "\n")
+                    .Replace("\\134", "\\");
+
+            result.AddRange(GetMountedPaths());
+
+            return result;
+        }
+
+        public static List<string> GetActiveStorageMounts()
+        {
+            List<string> result = GetAllActiveMounts().Select(path => path).Where(path => path.StartsWith("/data/storage/")).ToList();
+            return result;
         }
     }
 }

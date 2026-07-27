@@ -329,7 +329,9 @@ public class DatabaseSeeder
         var departments = await LoadDepartmentLookupAsync();
 
         // Create shares (with DepartmentId set directly)
-        var shares = CreateShares(departments);
+        var defaultPoolPath =
+            _configuration["Storage:Pools:0:Path"] ?? "/data/storage/pool01";
+        var shares = CreateShares(departments, defaultPoolPath);
         _db.ShareDefinitions.AddRange(shares.Values);
 
         // Create users
@@ -370,14 +372,15 @@ public class DatabaseSeeder
     /// No more DepartmentShare join table needed.
     /// </summary>
     private static Dictionary<string, ShareDefinition> CreateShares(
-        Dictionary<string, Department> departments) => new()
+        Dictionary<string, Department> departments,
+        string poolPath) => new()
         {
-            ["test"] = new ShareDefinition("test", "/data/storage/test", departments["Entwicklung"].Id),
-            ["projekte"] = new ShareDefinition("projekte", "/data/storage/projekte", departments["Entwicklung"].Id),
-            ["general"] = new ShareDefinition("general", "/data/storage/general", departments["Geschäftsleitung"].Id),
-            ["backend-docs"] = new ShareDefinition("backend-docs", "/data/storage/backend-docs", departments["Backend"].Id),
-            ["frontend-docs"] = new ShareDefinition("frontend-docs", "/data/storage/frontend-docs", departments["Frontend"].Id),
-            ["marketing-files"] = new ShareDefinition("marketing-files", "/data/storage/marketing-files", departments["Marketing"].Id),
+            ["test"] = new ShareDefinition("test", Path.Combine(poolPath, "test"), departments["Entwicklung"].Id),
+            ["projekte"] = new ShareDefinition("projekte", Path.Combine(poolPath, "projekte"), departments["Entwicklung"].Id),
+            ["general"] = new ShareDefinition("general", Path.Combine(poolPath, "general"), departments["Geschäftsleitung"].Id),
+            ["backend-docs"] = new ShareDefinition("backend-docs", Path.Combine(poolPath, "backend-docs"), departments["Backend"].Id),
+            ["frontend-docs"] = new ShareDefinition("frontend-docs", Path.Combine(poolPath, "frontend-docs"), departments["Frontend"].Id),
+            ["marketing-files"] = new ShareDefinition("marketing-files", Path.Combine(poolPath, "marketing-files"), departments["Marketing"].Id),
         };
 
     // -- Users --

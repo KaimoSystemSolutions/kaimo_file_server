@@ -3374,5 +3374,59 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Move_BatchPartialFailure", resourceCulture);
             }
         }
+
+        public static string Web_ShareList_Label_StoragePool {
+            get {
+                return ResourceManager.GetString("Web_ShareList_Label_StoragePool", resourceCulture);
+            }
+        }
+
+        public static string Web_ShareList_Action_MovePool {
+            get {
+                return ResourceManager.GetString("Web_ShareList_Action_MovePool", resourceCulture);
+            }
+        }
+
+        public static string Web_ShareList_StoragePoolUnconfigured {
+            get {
+                return ResourceManager.GetString("Web_ShareList_StoragePoolUnconfigured", resourceCulture);
+            }
+        }
+
+        public static string Web_Share_StoragePoolChanged {
+            get {
+                return ResourceManager.GetString("Web_Share_StoragePoolChanged", resourceCulture);
+            }
+        }
+
+        public static string Web_Share_StoragePoolUnchanged {
+            get {
+                return ResourceManager.GetString("Web_Share_StoragePoolUnchanged", resourceCulture);
+            }
+        }
+
+        public static string Web_Error_StoragePoolRequired {
+            get {
+                return ResourceManager.GetString("Web_Error_StoragePoolRequired", resourceCulture);
+            }
+        }
+
+        public static string Web_Error_StoragePoolDestinationExists {
+            get {
+                return ResourceManager.GetString("Web_Error_StoragePoolDestinationExists", resourceCulture);
+            }
+        }
+
+        public static string Web_Error_StoragePoolMoveFailed {
+            get {
+                return ResourceManager.GetString("Web_Error_StoragePoolMoveFailed", resourceCulture);
+            }
+        }
+
+        public static string Web_Error_SharePathMissing {
+            get {
+                return ResourceManager.GetString("Web_Error_SharePathMissing", resourceCulture);
+            }
+        }
     }
 }

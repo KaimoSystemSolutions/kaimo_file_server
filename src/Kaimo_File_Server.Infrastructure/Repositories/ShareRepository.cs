@@ -2,6 +2,7 @@
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Infrastructure.Persistence;
+using Kaimo_File_Server.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Kaimo_File_Server.Infrastructure.Repositories;
@@ -23,7 +24,8 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
         public async Task<List<ShareDefinition>> GetAllEnabledAsync()
         {
             await using var db = await _dbFactory.CreateDbContextAsync();
-            return await db.ShareDefinitions.Where(s => s.IsEnabled).ToListAsync();
+            var shares = await db.ShareDefinitions.Where(s => s.IsEnabled).ToListAsync();
+            return shares.Where(s => VolumeMountManager.IsPathAccessible(s.Path)).ToList();
         }
 
         public async Task<List<ShareDefinition>> GetAllAsync()

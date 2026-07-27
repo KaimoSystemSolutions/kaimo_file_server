@@ -14,7 +14,7 @@ namespace Kaimo_File_Server.Infrastructure.Services;
 /// </summary>
 public class SystemInfoService : ISystemInfoService
 {
-    private readonly string _storagePath;
+    private IReadOnlyList<string> _storagePoolPaths;
 
     // Shared, short-timeout client for the public-IP lookup. Static so the
     // singleton service doesn't churn sockets.
@@ -23,9 +23,9 @@ public class SystemInfoService : ISystemInfoService
         Timeout = TimeSpan.FromSeconds(4),
     };
 
-    public SystemInfoService(string storagePath)
+    public SystemInfoService(IReadOnlyList<string> storagePaths)
     {
-        _storagePath = storagePath;
+        _storagePoolPaths = storagePaths;
     }
 
     public string HostName
@@ -86,31 +86,37 @@ public class SystemInfoService : ISystemInfoService
         }
     }
 
-    public StorageUsageInfo GetStorageUsage()
+    public List<StorageUsageInfo> GetStorageUsage()
     {
+        var result = new List<StorageUsageInfo>();
+
         try
         {
-            // Fall back to the application's own location when the configured
-            // storage path doesn't exist yet (e.g. on a dev machine).
-            var probe = Directory.Exists(_storagePath) ? _storagePath : AppContext.BaseDirectory;
-            var root = Path.GetPathRoot(Path.GetFullPath(probe));
-            if (string.IsNullOrEmpty(root)) root = probe;
+            foreach (string storagePoolPath in _storagePoolPaths) {
 
-            var drive = new DriveInfo(root);
-            var total = drive.TotalSize;
-            var free = drive.TotalFreeSpace;
+                // Fall back to the application's own location when the configured
+                // storage path doesn't exist yet (e.g. on a dev machine).
+                var probe = Directory.Exists(storagePoolPath) ? storagePoolPath : AppContext.BaseDirectory;
+                var root = Path.GetPathRoot(Path.GetFullPath(probe));
+                if (string.IsNullOrEmpty(root)) root = probe;
 
-            return new StorageUsageInfo(
-                StoragePath: _storagePath,
-                DriveName: drive.Name,
-                TotalBytes: total,
-                UsedBytes: total - free,
-                FreeBytes: free,
-                Available: true);
+                var drive = new DriveInfo(root);
+                var total = drive.TotalSize;
+                var free = drive.TotalFreeSpace;
+
+                result.Add(new StorageUsageInfo(
+                    StoragePath: storagePoolPath,
+                    DriveName: drive.Name,
+                    TotalBytes: total,
+                    UsedBytes: total - free,
+                    FreeBytes: free,
+                    Available: true));
+            }
+            return result;
         }
         catch
         {
-            return new StorageUsageInfo(_storagePath, "—", 0, 0, 0, Available: false);
+            return result;
         }
     }
 

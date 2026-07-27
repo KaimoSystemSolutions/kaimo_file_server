@@ -1782,4 +1782,31 @@
   <data name="Web_Move_BatchPartialFailure" xml:space="preserve">
   <value>{0} of {1} items moved. Some items failed.</value>
 </data>
+  <data name="Web_ShareList_Label_StoragePool" xml:space="preserve">
+  <value>Storage pool</value>
+</data>
+  <data name="Web_ShareList_Action_MovePool" xml:space="preserve">
+  <value>Move</value>
+</data>
+  <data name="Web_ShareList_StoragePoolUnconfigured" xml:space="preserve">
+  <value>Current path (pool not configured)</value>
+</data>
+  <data name="Web_Share_StoragePoolChanged" xml:space="preserve">
+  <value>Share moved to storage pool “{0}”.</value>
+</data>
+  <data name="Web_Share_StoragePoolUnchanged" xml:space="preserve">
+  <value>The share already uses this storage pool.</value>
+</data>
+  <data name="Web_Error_StoragePoolRequired" xml:space="preserve">
+  <value>Select a valid storage pool.</value>
+</data>
+  <data name="Web_Error_StoragePoolDestinationExists" xml:space="preserve">
+  <value>A file or directory with this share name already exists in the selected storage pool.</value>
+</data>
+  <data name="Web_Error_StoragePoolMoveFailed" xml:space="preserve">
+  <value>The share could not be moved to the selected storage pool. Check the server log.</value>
+</data>
+  <data name="Web_Error_SharePathMissing" xml:space="preserve">
+  <value>The path stored for this share does not exist.</value>
+</data>
 </root>

@@ -6,7 +6,7 @@
 # collapses (SID derived from UID + getpwuid lookup) and auth/connect breaks.
 # Core assertion here: EACH user gets their OWN UID.
 #
-# Usage:  bash samba-vfs/tests/test-sync-users.sh   (Exit 0 = OK, 1 = FAIL)
+# Usage:  bash src/samba-vfs/tests/test-sync-users.sh   (Exit 0 = OK, 1 = FAIL)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,7 +16,9 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 export PASSWD_FILE="$WORK/passwd"
+export GROUP_LOG="$WORK/groups"
 : > "$PASSWD_FILE"
+: > "$GROUP_LOG"
 echo 1001 > "$PASSWD_FILE.cnt"     # Starting UID for auto-assignment
 SMBPASSWD_OUT="/tmp/kaimo.smbpasswd"
 : > "$SMBPASSWD_OUT"
@@ -63,6 +65,10 @@ EOF
 cat > "$WORK/bin/usermod" <<'EOF'
 #!/bin/bash
 P="$PASSWD_FILE"; uid=""; name=""; args=("$@")
+if [ "${1:-}" = "-aG" ]; then
+    printf '%s:%s\n' "$2" "$3" >> "$GROUP_LOG"
+    exit 0
+fi
 for ((i=0; i<${#args[@]}; i++)); do
     case "${args[i]}" in
         -u) uid="${args[i+1]}"; ((i++)) ;;
@@ -113,8 +119,19 @@ for u in admin marco.hanisch anna.weber; do
 done
 [ "$fail" = 0 ] && note "ok: all 3 usernames present"
 
+# 4) Every synchronized user is admitted to both the storage group and the
+# private authd socket group without changing its primary UID.
+for u in admin marco.hanisch anna.weber; do
+    for g in kaimo kaimo-authd; do
+        if ! grep -qx "$g:$u" "$GROUP_LOG"; then
+            echo "FAIL: user '$u' missing secondary group '$g'"; fail=1
+        fi
+    done
+done
+[ "$fail" = 0 ] && note "ok: storage + authd secondary groups assigned"
+
 if [ "$fail" = 0 ]; then
-    echo "PASS: sync-users.sh assigns distinct UIDs per user."
+    echo "PASS: sync-users.sh preserves UID identity and socket membership."
     exit 0
 else
     echo "FAILED."

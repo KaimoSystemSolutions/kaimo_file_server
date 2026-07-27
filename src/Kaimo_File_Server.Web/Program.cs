@@ -57,8 +57,13 @@ builder.AddDynamicLogLevel();
 
 builder.Services.AddElasticSearch(builder.Configuration);
 
-var storagePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
-builder.Services.AddCoreServices(storagePath);
+var baseStoragePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
+var applicationDataPath = builder.Configuration.GetValue<string>("Storage:ApplicationDataPath") ?? "/data/kaimo-system";
+var poolStoragePaths = Directory.GetDirectories(baseStoragePath).Select(path => path).ToList();
+
+var f = ServiceCollectionExtensions.GetActiveStorageMounts();
+
+builder.Services.AddCoreServices(poolStoragePaths, applicationDataPath);
 
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<IConfigRepository, ConfigRepository>();
@@ -109,7 +114,8 @@ builder.Services.AddScoped<UserListViewModel>();
 builder.Services.AddScoped<AclEditorViewModel>();
 builder.Services.AddScoped<DepartmentViewModel>();
 
-// ShareListViewModel needs the storagePath string — use a factory lambda.
+// ShareListViewModel receives configured pool destinations. File I/O itself
+// always uses the absolute path persisted on the selected share.
 builder.Services.AddScoped<ShareListViewModel>(sp =>
     new ShareListViewModel(
         sp.GetRequiredService<IShareRepository>(),
@@ -120,11 +126,10 @@ builder.Services.AddScoped<ShareListViewModel>(sp =>
         sp.GetRequiredService<IAclService>(),
         sp.GetRequiredService<IManagementAuthService>(),
         sp.GetRequiredService<IUserContextFactory>(),
-        sp.GetRequiredService<IStorageEngine>(),
         sp.GetRequiredService<ShareLockManager>(),
         sp.GetRequiredService<AuthenticationStateProvider>(),
         sp.GetRequiredService<ILogger<ShareListViewModel>>(),
-        storagePath,
+        poolStoragePaths,
         sp.GetRequiredService<IFileVersionService>()));
 
 // ══════════════════════════════════════════
@@ -132,7 +137,7 @@ builder.Services.AddScoped<ShareListViewModel>(sp =>
 // ══════════════════════════════════════════
 
 builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo("/data/storage/.dp-keys"))
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(applicationDataPath, ".dp-keys")))
     .SetApplicationName("KaimoFiles");
 
 
@@ -146,7 +151,7 @@ builder.Services.AddSingleton<HttpsCertificateProvider>(sp =>
         sp.GetRequiredService<ISystemInfoService>(),
         sp.GetRequiredService<IDataProtectionProvider>(),
         sp.GetRequiredService<TimeProvider>(),
-        storagePath,
+        applicationDataPath,
         sp.GetRequiredService<ILogger<HttpsCertificateProvider>>()));
 builder.Services.AddSingleton<IHttpsCertificateProvider>(
     sp => sp.GetRequiredService<HttpsCertificateProvider>());

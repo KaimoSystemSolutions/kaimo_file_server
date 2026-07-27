@@ -23,7 +23,7 @@ internal static class SnapshotCache
     internal const string LegacyDirName = ".kaimo-snapshots";
 
     /// <summary>Default global cache root shared by the bridge and Samba containers.</summary>
-    internal const string DefaultRoot = "/data/storage/.kaimo-snapshots";
+    internal const string DefaultRoot = "/data/kaimo-system/.kaimo-snapshots";
 
     /// <summary>Per-@GMT-token marker file recording real materialization time (UTC).</summary>
     internal const string MarkerName = ".kaimo-cached-at";

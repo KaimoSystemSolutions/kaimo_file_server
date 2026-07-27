@@ -18,11 +18,10 @@ COPY ["src/Kaimo_File_Server.Core/Kaimo_File_Server.Core.csproj", "src/Kaimo_Fil
 COPY ["src/Kaimo_File_Server.Infrastructure/Kaimo_File_Server.Infrastructure.csproj", "src/Kaimo_File_Server.Infrastructure/"]
 COPY ["src/Kaimo_File_Server.Search/Kaimo_File_Server.Search.csproj", "src/Kaimo_File_Server.Search/"]
 RUN dotnet restore "./src/Kaimo_File_Server.SmbBridge/Kaimo_File_Server.SmbBridge.csproj"
-# Copy only source code into build image — no tests/, docs/, tools/ and no
+# Copy the source tree, including the shared Samba bridge proto, into the build image —
+# no repository-level tests/, docs/, tools/ and no
 # IDE/build artifacts (additionally kept out by .dockerignore from context).
 COPY src/ src/
-# Proto contract that SmbBridge.csproj includes (lies outside src/).
-COPY samba-vfs/protos/ samba-vfs/protos/
 WORKDIR "/src/src/Kaimo_File_Server.SmbBridge"
 RUN dotnet build "./Kaimo_File_Server.SmbBridge.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
