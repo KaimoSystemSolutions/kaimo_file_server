@@ -61,6 +61,8 @@ var baseStoragePath = builder.Configuration.GetValue<string>("Storage:RootPath")
 var applicationDataPath = builder.Configuration.GetValue<string>("Storage:ApplicationDataPath") ?? "/data/kaimo-system";
 var poolStoragePaths = Directory.GetDirectories(baseStoragePath).Select(path => path).ToList();
 
+var f = ServiceCollectionExtensions.GetActiveStorageMounts();
+
 builder.Services.AddCoreServices(poolStoragePaths, applicationDataPath);
 
 builder.Services.AddMemoryCache();

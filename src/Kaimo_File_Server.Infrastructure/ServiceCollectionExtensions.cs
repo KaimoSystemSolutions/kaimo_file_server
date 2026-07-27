@@ -207,5 +207,36 @@ namespace Kaimo_File_Server.Infrastructure
                 }
             }
         }
+
+        public static List<string> GetAllActiveMounts()
+        {
+            List<string> result = [];
+
+            static IEnumerable<string> GetMountedPaths()
+            {
+                foreach (var line in File.ReadLines("/proc/mounts"))
+                {
+                    var parts = line.Split(' ');
+                    if (parts.Length >= 2)
+                        yield return Unescape(parts[1]); // Feld 2 = Mountpoint
+                }
+            }
+
+            static string Unescape(string path) =>
+                path.Replace("\\040", " ")
+                    .Replace("\\011", "\t")
+                    .Replace("\\012", "\n")
+                    .Replace("\\134", "\\");
+
+            result.AddRange(GetMountedPaths());
+
+            return result;
+        }
+
+        public static List<string> GetActiveStorageMounts()
+        {
+            List<string> result = GetAllActiveMounts().Select(path => path).Where(path => path.StartsWith("/data/storage/")).ToList();
+            return result;
+        }
     }
 }
