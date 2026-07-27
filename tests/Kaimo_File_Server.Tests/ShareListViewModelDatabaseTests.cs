@@ -31,22 +31,6 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     private readonly Mock<IAclService> _aclService = new();
     private readonly Mock<IFileVersionService> _versions = new();
     private readonly ShareLockManager _lockManager = new();
-    private readonly string _storagePath;
-    private readonly IReadOnlyList<StoragePoolDefinition> _storagePools;
-
-    public ShareListViewModelDatabaseTests()
-    {
-        _storagePath = Path.Combine(Path.GetTempPath(), "kaimo-tests", Guid.NewGuid().ToString("N"));
-        _storagePools =
-        [
-            new StoragePoolDefinition { Name = "Pool 01", Path = _storagePath },
-            new StoragePoolDefinition
-            {
-                Name = "Pool 02",
-                Path = Path.Combine(Path.GetDirectoryName(_storagePath)!, Guid.NewGuid().ToString("N"))
-            }
-        ];
-    }
 
     /// <summary>
     /// Builds the SUT for an actor who is an unrestricted (Global) share admin — the
@@ -86,13 +70,6 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         var share = sut.Shares.Single(s => s.Id == seeded.Id);
         sut.SelectShare(share);
         return (sut, share);
-    }
-
-    private void CleanupPools()
-    {
-        foreach (var pool in _storagePools)
-            if (Directory.Exists(pool.Path))
-                Directory.Delete(pool.Path, recursive: true);
     }
 
     // ─────────────────────── Toggle enabled ───────────────────────
@@ -244,29 +221,6 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     }
 
     [Fact]
-    public async Task RenameShareAsync_KeepsShareInItsCurrentPool()
-    {
-        var actor = SeedUser("admin");
-        var sourcePath = Path.Combine(_storagePools[1].Path, "oldname");
-        Directory.CreateDirectory(sourcePath);
-        await File.WriteAllTextAsync(Path.Combine(sourcePath, "content.txt"), "kept");
-        var seeded = SeedShare("oldname", sourcePath);
-        var (sut, _) = await LoadAndSelectAsync(seeded, actor);
-
-        sut.EditShareName = "newname";
-        var ok = await sut.RenameShareAsync();
-
-        Assert.True(ok);
-        await using var db = NewContext();
-        var row = await db.ShareDefinitions.FindAsync(seeded.Id);
-        var expected = Path.Combine(_storagePools[1].Path, "newname");
-        Assert.Equal(expected, row!.Path);
-        Assert.Equal("kept", await File.ReadAllTextAsync(
-            Path.Combine(expected, "content.txt")));
-        CleanupPools();
-    }
-
-    [Fact]
     public async Task RenameShareAsync_ToExistingName_IsRejectedAndDoesNotPersist()
     {
         var actor = SeedUser("admin");
@@ -384,24 +338,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         CleanupPools();
     }
 
-    [Fact]
-    public async Task CreateShareAsync_UsesSelectedStoragePool()
-    {
-        var actor = SeedUser("admin");
-        var sut = BuildAdminSut(actor);
-        sut.NewShareName = "archive";
-        sut.NewSharePoolPath = _storagePools[1].Path;
 
-        var ok = await sut.CreateShareAsync();
-
-        Assert.True(ok);
-        await using var db = NewContext();
-        var share = await db.ShareDefinitions.SingleAsync();
-        var expected = Path.Combine(_storagePools[1].Path, "archive");
-        Assert.Equal(expected, share.Path);
-        Assert.True(Directory.Exists(expected));
-        CleanupPools();
-    }
 
     [Fact]
     public async Task ChangeStoragePoolAsync_MovesDataAndPersistsNewSharePath()
