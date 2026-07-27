@@ -606,6 +606,11 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
         => Invoke<Kaimo_File_Server.Core.Storage.IStorageHandle>(
             "OpenAsync", path, mode, intent, share, ct);
 
+
+    public Task SetModifiedDateAsync(string path, DateTime time)
+        => Invoke("SetModifiedDateAsync", path, time);
+
+    
     // -- Helpers that unwrap TargetInvocationException from reflection --
 
     private async Task Invoke(string method, params object[] args)

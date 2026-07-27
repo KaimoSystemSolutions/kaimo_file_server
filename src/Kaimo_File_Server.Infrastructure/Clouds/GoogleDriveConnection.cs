@@ -107,7 +107,7 @@ public class GoogleDriveConnection : ICloudConnection
         return about.User.PhotoLink;
     }
 
-    public async Task UploadAsync(string path, Stream data)
+    public async Task UploadAsync(string path, Stream data, DateTime modifiedTime)
     {
         path = path.Replace('\\', '/').Trim('/');
 
@@ -118,24 +118,53 @@ public class GoogleDriveConnection : ICloudConnection
 
         string fileName = parts[^1];
 
-        string? parentId = "root";
+        string parentId = "root";
 
         // Create/find all parent folders
         for (int i = 0; i < parts.Length - 1; i++)
         {
-            parentId = await GetOrCreateFolderAsync(parts[i], parentId!);
+            parentId = await GetOrCreateFolderAsync(parts[i], parentId);
         }
+
+        // Check if file already exists
+        string? existingFileId = await FindFileIdAsync(
+            fileName,
+            parentId);
 
         var file = new Google.Apis.Drive.v3.Data.File
         {
-            Name = fileName,
-            Parents = new[] { parentId! }
+            Name = fileName
         };
 
-        var request = _service.Files.Create(file, data, "application/octet-stream");
-        request.Fields = "id";
+        file.ModifiedTimeDateTimeOffset = modifiedTime;
 
-        await request.UploadAsync();
+        if (existingFileId != null)
+        {
+            // Overwrite existing file
+            var request = _service.Files.Update(
+                file,
+                existingFileId,
+                data,
+                "application/octet-stream");
+
+            request.Fields = "id";
+
+            await request.UploadAsync();
+        }
+        else
+        {
+            // Create new file
+            file.Parents = new[] { parentId };
+
+            var request = _service.Files.Create(
+                file,
+                data,
+                "application/octet-stream");
+
+            request.Fields = "id";
+
+            await request.UploadAsync();
+        }
     }
 
     public async Task DownloadAsync(string path, Stream target)
@@ -290,6 +319,24 @@ public class GoogleDriveConnection : ICloudConnection
             $"'{parent}' in parents and trashed=false";
 
         request.Fields = "files(id)";
+
+        var result = await request.ExecuteAsync();
+
+        return result.Files.FirstOrDefault()?.Id;
+    }
+    
+    private async Task<string?> FindFileIdAsync(
+        string fileName,
+        string parentId)
+    {
+        var request = _service.Files.List();
+
+        request.Q = 
+            $"'{parentId}' in parents " +
+            $"and name = '{fileName.Replace("'", "\\'")}' " +
+            $"and trashed = false";
+
+        request.Fields = "files(id, name)";
 
         var result = await request.ExecuteAsync();
 

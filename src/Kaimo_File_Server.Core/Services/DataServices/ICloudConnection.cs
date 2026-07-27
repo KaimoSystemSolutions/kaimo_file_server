@@ -8,7 +8,7 @@ public interface ICloudConnection
 {
     Task Dispose();
     string getServiceName();
-    Task UploadAsync(string path, Stream data);
+    Task UploadAsync(string path, Stream data, DateTime modifiedTime);
     Task DownloadAsync(string path, Stream target);
     Task CreateDirectoryAsync(string path);
     Task<long> GetDirectorySizeAsync(string path);
@@ -51,7 +51,18 @@ public interface ICloudConnection
             progress
             );
     }
+    
+    private static int CompareModifiedTime(
+        DateTime local,
+        DateTime remote)
+    {
+        var difference = local - remote;
 
+        if (Math.Abs(difference.TotalMilliseconds) < 5)
+            return 0;
+
+        return difference > TimeSpan.Zero ? 1 : -1;
+    }
     private async Task SyncDirectory(
         IFileService fileService,
         UserContext user,
@@ -106,7 +117,7 @@ public interface ICloudConnection
                     syncProgress.Update($"Pushing {local.Name}...");
 
                     await using var stream = await fileService.ReadFileAsync(localChild, user);
-                    await UploadAsync(remoteChild, stream);
+                    await UploadAsync(remoteChild, stream, local.ModifiedAt);
 
                     syncProgress.TransferredBytes += local.Size;
                     syncProgress.Update($"Pushing {local.Name}...");
@@ -144,7 +155,8 @@ public interface ICloudConnection
 
                     ms.Position = 0;
                     await fileService.WriteFileAsync(localChild, ms, user);
-
+                    await fileService.SetModifiedAtAsync(localChild, user, remote.ModifiedAt);
+                    
                     syncProgress.TransferredBytes += remote.Size;
                     syncProgress.Update($"Pulling {remote.Name}...");
                 }
@@ -176,7 +188,7 @@ public interface ICloudConnection
             //--------------------------------------------------
             if (mode == SyncMode.Pull)
             {
-                if (remote.ModifiedAt > local.ModifiedAt)
+                if (CompareModifiedTime(local.ModifiedAt, remote.ModifiedAt) < 0)
                 {
                     syncProgress.Update($"Pulling {remote.Name}...");
 
@@ -185,6 +197,7 @@ public interface ICloudConnection
 
                     ms.Position = 0;
                     await fileService.WriteFileAsync(localChild, ms, user);
+                    await fileService.SetModifiedAtAsync(localChild, user, remote.ModifiedAt);
 
                     syncProgress.TransferredBytes += remote.Size;
                     syncProgress.Update($"Pulling {remote.Name}...");
@@ -198,12 +211,12 @@ public interface ICloudConnection
             //--------------------------------------------------
             if (mode == SyncMode.Push)
             {
-                if (local.ModifiedAt > remote.ModifiedAt)
+                if (CompareModifiedTime(local.ModifiedAt, remote.ModifiedAt) > 0)
                 {
                     syncProgress.Update($"Pushing {local.Name}...");
 
                     await using var stream = await fileService.ReadFileAsync(localChild, user);
-                    await UploadAsync(remoteChild, stream);
+                    await UploadAsync(remoteChild, stream, local.ModifiedAt);
 
                     syncProgress.TransferredBytes += local.Size;
                     syncProgress.Update($"Pushing {local.Name}...");
@@ -215,17 +228,17 @@ public interface ICloudConnection
             //--------------------------------------------------
             // Two-way
             //--------------------------------------------------
-            if (local.ModifiedAt > remote.ModifiedAt)
+            if (CompareModifiedTime(local.ModifiedAt, remote.ModifiedAt) > 0)
             {
                 syncProgress.Update($"Pushing {local.Name}...");
 
                 await using var stream = await fileService.ReadFileAsync(localChild, user);
-                await UploadAsync(remoteChild, stream);
+                await UploadAsync(remoteChild, stream, local.ModifiedAt);
 
                 syncProgress.TransferredBytes += local.Size;
                 syncProgress.Update($"Pushing {local.Name}...");
             }
-            else if (remote.ModifiedAt > local.ModifiedAt)
+            else if (CompareModifiedTime(local.ModifiedAt, remote.ModifiedAt) < 0)
             {
                 syncProgress.Update($"Pulling {remote.Name}...");
 
@@ -234,7 +247,8 @@ public interface ICloudConnection
 
                 ms.Position = 0;
                 await fileService.WriteFileAsync(localChild, ms, user);
-
+                await fileService.SetModifiedAtAsync(localChild, user, remote.ModifiedAt);
+                
                 syncProgress.TransferredBytes += remote.Size;
                 syncProgress.Update($"Pulling {remote.Name}...");
             }
@@ -269,7 +283,7 @@ public interface ICloudConnection
                 syncProgress.Update($"Pushing {item.Name}");
 
                 await using var stream = await fileService.ReadFileAsync(localChild, user);
-                await UploadAsync(remoteChild, stream);
+                await UploadAsync(remoteChild, stream, item.ModifiedAt);
 
                 syncProgress.TransferredBytes += item.Size;
                 syncProgress.Update($"Pushing {item.Name}");

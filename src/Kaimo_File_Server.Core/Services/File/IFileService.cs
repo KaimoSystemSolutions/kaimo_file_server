@@ -40,7 +40,8 @@ namespace Kaimo_File_Server.Core.Services.File
         Task<long> GetDirectorySizeAsync(string relativePath, UserContext userContext);
         Task UnzipAsync(string zipPath, string targetPath, UserContext user);
         Task ArchiveAsync(List<string> sourcePaths, string targetPath, string format, UserContext user);
-        
+
+        Task SetModifiedAtAsync(string path, UserContext user, DateTime time);
         // ------------ Hooks ------------
 
         Task OnFileCreated(string absolutePath, Task<Stream> fileData);

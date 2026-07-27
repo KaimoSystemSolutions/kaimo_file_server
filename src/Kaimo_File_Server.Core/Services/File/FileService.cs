@@ -528,6 +528,24 @@ public class FileService : IFileService
         return await _storage.ReadAsync(normalized);
     }
 
+    public async Task SetModifiedAtAsync(string path, UserContext user, DateTime time)
+    {
+        var normalized = ShareRelativePath.Normalize(path);
+        var isDir = await _storage.IsDirectoryAsync(normalized);
+        
+        if(isDir)
+            return;
+        
+        await EnsureAccessAsync(user, normalized, isDir, FilePermission.CreateWriteData);
+
+        var existedBefore = await _storage.ExistsAsync(normalized);
+
+        if(!existedBefore)
+            return;
+
+        await _storage.SetModifiedDateAsync(normalized, time);
+    }
+
     public async Task WriteFileAsync(string path, Stream data, UserContext user, CancellationToken cancellationToken = default)
     {
         var normalized = ShareRelativePath.Normalize(path);

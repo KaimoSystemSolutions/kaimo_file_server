@@ -157,6 +157,8 @@ namespace Kaimo_File_Server.Core.Domain
         /// </summary>
         public DateTime? LastSync { get; set; }
 
+        public SyncMode Mode { get; set; } = SyncMode.TwoWay;
+        
         public SyncedFolder(
             string provider,
             Dictionary<string, string> data,

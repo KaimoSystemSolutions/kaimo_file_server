@@ -256,6 +256,18 @@ public class FileSystemStorage : IStorageEngine
         await data.CopyToAsync(file, cancellationToken);
     }
 
+    public Task SetModifiedDateAsync(string path, DateTime time)
+    {
+        var fullTargetPath = ToAbsolutePath(path);
+
+        if (!File.Exists(fullTargetPath))
+            throw new IOException($"File does not exist: '{path}'");
+        
+        File.SetLastWriteTimeUtc(fullTargetPath, time.ToUniversalTime());
+        return Task.CompletedTask;
+    }
+    
+
     public async Task ArchiveAsync(List<string> sourcePaths, string targetPath, string format)
     {
         var fullTargetPath = ToAbsolutePath(targetPath);
