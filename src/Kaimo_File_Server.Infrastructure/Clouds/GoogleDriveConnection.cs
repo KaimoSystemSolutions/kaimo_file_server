@@ -3,6 +3,9 @@ using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Drive.v3;
 using Google.Apis.Services;
+using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Core.Services.File;
 using Microsoft.Extensions.Configuration;
 
 namespace Kaimo_File_Server.Infrastructure.Clouds;
@@ -77,7 +80,7 @@ public class GoogleDriveConnection : ICloudConnection
     }
 
     public string getServiceName() => "Google";
-    
+
     public async Task<string> GetAccountEmailAsync()
     {
         var request = _service.About.Get();
@@ -103,8 +106,193 @@ public class GoogleDriveConnection : ICloudConnection
 
         return about.User.PhotoLink;
     }
+
+    public async Task UploadAsync(string path, Stream data)
+    {
+        path = path.Replace('\\', '/').Trim('/');
+
+        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        if (parts.Length == 0)
+            throw new ArgumentException("Invalid path.", nameof(path));
+
+        string fileName = parts[^1];
+
+        string? parentId = "root";
+
+        // Create/find all parent folders
+        for (int i = 0; i < parts.Length - 1; i++)
+        {
+            parentId = await GetOrCreateFolderAsync(parts[i], parentId!);
+        }
+
+        var file = new Google.Apis.Drive.v3.Data.File
+        {
+            Name = fileName,
+            Parents = new[] { parentId! }
+        };
+
+        var request = _service.Files.Create(file, data, "application/octet-stream");
+        request.Fields = "id";
+
+        await request.UploadAsync();
+    }
+
+    public async Task DownloadAsync(string path, Stream target)
+    {
+        var fileId = await FindFileByPathAsync(path);
+
+        if (fileId == null)
+            throw new FileNotFoundException(path);
+
+        var request = _service.Files.Get(fileId);
+
+        await request.DownloadAsync(target);
+    }
     
-    public Task UploadAsync(string path, Stream data) => throw new NotImplementedException();
-    public Task DownloadAsync(string path, Stream target) => throw new NotImplementedException();
-    public Task<IReadOnlyList<string>> ListAsync(string path) => throw new NotImplementedException();
+    public async Task<IReadOnlyList<CloudItemMeta>> ListAsync(string path)
+    {
+        string? parentId = await FindFolderByPathAsync(path);
+
+        if (parentId == null)
+            return [];
+
+        var request = _service.Files.List();
+        request.Q = $"'{parentId}' in parents and trashed = false";
+        request.Fields = "files(id,name,mimeType,modifiedTime,size)";
+
+        var result = await request.ExecuteAsync();
+
+        return result.Files.Select(f => new CloudItemMeta(
+            IsDirectory: f.MimeType == "application/vnd.google-apps.folder",
+            Name: f.Name,
+            Path: path.TrimEnd('/') + "/" + f.Name,
+            ModifiedAt: f.ModifiedTimeDateTimeOffset?.UtcDateTime ?? DateTime.MinValue,
+            Size: f.Size ?? 0
+        )).ToList();
+    }
+
+    public async Task<long> GetDirectorySizeAsync(string path)
+    {
+        long totalSize = 0;
+
+        foreach (var item in await ListAsync(path))
+            if (item.IsDirectory)
+                totalSize += await GetDirectorySizeAsync(item.Path);
+            else
+                totalSize += item.Size;
+        
+        return totalSize;
+    }
+    
+    private async Task<string> GetOrCreateFolderAsync(string name, string parentId)
+    {
+        var list = _service.Files.List();
+        list.Q =
+            $"mimeType='application/vnd.google-apps.folder' and " +
+            $"name='{name.Replace("'", "\\'")}' and " +
+            $"'{parentId}' in parents and trashed=false";
+
+        list.Fields = "files(id)";
+
+        var existing = await list.ExecuteAsync();
+
+        if (existing.Files.Count > 0)
+            return existing.Files[0].Id;
+
+        var folder = new Google.Apis.Drive.v3.Data.File
+        {
+            Name = name,
+            MimeType = "application/vnd.google-apps.folder",
+            Parents = new[] { parentId }
+        };
+
+        var create = _service.Files.Create(folder);
+        create.Fields = "id";
+
+        var created = await create.ExecuteAsync();
+
+        return created.Id;
+    }
+    
+    public async Task CreateDirectoryAsync(string path)
+    {
+        path = path.Replace('\\', '/').Trim('/');
+
+        if (string.IsNullOrEmpty(path))
+            return;
+
+        string parentId = "root";
+
+        foreach (var part in path.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            parentId = await GetOrCreateFolderAsync(part, parentId);
+        }
+    }
+    
+
+    private async Task<string?> FindFolderByPathAsync(string path)
+    {
+        path = path.Replace('\\', '/').Trim('/');
+
+        if (string.IsNullOrEmpty(path))
+            return "root";
+
+        string parent = "root";
+
+        foreach (var part in path.Split('/'))
+        {
+            var list = _service.Files.List();
+
+            list.Q =
+                $"mimeType='application/vnd.google-apps.folder' and " +
+                $"name='{part.Replace("'", "\\'")}' and " +
+                $"'{parent}' in parents and trashed=false";
+
+            list.Fields = "files(id)";
+
+            var result = await list.ExecuteAsync();
+
+            if (result.Files.Count == 0)
+                return null;
+
+            parent = result.Files[0].Id;
+        }
+
+        return parent;
+    }
+
+    private async Task<string?> FindFileByPathAsync(string path)
+    {
+        path = path.Replace('\\', '/').Trim('/');
+
+        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        if (parts.Length == 0)
+            return null;
+
+        var parent = "root";
+
+        for (int i = 0; i < parts.Length - 1; i++)
+        {
+            var folder = await FindFolderByPathAsync(string.Join("/", parts.Take(i + 1)));
+
+            if (folder == null)
+                return null;
+
+            parent = folder;
+        }
+
+        var request = _service.Files.List();
+
+        request.Q =
+            $"name='{parts[^1].Replace("'", "\\'")}' and " +
+            $"'{parent}' in parents and trashed=false";
+
+        request.Fields = "files(id)";
+
+        var result = await request.ExecuteAsync();
+
+        return result.Files.FirstOrDefault()?.Id;
+    }
 }

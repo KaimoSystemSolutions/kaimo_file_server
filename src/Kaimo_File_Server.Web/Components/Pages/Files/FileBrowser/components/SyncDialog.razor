@@ -1,10 +1,15 @@
 @using Kaimo_File_Server.Infrastructure.Clouds
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Core.Repositories
+@using Kaimo_File_Server.Core.Services.DataServices
+@using Kaimo_File_Server.Core.Services.File
 @inject NavigationManager Navigation
 @inject ToastService Toast
 @inject ICloudProviderFactory CloudProviderFactory
 @inject IShareRepository ShareRepository
+@inject IFileServiceFactory FileServiceFactory
+@inject AuthenticationStateProvider Auth;
+@inject IUserContextFactory UserContextFactory;
 
 @if (_isOpen)
 {
@@ -17,7 +22,7 @@
                 <span class="detail-label">Cloud Provider</span>
                 <select class="edit-input"
                         @bind="_selectedProvider"
-                        disabled="@(_googleConnection is not null)">
+                        disabled="@(_connection is not null)">
                     <option value="">None</option>
                     <option value="Google">Google Drive</option>
                     <option value="Dropbox">Dropbox</option>
@@ -31,7 +36,7 @@
                 <div class="detail-section">
                     <span class="detail-label">Google Drive</span>
 
-                    @if (_googleConnection is not null)
+                    @if (_connection is not null)
                     {
                         <div class="cloud-account">
                             @if (!string.IsNullOrEmpty(_googleUserPhoto))
@@ -58,6 +63,38 @@
                     <p class="share-help-text">@_selectedProvider support is not available yet.</p>
                 </div>
             }
+            
+            @if (_selectedProvider != "")
+            {
+                <div class="detail-section">
+                    <span class="detail-label">Remote Path</span>
+                    <input class="edit-input"
+                           @bind="_remotePath" />
+                </div>
+
+                <div class="detail-section">
+                    <span class="detail-label">Last Sync</span>
+
+                    <span class="share-help-text">
+                        @if (_lastSync is null)
+                        {
+                            <text>Never</text>
+                        }
+                        else
+                        {
+                            @_lastSync.Value.ToLocalTime().ToString("g")
+                        }
+                    </span>
+                </div>
+
+                <div class="detail-section">
+                    <button class="btn-primary"
+                            @onclick="SyncNow"
+                            disabled="@(_connection is null)">
+                        Sync Now
+                    </button>
+                </div>
+            }
 
             <div class="modal-actions">
                 <button class="btn btn-secondary" @onclick="Close">@Resources.Web_Button_Cancel</button>
@@ -72,10 +109,13 @@
     private string _folderPath = "";
 
     private string _selectedProvider = "";
-    private GoogleDriveConnection? _googleConnection;
+    private ICloudConnection? _connection;
     private string? _googleUserEmail;
     private string? _googleUserPhoto;
-
+    
+    private string _remotePath = "/";
+    private DateTime? _lastSync;
+    
     public async Task Open(Guid shareId, string folderPath)
     {
         _shareId = shareId;
@@ -83,9 +123,12 @@
         _isOpen = true;
 
         _selectedProvider = "";
-        _googleConnection = null;
+        _connection = null;
         _googleUserEmail = null;
         _googleUserPhoto = null;
+        
+        _remotePath = "/";
+        _lastSync = null;
 
         await LoadExistingConnection();
         StateHasChanged();
@@ -113,9 +156,12 @@
         
         GoogleDriveConnection googleConnection = connection as GoogleDriveConnection;
 
-        _googleConnection = googleConnection;
+        _connection = googleConnection;
         _selectedProvider = googleConnection.getServiceName();
+        _remotePath = folder.RemotePath;
+        _lastSync = folder.LastSync;
 
+        // TODO: implement those ghost images so it doesnt change its size after this
         StateHasChanged();
         
         _googleUserEmail = await googleConnection.GetAccountEmailAsync();
@@ -153,7 +199,7 @@
 
     private async Task Disconnect()
     {
-        _googleConnection = null;
+        _connection = null;
         _googleUserEmail = null;
         _googleUserPhoto = null;
         _selectedProvider = "";
@@ -179,6 +225,58 @@
         CloudSettings settings = share.CloudSettings;
         settings.Folders.Remove(_folderPath);
         await ShareRepository.UpdateAsync(share);
+    }
+    
+    private async Task SyncNow()
+    {
+        if (_connection is null)
+            return;
+        
+        UserContext? user = await GetCurrentUser();
+        
+        if(user == null)
+            return;
+
+        ShareDefinition? share = await ShareRepository.GetByIdAsync(_shareId);
+        if (share == null)
+            return;
+        
+        IFileService fileService = FileServiceFactory.CreateForShare(_shareId, share.Path);
+        
+        string toastId = Toast.Show("Syncing...", ToastType.Progress);
+        
+        await _connection.SyncAsync(
+            fileService, 
+            user, 
+            _remotePath, 
+            _folderPath, 
+            SyncMode.TwoWay, 
+            (text, progress) => Toast.Update(toastId, text, progress, ToastType.Progress)
+            );
+        
+        Toast.Remove(toastId);
+        Toast.Show("Sync Complete!", ToastType.Success);
+        
+        _lastSync = DateTime.UtcNow;
+
+        if (share.CloudSettings.Folders.TryGetValue(_folderPath, out var folder))
+        {
+            folder.RemotePath = _remotePath;
+            folder.LastSync = _lastSync;
+
+            await ShareRepository.UpdateAsync(share);
+        }
+
+    }
+
+    private async Task<UserContext?> GetCurrentUser()
+    {
+        var state = await Auth.GetAuthenticationStateAsync();
+        var username = state.User.Identity?.Name;
+
+        return string.IsNullOrEmpty(username)
+            ? null
+            : await UserContextFactory.CreateByUsernameAsync(username);
     }
 
 
