@@ -24,6 +24,8 @@ The most important conclusions are:
 4. Folder snapshot materialization now uses the existing per-file ACL filter and a reconciled per-user projection. Materialized bytes are stored in an isolated global cache outside every share; overlap is rejected by both the bridge and share synchronizer.
    Timewarp access is read-only, mutation attempts fail with read-only
    filesystem semantics, and cache opens pass through the remaining VFS stack.
+   Cache files are content-verified and atomically published after a durable
+   same-filesystem temporary write.
 5. The local sidecar protocol is versioned and completely framed. Both ends
    handle partial I/O, and VFS-side connect/send/read now share strict monotonic
    end-to-end deadlines.
@@ -472,9 +474,20 @@ file. Timewarp delete, rename, and mkdir paths also return `EROFS`.
 
 ### P1-07: Snapshot materialization is non-atomic and only validates file size
 
+> **Remediation status (2026-07-27): Implemented; focused and complete managed
+> regression suites pass. Live SMB/container verification remains separate.**
+
 The bridge writes directly to the final cache filename using `FileMode.Create`. Another reader can race with a partial write, and a crash can leave a same-sized corrupt file that is subsequently reused.
 
 **Fix:** write to a unique temporary file on the same filesystem, stream with a byte cap, verify expected length and content hash, flush/fsync, apply safe mode/timestamps, and atomically rename into place.
+
+**Implemented fix:** existing cache entries are reused only after exact length
+and SHA-256 verification. New content is streamed into a unique sibling
+temporary file with the declared uncompressed size as a hard cap, and both the
+final length and stored content hash must match. The bridge then flushes the
+file to durable storage, applies projection mode and historical mtime, and
+atomically replaces the final entry. Every failure path removes the temporary
+file and returns `Found=false`.
 
 ### P1-08: Snapshot materialization and cleanup are unsynchronized
 
@@ -888,7 +901,7 @@ This milestone implements the detailed design in
 **Goal:** preserve the completed ACL and isolation model under concurrency,
 corruption, cancellation, and resource pressure.
 
-1. Materialize into a unique same-filesystem temporary file, enforce a byte
+1. **Completed 2026-07-27:** materialize into a unique same-filesystem temporary file, enforce a byte
    limit while streaming, verify expected length and content hash, flush, and
    publish with an atomic rename.
 2. Coordinate materialization, open, invalidation, and cleanup with keyed
@@ -1812,10 +1825,54 @@ read/write/mutation regression verified.
 
 - Exercise the Windows Explorer "Previous Versions" dialog and folder browsing
   against representative production clients.
-- P1-07 remains open for atomic, content-verified materialization.
+- P1-07 was completed immediately afterward with atomic, content-verified
+  materialization.
 
 **Next planned finding:** P1-07 — make snapshot materialization atomic and
-content-verified.
+content-verified. Completed immediately afterward.
+
+### 2026-07-27 — P1-07: Atomic, content-verified snapshot materialization
+
+**Status:** Implemented; focused and complete managed regression suites
+verified. Live SMB/container verification remains deliberately separate.
+
+**Solution implemented**
+
+1. Existing cache files are reused only when both their uncompressed length and
+   SHA-256 digest match the immutable `FileVersion` metadata.
+2. New content is written to a unique sibling temporary file, keeping the
+   publication rename on the same filesystem.
+3. Streaming is capped at the declared uncompressed size. Short content,
+   oversized content, negative sizes, malformed hashes, and digest mismatches
+   fail closed.
+4. The temporary file is flushed through `Flush(true)` before publication.
+   Projection mode and historical mtime are applied before an atomic
+   overwrite/rename exposes the completed file.
+5. A `finally` cleanup removes abandoned temporary files after read, hash,
+   flush, timestamp, mode, or rename failures.
+
+**Validation completed**
+
+- Focused `SnapshotGrpcServiceAclTests`: 11 passed, 0 failed, 0 skipped.
+- Regression coverage proves a same-sized corrupt cache entry is not reused,
+  matching replacement content is published, hash mismatches and both short
+  and oversized streams return `Found=false`, no final partial file appears,
+  and temporary files are removed.
+- Full managed solution suite: 533 passed, 0 failed, 0 skipped.
+- `Kaimo_File_Server.SmbBridge` builds successfully.
+- `git diff --check` reports no whitespace errors.
+
+**Validation still required / deliberately separate**
+
+- Run the snapshot regression in the Linux bridge/Samba containers so the
+  exact filesystem's rename and `fsync` behavior is covered.
+- Re-run Windows Explorer and `smbclient` browse/copy/restore against the
+  materialized cache path.
+- P1-08 remains open: materialization, traversal/open, and cleanup still need
+  keyed locks/leases across the lifetime of an active projection.
+
+**Next planned finding:** P1-08 — coordinate snapshot materialization and
+cleanup with keyed locks/leases.
 
 ## 15. Source evidence index
 

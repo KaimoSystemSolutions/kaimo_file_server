@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
@@ -89,7 +90,7 @@ public sealed class SnapshotGrpcServiceAclTests : IDisposable
         DateTime at = new(2026, 7, 20, 10, 11, 12, DateTimeKind.Utc);
         string token = "@GMT-2026.07.20-10.11.12";
         byte[] content = Encoding.UTF8.GetBytes("safe");
-        FileVersion visible = Version("docs/visible.txt", at, content.Length);
+        FileVersion visible = Version("docs/visible.txt", at, content);
         _files.Setup(f => f.GetFolderSnapshotAsync("docs", at, _user))
             .ReturnsAsync([visible]);
         _versions.Setup(v => v.GetVersionAtAsync(_share.Id, "docs", at))
@@ -220,6 +221,68 @@ public sealed class SnapshotGrpcServiceAclTests : IDisposable
             Times.Never);
     }
 
+    [Fact]
+    public async Task ResolveConcreteFile_ReplacesSameSizedCorruptCacheAtomically()
+    {
+        DateTime at = new(2026, 7, 20, 10, 11, 12, DateTimeKind.Utc);
+        string token = "@GMT-2026.07.20-10.11.12";
+        byte[] expected = Encoding.UTF8.GetBytes("good");
+        FileVersion version = Version("docs/file.txt", at, expected);
+        AllowConcreteFile(version, expected);
+
+        string final = CachePath(token, version.FilePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(final)!);
+        await File.WriteAllBytesAsync(final, Encoding.UTF8.GetBytes("evil"));
+
+        var reply = await ResolveAsync(version.FilePath, token);
+
+        Assert.True(reply.Found);
+        Assert.Equal(expected, await File.ReadAllBytesAsync(final));
+        Assert.Empty(Directory.EnumerateFiles(
+            Path.GetDirectoryName(final)!, "*.kaimo-tmp-*"));
+    }
+
+    [Fact]
+    public async Task ResolveConcreteFile_HashMismatchDoesNotPublishPartialFile()
+    {
+        DateTime at = new(2026, 7, 20, 10, 11, 12, DateTimeKind.Utc);
+        string token = "@GMT-2026.07.20-10.11.12";
+        byte[] expected = Encoding.UTF8.GetBytes("good");
+        byte[] corrupt = Encoding.UTF8.GetBytes("evil");
+        FileVersion version = Version("docs/file.txt", at, expected);
+        AllowConcreteFile(version, corrupt);
+
+        var reply = await ResolveAsync(version.FilePath, token);
+
+        string final = CachePath(token, version.FilePath);
+        Assert.False(reply.Found);
+        Assert.False(File.Exists(final));
+        Assert.Empty(Directory.EnumerateFiles(
+            Path.GetDirectoryName(final)!, "*.kaimo-tmp-*"));
+    }
+
+    [Theory]
+    [InlineData("short")]
+    [InlineData("content-too-long")]
+    public async Task ResolveConcreteFile_LengthMismatchDoesNotPublishPartialFile(
+        string actualText)
+    {
+        DateTime at = new(2026, 7, 20, 10, 11, 12, DateTimeKind.Utc);
+        string token = "@GMT-2026.07.20-10.11.12";
+        byte[] expected = Encoding.UTF8.GetBytes("expected");
+        byte[] actual = Encoding.UTF8.GetBytes(actualText);
+        FileVersion version = Version("docs/file.txt", at, expected);
+        AllowConcreteFile(version, actual);
+
+        var reply = await ResolveAsync(version.FilePath, token);
+
+        string final = CachePath(token, version.FilePath);
+        Assert.False(reply.Found);
+        Assert.False(File.Exists(final));
+        Assert.Empty(Directory.EnumerateFiles(
+            Path.GetDirectoryName(final)!, "*.kaimo-tmp-*"));
+    }
+
     private Task<ResolveVersionReply> ResolveAsync(string path, string token) =>
         _sut.ResolveVersion(
             new ResolveVersionRequest
@@ -230,6 +293,34 @@ public sealed class SnapshotGrpcServiceAclTests : IDisposable
                 GmtToken = token
             }, null!);
 
+    private void AllowConcreteFile(FileVersion version, byte[] content)
+    {
+        _versions.Setup(v => v.GetVersionAtAsync(
+                _share.Id, version.FilePath, version.SnapshotTimestampUtc))
+            .ReturnsAsync(version);
+        _acl.Setup(a => a.HasAccessAsync(
+                _user, _share.Id, version.FilePath, false,
+                FilePermission.ListReadData))
+            .ReturnsAsync(true);
+        _versions.Setup(v => v.ReadVersionAsync(
+                _share.Id, version.FilePath, version.SnapshotTimestampUtc))
+            .ReturnsAsync(() => new MemoryStream(content));
+    }
+
+    private string CachePath(string token, string relativePath) =>
+        Path.Combine(
+            _cacheRoot,
+            _share.Id.ToString("N"),
+            token,
+            _user.User.Id.ToString("N"),
+            relativePath.Replace('/', Path.DirectorySeparatorChar));
+
+    private FileVersion Version(string path, DateTime at, byte[] content) =>
+        new(
+            _share.Id, path, at, "blob",
+            Convert.ToHexString(SHA256.HashData(content)),
+            content.LongLength, null, 1);
+
     private FileVersion Version(string path, DateTime at, int size) =>
-        new(_share.Id, path, at, "blob", "hash", size, null, 1);
+        new(_share.Id, path, at, "blob", new string('0', 64), size, null, 1);
 }
