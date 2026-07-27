@@ -25,7 +25,7 @@ namespace Kaimo_File_Server.Infrastructure.Services
         }
 
         public static bool IsPathMounted(string path)
-        {
+        { 
             if (_volumeMounts.Any(e => path.StartsWith(e)))
                 return true;
             else

@@ -113,7 +113,7 @@ namespace Kaimo_File_Server.Infrastructure
             // -- Root StorageEngine (share-agnostic, used by Web UI for raw I/O) --
             //services.AddSingleton<IStorageEngine>(sp =>
             //    new FileSystemStorage(storagePath, Guid.Empty, sp));
-
+            VolumeMountManager.TrySetVolumeMounts(GetActiveStorageMounts());
 
             // -- Versioning (internal data, intentionally outside all shares) --
             var versionStoragePath = Path.Combine(

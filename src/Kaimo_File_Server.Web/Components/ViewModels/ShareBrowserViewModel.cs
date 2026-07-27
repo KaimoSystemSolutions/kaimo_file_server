@@ -96,7 +96,8 @@ public partial class ShareBrowserViewModel
             CanManageShares = await _mgmtAuth.HasAnyPermissionAsync(
                 actor, ManagementPermission.CreateShares);
 
-            var allShares = await _shareRepo.GetAllAsync();
+            var allShares = await _shareRepo.GetAllEnabledAsync();
+            //var allShares = await _shareRepo.GetAllAsync();
             var visible = new List<ShareDefinition>(allShares.Count);
 
             foreach (var share in allShares)
