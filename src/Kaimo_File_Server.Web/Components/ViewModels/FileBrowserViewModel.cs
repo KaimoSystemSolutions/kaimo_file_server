@@ -143,11 +143,22 @@ public class FileBrowserViewModel
             IsLoading = true;
             ErrorMessage = null;
             CanManageAcls = false;
+            _fileService = null;
 
             CurrentShare = await _shareRepo.GetByNameAsync(shareName);
             if (CurrentShare is null)
             {
                 ErrorMessage = Resources.Web_Error_ShareNotFound;
+                Items = [];
+                return;
+            }
+
+            // A disabled share is unavailable to everyone, including share managers.
+            // Enforce this before creating a file service so a direct /files/{share}
+            // URL cannot be used to reach its contents.
+            if (!CurrentShare.IsEnabled)
+            {
+                ErrorMessage = Resources.Web_Error_ShareDisabled;
                 Items = [];
                 return;
             }
@@ -183,18 +194,6 @@ public class FileBrowserViewModel
             // reused by the view. Same authority source the ACL editor enforces on write.
             CanManageAcls = await _mgmtAuth.CanManageShareAsync(
                 userContext, CurrentShare.Id, ManagementPermission.ManageShareAcls);
-
-            // Disabled shares reject all access — except for managers of the share,
-            // who may still browse them (e.g. to inspect before re-enabling).
-            // Hidden shares stay reachable here: ACL enforcement happens in ListAsync.
-            if (!CurrentShare.IsEnabled
-                && !await _mgmtAuth.CanManageShareAsync(
-                    userContext, CurrentShare.Id, ManagementPermission.EditShareSettings))
-            {
-                ErrorMessage = Resources.Web_Error_ShareDisabled;
-                Items = [];
-                return;
-            }
 
             _logger.LogDebug("Loading path: '{CurrentPath}' (share={ShareName}, user={User})",
                 CurrentPath, shareName, userContext.User.Username);

@@ -369,7 +369,7 @@ public class DepartmentViewModel
                 }
                 else if (!shouldBelong && currentlyBelongs)
                 {
-                    group.DepartmentId = WellKnownDepartments.GlobalId;
+                    group.DepartmentId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
                     await _groupRepo.UpdateAsync(group);
                 }
             }
@@ -388,7 +388,7 @@ public class DepartmentViewModel
                 }
                 else if (!shouldBelong && currentlyBelongs)
                 {
-                    share.DepartmentId = WellKnownDepartments.GlobalId;
+                    share.DepartmentId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
                     await _shareRepo.UpdateAsync(share);
                 }
             }
@@ -474,7 +474,7 @@ public class DepartmentViewModel
     {
         if (Selected is null || _actorContext is null) return;
 
-        if (Selected.Id == WellKnownDepartments.GlobalId)
+        if (Selected.Id == WellKnownGUIDs.DEPARTMENT_GLOBAL)
         {
             ErrorMessage = Resources.Web_Dept_CannotDeleteGlobal;
             return;
@@ -492,14 +492,14 @@ public class DepartmentViewModel
             var deptGroups = await _departmentRepo.GetGroupsAsync(Selected.Id);
             foreach (var group in deptGroups)
             {
-                group.DepartmentId = WellKnownDepartments.GlobalId;
+                group.DepartmentId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
                 await _groupRepo.UpdateAsync(group);
             }
 
             var deptShares = await _departmentRepo.GetSharesAsync(Selected.Id);
             foreach (var share in deptShares)
             {
-                share.DepartmentId = WellKnownDepartments.GlobalId;
+                share.DepartmentId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
                 await _shareRepo.UpdateAsync(share);
             }
 
@@ -546,7 +546,7 @@ public class DepartmentViewModel
     }
 
     public bool IsGlobalDepartment(Department dept)
-        => dept.Id == WellKnownDepartments.GlobalId;
+        => dept.Id == WellKnownGUIDs.DEPARTMENT_GLOBAL;
 
     // ══════════════════════════════════════════
     //  Tree helpers

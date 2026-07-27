@@ -66,7 +66,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 // Direct FK to Department (required, default = Global)
                 entity.Property(e => e.DepartmentId)
                     .IsRequired()
-                    .HasDefaultValue(WellKnownDepartments.GlobalId);
+                    .HasDefaultValue(WellKnownGUIDs.DEPARTMENT_GLOBAL);
 
                 entity.HasIndex(e => e.DepartmentId);
             });
@@ -138,7 +138,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 // Direct FK to Department (required, default = Global)
                 entity.Property(e => e.DepartmentId)
                     .IsRequired()
-                    .HasDefaultValue(WellKnownDepartments.GlobalId);
+                    .HasDefaultValue(WellKnownGUIDs.DEPARTMENT_GLOBAL);
 
                 entity.HasIndex(e => e.DepartmentId);
             });

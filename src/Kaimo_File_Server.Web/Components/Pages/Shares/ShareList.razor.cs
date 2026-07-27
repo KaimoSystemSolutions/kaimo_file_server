@@ -15,6 +15,7 @@ public partial class ShareList
     private ShareDetailTab _activeTab = ShareDetailTab.Settings;
     private string _aclEditorKey = "";
     private bool _accessLoaded;
+    private bool _showExtendedShareInfo;
     
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -62,6 +63,9 @@ public partial class ShareList
 
     private async Task SwitchTab(ShareDetailTab tab)
     {
+        if (VM.IsSelectedShareReadOnly && tab != ShareDetailTab.Settings)
+            return;
+
         _activeTab = tab;
 
         if (tab == ShareDetailTab.Access && !_accessLoaded)
@@ -84,6 +88,9 @@ public partial class ShareList
         VM.IsCreating = !VM.IsCreating;
         StateHasChanged();
     }
+
+    private void ToggleExtendedShareInfo()
+        => _showExtendedShareInfo = !_showExtendedShareInfo;
 
     private void OpenShare(string name) => Nav.NavigateTo($"/files/{name}");
 

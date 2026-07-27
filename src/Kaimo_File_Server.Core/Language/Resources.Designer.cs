@@ -3393,6 +3393,54 @@ namespace Kaimo_File_Server.Core.Language {
             }
         }
 
+        public static string Web_Error_ShareStorageUnavailableReadOnly {
+            get {
+                return ResourceManager.GetString("Web_Error_ShareStorageUnavailableReadOnly", resourceCulture);
+            }
+        }
+
+        public static string Web_ShareList_Card_ShowDetails {
+            get {
+                return ResourceManager.GetString("Web_ShareList_Card_ShowDetails", resourceCulture);
+            }
+        }
+
+        public static string Web_ShareList_Card_HideDetails {
+            get {
+                return ResourceManager.GetString("Web_ShareList_Card_HideDetails", resourceCulture);
+            }
+        }
+
+        public static string Web_ShareList_Card_Available {
+            get {
+                return ResourceManager.GetString("Web_ShareList_Card_Available", resourceCulture);
+            }
+        }
+
+        public static string Web_ShareList_Card_Unavailable {
+            get {
+                return ResourceManager.GetString("Web_ShareList_Card_Unavailable", resourceCulture);
+            }
+        }
+
+        public static string Web_ShareList_Card_Hidden {
+            get {
+                return ResourceManager.GetString("Web_ShareList_Card_Hidden", resourceCulture);
+            }
+        }
+
+        public static string Web_ShareList_Card_Yes {
+            get {
+                return ResourceManager.GetString("Web_ShareList_Card_Yes", resourceCulture);
+            }
+        }
+
+        public static string Web_ShareList_Card_No {
+            get {
+                return ResourceManager.GetString("Web_ShareList_Card_No", resourceCulture);
+            }
+        }
+
         public static string Web_Share_StoragePoolChanged {
             get {
                 return ResourceManager.GetString("Web_Share_StoragePoolChanged", resourceCulture);

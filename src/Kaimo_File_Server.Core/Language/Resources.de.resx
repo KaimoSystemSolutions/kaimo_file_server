@@ -1791,6 +1791,30 @@
   <data name="Web_ShareList_StoragePoolUnconfigured" xml:space="preserve">
   <value>Aktueller Pfad (Pool nicht konfiguriert)</value>
 </data>
+  <data name="Web_Error_ShareStorageUnavailableReadOnly" xml:space="preserve">
+  <value>Der Speicherpool des Shares ist derzeit nicht verfügbar. Seine Konfiguration bleibt schreibgeschützt, bis der Speicher wieder verfügbar ist.</value>
+</data>
+  <data name="Web_ShareList_Card_ShowDetails" xml:space="preserve">
+  <value>Details anzeigen</value>
+</data>
+  <data name="Web_ShareList_Card_HideDetails" xml:space="preserve">
+  <value>Details ausblenden</value>
+</data>
+  <data name="Web_ShareList_Card_Available" xml:space="preserve">
+  <value>Nutzbar</value>
+</data>
+  <data name="Web_ShareList_Card_Unavailable" xml:space="preserve">
+  <value>Nicht nutzbar</value>
+</data>
+  <data name="Web_ShareList_Card_Hidden" xml:space="preserve">
+  <value>Versteckt</value>
+</data>
+  <data name="Web_ShareList_Card_Yes" xml:space="preserve">
+  <value>Ja</value>
+</data>
+  <data name="Web_ShareList_Card_No" xml:space="preserve">
+  <value>Nein</value>
+</data>
   <data name="Web_Share_StoragePoolChanged" xml:space="preserve">
   <value>Share wurde in den Speicherpool „{0}“ verschoben.</value>
 </data>

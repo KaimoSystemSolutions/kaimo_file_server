@@ -4,7 +4,8 @@
 > **Scope:** `src/samba-vfs`, `Kaimo_File_Server.SmbBridge`, the relevant Core/Infrastructure lifecycle code, Samba synchronization scripts, container wiring, and the shared gRPC contract
 > **Audit type:** Static code and architecture review, supported by the available .NET test suite  
 > **Repository state:** No production source files were changed as part of the audit  
-> **Overall result:** Not ready for production as a security boundary without the P0/P1 remediation described below
+> **Roadmap revision:** 2026-07-27, reordered against the implemented remediations and remaining production risks
+> **Overall result:** Direct authorization and transport bypasses are largely contained; production approval remains blocked by credential synchronization, durable lifecycle handling, snapshot consistency, and release verification
 
 ## 1. Executive summary
 
@@ -759,81 +760,211 @@ Each event handler must define duplicate behavior:
 
 Periodic reconciliation should still exist to repair missed or partially applied side effects.
 
-## 10. Phased remediation plan
+## 10. Production-hardening roadmap
 
-### Phase 0: Production containment
+### 10.1 Target state and definition of done
 
-**Goal:** eliminate known direct bypasses while deeper work is in progress.
+Samba is ready to become Kaimo's production security boundary only when all of
+the following statements are continuously true:
 
-1. Keep fail-open disabled and reject configuration that enables it in production.
-2. Disable snapshot advertisement and deny timewarp opens, not merely the current openat redirect, until snapshot isolation is fixed.
-3. Temporarily deny rename if complete source/destination authorization cannot be added immediately.
-4. Change the Unix socket to a private directory and mode `0660`.
-5. Isolate the bridge on a dedicated network and restrict inbound clients.
-6. Remove default test credentials from production configuration.
-7. Mark the deployment unhealthy if `authd` is not responsive.
+1. Every live and historical access is authorized against the exact target and
+   fails closed on malformed input, missing context, timeout, or infrastructure
+   failure.
+2. Disabling a service, share, or user converges within a documented revocation
+   SLA; stale credentials and active sessions cannot silently outlive it.
+3. Reusable NT hashes never remain in predictable files, logs, process
+   arguments, or unmanaged long-lived buffers.
+4. Version, ownership, ACL-path, metadata, and search events survive crashes and
+   retries without duplication, misattribution, or loss.
+5. Snapshot materialization is atomic, content-verified, quota-bounded,
+   race-safe, cancellation-aware, and inaccessible outside an authorized
+   read-only timewarp operation.
+6. Every long-running security component is supervised and observable.
+   Operations can detect auth failures, queue pressure, event lag, failed
+   convergence, certificate expiry, and version/ABI drift.
+7. CI and release tests prove the supported SMB operation matrix against the
+   pinned Samba build. A release cannot bypass these gates.
 
-**Exit criteria:** no known unauthenticated path can retrieve hashes, access internal snapshot content, or perform an unmodeled rename.
+The release rule is simple: milestones 1–3 close the remaining correctness and
+security blockers. Milestone 4 supplies the evidence and operational controls
+required for production approval. Deferred product features such as recycle-bin
+behavior and full per-user share hiding are not production blockers as long as
+their current behavior remains explicit and tested.
 
-### Phase 1: Memory/resource and local protocol hardening
+### 10.2 Completed security baseline — maintain, do not reimplement
 
-1. Make connection-context allocation fail closed.
-2. Replace fixed/truncating authorization paths with checked dynamic strings.
-3. Implement framed messages, full I/O loops, deadlines, and field limits.
-4. Add peer credential verification.
-5. Replace detached threads with a bounded concurrency model.
-6. Replace the unbounded cache with bounded LRU+TTL storage.
-7. Add metrics for active connections, queue depth, cache entries, timeouts, denials, and sidecar failures.
+The following work is complete in source and is no longer part of the active
+implementation backlog:
 
-**Exit criteria:** fuzz and fault-injection tests cannot cause authorization bypass, indefinite worker blocking, or unbounded memory/thread growth.
+- Fail-closed connection context and default authorization behavior.
+- Exact dynamically allocated request paths and bounded/versioned local frames.
+- Complete SMB open-mask mapping and source/destination/replacement rename
+  authorization.
+- Fixed worker pool, bounded queue, strict I/O deadlines, and bounded LRU+TTL
+  authorization cache.
+- Private Unix socket with `SO_PEERCRED`, executable, UID, and claimed-user
+  verification.
+- Isolated mTLS control plane with RPC allow-lists and audited/rate-limited hash
+  export.
+- Per-file ACL-filtered folder snapshots in an isolated per-share/per-user cache.
+- Strictly read-only timewarp opens through `SMB_VFS_NEXT_OPENAT`.
+- Bounded snapshot cleanup, fail-safe audit-module activation, and immediate
+  share close when the global SMB service is disabled.
 
-### Phase 2: Complete authorization coverage
+These controls still require regression coverage in milestone 4. Any regression
+in this baseline is a release blocker.
 
-1. Extend/replace the authorization protobuf contract.
-2. Map the full Samba access mask to all Kaimo `FilePermission` values.
-3. Implement multi-path rename authorization.
-4. Cover mkdir fallback, metadata, EA, owner, security descriptor, link, symlink, and other mutating hooks actually reachable in Samba 4.19.5.
-5. Enforce enabled share/service state in every bridge operation.
-6. Centralize path validation/canonicalization.
-7. Define TOCTOU behavior and use FSP/handle identity where possible.
+### 10.3 Milestone 1 — Credential lifecycle and revocation
 
-**Exit criteria:** an automated matrix proves allow and deny behavior for every permission and every supported SMB mutation.
+**Goal:** remove the shortest remaining paths to stale or exposed credentials
+and make disabled identities converge predictably.
 
-### Phase 3: Snapshot redesign
+1. Remove `/tmp/kaimo.smbpasswd`. Prefer a pipe or private in-memory import; if
+   Samba requires a file, use a locked private runtime directory, `mktemp`,
+   `umask 077`, ownership checks, cleanup traps, and immediate deletion.
+2. Reconcile `tdbsam` and managed POSIX users to desired state. Disable or remove
+   users that are deleted, disabled, or absent from the bridge.
+3. Make user/share/config synchronization fail on every unapplied mutation,
+   verify the resulting passdb/registry/config state, prevent concurrent runs,
+   and expose the last successful convergence.
+4. Replace tab/newline synchronization records with a strictly validated
+   structured format. Reject control characters, reserved names, invalid
+   protocol values, and paths outside configured storage roots.
+5. Centralize enabled service/share/user resolution and use it in every Authz,
+   Event, Snapshot, and synchronization RPC.
+6. Define the revocation SLA and close affected shares/sessions when a service,
+   share, or user is disabled. Explicitly decide how already-open handles are
+   treated.
+7. Remove reusable test credentials from production entrypoints and health
+   probes. Reject `KAIMO_AUTHZ_FAILOPEN=1` in production configuration.
+8. Paginate or stream bulk user export, isolate corrupt rows, enforce exactly
+   16-byte NT hashes, and minimize/clear decrypted credential copies.
 
-1. Introduce per-file ACL filtering for folder snapshots.
-2. Protect or relocate the cache namespace.
-3. Enforce read-only access and VFS stackability.
-4. Implement atomic hash-verified materialization.
-5. Add quota reservation, keyed locks, active leases, and cancellation.
-6. Harden cleanup against symlinks/reparse points and concurrent activity.
-7. Add cache invalidation on share/version deletion and ACL-sensitive access checks on every open.
+**Exit criteria:**
 
-**Exit criteria:** users cannot access denied historical files through enumeration, direct paths, prior cache entries, guessing, races, or ACL revocation.
+- No reusable hash is recoverable from predictable files, logs, command lines,
+  or after a completed synchronization.
+- Delete/disable tests remove or disable local credentials and block new SMB
+  access within the stated SLA.
+- Injected `pdbedit`, `net conf`, validation, bridge, and partial-sync failures
+  make reconciliation unhealthy instead of reporting success.
+- Every bridge operation rejects disabled service/share/user state.
 
-### Phase 4: Durable lifecycle and synchronization
+### 10.4 Milestone 2 — Durable and correct lifecycle processing
 
-1. Add durable event spool, IDs, acknowledgement, retry, dead-letter handling, and reconciliation.
-2. Make every event handler idempotent.
-3. Solve stable close-content capture.
-4. Correct directory rename detection.
-5. Replace insecure hash/temp handling.
-6. Reconcile stale users and shares.
-7. Fail sync scripts on any unapplied desired state and verify final state.
-8. Supervise all long-running processes.
+**Goal:** make file history and secondary state correct across crashes,
+concurrency, duplicate delivery, and reordering.
 
-**Exit criteria:** crash/restart and duplicate-delivery tests leave database, versions, ACLs, metadata, search, passdb, and Samba registry converged.
+This milestone implements the detailed design in
+`file-lifecycle-reconciliation-outbox-roadmap.md`.
 
-### Phase 5: Transport security and operational readiness
+1. Add durable local event spooling/outbox semantics with operation IDs,
+   acknowledgement, bounded retry/backoff, dead-letter handling, retention, and
+   observable lag.
+2. Make all event handlers idempotent. A duplicate close creates no duplicate
+   version; repeated delete succeeds; repeated rename never deletes valid
+   destination history.
+3. Capture the exact bytes associated with a closing SMB handle. Choose and
+   implement staging copy/reflink, descriptor-aware capture, or a coordinated
+   file-version transaction; path re-open after close is not sufficient.
+4. Determine directory/file type before rename and send the correct lifecycle
+   event.
+5. Define concurrent-open and rapid-write semantics so version attribution is
+   deterministic.
+6. Add periodic reconciliation for missed or partially applied version,
+   ownership, ACL-path, metadata, and search side effects.
 
-1. Enable mTLS/workload identity for bridge RPCs.
-2. Apply per-service/RPC authorization.
-3. Add rate limits, message limits, structured audit logs, and secret redaction.
-4. Define SLOs for authorization latency, event lag, sync convergence, and revocation.
-5. Add backup/restore procedures for passdb, registry, event spool, and version metadata.
-6. Add a documented Samba upgrade/ABI process.
+**Exit criteria:**
 
-**Exit criteria:** security review verifies least privilege between containers and operations can detect and recover from all bridge/sidecar failure modes.
+- Crash/restart, network partition, duplicate, reorder, and retry tests converge
+  database, versions, ownership, ACL paths, metadata, and search state.
+- A recorded version always matches the bytes and user of the corresponding
+  operation ID.
+- Backlog, retry, dead-letter, and reconciliation state are observable and
+  bounded.
+
+### 10.5 Milestone 3 — Atomic and bounded snapshots
+
+**Goal:** preserve the completed ACL and isolation model under concurrency,
+corruption, cancellation, and resource pressure.
+
+1. Materialize into a unique same-filesystem temporary file, enforce a byte
+   limit while streaming, verify expected length and content hash, flush, and
+   publish with an atomic rename.
+2. Coordinate materialization, open, invalidation, and cleanup with keyed
+   locks/leases. Cleanup must skip active projections.
+3. Enforce request-level file, byte, time, and concurrency quotas before and
+   during folder materialization; remove abandoned output.
+4. Propagate gRPC cancellation through repository calls, ACL filtering,
+   decompression, copying, and materialization.
+5. Harden snapshot response parsing with bounded counts, overflow checks,
+   consistent framing, and explicit pagination or truncation behavior.
+6. Validate cache configuration at startup and use content identity rather than
+   file size for cache validity.
+7. Invalidate projections on version/share deletion and ACL revocation, while
+   retaining an authorization check on every open.
+
+**Exit criteria:**
+
+- Concurrent materialize/open/cleanup tests never expose partial, stale,
+  corrupt, cross-user, or unauthorized content.
+- Oversized, cancelled, malformed, or resource-exhausting requests fail closed
+  within documented limits and leave no published partial projection.
+- Windows Previous Versions and `smbclient` browse/copy/restore tests pass,
+  including child denies and post-cache ACL revocation.
+
+### 10.6 Milestone 4 — Coverage, supervision, and production release gate
+
+**Goal:** turn implemented controls into a repeatable, observable release
+guarantee.
+
+1. Centralize path validation and canonicalization across every VFS hook and
+   bridge service. Remove remaining fixed user/share context truncation.
+2. Inventory every mutation reachable through Samba 4.19.5—including
+   attributes, EAs, owner/security descriptor changes, hardlinks, symlinks,
+   server-side copy, delete-on-close, and mkdir fallbacks—and authorize or
+   explicitly deny it.
+3. Add native parser/path unit tests, ASan/UBSan, targeted concurrency tests,
+   fuzzing, OOM/fault injection, deep UTF-8 paths, and exact boundary tests.
+4. Build and load the module against the pinned Samba version in CI. Assert
+   Samba 4.19.5/ABI 49, run `testparm`, and execute the minimum SMB operation
+   matrix for every relevant change.
+5. Supervise `authd`; fail/restart the container when it is unavailable. Extend
+   health checks to validate the authorization path without reusable
+   credentials.
+6. Add metrics and alerts for workers, queue pressure, cache use, timeouts,
+   denials, bridge failures, sync convergence, revocation delay, event
+   backlog/dead letters, certificate expiry, and snapshot cleanup.
+7. Define SLOs, backup/restore and certificate-rotation procedures, and a
+   documented Samba upgrade/ABI process. Exercise recovery.
+8. Run the full container matrix: Samba/client interoperability, bridge/authd
+   crash and recovery, network partitions, active-session revocation, and
+   multi-user snapshot isolation.
+9. Decide whether bridge redundancy is required by the availability SLO and
+   implement it if a single fail-closed bridge outage is unacceptable.
+
+**Exit criteria:**
+
+- All section 11 release gates run automatically and pass against the exact
+  deployable images.
+- Operations can detect, diagnose, and recover every tested bridge, sidecar,
+  synchronization, certificate, and event-pipeline failure.
+- Security review signs off the complete live/historical operation matrix and
+  the documented residual product decisions.
+
+### 10.7 Recommended execution order
+
+| Order | Workstream | Why now | Production blocker |
+|---|---|---|---|
+| 1 | Credential lifecycle and revocation | Removes reusable-hash residue and stale principals first | Yes |
+| 2 | Durable lifecycle processing | Prevents silent loss or corruption of versions and secondary state | Yes |
+| 3 | Atomic bounded snapshots | Closes concurrency and resource-exhaustion gaps in historical access | Yes |
+| 4 | Coverage and operations | Proves the controls and makes failures detectable/recoverable | Yes |
+
+Milestones may overlap only where their contracts are already decided. In
+particular, lifecycle implementation must not begin before operation-ID,
+stable-close-capture, and stale-user policies are recorded; snapshot work can
+run independently after its lock/lease and quota contracts are fixed.
 
 ## 11. Required test plan
 
@@ -893,30 +1024,35 @@ A release should be blocked when any of the following is true:
 
 ## 12. Implementation checklist
 
+The checklist reflects the repository state on 2026-07-27. Checked items are
+implemented; their required release verification remains tracked in milestone 4.
+
 ### Native VFS checklist
 
-- [ ] Connection data uses Samba-owned lifetime and fail-closed allocation.
+- [x] Connection data uses Samba-owned lifetime and fail-closed allocation.
 - [ ] One canonical checked path routine is used everywhere.
-- [ ] No fixed buffer truncation can change the authorized target.
+- [x] No fixed request-path buffer truncation can change the authorized target.
+- [ ] User/share connection context cannot truncate or confuse UTF-8 identities.
 - [x] Full access-mask mapping exists in source; native/runtime verification remains pending.
 - [x] Rename is authorized before mutation (native/runtime verification pending).
 - [ ] All mutating VFS operations are inventoried and covered or explicitly denied.
-- [ ] Snapshot client paths cannot reach the internal cache.
-- [ ] Timewarp opens are read-only and use the VFS stack.
-- [ ] All Unix-socket calls have deadlines and full I/O loops.
+- [x] Snapshot client paths cannot reach the isolated internal cache.
+- [x] Timewarp opens are read-only and use the VFS stack.
+- [x] All Unix-socket calls have deadlines and full I/O loops.
 
 ### Sidecar checklist
 
-- [ ] Framed/versioned protocol with maximum frame size.
-- [ ] Peer credentials and private socket permissions.
-- [ ] Bounded worker and request queues.
-- [ ] Bounded cache with expiry and invalidation.
+- [x] Framed/versioned protocol with maximum frame size.
+- [x] Peer credentials and private socket permissions.
+- [x] Bounded worker and request queues.
+- [x] Bounded cache with expiry and documented maximum revocation delay.
+- [ ] Push invalidation exists for decisions that must revoke before TTL expiry.
 - [ ] Durable event spool and acknowledgement.
 - [ ] Sidecar health is supervised.
 
 ### Bridge checklist
 
-- [ ] Authenticated/authorized transport.
+- [x] Authenticated/authorized transport with mTLS and RPC allow-lists.
 - [ ] Enabled user/share/service checks are centralized.
 - [ ] Raw path validation and containment are consistent.
 - [ ] Cancellation and limits propagate through all expensive work.
@@ -937,13 +1073,14 @@ A release should be blocked when any of the following is true:
 ## 13. Decisions that must be made explicitly
 
 1. **Snapshot cache location (decided 2026-07-22):** global cache outside every share, with overlap rejected at bridge and share-sync boundaries.
-2. **Stable close-content capture:** staging copy/reflink, descriptor-aware helper, or coordinated locking.
-3. **Authorization contract:** full raw Samba access mask versus explicit Kaimo permission mask/operation enums.
-4. **Revocation semantics:** maximum accepted delay and whether active handles are forcibly terminated.
-5. **Event durability:** local spool technology, maximum retention, and dead-letter operations.
-6. **User lifecycle:** remove versus disable stale POSIX accounts.
+2. **Authorization contract (decided 2026-07-22):** transport the full raw Samba access mask, map it centrally, and return an attenuated granted mask.
+3. **Stable close-content capture — decide before milestone 2:** staging copy/reflink, descriptor-aware helper, or coordinated locking.
+4. **Revocation semantics — decide in milestone 1:** maximum accepted delay and whether active handles are forcibly terminated.
+5. **Event durability — decide before milestone 2:** local spool technology, maximum retention, acknowledgement, and dead-letter operations.
+6. **User lifecycle — decide in milestone 1:** remove versus disable stale POSIX accounts and define UID retention/reuse.
 7. **Share ABE:** retain hidden-flag-only behavior or implement per-user share enumeration.
 8. **Recycle behavior:** continue permanent SMB delete or align with the Web recycle-bin setting.
+9. **Availability — decide in milestone 4:** whether the bridge remains an accepted fail-closed single point of failure or needs redundancy.
 
 These should be recorded as architectural decisions before implementing the dependent phases.
 

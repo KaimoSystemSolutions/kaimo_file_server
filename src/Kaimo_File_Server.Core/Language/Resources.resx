@@ -1791,6 +1791,30 @@
   <data name="Web_ShareList_StoragePoolUnconfigured" xml:space="preserve">
   <value>Current path (pool not configured)</value>
 </data>
+  <data name="Web_Error_ShareStorageUnavailableReadOnly" xml:space="preserve">
+  <value>The share's storage pool is currently unavailable. Its configuration is read-only until the storage is available again.</value>
+</data>
+  <data name="Web_ShareList_Card_ShowDetails" xml:space="preserve">
+  <value>Show details</value>
+</data>
+  <data name="Web_ShareList_Card_HideDetails" xml:space="preserve">
+  <value>Hide details</value>
+</data>
+  <data name="Web_ShareList_Card_Available" xml:space="preserve">
+  <value>Available</value>
+</data>
+  <data name="Web_ShareList_Card_Unavailable" xml:space="preserve">
+  <value>Not available</value>
+</data>
+  <data name="Web_ShareList_Card_Hidden" xml:space="preserve">
+  <value>Hidden</value>
+</data>
+  <data name="Web_ShareList_Card_Yes" xml:space="preserve">
+  <value>Yes</value>
+</data>
+  <data name="Web_ShareList_Card_No" xml:space="preserve">
+  <value>No</value>
+</data>
   <data name="Web_Share_StoragePoolChanged" xml:space="preserve">
   <value>Share moved to storage pool “{0}”.</value>
 </data>
