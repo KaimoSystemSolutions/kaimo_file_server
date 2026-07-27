@@ -118,4 +118,29 @@ public class FileBrowserViewModelAclScopeTests
         Assert.Empty(_sut.Items);
         Assert.False(_sut.CanManageAcls);
     }
+
+    [Fact]
+    public async Task LoadShareAsync_WhenShareIsDisabled_BlocksDirectAccessEvenForManager()
+    {
+        _share.IsEnabled = false;
+        Authorize(true);
+        _mgmtAuth
+            .Setup(m => m.CanManageShareAsync(
+                It.IsAny<UserContext>(), _share.Id, ManagementPermission.EditShareSettings))
+            .ReturnsAsync(true);
+
+        await _sut.LoadShareAsync("share", "direct/url");
+
+        Assert.Equal(Resources.Web_Error_ShareDisabled, _sut.ErrorMessage);
+        Assert.Empty(_sut.Items);
+        Assert.False(_sut.CanManageAcls);
+        _fileServiceFactory.Verify(
+            f => f.CreateForShare(It.IsAny<Guid>(), It.IsAny<string>()), Times.Never);
+        _fileService.Verify(
+            s => s.ListAsync(It.IsAny<string>(), It.IsAny<UserContext>()), Times.Never);
+        _mgmtAuth.Verify(
+            m => m.CanManageShareAsync(
+                It.IsAny<UserContext>(), _share.Id, It.IsAny<ManagementPermission>()),
+            Times.Never);
+    }
 }
