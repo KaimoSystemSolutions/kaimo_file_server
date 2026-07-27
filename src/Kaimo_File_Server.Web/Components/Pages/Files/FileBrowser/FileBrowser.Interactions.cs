@@ -64,7 +64,13 @@ public partial class FileBrowser
     private bool CanRenameSelection => _selectedItems.Count == 1;
     private bool CanDeleteSelection => _selectedItems.Count > 0;
     private bool CanAclSelection => CanManageAcls() && _selectedItems.Count == 1;
-
+    
+    // ========== Syncing ==========
+    
+    [SupplyParameterFromQuery(Name = "just_synced")]
+    public string? JustSynced { get; set; }
+    
+    
     // ========== Selection ==========
 
     public void AddItemToSelection(FileMetadata item)

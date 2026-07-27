@@ -2,6 +2,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Kaimo_File_Server.Core.Helpers;
+using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Infrastructure.Clouds;
 
 namespace Kaimo_File_Server.Core.Domain
@@ -64,12 +65,15 @@ namespace Kaimo_File_Server.Core.Domain
         /// being permanently removed.
         /// </summary>
         public bool IsRecycleEnabled { get; set; }
-        public string? CloudSettings { get; set; }
-        
+
+        public CloudSettings CloudSettings { get; set; }
+
         public ICloudConnection? CloudConnection { get; set; }
-        
+
         /// <summary>EF Core / serialization constructor.</summary>
-        internal ShareDefinition() { }
+        internal ShareDefinition()
+        {
+        }
 
         /// <param name="name">Share / directory name — must not be blank.</param>
         /// <param name="path">Absolute host path — must not be blank.</param>
@@ -105,10 +109,12 @@ namespace Kaimo_File_Server.Core.Domain
             IsShareHidden = isShareHidden;
             IsEnabled = isEnabled;
             IsRecycleEnabled = isRecycleEnabled;
-            CloudSettings = cloudSettings;
+            CloudSettings = cloudSettings is null
+                ? new CloudSettings(new Dictionary<string, SyncedFolder>())
+                : CloudSettings.Deserialize(cloudSettings);
         }
     }
-    
+
 
     public record CloudSettings(
         // path -> synced folder data
@@ -119,8 +125,13 @@ namespace Kaimo_File_Server.Core.Domain
             => JsonSerializer.Serialize(this);
 
         public static CloudSettings Deserialize(string json)
-            => JsonSerializer.Deserialize<CloudSettings>(json)
-               ?? throw new InvalidOperationException("Invalid CloudSettings JSON");
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return new CloudSettings(new Dictionary<string, SyncedFolder>());
+
+            return JsonSerializer.Deserialize<CloudSettings>(json)
+                   ?? throw new InvalidOperationException("Invalid CloudSettings JSON");
+        }
     }
 
     /// <summary>
@@ -129,18 +140,83 @@ namespace Kaimo_File_Server.Core.Domain
     /// in-memory handle built on demand by ICloudProviderFactory — it is never
     /// serialized and does not survive a reload of the share from the DB.
     /// </summary>
-    public class SyncedFolder
+    public class SyncedFolder : IEquatable<SyncedFolder>
     {
         public string Provider { get; set; } = "";
+
         public Dictionary<string, string> Data { get; set; } = new();
 
-        [JsonIgnore]
-        public ICloudConnection? Connection { get; set; }
+        /// <summary>
+        /// Path on the remote provider. Defaults to root.
+        /// </summary>
+        public string RemotePath { get; set; } = "/";
 
-        public SyncedFolder(string provider, Dictionary<string, string> data)
+        /// <summary>
+        /// Timestamp of the last successful sync.
+        /// Null means the folder has never been synced.
+        /// </summary>
+        public DateTime? LastSync { get; set; }
+
+        public SyncedFolder(
+            string provider,
+            Dictionary<string, string> data,
+            string remotePath = "/",
+            DateTime? lastSync = null)
         {
-            this.Provider = provider;
-            this.Data = data;
+            Provider = provider;
+            Data = data;
+            RemotePath = remotePath;
+            LastSync = lastSync;
         }
+
+        public bool Equals(SyncedFolder? other)
+        {
+            if (other is null) return false;
+            if (ReferenceEquals(this, other)) return true;
+
+            if (Provider != other.Provider) return false;
+            if (RemotePath != other.RemotePath) return false;
+            if (LastSync != other.LastSync) return false;
+            if (Data.Count != other.Data.Count) return false;
+
+            foreach (var kvp in Data)
+            {
+                if (!other.Data.TryGetValue(kvp.Key, out var otherValue))
+                    return false;
+
+                if (kvp.Value != otherValue)
+                    return false;
+            }
+
+            return true;
+        }
+
+        public override bool Equals(object? obj) => Equals(obj as SyncedFolder);
+
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+
+            hash.Add(Provider);
+            hash.Add(RemotePath);
+            hash.Add(LastSync);
+
+            // Order-independent dictionary hash
+            int dataHash = 0;
+            foreach (var kvp in Data)
+            {
+                dataHash ^= HashCode.Combine(kvp.Key, kvp.Value);
+            }
+
+            hash.Add(dataHash);
+
+            return hash.ToHashCode();
+        }
+
+        public static bool operator ==(SyncedFolder? left, SyncedFolder? right)
+            => left is null ? right is null : left.Equals(right);
+
+        public static bool operator !=(SyncedFolder? left, SyncedFolder? right)
+            => !(left == right);
     }
 }

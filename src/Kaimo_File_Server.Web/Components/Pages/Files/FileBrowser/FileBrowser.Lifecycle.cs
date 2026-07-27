@@ -41,6 +41,19 @@ public partial class FileBrowser
         VM.OnStateChanged += OnVmStateChanged;
 
         TryApplyPendingFileSelection();
+
+        await CheckForJustSynced();
+    }
+
+    private async Task CheckForJustSynced()
+    {
+        if (string.IsNullOrEmpty(JustSynced))
+            return;
+        
+        var match = VM.Items.FirstOrDefault(i => i.IsDirectory && i.Name == JustSynced);
+
+        if (match is not null)
+            await OpenSyncDialog(match);
     }
 
     private void OnFileSelectionRequested()
@@ -81,6 +94,8 @@ public partial class FileBrowser
             await JS.InvokeVoidAsync("initFileUpload", "#file-drop-zone");
             await JS.InvokeVoidAsync("initInternalDragDrop");
         }
+        
+        
     }
 
     private void UpdateAclPath() => _aclPath = VM.CurrentPath ?? "";
