@@ -25,7 +25,7 @@ services:
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Host.dll"]
     volumes:
       - *vol-storage-pool-01
-      - *vol-storage-pool-02
+      #- *vol-storage-pool-02
       - *vol-app-data
     depends_on:
       kaimo_file_server_db:
@@ -58,7 +58,7 @@ services:
       Snapshots__Cache__RootPath: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}
     volumes:
       - *vol-storage-pool-01
-      - *vol-storage-pool-02
+      #- *vol-storage-pool-02
       - *vol-app-data
       # Mount only the server identity and public client CA. Client private
       # keys are available exclusively in the Samba container.
@@ -88,7 +88,7 @@ services:
       - 445:445
     volumes:
       - *vol-storage-pool-01
-      - *vol-storage-pool-02
+      #- *vol-storage-pool-02
       - *vol-app-data
       # Mount the single Samba workload identity and public control-plane CA.
       - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
@@ -157,7 +157,7 @@ services:
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Web.dll"]
     volumes:
       - *vol-storage-pool-01
-      - *vol-storage-pool-02
+      #- *vol-storage-pool-02
       - *vol-app-data
       - ${LOCATION_GDRIVE_CREDENTIALS:-./tests/data/logins/google-service-account.json}:/data/logins/google-service-account.json:ro
       
@@ -186,7 +186,7 @@ services:
     volumes:
       - ${LOCATION_DB:-./tests/data/postgres}:/var/lib/postgresql/data
     ports:
-      - "5432"
+      - 5432:5432
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kaimo_test_user -d kaimo_file_server"]
       interval: 2s

@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
@@ -31,6 +32,41 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     private readonly Mock<IAclService> _aclService = new();
     private readonly Mock<IFileVersionService> _versions = new();
     private readonly ShareLockManager _lockManager = new();
+    private readonly string _storagePath;
+    private readonly IReadOnlyList<string> _storagePools;
+
+    public ShareListViewModelDatabaseTests()
+    {
+        var testRoot = Path.Combine(
+            Path.GetTempPath(), "kaimo-tests", Guid.NewGuid().ToString("N"));
+        _storagePath = Path.Combine(testRoot, "pool-01");
+        _storagePools =
+        [
+            _storagePath,
+            Path.Combine(testRoot, "pool-02")
+        ];
+    }
+
+    private void CleanupPools()
+    {
+        var testRoot = Path.GetDirectoryName(_storagePath);
+        if (testRoot is not null && Directory.Exists(testRoot))
+            Directory.Delete(testRoot, recursive: true);
+    }
+
+    private ShareDefinition SeedPoolShare(
+        string name,
+        bool isEnabled = true,
+        bool isHidden = false,
+        bool isRecycleEnabled = false,
+        Guid? departmentId = null)
+        => SeedShare(
+            name,
+            Path.Combine(_storagePools[0], name),
+            isEnabled,
+            isHidden,
+            isRecycleEnabled,
+            departmentId);
 
     /// <summary>
     /// Builds the SUT for an actor who is an unrestricted (Global) share admin — the
@@ -78,7 +114,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     public async Task ToggleShareEnabledAsync_PersistsFlippedFlag()
     {
         var actor = SeedUser("admin");
-        var seeded = SeedShare("docs", isEnabled: true);
+        var seeded = SeedPoolShare("docs", isEnabled: true);
         var (sut, _) = await LoadAndSelectAsync(seeded, actor);
 
         var ok = await sut.ToggleShareEnabledAsync();
@@ -93,7 +129,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     public async Task ToggleRecycleEnabledAsync_PersistsFlippedFlag()
     {
         var actor = SeedUser("admin");
-        var seeded = SeedShare("docs", isRecycleEnabled: false);
+        var seeded = SeedPoolShare("docs", isRecycleEnabled: false);
         var (sut, _) = await LoadAndSelectAsync(seeded, actor);
 
         var ok = await sut.ToggleRecycleEnabledAsync();
@@ -108,7 +144,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     public async Task ToggleShareHiddenAsync_PersistsFlippedFlag()
     {
         var actor = SeedUser("admin");
-        var seeded = SeedShare("docs", isHidden: false);
+        var seeded = SeedPoolShare("docs", isHidden: false);
         var (sut, _) = await LoadAndSelectAsync(seeded, actor);
 
         var ok = await sut.ToggleShareHiddenAsync();
@@ -154,7 +190,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     public async Task ToggleShareHiddenAsync_WithoutManageShareAccess_IsDeniedAndNotPersisted()
     {
         var actor = SeedUser("editor");
-        var seeded = SeedShare("docs", isHidden: false);
+        var seeded = SeedPoolShare("docs", isHidden: false);
 
         var sut = BuildSettingsOnlyManagerSut(actor);
         await sut.LoadAsync();
@@ -172,7 +208,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     public async Task ToggleRecycleEnabledAsync_WithEditShareSettings_Succeeds()
     {
         var actor = SeedUser("editor");
-        var seeded = SeedShare("docs", isRecycleEnabled: false);
+        var seeded = SeedPoolShare("docs", isRecycleEnabled: false);
 
         var sut = BuildSettingsOnlyManagerSut(actor);
         await sut.LoadAsync();
@@ -190,7 +226,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     public async Task Toggle_WithNoSelection_DoesNothing()
     {
         var actor = SeedUser("admin");
-        SeedShare("docs", isEnabled: true);
+        SeedPoolShare("docs", isEnabled: true);
         var sut = BuildAdminSut(actor);
         await sut.LoadAsync(); // loaded, but nothing selected
 
@@ -207,7 +243,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     public async Task RenameShareAsync_PersistsNewNameAndPath()
     {
         var actor = SeedUser("admin");
-        var seeded = SeedShare("oldname");
+        var seeded = SeedPoolShare("oldname");
         var (sut, _) = await LoadAndSelectAsync(seeded, actor);
 
         sut.EditShareName = "newname";
@@ -224,8 +260,8 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     public async Task RenameShareAsync_ToExistingName_IsRejectedAndDoesNotPersist()
     {
         var actor = SeedUser("admin");
-        var seeded = SeedShare("oldname");
-        SeedShare("taken");
+        var seeded = SeedPoolShare("oldname");
+        SeedPoolShare("taken");
         var (sut, _) = await LoadAndSelectAsync(seeded, actor);
 
         sut.EditShareName = "taken";
@@ -241,7 +277,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     public async Task RenameShareAsync_WithInvalidName_IsRejectedAndDoesNotPersist()
     {
         var actor = SeedUser("admin");
-        var seeded = SeedShare("oldname");
+        var seeded = SeedPoolShare("oldname");
         var (sut, _) = await LoadAndSelectAsync(seeded, actor);
 
         sut.EditShareName = "in valid/name"; // spaces + slash are disallowed
@@ -258,7 +294,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     public async Task DeleteShareAsync_RemovesRowFromStore()
     {
         var actor = SeedUser("admin");
-        var seeded = SeedShare("docs");
+        var seeded = SeedPoolShare("docs");
         var (sut, _) = await LoadAndSelectAsync(seeded, actor);
 
         var ok = await sut.DeleteShareAsync();
@@ -296,7 +332,7 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     public async Task CreateShareAsync_WithDuplicateName_IsRejected()
     {
         var actor = SeedUser("admin");
-        SeedShare("docs");
+        SeedPoolShare("docs");
         var sut = BuildAdminSut(actor);
 
         sut.NewShareName = "docs";
@@ -331,10 +367,14 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         Assert.Equal(actor.Id, rootMeta.OwnerId);
 
         // The owner ACL must actually be persisted and linked to the root metadata.
-        var ownerAcl = Assert.Single(rootMeta.Acl);
+        var ownerAcl = Assert.Single(rootMeta.Acl, a => a.PrincipalId == actor.Id);
         Assert.Equal(actor.Id, ownerAcl.PrincipalId);
         Assert.Equal(AclEntryType.Allow, ownerAcl.EntryType);
         Assert.Equal(FilePermission.FullControl, ownerAcl.Permissions & FilePermission.FullControl);
+        Assert.Contains(rootMeta.Acl, a =>
+            a.PrincipalId == WellKnownGUIDs.ROLE_ADMIN
+            && a.EntryType == AclEntryType.Allow
+            && (a.Permissions & FilePermission.FullControl) == FilePermission.FullControl);
         CleanupPools();
     }
 
@@ -344,17 +384,17 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     public async Task ChangeStoragePoolAsync_MovesDataAndPersistsNewSharePath()
     {
         var actor = SeedUser("admin");
-        var source = Path.Combine(_storagePools[0].Path, "docs");
+        var source = Path.Combine(_storagePools[0], "docs");
         Directory.CreateDirectory(source);
         await File.WriteAllTextAsync(Path.Combine(source, "important.txt"), "content");
         var seeded = SeedShare("docs", source);
         var (sut, _) = await LoadAndSelectAsync(seeded, actor);
-        sut.EditSharePoolPath = _storagePools[1].Path;
+        sut.EditSharePoolPath = _storagePools[1];
 
         var ok = await sut.ChangeStoragePoolAsync();
 
         Assert.True(ok);
-        var destination = Path.Combine(_storagePools[1].Path, "docs");
+        var destination = Path.Combine(_storagePools[1], "docs");
         Assert.False(Directory.Exists(source));
         Assert.Equal("content", await File.ReadAllTextAsync(
             Path.Combine(destination, "important.txt")));
@@ -397,9 +437,9 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     public async Task LoadAsync_AsGlobalAdmin_SeesEvenHiddenAndDisabledShares()
     {
         var actor = SeedUser("admin");
-        SeedShare("enabled", isEnabled: true);
-        SeedShare("hidden", isHidden: true);
-        SeedShare("disabled", isEnabled: false);
+        SeedPoolShare("enabled", isEnabled: true);
+        SeedPoolShare("hidden", isHidden: true);
+        SeedPoolShare("disabled", isEnabled: false);
 
         var sut = BuildAdminSut(actor);
         await sut.LoadAsync();
