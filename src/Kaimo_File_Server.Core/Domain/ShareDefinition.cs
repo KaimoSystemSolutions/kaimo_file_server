@@ -64,7 +64,7 @@ namespace Kaimo_File_Server.Core.Domain
         /// being permanently removed.
         /// </summary>
         public bool IsRecycleEnabled { get; set; }
-        public string? CloudSettings { get; set; }
+        public CloudSettings CloudSettings { get; set; }
         
         public ICloudConnection? CloudConnection { get; set; }
         
@@ -105,11 +105,11 @@ namespace Kaimo_File_Server.Core.Domain
             IsShareHidden = isShareHidden;
             IsEnabled = isEnabled;
             IsRecycleEnabled = isRecycleEnabled;
-            CloudSettings = cloudSettings;
+            CloudSettings = cloudSettings is null ? new CloudSettings(new Dictionary<string, SyncedFolder>()) : CloudSettings.Deserialize(cloudSettings);
         }
     }
     
-
+    
     public record CloudSettings(
         // path -> synced folder data
         Dictionary<string, SyncedFolder> Folders
@@ -119,8 +119,13 @@ namespace Kaimo_File_Server.Core.Domain
             => JsonSerializer.Serialize(this);
 
         public static CloudSettings Deserialize(string json)
-            => JsonSerializer.Deserialize<CloudSettings>(json)
-               ?? throw new InvalidOperationException("Invalid CloudSettings JSON");
+        {
+            if(string.IsNullOrWhiteSpace(json))
+                return new CloudSettings(new Dictionary<string, SyncedFolder>());
+            
+            return JsonSerializer.Deserialize<CloudSettings>(json)
+                ?? throw new InvalidOperationException("Invalid CloudSettings JSON");
+        }
     }
 
     /// <summary>
@@ -134,13 +139,55 @@ namespace Kaimo_File_Server.Core.Domain
         public string Provider { get; set; } = "";
         public Dictionary<string, string> Data { get; set; } = new();
 
-        [JsonIgnore]
-        public ICloudConnection? Connection { get; set; }
 
         public SyncedFolder(string provider, Dictionary<string, string> data)
         {
             this.Provider = provider;
             this.Data = data;
         }
+        
+        
+        public bool Equals(SyncedFolder? other)
+        {
+            if (other is null) return false;
+            if (ReferenceEquals(this, other)) return true;
+
+            if (Provider != other.Provider) return false;
+            if (Data.Count != other.Data.Count) return false;
+
+            foreach (var kvp in Data)
+            {
+                if (!other.Data.TryGetValue(kvp.Key, out var otherValue))
+                    return false;
+                if (kvp.Value != otherValue)
+                    return false;
+            }
+
+            return true;
+        }
+
+        public override bool Equals(object? obj) => Equals(obj as SyncedFolder);
+
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+            hash.Add(Provider);
+
+            // Order-independent: XOR each entry's hash together
+            int dataHash = 0;
+            foreach (var kvp in Data)
+            {
+                dataHash ^= HashCode.Combine(kvp.Key, kvp.Value);
+            }
+            hash.Add(dataHash);
+
+            return hash.ToHashCode();
+        }
+
+        public static bool operator ==(SyncedFolder? left, SyncedFolder? right)
+            => left is null ? right is null : left.Equals(right);
+
+        public static bool operator !=(SyncedFolder? left, SyncedFolder? right)
+            => !(left == right);
     }
 }

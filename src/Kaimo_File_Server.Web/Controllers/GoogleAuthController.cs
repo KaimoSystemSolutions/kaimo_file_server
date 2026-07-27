@@ -35,7 +35,7 @@ public class GoogleOAuthController : ControllerBase
         if (share is null)
             return NotFound("Share not found");
 
-        var settings = CloudSyncPaths.ParseSettings(share.CloudSettings);
+        var settings = share.CloudSettings;
 
         var conflict = CloudSyncPaths.FindConflict(settings, normalizedPath);
         if (conflict is not null)
@@ -123,8 +123,7 @@ public class GoogleOAuthController : ControllerBase
         if (share is null)
             return Redirect("/");
 
-        var settings = CloudSyncPaths.ParseSettings(share.CloudSettings);
-
+        var settings = share.CloudSettings;
         // Re-check for conflicts: the share may have changed while the user
         // was over on Google's consent screen (e.g. an ancestor folder got
         // synced by someone else in the meantime).
@@ -147,14 +146,35 @@ public class GoogleOAuthController : ControllerBase
                 ["scope"] = token.Scope,
             });
 
-        share.CloudSettings = settings.Serialize();
+        share.CloudSettings = settings;
         await _shareRepository.UpdateAsync(share);
 
         var encoded = Uri.EscapeDataString(share.Name);
-        return Redirect($"/?successfulConnection={encoded}");
+        string parentPath = GetParentPath(path);
+        string syncedFolderName = Uri.EscapeDataString(GetFileOrFolderName(path));
+        return Redirect($"/files/{encoded}{parentPath}?just_synced={syncedFolderName}");
     }
 
+    private static string GetParentPath(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return "";
 
+        int lastSlash = path.LastIndexOf('/');
+
+        return lastSlash < 0 ? "" : "/" + path[..lastSlash];
+    }
+    
+    private static string GetFileOrFolderName(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return "";
+
+        int lastSlash = path.LastIndexOf('/');
+
+        return lastSlash < 0 ? path : path[(lastSlash + 1)..];
+    }
+    
     [HttpPost("disconnect")]
     public async Task<IActionResult> Disconnect(Guid shareId, [FromQuery] string? path)
     {
@@ -164,12 +184,12 @@ public class GoogleOAuthController : ControllerBase
         if (share is null)
             return NotFound("Share not found");
 
-        var settings = CloudSyncPaths.ParseSettings(share.CloudSettings);
+        var settings = share.CloudSettings;
 
         if (!settings.Folders.Remove(normalizedPath))
             return NotFound("This folder is not synced.");
 
-        share.CloudSettings = settings.Serialize();
+        share.CloudSettings = settings;
         await _shareRepository.UpdateAsync(share);
 
         return Ok();
@@ -185,7 +205,7 @@ public class GoogleOAuthController : ControllerBase
         if (share is null)
             return NotFound("Share not found");
 
-        var settings = CloudSyncPaths.ParseSettings(share.CloudSettings);
+        var settings = share.CloudSettings ?? new CloudSettings(new Dictionary<string, SyncedFolder>());
 
         if (settings.Folders.TryGetValue(normalizedPath, out var exact))
             return Ok(new { path = normalizedPath, relation = "exact", provider = exact.Provider });

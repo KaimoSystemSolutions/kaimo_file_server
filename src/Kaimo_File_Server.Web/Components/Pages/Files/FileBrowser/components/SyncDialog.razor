@@ -1,7 +1,10 @@
 @using Kaimo_File_Server.Infrastructure.Clouds
 @using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Repositories
 @inject NavigationManager Navigation
 @inject ToastService Toast
+@inject ICloudProviderFactory CloudProviderFactory
+@inject IShareRepository ShareRepository
 
 @if (_isOpen)
 {
@@ -33,7 +36,7 @@
                         <div class="cloud-account">
                             @if (!string.IsNullOrEmpty(_googleUserPhoto))
                             {
-                                <img class="cloud-avatar" src="@_googleUserPhoto" alt="Google account"/>
+                                <img class="cloud-avatar" src="@_googleUserPhoto" alt="Google account" referrerpolicy="no-referrer"/>
                             }
                             <span class="share-help-text">@_googleUserEmail</span>
                             <button class="btn-primary" @onclick="Disconnect">Unsync</button>
@@ -95,12 +98,44 @@
     }
 
     private async Task LoadExistingConnection()
-    {
-        // TODO: replace with a real lookup once folder-level connections are
-        // persisted, e.g.:
-        //   var conn = await CloudSync.GetConnectionAsync(_shareId, _folderPath);
-        //   if (conn is GoogleDriveConnection g) { _googleConnection = g; _selectedProvider = "Google"; ... }
+    { 
+        SyncedFolder? folder = await GetSyncedFlder();
+        
+        // there is no exsting connection
+        if(folder is null)
+            return;
+        
+        // load existing or establish new connection
+        ICloudConnection connection = CloudProviderFactory.CreateOrLoad(_shareId, folder);
+        
+        if (connection is not GoogleDriveConnection)
+            return;
+        
+        GoogleDriveConnection googleConnection = connection as GoogleDriveConnection;
+
+        _googleConnection = googleConnection;
+        _selectedProvider = googleConnection.getServiceName();
+
+        StateHasChanged();
+        
+        _googleUserEmail = await googleConnection.GetAccountEmailAsync();
+        _googleUserPhoto = await googleConnection.GetProfilePictureUrlAsync();
+        
         await Task.CompletedTask;
+    }
+
+    private async Task<SyncedFolder?> GetSyncedFlder()
+    {
+        ShareDefinition? share = await ShareRepository.GetByIdAsync(_shareId);
+        if (share == null)
+            return null;
+        
+        CloudSettings settings = share.CloudSettings;
+        
+        // folder isn't synced at all
+        if(!settings.Folders.TryGetValue(_folderPath, out SyncedFolder folder))
+            return folder;
+        return folder;
     }
 
     private void ConnectGoogle()
@@ -118,9 +153,6 @@
 
     private async Task Disconnect()
     {
-        // TODO: call a folder-scoped disconnect once it exists, e.g.:
-        //   await CloudSync.DisconnectAsync(_shareId, _folderPath);
-
         _googleConnection = null;
         _googleUserEmail = null;
         _googleUserPhoto = null;
@@ -128,6 +160,26 @@
 
         Toast.Show("Disconnected Cloud Provider from Folder");
         StateHasChanged();
+
+        SyncedFolder? syncedFolder = await GetSyncedFlder();
+        
+        if(syncedFolder != null)
+            CloudProviderFactory.DisposeConnection(syncedFolder);
+
+        await unsyncFolder();
         await Task.CompletedTask;
     }
+    
+    private async Task unsyncFolder()
+    {
+        ShareDefinition? share = await ShareRepository.GetByIdAsync(_shareId);
+        if (share == null)
+            return;
+        
+        CloudSettings settings = share.CloudSettings;
+        settings.Folders.Remove(_folderPath);
+        await ShareRepository.UpdateAsync(share);
+    }
+
+
 }

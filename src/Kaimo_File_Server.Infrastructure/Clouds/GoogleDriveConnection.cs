@@ -77,7 +77,33 @@ public class GoogleDriveConnection : ICloudConnection
     }
 
     public string getServiceName() => "Google";
+    
+    public async Task<string> GetAccountEmailAsync()
+    {
+        var request = _service.About.Get();
+        request.Fields = "user(emailAddress)";
 
+        var about = await request.ExecuteAsync();
+
+        if (string.IsNullOrEmpty(about.User?.EmailAddress))
+            throw new InvalidOperationException("Could not retrieve Google account email.");
+
+        return about.User.EmailAddress;
+    }
+
+    public async Task<string> GetProfilePictureUrlAsync()
+    {
+        var request = _service.About.Get();
+        request.Fields = "user(photoLink)";
+
+        var about = await request.ExecuteAsync();
+
+        if (string.IsNullOrEmpty(about.User?.PhotoLink))
+            throw new InvalidOperationException("Could not retrieve Google account profile picture.");
+
+        return about.User.PhotoLink;
+    }
+    
     public Task UploadAsync(string path, Stream data) => throw new NotImplementedException();
     public Task DownloadAsync(string path, Stream target) => throw new NotImplementedException();
     public Task<IReadOnlyList<string>> ListAsync(string path) => throw new NotImplementedException();
