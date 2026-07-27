@@ -146,7 +146,7 @@ public class DatabaseSeeder
 
     /// <summary>
     /// Seeds the well-known Global department with the fixed ID
-    /// from <see cref="WellKnownDepartments.GlobalId"/>.
+    /// from <see cref="WellKnownGUIDs.DEPARTMENT_GLOBAL"/>.
     ///
     /// This MUST run before Groups and Shares are created,
     /// because their DepartmentId defaults to GlobalId.
@@ -154,21 +154,21 @@ public class DatabaseSeeder
     private async Task SeedGlobalDepartmentAsync()
     {
         var exists = await _db.Departments
-            .AnyAsync(d => d.Id == WellKnownDepartments.GlobalId);
+            .AnyAsync(d => d.Id == WellKnownGUIDs.DEPARTMENT_GLOBAL);
 
         if (exists)
             return;
 
         var global = new Department("Global", "Globale Abteilung — Standard für alle Entitäten ohne explizite Zuordnung")
         {
-            Id = WellKnownDepartments.GlobalId
+            Id = WellKnownGUIDs.DEPARTMENT_GLOBAL
         };
 
         _db.Departments.Add(global);
         await _db.SaveChangesAsync();
 
         _logger.LogDebug(LogEvents.SeedGlobalDepartmentCreated, LogMessages.SeedGlobalDepartmentCreated,
-            WellKnownDepartments.GlobalId);
+            WellKnownGUIDs.DEPARTMENT_GLOBAL);
     }
 
     // ══════════════════════════════════════════
@@ -180,14 +180,14 @@ public class DatabaseSeeder
     /// System roles (IsSystemRole=true) cannot be deleted by users.
     /// Their permissions are authoritative — updated on every startup.
     /// </summary>
-    private static readonly (string Name, ManagementPermission Perms, bool IsSystem)[] RoleDefinitions =
+    private static readonly (string Name, ManagementPermission Perms, bool IsSystem, Guid uuid)[] RoleDefinitions =
     [
-        ("Administrator",     ManagementPermission.FullAdmin,                                      true),
-        ("UserManager",       ManagementPermission.UserAdmin | ManagementPermission.AssignGroups,   true),
-        ("ShareManager",      ManagementPermission.ShareAdmin,                                     true),
-        ("DepartmentAdmin",   ManagementPermission.DepartmentAdmin,                                true),
-        ("CertificateManager", ManagementPermission.ManageCertificates,                            true),
-        ("User",              ManagementPermission.None,                                           true),
+        ("Administrator",     ManagementPermission.FullAdmin,                                      true, WellKnownGUIDs.ROLE_ADMIN),
+        ("UserManager",       ManagementPermission.UserAdmin | ManagementPermission.AssignGroups,   true, WellKnownGUIDs.ROLE_USER_MANAGER), 
+        ("ShareManager",      ManagementPermission.ShareAdmin,                                     true, WellKnownGUIDs.ROLE_SHARE_MANAGER),
+        ("DepartmentAdmin",   ManagementPermission.DepartmentAdmin,                                true, WellKnownGUIDs.ROLE_DEPARTMENT_ADMIN),
+        ("CertificateManager", ManagementPermission.ManageCertificates,                            true, WellKnownGUIDs.ROLE_CERTIFICATE_MANAGER),
+        ("User",              ManagementPermission.None,                                           true, WellKnownGUIDs.ROLE_USER),
     ];
 
     private async Task SeedRolesAsync()
@@ -196,7 +196,7 @@ public class DatabaseSeeder
         var byName = existing.ToDictionary(r => r.Name, StringComparer.OrdinalIgnoreCase);
         var changed = false;
 
-        foreach (var (name, perms, isSystem) in RoleDefinitions)
+        foreach (var (name, perms, isSystem, uuid) in RoleDefinitions)
         {
             if (byName.TryGetValue(name, out var role))
             {
@@ -210,7 +210,7 @@ public class DatabaseSeeder
             }
             else
             {
-                _db.Roles.Add(new Role(Guid.NewGuid(), name, perms, isSystem));
+                _db.Roles.Add(new Role(uuid, name, perms, isSystem));
                 _logger.LogDebug(LogEvents.SeedRoleCreated, LogMessages.SeedRoleCreated, name, perms);
                 changed = true;
             }

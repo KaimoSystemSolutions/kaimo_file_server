@@ -167,7 +167,7 @@ public class UserListViewModel
     // -- Create Group --
     public bool IsCreatingGroup { get; set; }
     public string CreateGroupName { get; set; } = "";
-    public Guid CreateGroupDepartmentId { get; set; } = WellKnownDepartments.GlobalId;
+    public Guid CreateGroupDepartmentId { get; set; } = WellKnownGUIDs.DEPARTMENT_GLOBAL;
 
     // -- Create Role --
     public bool IsCreatingRole { get; set; }
@@ -279,7 +279,7 @@ public class UserListViewModel
 
     public string GetDepartmentName(Guid departmentId)
     {
-        if (departmentId == WellKnownDepartments.GlobalId) return "Global";
+        if (departmentId == WellKnownGUIDs.DEPARTMENT_GLOBAL) return "Global";
         var dept = AllDepartments.FirstOrDefault(d => d.Id == departmentId);
         return dept?.Name ?? departmentId.ToString();
     }
@@ -903,7 +903,7 @@ public class UserListViewModel
         SelectedUser = null; SelectedGroup = null; SelectedRole = null;
         IsCreatingGroup = true; IsCreatingUser = false; IsCreatingRole = false;
         CreateGroupName = "";
-        CreateGroupDepartmentId = WellKnownDepartments.GlobalId;
+        CreateGroupDepartmentId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
         ErrorMessage = null; SuccessMessage = null;
     }
 

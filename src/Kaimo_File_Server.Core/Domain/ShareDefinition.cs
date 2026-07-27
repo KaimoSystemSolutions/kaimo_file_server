@@ -41,10 +41,10 @@ namespace Kaimo_File_Server.Core.Domain
         /// The department this share belongs to.
         /// Determines which department-scoped administrators can manage this share
         /// and which department default file permissions apply.
-        /// Defaults to <see cref="WellKnownDepartments.GlobalId"/> (Global department).
+        /// Defaults to <see cref="WellKnownGUIDs.DEPARTMENT_GLOBAL"/> (Global department).
         /// A share always belongs to exactly one department.
         /// </summary>
-        public Guid DepartmentId { get; set; } = WellKnownDepartments.GlobalId;
+        public Guid DepartmentId { get; set; } = WellKnownGUIDs.DEPARTMENT_GLOBAL;
 
         /// <summary>
         /// When <c>false</c>, the share is hidden from directory listings
@@ -101,7 +101,7 @@ namespace Kaimo_File_Server.Core.Domain
                 ? path
                 : throw new ArgumentException("Path must not be empty.", nameof(path));
 
-            DepartmentId = departmentId ?? WellKnownDepartments.GlobalId;
+            DepartmentId = departmentId ?? WellKnownGUIDs.DEPARTMENT_GLOBAL;
             IsShareHidden = isShareHidden;
             IsEnabled = isEnabled;
             IsRecycleEnabled = isRecycleEnabled;

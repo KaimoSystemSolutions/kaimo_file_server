@@ -19,10 +19,10 @@ namespace Kaimo_File_Server.Core.Domain.Identity
         /// <summary>
         /// The department this group belongs to.
         /// Determines which department-scoped administrators can manage this group.
-        /// Defaults to <see cref="WellKnownDepartments.GlobalId"/> (Global department).
+        /// Defaults to <see cref="WellKnownGUIDs.DEPARTMENT_GLOBAL"/> (Global department).
         /// A group always belongs to exactly one department.
         /// </summary>
-        public Guid DepartmentId { get; set; } = WellKnownDepartments.GlobalId;
+        public Guid DepartmentId { get; set; } = WellKnownGUIDs.DEPARTMENT_GLOBAL;
 
         /// <summary>EF Core / serialization constructor.</summary>
         protected Group() { }
@@ -36,7 +36,7 @@ namespace Kaimo_File_Server.Core.Domain.Identity
         public Group(Guid id, string name, Guid? departmentId = null)
             : base(id, name)
         {
-            DepartmentId = departmentId ?? WellKnownDepartments.GlobalId;
+            DepartmentId = departmentId ?? WellKnownGUIDs.DEPARTMENT_GLOBAL;
         }
     }
 }

@@ -15,12 +15,28 @@
         <h1>@Resources.Web_Nav_Shares</h1>
         <p class="subtitle">@string.Format(Resources.Web_ShareList_Welcome, VM.CurrentUserName)</p>
     </div>
-    @if (VM.CanCreateShare)
-    {
-        <button class="btn-icon" title="@Resources.Web_ShareList_CreateShare" @onclick="ToggleCreate">
-            @Assets.SVG("plus.svg", new SvgOptions(Width: 20, Height: 20, StrokeWidth: 2))
-        </button>
-    }
+    <div class="page-header-actions">
+        @if (VM.Shares.Any())
+        {
+            <button class="btn-secondary share-info-toggle @(_showExtendedShareInfo ? "share-info-toggle--active" : "")"
+                    title="@(_showExtendedShareInfo
+                        ? Resources.Web_ShareList_Card_HideDetails
+                        : Resources.Web_ShareList_Card_ShowDetails)"
+                    aria-pressed="@_showExtendedShareInfo"
+                    @onclick="ToggleExtendedShareInfo">
+                @Assets.SVG("circle_info.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                <span>@(_showExtendedShareInfo
+                    ? Resources.Web_ShareList_Card_HideDetails
+                    : Resources.Web_ShareList_Card_ShowDetails)</span>
+            </button>
+        }
+        @if (VM.CanCreateShare)
+        {
+            <button class="btn-icon" title="@Resources.Web_ShareList_CreateShare" @onclick="ToggleCreate">
+                @Assets.SVG("plus.svg", new SvgOptions(Width: 20, Height: 20, StrokeWidth: 2))
+            </button>
+        }
+    </div>
 </div>
 
 @if (VM.IsCreating && VM.CanCreateShare)
@@ -52,6 +68,9 @@ else
         <div class="admin-list">
             <ShareCardList Shares="VM.Shares"
                            SelectedShare="VM.SelectedShare"
+                           ShowExtendedInfo="_showExtendedShareInfo"
+                           StorageAvailable="VM.IsShareStorageAvailable"
+                           StoragePoolName="VM.GetStoragePoolDisplayNameForShare"
                            OnSelected="HandleCardClick"
                            OnOpened="OpenShare"/>
         </div>
@@ -64,14 +83,24 @@ else
                     <span class="detail-subtitle">@Resources.Web_ShareList_DetailSubtitle</span>
                 </div>
 
+                @if (VM.IsSelectedShareReadOnly)
+                {
+                    <div class="storage-unavailable-banner">
+                        @Resources.Web_Error_ShareStorageUnavailableReadOnly
+                    </div>
+                }
+
                 <div class="detail-tabs">
                     <button class="detail-tab @(_activeTab == ShareDetailTab.Settings ? "detail-tab--active" : "")"
                             @onclick="() => SwitchTab(ShareDetailTab.Settings)"> @Assets.SVG("settings.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @Resources.Web_ShareList_Tab_General </button>
                     <button class="detail-tab @(_activeTab == ShareDetailTab.Access ? "detail-tab--active" : "")"
+                            disabled="@VM.IsSelectedShareReadOnly"
                             @onclick="() => SwitchTab(ShareDetailTab.Access)"> @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @Resources.Web_ShareList_Tab_Visibility </button>
                     <button class="detail-tab @(_activeTab == ShareDetailTab.Acl ? "detail-tab--active" : "")"
+                            disabled="@VM.IsSelectedShareReadOnly"
                             @onclick="() => SwitchTab(ShareDetailTab.Acl)"> @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @Resources.Web_ShareList_Tab_ACL </button>
                     <button class="detail-tab @(_activeTab == ShareDetailTab.Cloud ? "detail-tab--active" : "")"
+                            disabled="@VM.IsSelectedShareReadOnly"
                             @onclick="() => SwitchTab(ShareDetailTab.Cloud)"> @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Cloud </button>
                 </div>
 

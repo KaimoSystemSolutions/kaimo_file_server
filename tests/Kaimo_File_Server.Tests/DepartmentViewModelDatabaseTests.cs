@@ -205,7 +205,7 @@ public class DepartmentViewModelDatabaseTests : DatabaseTestBase
         await using var db = NewContext();
         Assert.False(await db.Departments.AnyAsync(d => d.Id == dept.Id));
         // Its share must survive, re-homed to the Global department (no orphan FK).
-        Assert.Equal(WellKnownDepartments.GlobalId,
+        Assert.Equal(WellKnownGUIDs.DEPARTMENT_GLOBAL,
             (await db.ShareDefinitions.FindAsync(share.Id))!.DepartmentId);
     }
 
@@ -214,7 +214,7 @@ public class DepartmentViewModelDatabaseTests : DatabaseTestBase
     {
         var actor = SeedUser("admin");
         // The Global department is protected — attempting to delete it must be rejected.
-        var global = SeedDepartment("Global", id: WellKnownDepartments.GlobalId);
+        var global = SeedDepartment("Global", id: WellKnownGUIDs.DEPARTMENT_GLOBAL);
 
         var sut = BuildGlobalAdminSut(actor);
         await sut.LoadAsync();
@@ -224,6 +224,6 @@ public class DepartmentViewModelDatabaseTests : DatabaseTestBase
 
         Assert.NotNull(sut.ErrorMessage);
         await using var db = NewContext();
-        Assert.True(await db.Departments.AnyAsync(d => d.Id == WellKnownDepartments.GlobalId));
+        Assert.True(await db.Departments.AnyAsync(d => d.Id == WellKnownGUIDs.DEPARTMENT_GLOBAL));
     }
 }

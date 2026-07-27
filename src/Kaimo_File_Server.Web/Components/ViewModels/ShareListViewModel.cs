@@ -1,5 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
+using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
@@ -8,7 +10,6 @@ using Kaimo_File_Server.Search;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
-using Kaimo_File_Server.Core.Language;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -280,6 +281,73 @@ public partial class ShareListViewModel
             PathComparer.Equals(Path.GetFullPath(pool.Path), parent))?.Name;
     }
 
+    public string GetStoragePoolDisplayNameForShare(ShareDefinition share)
+    {
+        try
+        {
+            var parent = Path.GetDirectoryName(Path.GetFullPath(share.Path));
+            if (parent is null)
+                return "—";
+
+            var configuredName = StoragePools.FirstOrDefault(pool =>
+                PathComparer.Equals(Path.GetFullPath(pool.Path), parent))?.Name;
+
+            var parentName = Path.GetFileName(
+                Path.TrimEndingDirectorySeparator(parent));
+            return configuredName
+                   ?? (!string.IsNullOrWhiteSpace(parentName) ? parentName : parent);
+        }
+        catch (Exception ex) when (ex is ArgumentException
+                                   or NotSupportedException
+                                   or PathTooLongException)
+        {
+            _logger.LogWarning(ex,
+                "Could not determine the storage pool for share '{ShareName}'",
+                share.Name);
+            return "—";
+        }
+    }
+
+    /// <summary>
+    /// A share is writable from the management UI only while its persisted path
+    /// belongs directly to one of the storage pools available to this process.
+    /// This intentionally uses the currently injected pool list; it can later be
+    /// switched to VolumeMountManager without changing the UI contract.
+    /// </summary>
+    public bool IsShareStorageAvailable(ShareDefinition? share)
+    {
+        if (share is null || string.IsNullOrWhiteSpace(share.Path))
+            return false;
+
+        try
+        {
+            var parent = Path.GetDirectoryName(Path.GetFullPath(share.Path));
+            return parent is not null && _storagePools.Any(pool =>
+                PathComparer.Equals(Path.GetFullPath(pool), parent));
+        }
+        catch (Exception ex) when (ex is ArgumentException
+                                   or NotSupportedException
+                                   or PathTooLongException)
+        {
+            _logger.LogWarning(ex,
+                "Share '{ShareName}' has an invalid storage path and is read-only",
+                share.Name);
+            return false;
+        }
+    }
+
+    public bool IsSelectedShareReadOnly
+        => SelectedShare is not null && !IsShareStorageAvailable(SelectedShare);
+
+    private bool EnsureSelectedShareWritable()
+    {
+        if (!IsSelectedShareReadOnly)
+            return true;
+
+        EditErrorMessage = Resources.Web_Error_ShareStorageUnavailableReadOnly;
+        return false;
+    }
+
     // -- Create --
 
     public async Task<bool> CreateShareAsync()
@@ -354,6 +422,17 @@ public partial class ShareListViewModel
 
             await _aclRepo.AddAsync(newAcl);
 
+            var adminAcl = new AccessEntry(
+                WellKnownGUIDs.ROLE_ADMIN,
+                AclEntryType.Allow,
+                FilePermission.FullControl,
+                AclInheritance.Everything)
+            {
+                FileMetadataId = rootMeta.Id
+            };
+
+            await _aclRepo.AddAsync(adminAcl);
+
             _logger.LogInformation("Share '{ShareName}' created", name);
 
             NewShareName = "";
@@ -411,6 +490,9 @@ public partial class ShareListViewModel
 
         EditErrorMessage = null;
         EditSuccessMessage = null;
+
+        if (!EnsureSelectedShareWritable())
+            return false;
 
         // Server-side authorization guard (see DeleteShareAsync).
         if (!await CanManageSelectedShareAsync(ManagementPermission.EditShareSettings))
@@ -536,6 +618,9 @@ public partial class ShareListViewModel
 
         EditErrorMessage = null;
         EditSuccessMessage = null;
+
+        if (!EnsureSelectedShareWritable())
+            return false;
 
         if (!await CanManageSelectedShareAsync(ManagementPermission.EditShareSettings))
         {
@@ -761,6 +846,9 @@ public partial class ShareListViewModel
         EditErrorMessage = null;
         EditSuccessMessage = null;
 
+        if (!EnsureSelectedShareWritable())
+            return false;
+
         // Enabling/disabling a share governs whether anyone can access it → ManageShareAccess.
         if (!await CanManageSelectedShareAsync(ManagementPermission.ManageShareAccess))
         { EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
@@ -800,6 +888,9 @@ public partial class ShareListViewModel
         EditErrorMessage = null;
         EditSuccessMessage = null;
 
+        if (!EnsureSelectedShareWritable())
+            return false;
+
         // The recycle bin is a share feature setting → EditShareSettings.
         if (!await CanManageSelectedShareAsync(ManagementPermission.EditShareSettings))
         { EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
@@ -838,6 +929,9 @@ public partial class ShareListViewModel
 
         EditErrorMessage = null;
         EditSuccessMessage = null;
+
+        if (!EnsureSelectedShareWritable())
+            return false;
 
         // Visibility (hidden = excluded from listings/ABE) is share-access control → ManageShareAccess.
         if (!await CanManageSelectedShareAsync(ManagementPermission.ManageShareAccess))
@@ -879,6 +973,9 @@ public partial class ShareListViewModel
 
         EditErrorMessage = null;
 
+        if (!EnsureSelectedShareWritable())
+            return false;
+
         // Server-side authorization: the razor hides the button when the actor
         // cannot manage this share, but the view-model method must guard too —
         // it enforces the specific DeleteShares right AND the department scope.
@@ -913,6 +1010,10 @@ public partial class ShareListViewModel
     public async Task DisconnectCurrentShareFromCloud()
     {
         if(SelectedShare is null)
+            return;
+
+        EditErrorMessage = null;
+        if (!EnsureSelectedShareWritable())
             return;
 
         SelectedShare.CloudConnection?.Dispose();

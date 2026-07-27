@@ -4,32 +4,65 @@
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject AssetProvider Icons
 
-<div class="share-grid">
-    @foreach (var share in Shares)
+<div class="share-grid @(ShowExtendedInfo ? "share-grid--extended" : "share-grid--compact")">
+    @foreach (var share in SortedShares)
     {
         var isSelected = SelectedShare?.Id == share.Id;
-        var isDisabled = !share.IsEnabled;
+        var isStorageUnavailable = !(StorageAvailable?.Invoke(share) ?? true);
+        var isUsable = IsUsable(share);
 
-        <div class="share-card @(isSelected ? "share-card--selected" : "") @(isDisabled ? "share-card--disabled" : "")"
+        <div class="share-card @(isSelected ? "share-card--selected" : "") @(isStorageUnavailable ? "share-card--storage-unavailable" : "")"
              @onclick="() => OnSelected.InvokeAsync(share)"
              @ondblclick="() => OnOpened.InvokeAsync(share.Name)">
-            
-            <div class="share-icon">
-                @Icons.SVG(
-                    $"folder{(share.CloudConnection is null ? "" : "_" + share.CloudConnection.getServiceName())}.svg",
-                    new SvgOptions(
-                        Width: 32,
-                        Height: 32,
-                        Color: isDisabled ? "var(--text-tertiary)" : "var(--folder-stroke)",
-                        Fill: isDisabled ? "transparent" : "var(--folder-fill)")
-                )
-            </div>
-            <div class="share-info">
-                <span class="share-name">@share.Name</span>
-                <span class="share-path">@share.Path</span>
-                @if (isDisabled)
+
+            <div class="share-card-main">
+                <div class="share-card-heading">
+                    <div class="share-icon">
+                        @Icons.SVG(
+                            $"folder{(share.CloudConnection is null ? "" : "_" + share.CloudConnection.getServiceName())}.svg",
+                            new SvgOptions(
+                                Width: 30,
+                                Height: 30,
+                                Color: isStorageUnavailable ? "var(--text-tertiary)" : "var(--folder-stroke)",
+                                Fill: isStorageUnavailable ? "transparent" : "var(--folder-fill)")
+                        )
+                    </div>
+                    <span class="share-name" title="@share.Name">@share.Name</span>
+                </div>
+
+                <div class="share-availability @(isUsable ? "share-availability--usable" : "share-availability--unusable")">
+                    <span class="share-status-dot"></span>
+                    <span>@(isUsable
+                        ? Resources.Web_ShareList_Card_Available
+                        : Resources.Web_ShareList_Card_Unavailable)</span>
+                </div>
+
+                @if (ShowExtendedInfo)
                 {
-                    <span class="share-badge share-badge--disabled">@Resources.Web_ShareList_Status_Disabled</span>
+                    <div class="share-card-details">
+                        <div class="share-detail-row">
+                            <span class="share-detail-label">@Resources.Web_ShareList_Label_StoragePool</span>
+                            <span class="share-detail-value" title="@(StoragePoolName?.Invoke(share))">
+                                @(StoragePoolName?.Invoke(share) ?? "—")
+                            </span>
+                        </div>
+                        <div class="share-detail-row">
+                            <span class="share-detail-label">@Resources.Web_ShareList_Label_RecycleBin</span>
+                            <span class="share-state-pill @(share.IsRecycleEnabled ? "share-state-pill--positive" : "share-state-pill--neutral")">
+                                @(share.IsRecycleEnabled
+                                    ? Resources.Web_ShareList_Card_Yes
+                                    : Resources.Web_ShareList_Card_No)
+                            </span>
+                        </div>
+                        <div class="share-detail-row">
+                            <span class="share-detail-label">@Resources.Web_ShareList_Card_Hidden</span>
+                            <span class="share-state-pill @(share.IsShareHidden ? "share-state-pill--negative" : "share-state-pill--positive")">
+                                @(share.IsShareHidden
+                                    ? Resources.Web_ShareList_Card_Yes
+                                    : Resources.Web_ShareList_Card_No)
+                            </span>
+                        </div>
+                    </div>
                 }
             </div>
         </div>
@@ -39,7 +72,22 @@
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<ShareDefinition> Shares { get; set; } = [];
     [Parameter] public ShareDefinition? SelectedShare { get; set; }
+    [Parameter] public bool ShowExtendedInfo { get; set; }
+    [Parameter] public Func<ShareDefinition, bool>? StorageAvailable { get; set; }
+    [Parameter] public Func<ShareDefinition, string>? StoragePoolName { get; set; }
     [Parameter] public EventCallback<ShareDefinition> OnSelected { get; set; }
     [Parameter] public EventCallback<string> OnOpened { get; set; }
+
+    private IEnumerable<ShareDefinition> SortedShares
+        => Shares
+            .OrderBy(share => IsUsable(share) ? 0 : 1)
+            .ThenBy(GetVolumeName, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(share => share.Name, StringComparer.CurrentCultureIgnoreCase);
+
+    private bool IsUsable(ShareDefinition share)
+        => share.IsEnabled && (StorageAvailable?.Invoke(share) ?? true);
+
+    private string GetVolumeName(ShareDefinition share)
+        => StoragePoolName?.Invoke(share) ?? string.Empty;
 }
 

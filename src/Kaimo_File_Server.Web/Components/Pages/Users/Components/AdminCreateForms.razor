@@ -147,7 +147,7 @@
     [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
     [Parameter] public EventCallback OnChanged { get; set; }
     private string CreateUserDepartmentId { get => VM.CreateUserDepartmentId?.ToString() ?? ""; set => VM.CreateUserDepartmentId = Guid.TryParse(value, out var id) ? id : null; }
-    private string CreateGroupDepartmentId { get => VM.CreateGroupDepartmentId.ToString(); set => VM.CreateGroupDepartmentId = Guid.TryParse(value, out var id) ? id : WellKnownDepartments.GlobalId; }
+    private string CreateGroupDepartmentId { get => VM.CreateGroupDepartmentId.ToString(); set => VM.CreateGroupDepartmentId = Guid.TryParse(value, out var id) ? id : WellKnownGUIDs.DEPARTMENT_GLOBAL; }
     private async Task CreateUser() { await VM.CreateUserAsync(); await OnChanged.InvokeAsync(); }
     private async Task CreateGroup() { await VM.CreateGroupAsync(); await OnChanged.InvokeAsync(); }
     private async Task CreateRole() { await VM.CreateRoleAsync(); await OnChanged.InvokeAsync(); }

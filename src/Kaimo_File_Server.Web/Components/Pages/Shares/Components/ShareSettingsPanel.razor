@@ -11,12 +11,15 @@
 
 @if (VM.SelectedShare is not null)
 {
+    var isReadOnly = VM.IsSelectedShareReadOnly;
+
     <div class="detail-section">
         <span class="detail-label">@Resources.Web_ShareList_Label_Name</span>
         <div class="detail-rename-row">
-            <input class="edit-input" type="text" @bind="VM.EditShareName" @bind:event="oninput" disabled="@VM.IsRenaming" />
+            <input class="edit-input" type="text" @bind="VM.EditShareName" @bind:event="oninput"
+                   disabled="@(isReadOnly || VM.IsRenaming)" />
             <button class="btn-primary" @onclick="RenameShare"
-                    disabled="@(VM.EditShareName.Trim() == VM.SelectedShare.Name || VM.IsRenaming)">
+                    disabled="@(isReadOnly || VM.EditShareName.Trim() == VM.SelectedShare.Name || VM.IsRenaming)">
                 @(VM.IsRenaming ? "…" : Resources.Web_Action_Rename)
             </button>
         </div>
@@ -32,7 +35,7 @@
         <div class="detail-value-row">
             <select class="edit-input"
                     @bind="VM.EditSharePoolPath"
-                    disabled="@VM.IsMovingPool">
+                    disabled="@(isReadOnly || VM.IsMovingPool)">
                 @if (VM.GetPoolNameForShare(VM.SelectedShare) is null)
                 {
                     <option value="@VM.EditSharePoolPath">
@@ -46,7 +49,7 @@
             </select>
             <button class="btn-primary compact-button"
                     @onclick="ChangeStoragePool"
-                    disabled="@VM.IsMovingPool">
+                    disabled="@(isReadOnly || VM.IsMovingPool)">
                 @(VM.IsMovingPool ? "…" : Resources.Web_ShareList_Action_MovePool)
             </button>
         </div>
@@ -56,7 +59,8 @@
         <span class="detail-label">@Resources.Web_ShareList_Label_Status</span>
         <div class="detail-value-row">
             <span class="detail-value">@(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)</span>
-            <button class="btn-secondary compact-button" @onclick="ToggleShareEnabled">
+            <button class="btn-secondary compact-button" @onclick="ToggleShareEnabled"
+                    disabled="@isReadOnly">
                 @(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
             </button>
         </div>
@@ -66,7 +70,8 @@
         <span class="detail-label">@Resources.Web_ShareList_Label_RecycleBin</span>
         <div class="detail-value-row">
             <span class="detail-value">@(VM.SelectedShare.IsRecycleEnabled ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)</span>
-            <button class="btn-secondary compact-button" @onclick="ToggleRecycleEnabled">
+            <button class="btn-secondary compact-button" @onclick="ToggleRecycleEnabled"
+                    disabled="@isReadOnly">
                 @(VM.SelectedShare.IsRecycleEnabled ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
             </button>
         </div>
@@ -75,14 +80,16 @@
     <div class="detail-actions">
         @if (!VM.ShowDeleteConfirm)
         {
-            <button class="btn-danger-outline" @onclick="() => VM.ShowDeleteConfirm = true">@Resources.Web_ShareList_DeleteShare</button>
+            <button class="btn-danger-outline" disabled="@isReadOnly"
+                    @onclick="() => VM.ShowDeleteConfirm = true">@Resources.Web_ShareList_DeleteShare</button>
         }
         else
         {
             <div class="confirm-delete">
                 <p>@string.Format(Resources.Web_ShareList_DeleteConfirm, VM.SelectedShare.Name)</p>
                 <div class="delete-actions">
-                    <button class="btn-danger-outline" @onclick="DeleteShare">@Resources.Web_ShareList_DeletePermanently</button>
+                    <button class="btn-danger-outline" disabled="@isReadOnly"
+                            @onclick="DeleteShare">@Resources.Web_ShareList_DeletePermanently</button>
                     <button class="btn-secondary" @onclick="() => VM.ShowDeleteConfirm = false">@Resources.Web_Button_Cancel</button>
                 </div>
             </div>

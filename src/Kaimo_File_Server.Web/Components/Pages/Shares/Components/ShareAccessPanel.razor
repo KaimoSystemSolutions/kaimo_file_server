@@ -19,7 +19,8 @@
             <div class="detail-section">
                 <div class="detail-value-row">
                     <span class="detail-value">@(VM.SelectedShare.IsShareHidden ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)</span>
-                    <button class="btn-secondary compact-button" @onclick="ToggleShareHidden">
+                    <button class="btn-secondary compact-button" @onclick="ToggleShareHidden"
+                            disabled="@VM.IsSelectedShareReadOnly">
                         @(VM.SelectedShare.IsShareHidden ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
                     </button>
                 </div>
