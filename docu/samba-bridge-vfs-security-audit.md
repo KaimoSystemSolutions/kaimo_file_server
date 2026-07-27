@@ -669,7 +669,7 @@ The module is built against Samba 4.19.5/ABI 49. The source version is pinned, b
 | Mkdir lifecycle | `create_file` primary event plus `mkdirat` fallback | Fallback authorization and duplicate-event semantics need proof |
 | Delete lifecycle | Metadata/version/search cleanup event | Event loss; no durable reconciliation |
 | Rename lifecycle | ACL/version/search path update event | Not idempotent; wrong directory flag; event loss |
-| Dynamic shares | Enabled shares mirrored to registry | Errors ignored, disabled window, unvalidated path, active-session semantics |
+| Dynamic shares | Enabled shares mirrored to registry; path changes/removals close stale sessions | Errors ignored, polling delay, unvalidated path |
 | Protocol config | Dialect/signing/encryption/wsdd/audit synchronized | Apply failures can be hidden; polling delay; probe credentials |
 | SMB enable/disable | Connect gate plus periodic close-share | Existing handles and delay; bridge methods do not all enforce state |
 | Snapshot enumeration | GMT tokens returned through VFS; folder timestamps pass through the central directory ACL boundary | Buffer/count limits, directory flag, live per-file visibility verification |

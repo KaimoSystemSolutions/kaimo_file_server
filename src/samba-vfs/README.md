@@ -359,7 +359,9 @@ replaces the FileSystemWatcher/`SyncFromDb()` mechanism from
   is reachable) and then every 60 s — same as user sync.
 - **Reconciliation** in `sync-shares.sh` is idempotent: new shares → `net conf addshare`,
   changed (path/visibility) → `net conf setparm`, removed/disabled → `net conf delshare`.
-  `global` is never touched.
+  A path change or removal additionally runs `smbcontrol smbd close-share` so an
+  existing client cannot remain attached to the old service path. `global` is
+  never touched.
 
 ### Visibility (ABE) — Decision: hidden flag only
 
