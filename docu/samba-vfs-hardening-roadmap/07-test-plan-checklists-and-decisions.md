@@ -66,9 +66,11 @@ implemented; their required release verification remains tracked in milestone 4.
 ### Native VFS checklist
 
 - [x] Connection data uses Samba-owned lifetime and fail-closed allocation.
-- [ ] One canonical checked path routine is used everywhere.
+- [x] One canonical share-relative path routine is used everywhere; raw-path
+  validation and containment checking remain P2-03.
 - [x] No fixed request-path buffer truncation can change the authorized target.
-- [ ] User/share connection context cannot truncate or confuse UTF-8 identities.
+- [x] User/share connection context cannot truncate or confuse identities;
+  ingress is restricted to the bounded synchronization-safe ASCII syntax.
 - [x] Full access-mask mapping exists in source; native/runtime verification remains pending.
 - [x] Rename is authorized before mutation (native/runtime verification pending).
 - [ ] All mutating VFS operations are inventoried and covered or explicitly denied.

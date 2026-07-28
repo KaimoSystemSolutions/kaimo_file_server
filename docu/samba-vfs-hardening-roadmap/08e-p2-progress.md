@@ -56,3 +56,52 @@ identity or share prefix than the authorized TREE_CONNECT.
 
 **Next planned finding:** P2-02 — route every VFS hook through one
 boundary-aware share-relative canonicalization routine.
+
+### 2026-07-28 — P2-02: Unified share-relative canonicalization
+
+**Status:** Implemented, regression-tested, and verified in the pinned Samba
+4.19.5 `build-runtime` image.
+
+The bridge historically normalized only selected snapshot and delete paths.
+P0-02 had already expanded the call coverage and added a component-boundary
+check, but the behavior still lived inside the Samba-dependent VFS source
+without focused regression tests. The root connectpath was also a missed edge
+case: `/folder/file` was left absolute when the configured connectpath was `/`.
+
+**Implemented**
+
+1. Extracted the allocation-free canonicalization rules into `share_path.h`,
+   with a thin VFS wrapper as the single entry point used by create,
+   directory-listing, close, delete, rename, mkdir, snapshot enumeration,
+   snapshot resolution, stat/lstat, openat, and reserved-namespace handling.
+2. Preserved already-relative paths and stripped absolute connectpaths only on
+   an exact component boundary. `/share-backup` therefore cannot be mistaken
+   for a child of `/share`.
+3. Canonicalized exact-share, `.`, and `./` root spellings to the empty path,
+   removed leading `./` segments, trimmed trailing connectpath separators, and
+   added explicit semantics for the `/` connectpath.
+4. Added a standalone native regression suite covering relative and absolute
+   inputs, exact roots, trailing and repeated separators, leading `./`,
+   null/empty connectpaths, root shares, and prefix collisions.
+5. Wired the regression into the pinned native `build-runtime` stage before
+   compiling and linking the real VFS module.
+
+**Validation completed**
+
+- The focused `test-share-path` native suite passes in the generated
+  `kaimo-samba-build-tests:p2-02` image.
+- The pinned Samba 4.19.5 `build-runtime` image builds successfully, including
+  the complete native helper suite and real `kaimo_bridge` ABI-49 module.
+- `git diff --check` passes.
+
+**Validation still required**
+
+- Exercise live SMB operations whose Samba path arguments alternate between
+  already-relative and connectpath-prefixed forms across create, listing,
+  close, delete, rename, mkdir, and snapshots in the deployable Compose stack.
+- P2-02 intentionally does not make arbitrary raw client paths trustworthy.
+  Rejection of NUL, traversal, absolute/out-of-share, and internal paths plus
+  containment-checked materialization remains P2-03.
+
+**Next planned finding:** P2-03 — unify bridge path validation and route
+snapshot materialization through containment-checked storage resolution.

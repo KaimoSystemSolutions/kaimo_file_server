@@ -25,11 +25,24 @@ same ASCII syntax, reserved-name rules, and byte limits.
 
 ### P2-02: Share-relative canonicalization is inconsistent
 
+> **Remediation status (2026-07-28): Verified in focused native tests and the
+> pinned Samba 4.19.5 build-runtime image. Live SMB path-shape coverage remains
+> part of the release operation matrix.**
+
 `kaimo_share_rel()` is applied in selected snapshot and delete paths but not uniformly in create, readdir, close, rename, and mkdir. Some Samba call sites may produce connectpath-prefixed names.
 
 Its prefix test also does not require a path-separator boundary after `connectpath`.
 
 **Fix:** one canonical path routine, with boundary-aware connectpath stripping, called by every hook before authorization or event emission.
+
+**Implemented fix:** all authorization, lifecycle, listing, reserved-namespace,
+and snapshot paths now use `kaimo_canonical_share_path()`, backed by the
+independently testable `share_path.h` implementation. It accepts already
+share-relative and connectpath-prefixed Samba names, maps root spellings to the
+empty share-relative path, strips leading `./`, and requires a complete
+component boundary before removing a non-root connectpath. Root connectpaths
+are handled explicitly, so `/folder` correctly becomes `folder` without
+weakening the prefix-collision rule.
 
 ### P2-03: Bridge path validation is inconsistent
 

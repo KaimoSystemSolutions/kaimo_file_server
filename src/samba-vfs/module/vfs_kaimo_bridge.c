@@ -39,6 +39,7 @@
 
 #include "local_protocol.h"
 #include "rename_event.h"
+#include "share_path.h"
 
 #undef DBGC_CLASS
 #define DBGC_CLASS DBGC_VFS
@@ -711,21 +712,13 @@ static void kaimo_snaplease_release(struct kaimo_conn_ctx *ctx,
  * normalize a lone "." (share root) to "". MUST be applied identically in every
  * hook (openat AND stat/lstat) or their snapshot views diverge and Samba rejects the
  * open on the stat-vs-fd inode mismatch. */
-static const char *kaimo_share_rel(vfs_handle_struct *handle, const char *path)
+static const char *kaimo_canonical_share_path(
+	vfs_handle_struct *handle, const char *path)
 {
-	if (path == NULL) return "";
-	const char *cp = handle->conn->connectpath;
-	size_t cplen = (cp != NULL) ? strlen(cp) : 0;
-	while (cplen > 1 && cp[cplen - 1] == '/') cplen--;
-	/* A byte-prefix alone is insufficient: connectpath=/share must not strip
-	 * the unrelated absolute path /share-backup/file. */
-	if (cplen > 0 && strncmp(path, cp, cplen) == 0 &&
-	    (path[cplen] == '\0' || path[cplen] == '/')) {
-		path += cplen;
-		while (*path == '/') path++;
-	}
-	if (path[0] == '.' && path[1] == '\0') path++; /* "." -> "" */
-	return path;
+	const char *connectpath =
+		handle != NULL && handle->conn != NULL
+			? handle->conn->connectpath : NULL;
+	return kaimo_share_path_canonical(connectpath, path);
 }
 
 #define KAIMO_CLOSE_CAPTURE_DIR ".kaimo-close-captures"
@@ -738,7 +731,7 @@ static const char *kaimo_share_rel(vfs_handle_struct *handle, const char *path)
 static bool kaimo_is_reserved_client_path(vfs_handle_struct *handle,
 					  const char *path)
 {
-	const char *logical = kaimo_share_rel(handle, path);
+	const char *logical = kaimo_canonical_share_path(handle, path);
 	while (logical[0] == '.' && logical[1] == '/') logical += 2;
 	while (logical[0] == '/') logical++;
 	return strncmp(logical, ".kaimo-", 7) == 0;
@@ -872,7 +865,8 @@ static int kaimo_apply_twrp(vfs_handle_struct *handle,
 	char gmt[32];
 	if (!kaimo_twrp_to_gmt(smb_fname->twrp, gmt, sizeof(gmt))) return -1;
 
-	const char *logical = kaimo_share_rel(handle, smb_fname->base_name);
+	const char *logical = kaimo_canonical_share_path(
+		handle, smb_fname->base_name);
 	char cache[6144];
 	char lease_id[128];
 	errno = 0;
@@ -915,7 +909,7 @@ static int kaimo_get_shadow_copy_data(vfs_handle_struct *handle,
 	const char *path = (fsp != NULL && fsp->fsp_name != NULL &&
 			    fsp->fsp_name->base_name != NULL)
 				? fsp->fsp_name->base_name : "";
-	const char *logical = kaimo_share_rel(handle, path);
+	const char *logical = kaimo_canonical_share_path(handle, path);
 
 	shadow_copy_data->num_volumes = 0;
 	shadow_copy_data->labels = NULL;
@@ -1086,7 +1080,8 @@ static int kaimo_lstat(vfs_handle_struct *handle, struct smb_filename *smb_fname
 }
 
 /* Builds the complete path from directory-fsp + at-relative name without a
- * fixed buffer. The caller then canonicalizes it through kaimo_share_rel(). */
+ * fixed buffer. The caller then canonicalizes it through
+ * kaimo_canonical_share_path(). */
 static char *kaimo_join_path(TALLOC_CTX *mem_ctx,
 			     const struct files_struct *dirfsp,
 			     const struct smb_filename *name)
@@ -1211,8 +1206,8 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 	 * redirect to the version copy must happen in kaimo_openat. Rewriting here is
 	 * ignored for file content (it opens the live file). */
 	if (smb_fname != NULL && smb_fname->twrp != 0) {
-		const char *logical = kaimo_share_rel(handle,
-						      smb_fname->base_name);
+		const char *logical = kaimo_canonical_share_path(
+			handle, smb_fname->base_name);
 		if (!kaimo_snapshot_create_is_readonly(
 			    access_mask, create_disposition, create_options,
 			    allocation_size, sd, ea_list)) {
@@ -1250,8 +1245,8 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 	}
 
 	if (ctx != NULL && smb_fname != NULL && smb_fname->base_name != NULL) {
-		const char *logical = kaimo_share_rel(handle,
-						      smb_fname->base_name);
+		const char *logical = kaimo_canonical_share_path(
+			handle, smb_fname->base_name);
 		bool wants_create =
 			(create_disposition == FILE_SUPERSEDE ||
 			 create_disposition == FILE_CREATE ||
@@ -1295,8 +1290,8 @@ static NTSTATUS kaimo_create_file(vfs_handle_struct *handle,
 	    smb_fname != NULL && smb_fname->base_name != NULL &&
 	    smb_fname->base_name[0] != '\0') {
 		TALLOC_CTX *frame = talloc_stackframe();
-		const char *logical = kaimo_share_rel(handle,
-						      smb_fname->base_name);
+		const char *logical = kaimo_canonical_share_path(
+			handle, smb_fname->base_name);
 		struct kaimo_local_request request;
 		kaimo_request_init(&request);
 		kaimo_local_builder_string(&request.builder, ctx->user);
@@ -1319,7 +1314,8 @@ static struct dirent *kaimo_readdir(vfs_handle_struct *handle,
 	const char *dirpath = (dirfsp != NULL && dirfsp->fsp_name != NULL)
 				? dirfsp->fsp_name->base_name : NULL;
 	const char *logical_dir = (dirpath != NULL)
-				? kaimo_share_rel(handle, dirpath) : NULL;
+				? kaimo_canonical_share_path(handle, dirpath)
+				: NULL;
 	if (dirpath != NULL && kaimo_is_reserved_client_path(handle, dirpath)) {
 		errno = EACCES;
 		return NULL;
@@ -1607,9 +1603,9 @@ static int kaimo_close(vfs_handle_struct *handle, files_struct *fsp)
 	kaimo_request_init(&event_request);
 	bool event_ready = false;
 	if (fsp != NULL && fsp->fsp_name != NULL && fsp->fsp_name->base_name != NULL)
-		path = talloc_strdup(frame,
-				     kaimo_share_rel(handle,
-						     fsp->fsp_name->base_name));
+		path = talloc_strdup(
+			frame, kaimo_canonical_share_path(
+				handle, fsp->fsp_name->base_name));
 	if (modified && !isdir && path == NULL)
 		DBG_WARNING("kaimo_bridge: CLOSE path unavailable; "
 			    "native close will still proceed\n");
@@ -1668,7 +1664,7 @@ static int kaimo_unlinkat(vfs_handle_struct *handle,
 		return -1;
 	}
 	bool isdir = (flags & AT_REMOVEDIR) != 0;
-	const char *logical = kaimo_share_rel(handle, path);
+	const char *logical = kaimo_canonical_share_path(handle, path);
 	if (kaimo_is_reserved_client_path(handle, path)) {
 		TALLOC_FREE(frame);
 		errno = EACCES;
@@ -1732,8 +1728,8 @@ static int kaimo_renameat(vfs_handle_struct *handle,
 		errno = (ctx == NULL) ? EACCES : ENOMEM;
 		return -1;
 	}
-	const char *oldlogical = kaimo_share_rel(handle, oldp);
-	const char *newlogical = kaimo_share_rel(handle, newp);
+	const char *oldlogical = kaimo_canonical_share_path(handle, oldp);
+	const char *newlogical = kaimo_canonical_share_path(handle, newp);
 	if (kaimo_is_reserved_client_path(handle, oldp) ||
 	    kaimo_is_reserved_client_path(handle, newp)) {
 		TALLOC_FREE(frame);
@@ -1856,7 +1852,7 @@ static int kaimo_mkdirat(vfs_handle_struct *handle,
 		errno = (ctx == NULL) ? EACCES : ENOMEM;
 		return -1;
 	}
-	const char *logical = kaimo_share_rel(handle, path);
+	const char *logical = kaimo_canonical_share_path(handle, path);
 	if (kaimo_is_reserved_client_path(handle, path)) {
 		TALLOC_FREE(frame);
 		errno = EACCES;
@@ -2036,7 +2032,7 @@ static int kaimo_openat(vfs_handle_struct *handle,
 	 * the parent fsp carrying the absolute connectpath, yielding an absolute path
 	 * like "/data/storage/<share>/topOrdner". The bridge expects a share-relative
 	 * path ("topOrdner"), so strip the connectpath prefix. A lone "." -> "" (root). */
-	const char *logical = kaimo_share_rel(handle, joined);
+	const char *logical = kaimo_canonical_share_path(handle, joined);
 
 	char cache_rel[6144];
 	char lease_id[128];
