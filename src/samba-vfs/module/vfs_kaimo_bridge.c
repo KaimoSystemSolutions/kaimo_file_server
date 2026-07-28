@@ -28,9 +28,14 @@
 #include <fcntl.h>
 #include <time.h>
 #include <poll.h>
+#include <sys/ioctl.h>
 #include <sys/file.h>
+#include <sys/random.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#ifdef __linux__
+#include <linux/fs.h>
+#endif
 
 #include "local_protocol.h"
 
@@ -469,7 +474,7 @@ static bool kaimo_list_filter_enabled(void)
 /* Best-effort notification to kaimo_authd (no response expected by this
  * caller). Its deliberately small, independent budget bounds the local
  * enqueue cost; SMB Close/Delete/Rename never wait for gRPC processing. */
-static void kaimo_notify_send(
+static bool kaimo_notify_send(
 	uint8_t operation, const struct kaimo_local_request *request)
 {
 	struct kaimo_local_frame_header response;
@@ -481,7 +486,9 @@ static void kaimo_notify_send(
 	    response.payload_length != 0) {
 		DBG_ERR("kaimo_bridge: lifecycle event %u was not durably "
 			"accepted by authd\n", (unsigned)operation);
+		return false;
 	}
+	return true;
 }
 
 /* ---- Phase 5: snapshot helpers (@GMT / "Previous Versions") ---- */
@@ -711,22 +718,20 @@ static const char *kaimo_share_rel(vfs_handle_struct *handle, const char *path)
 	return path;
 }
 
-#define KAIMO_LEGACY_CACHE_DIR ".kaimo-snapshots"
+#define KAIMO_CLOSE_CAPTURE_DIR ".kaimo-close-captures"
 #define KAIMO_DEFAULT_SNAPSHOT_CACHE_ROOT "/data/kaimo-system/.kaimo-snapshots"
 #define KAIMO_SNAPSHOT_LEASE_FILE ".kaimo-lease"
 
-/* The old in-share cache name stays permanently reserved. This blocks direct
- * client access to stale pre-P0-06 materializations during rolling upgrades and
- * prevents clients from planting a lookalike internal namespace. */
+/* Every internal .kaimo-* namespace is permanently reserved. This blocks
+ * direct client access to old snapshot materializations and to immutable close
+ * captures while authd is retrying their lifecycle events. */
 static bool kaimo_is_reserved_client_path(vfs_handle_struct *handle,
 					  const char *path)
 {
 	const char *logical = kaimo_share_rel(handle, path);
 	while (logical[0] == '.' && logical[1] == '/') logical += 2;
 	while (logical[0] == '/') logical++;
-	size_t reserved_len = strlen(KAIMO_LEGACY_CACHE_DIR);
-	return strnequal(logical, KAIMO_LEGACY_CACHE_DIR, reserved_len) &&
-	       (logical[reserved_len] == '\0' || logical[reserved_len] == '/');
+	return strncmp(logical, ".kaimo-", 7) == 0;
 }
 
 /* The bridge response crosses an unauthenticated control-plane boundary today,
@@ -1337,6 +1342,228 @@ static struct dirent *kaimo_readdir(vfs_handle_struct *handle,
 	}
 }
 
+static bool kaimo_random_capture_id(char id[33])
+{
+	uint8_t random_bytes[16];
+	size_t offset = 0;
+	static const char hex[] = "0123456789abcdef";
+
+	while (offset < sizeof(random_bytes)) {
+		ssize_t result = getrandom(
+			random_bytes + offset, sizeof(random_bytes) - offset, 0);
+		if (result < 0 && errno == EINTR)
+			continue;
+		if (result <= 0)
+			return false;
+		offset += (size_t)result;
+	}
+	for (size_t i = 0; i < sizeof(random_bytes); i++) {
+		id[i * 2] = hex[random_bytes[i] >> 4];
+		id[i * 2 + 1] = hex[random_bytes[i] & 0x0f];
+	}
+	id[32] = '\0';
+	return true;
+}
+
+static bool kaimo_capture_source_stable(const struct stat *before,
+					const struct stat *after)
+{
+	return before->st_dev == after->st_dev &&
+	       before->st_ino == after->st_ino &&
+	       before->st_size == after->st_size &&
+	       before->st_mtim.tv_sec == after->st_mtim.tv_sec &&
+	       before->st_mtim.tv_nsec == after->st_mtim.tv_nsec &&
+	       before->st_ctim.tv_sec == after->st_ctim.tv_sec &&
+	       before->st_ctim.tv_nsec == after->st_ctim.tv_nsec;
+}
+
+/* Capture the exact inode behind the closing Samba handle, never a reopened
+ * pathname. FICLONE gives a constant-time CoW snapshot where available. The
+ * fallback copies with pread so it cannot disturb Samba's file position and
+ * rejects a source whose size/timestamps changed during the copy. */
+static bool kaimo_capture_close_content(
+	vfs_handle_struct *handle, files_struct *fsp, TALLOC_CTX *mem_ctx,
+	char **capture_id_out, char **capture_path_out)
+{
+	char capture_id[33];
+	char *capture_dir_path = NULL;
+	char *temporary_name = NULL;
+	char *final_name = NULL;
+	char *final_path = NULL;
+	struct stat before;
+	struct stat after;
+	struct stat reopened;
+	int samba_fd = -1;
+	int source_fd = -1;
+	int directory_fd = -1;
+	int capture_fd = -1;
+	bool copied = false;
+	uint8_t *buffer = NULL;
+	int saved_errno = 0;
+
+	*capture_id_out = NULL;
+	*capture_path_out = NULL;
+	if (handle == NULL || handle->conn == NULL ||
+	    handle->conn->connectpath == NULL || fsp == NULL) {
+		errno = EINVAL;
+		return false;
+	}
+	samba_fd = fsp_get_io_fd(fsp);
+	if (samba_fd < 0) {
+		errno = EBADF;
+		return false;
+	}
+	if (fstat(samba_fd, &before) != 0)
+		return false;
+	if (!S_ISREG(before.st_mode)) {
+		errno = EINVAL;
+		return false;
+	}
+	/* A client may have requested a write-only handle. Reopening this procfd
+	 * obtains a readable description of the same already-resolved inode; it
+	 * does not resolve the mutable share pathname. Verify identity before use. */
+	char procfd_path[64];
+	int procfd_length = snprintf(
+		procfd_path, sizeof(procfd_path), "/proc/self/fd/%d", samba_fd);
+	if (procfd_length <= 0 || (size_t)procfd_length >= sizeof(procfd_path)) {
+		errno = EOVERFLOW;
+		return false;
+	}
+	source_fd = open(procfd_path, O_RDONLY | O_CLOEXEC);
+	if (source_fd < 0)
+		return false;
+	if (fstat(source_fd, &reopened) != 0) {
+		int reopen_errno = errno;
+		close(source_fd);
+		errno = reopen_errno;
+		return false;
+	}
+	if (reopened.st_dev != before.st_dev ||
+	    reopened.st_ino != before.st_ino) {
+		if (source_fd >= 0)
+			close(source_fd);
+		errno = ESTALE;
+		return false;
+	}
+	if (!kaimo_random_capture_id(capture_id))
+		goto done;
+
+	capture_dir_path = talloc_asprintf(
+		mem_ctx, "%s/%s", handle->conn->connectpath,
+		KAIMO_CLOSE_CAPTURE_DIR);
+	temporary_name = talloc_asprintf(
+		mem_ctx, ".%s.%lld.tmp", capture_id,
+		(long long)getpid());
+	final_name = talloc_asprintf(mem_ctx, "%s.cap", capture_id);
+	final_path = talloc_asprintf(
+		mem_ctx, "%s/%s", capture_dir_path, final_name);
+	if (capture_dir_path == NULL || temporary_name == NULL ||
+	    final_name == NULL || final_path == NULL) {
+		errno = ENOMEM;
+		return false;
+	}
+
+	directory_fd = open(
+		capture_dir_path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+	if (directory_fd < 0)
+		goto done;
+	capture_fd = openat(
+		directory_fd, temporary_name,
+		O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0440);
+	if (capture_fd < 0)
+		goto done;
+
+#ifdef FICLONE
+	if (ioctl(capture_fd, FICLONE, source_fd) == 0) {
+		copied = true;
+	} else if (ftruncate(capture_fd, 0) != 0) {
+		goto done;
+	}
+#endif
+	if (!copied) {
+		const size_t buffer_size = 128 * 1024;
+		buffer = talloc_array(mem_ctx, uint8_t, buffer_size);
+		if (buffer == NULL) {
+			errno = ENOMEM;
+			goto done;
+		}
+		off_t cursor = 0;
+		while (cursor < before.st_size) {
+			size_t requested = (size_t)MIN(
+				(off_t)buffer_size, before.st_size - cursor);
+			ssize_t count = pread(source_fd, buffer, requested, cursor);
+			if (count < 0 && errno == EINTR)
+				continue;
+			if (count <= 0) {
+				errno = count == 0 ? EIO : errno;
+				goto done;
+			}
+			size_t written = 0;
+			while (written < (size_t)count) {
+				ssize_t result = pwrite(
+					capture_fd, buffer + written,
+					(size_t)count - written,
+					cursor + (off_t)written);
+				if (result < 0 && errno == EINTR)
+					continue;
+				if (result <= 0) {
+					errno = result == 0 ? EIO : errno;
+					goto done;
+				}
+				written += (size_t)result;
+			}
+			cursor += count;
+		}
+	}
+
+	if (fstat(source_fd, &after) != 0 ||
+	    !kaimo_capture_source_stable(&before, &after)) {
+		errno = EBUSY;
+		goto done;
+	}
+	if (fchmod(capture_fd, 0440) != 0 || fsync(capture_fd) != 0)
+		goto done;
+	if (close(capture_fd) != 0) {
+		capture_fd = -1;
+		goto done;
+	}
+	capture_fd = -1;
+
+	/* linkat is an atomic no-replace publication; the random final name cannot
+	 * overwrite an existing capture even under a compromised local peer. */
+	if (linkat(
+	     directory_fd, temporary_name, directory_fd, final_name, 0) != 0)
+		goto done;
+	if (unlinkat(directory_fd, temporary_name, 0) != 0)
+		goto done;
+	if (fsync(directory_fd) != 0)
+		goto done;
+
+	*capture_id_out = talloc_strdup(mem_ctx, capture_id);
+	*capture_path_out = talloc_strdup(mem_ctx, final_path);
+	if (*capture_id_out == NULL || *capture_path_out == NULL) {
+		errno = ENOMEM;
+		goto done;
+	}
+	close(directory_fd);
+	close(source_fd);
+	return true;
+
+done:
+	saved_errno = errno;
+	if (capture_fd >= 0)
+		close(capture_fd);
+	if (source_fd >= 0)
+		close(source_fd);
+	if (directory_fd >= 0) {
+		unlinkat(directory_fd, temporary_name, 0);
+		unlinkat(directory_fd, final_name, 0);
+		close(directory_fd);
+	}
+	errno = saved_errno;
+	return false;
+}
+
 /* ---- Close hook: written file -> versioning/index/ownership (Phase 3) ---- */
 static int kaimo_close(vfs_handle_struct *handle, files_struct *fsp)
 {
@@ -1349,6 +1576,8 @@ static int kaimo_close(vfs_handle_struct *handle, files_struct *fsp)
 	 * leaking the native descriptor; only the best-effort event is then lost. */
 	TALLOC_CTX *frame = talloc_stackframe();
 	char *path = NULL;
+	char *capture_id = NULL;
+	char *capture_path = NULL;
 	struct kaimo_local_request event_request;
 	kaimo_request_init(&event_request);
 	bool event_ready = false;
@@ -1359,11 +1588,19 @@ static int kaimo_close(vfs_handle_struct *handle, files_struct *fsp)
 	if (modified && !isdir && path == NULL)
 		DBG_WARNING("kaimo_bridge: CLOSE path unavailable; "
 			    "native close will still proceed\n");
-	if (ctx != NULL && modified && !isdir && path != NULL && path[0] != '\0') {
+	if (ctx != NULL && modified && !isdir && path != NULL && path[0] != '\0' &&
+	    kaimo_capture_close_content(
+		    handle, fsp, frame, &capture_id, &capture_path)) {
 		kaimo_local_builder_string(&event_request.builder, ctx->user);
 		kaimo_local_builder_string(&event_request.builder, ctx->share);
 		kaimo_local_builder_string(&event_request.builder, path);
+		kaimo_local_builder_string(&event_request.builder, capture_id);
 		event_ready = kaimo_request_ready("CLOSE", &event_request);
+	} else if (ctx != NULL && modified && !isdir &&
+		   path != NULL && path[0] != '\0') {
+		DBG_ERR("kaimo_bridge: CLOSE could not capture the exact handle "
+			"content; lifecycle event suppressed: %s\n",
+			strerror(errno));
 	}
 
 	/* The fsp may become invalid inside NEXT_CLOSE. Release the cache lease at
@@ -1376,8 +1613,12 @@ static int kaimo_close(vfs_handle_struct *handle, files_struct *fsp)
 
 	int ret = SMB_VFS_NEXT_CLOSE(handle, fsp);
 
-	if (ret == 0 && event_ready)
-		kaimo_notify_send(KAIMO_LOCAL_OP_CLOSE, &event_request);
+	if (ret == 0 && event_ready) {
+		if (!kaimo_notify_send(KAIMO_LOCAL_OP_CLOSE, &event_request))
+			unlink(capture_path);
+	} else if (event_ready) {
+		unlink(capture_path);
+	}
 	TALLOC_FREE(frame);
 	return ret;
 }
@@ -1872,7 +2113,7 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 /* Build marker: bump on every module change so the running image can be
  * identified in the logs (grep "kaimo_bridge build"). This is how we tell whether
  * a rebuild actually picked up the latest source vs. served a cached layer. */
-#define KAIMO_BRIDGE_BUILD "2026-07-28f durable event enqueue ack"
+#define KAIMO_BRIDGE_BUILD "2026-07-28g descriptor-bound close captures"
 
 static_decl_vfs;
 NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)

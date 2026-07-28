@@ -16,6 +16,7 @@ namespace Kaimo_File_Server.SmbBridge.Services;
 /// </summary>
 public sealed class FileEventGrpcService : EventService.EventServiceBase
 {
+    private const string CloseCaptureDirectory = ".kaimo-close-captures";
     private readonly IFileServiceFactory _factory;
     private readonly IShareRepository _shares;
     private readonly IAuthenticationLookup _auth;
@@ -39,16 +40,32 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
     public override async Task<NotifyReply> NotifyClose(NotifyCloseRequest request, ServerCallContext context)
     {
         if (!TryParseEventId(request.EventId, out var eventId)) return Fail();
+        if (!IsCaptureId(request.CaptureId)) return Fail();
         var (svc, user) = await ResolveAsync(
             request.Username, request.Share,
             context?.CancellationToken ?? CancellationToken.None);
         if (svc is null || user is null) return Fail();
 
+        var capturePath = svc.ToAbsolutePath(
+            $"{CloseCaptureDirectory}/{request.CaptureId}.cap");
         if (!await ProcessOnceAsync(
                 eventId, "close",
-                () => svc.NotifyExternalCloseAsync(request.Path, user),
+                () => svc.NotifyExternalCloseAsync(
+                    request.Path, user, () => OpenCaptureAsync(capturePath)),
                 context?.CancellationToken ?? CancellationToken.None))
             return Fail();
+        try
+        {
+            File.Delete(capturePath);
+        }
+        catch (Exception error)
+        {
+            _logger.LogError(
+                error,
+                "Completed close capture {CaptureId} could not be removed.",
+                request.CaptureId);
+            return Fail();
+        }
         _logger.LogInformation("NotifyClose: share={Share} path=[{Path}] user={User}",
             request.Share, request.Path, request.Username);
         return Ok();
@@ -147,6 +164,19 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
 
     private static bool TryParseEventId(string value, out Guid eventId) =>
         Guid.TryParseExact(value, "N", out eventId);
+
+    private static bool IsCaptureId(string value) =>
+        value.Length == 32 && value.All(character =>
+            character is >= '0' and <= '9' or >= 'a' and <= 'f');
+
+    private static Task<Stream> OpenCaptureAsync(string path)
+    {
+        Stream stream = new FileStream(
+            path, FileMode.Open, FileAccess.Read, FileShare.Read,
+            bufferSize: 64 * 1024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        return Task.FromResult(stream);
+    }
 
     private async Task<(IFileService? Service, UserContext? User)> ResolveAsync(
         string username,

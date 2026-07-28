@@ -101,6 +101,22 @@ if (( ${#want_path[@]} > 0 )); then
         chgrp "${KAIMO_STORAGE_GID:-1654}" "$path" 2>/dev/null || true
         chmod 2775 "$path" 2>/dev/null || true
 
+        # P1-12 immutable close captures live on the same filesystem as the
+        # share so the VFS can use a reflink when supported. The namespace is
+        # denied by every client-facing VFS path hook. setgid preserves the
+        # storage group for bridge reads and post-ack cleanup. Client access to
+        # this namespace is blocked by the VFS.
+        capture_dir="$path/.kaimo-close-captures"
+        if [ -L "$capture_dir" ] ||
+           ! install -d -m 2770 -o root -g "${KAIMO_STORAGE_GID:-1654}" "$capture_dir"; then
+            echo "[sync-shares] FAILED to secure close-capture directory: $capture_dir" >&2
+            if net conf showshare "$name" >/dev/null 2>&1; then
+                net conf delshare "$name" >/dev/null 2>&1 || true
+                close_share_sessions "$name"
+            fi
+            exit 1
+        fi
+
         # Create, if not already present ...
         if net conf showshare "$name" >/dev/null 2>&1; then
             current_path="$(net conf getparm "$name" path 2>/dev/null || true)"

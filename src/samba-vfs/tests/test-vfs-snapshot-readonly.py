@@ -33,7 +33,7 @@ UPLOAD_PATH = ROOT / "replacement.txt"
 USER = "kaimosnapshot"
 PASSWORD = "SnapshotPassw0rd!"
 GMT = "@GMT-2024.01.02-03.04.05"
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 3
 HEADER = struct.Struct("!4sBBBBI")
 
 

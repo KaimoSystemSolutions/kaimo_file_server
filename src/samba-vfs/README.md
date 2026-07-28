@@ -258,7 +258,7 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
 
 ```
  smbd VFS hook (pure C)            Sidecar (kaimo_authd)        SmbBridge (.NET)
-  close_fn   (file written)    ──framed CLOSE──► NotifyClose ──► FileService.NotifyExternalCloseAsync
+  close_fn (descriptor capture)──framed CLOSE──► NotifyClose ──► FileService.NotifyExternalCloseAsync
   unlinkat_fn(deleted)         ──framed DELETE─► NotifyDelete ─►   → Version (CreateVersionAsync)
   renameat_fn(renamed)  ──framed RENAME_AUTH─► AuthorizeRename
                         ──framed RENAME───────► NotifyRename ─►   → Ownership (EnsureOwnerAsync)
@@ -284,6 +284,14 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
   `samba_lifecycle_event_receipts`; completed duplicates are acknowledged
   without re-running effects, crashed leases expire, and completed receipts are
   retained for `LifecycleEvents:ReceiptRetentionDays` (default 30).
+- **Exact close content (P1-12):** before the native descriptor is released,
+  the VFS publishes a read-only `.kaimo-close-captures/<id>.cap` from that
+  descriptor (`FICLONE` where supported, stable checked copy otherwise).
+  Versioning and indexing open this capture, never the live pathname. `authd`
+  keeps it across delivery retries/dead-lettering and removes it only after the
+  bridge acknowledges the stable event ID. Share sync provisions the reserved
+  root as `root:<storage-gid>` mode `2770`; all client-visible `.kaimo-*` paths
+  are denied by the VFS.
 - **Local peer security:** `/var/run/kaimo` is `root:kaimo-authd` mode `0750`
   and `authz.sock` is mode `0660`. Synchronized Samba users are members of the
   dedicated group, while `authd` authenticates every connection with
@@ -336,9 +344,9 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
   **system-wide inactive** (the host also hasn't indexed anything new since July 9 — independent of
   this migration). The bridge therefore behaves **parity-faithfully**. Once ES indexing is active again,
   SMB writes will be indexed like web uploads.
-- **Rapid successive writes** to the same file may collapse into one version: the version is
-  **re-read** from the file on close (not from the open stream as in the old in-process path).
-  Uncritical for normal save intervals.
+- **Concurrent writers:** a close capture is taken from the closing descriptor.
+  The copy fallback rejects a file whose inode/size/timestamps change during
+  capture; a later writer's subsequent close produces its own event.
 - **`mkdirat` hook** doesn't fire reliably in Samba's SMB2 directory creation path (directories
   apparently aren't always created via `mkdirat_fn`) — minor edge gap, file ops are complete.
 

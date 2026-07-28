@@ -33,9 +33,11 @@ The most important conclusions are:
    protected by mTLS, per-workload RPC allow-lists, and audited/rate-limited
    hash export. Native/container runtime verification remains pending.
 7. Lifecycle-event transport is now durably spooled, explicitly acknowledged,
-   retried, dead-lettered, and deduplicated by persistent event ID. Credential
-   and configuration synchronization remain non-durable, and exact close
-   attribution/reconciliation still require P1-12 and Milestone B.
+   retried, dead-lettered, and deduplicated by persistent event ID. Close
+   versioning/indexing consumes immutable content captured from the exact
+   closing descriptor and attributed to its authenticated Samba identity.
+   Credential/configuration synchronization and full multi-effect
+   reconciliation remain open.
 
 The system should be treated as a **working migration prototype with critical hardening work remaining**, not as a completed production security boundary.
 
@@ -597,6 +599,10 @@ journal/outbox remains the full cross-system recovery design.
 
 ### P1-12: Close processing can version the wrong content or assign the wrong user
 
+> **Remediation status (2026-07-28): Implemented; managed tests and the pinned
+> Samba 4.19.5 native/container build pass. Live concurrent-writer and outage
+> verification remains pending.**
+
 `NotifyExternalCloseAsync` reopens the file by path after the SMB close. Between the native close and the bridge read, another client may modify, rename, replace, or delete the path. Concurrent handles make the attribution problem worse.
 
 **Fix options:**
@@ -606,6 +612,27 @@ journal/outbox remains the full cross-system recovery design.
 - Move the version snapshot into a component that can read the exact closing file descriptor before it is released.
 
 Whichever option is chosen must preserve the data-path goals while guaranteeing that version bytes correspond to the reported close event.
+
+**Implemented fix**
+
+1. Before `SMB_VFS_NEXT_CLOSE`, the VFS captures the regular file through
+   `fsp_get_io_fd`; it never reopens the live pathname. `FICLONE` is preferred,
+   with a `pread`/`pwrite` fallback whose pre/post inode, size, mtime, and ctime
+   checks reject a source modified during copying.
+2. Captures are flushed, made read-only, and atomically no-replace-published
+   below the root-provisioned `.kaimo-close-captures` directory. Every
+   `.kaimo-*` client path is denied by the VFS.
+3. The version-3 local CLOSE payload binds authenticated user, share, logical
+   path, and opaque capture ID before `authd` durably enqueues it.
+4. The gRPC contract exposes only the opaque ID. The bridge derives its path
+   below the resolved share root and uses a fresh stream over the immutable
+   capture for both versioning and indexing; it no longer reads the live path.
+5. Captures remain beside the durable event across retries and dead-lettering.
+   The bridge deletes one only after completing the stable event receipt;
+   completed duplicate delivery remains successful after that deletion.
+6. The closing handle's Samba connection identity crosses the already
+   peer-authenticated local channel and is resolved to the exact Kaimo user
+   before ownership/version attribution.
 
 ### P1-13: Rename events are not idempotent and can delete version history
 
@@ -2156,6 +2183,58 @@ build pass. Live outage/restart verification remains pending.
 **Next planned finding:** P1-12 — bind close processing to the exact content and
 authenticated user associated with the closing handle.
 
+### 2026-07-28 — P1-12: Descriptor-bound immutable close captures
+
+**Status:** Implemented; focused managed tests, Compose validation, native
+sidecar tests, and the pinned Samba 4.19.5 module/container build pass. Live
+concurrent-writer and outage/restart verification remains pending.
+
+**Solution implemented**
+
+1. The VFS captures bytes from `fsp_get_io_fd` before native close, preferring a
+   same-filesystem CoW reflink and otherwise copying without changing the Samba
+   file offset. A changing source is detected and rejected.
+2. Captures are durable, read-only, atomically published under a root-provisioned
+   reserved namespace, and removed if native close or local durable enqueue
+   fails.
+3. Local protocol v3 binds the capture to the peer-authenticated Samba user,
+   share, and logical close path. `authd` validates it before accepting the
+   durable event.
+4. The bridge accepts only a 128-bit lowercase opaque capture ID, derives the
+   path beneath the resolved share, and supplies independent capture streams to
+   versioning and search. The mutable live path is never reopened for content.
+5. Capture lifetime follows the P1-11 event: retained during retry/dead-letter,
+   deleted by the bridge after receipt completion, and compatible with a
+   completed duplicate after cleanup.
+6. Updated the native marker to
+   `2026-07-28g descriptor-bound close captures`.
+
+**Validation completed**
+
+- Focused managed FileService/event suites pass, including regressions proving
+  live storage is never read, both versioning and indexing receive capture
+  bytes, invalid IDs are rejected before lookup, and a completed retry succeeds
+  after capture deletion without repeating effects.
+- Complete managed suite: 555 passed, 0 failed, 0 skipped.
+- `docker compose config --quiet` passes.
+- `docker compose build kaimo_samba` passes. This compiles/links the real VFS
+  module against Samba 4.19.5, compiles the revised protobuf client and
+  `authd`, and runs the native decision-cache, event-spool, and local-protocol
+  tests.
+
+**Validation still required**
+
+- Exercise two concurrent SMB writers and prove each close versions the bytes
+  captured at its own close boundary, including the checked-copy fallback.
+- Stop the bridge/database after local enqueue, restart them, and verify the
+  capture survives until acknowledgement and is then removed.
+- Force dead-lettering and validate that the associated capture remains
+  available for repair and that capacity monitoring covers both records and
+  capture bytes.
+
+**Next planned finding:** P1-13 — make rename lifecycle side effects
+independently retry-idempotent.
+
 ## 15. Source evidence index
 
 | Finding area | Primary source locations |
@@ -2174,7 +2253,7 @@ authenticated user associated with the closing handle.
 | Snapshot read-only/VFS-stack enforcement | `vfs_kaimo_bridge.c` (`kaimo_snapshot_create_is_readonly`, `kaimo_snapshot_granted_access`, `kaimo_snapshot_open_how_readonly`, `kaimo_openat`); `src/samba-vfs/tests/test-vfs-snapshot-readonly.py` |
 | Snapshot materialization/cleanup leases | `SnapshotCacheLeaseManager.cs`; `SnapshotGrpcService.cs` (`PublishHandoff`, `ReleaseVersionLease`); `SnapshotCacheCleanupService.cs` (`TryDeleteTokenDir`); `vfs_kaimo_bridge.c` (`kaimo_snapshot_lease_acquire`, FSP extensions); `authd.cpp`; `local_protocol.h`; `kaimo_smb_bridge.proto` |
 | Disabled share lookup and revocation | `SmbBridge/Services/EnabledShareResolver.cs`; `AuthzGrpcService.cs`; `FileEventGrpcService.cs`; `SnapshotGrpcService.cs`; `entrypoint.vfs.sh`; `sync-shares.sh`; `tests/Kaimo_File_Server.Tests/DisabledShareBridgeTests.cs` |
-| Event reliability/TOCTOU | `vfs_kaimo_bridge.c:233-257`, `:665-919`; `FileEventGrpcService.cs`; `FileService.cs:341-400` |
+| Event reliability/TOCTOU | `vfs_kaimo_bridge.c` (`kaimo_capture_close_content`, `kaimo_close`); `authd.cpp` (capture-ID framing/delivery); `FileEventGrpcService.cs` (capture resolution/cleanup); `FileService.NotifyExternalCloseAsync`; `sync-shares.sh` |
 | Rename duplicate destruction | `Infrastructure/Repositories/FileVersionRepository.cs:142-178` |
 | Insecure hash temp file | `src/samba-vfs/sync-users.sh:17-49` |
 | Sync error handling | `sync-users.sh`, `sync-shares.sh`, `sync-config.sh` |

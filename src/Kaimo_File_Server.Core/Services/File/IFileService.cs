@@ -58,8 +58,15 @@ namespace Kaimo_File_Server.Core.Services.File
         // search indexing, ownership. Failures reach the bridge so the durable
         // event remains unacknowledged and is retried.
 
-        /// <summary>A file was written+closed externally: snapshot a version, index it, stamp owner.</summary>
-        Task NotifyExternalCloseAsync(string path, UserContext user);
+        /// <summary>
+        /// A file was written+closed externally: snapshot a version, index it,
+        /// and stamp its owner from the immutable content captured from the
+        /// exact closing handle.
+        /// </summary>
+        Task NotifyExternalCloseAsync(
+            string path,
+            UserContext user,
+            Func<Task<Stream>> openCapturedContent);
 
         /// <summary>A directory was created externally: index it and stamp owner.</summary>
         Task NotifyExternalMkdirAsync(string path, UserContext user);

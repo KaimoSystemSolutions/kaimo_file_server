@@ -344,8 +344,12 @@ public class FileService : IFileService
     // ownership. P1-11 surfaces failures to the bridge so authd retains and
     // retries the durable event. The native SMB operation has already completed.
 
-    public async Task NotifyExternalCloseAsync(string path, UserContext user)
+    public async Task NotifyExternalCloseAsync(
+        string path,
+        UserContext user,
+        Func<Task<Stream>> openCapturedContent)
     {
+        ArgumentNullException.ThrowIfNull(openCapturedContent);
         var rel = ShareRelativePath.Normalize(path);
         var abs = _storage.ToAbsolutePath(rel);
         var failures = new List<Exception>();
@@ -362,7 +366,7 @@ public class FileService : IFileService
         {
             try
             {
-                await using var content = await _storage.ReadAsync(rel);
+                await using var content = await openCapturedContent();
                 await _versionService.CreateVersionAsync(_shareId, rel, content, user.User.Id.ToString());
             }
             catch (Exception ex)
@@ -376,7 +380,7 @@ public class FileService : IFileService
         // before the scope/DbContext is torn down — and surface errors.
         if (_searchService != null)
         {
-            try { await _searchService.onFileCreated(abs, _storage.ReadAsync(rel)); }
+            try { await _searchService.onFileCreated(abs, openCapturedContent()); }
             catch (Exception ex) { failures.Add(ex); }
         }
 

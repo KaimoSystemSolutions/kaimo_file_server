@@ -499,10 +499,23 @@ static bool read_string(kaimo_local_reader& reader, std::string& value);
 static bool read_boolean(kaimo_local_reader& reader, bool& value);
 
 // ---- Durable lifecycle events (P1-11) ----
+static bool valid_capture_id(const std::string& value) {
+    if (value.size() != 32) return false;
+    for (char character : value) {
+        if (!((character >= '0' && character <= '9') ||
+              (character >= 'a' && character <= 'f'))) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool ev_close(const std::string& event_id, const std::string& user,
-                     const std::string& share, const std::string& path) {
+                     const std::string& share, const std::string& path,
+                     const std::string& capture_id) {
     NotifyCloseRequest req; req.set_event_id(event_id);
     req.set_username(user); req.set_share(share); req.set_path(path);
+    req.set_capture_id(capture_id);
     grpc::ClientContext ctx; ctx.set_deadline(deadline(30));
     NotifyReply reply;
     grpc::Status status = g_events->NotifyClose(&ctx, req, &reply);
@@ -543,14 +556,17 @@ static bool deliver_spooled_event(const kaimo::authd::SpoolEvent& event) {
     kaimo_local_reader input;
     kaimo_local_reader_init(&input, event.payload.data(), event.payload.size());
     std::string user, share, path, old_path, new_path;
+    std::string capture_id;
     bool is_directory = false;
     if (!read_string(input, user) || !read_string(input, share)) return false;
 
     switch (event.operation) {
     case KAIMO_LOCAL_OP_CLOSE:
         return read_string(input, path) &&
+               read_string(input, capture_id) &&
                kaimo_local_reader_finished(&input) &&
-               ev_close(event.id, user, share, path);
+               valid_capture_id(capture_id) &&
+               ev_close(event.id, user, share, path, capture_id);
     case KAIMO_LOCAL_OP_MKDIR:
         return read_string(input, path) &&
                kaimo_local_reader_finished(&input) &&
@@ -739,6 +755,7 @@ static void handle_client(const ClientConnection& connection) {
     kaimo_local_builder_init(&output, response.data(), response.size());
     uint8_t status = KAIMO_LOCAL_STATUS_ERROR;
     std::string user, share, path, old_path, new_path, token;
+    std::string capture_id;
     bool first = false, second = false, third = false, fourth = false;
     uint32_t access_mask = 0;
 
@@ -788,7 +805,9 @@ static void handle_client(const ClientConnection& connection) {
         break;
     case KAIMO_LOCAL_OP_CLOSE:
         if (read_string(input, path) &&
-            kaimo_local_reader_finished(&input)) {
+            read_string(input, capture_id) &&
+            kaimo_local_reader_finished(&input) &&
+            valid_capture_id(capture_id)) {
             std::string event_id, spool_error;
             if (g_event_spool->enqueue(
                     frame.operation, request.data(), request.size(),

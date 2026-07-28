@@ -127,6 +127,10 @@ message NotifyCloseRequest {
   string share    = 2;
   string path     = 3;
   string event_id = 4;
+  // Opaque 128-bit id of the immutable, descriptor-backed close capture.
+  // The bridge derives the actual path below the resolved share root; it never
+  // accepts an arbitrary filesystem path from the control plane.
+  string capture_id = 5;
 }
 
 message NotifyPathRequest {
