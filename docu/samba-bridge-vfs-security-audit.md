@@ -531,11 +531,24 @@ files newly created by that request.
 
 ### P1-10: Disabled shares remain valid in bridge authorization
 
+> **Remediation status (2026-07-28): Implemented; managed tests and pinned
+> native container build pass. Live active-session revocation verification
+> remains pending.**
+
 `ShareRepository.GetByNameAsync()` returns disabled definitions. Connect, Open, Delete, Event, and Snapshot services generally check only for `null`, not `IsEnabled`.
 
 **Impact:** during the polling/reconciliation interval, new connections or internal RPC callers may continue to use a disabled share. Existing open handles are not revoked by per-open authorization.
 
 **Fix:** centralize `ResolveEnabledShareAsync`, use it in every bridge service, immediately close the share on disable, and document/implement active-handle revocation semantics.
+
+**Implemented fix:** every bridge authorization, event, and snapshot share
+lookup now passes through one cancellation-aware enabled-share resolver.
+Disabled shares therefore fail closed immediately after the database change is
+visible to the bridge. The Samba reconciler runs on a configurable two-second
+default interval; it removes disabled shares from the registry and forcibly
+disconnects all active tree connections with `smbcontrol close-share`. The
+bounded revocation semantics and bridge-outage limitation are documented in
+the Samba VFS runbook.
 
 ### P1-11: Event delivery is lossy and has no retry-safe contract
 
@@ -1096,7 +1109,8 @@ implemented; their required release verification remains tracked in milestone 4.
 ### Bridge checklist
 
 - [x] Authenticated/authorized transport with mTLS and RPC allow-lists.
-- [ ] Enabled user/share/service checks are centralized.
+- [ ] Enabled user/share/service checks are centralized. Share checks are now
+  centralized; user and service checks still use separate paths.
 - [ ] Raw path validation and containment are consistent.
 - [ ] Cancellation and limits propagate through all expensive work.
 - [x] Snapshot folder results are filtered per file.
@@ -2003,6 +2017,63 @@ remains pending.
 **Next planned finding:** P1-10 — reject disabled shares consistently and
 define active-handle revocation semantics.
 
+### 2026-07-28 — P1-10: Central disabled-share gate and bounded revocation
+
+**Status:** Implemented; managed tests and pinned native container build pass.
+Live active-session revocation verification remains pending.
+
+**Original problem**
+
+`GetByNameAsync` intentionally returns disabled definitions for management
+workflows, but the bridge treated any non-null definition as usable. During
+share reconciliation, new internal requests could still authorize or process
+a disabled share, while already-open handles remained usable until Samba
+eventually removed the registry entry.
+
+**Solution implemented**
+
+1. Added the single `ResolveEnabledShareAsync` gate and routed Connect, Open,
+   Delete, Rename, Event, EnumerateSnapshots, and ResolveVersion through it.
+2. Disabled and unknown shares now have identical fail-closed external
+   behavior; no ACL, file-service, version, or snapshot work starts afterward.
+3. Propagated the gRPC cancellation token through the centralized lookup.
+4. Made the share reconciliation interval configurable with
+   `KAIMO_SHARE_SYNC_INTERVAL_SECONDS` and changed the production default from
+   60 seconds to 2 seconds. Invalid zero/non-numeric values stop startup.
+5. Retained the existing safe revocation order: delete the registry share,
+   then call `smbcontrol smbd close-share` to terminate every active tree
+   connection.
+6. Documented the explicit semantics: bridge RPCs reject once the committed
+   state is visible; under healthy operation, existing handles are forcibly
+   disconnected after the configured interval plus reconciliation runtime.
+   A bridge outage cannot safely infer a new desired state and therefore delays
+   active-session revocation beyond that operational target.
+
+**Validation completed**
+
+- Focused disabled-share, authorization, and snapshot suites: 62 passed,
+  0 failed, 0 skipped.
+- New managed tests cover all four authorization RPCs, all four lifecycle
+  event RPCs, both share-dependent snapshot RPCs, and prove downstream ACL,
+  file-service, and version work is not invoked.
+- Existing `sync-shares.sh` regression coverage verifies that removed/disabled
+  shares invoke `smbcontrol smbd close-share` while stable shares do not.
+- Complete managed suite: 548 passed, 0 failed, 0 skipped.
+- `docker compose build kaimo_smb_bridge kaimo_samba` passed, including the
+  pinned Samba 4.19.5 native module/client compilation and image assembly.
+
+**Validation still required**
+
+- In a live Compose environment, keep an SMB file handle open, disable its
+  share, and verify the client is disconnected within the configured SLA.
+  This run could not start the standalone stack because Visual Studio already
+  owned the fixed `kaimo_file_server_db` container name.
+- Alert on consecutive share reconciliation failures because a bridge outage
+  necessarily postpones registry and active-handle revocation.
+
+**Next planned finding:** P1-11 — make lifecycle event delivery durable,
+acknowledged, retry-safe, and idempotent.
+
 ## 15. Source evidence index
 
 | Finding area | Primary source locations |
@@ -2020,7 +2091,7 @@ define active-handle revocation semantics.
 | Snapshot cache isolation / original direct path | `SnapshotCache.cs`; `SnapshotGrpcService.cs` (`EnsureIsolatedFromShare`, cache-root-relative paths); `vfs_kaimo_bridge.c` (`kaimo_snapshot_cache_abspath`, reserved namespace checks); `sync-shares.sh`; `docker-compose.yml` |
 | Snapshot read-only/VFS-stack enforcement | `vfs_kaimo_bridge.c` (`kaimo_snapshot_create_is_readonly`, `kaimo_snapshot_granted_access`, `kaimo_snapshot_open_how_readonly`, `kaimo_openat`); `src/samba-vfs/tests/test-vfs-snapshot-readonly.py` |
 | Snapshot materialization/cleanup leases | `SnapshotCacheLeaseManager.cs`; `SnapshotGrpcService.cs` (`PublishHandoff`, `ReleaseVersionLease`); `SnapshotCacheCleanupService.cs` (`TryDeleteTokenDir`); `vfs_kaimo_bridge.c` (`kaimo_snapshot_lease_acquire`, FSP extensions); `authd.cpp`; `local_protocol.h`; `kaimo_smb_bridge.proto` |
-| Disabled share lookup | `Infrastructure/Repositories/ShareRepository.cs:45-49`; bridge service share lookups |
+| Disabled share lookup and revocation | `SmbBridge/Services/EnabledShareResolver.cs`; `AuthzGrpcService.cs`; `FileEventGrpcService.cs`; `SnapshotGrpcService.cs`; `entrypoint.vfs.sh`; `sync-shares.sh`; `tests/Kaimo_File_Server.Tests/DisabledShareBridgeTests.cs` |
 | Event reliability/TOCTOU | `vfs_kaimo_bridge.c:233-257`, `:665-919`; `FileEventGrpcService.cs`; `FileService.cs:341-400` |
 | Rename duplicate destruction | `Infrastructure/Repositories/FileVersionRepository.cs:142-178` |
 | Insecure hash temp file | `src/samba-vfs/sync-users.sh:17-49` |

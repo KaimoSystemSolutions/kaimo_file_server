@@ -72,11 +72,12 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             request.Username, request.Share, request.Path);
 
         var user = await _auth.ResolveUserContextAsync(request.Username);
-        var share = await _shares.GetByNameAsync(request.Share);
+        var share = await _shares.ResolveEnabledShareAsync(
+            request.Share, context?.CancellationToken ?? CancellationToken.None);
         if (user is null || share is null)
         {
             _logger.LogInformation(
-                "EnumerateSnapshots: unknown user/share (user={User} share={Share}) -> 0",
+                "EnumerateSnapshots: unknown user or unknown/disabled share (user={User} share={Share}) -> 0",
                 request.Username, request.Share);
             return reply;
         }
@@ -156,12 +157,12 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
 
         var user = await _auth.ResolveUserContextAsync(request.Username)
             .WaitAsync(requestCancellation);
-        var share = await _shares.GetByNameAsync(request.Share)
-            .WaitAsync(requestCancellation);
+        var share = await _shares.ResolveEnabledShareAsync(
+            request.Share, requestCancellation);
         if (user is null || share is null)
         {
             _logger.LogWarning(
-                "ResolveVersion: unknown user/share (user={User} share={Share}) -> notFound",
+                "ResolveVersion: unknown user or unknown/disabled share (user={User} share={Share}) -> notFound",
                 request.Username, request.Share);
             return notFound;
         }

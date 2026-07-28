@@ -108,9 +108,10 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         if (user is null || !user.IsEnabled)
             return Deny($"unknown or disabled user '{request.Username}'");
 
-        var share = await _shares.GetByNameAsync(request.Share);
+        var share = await _shares.ResolveEnabledShareAsync(
+            request.Share, context?.CancellationToken ?? CancellationToken.None);
         if (share is null)
-            return Deny($"unknown share '{request.Share}'");
+            return Deny($"unknown or disabled share '{request.Share}'");
 
         bool allow = await _auth.CanAccessShareAsync(share.Id, user.Id);
 
@@ -134,9 +135,10 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         if (user is null)
             return Deny($"unknown user '{request.Username}'");
 
-        var share = await _shares.GetByNameAsync(request.Share);
+        var share = await _shares.ResolveEnabledShareAsync(
+            request.Share, context?.CancellationToken ?? CancellationToken.None);
         if (share is null)
-            return Deny($"unknown share '{request.Share}'");
+            return Deny($"unknown or disabled share '{request.Share}'");
 
         if (!ShareRelativePath.IsValid(request.Path))
             return Deny($"invalid open path '{request.Path}'");
@@ -338,9 +340,10 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         if (user is null)
             return Deny($"unknown user '{request.Username}'");
 
-        var share = await _shares.GetByNameAsync(request.Share);
+        var share = await _shares.ResolveEnabledShareAsync(
+            request.Share, context?.CancellationToken ?? CancellationToken.None);
         if (share is null)
-            return Deny($"unknown share '{request.Share}'");
+            return Deny($"unknown or disabled share '{request.Share}'");
 
         string normalized = ShareRelativePath.Normalize(request.Path);
         if (string.IsNullOrEmpty(normalized) || !ShareRelativePath.IsValid(request.Path))
@@ -377,9 +380,10 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         if (user is null)
             return Deny($"unknown user '{request.Username}'");
 
-        var share = await _shares.GetByNameAsync(request.Share);
+        var share = await _shares.ResolveEnabledShareAsync(
+            request.Share, context?.CancellationToken ?? CancellationToken.None);
         if (share is null)
-            return Deny($"unknown share '{request.Share}'");
+            return Deny($"unknown or disabled share '{request.Share}'");
 
         if (!ShareRelativePath.IsValid(request.SourcePath) ||
             !ShareRelativePath.IsValid(request.DestinationPath))

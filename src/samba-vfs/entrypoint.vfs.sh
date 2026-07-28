@@ -92,8 +92,21 @@ for i in $(seq 1 30); do
     sleep 2
 done
 
-# Then periodically follow up (new/changed/deleted shares, without restart).
-( while true; do sleep 60; /usr/local/bin/sync-shares.sh >/dev/null 2>&1 || true; done ) &
+# Then continuously reconcile new/changed/deleted shares. Disabled and deleted
+# shares are removed from the registry and `smbcontrol close-share` forcibly
+# disconnects their active tree connections. Keep this interval short: it is
+# the maximum active-handle revocation delay after the database commit.
+SHARE_SYNC_INTERVAL_SECONDS="${KAIMO_SHARE_SYNC_INTERVAL_SECONDS:-2}"
+case "$SHARE_SYNC_INTERVAL_SECONDS" in
+    ''|*[!0-9]*|0)
+        echo "[entrypoint] Invalid KAIMO_SHARE_SYNC_INTERVAL_SECONDS='$SHARE_SYNC_INTERVAL_SECONDS' (expected a positive integer)." >&2
+        exit 1
+        ;;
+esac
+( while true; do
+    sleep "$SHARE_SYNC_INTERVAL_SECONDS"
+    /usr/local/bin/sync-shares.sh >/dev/null 2>&1 || true
+done ) &
 
 # --- Phase 4: Protocol settings from Kaimo DB into Samba global registry ---
 # Initially BEFORE smbd start (with retries), so smbd reads the dialect range/signing/

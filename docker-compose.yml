@@ -136,6 +136,9 @@ services:
       KAIMO_AUTHD_CACHE_MAX_ENTRIES: ${KAIMO_AUTHD_CACHE_MAX_ENTRIES:-10000}
       KAIMO_AUTHD_CACHE_MAX_BYTES: ${KAIMO_AUTHD_CACHE_MAX_BYTES:-8388608}
       KAIMO_AUTHD_CACHE_TTL_MS: ${KAIMO_AUTHD_CACHE_TTL_MS:-3000}
+      # P1-10: maximum polling delay before a disabled/deleted share is removed
+      # from Samba and all of its active tree connections are force-closed.
+      KAIMO_SHARE_SYNC_INTERVAL_SECONDS: ${KAIMO_SHARE_SYNC_INTERVAL_SECONDS:-2}
       # @GMT "Previous Versions" data-path redirect (openat hook). "1" = on (serve the
       # materialized version copy). Set to "0" to disable the redirect at runtime
       # (no rebuild) if it ever misbehaves; timewarp opens then fail closed.

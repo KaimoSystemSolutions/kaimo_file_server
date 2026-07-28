@@ -35,7 +35,9 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
 
     public override async Task<NotifyReply> NotifyClose(NotifyCloseRequest request, ServerCallContext context)
     {
-        var (svc, user) = await ResolveAsync(request.Username, request.Share);
+        var (svc, user) = await ResolveAsync(
+            request.Username, request.Share,
+            context?.CancellationToken ?? CancellationToken.None);
         if (svc is null || user is null) return Fail();
 
         await svc.NotifyExternalCloseAsync(request.Path, user);
@@ -46,7 +48,9 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
 
     public override async Task<NotifyReply> NotifyMkdir(NotifyPathRequest request, ServerCallContext context)
     {
-        var (svc, user) = await ResolveAsync(request.Username, request.Share);
+        var (svc, user) = await ResolveAsync(
+            request.Username, request.Share,
+            context?.CancellationToken ?? CancellationToken.None);
         if (svc is null || user is null) return Fail();
 
         await svc.NotifyExternalMkdirAsync(request.Path, user);
@@ -55,7 +59,9 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
 
     public override async Task<NotifyReply> NotifyDelete(NotifyPathRequest request, ServerCallContext context)
     {
-        var svc = await ResolveServiceAsync(request.Share);
+        var svc = await ResolveServiceAsync(
+            request.Share,
+            context?.CancellationToken ?? CancellationToken.None);
         if (svc is null) return Fail();
 
         await svc.NotifyExternalDeleteAsync(request.Path, request.IsDirectory);
@@ -66,7 +72,9 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
 
     public override async Task<NotifyReply> NotifyRename(NotifyRenameRequest request, ServerCallContext context)
     {
-        var svc = await ResolveServiceAsync(request.Share);
+        var svc = await ResolveServiceAsync(
+            request.Share,
+            context?.CancellationToken ?? CancellationToken.None);
         if (svc is null) return Fail();
 
         await svc.NotifyExternalRenameAsync(request.OldPath, request.NewPath, request.IsDirectory);
@@ -77,19 +85,27 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
 
     // ---- helpers ----
 
-    private async Task<(IFileService? Service, UserContext? User)> ResolveAsync(string username, string share)
+    private async Task<(IFileService? Service, UserContext? User)> ResolveAsync(
+        string username,
+        string share,
+        CancellationToken cancellationToken)
     {
         var user = await _auth.ResolveUserContextAsync(username);
-        var svc = await ResolveServiceAsync(share);
+        var svc = await ResolveServiceAsync(share, cancellationToken);
         return (svc, user);
     }
 
-    private async Task<IFileService?> ResolveServiceAsync(string share)
+    private async Task<IFileService?> ResolveServiceAsync(
+        string share,
+        CancellationToken cancellationToken)
     {
-        var def = await _shares.GetByNameAsync(share);
+        var def = await _shares.ResolveEnabledShareAsync(
+            share, cancellationToken);
         if (def is null)
         {
-            _logger.LogWarning("Event for unknown share '{Share}' discarded.", share);
+            _logger.LogWarning(
+                "Event for unknown or disabled share '{Share}' discarded.",
+                share);
             return null;
         }
         return _factory.CreateForShare(def.Id, def.Path);

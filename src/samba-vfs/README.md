@@ -353,15 +353,36 @@ replaces the FileSystemWatcher/`SyncFromDb()` mechanism from
 
 - **.NET:** [`ShareGrpcService`](../src/Kaimo_File_Server.SmbBridge/Services/ShareGrpcService.cs) —
   thin facade over `IShareRepository`; no share logic duplicated (repository already filters disabled shares).
+  Every Samba-facing authorization, lifecycle-event, and snapshot RPC also
+  resolves its share through the central `ResolveEnabledShareAsync` gate.
   Registered in [`Program.cs`](../src/Kaimo_File_Server.SmbBridge/Program.cs).
 - **C++:** [`module/sharesync.cpp`](module/sharesync.cpp) (gRPC client) +
   [`sync-shares.sh`](sync-shares.sh). The entrypoint syncs on start (with retries until bridge
-  is reachable) and then every 60 s — same as user sync.
+  is reachable) and then every `KAIMO_SHARE_SYNC_INTERVAL_SECONDS` (default:
+  2 seconds).
 - **Reconciliation** in `sync-shares.sh` is idempotent: new shares → `net conf addshare`,
   changed (path/visibility) → `net conf setparm`, removed/disabled → `net conf delshare`.
   A path change or removal additionally runs `smbcontrol smbd close-share` so an
   existing client cannot remain attached to the old service path. `global` is
   never touched.
+
+#### Disabled-share revocation semantics
+
+- Once the disabled state is committed, every new bridge authorization,
+  lifecycle-event, and snapshot request fails closed on its next database
+  lookup; it does not wait for Samba registry reconciliation.
+- An already-open Samba tree connection may continue using existing handles
+  until the next successful share reconciliation. Under healthy operation,
+  the revocation target is therefore `KAIMO_SHARE_SYNC_INTERVAL_SECONDS` plus
+  the `ListShares` RPC/reconciliation runtime (2 seconds plus runtime by
+  default).
+- Reconciliation removes the registry share first and then calls
+  `smbcontrol smbd close-share`, which forcibly disconnects every active tree
+  connection for that share. Clients must reconnect after it is enabled again.
+- If the bridge is unreachable, the synchronizer cannot safely infer which
+  existing shares were disabled. Registry state and active sessions remain
+  until a successful reconciliation; operators must alert on repeated
+  share-sync failures.
 
 ### Visibility (ABE) — Decision: hidden flag only
 
