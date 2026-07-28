@@ -38,6 +38,7 @@
 #endif
 
 #include "local_protocol.h"
+#include "rename_event.h"
 
 #undef DBGC_CLASS
 #define DBGC_CLASS DBGC_VFS
@@ -1733,7 +1734,8 @@ static int kaimo_renameat(vfs_handle_struct *handle,
 		return -1;
 	}
 
-	bool source_is_directory = S_ISDIR(source_before.st_ex_mode);
+	bool source_is_directory =
+		kaimo_rename_event_directory_flag(source_before.st_ex_mode) != 0;
 	bool destination_is_directory = destination_exists &&
 		S_ISDIR(destination_before.st_ex_mode);
 

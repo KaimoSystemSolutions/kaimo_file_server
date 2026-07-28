@@ -133,8 +133,13 @@ public sealed class FileEventGrpcServiceIdempotencyTests
             Times.Once);
     }
 
-    [Fact]
-    public async Task RenameThreadsStableEventIdIntoVersionTransition()
+    [Theory]
+    [InlineData(false, "old.txt", "new.txt")]
+    [InlineData(true, "old", "new")]
+    public async Task RenameThreadsEventIdAndObjectTypeIntoLifecycleTransition(
+        bool isDirectory,
+        string oldPath,
+        string newPath)
     {
         var share = new ShareDefinition("docs", Path.GetTempPath());
         var shares = new Mock<IShareRepository>();
@@ -142,7 +147,7 @@ public sealed class FileEventGrpcServiceIdempotencyTests
         var fileService = new Mock<IFileService>();
         var eventId = Guid.NewGuid();
         fileService.Setup(x => x.NotifyExternalRenameAsync(
-                "old.txt", "new.txt", false, eventId))
+                oldPath, newPath, isDirectory, eventId))
             .Returns(Task.CompletedTask);
         var factory = new Mock<IFileServiceFactory>();
         factory.Setup(x => x.CreateForShare(share.Id, share.Path))
@@ -164,15 +169,15 @@ public sealed class FileEventGrpcServiceIdempotencyTests
             {
                 EventId = eventId.ToString("N"),
                 Share = "docs",
-                OldPath = "old.txt",
-                NewPath = "new.txt",
-                IsDirectory = false
+                OldPath = oldPath,
+                NewPath = newPath,
+                IsDirectory = isDirectory
             },
             null!);
 
         Assert.True(reply.Ok);
         fileService.Verify(x => x.NotifyExternalRenameAsync(
-            "old.txt", "new.txt", false, eventId), Times.Once);
+            oldPath, newPath, isDirectory, eventId), Times.Once);
     }
 
     [Fact]

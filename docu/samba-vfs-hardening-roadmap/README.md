@@ -3,8 +3,8 @@
 This documentation contains the security, memory-safety, and coverage audit for the Samba VFS migration. The former monolithic document has been split by topic so findings, target architecture, implementation planning, and progress history can be maintained and reviewed independently.
 
 > **Current as of:** 2026-07-28  
-> **Most recently completed:** P1-13 – Retry-idempotent rename version transitions
-> **Next planned finding:** P1-14 – Report directory renames with the correct object type
+> **Most recently completed:** P1-14 – Correct directory rename lifecycle type
+> **Next planned finding:** P1-15 – Remove the insecure predictable NT-hash temporary file
 > **Production approval:** Still blocked until the remaining credential and synchronization risks, lifecycle reconciliation work, and release gates are complete.
 
 ## Table of contents

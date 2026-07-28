@@ -335,7 +335,7 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
 | marco writes file → closes | `file_versions` snapshot created (**versioning** ✅) |
 | same file | `file_metadata.OwnerId = marco` (**ownership** ✅) |
 | delete file | `NotifyDelete` fired → deindex path ✅ |
-| rename file | `NotifyRename` fired → ACL realignment + index path ✅ |
+| rename file/directory | `NotifyRename` fired with source type → ACL realignment + matching file/directory index lifecycle ✅ |
 
 **Known points:**
 

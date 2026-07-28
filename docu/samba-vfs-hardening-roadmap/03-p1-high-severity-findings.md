@@ -262,9 +262,18 @@ original rename. Non-Samba rename callers retain the existing behavior.
 
 ### P1-14: Directory rename events are reported as file renames
 
+> **Remediation status (2026-07-28): Implemented, regression-tested, and built
+> against pinned Samba 4.19.5. Live SMB/search verification remains pending.**
+
 The VFS hardcodes `is_directory = 0` in rename notifications. ACL and version path-prefix updates happen independently of this flag, but search lifecycle behavior chooses the file rename callback instead of the directory rename callback.
 
 **Fix:** determine object type before the native rename using the source FSP/stat data and send the correct value.
+
+**Implemented fix:** P0-04 already introduced a fail-closed source `FSTATAT`
+before the native rename and used its mode for both authorization and the
+durable lifecycle payload. P1-14 adds a shared, native-tested mode-to-event
+mapping plus managed regressions proving the directory flag survives the gRPC
+boundary and selects the directory search lifecycle callback.
 
 ### P1-15: NT hashes are written to an insecure predictable temporary file
 

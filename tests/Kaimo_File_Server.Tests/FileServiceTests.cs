@@ -491,6 +491,26 @@ public class FileServiceTests
     }
 
     [Fact]
+    public async Task ExternalDirectoryRename_UsesDirectorySearchLifecycle()
+    {
+        var search = new Mock<ISearchService>();
+        _storageMock.Setup(s => s.ToAbsolutePath("old"))
+            .Returns("/storage/old");
+        _storageMock.Setup(s => s.ToAbsolutePath("new"))
+            .Returns("/storage/new");
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, search.Object, _shareId);
+
+        await sut.NotifyExternalRenameAsync(
+            "old", "new", isDirectory: true, Guid.NewGuid());
+
+        search.Verify(s => s.onDirectoryRenamed(
+            "/storage/old", "/storage/new"), Times.Once);
+        search.Verify(s => s.onFileRenamed(
+            It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
     public async Task DeleteFileAsync_WithoutAccess_ThrowsUnauthorized()
     {
         var ctx = CreateContext();

@@ -53,3 +53,43 @@ could delete history created after the original rename.
 
 **Next planned finding:** P1-14 — determine the renamed object's type before the
 native rename and report directory lifecycle events correctly.
+
+### 2026-07-28 — P1-14: Correct directory rename lifecycle type
+
+**Status:** Implemented, regression-tested, and built against pinned Samba
+4.19.5/ABI 49. Live SMB/search verification remains pending.
+
+**Problem**
+
+Directory rename events must select the directory search lifecycle callback.
+The audit still described the VFS rename event as hardcoded to file even though
+P0-04 had already begun deriving the type from the source stat result.
+
+**Solution implemented**
+
+1. Retained the fail-closed `FSTATAT` of the source before authorization and
+   native mutation.
+2. Centralized the source-mode to lifecycle-directory flag mapping in
+   `rename_event.h`; neither a missing nor a displaced destination influences
+   the event type.
+3. Kept the derived flag in the durable local rename payload, which `authd`
+   forwards unchanged to `NotifyRename`.
+4. Added native coverage for directory, regular-file, and symlink modes.
+5. Added managed coverage proving that both object types cross the gRPC boundary
+   and that a directory rename invokes only the directory search callback.
+
+**Validation still required**
+
+- Rename a populated directory over SMB and verify descendants in the live
+  search index move to the new prefix without a full re-index.
+
+**Validation completed**
+
+- The Docker `build-runtime` target compiled and linked `kaimo_bridge.so`
+  against pinned Samba 4.19.5.
+- The native directory/regular-file/symlink lifecycle type regression passed.
+- Focused lifecycle tests passed: 47 passed, 0 failed, 0 skipped.
+- Complete managed suite passed: 559 passed, 0 failed, 0 skipped.
+
+**Next planned finding:** P1-15 — remove the predictable temporary file used for
+NT-hash import.
