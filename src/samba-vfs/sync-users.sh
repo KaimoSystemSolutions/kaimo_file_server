@@ -5,17 +5,67 @@
 #
 # Exit 0 only on successful retrieval (for retry loop in entrypoint).
 set -uo pipefail
-export PATH=/opt/samba/sbin:/opt/samba/bin:$PATH
+SAMBA_PATH_PREFIX="${KAIMO_SAMBA_PATH_PREFIX-/opt/samba/sbin:/opt/samba/bin}"
+[ -n "$SAMBA_PATH_PREFIX" ] && export PATH="$SAMBA_PATH_PREFIX:$PATH"
 
-OUT="$(kaimo_authsync 2>>/tmp/authsync.err)"
-rc=$?
-if [ $rc -ne 0 ]; then
-    echo "[sync-users] Bridge unreachable (rc=$rc) - see /tmp/authsync.err"
+# NT hashes must never be written to a shared or predictable temporary path.
+# /run is root-owned in the container; tests may select another private parent
+# with KAIMO_SYNC_RUNTIME_DIR.
+RUNTIME_DIR="${KAIMO_SYNC_RUNTIME_DIR:-/run/kaimo-user-sync}"
+SMBPASSWD=""
+AUTH_ERR=""
+PDBEDIT_LOG=""
+
+cleanup() {
+    [ -n "$SMBPASSWD" ] && rm -f -- "$SMBPASSWD"
+    [ -n "$AUTH_ERR" ] && rm -f -- "$AUTH_ERR"
+    [ -n "$PDBEDIT_LOG" ] && rm -f -- "$PDBEDIT_LOG"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+# Create the directory with the invoking identity and reject an existing
+# symlink, foreign owner, or group/other access. mktemp below then provides
+# O_EXCL-style unpredictable file creation inside this trusted directory.
+umask 077
+if [ -L "$RUNTIME_DIR" ]; then
+    echo "[sync-users] Refusing symlink runtime directory: $RUNTIME_DIR"
+    exit 1
+fi
+if [ ! -e "$RUNTIME_DIR" ]; then
+    mkdir -m 0700 -- "$RUNTIME_DIR" || {
+        echo "[sync-users] Cannot create private runtime directory: $RUNTIME_DIR"
+        exit 1
+    }
+fi
+if [ ! -d "$RUNTIME_DIR" ] \
+    || [ "$(stat -c '%u' -- "$RUNTIME_DIR" 2>/dev/null)" != "$(id -u)" ] \
+    || [ "$(stat -c '%a' -- "$RUNTIME_DIR" 2>/dev/null)" != "700" ]; then
+    echo "[sync-users] Runtime directory must be owned by the current user with mode 0700: $RUNTIME_DIR"
     exit 1
 fi
 
-SMBPASSWD=/tmp/kaimo.smbpasswd
-: > "$SMBPASSWD"
+# Serialize imports so two periodic/startup invocations cannot race over tdbsam.
+exec 9>"$RUNTIME_DIR/sync-users.lock" || {
+    echo "[sync-users] Cannot open synchronization lock."
+    exit 1
+}
+if ! flock -n 9; then
+    echo "[sync-users] Another user synchronization is already running."
+    exit 1
+fi
+
+SMBPASSWD="$(mktemp "$RUNTIME_DIR/smbpasswd.XXXXXX")" || exit 1
+AUTH_ERR="$(mktemp "$RUNTIME_DIR/authsync.XXXXXX")" || exit 1
+PDBEDIT_LOG="$(mktemp "$RUNTIME_DIR/pdbedit.XXXXXX")" || exit 1
+
+OUT="$(kaimo_authsync 2>>"$AUTH_ERR")"
+rc=$?
+if [ $rc -ne 0 ]; then
+    echo "[sync-users] Bridge unreachable (rc=$rc)."
+    exit 1
+fi
+
 LM="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 LCT="$(printf 'LCT-%08X' "$(date +%s)")"
 count=0
@@ -45,7 +95,7 @@ while IFS=$'\t' read -r user nthash; do
 done <<< "$OUT"
 
 if [ "$count" -gt 0 ]; then
-    pdbedit -i "smbpasswd:$SMBPASSWD" -e tdbsam >/tmp/pdbedit.log 2>&1
+    pdbedit -i "smbpasswd:$SMBPASSWD" -e tdbsam >"$PDBEDIT_LOG" 2>&1
     echo "[sync-users] $count users imported into tdbsam."
 else
     echo "[sync-users] no active users received."

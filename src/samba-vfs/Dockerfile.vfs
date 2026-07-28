@@ -219,18 +219,22 @@ COPY selftest.sh              /usr/local/bin/selftest.sh
 COPY sync-users.sh            /usr/local/bin/sync-users.sh
 COPY sync-shares.sh           /usr/local/bin/sync-shares.sh
 COPY sync-config.sh           /usr/local/bin/sync-config.sh
+COPY tests/test-sync-users.sh /tmp/test-sync-users.sh
 COPY tests/test-vfs-io-deadline.py /usr/local/bin/test-vfs-io-deadline.py
 COPY tests/test-vfs-snapshot-readonly.py /usr/local/bin/test-vfs-snapshot-readonly.py
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
                        /usr/local/bin/sync-users.sh /usr/local/bin/sync-shares.sh \
                        /usr/local/bin/sync-config.sh \
+                       /tmp/test-sync-users.sh \
                        /usr/local/bin/test-vfs-io-deadline.py \
                        /usr/local/bin/test-vfs-snapshot-readonly.py \
     && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
              /usr/local/bin/sync-users.sh /usr/local/bin/sync-shares.sh \
              /usr/local/bin/sync-config.sh \
              /usr/local/bin/test-vfs-io-deadline.py \
-             /usr/local/bin/test-vfs-snapshot-readonly.py
+             /usr/local/bin/test-vfs-snapshot-readonly.py \
+    && SYNC_USERS_SUT=/usr/local/bin/sync-users.sh bash /tmp/test-sync-users.sh \
+    && rm /tmp/test-sync-users.sh
 
 # Package the installed runtime separately. Stripping is intentionally performed
 # on the copy only: `docker build --target build-runtime` still yields the full
@@ -254,7 +258,7 @@ RUN set -eux; \
       | xargs -r -n1 readlink -f \
       | sort -u > /tmp/runtime-libraries.txt; \
     { \
-        printf '%s\n' acl ca-certificates login passwd procps sysvinit-utils wsdd; \
+        printf '%s\n' acl ca-certificates login passwd procps sysvinit-utils util-linux wsdd; \
         while IFS= read -r library_path; do \
             owner="$(dpkg-query -S "$library_path" | head -n1)"; \
             printf '%s\n' "${owner%%:*}"; \
@@ -271,7 +275,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 COPY --from=build-runtime /runtime/runtime-packages.txt /tmp/runtime-packages.txt
 RUN apt-get update \
     && xargs -r apt-get install -y --no-install-recommends < /tmp/runtime-packages.txt \
-    && rm -rf /var/lib/apt/lists/* /tmp/runtime-packages.txt
+    && rm -rf /var/lib/apt/lists/* /tmp/runtime-packages.txt \
+    && command -v flock >/dev/null \
+    && command -v mktemp >/dev/null \
+    && command -v stat >/dev/null
 
 COPY --from=build-runtime /runtime/opt/samba/ /opt/samba/
 COPY --from=build-runtime /runtime/usr/local/bin/ /usr/local/bin/

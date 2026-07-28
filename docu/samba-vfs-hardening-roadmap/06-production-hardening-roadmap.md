@@ -48,6 +48,8 @@ implementation backlog:
   verification.
 - Isolated mTLS control plane with RPC allow-lists and audited/rate-limited hash
   export.
+- Private, locked NT-hash import using mode-0600 random files in a validated
+  mode-0700 runtime directory with unconditional cleanup.
 - Per-file ACL-filtered folder snapshots in an isolated per-share/per-user cache.
 - Strictly read-only timewarp opens through `SMB_VFS_NEXT_OPENAT`.
 - Bounded snapshot cleanup, fail-safe audit-module activation, and immediate
@@ -61,9 +63,10 @@ in this baseline is a release blocker.
 **Goal:** remove the shortest remaining paths to stale or exposed credentials
 and make disabled identities converge predictably.
 
-1. Remove `/tmp/kaimo.smbpasswd`. Prefer a pipe or private in-memory import; if
-   Samba requires a file, use a locked private runtime directory, `mktemp`,
-   `umask 077`, ownership checks, cleanup traps, and immediate deletion.
+1. **Completed 2026-07-28:** removed `/tmp/kaimo.smbpasswd`; the file-backed
+   `pdbedit` import now uses a locked, validated private runtime directory,
+   `mktemp`, `umask 077`, ownership checks, cleanup traps, and immediate
+   deletion.
 2. Reconcile `tdbsam` and managed POSIX users to desired state. Disable or remove
    users that are deleted, disabled, or absent from the bridge.
 3. Make user/share/config synchronization fail on every unapplied mutation,

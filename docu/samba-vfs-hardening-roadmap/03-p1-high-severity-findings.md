@@ -277,9 +277,24 @@ boundary and selects the directory search lifecycle callback.
 
 ### P1-15: NT hashes are written to an insecure predictable temporary file
 
+> **Remediation status (2026-07-28): Implemented, regression-tested, and
+> verified in the pinned Samba 4.19.5 build and slim runtime image. Live
+> startup/login verification remains pending.**
+
 `sync-users.sh` writes `/tmp/kaimo.smbpasswd` without `mktemp`, an explicit restrictive umask, safe ownership verification, locking, or cleanup. The file contains reusable NT hashes.
 
 **Fix:** avoid disk completely if `pdbedit` supports a safe pipe/import method. Otherwise use a private runtime directory or `mktemp`, `umask 077`, `O_NOFOLLOW`-equivalent creation, cleanup traps, single-instance locking, and immediate deletion after a successful or failed import.
+
+**Implemented fix:** `sync-users.sh` now creates or validates an invoking-user
+owned mode-0700 runtime directory under `/run`, sets `umask 077`, and creates
+the import and diagnostic files with `mktemp`. It rejects a symlink, foreign
+owner, or incorrect mode before exporting hashes. A private `flock` serializes
+imports, and exit/signal traps immediately remove every per-run file after
+successful or failed processing. The only persistent file is the non-secret
+mode-0600 lock inside the private directory. The container build runs a shell
+regression that verifies unpredictable placement, mode 0600, cleanup on both
+import outcomes, and concurrent-run rejection. The slim runtime explicitly
+installs and verifies the required `flock`, `mktemp`, and `stat` tools.
 
 ### P1-16: User reconciliation does not remove disabled/deleted users
 

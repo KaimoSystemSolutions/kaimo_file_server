@@ -93,3 +93,57 @@ P0-04 had already begun deriving the type from the source stat result.
 
 **Next planned finding:** P1-15 — remove the predictable temporary file used for
 NT-hash import.
+
+### 2026-07-28 — P1-15: Private temporary NT-hash import
+
+**Status:** Implemented, regression-tested, and verified in the pinned Samba
+4.19.5 build and slim runtime image. Live startup/login verification remains
+pending.
+
+**Problem**
+
+`sync-users.sh` placed reusable NT hashes in the predictable shared path
+`/tmp/kaimo.smbpasswd`. It neither restricted the process umask nor verified
+safe directory ownership, serialized concurrent imports, or deleted the file
+after successful and failed imports.
+
+**Solution implemented**
+
+1. The sync now uses `/run/kaimo-user-sync` by default and creates it with mode
+   0700. Before exporting a hash it rejects a symlink, a non-directory, a
+   foreign owner, or any mode other than 0700.
+2. `umask 077` applies before a per-run `mktemp` creates the smbpasswd import
+   and diagnostic files. The reusable hashes therefore exist only in an
+   unpredictable mode-0600 file inside the private directory.
+3. Exit and signal traps delete the import and both diagnostic files after all
+   success and failure paths.
+4. A nonblocking `flock` in the private directory prevents startup and periodic
+   synchronization runs from importing concurrently.
+5. `KAIMO_SYNC_RUNTIME_DIR` permits an isolated private directory in tests. A
+   separate path-prefix override lets the regression select stubbed Samba
+   tools without changing the production default.
+6. The shell regression is now a required `build-runtime` Docker layer rather
+   than an unexecuted standalone test.
+7. The slim runtime explicitly includes and verifies `flock`, `mktemp`, and
+   `stat`, so the hardening does not depend on accidental base-image contents.
+
+**Validation completed**
+
+- The standalone regression passed in the Samba debug container:
+  three distinct users imported, the import path was random and mode 0600,
+  successful and failed imports left no temporary files, and a held lock
+  rejected a second export.
+- The Docker `build-runtime` target passed the same regression and completed
+  against pinned Samba 4.19.5/ABI 49.
+- The final slim deployable image built successfully and verified all required
+  runtime tools.
+- `git diff --check` passed.
+
+**Validation still required**
+
+- Start the deployable Samba container against the bridge, perform an initial
+  and periodic user sync, and verify a real NTLMv2 login while confirming no
+  per-run files remain in `/run/kaimo-user-sync`.
+
+**Next planned finding:** P1-16 — reconcile `tdbsam` and managed POSIX users
+when a Kaimo user is disabled, deleted, or absent from the bridge response.
