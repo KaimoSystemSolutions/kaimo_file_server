@@ -68,6 +68,9 @@ services:
       Snapshots__Materialization__MaxBytesPerRequest: ${KAIMO_SNAPSHOT_MAX_REQUEST_BYTES:-1073741824}
       Snapshots__Materialization__MaxConcurrentRequests: ${KAIMO_SNAPSHOT_MAX_CONCURRENT_REQUESTS:-2}
       Snapshots__Materialization__MaxDurationSeconds: ${KAIMO_SNAPSHOT_MAX_DURATION_SECONDS:-25}
+      # P1-11: completed event IDs remain long enough to deduplicate delayed
+      # sidecar retries across bridge/database restarts.
+      LifecycleEvents__ReceiptRetentionDays: ${KAIMO_EVENT_RECEIPT_RETENTION_DAYS:-30}
     volumes:
       - *vol-storage-pool-01
       #- *vol-storage-pool-02
@@ -103,6 +106,8 @@ services:
       - *vol-storage-pool-01
       #- *vol-storage-pool-02
       - *vol-app-data
+      # P1-11: survives Samba container recreation, not only process restarts.
+      - kaimo_samba_event_spool:/var/lib/kaimo/event-spool
       # Mount the single Samba workload identity and public control-plane CA.
       - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
     build:
@@ -136,6 +141,15 @@ services:
       KAIMO_AUTHD_CACHE_MAX_ENTRIES: ${KAIMO_AUTHD_CACHE_MAX_ENTRIES:-10000}
       KAIMO_AUTHD_CACHE_MAX_BYTES: ${KAIMO_AUTHD_CACHE_MAX_BYTES:-8388608}
       KAIMO_AUTHD_CACHE_TTL_MS: ${KAIMO_AUTHD_CACHE_TTL_MS:-3000}
+      # P1-11: durable lifecycle queue. A VFS event is acknowledged locally only
+      # after its fsync+rename publication. Failed gRPC deliveries back off and
+      # eventually move to the bounded dead-letter directory.
+      KAIMO_EVENT_SPOOL_PATH: /var/lib/kaimo/event-spool
+      KAIMO_EVENT_MAX_PENDING: ${KAIMO_EVENT_MAX_PENDING:-100000}
+      KAIMO_EVENT_MAX_DEAD: ${KAIMO_EVENT_MAX_DEAD:-10000}
+      KAIMO_EVENT_MAX_ATTEMPTS: ${KAIMO_EVENT_MAX_ATTEMPTS:-20}
+      KAIMO_EVENT_RETRY_BASE_MS: ${KAIMO_EVENT_RETRY_BASE_MS:-1000}
+      KAIMO_EVENT_RETRY_MAX_MS: ${KAIMO_EVENT_RETRY_MAX_MS:-60000}
       # P1-10: maximum polling delay before a disabled/deleted share is removed
       # from Samba and all of its active tree connections are force-closed.
       KAIMO_SHARE_SYNC_INTERVAL_SECONDS: ${KAIMO_SHARE_SYNC_INTERVAL_SECONDS:-2}
@@ -264,3 +278,6 @@ networks:
   # Web/Adminer cannot route to the bridge through their DB segment.
   kaimo_bridge_database:
     internal: true
+
+volumes:
+  kaimo_samba_event_spool:

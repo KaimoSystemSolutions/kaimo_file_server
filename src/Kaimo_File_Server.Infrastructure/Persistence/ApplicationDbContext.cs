@@ -23,6 +23,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<AccessEntry> AccessEntries { get; set; }
         public DbSet<ShareDefinition> ShareDefinitions { get; set; }
         public DbSet<FileVersion> FileVersions { get; set; }
+        public DbSet<SambaLifecycleEventReceipt> SambaLifecycleEventReceipts { get; set; }
 
         // -- Departments & Scoped Roles --
         public DbSet<Department> Departments { get; set; }
@@ -159,6 +160,18 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(e => new { e.ShareId, e.FilePath, e.SnapshotTimestampUtc }).IsUnique();
                 entity.HasIndex(e => e.SnapshotTimestampUtc);
                 entity.HasIndex(e => new { e.ShareId, e.FilePath, e.ContentHash });
+            });
+
+            modelBuilder.Entity<SambaLifecycleEventReceipt>(entity =>
+            {
+                entity.ToTable("samba_lifecycle_event_receipts");
+                entity.HasKey(e => e.EventId);
+                entity.Property(e => e.EventType).IsRequired().HasMaxLength(32);
+                entity.Property(e => e.CreatedAtUtc).IsRequired();
+                entity.Property(e => e.AttemptCount).IsRequired();
+                entity.Property(e => e.LastError).HasMaxLength(1000);
+                entity.HasIndex(e => e.CompletedAtUtc);
+                entity.HasIndex(e => e.LeaseUntilUtc);
             });
 
             // -- Departments --

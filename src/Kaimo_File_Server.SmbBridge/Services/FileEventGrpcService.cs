@@ -19,28 +19,36 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
     private readonly IFileServiceFactory _factory;
     private readonly IShareRepository _shares;
     private readonly IAuthenticationLookup _auth;
+    private readonly ISambaLifecycleEventRepository _events;
     private readonly ILogger<FileEventGrpcService> _logger;
 
     public FileEventGrpcService(
         IFileServiceFactory factory,
         IShareRepository shares,
         IAuthenticationLookup auth,
+        ISambaLifecycleEventRepository events,
         ILogger<FileEventGrpcService> logger)
     {
         _factory = factory;
         _shares = shares;
         _auth = auth;
+        _events = events;
         _logger = logger;
     }
 
     public override async Task<NotifyReply> NotifyClose(NotifyCloseRequest request, ServerCallContext context)
     {
+        if (!TryParseEventId(request.EventId, out var eventId)) return Fail();
         var (svc, user) = await ResolveAsync(
             request.Username, request.Share,
             context?.CancellationToken ?? CancellationToken.None);
         if (svc is null || user is null) return Fail();
 
-        await svc.NotifyExternalCloseAsync(request.Path, user);
+        if (!await ProcessOnceAsync(
+                eventId, "close",
+                () => svc.NotifyExternalCloseAsync(request.Path, user),
+                context?.CancellationToken ?? CancellationToken.None))
+            return Fail();
         _logger.LogInformation("NotifyClose: share={Share} path=[{Path}] user={User}",
             request.Share, request.Path, request.Username);
         return Ok();
@@ -48,23 +56,34 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
 
     public override async Task<NotifyReply> NotifyMkdir(NotifyPathRequest request, ServerCallContext context)
     {
+        if (!TryParseEventId(request.EventId, out var eventId)) return Fail();
         var (svc, user) = await ResolveAsync(
             request.Username, request.Share,
             context?.CancellationToken ?? CancellationToken.None);
         if (svc is null || user is null) return Fail();
 
-        await svc.NotifyExternalMkdirAsync(request.Path, user);
+        if (!await ProcessOnceAsync(
+                eventId, "mkdir",
+                () => svc.NotifyExternalMkdirAsync(request.Path, user),
+                context?.CancellationToken ?? CancellationToken.None))
+            return Fail();
         return Ok();
     }
 
     public override async Task<NotifyReply> NotifyDelete(NotifyPathRequest request, ServerCallContext context)
     {
+        if (!TryParseEventId(request.EventId, out var eventId)) return Fail();
         var svc = await ResolveServiceAsync(
             request.Share,
             context?.CancellationToken ?? CancellationToken.None);
         if (svc is null) return Fail();
 
-        await svc.NotifyExternalDeleteAsync(request.Path, request.IsDirectory);
+        if (!await ProcessOnceAsync(
+                eventId, "delete",
+                () => svc.NotifyExternalDeleteAsync(
+                    request.Path, request.IsDirectory),
+                context?.CancellationToken ?? CancellationToken.None))
+            return Fail();
         _logger.LogInformation("NotifyDelete: share={Share} path=[{Path}] dir={Dir}",
             request.Share, request.Path, request.IsDirectory);
         return Ok();
@@ -72,18 +91,62 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
 
     public override async Task<NotifyReply> NotifyRename(NotifyRenameRequest request, ServerCallContext context)
     {
+        if (!TryParseEventId(request.EventId, out var eventId)) return Fail();
         var svc = await ResolveServiceAsync(
             request.Share,
             context?.CancellationToken ?? CancellationToken.None);
         if (svc is null) return Fail();
 
-        await svc.NotifyExternalRenameAsync(request.OldPath, request.NewPath, request.IsDirectory);
+        if (!await ProcessOnceAsync(
+                eventId, "rename",
+                () => svc.NotifyExternalRenameAsync(
+                    request.OldPath, request.NewPath, request.IsDirectory),
+                context?.CancellationToken ?? CancellationToken.None))
+            return Fail();
         _logger.LogInformation("NotifyRename: share={Share} [{Old}] -> [{New}] dir={Dir}",
             request.Share, request.OldPath, request.NewPath, request.IsDirectory);
         return Ok();
     }
 
     // ---- helpers ----
+
+    private async Task<bool> ProcessOnceAsync(
+        Guid eventId,
+        string eventType,
+        Func<Task> handler,
+        CancellationToken cancellationToken)
+    {
+        var claim = await _events.TryClaimAsync(
+            eventId, eventType, TimeSpan.FromMinutes(2), cancellationToken);
+        if (claim == SambaEventClaimResult.AlreadyCompleted) return true;
+        if (claim != SambaEventClaimResult.Acquired)
+        {
+            _logger.LogWarning(
+                "Lifecycle event {EventId} ({EventType}) was not claimed: {Claim}.",
+                eventId, eventType, claim);
+            return false;
+        }
+
+        try
+        {
+            await handler();
+            await _events.CompleteAsync(eventId, cancellationToken);
+            return true;
+        }
+        catch (Exception error)
+        {
+            _logger.LogError(
+                error,
+                "Lifecycle event {EventId} ({EventType}) failed and will be retried.",
+                eventId, eventType);
+            await _events.ReleaseAsync(
+                eventId, error.Message, CancellationToken.None);
+            return false;
+        }
+    }
+
+    private static bool TryParseEventId(string value, out Guid eventId) =>
+        Guid.TryParseExact(value, "N", out eventId);
 
     private async Task<(IFileService? Service, UserContext? User)> ResolveAsync(
         string username,

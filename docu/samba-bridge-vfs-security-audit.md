@@ -32,7 +32,10 @@ The most important conclusions are:
 6. The gRPC control plane is now isolated on a dedicated internal network and
    protected by mTLS, per-workload RPC allow-lists, and audited/rate-limited
    hash export. Native/container runtime verification remains pending.
-7. Event delivery and synchronization are best-effort rather than durable. Failures can leave version, ACL, metadata, ownership, search, passdb, registry, and runtime state inconsistent.
+7. Lifecycle-event transport is now durably spooled, explicitly acknowledged,
+   retried, dead-lettered, and deduplicated by persistent event ID. Credential
+   and configuration synchronization remain non-durable, and exact close
+   attribution/reconciliation still require P1-12 and Milestone B.
 
 The system should be treated as a **working migration prototype with critical hardening work remaining**, not as a completed production security boundary.
 
@@ -552,11 +555,45 @@ the Samba VFS runbook.
 
 ### P1-11: Event delivery is lossy and has no retry-safe contract
 
+> **Remediation status (2026-07-28): Implemented; managed tests and the pinned
+> Samba 4.19.5 native container build pass. Live bridge-outage/restart and
+> dead-letter operational regressions remain pending.**
+
 VFS notifications are described as fire-and-forget. The VFS does not wait for a meaningful acknowledgement, the sidecar does not durably spool events, and gRPC status/reply values are ignored by event handlers.
 
 **Impact:** version creation, owner stamping, metadata cleanup, ACL path updates, and search indexing can be silently missed.
 
 **Fix:** use a durable local outbox/spool, event IDs, explicit acknowledgements, bounded retry with backoff, dead-letter handling, and idempotent server-side processing.
+
+**Implemented fix**
+
+1. `authd` generates a UUID per accepted lifecycle event and persists the exact
+   bounded local-protocol payload under an owner-only spool using a `0600`
+   temporary file, file `fsync`, atomic `rename`, and directory `fsync`.
+2. The VFS receives `OK` only after this durable publication. gRPC delivery runs
+   on a separate dispatcher and no longer consumes an `smbd` worker's event
+   budget.
+3. Delivery requires both a successful gRPC status and `NotifyReply.ok`.
+   Failures use bounded exponential backoff; exhausted events move to a bounded
+   dead-letter directory. Pending/dead capacities, attempts, and retry bounds
+   are validated environment settings.
+4. The spool is mounted as a dedicated Compose volume and recovered on `authd`
+   restart. Unsafe ownership/modes, symlinks, malformed records, and incompatible
+   record versions fail closed.
+5. All event protobuf requests carry the stable ID. The bridge claims it through
+   the migrated `samba_lifecycle_event_receipts` table with a crash-reclaimable
+   lease, acknowledges completed duplicates without re-running effects, rejects
+   cross-type ID reuse, and expires completed receipts after a configurable
+   retention period.
+6. External lifecycle helpers now surface ownership/version/search/ACL failures
+   to the bridge instead of logging them as success, so failed effects keep the
+   event unacknowledged.
+
+P1-11 provides at-least-once delivery and post-completion deduplication. The
+known crash window inside multi-effect handlers is intentionally not described
+as exactly-once: P1-12 must bind close versions to exact bytes, P1-13 must make
+rename effects independently idempotent, and the Milestone-B operation
+journal/outbox remains the full cross-system recovery design.
 
 ### P1-12: Close processing can version the wrong content or assign the wrong user
 
@@ -2072,7 +2109,52 @@ eventually removed the registry entry.
   necessarily postpones registry and active-handle revocation.
 
 **Next planned finding:** P1-11 — make lifecycle event delivery durable,
-acknowledged, retry-safe, and idempotent.
+acknowledged, retry-safe, and idempotent. Completed immediately afterward.
+
+### 2026-07-28 — P1-11: Durable, acknowledged lifecycle event delivery
+
+**Status:** Implemented; complete managed suite and pinned native container
+build pass. Live outage/restart verification remains pending.
+
+**Solution implemented**
+
+1. Added a versioned native event spool with stable UUIDs, restrictive
+   ownership/modes, atomic `fsync` publication, restart recovery, capacity
+   limits, bounded exponential retry, and a bounded dead-letter directory.
+2. Changed the local contract from "gRPC attempted" to "event durably
+   enqueued": `smbd` waits only for local persistence, while a dedicated
+   dispatcher verifies gRPC status plus the application acknowledgement.
+3. Added protobuf event IDs and a persistent bridge receipt/lease repository,
+   EF migration, duplicate/type-conflict handling, crash lease recovery, and
+   30-day configurable completed-receipt retention.
+4. Changed external lifecycle effects to propagate failures so the bridge never
+   acknowledges a partially failed attempt as successful.
+5. Added the durable spool volume and documented operational capacity/retry/
+   retention settings in Compose, `.env.example`, and the Samba runbook.
+
+**Validation completed**
+
+- Complete managed suite: 552 passed, 0 failed, 0 skipped.
+- Repository regressions cover claim, busy lease, release/reclaim, completion,
+  duplicate acknowledgement, type conflict, and receipt retention.
+- gRPC regressions cover required stable IDs and completed-duplicate suppression.
+- The pinned Samba 4.19.5 image compiles the protobuf client, `authd`, and VFS
+  module; deterministic native spool tests cover restart recovery, retry timing,
+  dead-letter transition, delivery removal, and capacity rejection.
+- `docker compose config --quiet` passes.
+
+**Validation still required / deliberately separate**
+
+- Interrupt the bridge and database during live SMB close/mkdir/delete/rename,
+  recreate both containers, and verify pending spool drain without lost events.
+- Exercise retry exhaustion, dead-letter alerting/repair, volume pressure, and
+  receipt cleanup under representative production load.
+- P1-12 remains next for exact close-content/user attribution. P1-13 remains
+  necessary for independently idempotent rename side effects across the
+  handler-to-receipt crash window.
+
+**Next planned finding:** P1-12 — bind close processing to the exact content and
+authenticated user associated with the closing handle.
 
 ## 15. Source evidence index
 

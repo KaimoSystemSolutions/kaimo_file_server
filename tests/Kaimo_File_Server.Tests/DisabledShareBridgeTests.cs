@@ -86,42 +86,47 @@ public sealed class DisabledShareBridgeTests
         var shares = DisabledShareRepository();
         var auth = new Mock<IAuthenticationLookup>();
         var factory = new Mock<IFileServiceFactory>();
+        var events = new Mock<ISambaLifecycleEventRepository>();
         auth.Setup(x => x.ResolveUserContextAsync("alice"))
             .ReturnsAsync(new UserContext(_user, [], [], []));
         var sut = new FileEventGrpcService(
-            factory.Object, shares.Object, auth.Object,
+            factory.Object, shares.Object, auth.Object, events.Object,
             NullLogger<FileEventGrpcService>.Instance);
 
         var close = await sut.NotifyClose(
             new NotifyCloseRequest
             {
-                Username = "alice", Share = "disabled", Path = "file.txt"
+                Username = "alice", Share = "disabled", Path = "file.txt",
+                EventId = Guid.NewGuid().ToString("N")
             },
             null!);
         var mkdir = await sut.NotifyMkdir(
             new NotifyPathRequest
             {
                 Username = "alice", Share = "disabled", Path = "folder",
-                IsDirectory = true
+                IsDirectory = true, EventId = Guid.NewGuid().ToString("N")
             },
             null!);
         var delete = await sut.NotifyDelete(
             new NotifyPathRequest
             {
-                Username = "alice", Share = "disabled", Path = "file.txt"
+                Username = "alice", Share = "disabled", Path = "file.txt",
+                EventId = Guid.NewGuid().ToString("N")
             },
             null!);
         var rename = await sut.NotifyRename(
             new NotifyRenameRequest
             {
                 Username = "alice", Share = "disabled",
-                OldPath = "old.txt", NewPath = "new.txt"
+                OldPath = "old.txt", NewPath = "new.txt",
+                EventId = Guid.NewGuid().ToString("N")
             },
             null!);
 
         Assert.All([close, mkdir, delete, rename],
             reply => Assert.False(reply.Ok));
         factory.VerifyNoOtherCalls();
+        events.VerifyNoOtherCalls();
     }
 
     [Fact]

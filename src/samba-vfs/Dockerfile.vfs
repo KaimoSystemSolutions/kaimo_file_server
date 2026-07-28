@@ -149,8 +149,10 @@ COPY module/sharesync.cpp ./
 COPY module/configsync.cpp ./
 COPY module/bridge_channel.h ./
 COPY module/decision_cache.h ./
+COPY module/event_spool.h ./
 COPY module/local_protocol.h ./
 COPY tests/test-decision-cache.cpp ./
+COPY tests/test-event-spool.cpp ./
 COPY tests/test-local-protocol.cpp ./
 RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
     && protoc --grpc_out=. --plugin=protoc-gen-grpc="$(which grpc_cpp_plugin)" kaimo_smb_bridge.proto \
@@ -178,6 +180,10 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
        test-decision-cache.cpp -o /tmp/test-decision-cache \
     && /tmp/test-decision-cache \
     && rm /tmp/test-decision-cache \
+    && g++ -std=c++17 -O2 -pthread -I. \
+       test-event-spool.cpp -o /tmp/test-event-spool \
+    && /tmp/test-event-spool \
+    && rm /tmp/test-event-spool \
     && g++ -std=c++17 -O2 -pthread -I. \
        test-local-protocol.cpp -o /tmp/test-local-protocol \
     && /tmp/test-local-protocol \

@@ -263,7 +263,7 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
   renameat_fn(renamed)  ──framed RENAME_AUTH─► AuthorizeRename
                         ──framed RENAME───────► NotifyRename ─►   → Ownership (EnsureOwnerAsync)
   mkdirat_fn (directory created) ──framed MKDIR──► NotifyMkdir ─►   → Search index (SearchServiceRouter)
-                                      (fire-and-forget)             → ACL realignment (Rename)
+                                      (durable retry + ack)         → ACL realignment (Rename)
 ```
 
 - **.NET:** new `FileService.NotifyExternal{Close,Delete,Rename,Mkdir}Async` (in Core) use the
@@ -273,8 +273,17 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
   and a bounded accepted-client queue (`KAIMO_AUTHD_QUEUE_CAPACITY`, default
   64), so slow events do not create unbounded threads or descriptors. Excess
   clients receive `ERROR`; silent clients are closed after
-  `KAIMO_AUTHD_IO_TIMEOUT_MS` (default 2000 ms). Events remain
-  fire-and-forget.
+  `KAIMO_AUTHD_IO_TIMEOUT_MS` (default 2000 ms).
+- **Durable event delivery (P1-11):** `authd` assigns a stable UUID, writes the
+  complete framed event to the owner-only `KAIMO_EVENT_SPOOL_PATH` using
+  `fsync` + atomic `rename`, and only then acknowledges the VFS. A separate
+  dispatcher requires both successful gRPC status and `NotifyReply.ok`, retries
+  with bounded exponential backoff, and moves exhausted events to the bounded
+  `dead/` directory. The spool is a dedicated Compose volume, so it survives
+  container recreation. The bridge leases each ID in
+  `samba_lifecycle_event_receipts`; completed duplicates are acknowledged
+  without re-running effects, crashed leases expire, and completed receipts are
+  retained for `LifecycleEvents:ReceiptRetentionDays` (default 30).
 - **Local peer security:** `/var/run/kaimo` is `root:kaimo-authd` mode `0750`
   and `authz.sock` is mode `0660`. Synchronized Samba users are members of the
   dedicated group, while `authd` authenticates every connection with
@@ -294,7 +303,7 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
   fragmentation and partial I/O cannot change message boundaries.
 - **VFS client deadlines:** the module opens its local client socket as
   nonblocking and uses a single monotonic deadline for connect, all partial
-  writes, and all partial reads. Authorization, snapshot, and best-effort event
+  writes, and all partial reads. Authorization, snapshot, and durable event
   traffic have separate budgets, so a stalled sidecar cannot indefinitely pin
   an `smbd` worker and event enqueue cannot consume an authorization-sized
   timeout.

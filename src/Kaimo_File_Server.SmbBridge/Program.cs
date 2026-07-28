@@ -48,6 +48,7 @@ builder.Services.AddGrpc(options =>
 builder.Services.AddSingleton<SnapshotCacheLeaseManager>();
 builder.Services.AddSingleton<SnapshotMaterializationLimiter>();
 builder.Services.AddHostedService<SnapshotCacheCleanupService>();
+builder.Services.AddHostedService<SambaEventReceiptCleanupService>();
 
 // The bridge is reachable only on its dedicated Compose control network, and
 // every connection must also present a client certificate issued by the
@@ -69,6 +70,11 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 var app = builder.Build();
+
+// P1-11 receipts are part of the bridge's correctness boundary. Do not depend
+// on Host/Web winning startup first; the shared advisory lock makes concurrent
+// migration/seeding safe.
+await app.InitializeDatabaseAsync();
 
 app.MapGrpcService<AuthGrpcService>();       // Phase 1: NT-Hashes (GetNtHash/ListUsers)
 app.MapGrpcService<AuthzGrpcService>();      // Phase 2: Autorisierung (Connect/Open)

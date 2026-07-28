@@ -226,7 +226,11 @@ public class FileService : IFileService
     /// underlying file operation, so it is swallowed and logged. No-op when ownership
     /// tracking is not configured.
     /// </summary>
-    private async Task RecordOwnerAsync(string normalizedPath, bool isDirectory, UserContext user)
+    private async Task RecordOwnerAsync(
+        string normalizedPath,
+        bool isDirectory,
+        UserContext user,
+        bool bestEffort = true)
     {
         if (_ownershipService is null) return;
         try
@@ -235,6 +239,7 @@ public class FileService : IFileService
         }
         catch (Exception ex)
         {
+            if (!bestEffort) throw;
             _logger.LogWarning(LogEvents.FileOwnerRecordFailed, ex, LogMessages.FileOwnerRecordFailed, normalizedPath);
         }
     }
@@ -336,15 +341,21 @@ public class FileService : IFileService
     //
     // Samba performs the raw file I/O itself, then the VFS bridge calls these so the same
     // cross-cutting effects as FileSession.DisposeAsync happen: versioning, search indexing,
-    // ownership. All best-effort — a hook failure must never surface as an SMB error.
+    // ownership. P1-11 surfaces failures to the bridge so authd retains and
+    // retries the durable event. The native SMB operation has already completed.
 
     public async Task NotifyExternalCloseAsync(string path, UserContext user)
     {
         var rel = ShareRelativePath.Normalize(path);
         var abs = _storage.ToAbsolutePath(rel);
+        var failures = new List<Exception>();
 
-        // Ownership (idempotent, swallows its own errors).
-        await RecordOwnerAsync(rel, isDirectory: false, user);
+        try
+        {
+            await RecordOwnerAsync(
+                rel, isDirectory: false, user, bestEffort: false);
+        }
+        catch (Exception ex) { failures.Add(ex); }
 
         // Versioning: snapshot the freshly written content (mirrors DisposeAsync).
         if (_versionService != null)
@@ -356,7 +367,7 @@ public class FileService : IFileService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(LogEvents.FileVersionSnapshotFailed, ex, LogMessages.FileVersionSnapshotFailed, rel);
+                failures.Add(ex);
             }
         }
 
@@ -366,27 +377,42 @@ public class FileService : IFileService
         if (_searchService != null)
         {
             try { await _searchService.onFileCreated(abs, _storage.ReadAsync(rel)); }
-            catch (Exception ex) { _logger.LogWarning(LogEvents.FileSearchHookFailed, ex, LogMessages.FileSearchHookFailed, rel); }
+            catch (Exception ex) { failures.Add(ex); }
         }
+
+        if (failures.Count != 0)
+            throw new AggregateException(
+                $"One or more close side effects failed for '{rel}'.",
+                failures);
     }
 
     public async Task NotifyExternalMkdirAsync(string path, UserContext user)
     {
         var rel = ShareRelativePath.Normalize(path);
         var abs = _storage.ToAbsolutePath(rel);
-        await RecordOwnerAsync(rel, isDirectory: true, user);
+        var failures = new List<Exception>();
+        try
+        {
+            await RecordOwnerAsync(
+                rel, isDirectory: true, user, bestEffort: false);
+        }
+        catch (Exception ex) { failures.Add(ex); }
         if (_searchService != null)
         {
             try { await _searchService.onDirectoryCreated(abs); }
-            catch (Exception ex) { _logger.LogWarning(LogEvents.FileSearchHookFailed, ex, LogMessages.FileSearchHookFailed, rel); }
+            catch (Exception ex) { failures.Add(ex); }
         }
+        if (failures.Count != 0)
+            throw new AggregateException(
+                $"One or more mkdir side effects failed for '{rel}'.",
+                failures);
     }
 
     public async Task NotifyExternalDeleteAsync(string path, bool isDirectory)
     {
         var rel = ShareRelativePath.Normalize(path);
         var abs = _storage.ToAbsolutePath(rel);
-        await ApplyDeleteSideEffectsAsync(rel, isDirectory, abs, bestEffort: true);
+        await ApplyDeleteSideEffectsAsync(rel, isDirectory, abs, bestEffort: false);
     }
 
     public async Task NotifyExternalRenameAsync(string oldPath, string newPath, bool isDirectory)
@@ -397,7 +423,7 @@ public class FileService : IFileService
         var newAbs = _storage.ToAbsolutePath(newRel);
 
         await ApplyRenameSideEffectsAsync(
-            oldRel, newRel, isDirectory, oldAbs, newAbs, bestEffort: true);
+            oldRel, newRel, isDirectory, oldAbs, newAbs, bestEffort: false);
     }
 
     // ------------------ ACL helpers ------------------

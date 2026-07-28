@@ -111,9 +111,10 @@ message AuthorizeRenameRequest {
   bool   replace_intent           = 8;
 }
 
-// Close/Event hooks (Phase 3). Samba performs I/O natively and reports the event
-// afterward; .NET handles cross-cutting concerns (versioning, search index,
-// ownership) as previously in FileSession.DisposeAsync. Fire-and-forget, best-effort.
+// Close/Event hooks (Phase 3/P1-11). Samba performs I/O natively and reports the
+// event afterward. authd durably spools each event before acknowledging the VFS
+// and retries until this service explicitly acknowledges it. event_id is stable
+// across retries and is the bridge's persistent idempotency key.
 service EventService {
   rpc NotifyClose (NotifyCloseRequest)  returns (NotifyReply); // file written and closed
   rpc NotifyMkdir (NotifyPathRequest)   returns (NotifyReply); // directory created
@@ -125,6 +126,7 @@ message NotifyCloseRequest {
   string username = 1;
   string share    = 2;
   string path     = 3;
+  string event_id = 4;
 }
 
 message NotifyPathRequest {
@@ -132,6 +134,7 @@ message NotifyPathRequest {
   string share        = 2;
   string path         = 3;
   bool   is_directory = 4;
+  string event_id     = 5;
 }
 
 message NotifyRenameRequest {
@@ -140,6 +143,7 @@ message NotifyRenameRequest {
   string old_path     = 3;
   string new_path     = 4;
   bool   is_directory = 5;
+  string event_id     = 6;
 }
 
 message NotifyReply { bool ok = 1; }

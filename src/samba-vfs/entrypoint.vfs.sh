@@ -10,6 +10,10 @@ TEST_USER="${KAIMO_TEST_USER:-kaimotest}"
 TEST_PASS="${KAIMO_TEST_PASS:-Passw0rd!}"
 
 mkdir -p "$STORAGE"
+# P1-11 durable outbox. Owner-only permissions are reasserted on every start;
+# authd independently verifies ownership, mode, and non-symlink directory type.
+install -d -m 0700 -o root -g root \
+    "${KAIMO_EVENT_SPOOL_PATH:-/var/lib/kaimo/event-spool}"
 
 # --- Storage write permissions via a shared group (risk: storage ownership) ---
 # Each Kaimo user has their OWN UID (per-user identity/SID), but share

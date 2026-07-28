@@ -55,7 +55,8 @@ namespace Kaimo_File_Server.Core.Services.File
         // ---- External-writer close hooks (Samba VFS direct I/O) ----
         // Samba performs the raw I/O natively, then calls these so the same
         // cross-cutting effects as FileSession.DisposeAsync run: versioning,
-        // search indexing, ownership. Best-effort (failures logged, not thrown).
+        // search indexing, ownership. Failures reach the bridge so the durable
+        // event remains unacknowledged and is retried.
 
         /// <summary>A file was written+closed externally: snapshot a version, index it, stamp owner.</summary>
         Task NotifyExternalCloseAsync(string path, UserContext user);

@@ -472,18 +472,16 @@ static bool kaimo_list_filter_enabled(void)
 static void kaimo_notify_send(
 	uint8_t operation, const struct kaimo_local_request *request)
 {
-	struct kaimo_local_deadline deadline;
-	if (kaimo_local_deadline_init(
-		    &deadline, kaimo_event_timeout_ms) != 0)
-		return;
-	int fd = kaimo_authd_connect(&deadline);
-	if (fd < 0)
-		return;
-	(void)kaimo_local_send_frame_until(
-		fd, operation, KAIMO_LOCAL_KIND_REQUEST,
-		KAIMO_LOCAL_STATUS_NONE, request->payload,
-		request->builder.length, &deadline);
-	close(fd);
+	struct kaimo_local_frame_header response;
+	int result = kaimo_roundtrip(
+		operation, request, &response, NULL, 0,
+		kaimo_event_timeout_ms);
+	if (result != 0 ||
+	    response.status != KAIMO_LOCAL_STATUS_OK ||
+	    response.payload_length != 0) {
+		DBG_ERR("kaimo_bridge: lifecycle event %u was not durably "
+			"accepted by authd\n", (unsigned)operation);
+	}
 }
 
 /* ---- Phase 5: snapshot helpers (@GMT / "Previous Versions") ---- */
@@ -1874,7 +1872,7 @@ static struct vfs_fn_pointers kaimo_bridge_fns = {
 /* Build marker: bump on every module change so the running image can be
  * identified in the logs (grep "kaimo_bridge build"). This is how we tell whether
  * a rebuild actually picked up the latest source vs. served a cached layer. */
-#define KAIMO_BRIDGE_BUILD "2026-07-28e borrowed stat filename"
+#define KAIMO_BRIDGE_BUILD "2026-07-28f durable event enqueue ack"
 
 static_decl_vfs;
 NTSTATUS vfs_kaimo_bridge_init(TALLOC_CTX *ctx)
