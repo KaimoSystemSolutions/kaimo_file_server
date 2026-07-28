@@ -298,11 +298,29 @@ installs and verifies the required `flock`, `mktemp`, and `stat` tools.
 
 ### P1-16: User reconciliation does not remove disabled/deleted users
 
+> **Remediation status (2026-07-28): Implemented, regression-tested, and
+> verified with real Samba 4.19.5 `pdbedit` plus an NTLM login-revocation
+> probe. Bridge-driven live disable/delete and already-open-session behavior
+> remain release validation.**
+
 The bridge filters inactive users from `ListUsers`, but `sync-users.sh` only imports/updates returned users. Old passdb and POSIX accounts remain.
 
 **Impact:** stale credentials persist locally. Connect authorization normally blocks them, but this creates dangerous coupling with fail-open modes and future bridge failures.
 
 **Fix:** perform desired-state reconciliation: enumerate managed Samba users, remove those absent from the bridge, disable/remove their passdb entries, and define a safe POSIX-account retention policy.
+
+**Implemented fix:** each successful sync now publishes a private mode-0600
+managed-user set below an owner-only state directory. The first run adopts
+existing `tdbsam` entries except explicitly reserved accounts; later runs touch
+only that managed boundary. Users absent from the bridge response are removed
+from `tdbsam` and both Kaimo secondary groups. Their POSIX account remains
+locked with `nologin` and retains its UID, preventing orphaned ownership and
+unsafe UID reuse. Reactivation reimports the credential and restores the groups
+without changing that UID. Import or reconciliation failure leaves the prior
+managed state for retry. New SMB authentication with a removed credential was
+verified to fail against the pinned Samba build. Existing authenticated
+sessions are not forcibly terminated by this item and remain covered by the
+later revocation-SLA decision.
 
 ### P1-17: Synchronization scripts can report success after failed mutations
 

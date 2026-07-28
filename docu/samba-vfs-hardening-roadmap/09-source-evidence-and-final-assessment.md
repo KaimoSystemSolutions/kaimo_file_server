@@ -23,6 +23,7 @@
 | Event reliability/TOCTOU | `vfs_kaimo_bridge.c` (`kaimo_capture_close_content`, `kaimo_close`); `authd.cpp` (capture-ID framing/delivery); `FileEventGrpcService.cs` (capture resolution/cleanup); `FileService.NotifyExternalCloseAsync`; `sync-shares.sh` |
 | Rename duplicate destruction | `Infrastructure/Repositories/FileVersionRepository.cs:142-178` |
 | Private NT-hash import / original predictable temp file | `src/samba-vfs/sync-users.sh`; `src/samba-vfs/tests/test-sync-users.sh`; `src/samba-vfs/Dockerfile.vfs` |
+| Disabled/deleted user reconciliation | `src/samba-vfs/sync-users.sh` (managed state, stale passdb removal, group revocation, UID retention); `src/samba-vfs/tests/test-sync-users.sh`; `src/samba-vfs/Dockerfile.vfs` |
 | Sync error handling | `sync-users.sh`, `sync-shares.sh`, `sync-config.sh` |
 | Authenticated gRPC control plane / original h2c gap | `SmbBridge/Program.cs`; `SmbBridge/Security/*`; `AuthGrpcService.cs`; `bridge_channel.h` and native clients; `docker-compose.yml` |
 

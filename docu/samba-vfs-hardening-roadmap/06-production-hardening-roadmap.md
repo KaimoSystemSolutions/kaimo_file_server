@@ -50,6 +50,8 @@ implementation backlog:
   export.
 - Private, locked NT-hash import using mode-0600 random files in a validated
   mode-0700 runtime directory with unconditional cleanup.
+- Desired-state `tdbsam` reconciliation that revokes absent users while
+  retaining locked POSIX identities and stable UIDs.
 - Per-file ACL-filtered folder snapshots in an isolated per-share/per-user cache.
 - Strictly read-only timewarp opens through `SMB_VFS_NEXT_OPENAT`.
 - Bounded snapshot cleanup, fail-safe audit-module activation, and immediate
@@ -67,8 +69,10 @@ and make disabled identities converge predictably.
    `pdbedit` import now uses a locked, validated private runtime directory,
    `mktemp`, `umask 077`, ownership checks, cleanup traps, and immediate
    deletion.
-2. Reconcile `tdbsam` and managed POSIX users to desired state. Disable or remove
-   users that are deleted, disabled, or absent from the bridge.
+2. **Completed 2026-07-28:** reconcile `tdbsam` and managed POSIX users to
+   desired state. Deleted, disabled, or absent users lose passdb credentials
+   and Kaimo group membership; their locked `nologin` POSIX identity and UID
+   remain to preserve file ownership and permit safe reactivation.
 3. Make user/share/config synchronization fail on every unapplied mutation,
    verify the resulting passdb/registry/config state, prevent concurrent runs,
    and expose the last successful convergence.

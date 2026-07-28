@@ -113,6 +113,17 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
 - **C++ side:** `module/authsync.cpp` (gRPC C++ client) + [`sync-users.sh`](sync-users.sh). The
   entrypoint syncs on start (with retries) and then every 60 s. **This also proves gRPC-in-C++ in the
   Samba container** — the last open toolchain risk from Phase 0.
+- **P1-15/P1-16 credential convergence:** each run imports through random
+  mode-0600 files below `/run/kaimo-user-sync`, then reconciles `tdbsam` to the
+  active bridge response. Managed users that disappear lose their passdb entry
+  and the `kaimo`/`kaimo-authd` secondary groups. Their POSIX account stays
+  locked with `nologin` and keeps its UID so file ownership remains stable;
+  reactivation restores Samba access with that UID. The private ownership set
+  is stored in `/var/lib/kaimo-user-sync/managed-users`. On its first run the
+  sync adopts existing passdb users except the comma-separated
+  `KAIMO_UNMANAGED_SAMBA_USERS` list (default: `KAIMO_TEST_USER`, otherwise
+  `kaimotest`). This blocks new logins but does not terminate an already
+  authenticated SMB session.
 - **Proto contract:** [`protos/kaimo_smb_bridge.proto`](protos/kaimo_smb_bridge.proto) — defined once,
   generates C# (Bridge) and C++ stubs (authsync).
 - **P0-07 control-plane security:** the bridge accepts only client certificates

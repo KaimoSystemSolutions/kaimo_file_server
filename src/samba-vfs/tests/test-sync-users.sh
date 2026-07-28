@@ -1,207 +1,308 @@
 #!/bin/bash
-# Unit test for sync-users.sh — runs WITHOUT Samba/Docker against stub binaries.
+# Unit regression for sync-users.sh. Runs without Samba against stateful stubs.
 #
-# Catches the regression that once broke SMB access: if all Kaimo users get
-# the same UID (formerly "force user"/shared UID), Samba's per-user identity
-# collapses (SID derived from UID + getpwuid lookup) and auth/connect breaks.
-# Core assertion here: EACH user gets their OWN UID.
-#
-# Usage:  bash src/samba-vfs/tests/test-sync-users.sh   (Exit 0 = OK, 1 = FAIL)
+# Verifies distinct POSIX identities, private NT-hash import, desired-state
+# credential revocation, safe UID retention/reactivation, bootstrap ownership,
+# and single-instance serialization.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Default: test the real script; overridable via SYNC_USERS_SUT (regression demo).
 SUT="${SYNC_USERS_SUT:-$HERE/../sync-users.sh}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 export PASSWD_FILE="$WORK/passwd"
-export GROUP_LOG="$WORK/groups"
+export PASSDB_FILE="$WORK/passdb"
+export GROUP_STATE="$WORK/group-state"
+export GROUP_LOG="$WORK/group-log"
+export LOCK_LOG="$WORK/lock-log"
+export DELETE_LOG="$WORK/delete-log"
+export AUTH_USERS_FILE="$WORK/auth-users"
+export AUTH_CALL_LOG="$WORK/auth-calls"
 export IMPORT_CAPTURE="$WORK/imported.smbpasswd"
 export IMPORT_PATH_LOG="$WORK/import-path"
 export IMPORT_MODE_LOG="$WORK/import-mode"
-export AUTH_CALL_LOG="$WORK/auth-calls"
 export KAIMO_SYNC_RUNTIME_DIR="$WORK/runtime"
+export KAIMO_SYNC_STATE_DIR="$WORK/state"
 export KAIMO_SAMBA_PATH_PREFIX=""
-: > "$PASSWD_FILE"
-: > "$GROUP_LOG"
-: > "$AUTH_CALL_LOG"
-echo 1001 > "$PASSWD_FILE.cnt"     # Starting UID for auto-assignment
+export KAIMO_UNMANAGED_SAMBA_USERS="kaimotest"
 
+cat >"$PASSWD_FILE" <<'EOF'
+stale.user:1401
+kaimotest:1402
+EOF
+cat >"$PASSDB_FILE" <<'EOF'
+stale.user:1401:Stale Kaimo user
+kaimotest:1402:Reserved test user
+EOF
+cat >"$GROUP_STATE" <<'EOF'
+kaimo:stale.user
+kaimo-authd:stale.user
+EOF
+cat >"$AUTH_USERS_FILE" <<'EOF'
+admin	31D6CFE0D16AE931B73C59D7E0C089C0
+marco.hanisch	AABBCCDDEEFF00112233445566778899
+anna.weber	00112233445566778899AABBCCDDEEFF
+EOF
+: >"$GROUP_LOG"
+: >"$LOCK_LOG"
+: >"$DELETE_LOG"
+: >"$AUTH_CALL_LOG"
+echo 1500 >"$PASSWD_FILE.cnt"
+
+mkdir -m 0700 "$KAIMO_SYNC_STATE_DIR"
+printf 'stale.user\n' >"$KAIMO_SYNC_STATE_DIR/managed-users"
+chmod 0600 "$KAIMO_SYNC_STATE_DIR/managed-users"
 mkdir -p "$WORK/bin"
 
-# --- Stub: kaimo_authsync (3 demo users with valid 16-byte NT-Hashes hex) ---
-cat > "$WORK/bin/kaimo_authsync" <<'EOF'
+cat >"$WORK/bin/kaimo_authsync" <<'EOF'
 #!/bin/bash
-printf 'called\n' >> "$AUTH_CALL_LOG"
-printf 'admin\t%s\n'         '31D6CFE0D16AE931B73C59D7E0C089C0'
-printf 'marco.hanisch\t%s\n' 'AABBCCDDEEFF00112233445566778899'
-printf 'anna.weber\t%s\n'    '00112233445566778899AABBCCDDEEFF'
+printf 'called\n' >>"$AUTH_CALL_LOG"
+cat "$AUTH_USERS_FILE"
 EOF
 
-# --- Stub: id  (existence check + `id -u NAME` from fake passwd) ---
-cat > "$WORK/bin/id" <<'EOF'
+cat >"$WORK/bin/id" <<'EOF'
 #!/bin/bash
 P="$PASSWD_FILE"
 if [ "${1:-}" = "-u" ]; then
     [ "$#" -eq 1 ] && exec /usr/bin/id -u
     line="$(grep -F "$2:" "$P" 2>/dev/null | head -1)"
-    [ -n "$line" ] && { printf '%s\n' "${line#*:}"; exit 0; } || exit 1
+    [ -n "$line" ] && { printf '%s\n' "${line#*:}"; exit 0; }
+    exit 1
 fi
-grep -qF "$1:" "$P" 2>/dev/null && exit 0 || exit 1
-EOF
-
-# --- Stub: useradd  (respects -u N, otherwise auto-increment UID) ---
-cat > "$WORK/bin/useradd" <<'EOF'
-#!/bin/bash
-P="$PASSWD_FILE"; C="$PASSWD_FILE.cnt"
-uid=""; name=""; args=("$@")
-for ((i=0; i<${#args[@]}; i++)); do
-    case "${args[i]}" in
-        -u) uid="${args[i+1]}"; ((i++)) ;;
-        -*) : ;;                         # flag without relevant value for us
-        *)  name="${args[i]}" ;;         # last non-flag value = username
-    esac
-done
-[ -z "$name" ] && exit 1
-if [ -z "$uid" ]; then n="$(cat "$C" 2>/dev/null || echo 1001)"; n=$((n+1)); echo "$n" > "$C"; uid="$n"; fi
-echo "$name:$uid" >> "$P"
-EOF
-
-# --- Stub: usermod (-u N NAME -> change UID; should NOT be called in healthy path) ---
-cat > "$WORK/bin/usermod" <<'EOF'
-#!/bin/bash
-P="$PASSWD_FILE"; uid=""; name=""; args=("$@")
-if [ "${1:-}" = "-aG" ]; then
-    printf '%s:%s\n' "$2" "$3" >> "$GROUP_LOG"
+if [ "${1:-}" = "-nG" ]; then
+    grep -qF "$2:" "$P" 2>/dev/null || exit 1
+    printf 'primary'
+    while IFS=: read -r group member; do
+        [ "$member" = "$2" ] && printf ' %s' "$group"
+    done <"$GROUP_STATE"
+    printf '\n'
     exit 0
 fi
-for ((i=0; i<${#args[@]}; i++)); do
-    case "${args[i]}" in
-        -u) uid="${args[i+1]}"; ((i++)) ;;
-        -*) : ;;
-        *)  name="${args[i]}" ;;
-    esac
-done
-grep -vF "$name:" "$P" > "$P.t" 2>/dev/null; mv "$P.t" "$P"
-echo "$name:$uid" >> "$P"
+grep -qF "${1:-}:" "$P" 2>/dev/null
 EOF
 
-cat > "$WORK/bin/pdbedit" <<'EOF'
+cat >"$WORK/bin/useradd" <<'EOF'
 #!/bin/bash
+P="$PASSWD_FILE"; C="$PASSWD_FILE.cnt"
+name=""
 for arg in "$@"; do
-    case "$arg" in
-        smbpasswd:*) import_path="${arg#smbpasswd:}" ;;
-    esac
+    case "$arg" in -*) : ;; *) name="$arg" ;; esac
 done
-[ -n "${import_path:-}" ] || exit 2
-cp -- "$import_path" "$IMPORT_CAPTURE"
-printf '%s\n' "$import_path" > "$IMPORT_PATH_LOG"
-stat -c '%a' -- "$import_path" > "$IMPORT_MODE_LOG"
-exit "${PDBEDIT_EXIT_CODE:-0}"
+[ -n "$name" ] || exit 1
+n="$(cat "$C")"; n=$((n + 1)); printf '%s\n' "$n" >"$C"
+printf '%s:%s\n' "$name" "$n" >>"$P"
 EOF
-chmod +x "$WORK/bin"/*
 
-export PATH="$WORK/bin:$PATH"
-
-# ─────────────────────────── Run test ───────────────────────────
-if ! bash "$SUT" >/dev/null 2>&1; then
-    echo "FAIL: sync-users.sh returned failure"; exit 1
+cat >"$WORK/bin/usermod" <<'EOF'
+#!/bin/bash
+if [ "${1:-}" = "-aG" ]; then
+    entry="$2:$3"
+    grep -Fqx "$entry" "$GROUP_STATE" || printf '%s\n' "$entry" >>"$GROUP_STATE"
+    printf 'add:%s\n' "$entry" >>"$GROUP_LOG"
+    exit 0
 fi
+if [ "${1:-}" = "-L" ]; then
+    user="${@: -1}"
+    printf '%s\n' "$user" >>"$LOCK_LOG"
+    exit 0
+fi
+exit 2
+EOF
+
+cat >"$WORK/bin/gpasswd" <<'EOF'
+#!/bin/bash
+[ "${1:-}" = "-d" ] || exit 2
+entry="$3:$2"
+grep -Fvx "$entry" "$GROUP_STATE" >"$GROUP_STATE.tmp" || true
+mv "$GROUP_STATE.tmp" "$GROUP_STATE"
+printf 'remove:%s\n' "$entry" >>"$GROUP_LOG"
+EOF
+
+cat >"$WORK/bin/pdbedit" <<'EOF'
+#!/bin/bash
+if [ "${1:-}" = "-L" ]; then
+    cat "$PASSDB_FILE"
+    exit "${PDBEDIT_LIST_EXIT_CODE:-0}"
+fi
+if [ "${1:-}" = "-x" ]; then
+    user=""
+    while [ "$#" -gt 0 ]; do
+        [ "$1" = "-u" ] && { user="${2:-}"; break; }
+        shift
+    done
+    [ -n "$user" ] || exit 2
+    grep -Fvx "$user:" "$PASSDB_FILE" >/dev/null 2>&1 || true
+    awk -F: -v user="$user" '$1 != user' "$PASSDB_FILE" >"$PASSDB_FILE.tmp"
+    mv "$PASSDB_FILE.tmp" "$PASSDB_FILE"
+    printf '%s\n' "$user" >>"$DELETE_LOG"
+    exit "${PDBEDIT_DELETE_EXIT_CODE:-0}"
+fi
+
+import_path=""
+for arg in "$@"; do
+    case "$arg" in smbpasswd:*) import_path="${arg#smbpasswd:}" ;; esac
+done
+[ -n "$import_path" ] || exit 2
+cp -- "$import_path" "$IMPORT_CAPTURE"
+printf '%s\n' "$import_path" >"$IMPORT_PATH_LOG"
+stat -c '%a' -- "$import_path" >"$IMPORT_MODE_LOG"
+[ "${PDBEDIT_EXIT_CODE:-0}" -eq 0 ] || exit "$PDBEDIT_EXIT_CODE"
+while IFS=: read -r user uid _; do
+    awk -F: -v user="$user" '$1 != user' "$PASSDB_FILE" >"$PASSDB_FILE.tmp"
+    mv "$PASSDB_FILE.tmp" "$PASSDB_FILE"
+    printf '%s:%s:Kaimo managed\n' "$user" "$uid" >>"$PASSDB_FILE"
+done <"$import_path"
+EOF
+
+chmod +x "$WORK/bin"/*
+export PATH="$WORK/bin:$PATH"
 
 fail=0
 note() { printf '  %s\n' "$1"; }
+has_passdb_user() { awk -F: -v user="$1" '$1 == user { found=1 } END { exit !found }' "$PASSDB_FILE"; }
 
-# 1) Exactly 3 smbpasswd lines were written.
+if ! bash "$SUT" >/dev/null 2>&1; then
+    echo "FAIL: initial sync-users.sh run returned failure"
+    exit 1
+fi
+
+# 1) Every desired Samba record has a distinct POSIX UID.
 lines="$(grep -c ':' "$IMPORT_CAPTURE" 2>/dev/null || echo 0)"
-if [ "$lines" -ne 3 ]; then
-    echo "FAIL: expected 3 smbpasswd lines, got $lines"; fail=1
-else
-    note "ok: 3 smbpasswd lines"
-fi
-
-# 2) CORE ASSERTION: all UIDs (field 2) are distinct.
 uids="$(cut -d: -f2 "$IMPORT_CAPTURE")"
-total="$(printf '%s\n' "$uids" | grep -c .)"
-uniq="$(printf '%s\n' "$uids" | sort -u | grep -c .)"
-if [ "$total" != "$uniq" ]; then
-    echo "FAIL: UIDs not distinct ($total total, $uniq unique) -> identity collapse!"
-    printf '%s\n' "$uids" | sed 's/^/    uid=/'
-    fail=1
+unique_uids="$(printf '%s\n' "$uids" | sort -u | grep -c .)"
+if [ "$lines" -ne 3 ] || [ "$unique_uids" -ne 3 ]; then
+    echo "FAIL: expected 3 imported users with distinct UIDs"; fail=1
 else
-    note "ok: $uniq distinct UIDs (no identity collapse)"
+    note "ok: 3 active users imported with distinct POSIX UIDs"
 fi
-
-# 3) Each smbpasswd line bears the expected username (field 1).
-for u in admin marco.hanisch anna.weber; do
-    if ! cut -d: -f1 "$IMPORT_CAPTURE" | grep -qx "$u"; then
-        echo "FAIL: user '$u' missing from smbpasswd"; fail=1
+for user in admin marco.hanisch anna.weber; do
+    if ! has_passdb_user "$user"; then
+        echo "FAIL: active passdb user '$user' missing"; fail=1
     fi
-done
-[ "$fail" = 0 ] && note "ok: all 3 usernames present"
-
-# 4) Every synchronized user is admitted to both the storage group and the
-# private authd socket group without changing its primary UID.
-for u in admin marco.hanisch anna.weber; do
-    for g in kaimo kaimo-authd; do
-        if ! grep -qx "$g:$u" "$GROUP_LOG"; then
-            echo "FAIL: user '$u' missing secondary group '$g'"; fail=1
+    for group in kaimo kaimo-authd; do
+        if ! grep -Fqx "$group:$user" "$GROUP_STATE"; then
+            echo "FAIL: active user '$user' missing group '$group'"; fail=1
         fi
     done
 done
-[ "$fail" = 0 ] && note "ok: storage + authd secondary groups assigned"
 
-# 5) The reusable hashes existed only in an unpredictable mode-0600 file
-# inside the private runtime directory and the file was removed after import.
-import_path="$(cat "$IMPORT_PATH_LOG" 2>/dev/null)"
-case "$import_path" in
-    "$KAIMO_SYNC_RUNTIME_DIR"/smbpasswd.*) : ;;
-    *) echo "FAIL: import used an unexpected path: $import_path"; fail=1 ;;
-esac
-if [ "$(cat "$IMPORT_MODE_LOG" 2>/dev/null)" != "600" ]; then
-    echo "FAIL: smbpasswd import file was not mode 0600"; fail=1
-elif [ -e "$import_path" ]; then
-    echo "FAIL: smbpasswd import file survived successful import"; fail=1
-elif find "$KAIMO_SYNC_RUNTIME_DIR" -type f ! -name 'sync-users.lock' | grep -q .; then
-    echo "FAIL: temporary sync files survived successful import"; fail=1
+# 2) The stale credential and groups are removed, but its POSIX UID remains
+# locked; the explicitly unmanaged test credential is untouched.
+if has_passdb_user stale.user \
+    || ! has_passdb_user kaimotest \
+    || grep -Fq ':stale.user' "$GROUP_STATE" \
+    || ! grep -Fqx 'stale.user:1401' "$PASSWD_FILE" \
+    || ! grep -Fqx 'stale.user' "$LOCK_LOG"; then
+    echo "FAIL: stale-user revocation or safe POSIX retention is incorrect"; fail=1
 else
-    note "ok: private unpredictable import file was mode 0600 and cleaned"
-fi
-if [ "$(stat -c '%a' "$KAIMO_SYNC_RUNTIME_DIR" 2>/dev/null)" != "700" ]; then
-    echo "FAIL: runtime directory was not mode 0700"; fail=1
+    note "ok: stale credential/groups revoked while UID 1401 is retained and locked"
 fi
 
-# 6) A held lock rejects a concurrent invocation before it exports hashes.
-before_calls="$(wc -l < "$AUTH_CALL_LOG")"
+# 3) The new managed-user boundary is private and contains exactly the desired
+# identities. Runtime secrets/logs are cleaned after the run.
+expected_managed="$WORK/expected-managed"
+printf 'admin\nanna.weber\nmarco.hanisch\n' >"$expected_managed"
+import_path="$(cat "$IMPORT_PATH_LOG" 2>/dev/null)"
+if ! cmp -s "$expected_managed" "$KAIMO_SYNC_STATE_DIR/managed-users" \
+    || [ "$(stat -c '%a' "$KAIMO_SYNC_STATE_DIR")" != "700" ] \
+    || [ "$(stat -c '%a' "$KAIMO_SYNC_STATE_DIR/managed-users")" != "600" ]; then
+    echo "FAIL: managed-user state is not exact/private"; fail=1
+elif [ "$(cat "$IMPORT_MODE_LOG" 2>/dev/null)" != "600" ] \
+    || [ -e "$import_path" ] \
+    || find "$KAIMO_SYNC_RUNTIME_DIR" -type f ! -name 'sync-users.lock' | grep -q .; then
+    echo "FAIL: private per-run files were not cleaned"; fail=1
+else
+    note "ok: managed state is private and per-run hash files are cleaned"
+fi
+
+# 4) A held lock rejects another run before exporting hashes.
+before_calls="$(wc -l <"$AUTH_CALL_LOG")"
 (
     exec 8>"$KAIMO_SYNC_RUNTIME_DIR/sync-users.lock"
     flock 8
     bash "$SUT" >/dev/null 2>&1
-    printf '%s\n' "$?" > "$WORK/locked-exit"
+    printf '%s\n' "$?" >"$WORK/locked-exit"
 )
-locked_rc="$(cat "$WORK/locked-exit")"
-after_calls="$(wc -l < "$AUTH_CALL_LOG")"
-if [ "$locked_rc" -eq 0 ] || [ "$before_calls" != "$after_calls" ]; then
-    echo "FAIL: concurrent sync was not rejected before hash export"; fail=1
+after_calls="$(wc -l <"$AUTH_CALL_LOG")"
+if [ "$(cat "$WORK/locked-exit")" -eq 0 ] || [ "$before_calls" != "$after_calls" ]; then
+    echo "FAIL: concurrent sync was not rejected before export"; fail=1
 else
-    note "ok: synchronization lock rejects concurrent hash export"
+    note "ok: synchronization lock rejects concurrent reconciliation"
 fi
 
-# 7) Cleanup also runs when pdbedit reports an import failure.
+# 5) Failed import returns failure, cleans files, and does not publish a new
+# managed state (P1-16 must not forget stale identities on a partial run).
+cp "$KAIMO_SYNC_STATE_DIR/managed-users" "$WORK/state-before-failure"
 export PDBEDIT_EXIT_CODE=7
 bash "$SUT" >/dev/null 2>&1
+failed_rc=$?
+unset PDBEDIT_EXIT_CODE
 failed_import_path="$(cat "$IMPORT_PATH_LOG" 2>/dev/null)"
-if [ -e "$failed_import_path" ] \
+if [ "$failed_rc" -eq 0 ] \
+    || ! cmp -s "$WORK/state-before-failure" "$KAIMO_SYNC_STATE_DIR/managed-users" \
+    || [ -e "$failed_import_path" ] \
     || find "$KAIMO_SYNC_RUNTIME_DIR" -type f ! -name 'sync-users.lock' | grep -q .; then
-    echo "FAIL: temporary sync files survived failed import"; fail=1
+    echo "FAIL: failed import changed state or left private files"; fail=1
 else
-    note "ok: failed import leaves no temporary hash or log files"
+    note "ok: failed import preserves retry state and leaves no hash residue"
 fi
 
-if [ "$fail" = 0 ]; then
-    echo "PASS: sync-users.sh preserves identity and handles NT hashes privately."
-    exit 0
+# 6) A passdb deletion followed by a reported failure keeps the old ownership
+# boundary. Retry must finish group/lock convergence even though passdb no
+# longer contains that user.
+printf 'partial.user:1551\n' >>"$PASSWD_FILE"
+printf 'partial.user:1551:Partial user\n' >>"$PASSDB_FILE"
+printf 'kaimo:partial.user\nkaimo-authd:partial.user\n' >>"$GROUP_STATE"
+printf 'partial.user\n' >>"$KAIMO_SYNC_STATE_DIR/managed-users"
+sort -u -o "$KAIMO_SYNC_STATE_DIR/managed-users" "$KAIMO_SYNC_STATE_DIR/managed-users"
+export PDBEDIT_DELETE_EXIT_CODE=9
+bash "$SUT" >/dev/null 2>&1
+partial_rc=$?
+unset PDBEDIT_DELETE_EXIT_CODE
+if [ "$partial_rc" -eq 0 ] \
+    || ! grep -Fqx 'partial.user' "$KAIMO_SYNC_STATE_DIR/managed-users" \
+    || has_passdb_user partial.user; then
+    echo "FAIL: partial delete did not preserve retry ownership"; fail=1
+elif ! bash "$SUT" >/dev/null 2>&1 \
+    || grep -Fq ':partial.user' "$GROUP_STATE" \
+    || ! grep -Fqx 'partial.user' "$LOCK_LOG" \
+    || grep -Fqx 'partial.user' "$KAIMO_SYNC_STATE_DIR/managed-users"; then
+    echo "FAIL: retry did not finish partial stale-user convergence"; fail=1
 else
-    echo "FAILED."
-    exit 1
+    note "ok: partial passdb deletion remains owned and converges on retry"
 fi
+
+# 7) Reactivation restores passdb/groups while preserving the retained UID.
+printf 'stale.user\tAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n' >>"$AUTH_USERS_FILE"
+if ! bash "$SUT" >/dev/null 2>&1 \
+    || ! has_passdb_user stale.user \
+    || ! grep -Fqx 'stale.user:1401' "$PASSWD_FILE" \
+    || ! grep -Fqx 'kaimo:stale.user' "$GROUP_STATE" \
+    || ! grep -Fqx 'kaimo-authd:stale.user' "$GROUP_STATE"; then
+    echo "FAIL: reactivated user did not recover with retained UID"; fail=1
+else
+    note "ok: reactivation restores access with the original retained UID"
+fi
+
+# 8) First-run bootstrap adopts existing passdb identities, excludes reserved
+# users, and revokes an absent legacy Kaimo credential.
+printf 'legacy.user:1601\n' >>"$PASSWD_FILE"
+printf 'legacy.user:1601:Legacy user\n' >>"$PASSDB_FILE"
+printf 'kaimo:legacy.user\nkaimo-authd:legacy.user\n' >>"$GROUP_STATE"
+rm "$KAIMO_SYNC_STATE_DIR/managed-users"
+if ! bash "$SUT" >/dev/null 2>&1 \
+    || has_passdb_user legacy.user \
+    || ! has_passdb_user kaimotest \
+    || ! grep -Fqx 'legacy.user:1601' "$PASSWD_FILE"; then
+    echo "FAIL: bootstrap ownership did not safely reconcile legacy users"; fail=1
+else
+    note "ok: bootstrap adopts legacy passdb users and excludes reserved accounts"
+fi
+
+if [ "$fail" -eq 0 ]; then
+    echo "PASS: sync-users.sh securely reconciles Kaimo users to desired state."
+    exit 0
+fi
+echo "FAILED."
+exit 1

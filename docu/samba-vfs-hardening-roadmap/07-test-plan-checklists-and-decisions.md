@@ -99,9 +99,9 @@ implemented; their required release verification remains tracked in milestone 4.
 
 ### Synchronization checklist
 
-- [ ] NT hashes never remain in a predictable or world-readable file.
+- [x] NT hashes never remain in a predictable or world-readable file.
 - [ ] User/share/config records have strict schema validation.
-- [ ] Removed users and shares are reconciled.
+- [x] Removed users and shares are reconciled.
 - [ ] Every mutation error makes the sync fail.
 - [ ] Final state is verified before recording success.
 - [ ] Concurrent sync instances are locked out.

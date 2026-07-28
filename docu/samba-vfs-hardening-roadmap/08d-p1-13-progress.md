@@ -147,3 +147,63 @@ after successful and failed imports.
 
 **Next planned finding:** P1-16 — reconcile `tdbsam` and managed POSIX users
 when a Kaimo user is disabled, deleted, or absent from the bridge response.
+
+### 2026-07-28 — P1-16: Desired-state Samba user reconciliation
+
+**Status:** Implemented, regression-tested, and verified with real Samba
+4.19.5 `pdbedit` and NTLM login rejection. Bridge-driven live disable/delete
+and already-open-session behavior remain release validation.
+
+**Problem**
+
+`ListUsers` correctly omitted disabled, deleted, and passwordless users, but
+`sync-users.sh` only imported the returned users. Their old `tdbsam` credentials
+and broad storage/authd group membership therefore survived indefinitely.
+
+**Solution implemented**
+
+1. A private mode-0700 state directory and mode-0600 `managed-users` file define
+   exactly which local accounts the Kaimo sync owns.
+2. On migration, an absent state file bootstraps from current `tdbsam` entries
+   while excluding the comma-separated reserved-user setting. Subsequent runs
+   touch only the published managed set, so later unrelated accounts are not
+   silently adopted.
+3. After a successful import, every previously managed user absent from the
+   bridge response is removed with `pdbedit -x -u` and removed from the storage
+   and private authd-socket groups.
+4. The POSIX account is retained, locked, and forced to `nologin`. Keeping its
+   UID preserves existing file ownership, prevents UID reuse, and allows later
+   reactivation without identity drift.
+5. Reactivated users regain their passdb entry and both secondary groups while
+   retaining the original UID.
+6. Import, POSIX provisioning, group mutation, passdb removal, and state
+   publication now fail the user sync. The managed boundary is atomically
+   replaced only after reconciliation, so a partial failure remains retryable.
+7. Existing authenticated SMB sessions are deliberately not killed here. The
+   later revocation-SLA item must decide and test forced per-user session
+   termination without conflating it with local credential convergence.
+
+**Validation completed**
+
+- The required container-build regression verifies stale-user removal, reserved
+  account exclusion, locked UID retention, group removal, reactivation with the
+  same UID, first-run passdb bootstrap, private state modes, failure retry
+  state, cleanup, and concurrent-run rejection.
+- The Docker `build-runtime` target completed against pinned Samba 4.19.5/ABI
+  49 with the regression passing.
+- A disposable pinned-Samba probe exercised the real `pdbedit -L`, import, and
+  `pdbedit -x -u` paths and confirmed the retained POSIX identity and removed
+  groups.
+- A live `smbd`/`smbclient` probe proved the stale password authenticated before
+  reconciliation and returned login failure afterward.
+
+**Validation still required**
+
+- Disable and delete a real bridge-backed Kaimo user, measure convergence at the
+  periodic-sync boundary, and verify the managed state and container logs.
+- Decide the user revocation SLA for already-open SMB sessions and add the
+  corresponding forced-disconnect test under the later revocation finding.
+
+**Next planned finding:** P1-17 — make every user/share/config synchronization
+fail when a requested mutation was not applied, verify final state, and expose
+the last successful convergence.
