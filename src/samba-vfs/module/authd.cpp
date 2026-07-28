@@ -538,6 +538,7 @@ static uint8_t do_snapenum(const std::string& user, const std::string& share,
 struct SnapshotResolveResult {
     uint8_t status;
     std::string cache_path;
+    std::string lease_id;
     uint64_t size;
 };
 
@@ -552,19 +553,40 @@ static SnapshotResolveResult do_snapresolve(
     grpc::Status st = g_snapshot->ResolveVersion(&ctx, req, &reply);
     if (!st.ok()) {
         std::cerr << "kaimo_authd: ResolveVersion: " << st.error_message() << std::endl;
-        return {KAIMO_LOCAL_STATUS_ERROR, {}, 0};
+        return {KAIMO_LOCAL_STATUS_ERROR, {}, {}, 0};
     }
-    if (!reply.found()) return {KAIMO_LOCAL_STATUS_NOT_FOUND, {}, 0};
+    if (!reply.found())
+        return {KAIMO_LOCAL_STATUS_NOT_FOUND, {}, {}, 0};
     if (reply.size() < 0) {
         std::cerr << "kaimo_authd: ResolveVersion returned a negative size"
                   << std::endl;
-        return {KAIMO_LOCAL_STATUS_ERROR, {}, 0};
+        return {KAIMO_LOCAL_STATUS_ERROR, {}, {}, 0};
+    }
+    if (reply.lease_id().empty()) {
+        std::cerr << "kaimo_authd: ResolveVersion returned no lease id"
+                  << std::endl;
+        return {KAIMO_LOCAL_STATUS_ERROR, {}, {}, 0};
     }
     return {
         KAIMO_LOCAL_STATUS_OK,
         reply.cache_path(),
+        reply.lease_id(),
         static_cast<uint64_t>(reply.size())
     };
+}
+
+static uint8_t do_snaprelease(const std::string& lease_id) {
+    ReleaseVersionLeaseRequest req;
+    req.set_lease_id(lease_id);
+    grpc::ClientContext ctx; ctx.set_deadline(deadline(1));
+    ReleaseVersionLeaseReply reply;
+    grpc::Status st = g_snapshot->ReleaseVersionLease(&ctx, req, &reply);
+    if (!st.ok()) {
+        std::cerr << "kaimo_authd: ReleaseVersionLease: "
+                  << st.error_message() << std::endl;
+        return KAIMO_LOCAL_STATUS_ERROR;
+    }
+    return KAIMO_LOCAL_STATUS_OK;
 }
 
 static bool read_string(kaimo_local_reader& reader, std::string& value) {
@@ -729,11 +751,18 @@ static void handle_client(const ClientConnection& connection) {
             if (status == KAIMO_LOCAL_STATUS_OK &&
                 (!kaimo_local_builder_string(
                      &output, result.cache_path.c_str()) ||
-                 !kaimo_local_builder_u64(&output, result.size))) {
+                 !kaimo_local_builder_u64(&output, result.size) ||
+                 !kaimo_local_builder_string(
+                     &output, result.lease_id.c_str()))) {
                 output.length = 0;
                 status = KAIMO_LOCAL_STATUS_ERROR;
             }
         }
+        break;
+    case KAIMO_LOCAL_OP_SNAPSHOT_RELEASE:
+        if (read_string(input, token) &&
+            kaimo_local_reader_finished(&input))
+            status = do_snaprelease(token);
         break;
     default:
         break;

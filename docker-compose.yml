@@ -1,6 +1,11 @@
 x-vol-storage-pool-01: &vol-storage-pool-01 ${LOCATION_STORAGE_01:-./tests/data/storage/pool01}:/data/storage/pool01
 x-vol-storage-pool-02: &vol-storage-pool-02 ${LOCATION_STORAGE_02:-./tests/data/storage/pool02}:/data/storage/pool02
 x-vol-app-data: &vol-app-data               ${LOCATION_APP_DATA:-./tests/data/kaimo-system}:/data/kaimo-system
+x-bounded-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   # One-shot bootstrap for local development. It creates the complete mTLS PKI
@@ -44,6 +49,7 @@ services:
   kaimo_smb_bridge:
     image: ${DOCKER_REGISTRY-}kaimosmbbridge
     container_name: kaimo_smb_bridge
+    logging: *bounded-logging
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.SmbBridge/Dockerfile
@@ -76,6 +82,7 @@ services:
   kaimo_samba:
     image: ${DOCKER_REGISTRY-}kaimosamba
     container_name: kaimo_samba
+    logging: *bounded-logging
     # Neutralize search domain inherited from host (e.g., home.lab). Otherwise the
     # gRPC C++ client (c-ares, NOT glibc/NSS) appends it to the bridge service name
     # -> asks "kaimo_smb_bridge.home.lab" -> Docker forwards to LAN DNS,

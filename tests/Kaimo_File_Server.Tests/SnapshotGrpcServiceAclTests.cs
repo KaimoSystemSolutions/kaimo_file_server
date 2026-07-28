@@ -55,7 +55,7 @@ public sealed class SnapshotGrpcServiceAclTests : IDisposable
             .Build();
         _sut = new SnapshotGrpcService(
             _shares.Object, _auth.Object, _acl.Object, _versions.Object,
-            _factory.Object, configuration,
+            _factory.Object, new SnapshotCacheLeaseManager(), configuration,
             NullLogger<SnapshotGrpcService>.Instance);
     }
 
@@ -200,7 +200,7 @@ public sealed class SnapshotGrpcServiceAclTests : IDisposable
             .Build();
         var unsafeService = new SnapshotGrpcService(
             _shares.Object, _auth.Object, _acl.Object, _versions.Object,
-            _factory.Object, unsafeConfiguration,
+            _factory.Object, new SnapshotCacheLeaseManager(), unsafeConfiguration,
             NullLogger<SnapshotGrpcService>.Instance);
 
         var reply = await unsafeService.ResolveVersion(
@@ -283,8 +283,10 @@ public sealed class SnapshotGrpcServiceAclTests : IDisposable
             Path.GetDirectoryName(final)!, "*.kaimo-tmp-*"));
     }
 
-    private Task<ResolveVersionReply> ResolveAsync(string path, string token) =>
-        _sut.ResolveVersion(
+    private async Task<ResolveVersionReply> ResolveAsync(
+        string path, string token)
+    {
+        ResolveVersionReply reply = await _sut.ResolveVersion(
             new ResolveVersionRequest
             {
                 Username = "alice",
@@ -292,6 +294,12 @@ public sealed class SnapshotGrpcServiceAclTests : IDisposable
                 Path = path,
                 GmtToken = token
             }, null!);
+        if (!string.IsNullOrEmpty(reply.LeaseId))
+            await _sut.ReleaseVersionLease(
+                new ReleaseVersionLeaseRequest { LeaseId = reply.LeaseId },
+                null!);
+        return reply;
+    }
 
     private void AllowConcreteFile(FileVersion version, byte[] content)
     {

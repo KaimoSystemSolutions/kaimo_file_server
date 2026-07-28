@@ -227,6 +227,11 @@ service SnapshotService {
   // open/stat there and serves it natively. Idempotent: an already-materialized
   // version is reused.
   rpc ResolveVersion(ResolveVersionRequest) returns (ResolveVersionReply);
+
+  // Completes the atomic bridge-to-VFS lease handoff after the native module
+  // has acquired its shared token lock. Idempotent: an expired/already-released
+  // lease is reported as released=false and requires no further action.
+  rpc ReleaseVersionLease(ReleaseVersionLeaseRequest) returns (ReleaseVersionLeaseReply);
 }
 
 message EnumerateSnapshotsRequest {
@@ -253,4 +258,15 @@ message ResolveVersionReply {
   // The native VFS validates every component before joining its configured root.
   string cache_path = 2;
   int64  size       = 3;
+  // Opaque, short-lived lease held by the bridge until the VFS has locked the
+  // token itself. It expires server-side if the caller disappears.
+  string lease_id   = 4;
+}
+
+message ReleaseVersionLeaseRequest {
+  string lease_id = 1;
+}
+
+message ReleaseVersionLeaseReply {
+  bool released = 1;
 }

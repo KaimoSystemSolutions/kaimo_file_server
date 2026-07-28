@@ -24,16 +24,19 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopes;
     private readonly IConfiguration _config;
+    private readonly SnapshotCacheLeaseManager _leases;
     private readonly ILogger<SnapshotCacheCleanupService> _logger;
     private readonly string _cacheRoot;
 
     public SnapshotCacheCleanupService(
         IServiceScopeFactory scopes,
         IConfiguration config,
+        SnapshotCacheLeaseManager leases,
         ILogger<SnapshotCacheCleanupService> logger)
     {
         _scopes = scopes;
         _config = config;
+        _leases = leases;
         _cacheRoot = SnapshotCache.ConfiguredRoot(config);
         _logger = logger;
     }
@@ -116,6 +119,7 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
 
             string root = SnapshotCache.ShareRootFor(_cacheRoot, share.Id);
             if (!Directory.Exists(root)) continue;
+            string shareScope = SnapshotCache.RelativeShareRootFor(share.Id);
 
             // Token dirs are the immediate children of a share-id cache root.
             var tokens = new List<(string dir, DateTime cachedAt, long size)>();
@@ -124,7 +128,7 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
                 DateTime cachedAt = SnapshotCache.CachedAtUtc(dir);
                 if (cachedAt < cutoff)
                 {
-                    if (TryDeleteDir(dir)) evictedTtl++;
+                    if (TryDeleteTokenDir(shareScope, dir)) evictedTtl++;
                     continue;
                 }
                 tokens.Add((dir, cachedAt, DirectorySize(dir)));
@@ -137,7 +141,7 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
                 foreach (var t in tokens.OrderBy(t => t.cachedAt))
                 {
                     if (total <= cap) break;
-                    if (TryDeleteDir(t.dir))
+                    if (TryDeleteTokenDir(shareScope, t.dir))
                     {
                         total -= t.size;
                         evictedSize++;
@@ -153,8 +157,9 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
             foreach (string root in SafeEnumerateDirectories(_cacheRoot))
             {
                 ct.ThrowIfCancellationRequested();
-                if (!activeShareIds.Contains(Path.GetFileName(root)) &&
-                    TryDeleteDir(root))
+                string shareScope = Path.GetFileName(root);
+                if (!activeShareIds.Contains(shareScope) &&
+                    TryDeleteOrphanShareRoot(shareScope, root, ct))
                     evictedOrphan++;
             }
         }
@@ -198,6 +203,50 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Snapshot cache: failed to evict {Dir}", dir);
+            return false;
+        }
+    }
+
+    internal bool TryDeleteTokenDir(string shareScope, string tokenDir)
+    {
+        IDisposable? lease = _leases.TryAcquireEviction(
+            _cacheRoot, shareScope, Path.GetFileName(tokenDir));
+        if (lease is null)
+            return false;
+
+        using (lease)
+            return TryDeleteDir(tokenDir);
+    }
+
+    private bool TryDeleteOrphanShareRoot(
+        string shareScope, string root, CancellationToken ct)
+    {
+        foreach (string tokenDir in SafeEnumerateDirectories(root))
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!TryDeleteTokenDir(shareScope, tokenDir))
+                return false;
+        }
+
+        try
+        {
+            Directory.Delete(root, recursive: false);
+            return true;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return true;
+        }
+        catch (IOException)
+        {
+            // A concurrent materializer recreated a token after the final
+            // per-token lease was released. Leave the share root for next sweep.
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Snapshot cache: failed to evict orphan share root {Dir}", root);
             return false;
         }
     }

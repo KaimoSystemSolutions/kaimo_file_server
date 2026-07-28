@@ -212,7 +212,7 @@ def main() -> int:
     assert "rejected unauthorized local peer" not in authd_output, diagnostics
     assert "cannot claim user" not in authd_output, diagnostics
     assert (
-        "kaimo_bridge build [2026-07-23g read-only stacked snapshots]" in smbd_output
+        "kaimo_bridge build [2026-07-28e borrowed stat filename]" in smbd_output
     ), diagnostics
 
     print("live smbd/authd peer-identity test passed")

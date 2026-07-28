@@ -17,15 +17,23 @@ ROOT = Path(f"/tmp/kaimo-vfs-snapshot-readonly-{os.getpid()}")
 SOCKET_PATH = ROOT / "authz.sock"
 SHARE_PATH = ROOT / "share"
 CACHE_ROOT = ROOT / "cache"
-CACHE_RELATIVE = Path("projection/historical.txt")
+CACHE_RELATIVE = Path(
+    "0123456789abcdef0123456789abcdef"
+    "/@GMT-2026.07.23-10.11.12"
+    "/fedcba9876543210fedcba9876543210"
+    "/historical.txt"
+)
 SNAPSHOT_PATH = CACHE_ROOT / CACHE_RELATIVE
+LEASE_PATH = CACHE_ROOT / Path(*CACHE_RELATIVE.parts[:2]) / ".kaimo-lease"
 CONFIG_PATH = ROOT / "smb.conf"
 SMBD_LOG = ROOT / "smbd.log"
 DOWNLOAD_PATH = ROOT / "downloaded.txt"
+SECOND_DOWNLOAD_PATH = ROOT / "downloaded-again.txt"
 UPLOAD_PATH = ROOT / "replacement.txt"
 USER = "kaimosnapshot"
 PASSWORD = "SnapshotPassw0rd!"
 GMT = "@GMT-2024.01.02-03.04.05"
+PROTOCOL_VERSION = 2
 HEADER = struct.Struct("!4sBBBBI")
 
 
@@ -49,7 +57,12 @@ def encoded_string(value: str) -> bytes:
 
 
 def response(operation: int, status: int, payload: bytes = b"") -> bytes:
-    return HEADER.pack(b"KAIM", 1, operation, 2, status, len(payload)) + payload
+    return (
+        HEADER.pack(
+            b"KAIM", PROTOCOL_VERSION, operation, 2, status, len(payload)
+        )
+        + payload
+    )
 
 
 def serve_requests(ready: threading.Event, stop: threading.Event) -> None:
@@ -71,7 +84,7 @@ def serve_requests(ready: threading.Event, stop: threading.Event) -> None:
                     magic, version, operation, kind, status, length = header
                     assert (magic, version, kind, status) == (
                         b"KAIM",
-                        1,
+                        PROTOCOL_VERSION,
                         1,
                         0,
                     )
@@ -88,8 +101,11 @@ def serve_requests(ready: threading.Event, stop: threading.Event) -> None:
                         payload = (
                             encoded_string(CACHE_RELATIVE.as_posix())
                             + struct.pack("!Q", len(b"SNAPSHOT\n"))
+                            + encoded_string("lease-for-native-handoff")
                         )
                         connection.sendall(response(operation, 1, payload))
+                    elif operation == 11:
+                        connection.sendall(response(operation, 1))
                     elif operation == 9:
                         connection.sendall(response(operation, 1, struct.pack("!I", 0)))
                 except (AssertionError, EOFError, OSError, TimeoutError):
@@ -153,6 +169,7 @@ def main() -> int:
     ROOT.mkdir(mode=0o755)
     SHARE_PATH.mkdir(mode=0o755)
     SNAPSHOT_PATH.parent.mkdir(parents=True, mode=0o755)
+    LEASE_PATH.touch()
     (SHARE_PATH / "historical.txt").write_text("LIVE\n", encoding="utf-8")
     SNAPSHOT_PATH.write_text("SNAPSHOT\n", encoding="utf-8")
     UPLOAD_PATH.write_text("REPLACEMENT\n", encoding="utf-8")
@@ -228,6 +245,14 @@ def main() -> int:
             read_result = smb(
                 f"get {GMT}/historical.txt {DOWNLOAD_PATH}"
             )
+            # Explorer reuses one SMB session for metadata and content queries.
+            # This sequence previously opened once and then crashed smbd in the
+            # timewarp stat hook with "Bad talloc magic".
+            repeat_read_result = smb(
+                f"allinfo {GMT}/historical.txt; "
+                f"get {GMT}/historical.txt {SECOND_DOWNLOAD_PATH}; "
+                f"allinfo {GMT}/historical.txt"
+            )
             write_result = smb(
                 f"put {UPLOAD_PATH} {GMT}/historical.txt"
             )
@@ -236,6 +261,11 @@ def main() -> int:
                 f"rename {GMT}/historical.txt moved.txt"
             )
             mkdir_result = smb(f"mkdir {GMT}/new-directory")
+            # Windows Explorer's folder Properties dialog performs metadata
+            # queries and recursively totals the directory. Keep a focused,
+            # bounded regression for that traffic shape so a VFS/authd wait
+            # cannot turn into an endless Explorer spinner.
+            properties_result = smb("allinfo .; du")
     finally:
         terminate(smbd)
         stop.set()
@@ -243,13 +273,17 @@ def main() -> int:
 
     details = diagnostics(
         read_result,
+        repeat_read_result,
         write_result,
         delete_result,
         rename_result,
         mkdir_result,
+        properties_result,
     )
     assert read_result.returncode == 0, details
     assert DOWNLOAD_PATH.read_text(encoding="utf-8") == "SNAPSHOT\n", details
+    assert repeat_read_result.returncode == 0, details
+    assert SECOND_DOWNLOAD_PATH.read_text(encoding="utf-8") == "SNAPSHOT\n", details
     for result in (
         write_result,
         delete_result,
@@ -265,9 +299,12 @@ def main() -> int:
     assert (SHARE_PATH / "historical.txt").read_text(encoding="utf-8") == "LIVE\n"
     assert not (SHARE_PATH / "moved.txt").exists(), details
     assert not (SHARE_PATH / "new-directory").exists(), details
+    assert properties_result.returncode == 0, details
 
     log_text = SMBD_LOG.read_text(encoding="utf-8", errors="replace")
-    assert "read-only stacked snapshots" in log_text, details
+    assert "borrowed stat filename" in log_text, details
+    assert "Bad talloc magic" not in log_text, details
+    assert "INTERNAL ERROR" not in log_text, details
     assert "CREATE twrp write intent denied" in log_text, details
     # full_audit is the VFS module after kaimo_bridge. Its successful record for
     # the same historical open proves the redirect reached the next VFS layer

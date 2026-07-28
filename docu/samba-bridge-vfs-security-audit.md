@@ -491,9 +491,23 @@ file and returns `Found=false`.
 
 ### P1-08: Snapshot materialization and cleanup are unsynchronized
 
+> **Remediation status (2026-07-28): Implemented in bridge, local protocol,
+> and native VFS source; managed tests pass. Pinned native build and live SMB
+> regression remain pending because the Docker daemon was unavailable.**
+
 The background cleanup service can delete a token directory while another RPC is materializing or while Samba is traversing it. Unix open file descriptors may survive deletion, but directory traversal and later child opens can fail inconsistently.
 
 **Fix:** keyed locks/leases per share+token, atomic directory publication, cleanup that skips active leases, and tests that interleave materialization, enumeration, open, and eviction.
+
+**Implemented fix:** a singleton keyed coordinator serializes each
+share+token materialization. A protected `.kaimo-lease` file extends the
+boundary across the bridge and `smbd`: materialization and eviction require an
+exclusive `flock`, while native stat/open/directory handles hold shared locks.
+`ResolveVersion` returns an opaque handoff id while retaining a shared bridge
+lease; the VFS first acquires its native shared lock and then acknowledges the
+handoff through a dedicated RPC/local-protocol operation. Unacknowledged
+handoffs expire after 30 seconds. Cleanup uses nonblocking exclusive locks and
+skips active tokens, including orphan-share cleanup.
 
 ### P1-09: Folder materialization is unbounded and ignores cancellation
 
@@ -904,8 +918,9 @@ corruption, cancellation, and resource pressure.
 1. **Completed 2026-07-27:** materialize into a unique same-filesystem temporary file, enforce a byte
    limit while streaming, verify expected length and content hash, flush, and
    publish with an atomic rename.
-2. Coordinate materialization, open, invalidation, and cleanup with keyed
-   locks/leases. Cleanup must skip active projections.
+2. **Completed in source 2026-07-28:** coordinate materialization, open,
+   invalidation, and cleanup with keyed locks/leases. Cleanup must skip active
+   projections. Pinned native/live SMB verification remains a release gate.
 3. Enforce request-level file, byte, time, and concurrency quotas before and
    during folder materialization; remove abandoned output.
 4. Propagate gRPC cancellation through repository calls, ACL filtering,
@@ -1868,11 +1883,67 @@ verified. Live SMB/container verification remains deliberately separate.
   exact filesystem's rename and `fsync` behavior is covered.
 - Re-run Windows Explorer and `smbclient` browse/copy/restore against the
   materialized cache path.
-- P1-08 remains open: materialization, traversal/open, and cleanup still need
-  keyed locks/leases across the lifetime of an active projection.
+- P1-08 was completed in source immediately afterward with keyed bridge locks,
+  cross-process leases, and an explicit bridge-to-VFS handoff.
 
 **Next planned finding:** P1-08 — coordinate snapshot materialization and
-cleanup with keyed locks/leases.
+cleanup with keyed locks/leases. Completed in source immediately afterward.
+
+### 2026-07-28 — P1-08: Cross-process snapshot token leases
+
+**Status:** Implemented in managed and native source. Managed regression suite
+verified; native compilation and live SMB verification remain pending because
+Docker Desktop's engine was not running.
+
+**Solution implemented**
+
+1. Added `SnapshotCacheLeaseManager`, keyed by immutable share id plus @GMT
+   token. Its per-key gate serializes materialization and projection
+   reconciliation without retaining inactive keys indefinitely.
+2. Added a protected `.kaimo-lease` file to every token root. Bridge
+   materialization takes an exclusive Unix `flock`; cleanup can delete only
+   after obtaining the same lock exclusively and nonblocking.
+3. Extended `ResolveVersionReply` with a cryptographically random, opaque
+   handoff id and added the allow-listed `ReleaseVersionLease` RPC plus framed
+   local operation 11. The bridge downgrades its exclusive lock to shared
+   before replying and retains it until acknowledgement or a bounded 30-second
+   expiry.
+4. The VFS validates and opens the token lease with `O_NOFOLLOW`, verifies a
+   regular single-link file, obtains `LOCK_SH`, and only then acknowledges the
+   bridge handoff. This closes the resolve-to-open deletion window.
+5. Native shared leases are attached to Samba `files_struct` extensions,
+   inherited by relative child opens, and released immediately before the
+   underlying handle closes. Path-based stat/lstat holds a scoped shared lease
+   around the downstream VFS call.
+6. TTL, size-cap, and orphan-share eviction now all acquire a token-exclusive
+   lease. Active tokens are skipped and retried by a later sweep.
+7. Updated the native module marker to
+   `2026-07-28a leased snapshot cache`.
+
+**Validation completed**
+
+- Focused snapshot/lease/access-policy suite: 16 passed, 0 failed, 0 skipped.
+- Full managed solution suite: 538 passed, 0 failed, 0 skipped.
+- Tests cover same-token serialization, independent tokens, cleanup during
+  materialization, post-release eviction, handoff blocking, idempotent
+  acknowledgement, and the existing snapshot ACL/materialization matrix.
+- The adapted native live-test harness passes Python syntax validation.
+- The FSP extension macros and const signatures were checked against the exact
+  official Samba 4.19.5 source.
+- `git diff --check` reports no whitespace errors.
+
+**Validation still required**
+
+- Build and link `vfs_kaimo_bridge.so` and `kaimo_authd` against the pinned
+  Samba 4.19.5/protobuf toolchain.
+- Run the updated live SMB3 snapshot read-only regression and add an
+  interleaving test that holds an SMB directory/file handle while forcing TTL
+  and size eviction.
+- Re-run Windows Explorer and `smbclient` browse/copy/restore. The Docker
+  daemon was unavailable in this session, so these are not claimed as passed.
+
+**Next planned finding:** P1-09 — bound folder snapshot materialization and
+propagate cancellation.
 
 ## 15. Source evidence index
 
@@ -1890,7 +1961,7 @@ cleanup with keyed locks/leases.
 | Snapshot ACL filtering / original leak | `SmbBridge/Services/SnapshotGrpcService.cs` (`GetFolderSnapshotAsync`, per-user reconciliation); `Core/Services/File/FileService.cs:884-899` |
 | Snapshot cache isolation / original direct path | `SnapshotCache.cs`; `SnapshotGrpcService.cs` (`EnsureIsolatedFromShare`, cache-root-relative paths); `vfs_kaimo_bridge.c` (`kaimo_snapshot_cache_abspath`, reserved namespace checks); `sync-shares.sh`; `docker-compose.yml` |
 | Snapshot read-only/VFS-stack enforcement | `vfs_kaimo_bridge.c` (`kaimo_snapshot_create_is_readonly`, `kaimo_snapshot_granted_access`, `kaimo_snapshot_open_how_readonly`, `kaimo_openat`); `src/samba-vfs/tests/test-vfs-snapshot-readonly.py` |
-| Snapshot materialization races | `SnapshotGrpcService.cs:288-317`; `SnapshotCacheCleanupService.cs` |
+| Snapshot materialization/cleanup leases | `SnapshotCacheLeaseManager.cs`; `SnapshotGrpcService.cs` (`PublishHandoff`, `ReleaseVersionLease`); `SnapshotCacheCleanupService.cs` (`TryDeleteTokenDir`); `vfs_kaimo_bridge.c` (`kaimo_snapshot_lease_acquire`, FSP extensions); `authd.cpp`; `local_protocol.h`; `kaimo_smb_bridge.proto` |
 | Disabled share lookup | `Infrastructure/Repositories/ShareRepository.cs:45-49`; bridge service share lookups |
 | Event reliability/TOCTOU | `vfs_kaimo_bridge.c:233-257`, `:665-919`; `FileEventGrpcService.cs`; `FileService.cs:341-400` |
 | Rename duplicate destruction | `Infrastructure/Repositories/FileVersionRepository.cs:142-178` |
