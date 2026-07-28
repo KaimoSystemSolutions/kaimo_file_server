@@ -322,6 +322,14 @@ verified to fail against the pinned Samba build. Existing authenticated
 sessions are not forcibly terminated by this item and remain covered by the
 later revocation-SLA decision.
 
+**Corrective hardening (2026-07-28):** live Compose verification found that
+`pdbedit -L` wrote interface-discovery diagnostics to stderr while user records
+were written to stdout. The reconciler merged both streams, parsed the
+diagnostics as usernames, and persisted them in `managed-users`. It now keeps
+machine data and diagnostics separate, validates every passdb inventory record
+before use, and ignores impossible legacy managed-state records so affected
+installations self-heal on the next successful reconciliation.
+
 ### P1-17: Synchronization scripts can report success after failed mutations
 
 > **Remediation status (2026-07-28): Implemented, regression-tested, and
@@ -345,6 +353,13 @@ transition as failure. A common nonblocking runner serializes each component
 and atomically records last-success/last-failure timestamps in a private state
 directory. Container health now fails when a component never converged, failed
 after its last success, or exceeded the configurable convergence age.
+
+The user reconciler additionally treats `pdbedit` stdout as a strict data
+channel: malformed records fail before mutation, while stderr remains
+diagnostic-only. This closes a live failure mode where a malformed inventory
+poisoned retry state, caused the whole job to repeat, and then surfaced as
+expected `ListUsers` `ResourceExhausted` responses after the hash-export rate
+limit was consumed.
 
 ### P1-18: Text synchronization output is not safely validated
 

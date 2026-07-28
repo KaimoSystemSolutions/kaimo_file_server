@@ -18,6 +18,7 @@ UNMANAGED_USERS="${KAIMO_UNMANAGED_SAMBA_USERS:-${KAIMO_TEST_USER:-kaimotest}}"
 SMBPASSWD=""
 AUTH_ERR=""
 PDBEDIT_LOG=""
+PDBEDIT_USERS_RAW=""
 DESIRED_USERS=""
 LOCAL_PASSDB_USERS=""
 PREVIOUS_MANAGED=""
@@ -28,6 +29,7 @@ cleanup() {
     [ -n "$SMBPASSWD" ] && rm -f -- "$SMBPASSWD"
     [ -n "$AUTH_ERR" ] && rm -f -- "$AUTH_ERR"
     [ -n "$PDBEDIT_LOG" ] && rm -f -- "$PDBEDIT_LOG"
+    [ -n "$PDBEDIT_USERS_RAW" ] && rm -f -- "$PDBEDIT_USERS_RAW"
     [ -n "$DESIRED_USERS" ] && rm -f -- "$DESIRED_USERS"
     [ -n "$LOCAL_PASSDB_USERS" ] && rm -f -- "$LOCAL_PASSDB_USERS"
     [ -n "$PREVIOUS_MANAGED" ] && rm -f -- "$PREVIOUS_MANAGED"
@@ -91,6 +93,38 @@ is_reserved_posix_user() {
     is_unmanaged_user "$candidate"
 }
 
+is_valid_sync_username() {
+    local candidate="$1"
+    [ "${#candidate}" -ge 1 ] \
+        && [ "${#candidate}" -le 32 ] \
+        && [[ "$candidate" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
+}
+
+enumerate_local_passdb_users() {
+    : >"$PDBEDIT_LOG"
+    : >"$PDBEDIT_USERS_RAW"
+    : >"$LOCAL_PASSDB_USERS"
+
+    # Samba diagnostics follow its configured logging target. With
+    # "logging = stdout", pdbedit still writes interface-discovery messages to
+    # stderr. Never merge stderr into the machine-readable `pdbedit -L` data:
+    # doing so previously persisted "added interface ..." as managed users.
+    if ! pdbedit -L >"$PDBEDIT_USERS_RAW" 2>"$PDBEDIT_LOG"; then
+        echo "[sync-users] Cannot enumerate local tdbsam users."
+        return 1
+    fi
+
+    while IFS=: read -r passdb_user passdb_uid _; do
+        if ! is_valid_sync_username "$passdb_user" \
+            || ! [[ "$passdb_uid" =~ ^[0-9]+$ ]]; then
+            echo "[sync-users] Invalid pdbedit list record rejected." >&2
+            return 1
+        fi
+        printf '%s\n' "$passdb_user" >>"$LOCAL_PASSDB_USERS"
+    done <"$PDBEDIT_USERS_RAW"
+    sort -u -o "$LOCAL_PASSDB_USERS" "$LOCAL_PASSDB_USERS"
+}
+
 remove_secondary_group() {
     local user="$1"
     local group="$2"
@@ -122,6 +156,7 @@ fi
 SMBPASSWD="$(mktemp "$RUNTIME_DIR/smbpasswd.XXXXXX")" || exit 1
 AUTH_ERR="$(mktemp "$RUNTIME_DIR/authsync.XXXXXX")" || exit 1
 PDBEDIT_LOG="$(mktemp "$RUNTIME_DIR/pdbedit.XXXXXX")" || exit 1
+PDBEDIT_USERS_RAW="$(mktemp "$RUNTIME_DIR/pdbedit-users.XXXXXX")" || exit 1
 DESIRED_USERS="$(mktemp "$RUNTIME_DIR/desired-users.XXXXXX")" || exit 1
 LOCAL_PASSDB_USERS="$(mktemp "$RUNTIME_DIR/local-users.XXXXXX")" || exit 1
 PREVIOUS_MANAGED="$(mktemp "$RUNTIME_DIR/managed-users.XXXXXX")" || exit 1
@@ -189,11 +224,7 @@ done <"$USER_RECORDS"
 # tdbsam users are adopted as Kaimo-managed except for explicitly reserved
 # accounts. Later runs use the private state file and never touch unrelated
 # accounts introduced after that bootstrap.
-if ! pdbedit -L >"$PDBEDIT_LOG" 2>&1; then
-    echo "[sync-users] Cannot enumerate local tdbsam users."
-    exit 1
-fi
-cut -d: -f1 "$PDBEDIT_LOG" | sort -u >"$LOCAL_PASSDB_USERS"
+enumerate_local_passdb_users || exit 1
 
 if [ -e "$MANAGED_STATE" ] || [ -L "$MANAGED_STATE" ]; then
     if [ -L "$MANAGED_STATE" ] || [ ! -f "$MANAGED_STATE" ] \
@@ -202,7 +233,18 @@ if [ -e "$MANAGED_STATE" ] || [ -L "$MANAGED_STATE" ]; then
         echo "[sync-users] Managed-user state must be a current-user-owned mode-0600 regular file."
         exit 1
     fi
-    cp -- "$MANAGED_STATE" "$PREVIOUS_MANAGED" || exit 1
+    while IFS= read -r managed_user; do
+        [ -z "$managed_user" ] && continue
+        if ! is_valid_sync_username "$managed_user"; then
+            # Invalid records cannot name an identity accepted by authsync or
+            # the local importer. Ignore them so releases affected by the old
+            # stderr-merging bug self-heal when desired state is published.
+            echo "[sync-users] Ignoring invalid persisted managed-user record." >&2
+            continue
+        fi
+        printf '%s\n' "$managed_user" >>"$PREVIOUS_MANAGED"
+    done <"$MANAGED_STATE"
+    sort -u -o "$PREVIOUS_MANAGED" "$PREVIOUS_MANAGED"
 else
     while IFS= read -r local_user; do
         [ -z "$local_user" ] && continue
@@ -298,11 +340,10 @@ done <"$PREVIOUS_MANAGED"
 
 # Read the passdb back after every mutation. A command returning zero is not
 # sufficient evidence that tdbsam reached the desired state.
-if ! pdbedit -L >"$PDBEDIT_LOG" 2>&1; then
+if ! enumerate_local_passdb_users; then
     echo "[sync-users] Cannot verify reconciled tdbsam users."
     exit 1
 fi
-cut -d: -f1 "$PDBEDIT_LOG" | sort -u >"$LOCAL_PASSDB_USERS"
 while IFS= read -r desired_user; do
     [ -z "$desired_user" ] && continue
     if ! grep -Fqx -- "$desired_user" "$LOCAL_PASSDB_USERS"; then

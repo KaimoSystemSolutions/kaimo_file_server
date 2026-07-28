@@ -103,6 +103,8 @@ implemented; their required release verification remains tracked in milestone 4.
 
 - [x] NT hashes never remain in a predictable or world-readable file.
 - [x] User/share/config records use versioned JSON with strict schema validation.
+- [x] Native command data is separated from diagnostics and validated before
+  it can enter persistent reconciliation state.
 - [x] Removed users and shares are reconciled.
 - [x] Every mutation error makes the sync fail.
 - [x] Final state is verified before recording success.

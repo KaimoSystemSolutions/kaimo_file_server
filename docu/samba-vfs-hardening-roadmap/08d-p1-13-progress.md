@@ -324,3 +324,68 @@ outside the intended storage tree.
 
 **Next planned finding:** P2-01 — replace fixed user/share connection-context
 arrays with exact Samba-owned strings and enforce the ingress byte limits.
+
+### 2026-07-28 — P1-16/P1-17 corrective hardening: strict passdb inventory
+
+**Status:** Fixed, regression-tested, and verified in the pinned Samba 4.19.5
+`build-runtime` image. Live post-deployment recovery remains validation.
+
+**Live failure**
+
+The deployable Compose stack exposed an assumption that the standalone stubs
+and earlier real-Samba probe had not modeled. With Samba configured for stdout
+logging, `/opt/samba/bin/pdbedit -L` emitted valid `username:uid:` records on
+stdout and `added interface ...` diagnostics on stderr. `sync-users.sh`
+redirected both streams into one file and extracted the text before the first
+colon from every line.
+
+On first reconciliation, those diagnostics were adopted into the private
+`managed-users` ownership boundary. Each subsequent run imported the four real
+users, then attempted `pdbedit -x -u "added interface ..."` and failed. The
+two-second startup retry repeated the complete export; after two successful
+`ListUsers` calls, the bridge correctly enforced its two-per-60-second NT-hash
+export limit. The repeatedly observed `ResourceExhausted` exception was
+therefore a secondary symptom, not a stuck rate limiter.
+
+**Corrective implementation**
+
+1. `pdbedit -L` stdout is captured as machine data and stderr as diagnostics;
+   the streams are never merged before parsing.
+2. Every passdb inventory row must contain a synchronization-safe bounded
+   username and a numeric UID. Unexpected stdout fails before any passdb,
+   POSIX, group, or managed-state mutation.
+3. Existing `managed-users` records are revalidated on read. Invalid strings
+   cannot identify an account accepted by the exporter/importer, so they are
+   ignored; after successful convergence, atomic publication replaces the
+   polluted file with the exact desired set. This gives affected deployments a
+   safe automatic recovery path without weakening the ownership boundary for
+   valid identities.
+4. The user-sync regression now injects the exact observed `added interface`
+   stderr record on every `pdbedit -L`, starts with the same polluted persistent
+   state, and proves exact self-healing. A separate malformed-stdout case proves
+   rejection before mutation.
+
+**Validation completed**
+
+- `bash -n` passes for the reconciler and regression.
+- The complete `test-sync-users.sh` suite passes in the pinned Samba 4.19.5
+  build image, including desired-state import/revocation, retry preservation,
+  self-healing stderr pollution, and malformed-stdout rejection.
+- The complete pinned `build-runtime` target succeeds with the corrected user
+  test plus the share, config, runner, native-helper, and real ABI-49 module
+  build graph.
+- Read-only live inspection confirmed the stream split: real users were present
+  only on stdout and both `added interface ...` records only on stderr.
+
+**Validation still required**
+
+- Rebuild/redeploy `kaimo_samba`, observe one successful user reconciliation,
+  verify that the two invalid persisted records disappear, and confirm the
+  container returns to healthy.
+- The startup retry loop still does not consume the bridge's `retry-after-ms`
+  trailer. Client-side backoff should be aligned with the hash-export limiter
+  in a separate availability improvement; it is no longer required for
+  recovery from this parser defect.
+
+**Roadmap resumes at:** P2-03 — unify bridge path validation and route snapshot
+materialization through containment-checked storage resolution.

@@ -53,7 +53,10 @@ EOF
 echo 1500 >"$PASSWD_FILE.cnt"
 
 mkdir -m 0700 "$KAIMO_SYNC_STATE_DIR"
-printf 'stale.user\n' >"$KAIMO_SYNC_STATE_DIR/managed-users"
+printf '%s\n' \
+    'stale.user' \
+    'added interface eth0 ip=172.21.0.4 bcast=172.21.255.255 netmask=255.255.0.0' \
+    >"$KAIMO_SYNC_STATE_DIR/managed-users"
 chmod 0600 "$KAIMO_SYNC_STATE_DIR/managed-users"
 mkdir -p "$WORK/bin"
 
@@ -124,7 +127,12 @@ EOF
 cat >"$WORK/bin/pdbedit" <<'EOF'
 #!/bin/bash
 if [ "${1:-}" = "-L" ]; then
+    printf '%s\n' \
+        'added interface eth0 ip=172.21.0.4 bcast=172.21.255.255 netmask=255.255.0.0' \
+        >&2
     cat "$PASSDB_FILE"
+    [ -z "${PDBEDIT_LIST_EXTRA_STDOUT:-}" ] \
+        || printf '%s\n' "$PDBEDIT_LIST_EXTRA_STDOUT"
     exit "${PDBEDIT_LIST_EXIT_CODE:-0}"
 fi
 if [ "${1:-}" = "-x" ]; then
@@ -202,7 +210,8 @@ else
 fi
 
 # 3) The new managed-user boundary is private and contains exactly the desired
-# identities. Runtime secrets/logs are cleaned after the run.
+# identities. A legacy stderr diagnostic previously persisted as a username is
+# ignored and healed. Runtime secrets/logs are cleaned after the run.
 expected_managed="$WORK/expected-managed"
 printf 'admin\nanna.weber\nmarco.hanisch\n' >"$expected_managed"
 import_path="$(cat "$IMPORT_PATH_LOG" 2>/dev/null)"
@@ -215,7 +224,7 @@ elif [ "$(cat "$IMPORT_MODE_LOG" 2>/dev/null)" != "600" ] \
     || find "$KAIMO_SYNC_RUNTIME_DIR" -type f ! -name 'sync-users.lock' | grep -q .; then
     echo "FAIL: private per-run files were not cleaned"; fail=1
 else
-    note "ok: managed state is private and per-run hash files are cleaned"
+    note "ok: managed state self-heals stderr pollution and private files are cleaned"
 fi
 
 # 4) A held lock rejects another run before exporting hashes.
@@ -331,6 +340,24 @@ unset KAIMO_USER_SYNC_MAX_JSON_BYTES
 cp "$WORK/auth-users-valid" "$AUTH_USERS_FILE"
 if [ "$fail" -eq 0 ]; then
     note "ok: invalid structured user records fail before passdb mutation"
+fi
+
+# 10) Unexpected stdout from `pdbedit -L` is rejected as malformed machine
+# data. Diagnostics on stderr are allowed and already covered by every run.
+cp "$PASSDB_FILE" "$WORK/passdb-before-malformed-list"
+cp "$KAIMO_SYNC_STATE_DIR/managed-users" "$WORK/state-before-malformed-list"
+export PDBEDIT_LIST_EXTRA_STDOUT='unexpected diagnostic without fields'
+if bash "$SUT" >/dev/null 2>&1 \
+    || ! cmp -s "$WORK/passdb-before-malformed-list" "$PASSDB_FILE" \
+    || ! cmp -s "$WORK/state-before-malformed-list" \
+        "$KAIMO_SYNC_STATE_DIR/managed-users"; then
+    echo "FAIL: malformed pdbedit list output was accepted or mutated state"; fail=1
+else
+    note "ok: malformed pdbedit data output fails before local mutation"
+fi
+unset PDBEDIT_LIST_EXTRA_STDOUT
+
+if [ "$fail" -eq 0 ]; then
     echo "PASS: sync-users.sh securely reconciles Kaimo users to desired state."
     exit 0
 fi
