@@ -13,7 +13,7 @@ export NET_FAIL_PARAMETER=""
 export NET_IGNORE_PARAMETER=""
 export KAIMO_SAMBA_PATH_PREFIX=""
 mkdir -p "$WORK/bin"
-printf 'SMB2\tSMB3\t1\t1\t1\t0\t0\n' >"$CONFIG_RESPONSE"
+printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":true,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false}}' >"$CONFIG_RESPONSE"
 : >"$CONFIG_STATE"
 
 cat >"$WORK/bin/kaimo_configsync" <<'EOF'
@@ -64,7 +64,7 @@ if ! bash "$SUT" >/dev/null 2>&1; then
 fi
 
 export NET_FAIL_PARAMETER="server signing"
-printf 'SMB2_10\tSMB3\t0\t0\t1\t0\t0\n' >"$CONFIG_RESPONSE"
+printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_10","max_protocol":"SMB3_11","require_signing":false,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false}}' >"$CONFIG_RESPONSE"
 if bash "$SUT" >/dev/null 2>&1; then
     echo "FAIL: failed setparm mutation reported success."
     exit 1
@@ -78,10 +78,28 @@ if bash "$SUT" >/dev/null 2>&1; then
 fi
 
 unset NET_IGNORE_PARAMETER
-: >"$CONFIG_RESPONSE"
-if bash "$SUT" >/dev/null 2>&1; then
-    echo "FAIL: incomplete bridge response reported success."
+cp "$CONFIG_STATE" "$WORK/config-before-invalid"
+for invalid_case in \
+    '' \
+    '{"version":2,"config":{}}' \
+    '{"version":1,"config":{"min_protocol":"NT1","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false}}' \
+    '{"version":1,"config":{"min_protocol":"SMB3_11","max_protocol":"SMB2_02","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false}}' \
+    '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":"true","require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false}}' \
+    '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"unexpected":true}}' \
+    '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false}} {"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false}}'; do
+    printf '%s\n' "$invalid_case" >"$CONFIG_RESPONSE"
+    if bash "$SUT" >/dev/null 2>&1 \
+        || ! cmp -s "$WORK/config-before-invalid" "$CONFIG_STATE"; then
+        echo "FAIL: invalid structured config response mutated registry state."
+        exit 1
+    fi
+done
+export KAIMO_CONFIG_SYNC_MAX_JSON_BYTES=invalid
+if bash "$SUT" >/dev/null 2>&1 \
+    || ! cmp -s "$WORK/config-before-invalid" "$CONFIG_STATE"; then
+    echo "FAIL: invalid config JSON limit mutated registry state."
     exit 1
 fi
+unset KAIMO_CONFIG_SYNC_MAX_JSON_BYTES
 
 echo "PASS: config reconciliation fails on unapplied or unverifiable state."

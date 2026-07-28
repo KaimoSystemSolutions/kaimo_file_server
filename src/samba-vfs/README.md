@@ -130,6 +130,11 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
   private last-success/last-failure timestamps; `sync-health.sh` makes missing,
   failed, or stale convergence fail container health (180-second default,
   configurable with `KAIMO_SYNC_HEALTH_MAX_AGE_SECONDS`).
+- **P1-18 structured records:** the three C++ exporters emit bounded version-1
+  JSON documents. The shell reconcilers independently require exact schemas,
+  types, unique safe names, exact NT hashes, valid protocol ranges, and share
+  paths canonically contained below `KAIMO_STORAGE_ROOT`/`KAIMO_STORAGE`.
+  Validation finishes before any Samba/POSIX mutation.
 - **Proto contract:** [`protos/kaimo_smb_bridge.proto`](protos/kaimo_smb_bridge.proto) — defined once,
   generates C# (Bridge) and C++ stubs (authsync).
 - **P0-07 control-plane security:** the bridge accepts only client certificates
@@ -378,7 +383,7 @@ replaces the FileSystemWatcher/`SyncFromDb()` mechanism from
 
 ```
  Kaimo-DB ──► SmbBridge (.NET gRPC, :5080) ──gRPC ListShares──► kaimo_sharesync (C++)
-                 IShareRepository.GetAllEnabledAsync                 │  name<TAB>path<TAB>hidden
+                 IShareRepository.GetAllEnabledAsync                 │  versioned JSON envelope
                  (enabled shares only)                               ▼
                                                           sync-shares.sh ──net conf──► registry.tdb
                                                             (add/setparm/delshare)        │

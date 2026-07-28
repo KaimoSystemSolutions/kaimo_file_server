@@ -22,6 +22,7 @@ DESIRED_USERS=""
 LOCAL_PASSDB_USERS=""
 PREVIOUS_MANAGED=""
 STATE_TMP=""
+USER_RECORDS=""
 
 cleanup() {
     [ -n "$SMBPASSWD" ] && rm -f -- "$SMBPASSWD"
@@ -31,6 +32,7 @@ cleanup() {
     [ -n "$LOCAL_PASSDB_USERS" ] && rm -f -- "$LOCAL_PASSDB_USERS"
     [ -n "$PREVIOUS_MANAGED" ] && rm -f -- "$PREVIOUS_MANAGED"
     [ -n "$STATE_TMP" ] && rm -f -- "$STATE_TMP"
+    [ -n "$USER_RECORDS" ] && rm -f -- "$USER_RECORDS"
 }
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
@@ -70,13 +72,23 @@ is_unmanaged_user() {
     local old_ifs="$IFS"
     IFS=','
     for item in $UNMANAGED_USERS; do
-        if [ "$candidate" = "$item" ]; then
+        if [ "${candidate,,}" = "${item,,}" ]; then
             IFS="$old_ifs"
             return 0
         fi
     done
     IFS="$old_ifs"
     return 1
+}
+
+is_reserved_posix_user() {
+    local candidate="$1"
+    case "${candidate,,}" in
+        root|daemon|bin|sys|sync|games|man|lp|mail|news|uucp|proxy|www-data|backup|list|irc|gnats|nobody|_apt|systemd-network|systemd-timesync|messagebus|polkitd|redis)
+            return 0
+            ;;
+    esac
+    is_unmanaged_user "$candidate"
 }
 
 remove_secondary_group() {
@@ -113,6 +125,65 @@ PDBEDIT_LOG="$(mktemp "$RUNTIME_DIR/pdbedit.XXXXXX")" || exit 1
 DESIRED_USERS="$(mktemp "$RUNTIME_DIR/desired-users.XXXXXX")" || exit 1
 LOCAL_PASSDB_USERS="$(mktemp "$RUNTIME_DIR/local-users.XXXXXX")" || exit 1
 PREVIOUS_MANAGED="$(mktemp "$RUNTIME_DIR/managed-users.XXXXXX")" || exit 1
+USER_RECORDS="$(mktemp "$RUNTIME_DIR/user-records.XXXXXX")" || exit 1
+
+# P1-18: the exporter emits one versioned JSON document. Validate the complete
+# document before any passdb/POSIX mutation, then convert only validated fields
+# to the private per-run record file consumed below.
+command -v jq >/dev/null 2>&1 || {
+    echo "[sync-users] jq is required for structured synchronization."
+    exit 1
+}
+OUT="$(kaimo_authsync 2>>"$AUTH_ERR")"
+rc=$?
+if [ $rc -ne 0 ]; then
+    echo "[sync-users] Bridge unreachable (rc=$rc)."
+    exit 1
+fi
+MAX_JSON_BYTES="${KAIMO_USER_SYNC_MAX_JSON_BYTES:-16777216}"
+case "$MAX_JSON_BYTES" in
+    ''|*[!0-9]*|0)
+        echo "[sync-users] Invalid KAIMO_USER_SYNC_MAX_JSON_BYTES." >&2
+        exit 1
+        ;;
+esac
+if [ "${#OUT}" -gt "$MAX_JSON_BYTES" ]; then
+    echo "[sync-users] Structured response exceeds size limit."
+    exit 1
+fi
+if ! printf '%s' "$OUT" | jq -s -e -r '
+    def exact_keys($expected): (keys | sort) == ($expected | sort);
+    if length != 1 then error("expected exactly one JSON document")
+    else .[0]
+    end
+    | if type != "object"
+       or (exact_keys(["version", "users"]) | not)
+       or .version != 1
+       or (.users | type) != "array"
+       or (.users | length) > 100000
+       or (all(.users[];
+            type == "object"
+            and exact_keys(["username", "nt_hash"])
+            and (.username | type == "string"
+                 and test("^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$"))
+            and (.nt_hash | type == "string"
+                 and test("^[0-9A-Fa-f]{32}$"))) | not)
+       or (([.users[].username | ascii_downcase] | length)
+           != ([.users[].username | ascii_downcase] | unique | length))
+    then error("invalid user sync schema")
+    else .users[] | [.username, (.nt_hash | ascii_upcase)] | @tsv
+    end
+' >"$USER_RECORDS"; then
+    echo "[sync-users] Invalid structured user response."
+    exit 1
+fi
+while IFS=$'\t' read -r validated_user validated_hash; do
+    [ -z "${validated_user:-}" ] && continue
+    if is_reserved_posix_user "$validated_user"; then
+        echo "[sync-users] Reserved local username rejected: '$validated_user'."
+        exit 1
+    fi
+done <"$USER_RECORDS"
 
 # Capture local passdb state before importing. On the first P1-16 run, existing
 # tdbsam users are adopted as Kaimo-managed except for explicitly reserved
@@ -145,13 +216,6 @@ else
         echo "[sync-users] Cannot publish initial managed-user state."
         exit 1
     }
-fi
-
-OUT="$(kaimo_authsync 2>>"$AUTH_ERR")"
-rc=$?
-if [ $rc -ne 0 ]; then
-    echo "[sync-users] Bridge unreachable (rc=$rc)."
-    exit 1
 fi
 
 LM="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
@@ -193,7 +257,7 @@ while IFS=$'\t' read -r user nthash; do
     printf '%s:%s:%s:%s:[U          ]:%s:\n' "$user" "$uid" "$LM" "$nthash" "$LCT" >> "$SMBPASSWD"
     printf '%s\n' "$user" >>"$DESIRED_USERS"
     count=$((count + 1))
-done <<< "$OUT"
+done <"$USER_RECORDS"
 sort -u -o "$DESIRED_USERS" "$DESIRED_USERS"
 
 if [ "$count" -gt 0 ]; then

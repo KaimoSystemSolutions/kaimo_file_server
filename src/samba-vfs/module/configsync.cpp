@@ -1,8 +1,7 @@
 // kaimo_configsync - gRPC C++ client for protocol settings (Phase 4).
 //
-// Calls GetProtocolSettings on the .NET bridge over mTLS and outputs ONE tab-separated
-// line to stdout:
-//   "min<TAB>max<TAB>signing(0|1)<TAB>encrypt(0|1)<TAB>enabled(0|1)<TAB>wsdd(0|1)<TAB>audit(0|1)"
+// Calls GetProtocolSettings on the .NET bridge over mTLS and emits one
+// versioned JSON document.
 // The mapping to Samba (net conf setparm global, wsdd daemon, full_audit VFS) is
 // handled by the shell script sync-config.sh. Mirror to kaimo_authsync / kaimo_sharesync.
 // The enabled flag (Phase 5) is informational here — the authoritative on/off gate
@@ -17,6 +16,7 @@
 #include <grpcpp/grpcpp.h>
 #include "bridge_channel.h"
 #include "kaimo_smb_bridge.grpc.pb.h"
+#include "sync_json.h"
 
 using kaimo::smb::bridge::v1::ConfigService;
 using kaimo::smb::bridge::v1::GetProtocolSettingsRequest;
@@ -53,17 +53,22 @@ int main() {
         return 1;
     }
 
-    if (reply.min_protocol().empty() || reply.max_protocol().empty()) {
-        std::cerr << "kaimo_configsync: incomplete response (empty dialect)." << std::endl;
+    const int min_rank = kaimo::sync_json::dialect_rank(reply.min_protocol());
+    const int max_rank = kaimo::sync_json::dialect_rank(reply.max_protocol());
+    if (min_rank < 0 || max_rank < 0 || min_rank > max_rank) {
+        std::cerr << "kaimo_configsync: invalid protocol range." << std::endl;
         return 1;
     }
 
-    std::cout << reply.min_protocol() << '\t' << reply.max_protocol() << '\t'
-              << (reply.require_signing() ? '1' : '0') << '\t'
-              << (reply.require_encryption() ? '1' : '0') << '\t'
-              << (reply.enabled() ? '1' : '0') << '\t'
-              << (reply.enable_ws_discovery() ? '1' : '0') << '\t'
-              << (reply.enable_audit_log() ? '1' : '0') << '\n';
+    std::cout << "{\"version\":1,\"config\":{"
+              << "\"min_protocol\":" << kaimo::sync_json::quote(reply.min_protocol())
+              << ",\"max_protocol\":" << kaimo::sync_json::quote(reply.max_protocol())
+              << ",\"require_signing\":" << kaimo::sync_json::boolean(reply.require_signing())
+              << ",\"require_encryption\":" << kaimo::sync_json::boolean(reply.require_encryption())
+              << ",\"enabled\":" << kaimo::sync_json::boolean(reply.enabled())
+              << ",\"enable_ws_discovery\":" << kaimo::sync_json::boolean(reply.enable_ws_discovery())
+              << ",\"enable_audit_log\":" << kaimo::sync_json::boolean(reply.enable_audit_log())
+              << "}}\n";
     std::cerr << "kaimo_configsync: settings received (addr=" << addr << ")." << std::endl;
     return 0;
 }

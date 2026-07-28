@@ -3,8 +3,8 @@
 This documentation contains the security, memory-safety, and coverage audit for the Samba VFS migration. The former monolithic document has been split by topic so findings, target architecture, implementation planning, and progress history can be maintained and reviewed independently.
 
 > **Current as of:** 2026-07-28  
-> **Most recently completed:** P1-17 – Fail synchronization after unapplied mutations
-> **Next planned finding:** P1-18 – Replace and strictly validate text synchronization records
+> **Most recently completed:** P1-18 – Structured and strictly validated synchronization records
+> **Next planned finding:** P2-01 – Remove fixed user/share context truncation
 > **Production approval:** Still blocked until the remaining credential and synchronization risks, lifecycle reconciliation work, and release gates are complete.
 
 ## Table of contents

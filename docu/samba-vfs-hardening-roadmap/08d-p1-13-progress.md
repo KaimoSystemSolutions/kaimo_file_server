@@ -263,3 +263,64 @@ health did not expose the last successful convergence.
 **Next planned finding:** P1-18 — replace tab/newline synchronization records
 with a strictly validated structured format and enforce names, hashes,
 protocols, and storage-root paths at the container boundary.
+
+### 2026-07-28 — P1-18: Structured synchronization records
+
+**Status:** Implemented, regression-tested, and verified in the pinned Samba
+4.19.5 `build-runtime` image. Live bridge-backed synchronization remains
+release validation.
+
+**Problem**
+
+The gRPC control plane was protobuf-structured, but each C++ sync client
+flattened its reply to tab/newline-delimited stdout. Legacy or manually altered
+database values could inject record boundaries, collide with local/Samba
+reserved names, supply malformed hashes or protocol values, or point a share
+outside the intended storage tree.
+
+**Solution implemented**
+
+1. `kaimo_authsync`, `kaimo_sharesync`, and `kaimo_configsync` now emit exactly
+   one version-1 JSON envelope. They validate the entire reply and total output
+   budget before writing the first byte.
+2. The shared native validator enforces valid UTF-8, no control characters,
+   ASCII-safe bounded usernames/share names, Samba-reserved share names,
+   absolute bounded paths, exact 16-byte NT hashes, and the supported ordered
+   SMB dialect set.
+3. The shell scripts independently parse with `jq --slurp` and require exactly
+   one document, exact object keys, JSON types, version 1, bounded record
+   counts, case-insensitive uniqueness, and fixed-format hashes.
+4. User sync rejects fixed POSIX system identities and all explicitly unmanaged
+   Samba identities before passdb/POSIX inspection or mutation.
+5. Share sync canonicalizes both the configured storage root and every desired
+   path with symlink resolution. A share must be a strict descendant of that
+   root, must not overlap the snapshot cache, and must not duplicate another
+   canonical desired path.
+6. Config sync accepts only the five supported dialect tokens, verifies
+   minimum ≤ maximum, and requires real JSON booleans.
+7. Safe identifiers cannot begin with an option marker; filesystem utilities
+   receive `--` where supported. `jq` is now an explicit verified slim-runtime
+   dependency.
+
+**Validation completed**
+
+- Native tests cover UTF-8, controls, identifier syntax/reserved names,
+  absolute paths, dialects, and JSON escaping.
+- Shell regressions cover malformed/empty/multiple documents, wrong versions,
+  unknown fields, control characters, reserved and duplicate names, malformed
+  hashes, non-boolean settings, invalid/reversed dialects, storage-root escape,
+  and no-mutation-on-validation-failure.
+- All P1-17 reconciliation/health regressions continue to pass.
+- The pinned Samba 4.19.5 `build-runtime` image builds successfully with native
+  and shell tests required in its build graph.
+
+**Validation still required**
+
+- Run all three exporters against real bridge data and verify initial and
+  periodic reconciliation in the deployable Compose stack.
+- Bulk pagination and minimizing/clearing decrypted credential copies remain
+  separate P2-10/P2-11 work; JSON removes delimiter ambiguity but intentionally
+  does not claim zero-copy credential handling.
+
+**Next planned finding:** P2-01 — replace fixed user/share connection-context
+arrays with exact Samba-owned strings and enforce the ingress byte limits.

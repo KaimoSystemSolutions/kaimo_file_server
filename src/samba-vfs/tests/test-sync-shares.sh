@@ -18,12 +18,20 @@ export SMBCONTROL_LOG="$WORK/smbcontrol.log"
 export NET_FAIL_COMMAND=""
 export NET_FAIL_PARAMETER=""
 export KAIMO_SAMBA_PATH_PREFIX=""
+export KAIMO_STORAGE_ROOT="$WORK"
 mkdir -p "$WORK/bin" "$WORK/pool01/stable" "$WORK/pool01/moved" "$WORK/pool01/removed"
 
 printf 'stable\t%s\nmoved\t%s\nremoved\t%s\n' \
     "$WORK/pool01/stable" "$WORK/pool01/moved" "$WORK/pool01/removed" > "$SHARE_STATE"
-printf 'stable\t%s\t0\nmoved\t%s\t0\nnew-share\t%s\t1\n' \
-    "$WORK/pool01/stable" "$WORK/pool02/moved" "$WORK/pool02/new-share" > "$DESIRED_SHARES"
+jq -n \
+    --arg stable "$WORK/pool01/stable" \
+    --arg moved "$WORK/pool02/moved" \
+    --arg new_share "$WORK/pool02/new-share" \
+    '{version:1,shares:[
+      {name:"stable",path:$stable,hidden:false},
+      {name:"moved",path:$moved,hidden:false},
+      {name:"new-share",path:$new_share,hidden:true}
+    ]}' >"$DESIRED_SHARES"
 : > "$SMBCONTROL_LOG"
 
 cat > "$WORK/bin/kaimo_sharesync" <<'EOF'
@@ -160,7 +168,9 @@ fi
 
 # Mutation failures must fail the run rather than producing a misleading
 # success summary.
-printf 'failing-share\t%s\t0\n' "$WORK/pool02/failing" >"$DESIRED_SHARES"
+jq -n --arg path "$WORK/pool02/failing" \
+    '{version:1,shares:[{name:"failing-share",path:$path,hidden:false}]}' \
+    >"$DESIRED_SHARES"
 export NET_FAIL_COMMAND=addshare
 if bash "$SUT" >/dev/null 2>&1; then
     echo "FAIL: failed addshare mutation reported success."
@@ -173,6 +183,40 @@ if bash "$SUT" >/dev/null 2>&1; then
     fail=1
 fi
 unset NET_FAIL_COMMAND NET_FAIL_PARAMETER
+
+# Invalid names, control characters, duplicate names, and storage-root escapes
+# must fail before registry mutation.
+cp "$SHARE_STATE" "$WORK/share-state-before-invalid"
+for invalid_case in \
+    '{"version":1,"shares":[{"name":"global","path":"/tmp/share","hidden":false}]}' \
+    '{"version":1,"shares":[{"name":"bad/name","path":"/tmp/share","hidden":false}]}' \
+    '{"version":1,"shares":[{"name":"valid","path":"/tmp/bad\npath","hidden":false}]}' \
+    '{"version":1,"shares":[{"name":"Dupe","path":"/tmp/a","hidden":false},{"name":"dupe","path":"/tmp/b","hidden":false}]}' \
+    '{"version":2,"shares":[]}' \
+    '{"version":1,"shares":[]} {"version":1,"shares":[]}'; do
+    printf '%s\n' "$invalid_case" >"$DESIRED_SHARES"
+    if bash "$SUT" >/dev/null 2>&1 \
+        || ! cmp -s "$WORK/share-state-before-invalid" "$SHARE_STATE"; then
+        echo "FAIL: invalid structured share response mutated registry state."
+        fail=1
+        break
+    fi
+done
+export KAIMO_SHARE_SYNC_MAX_JSON_BYTES=invalid
+if bash "$SUT" >/dev/null 2>&1 \
+    || ! cmp -s "$WORK/share-state-before-invalid" "$SHARE_STATE"; then
+    echo "FAIL: invalid share JSON limit mutated registry state."
+    fail=1
+fi
+unset KAIMO_SHARE_SYNC_MAX_JSON_BYTES
+jq -n --arg path "/outside/storage/share" \
+    '{version:1,shares:[{name:"outside",path:$path,hidden:false}]}' \
+    >"$DESIRED_SHARES"
+if bash "$SUT" >/dev/null 2>&1 \
+    || ! cmp -s "$WORK/share-state-before-invalid" "$SHARE_STATE"; then
+    echo "FAIL: storage-root escape mutated registry state."
+    fail=1
+fi
 
 if [ "$fail" = "0" ]; then
     echo "PASS: share reconciliation verifies mutations and disconnects stale sessions."

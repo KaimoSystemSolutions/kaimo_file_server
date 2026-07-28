@@ -40,9 +40,11 @@ kaimo:stale.user
 kaimo-authd:stale.user
 EOF
 cat >"$AUTH_USERS_FILE" <<'EOF'
-admin	31D6CFE0D16AE931B73C59D7E0C089C0
-marco.hanisch	AABBCCDDEEFF00112233445566778899
-anna.weber	00112233445566778899AABBCCDDEEFF
+{"version":1,"users":[
+  {"username":"admin","nt_hash":"31D6CFE0D16AE931B73C59D7E0C089C0"},
+  {"username":"marco.hanisch","nt_hash":"AABBCCDDEEFF00112233445566778899"},
+  {"username":"anna.weber","nt_hash":"00112233445566778899AABBCCDDEEFF"}
+]}
 EOF
 : >"$GROUP_LOG"
 : >"$LOCK_LOG"
@@ -274,7 +276,9 @@ else
 fi
 
 # 7) Reactivation restores passdb/groups while preserving the retained UID.
-printf 'stale.user\tAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n' >>"$AUTH_USERS_FILE"
+jq '.users += [{"username":"stale.user","nt_hash":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}]' \
+    "$AUTH_USERS_FILE" >"$AUTH_USERS_FILE.tmp"
+mv "$AUTH_USERS_FILE.tmp" "$AUTH_USERS_FILE"
 if ! bash "$SUT" >/dev/null 2>&1 \
     || ! has_passdb_user stale.user \
     || ! grep -Fqx 'stale.user:1401' "$PASSWD_FILE" \
@@ -300,7 +304,33 @@ else
     note "ok: bootstrap adopts legacy passdb users and excludes reserved accounts"
 fi
 
+# 9) Structured records fail before any local mutation when their schema,
+# hash, identity, or uniqueness is unsafe.
+cp "$AUTH_USERS_FILE" "$WORK/auth-users-valid"
+cp "$PASSDB_FILE" "$WORK/passdb-before-invalid"
+for invalid_case in \
+    '{"version":1,"users":[{"username":"bad\tname","nt_hash":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}]}' \
+    '{"version":1,"users":[{"username":"root","nt_hash":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}]}' \
+    '{"version":1,"users":[{"username":"valid","nt_hash":"SHORT"}]}' \
+    '{"version":1,"users":[{"username":"Duplicate","nt_hash":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},{"username":"duplicate","nt_hash":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"}]}' \
+    '{"version":2,"users":[]}' \
+    '{"version":1,"users":[]} {"version":1,"users":[]}'; do
+    printf '%s\n' "$invalid_case" >"$AUTH_USERS_FILE"
+    if bash "$SUT" >/dev/null 2>&1 \
+        || ! cmp -s "$WORK/passdb-before-invalid" "$PASSDB_FILE"; then
+        echo "FAIL: invalid structured user response mutated state"; fail=1
+        break
+    fi
+done
+export KAIMO_USER_SYNC_MAX_JSON_BYTES=invalid
+if bash "$SUT" >/dev/null 2>&1 \
+    || ! cmp -s "$WORK/passdb-before-invalid" "$PASSDB_FILE"; then
+    echo "FAIL: invalid user JSON limit mutated state"; fail=1
+fi
+unset KAIMO_USER_SYNC_MAX_JSON_BYTES
+cp "$WORK/auth-users-valid" "$AUTH_USERS_FILE"
 if [ "$fail" -eq 0 ]; then
+    note "ok: invalid structured user records fail before passdb mutation"
     echo "PASS: sync-users.sh securely reconciles Kaimo users to desired state."
     exit 0
 fi

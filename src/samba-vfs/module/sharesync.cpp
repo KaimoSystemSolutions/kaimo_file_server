@@ -1,7 +1,7 @@
 // kaimo_sharesync - gRPC C++ client for share provisioning (Phase 4).
 //
-// Calls ListShares on the .NET bridge over mTLS and outputs one line
-// "name<TAB>path<TAB>hidden(0|1)" per enabled share to stdout. The actual
+// Calls ListShares on the .NET bridge over mTLS and emits one versioned JSON
+// document. The actual
 // reconciliation in Samba's registry (net conf addshare/setparm/delshare) is
 // handled by the shell script sync-shares.sh. Mirror to kaimo_authsync (NT-Hash sync).
 #include <chrono>
@@ -13,6 +13,7 @@
 #include <grpcpp/grpcpp.h>
 #include "bridge_channel.h"
 #include "kaimo_smb_bridge.grpc.pb.h"
+#include "sync_json.h"
 
 using kaimo::smb::bridge::v1::ShareService;
 using kaimo::smb::bridge::v1::ListSharesReply;
@@ -49,11 +50,36 @@ int main() {
         return 1;
     }
 
-    for (const auto& s : reply.shares()) {
-        if (s.name().empty() || s.path().empty()) continue;  // skip incomplete entries
-        std::cout << s.name() << '\t' << s.path() << '\t'
-                  << (s.is_hidden() ? '1' : '0') << '\n';
+    if (reply.shares_size() > 100000) {
+        std::cerr << "kaimo_sharesync: response exceeds share limit." << std::endl;
+        return 1;
     }
+
+    std::size_t estimated_json_bytes = 32;
+    for (const auto& s : reply.shares()) {
+        if (!kaimo::sync_json::valid_share_name(s.name())
+            || !kaimo::sync_json::valid_absolute_path(s.path())) {
+            std::cerr << "kaimo_sharesync: invalid share record rejected." << std::endl;
+            return 1;
+        }
+        estimated_json_bytes += s.name().size() + s.path().size() + 64;
+        if (estimated_json_bytes > 16 * 1024 * 1024) {
+            std::cerr << "kaimo_sharesync: JSON response exceeds size limit." << std::endl;
+            return 1;
+        }
+    }
+
+    std::cout << "{\"version\":1,\"shares\":[";
+    bool first = true;
+    for (const auto& s : reply.shares()) {
+        if (!first) std::cout << ',';
+        first = false;
+        std::cout << "{\"name\":" << kaimo::sync_json::quote(s.name())
+                  << ",\"path\":" << kaimo::sync_json::quote(s.path())
+                  << ",\"hidden\":" << kaimo::sync_json::boolean(s.is_hidden())
+                  << '}';
+    }
+    std::cout << "]}\n";
     std::cerr << "kaimo_sharesync: " << reply.shares_size()
               << " shares received (addr=" << addr << ")." << std::endl;
     return 0;

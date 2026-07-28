@@ -348,6 +348,20 @@ after its last success, or exceeded the configurable convergence age.
 
 ### P1-18: Text synchronization output is not safely validated
 
+> **Remediation status (2026-07-28): Implemented, regression-tested, and
+> verified in the pinned Samba 4.19.5 build-runtime image. Live bridge-backed
+> export/import remains release validation.**
+
 Usernames, share names, paths, and settings are transported as tab/newline-delimited text. The sync scripts do not independently enforce the Web UI's validation rules. Manually modified or legacy DB rows can therefore alter record boundaries or be interpreted as command options.
 
 **Fix:** use protobuf/JSON with strict schema validation, reject control characters and reserved names, pass `--` before shell operands where supported, and validate share paths against the configured storage root.
+
+**Implemented fix:** all three C++ exporters now emit exactly one version-1
+JSON envelope and reject invalid UTF-8/text, record counts, identifiers,
+16-byte NT hashes, absolute paths, dialect values/ranges, and response sizes
+before emitting data. Each shell reconciler independently validates the exact
+schema with `jq`, rejects unknown fields, duplicate case-insensitive names,
+reserved POSIX/Samba names, control characters, malformed hashes and non-JSON
+booleans. Share paths are symlink-aware canonicalized and must resolve strictly
+below the configured storage root without cache overlap or duplicate canonical
+targets. Validation completes before the first local mutation.

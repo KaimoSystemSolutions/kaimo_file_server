@@ -29,6 +29,7 @@
       <File Path="src/samba-vfs/module/configsync.cpp" />
       <File Path="src/samba-vfs/module/decision_cache.h" />
       <File Path="src/samba-vfs/module/local_protocol.h" />
+      <File Path="src/samba-vfs/module/sync_json.h" />
       <File Path="src/samba-vfs/module/sharesync.cpp" />
       <File Path="src/samba-vfs/module/vfs_kaimo_bridge.c" />
     </Folder>
@@ -49,6 +50,7 @@
       <File Path="src/samba-vfs/tests/test-sync-config.sh" />
       <File Path="src/samba-vfs/tests/test-sync-runner.sh" />
       <File Path="src/samba-vfs/tests/test-sync-shares.sh" />
+      <File Path="src/samba-vfs/tests/test-sync-json.cpp" />
       <File Path="src/samba-vfs/tests/test-vfs-connect-status.py" />
       <File Path="src/samba-vfs/tests/test-vfs-io-deadline.py" />
       <File Path="src/samba-vfs/tests/test-vfs-snapshot-readonly.py" />

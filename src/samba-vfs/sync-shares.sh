@@ -13,11 +13,62 @@ set -uo pipefail
 SAMBA_PATH_PREFIX="${KAIMO_SAMBA_PATH_PREFIX-/opt/samba/sbin:/opt/samba/bin}"
 [ -n "$SAMBA_PATH_PREFIX" ] && export PATH="$SAMBA_PATH_PREFIX:$PATH"
 CACHE_ROOT="$(readlink -m "${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}")"
+STORAGE_ROOT="$(readlink -m "${KAIMO_STORAGE_ROOT:-${KAIMO_STORAGE:-/data/storage}}")"
 
 OUT="$(kaimo_sharesync 2>>/tmp/sharesync.err)"
 rc=$?
 if [ $rc -ne 0 ]; then
     echo "[sync-shares] Bridge unreachable (rc=$rc) - see /tmp/sharesync.err"
+    exit 1
+fi
+command -v jq >/dev/null 2>&1 || {
+    echo "[sync-shares] jq is required for structured synchronization." >&2
+    exit 1
+}
+MAX_JSON_BYTES="${KAIMO_SHARE_SYNC_MAX_JSON_BYTES:-16777216}"
+case "$MAX_JSON_BYTES" in
+    ''|*[!0-9]*|0)
+        echo "[sync-shares] Invalid KAIMO_SHARE_SYNC_MAX_JSON_BYTES." >&2
+        exit 1
+        ;;
+esac
+if [ "${#OUT}" -gt "$MAX_JSON_BYTES" ]; then
+    echo "[sync-shares] Structured response exceeds size limit." >&2
+    exit 1
+fi
+if ! SHARE_RECORDS="$(printf '%s' "$OUT" | jq -s -e -r '
+    def exact_keys($expected): (keys | sort) == ($expected | sort);
+    def reserved_share:
+        (. | ascii_downcase) as $name
+        | ($name == "global" or $name == "homes" or $name == "printers"
+           or $name == "print$" or $name == "ipc$");
+    if length != 1 then error("expected exactly one JSON document")
+    else .[0]
+    end
+    | if type != "object"
+       or (exact_keys(["version", "shares"]) | not)
+       or .version != 1
+       or (.shares | type) != "array"
+       or (.shares | length) > 100000
+       or (all(.shares[]; . as $share
+            | ($share | type) == "object"
+            and ($share | exact_keys(["name", "path", "hidden"]))
+            and (($share.name | type) == "string")
+            and ($share.name | test("^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"))
+            and ($share.name | endswith(".") | not)
+            and ($share.name | reserved_share | not)
+            and (($share.path | type) == "string")
+            and (($share.path | length) > 0 and ($share.path | length) <= 4096)
+            and ($share.path | startswith("/"))
+            and ($share.path | explode | all(.[]; . >= 32 and . != 127))
+            and (($share.hidden | type) == "boolean")) | not)
+       or (([.shares[].name | ascii_downcase] | length)
+           != ([.shares[].name | ascii_downcase] | unique | length))
+    then error("invalid share sync schema")
+    else .shares[] | [.name, .path, (if .hidden then "1" else "0" end)] | @tsv
+    end
+')"; then
+    echo "[sync-shares] Invalid structured share response." >&2
     exit 1
 fi
 
@@ -27,9 +78,15 @@ fi
 # break under `set -u` with "unbound variable" (case: no/all shares disabled).
 declare -A want_path=()
 declare -A want_hidden=()
+canonical_paths=()
 while IFS=$'\t' read -r name path hidden; do
     [ -z "${name:-}" ] && continue
-    canonical_path="$(readlink -m "$path")"
+    canonical_path="$(readlink -m -- "$path")"
+    if [ "$canonical_path" = "$STORAGE_ROOT" ] ||
+       [[ "$canonical_path/" != "$STORAGE_ROOT/"* ]]; then
+        echo "[sync-shares] REJECTED path outside storage root: $name -> $canonical_path" >&2
+        exit 1
+    fi
     # The snapshot cache must never be published as a share, nor may a broad
     # share contain it. Excluding an unsafe definition from desired state also
     # removes a previously published registry share during the reconciliation.
@@ -37,11 +94,21 @@ while IFS=$'\t' read -r name path hidden; do
        [[ "$canonical_path/" == "$CACHE_ROOT/"* ]] ||
        [[ "$CACHE_ROOT/" == "$canonical_path/"* ]]; then
         echo "[sync-shares] REJECTED unsafe share/cache overlap: $name -> $canonical_path" >&2
-        continue
+        exit 1
     fi
     want_path["$name"]="$path"
     want_hidden["$name"]="${hidden:-0}"
-done <<< "$OUT"
+    canonical_paths+=("$canonical_path")
+done <<< "$SHARE_RECORDS"
+if (( ${#canonical_paths[@]} > 0 )); then
+    duplicate_canonical_paths="$(
+        printf '%s\n' "${canonical_paths[@]}" | sort | uniq -d
+    )"
+    if [ -n "$duplicate_canonical_paths" ]; then
+        echo "[sync-shares] REJECTED duplicate canonical share path." >&2
+        exit 1
+    fi
+fi
 
 # --- Current state: shares currently in registry (one per line) ---
 if ! current_output="$(net conf listshares 2>/dev/null)"; then
@@ -129,7 +196,7 @@ if (( ${#want_path[@]} > 0 )); then
         # this namespace is blocked by the VFS.
         capture_dir="$path/.kaimo-close-captures"
         if [ -L "$capture_dir" ] ||
-           ! install -d -m 2770 -o root -g "${KAIMO_STORAGE_GID:-1654}" "$capture_dir"; then
+           ! install -d -m 2770 -o root -g "${KAIMO_STORAGE_GID:-1654}" -- "$capture_dir"; then
             echo "[sync-shares] FAILED to secure close-capture directory: $capture_dir" >&2
             if net conf showshare "$name" >/dev/null 2>&1; then
                 net conf delshare "$name" >/dev/null 2>&1 || true

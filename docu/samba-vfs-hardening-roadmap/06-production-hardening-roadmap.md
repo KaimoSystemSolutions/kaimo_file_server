@@ -77,9 +77,11 @@ and make disabled identities converge predictably.
    unapplied or unverifiable mutations, reads back passdb/registry/config
    state, rejects concurrent component runs, and exposes last-success/failure
    convergence through container health.
-4. Replace tab/newline synchronization records with a strictly validated
-   structured format. Reject control characters, reserved names, invalid
-   protocol values, and paths outside configured storage roots.
+4. **Completed 2026-07-28:** replaced tab/newline synchronization records with
+   versioned JSON envelopes independently validated by exporter and reconciler.
+   Control characters, reserved/duplicate names, malformed hashes, invalid
+   protocol values/ranges, unknown fields, and canonical paths outside the
+   configured storage root fail before mutation.
 5. Centralize enabled service/share/user resolution and use it in every Authz,
    Event, Snapshot, and synchronization RPC.
 6. Define the revocation SLA and close affected shares/sessions when a service,

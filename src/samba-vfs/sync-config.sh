@@ -22,9 +22,76 @@ if [ $rc -ne 0 ]; then
     exit 1
 fi
 
-IFS=$'\t' read -r min_proto max_proto req_sign req_enc enabled wsdd_on audit_on <<< "$OUT"
-if [ -z "${min_proto:-}" ] || [ -z "${max_proto:-}" ]; then
-    echo "[sync-config] empty/incomplete response." >&2
+command -v jq >/dev/null 2>&1 || {
+    echo "[sync-config] jq is required for structured synchronization." >&2
+    exit 1
+}
+MAX_JSON_BYTES="${KAIMO_CONFIG_SYNC_MAX_JSON_BYTES:-65536}"
+case "$MAX_JSON_BYTES" in
+    ''|*[!0-9]*|0)
+        echo "[sync-config] Invalid KAIMO_CONFIG_SYNC_MAX_JSON_BYTES." >&2
+        exit 1
+        ;;
+esac
+if [ "${#OUT}" -gt "$MAX_JSON_BYTES" ]; then
+    echo "[sync-config] Structured response exceeds size limit." >&2
+    exit 1
+fi
+if ! CONFIG_RECORD="$(printf '%s' "$OUT" | jq -s -e -r '
+    def exact_keys($expected): (keys | sort) == ($expected | sort);
+    def dialect:
+        . == "SMB2_02" or . == "SMB2_10" or . == "SMB3_00"
+        or . == "SMB3_02" or . == "SMB3_11";
+    if length != 1 then error("expected exactly one JSON document")
+    else .[0]
+    end
+    | if type != "object"
+       or (exact_keys(["version", "config"]) | not)
+       or .version != 1
+       or (.config | type) != "object"
+       or (.config | exact_keys([
+            "min_protocol", "max_protocol", "require_signing",
+            "require_encryption", "enabled", "enable_ws_discovery",
+            "enable_audit_log"]) | not)
+       or ((.config.min_protocol | type) != "string")
+       or (.config.min_protocol | dialect | not)
+       or ((.config.max_protocol | type) != "string")
+       or (.config.max_protocol | dialect | not)
+       or (.config.require_signing | type) != "boolean"
+       or (.config.require_encryption | type) != "boolean"
+       or (.config.enabled | type) != "boolean"
+       or (.config.enable_ws_discovery | type) != "boolean"
+       or (.config.enable_audit_log | type) != "boolean"
+    then error("invalid config sync schema")
+    else .config | [
+        .min_protocol, .max_protocol,
+        (if .require_signing then "1" else "0" end),
+        (if .require_encryption then "1" else "0" end),
+        (if .enabled then "1" else "0" end),
+        (if .enable_ws_discovery then "1" else "0" end),
+        (if .enable_audit_log then "1" else "0" end)
+    ] | @tsv
+    end
+')"; then
+    echo "[sync-config] Invalid structured config response." >&2
+    exit 1
+fi
+IFS=$'\t' read -r min_proto max_proto req_sign req_enc enabled wsdd_on audit_on <<<"$CONFIG_RECORD"
+
+dialect_rank() {
+    case "$1" in
+        SMB2_02) printf '0' ;;
+        SMB2_10) printf '1' ;;
+        SMB3_00) printf '2' ;;
+        SMB3_02) printf '3' ;;
+        SMB3_11) printf '4' ;;
+        *) return 1 ;;
+    esac
+}
+min_rank="$(dialect_rank "$min_proto")" || exit 1
+max_rank="$(dialect_rank "$max_proto")" || exit 1
+if [ "$min_rank" -gt "$max_rank" ]; then
+    echo "[sync-config] Invalid protocol range: $min_proto > $max_proto." >&2
     exit 1
 fi
 

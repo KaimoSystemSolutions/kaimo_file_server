@@ -136,7 +136,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # toggle) is a standard Samba module already built into /opt/samba by the source
 # build above — no extra package needed.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends wsdd procps \
+    && apt-get install -y --no-install-recommends wsdd procps jq \
     && rm -rf /var/lib/apt/lists/*
 
 # Phase 1: build gRPC C++ clients (authsync/authd/sharesync/configsync) for
@@ -152,10 +152,12 @@ COPY module/decision_cache.h ./
 COPY module/event_spool.h ./
 COPY module/local_protocol.h ./
 COPY module/rename_event.h ./
+COPY module/sync_json.h ./
 COPY tests/test-decision-cache.cpp ./
 COPY tests/test-event-spool.cpp ./
 COPY tests/test-local-protocol.cpp ./
 COPY tests/test-rename-event.cpp ./
+COPY tests/test-sync-json.cpp ./
 RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
     && protoc --grpc_out=. --plugin=protoc-gen-grpc="$(which grpc_cpp_plugin)" kaimo_smb_bridge.proto \
     && g++ -std=c++17 -O2 \
@@ -194,6 +196,10 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
        test-rename-event.cpp -o /tmp/test-rename-event \
     && /tmp/test-rename-event \
     && rm /tmp/test-rename-event \
+    && g++ -std=c++17 -O2 -I. \
+       test-sync-json.cpp -o /tmp/test-sync-json \
+    && /tmp/test-sync-json \
+    && rm /tmp/test-sync-json \
     && test -x /usr/local/bin/kaimo_authsync \
     && test -x /usr/local/bin/kaimo_authd \
     && test -x /usr/local/bin/kaimo_sharesync \
@@ -273,7 +279,7 @@ RUN set -eux; \
       | xargs -r -n1 readlink -f \
       | sort -u > /tmp/runtime-libraries.txt; \
     { \
-        printf '%s\n' acl ca-certificates login passwd procps sysvinit-utils util-linux wsdd; \
+        printf '%s\n' acl ca-certificates jq login passwd procps sysvinit-utils util-linux wsdd; \
         while IFS= read -r library_path; do \
             owner="$(dpkg-query -S "$library_path" | head -n1)"; \
             printf '%s\n' "${owner%%:*}"; \
@@ -292,6 +298,7 @@ RUN apt-get update \
     && xargs -r apt-get install -y --no-install-recommends < /tmp/runtime-packages.txt \
     && rm -rf /var/lib/apt/lists/* /tmp/runtime-packages.txt \
     && command -v flock >/dev/null \
+    && command -v jq >/dev/null \
     && command -v mktemp >/dev/null \
     && command -v stat >/dev/null
 

@@ -100,11 +100,11 @@ implemented; their required release verification remains tracked in milestone 4.
 ### Synchronization checklist
 
 - [x] NT hashes never remain in a predictable or world-readable file.
-- [ ] User/share/config records have strict schema validation.
+- [x] User/share/config records use versioned JSON with strict schema validation.
 - [x] Removed users and shares are reconciled.
-- [ ] Every mutation error makes the sync fail.
-- [ ] Final state is verified before recording success.
-- [ ] Concurrent sync instances are locked out.
+- [x] Every mutation error makes the sync fail.
+- [x] Final state is verified before recording success.
+- [x] Concurrent sync instances are locked out.
 - [ ] Credentials are not exposed in process arguments.
 
 ## 13. Decisions that must be made explicitly
