@@ -558,7 +558,11 @@ static bool deliver_spooled_event(const kaimo::authd::SpoolEvent& event) {
     std::string user, share, path, old_path, new_path;
     std::string capture_id;
     bool is_directory = false;
-    if (!read_string(input, user) || !read_string(input, share)) return false;
+    if (!read_string(input, user) || !read_string(input, share) ||
+        !kaimo_local_valid_username(user.c_str()) ||
+        !kaimo_local_valid_share(share.c_str())) {
+        return false;
+    }
 
     switch (event.operation) {
     case KAIMO_LOCAL_OP_CLOSE:
@@ -759,9 +763,12 @@ static void handle_client(const ClientConnection& connection) {
     bool first = false, second = false, third = false, fourth = false;
     uint32_t access_mask = 0;
 
-    if (!read_string(input, user) || !read_string(input, share)) {
+    if (!read_string(input, user) || !read_string(input, share) ||
+        !kaimo_local_valid_username(user.c_str()) ||
+        !kaimo_local_valid_share(share.c_str())) {
         // The operation-specific parser below is deliberately skipped. A
-        // syntactically invalid request receives the generic protocol error.
+        // syntactically invalid or oversized identity context receives the
+        // generic protocol error and never reaches gRPC.
     } else if (!peer_matches_username(connection.peer, user)) {
         status = KAIMO_LOCAL_STATUS_UNAUTHORIZED_PEER;
         uint64_t count = ++g_peer_rejections;

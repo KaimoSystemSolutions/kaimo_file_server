@@ -32,3 +32,4 @@ Status values used here and in individual findings:
 | [Early P1 remediations](08b-p1-01-through-p1-06-progress.md) | P1-01 through P1-06: resources, cache, framing, local identity, deadlines, and read-only snapshots. |
 | [Current P1 remediations](08c-p1-07-through-p1-12-progress.md) | P1-07 through P1-12: snapshot consistency, share revocation, event durability, and exact close captures. |
 | [Later P1 remediations](08d-p1-13-progress.md) | P1-13 onward: independently retry-safe lifecycle transitions and remaining synchronization hardening. |
+| [P2 defense-in-depth remediations](08e-p2-progress.md) | P2-01 onward: boundary consistency, parser hardening, supervision, and release controls. |

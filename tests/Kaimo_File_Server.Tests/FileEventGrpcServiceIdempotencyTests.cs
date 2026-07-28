@@ -117,6 +117,7 @@ public sealed class FileEventGrpcServiceIdempotencyTests
         var request = new NotifyPathRequest
         {
             EventId = Guid.NewGuid().ToString("N"),
+            Username = "alice",
             Share = "docs",
             Path = "old.txt",
             IsDirectory = false
@@ -168,6 +169,7 @@ public sealed class FileEventGrpcServiceIdempotencyTests
             new NotifyRenameRequest
             {
                 EventId = eventId.ToString("N"),
+                Username = "alice",
                 Share = "docs",
                 OldPath = oldPath,
                 NewPath = newPath,

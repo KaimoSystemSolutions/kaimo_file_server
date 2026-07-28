@@ -1,5 +1,6 @@
 using Google.Protobuf;
 using Grpc.Core;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.SmbBridge.Grpc;
@@ -34,6 +35,9 @@ public sealed class AuthGrpcService : AuthService.AuthServiceBase
     public override async Task<GetNtHashReply> GetNtHash(
         GetNtHashRequest request, ServerCallContext context)
     {
+        if (!SambaName.IsValidUsername(request.Username))
+            return new GetNtHashReply { Found = false };
+
         byte[]? hash = await _auth.GetNtHashAsync(request.Username);
         if (hash is not { Length: > 0 })
             return new GetNtHashReply { Found = false };

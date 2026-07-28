@@ -66,6 +66,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         EnumerateSnapshotsRequest request, ServerCallContext context)
     {
         var reply = new EnumerateSnapshotsReply();
+        if (!SambaName.IsValidContext(request.Username, request.Share))
+            return reply;
 
         _logger.LogInformation(
             "EnumerateSnapshots ENTER: user={User} share={Share} path=[{Path}]",
@@ -146,6 +148,9 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         ResolveVersionRequest request, ServerCallContext context)
     {
         var notFound = new ResolveVersionReply { Found = false };
+        if (!SambaName.IsValidContext(request.Username, request.Share))
+            return notFound;
+
         CancellationToken requestCancellation =
             context?.CancellationToken ?? CancellationToken.None;
 

@@ -134,6 +134,10 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
   JSON documents. The shell reconcilers independently require exact schemas,
   types, unique safe names, exact NT hashes, valid protocol ranges, and share
   paths canonically contained below `KAIMO_STORAGE_ROOT`/`KAIMO_STORAGE`.
+- **P2-01 exact connection context:** usernames and share names are stored as
+  exact owned strings instead of fixed arrays. Account/share creation, VFS,
+  `authd`, and every identity-bearing bridge RPC enforce the same 32-byte
+  username and 64-byte share-name constraints before any lookup or mutation.
   Validation finishes before any Samba/POSIX mutation.
 - **Proto contract:** [`protos/kaimo_smb_bridge.proto`](protos/kaimo_smb_bridge.proto) — defined once,
   generates C# (Bridge) and C++ stubs (authsync).

@@ -1,5 +1,6 @@
 using Grpc.Core;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services.File;
@@ -39,6 +40,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
 
     public override async Task<NotifyReply> NotifyClose(NotifyCloseRequest request, ServerCallContext context)
     {
+        if (!SambaName.IsValidContext(request.Username, request.Share)) return Fail();
         if (!TryParseEventId(request.EventId, out var eventId)) return Fail();
         if (!IsCaptureId(request.CaptureId)) return Fail();
         var (svc, user) = await ResolveAsync(
@@ -73,6 +75,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
 
     public override async Task<NotifyReply> NotifyMkdir(NotifyPathRequest request, ServerCallContext context)
     {
+        if (!SambaName.IsValidContext(request.Username, request.Share)) return Fail();
         if (!TryParseEventId(request.EventId, out var eventId)) return Fail();
         var (svc, user) = await ResolveAsync(
             request.Username, request.Share,
@@ -89,6 +92,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
 
     public override async Task<NotifyReply> NotifyDelete(NotifyPathRequest request, ServerCallContext context)
     {
+        if (!SambaName.IsValidContext(request.Username, request.Share)) return Fail();
         if (!TryParseEventId(request.EventId, out var eventId)) return Fail();
         var svc = await ResolveServiceAsync(
             request.Share,
@@ -108,6 +112,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
 
     public override async Task<NotifyReply> NotifyRename(NotifyRenameRequest request, ServerCallContext context)
     {
+        if (!SambaName.IsValidContext(request.Username, request.Share)) return Fail();
         if (!TryParseEventId(request.EventId, out var eventId)) return Fail();
         var svc = await ResolveServiceAsync(
             request.Share,

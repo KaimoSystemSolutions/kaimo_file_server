@@ -97,6 +97,9 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     public override async Task<AuthorizeReply> AuthorizeConnect(
         AuthorizeConnectRequest request, ServerCallContext context)
     {
+        if (!SambaName.IsValidContext(request.Username, request.Share))
+            return Deny("invalid user/share context");
+
         // Phase 5 cutover: the SMB on/off toggle. The old in-process SmbServer was
         // start/stopped by the host reconciler; smbd now runs in its own container.
         // Enforcing the flag here (deny every TREE_CONNECT when disabled) is what
@@ -131,6 +134,9 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     public override async Task<AuthorizeReply> AuthorizeOpen(
         AuthorizeOpenRequest request, ServerCallContext context)
     {
+        if (!SambaName.IsValidContext(request.Username, request.Share))
+            return Deny("invalid user/share context");
+
         var user = await _auth.ResolveUserContextAsync(request.Username);
         if (user is null)
             return Deny($"unknown user '{request.Username}'");
@@ -336,6 +342,9 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     public override async Task<AuthorizeReply> AuthorizeDelete(
         AuthorizeDeleteRequest request, ServerCallContext context)
     {
+        if (!SambaName.IsValidContext(request.Username, request.Share))
+            return Deny("invalid user/share context");
+
         var user = await _auth.ResolveUserContextAsync(request.Username);
         if (user is null)
             return Deny($"unknown user '{request.Username}'");
@@ -376,6 +385,9 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     public override async Task<AuthorizeReply> AuthorizeRename(
         AuthorizeRenameRequest request, ServerCallContext context)
     {
+        if (!SambaName.IsValidContext(request.Username, request.Share))
+            return Deny("invalid user/share context");
+
         var user = await _auth.ResolveUserContextAsync(request.Username);
         if (user is null)
             return Deny($"unknown user '{request.Username}'");

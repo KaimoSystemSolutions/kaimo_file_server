@@ -78,9 +78,9 @@ namespace Kaimo_File_Server.Core.Domain.Identity
             bool canChangePassword = true)
             : base(id, name)
         {
-            Username = !string.IsNullOrWhiteSpace(username)
-                ? username
-                : throw new ArgumentException("Username must not be empty.", nameof(username));
+            Kaimo_File_Server.Core.Helpers.SambaName.EnsureValidUsername(
+                username, nameof(username));
+            Username = username;
 
             PasswordHash = !string.IsNullOrWhiteSpace(passwordHash)
                 ? passwordHash

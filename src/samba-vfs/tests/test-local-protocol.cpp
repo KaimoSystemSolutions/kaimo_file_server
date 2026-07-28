@@ -41,6 +41,27 @@ static void test_binary_fields()
 	assert(kaimo_local_reader_finished(&reader));
 }
 
+static void test_identity_context_bounds()
+{
+	assert(kaimo_local_valid_username("a"));
+	assert(kaimo_local_valid_username(
+		"abcdefghijklmnopqrstuvwxyz123456"));
+	assert(!kaimo_local_valid_username(
+		"abcdefghijklmnopqrstuvwxyz1234567"));
+	assert(!kaimo_local_valid_username(".alice"));
+	assert(!kaimo_local_valid_username("alice\xC3\xA4"));
+	assert(!kaimo_local_valid_username("alice/name"));
+
+	assert(kaimo_local_valid_share("share"));
+	assert(kaimo_local_valid_share(
+		"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"));
+	assert(!kaimo_local_valid_share(
+		"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."));
+	assert(!kaimo_local_valid_share(".hidden"));
+	assert(!kaimo_local_valid_share("IPC$"));
+	assert(!kaimo_local_valid_share("share/name"));
+}
+
 static void test_fragmented_frame_read()
 {
 	int sockets[2];
@@ -183,6 +204,7 @@ static void test_absolute_send_deadline()
 int main()
 {
 	test_binary_fields();
+	test_identity_context_bounds();
 	test_fragmented_frame_read();
 	test_write_all_and_frame_bounds();
 	test_rejects_embedded_nul_and_trailing_fields();

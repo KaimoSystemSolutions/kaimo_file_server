@@ -30,6 +30,8 @@
 #define KAIMO_LOCAL_MAX_REQUEST_PAYLOAD 8192U
 #define KAIMO_LOCAL_MAX_RESPONSE_PAYLOAD 65536U
 #define KAIMO_LOCAL_MAX_STRING_BYTES 8191U
+#define KAIMO_LOCAL_MAX_USERNAME_BYTES 32U
+#define KAIMO_LOCAL_MAX_SHARE_BYTES 64U
 
 enum kaimo_local_operation {
 	KAIMO_LOCAL_OP_NONE = 0,
@@ -87,6 +89,81 @@ struct kaimo_local_reader {
 struct kaimo_local_deadline {
 	struct timespec expires_at;
 };
+
+static inline bool kaimo_local_ascii_alphanumeric(uint8_t value)
+{
+	return (value >= 'a' && value <= 'z') ||
+	       (value >= 'A' && value <= 'Z') ||
+	       (value >= '0' && value <= '9');
+}
+
+static inline bool kaimo_local_ascii_name_character(uint8_t value)
+{
+	return kaimo_local_ascii_alphanumeric(value) ||
+	       value == '.' || value == '_' || value == '-';
+}
+
+static inline bool kaimo_local_valid_username(const char *value)
+{
+	size_t length;
+	if (value == NULL)
+		return false;
+	length = strlen(value);
+	if (length == 0 || length > KAIMO_LOCAL_MAX_USERNAME_BYTES ||
+	    !kaimo_local_ascii_alphanumeric((uint8_t)value[0]))
+		return false;
+	for (size_t i = 0; i < length; ++i) {
+		if (!kaimo_local_ascii_name_character((uint8_t)value[i]))
+			return false;
+	}
+	return true;
+}
+
+static inline uint8_t kaimo_local_ascii_lower(uint8_t value)
+{
+	return value >= 'A' && value <= 'Z'
+		? (uint8_t)(value - 'A' + 'a')
+		: value;
+}
+
+static inline bool kaimo_local_ascii_equal_ci(const char *left,
+					       const char *right)
+{
+	size_t offset = 0;
+	while (left[offset] != '\0' && right[offset] != '\0') {
+		if (kaimo_local_ascii_lower((uint8_t)left[offset]) !=
+		    kaimo_local_ascii_lower((uint8_t)right[offset]))
+			return false;
+		++offset;
+	}
+	return left[offset] == right[offset];
+}
+
+static inline bool kaimo_local_reserved_share(const char *value)
+{
+	return kaimo_local_ascii_equal_ci(value, "global") ||
+	       kaimo_local_ascii_equal_ci(value, "homes") ||
+	       kaimo_local_ascii_equal_ci(value, "printers") ||
+	       kaimo_local_ascii_equal_ci(value, "print$") ||
+	       kaimo_local_ascii_equal_ci(value, "ipc$");
+}
+
+static inline bool kaimo_local_valid_share(const char *value)
+{
+	size_t length;
+	if (value == NULL)
+		return false;
+	length = strlen(value);
+	if (length == 0 || length > KAIMO_LOCAL_MAX_SHARE_BYTES ||
+	    value[0] == '.' || value[length - 1] == '.' ||
+	    kaimo_local_reserved_share(value))
+		return false;
+	for (size_t i = 0; i < length; ++i) {
+		if (!kaimo_local_ascii_name_character((uint8_t)value[i]))
+			return false;
+	}
+	return true;
+}
 
 static inline int kaimo_local_deadline_init(
 	struct kaimo_local_deadline *deadline, uint32_t timeout_ms)

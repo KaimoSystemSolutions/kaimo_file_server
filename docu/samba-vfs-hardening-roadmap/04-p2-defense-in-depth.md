@@ -6,9 +6,22 @@
 
 ### P2-01: User/share context strings are silently truncated
 
+> **Remediation status (2026-07-28): Verified in managed tests and the pinned
+> Samba 4.19.5 build-runtime image. Live long-name rejection remains part of
+> the release operation matrix.**
+
 The connection context stores user and share names in 128-byte arrays. The database username limit is character-based, so UTF-8 input can exceed 127 bytes. Silent truncation can cause denial, incorrect lookup, or prefix identity confusion.
 
 **Fix:** dynamically allocate exact strings and enforce protocol byte-length limits at account/share creation and bridge ingress.
+
+**Implemented fix:** the VFS connection context now owns exact heap copies of
+the authenticated Samba username and connected share, with complete cleanup on
+connect failure, handle destruction, and partial allocation failure. The common
+local protocol defines and tests the same 32-byte username and 64-byte share
+limits introduced by P1-18; both the VFS and `authd` reject invalid contexts
+before authorization or gRPC. The Core domain, share repository, administration
+UI, and Auth/Authz/Event/Snapshot bridge entry points independently enforce the
+same ASCII syntax, reserved-name rules, and byte limits.
 
 ### P2-02: Share-relative canonicalization is inconsistent
 

@@ -66,8 +66,8 @@
 
 /* Per-connection stored in VFS handle (set at TREE_CONNECT). */
 struct kaimo_conn_ctx {
-	char user[128];
-	char share[128];
+	char *user;
+	char *share;
 };
 
 struct kaimo_fsp_ext {
@@ -84,12 +84,21 @@ static uint32_t kaimo_snapshot_timeout_ms =
 	KAIMO_VFS_SNAPSHOT_TIMEOUT_MS_DEFAULT;
 static uint32_t kaimo_event_timeout_ms = KAIMO_VFS_EVENT_TIMEOUT_MS_DEFAULT;
 
+static void kaimo_conn_ctx_free(struct kaimo_conn_ctx *ctx)
+{
+	if (ctx == NULL)
+		return;
+	free(ctx->user);
+	free(ctx->share);
+	free(ctx);
+}
+
 static void kaimo_free_data(void **pptr)
 {
-	if (pptr != NULL && *pptr != NULL) {
-		free(*pptr);
-		*pptr = NULL;
-	}
+	if (pptr == NULL || *pptr == NULL)
+		return;
+	kaimo_conn_ctx_free((struct kaimo_conn_ctx *)*pptr);
+	*pptr = NULL;
 }
 
 static void kaimo_fsp_ext_destroy(void *p_data)
@@ -1101,6 +1110,14 @@ static int kaimo_connect(vfs_handle_struct *handle,
 	bool is_ipc = (service != NULL && strequal(service, "IPC$"));
 	struct kaimo_conn_ctx *ctx = NULL;
 
+	if (!is_ipc &&
+	    (!kaimo_local_valid_username(user) ||
+	     !kaimo_local_valid_share(service))) {
+		DBG_ERR("kaimo_bridge: CONNECT invalid user/share context denied\n");
+		errno = EACCES;
+		return -1;
+	}
+
 	if (!is_ipc && !kaimo_authz_connect(service, user)) {
 		DBG_ERR("kaimo_bridge: CONNECT DENIED share=[%s] user=[%s]\n",
 			service ? service : "(null)", user ? user : "(null)");
@@ -1127,19 +1144,26 @@ static int kaimo_connect(vfs_handle_struct *handle,
 			return -1;
 		}
 
-		strlcpy(ctx->user, user ? user : "", sizeof(ctx->user));
-		strlcpy(ctx->share, service ? service : "", sizeof(ctx->share));
+		ctx->user = strdup(user);
+		ctx->share = strdup(service);
+		if (ctx->user == NULL || ctx->share == NULL) {
+			DBG_ERR("kaimo_bridge: CONNECT string allocation failed\n");
+			kaimo_conn_ctx_free(ctx);
+			errno = ENOMEM;
+			return -1;
+		}
 	}
 
 	int ret = SMB_VFS_NEXT_CONNECT(handle, service, user);
 	if (ret < 0) {
-		free(ctx);
+		kaimo_conn_ctx_free(ctx);
 		return ret;
 	}
 
 	if (!is_ipc) {
 		SMB_VFS_HANDLE_SET_DATA(handle, ctx, kaimo_free_data,
-					struct kaimo_conn_ctx, { free(ctx); });
+					struct kaimo_conn_ctx,
+					{ kaimo_conn_ctx_free(ctx); });
 	}
 	return ret;
 }
