@@ -80,19 +80,19 @@ testparm -s 2>/dev/null | sed -n '1,40p' || true
 # so real Kaimo logins work immediately.
 echo "[entrypoint] Initial NT-Hash sync from bridge ..."
 for i in $(seq 1 30); do
-    if /usr/local/bin/sync-users.sh; then break; fi
+    if /usr/local/bin/run-sync.sh users /usr/local/bin/sync-users.sh; then break; fi
     sleep 2
 done
 
 # Then periodically follow up (new/changed users, without restart).
-( while true; do sleep 60; /usr/local/bin/sync-users.sh >/dev/null 2>&1 || true; done ) &
+( while true; do sleep 60; /usr/local/bin/run-sync.sh users /usr/local/bin/sync-users.sh >/dev/null 2>&1 || true; done ) &
 
 # --- Phase 4: Share provisioning from Kaimo DB into Samba registry (net conf) ---
 # Initially once with retries (until bridge is reachable), so shares
 # are ready at first client connect. Replaces SmbServer.SyncFromDb().
 echo "[entrypoint] Initial share sync from bridge ..."
 for i in $(seq 1 30); do
-    if /usr/local/bin/sync-shares.sh; then break; fi
+    if /usr/local/bin/run-sync.sh shares /usr/local/bin/sync-shares.sh; then break; fi
     sleep 2
 done
 
@@ -109,7 +109,7 @@ case "$SHARE_SYNC_INTERVAL_SECONDS" in
 esac
 ( while true; do
     sleep "$SHARE_SYNC_INTERVAL_SECONDS"
-    /usr/local/bin/sync-shares.sh >/dev/null 2>&1 || true
+    /usr/local/bin/run-sync.sh shares /usr/local/bin/sync-shares.sh >/dev/null 2>&1 || true
 done ) &
 
 # --- Phase 4: Protocol settings from Kaimo DB into Samba global registry ---
@@ -118,12 +118,12 @@ done ) &
 # SmbServer.LoadProtocolSettings().
 echo "[entrypoint] Initial protocol settings sync from bridge ..."
 for i in $(seq 1 30); do
-    if /usr/local/bin/sync-config.sh; then break; fi
+    if /usr/local/bin/run-sync.sh config /usr/local/bin/sync-config.sh; then break; fi
     sleep 2
 done
 
 # Then periodically follow up (web UI changes, reload only on change).
-( while true; do sleep 60; /usr/local/bin/sync-config.sh >/dev/null 2>&1 || true; done ) &
+( while true; do sleep 60; /usr/local/bin/run-sync.sh config /usr/local/bin/sync-config.sh >/dev/null 2>&1 || true; done ) &
 
 # --- Phase 2: Start authorization sidecar (Unix socket <-> gRPC) ---
 # The VFS module (connect hook) asks here "may <user> access <share>?".

@@ -153,6 +153,9 @@ services:
       # P1-10: maximum polling delay before a disabled/deleted share is removed
       # from Samba and all of its active tree connections are force-closed.
       KAIMO_SHARE_SYNC_INTERVAL_SECONDS: ${KAIMO_SHARE_SYNC_INTERVAL_SECONDS:-2}
+      # Health fails after any sync failure or when users/shares/config have not
+      # all converged within this window.
+      KAIMO_SYNC_HEALTH_MAX_AGE_SECONDS: ${KAIMO_SYNC_HEALTH_MAX_AGE_SECONDS:-180}
       # @GMT "Previous Versions" data-path redirect (openat hook). "1" = on (serve the
       # materialized version copy). Set to "0" to disable the redirect at runtime
       # (no rebuild) if it ever misbehaves; timewarp opens then fail closed.
@@ -164,7 +167,7 @@ services:
       - default
       - kaimo_smb_control
     healthcheck:
-      test: ["CMD-SHELL", "/opt/samba/bin/smbclient -L localhost -U kaimotest%Passw0rd! -m SMB3 >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "/usr/local/bin/sync-health.sh && /opt/samba/bin/smbclient -L localhost -U kaimotest%Passw0rd! -m SMB3 >/dev/null 2>&1 || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 6

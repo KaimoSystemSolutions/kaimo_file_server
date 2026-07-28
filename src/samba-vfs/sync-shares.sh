@@ -10,7 +10,8 @@
 #
 # Exit 0 only on successful retrieval from bridge (for retry loop in entrypoint).
 set -uo pipefail
-export PATH=/opt/samba/sbin:/opt/samba/bin:$PATH
+SAMBA_PATH_PREFIX="${KAIMO_SAMBA_PATH_PREFIX-/opt/samba/sbin:/opt/samba/bin}"
+[ -n "$SAMBA_PATH_PREFIX" ] && export PATH="$SAMBA_PATH_PREFIX:$PATH"
 CACHE_ROOT="$(readlink -m "${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}")"
 
 OUT="$(kaimo_sharesync 2>>/tmp/sharesync.err)"
@@ -43,7 +44,11 @@ while IFS=$'\t' read -r name path hidden; do
 done <<< "$OUT"
 
 # --- Current state: shares currently in registry (one per line) ---
-mapfile -t current < <(net conf listshares 2>/dev/null | sed '/^[[:space:]]*$/d')
+if ! current_output="$(net conf listshares 2>/dev/null)"; then
+    echo "[sync-shares] FAILED to enumerate registry shares." >&2
+    exit 1
+fi
+mapfile -t current < <(printf '%s\n' "$current_output" | sed '/^[[:space:]]*$/d')
 
 # Registry updates affect new TREE_CONNECTs, but an already connected client
 # keeps using the service instance (and therefore the old connect path) that
@@ -56,7 +61,8 @@ close_share_sessions() {
         if smbcontrol smbd close-share "$name" >/dev/null 2>&1; then
             echo "[sync-shares] disconnected existing sessions: $name"
         else
-            echo "[sync-shares] warning: could not disconnect existing sessions: $name" >&2
+            echo "[sync-shares] FAILED to disconnect existing sessions: $name" >&2
+            return 1
         fi
     fi
 }
@@ -73,11 +79,17 @@ if (( ${#current[@]} > 0 )); then
         [ -z "${name:-}" ] && continue
         [ "$name" = "global" ] && continue
         if [ -z "${want_path[$name]+x}" ]; then
-            if net conf delshare "$name" 2>/dev/null; then
-                close_share_sessions "$name"
-                echo "[sync-shares] removed: $name"
-                removed=$((removed + 1))
+            net conf delshare "$name" >/dev/null 2>&1 || {
+                echo "[sync-shares] FAILED to remove registry share: $name" >&2
+                exit 1
+            }
+            if net conf showshare "$name" >/dev/null 2>&1; then
+                echo "[sync-shares] FAILED to verify removal: $name" >&2
+                exit 1
             fi
+            close_share_sessions "$name" || exit 1
+            echo "[sync-shares] removed: $name"
+            removed=$((removed + 1))
         fi
     done
 fi
@@ -93,13 +105,22 @@ if (( ${#want_path[@]} > 0 )); then
         path_changed=0
 
         # Samba validates on addshare that the target directory exists.
-        mkdir -p "$path"
+        mkdir -p -- "$path" || {
+            echo "[sync-shares] FAILED to create share directory: $path" >&2
+            exit 1
+        }
         # Give new share directory to shared storage group + setgid + g+w,
         # so SMB users (group kaimo) and Web (uid $KAIMO_STORAGE_GID) can write
         # and new files inherit the group. Complements create/directory masks
         # in smb.conf.vfs. Idempotent (enforced at each sync).
-        chgrp "${KAIMO_STORAGE_GID:-1654}" "$path" 2>/dev/null || true
-        chmod 2775 "$path" 2>/dev/null || true
+        chgrp "${KAIMO_STORAGE_GID:-1654}" "$path" 2>/dev/null || {
+            echo "[sync-shares] FAILED to set share group: $path" >&2
+            exit 1
+        }
+        chmod 2775 "$path" 2>/dev/null || {
+            echo "[sync-shares] FAILED to set share mode: $path" >&2
+            exit 1
+        }
 
         # P1-12 immutable close captures live on the same filesystem as the
         # share so the VFS can use a reflink when supported. The namespace is
@@ -127,7 +148,10 @@ if (( ${#want_path[@]} > 0 )); then
             fi
             updated=$((updated + 1))
         else
-            net conf addshare "$name" "$path" writeable=y guest_ok=n "Kaimo Share" >/dev/null 2>&1
+            net conf addshare "$name" "$path" writeable=y guest_ok=n "Kaimo Share" >/dev/null 2>&1 || {
+                echo "[sync-shares] FAILED to create registry share: $name" >&2
+                exit 1
+            }
             echo "[sync-shares] created: $name -> $path (browseable=$browseable)"
             added=$((added + 1))
         fi
@@ -138,13 +162,34 @@ if (( ${#want_path[@]} > 0 )); then
         # shares are read-only (reading via SMB works, writing fails at
         # Samba level, before ACL). Hard access control stays at the
         # VFS connect/create_file hook; here only the share base disposition.
-        net conf setparm "$name" path         "$path"       >/dev/null 2>&1
-        net conf setparm "$name" "read only"  no            >/dev/null 2>&1
-        net conf setparm "$name" browseable   "$browseable" >/dev/null 2>&1
-        net conf setparm "$name" "guest ok"   no            >/dev/null 2>&1
+        for setting in \
+            "path"$'\t'"$path" \
+            "read only"$'\t'"no" \
+            "browseable"$'\t'"$browseable" \
+            "guest ok"$'\t'"no"; do
+            param="${setting%%$'\t'*}"
+            value="${setting#*$'\t'}"
+            net conf setparm "$name" "$param" "$value" >/dev/null 2>&1 || {
+                echo "[sync-shares] FAILED to set '$param' on '$name'." >&2
+                exit 1
+            }
+            actual="$(net conf getparm "$name" "$param" 2>/dev/null)" || {
+                echo "[sync-shares] FAILED to read back '$param' on '$name'." >&2
+                exit 1
+            }
+            if [ "$param" = "path" ]; then
+                [ "$(readlink -m "$actual")" = "$(readlink -m "$value")" ] || {
+                    echo "[sync-shares] FAILED verification for '$name/$param'." >&2
+                    exit 1
+                }
+            elif [ "$actual" != "$value" ]; then
+                echo "[sync-shares] FAILED verification for '$name/$param': '$actual' != '$value'." >&2
+                exit 1
+            fi
+        done
 
         if [ "$path_changed" = "1" ]; then
-            close_share_sessions "$name"
+            close_share_sessions "$name" || exit 1
             echo "[sync-shares] path changed: $name -> $path"
         fi
     done

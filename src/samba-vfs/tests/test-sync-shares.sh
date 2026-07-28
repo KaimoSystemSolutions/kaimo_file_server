@@ -15,6 +15,9 @@ trap 'rm -rf "$WORK"' EXIT
 export SHARE_STATE="$WORK/shares.tsv"
 export DESIRED_SHARES="$WORK/desired.tsv"
 export SMBCONTROL_LOG="$WORK/smbcontrol.log"
+export NET_FAIL_COMMAND=""
+export NET_FAIL_PARAMETER=""
+export KAIMO_SAMBA_PATH_PREFIX=""
 mkdir -p "$WORK/bin" "$WORK/pool01/stable" "$WORK/pool01/moved" "$WORK/pool01/removed"
 
 printf 'stable\t%s\nmoved\t%s\nremoved\t%s\n' \
@@ -43,24 +46,41 @@ case "$command" in
         grep -q "^${name}"$'\t' "$SHARE_STATE"
         ;;
     getparm)
-        [ "${4:-}" = "path" ] || exit 2
-        awk -F '\t' -v wanted="$name" '$1 == wanted { print $2; found=1 } END { exit !found }' "$SHARE_STATE"
+        parameter="${4:-}"
+        case "$parameter" in
+            path) column=2 ;;
+            "read only") column=3 ;;
+            browseable) column=4 ;;
+            "guest ok") column=5 ;;
+            *) exit 2 ;;
+        esac
+        awk -F '\t' -v wanted="$name" -v column="$column" \
+            '$1 == wanted { value=$column; if (value == "") value=(column == 4 ? "yes" : "no"); print value; found=1 } END { exit !found }' \
+            "$SHARE_STATE"
         ;;
     addshare)
+        [ "$NET_FAIL_COMMAND" != "addshare" ] || exit 9
         path="${4:-}"
-        printf '%s\t%s\n' "$name" "$path" >> "$SHARE_STATE"
+        printf '%s\t%s\tno\tyes\tno\n' "$name" "$path" >> "$SHARE_STATE"
         ;;
     setparm)
         parameter="${4:-}"
         value="${5:-}"
-        if [ "$parameter" = "path" ]; then
-            awk -F '\t' -v wanted="$name" -v path="$value" \
-                'BEGIN { OFS="\t" } $1 == wanted { $2=path } { print }' \
-                "$SHARE_STATE" > "$SHARE_STATE.tmp"
-            mv "$SHARE_STATE.tmp" "$SHARE_STATE"
-        fi
+        [ "$NET_FAIL_COMMAND" != "setparm" ] || [ "$NET_FAIL_PARAMETER" != "$parameter" ] || exit 9
+        case "$parameter" in
+            path) column=2 ;;
+            "read only") column=3 ;;
+            browseable) column=4 ;;
+            "guest ok") column=5 ;;
+            *) exit 2 ;;
+        esac
+        awk -F '\t' -v wanted="$name" -v column="$column" -v value="$value" \
+            'BEGIN { OFS="\t" } $1 == wanted { $column=value } { print }' \
+            "$SHARE_STATE" > "$SHARE_STATE.tmp"
+        mv "$SHARE_STATE.tmp" "$SHARE_STATE"
         ;;
     delshare)
+        [ "$NET_FAIL_COMMAND" != "delshare" ] || exit 9
         awk -F '\t' -v wanted="$name" '$1 != wanted' \
             "$SHARE_STATE" > "$SHARE_STATE.tmp"
         mv "$SHARE_STATE.tmp" "$SHARE_STATE"
@@ -79,6 +99,20 @@ EOF
 cat > "$WORK/bin/smbcontrol" <<'EOF'
 #!/bin/bash
 printf '%s\n' "$*" >> "$SMBCONTROL_LOG"
+EOF
+
+cat > "$WORK/bin/chgrp" <<'EOF'
+#!/bin/bash
+# The production script runs as root with the configured numeric storage GID.
+# This unit test only verifies that chgrp failures are no longer ignored.
+exit "${CHGRP_EXIT_CODE:-0}"
+EOF
+
+cat > "$WORK/bin/install" <<'EOF'
+#!/bin/bash
+target="${@: -1}"
+/bin/mkdir -p -- "$target"
+/bin/chmod 2770 "$target"
 EOF
 
 chmod +x "$WORK/bin"/*
@@ -124,8 +158,24 @@ if ! grep -q '^new-share'$'\t' "$SHARE_STATE"; then
     fail=1
 fi
 
+# Mutation failures must fail the run rather than producing a misleading
+# success summary.
+printf 'failing-share\t%s\t0\n' "$WORK/pool02/failing" >"$DESIRED_SHARES"
+export NET_FAIL_COMMAND=addshare
+if bash "$SUT" >/dev/null 2>&1; then
+    echo "FAIL: failed addshare mutation reported success."
+    fail=1
+fi
+export NET_FAIL_COMMAND=setparm
+export NET_FAIL_PARAMETER=browseable
+if bash "$SUT" >/dev/null 2>&1; then
+    echo "FAIL: failed setparm mutation reported success."
+    fail=1
+fi
+unset NET_FAIL_COMMAND NET_FAIL_PARAMETER
+
 if [ "$fail" = "0" ]; then
-    echo "PASS: changed/removed shares disconnect stale sessions; unchanged shares stay connected."
+    echo "PASS: share reconciliation verifies mutations and disconnects stale sessions."
     exit 0
 fi
 

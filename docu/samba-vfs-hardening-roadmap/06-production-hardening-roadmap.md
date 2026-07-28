@@ -73,9 +73,10 @@ and make disabled identities converge predictably.
    desired state. Deleted, disabled, or absent users lose passdb credentials
    and Kaimo group membership; their locked `nologin` POSIX identity and UID
    remain to preserve file ownership and permit safe reactivation.
-3. Make user/share/config synchronization fail on every unapplied mutation,
-   verify the resulting passdb/registry/config state, prevent concurrent runs,
-   and expose the last successful convergence.
+3. **Completed 2026-07-28:** user/share/config synchronization fails on
+   unapplied or unverifiable mutations, reads back passdb/registry/config
+   state, rejects concurrent component runs, and exposes last-success/failure
+   convergence through container health.
 4. Replace tab/newline synchronization records with a strictly validated
    structured format. Reject control characters, reserved names, invalid
    protocol values, and paths outside configured storage roots.

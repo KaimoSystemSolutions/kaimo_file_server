@@ -207,3 +207,59 @@ and broad storage/authd group membership therefore survived indefinitely.
 **Next planned finding:** P1-17 — make every user/share/config synchronization
 fail when a requested mutation was not applied, verify final state, and expose
 the last successful convergence.
+
+### 2026-07-28 — P1-17: Verified synchronization convergence
+
+**Status:** Implemented, regression-tested, and verified in the pinned Samba
+4.19.5 `build-runtime` image. Live bridge-driven failure/recovery transitions
+remain release validation.
+
+**Problem**
+
+The synchronization scripts could return zero after an unsuccessful registry
+or configuration mutation. A successful command exit also was not followed by
+state verification, concurrent share/config runs were possible, and container
+health did not expose the last successful convergence.
+
+**Solution implemented**
+
+1. User reconciliation re-enumerates `tdbsam` after import/revocation, verifies
+   every desired passdb identity and required group membership, and verifies
+   every stale managed credential is absent before publishing managed state.
+2. Share reconciliation fails on enumeration, directory ownership/mode,
+   close-capture setup, `addshare`, `delshare`, `setparm`, or required
+   `close-share` failure. It verifies removals and reads every desired share
+   parameter back, with canonical comparison for paths.
+3. Config reconciliation treats incomplete responses and failed mutations as
+   errors, reads every global setting back, and fails on unsuccessful config
+   reload, service-disable disconnect, audit safety fallback, or requested
+   WSDD transition.
+4. `run-sync.sh` uses a private per-component nonblocking `flock`, executes the
+   reconciler, and atomically publishes mode-0600 last-success/last-failure
+   timestamps below a private state directory.
+5. `sync-health.sh` rejects missing, stale, malformed, or superseded success
+   state. The Samba container health check now requires both fresh convergence
+   and the existing SMB probe. `KAIMO_SYNC_HEALTH_MAX_AGE_SECONDS` controls the
+   default 180-second freshness window.
+
+**Validation completed**
+
+- Standalone shell regressions pass for users, shares, config, runner locking,
+  failure/success publication, recovery, and stale-health detection.
+- Injected `pdbedit`, `net conf addshare`, `net conf setparm`, ignored
+  read-after-write, incomplete-response, and concurrent-run failures all
+  produce non-zero results.
+- The pinned Samba 4.19.5 `build-runtime` Docker target completed successfully
+  with all four synchronization regressions as required build layers.
+- Shell syntax checks and `git diff --check` pass.
+
+**Validation still required**
+
+- Exercise bridge outage and injected live mutation failures in the deployable
+  container and observe healthy → unhealthy → recovered transitions.
+- The existing credential-based SMB health probe remains scheduled for removal
+  under the later production-health finding.
+
+**Next planned finding:** P1-18 — replace tab/newline synchronization records
+with a strictly validated structured format and enforce names, hashes,
+protocols, and storage-root paths at the container boundary.

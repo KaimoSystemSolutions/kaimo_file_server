@@ -232,6 +232,36 @@ while IFS= read -r stale_user; do
     revoked=$((revoked + 1))
 done <"$PREVIOUS_MANAGED"
 
+# Read the passdb back after every mutation. A command returning zero is not
+# sufficient evidence that tdbsam reached the desired state.
+if ! pdbedit -L >"$PDBEDIT_LOG" 2>&1; then
+    echo "[sync-users] Cannot verify reconciled tdbsam users."
+    exit 1
+fi
+cut -d: -f1 "$PDBEDIT_LOG" | sort -u >"$LOCAL_PASSDB_USERS"
+while IFS= read -r desired_user; do
+    [ -z "$desired_user" ] && continue
+    if ! grep -Fqx -- "$desired_user" "$LOCAL_PASSDB_USERS"; then
+        echo "[sync-users] Verification failed: missing tdbsam user '$desired_user'."
+        exit 1
+    fi
+    for desired_group in "${KAIMO_STORAGE_GROUP:-kaimo}" "${KAIMO_AUTHD_GROUP:-kaimo-authd}"; do
+        if ! id -nG "$desired_user" 2>/dev/null | tr ' ' '\n' | grep -Fqx "$desired_group"; then
+            echo "[sync-users] Verification failed: '$desired_user' is not in '$desired_group'."
+            exit 1
+        fi
+    done
+done <"$DESIRED_USERS"
+while IFS= read -r stale_user; do
+    [ -z "$stale_user" ] && continue
+    is_unmanaged_user "$stale_user" && continue
+    grep -Fqx -- "$stale_user" "$DESIRED_USERS" && continue
+    if grep -Fqx -- "$stale_user" "$LOCAL_PASSDB_USERS"; then
+        echo "[sync-users] Verification failed: stale tdbsam user remains '$stale_user'."
+        exit 1
+    fi
+done <"$PREVIOUS_MANAGED"
+
 # Publish the new ownership boundary only after import and revocation complete.
 # A failed run therefore leaves the prior state available for an idempotent retry.
 publish_managed_state "$DESIRED_USERS" || {

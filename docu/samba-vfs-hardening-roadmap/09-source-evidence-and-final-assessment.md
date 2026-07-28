@@ -24,7 +24,7 @@
 | Rename duplicate destruction | `Infrastructure/Repositories/FileVersionRepository.cs:142-178` |
 | Private NT-hash import / original predictable temp file | `src/samba-vfs/sync-users.sh`; `src/samba-vfs/tests/test-sync-users.sh`; `src/samba-vfs/Dockerfile.vfs` |
 | Disabled/deleted user reconciliation | `src/samba-vfs/sync-users.sh` (managed state, stale passdb removal, group revocation, UID retention); `src/samba-vfs/tests/test-sync-users.sh`; `src/samba-vfs/Dockerfile.vfs` |
-| Sync error handling | `sync-users.sh`, `sync-shares.sh`, `sync-config.sh` |
+| Sync error handling and convergence health | `sync-users.sh`, `sync-shares.sh`, `sync-config.sh`, `run-sync.sh`, `sync-health.sh`; `entrypoint.vfs.sh`; `docker-compose.yml`; `tests/test-sync-users.sh`; `tests/test-sync-shares.sh`; `tests/test-sync-config.sh`; `tests/test-sync-runner.sh` |
 | Authenticated gRPC control plane / original h2c gap | `SmbBridge/Program.cs`; `SmbBridge/Security/*`; `AuthGrpcService.cs`; `bridge_channel.h` and native clients; `docker-compose.yml` |
 
 ## 16. Final assessment

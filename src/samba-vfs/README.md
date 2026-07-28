@@ -124,6 +124,12 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
   `KAIMO_UNMANAGED_SAMBA_USERS` list (default: `KAIMO_TEST_USER`, otherwise
   `kaimotest`). This blocks new logins but does not terminate an already
   authenticated SMB session.
+- **P1-17 verified convergence:** all user/share/config reconcilers fail on
+  unapplied mutations and read the resulting Samba state back before reporting
+  success. `/usr/local/bin/run-sync.sh` serializes each component and publishes
+  private last-success/last-failure timestamps; `sync-health.sh` makes missing,
+  failed, or stale convergence fail container health (180-second default,
+  configurable with `KAIMO_SYNC_HEALTH_MAX_AGE_SECONDS`).
 - **Proto contract:** [`protos/kaimo_smb_bridge.proto`](protos/kaimo_smb_bridge.proto) — defined once,
   generates C# (Bridge) and C++ stubs (authsync).
 - **P0-07 control-plane security:** the bridge accepts only client certificates

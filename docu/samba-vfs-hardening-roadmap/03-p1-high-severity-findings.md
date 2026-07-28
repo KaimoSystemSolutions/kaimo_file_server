@@ -324,6 +324,10 @@ later revocation-SLA decision.
 
 ### P1-17: Synchronization scripts can report success after failed mutations
 
+> **Remediation status (2026-07-28): Implemented, regression-tested, and
+> verified in the pinned Samba 4.19.5 build-runtime image. Live bridge-driven
+> convergence and health-transition verification remain release validation.**
+
 Examples include:
 
 - `pdbedit` failure followed by a success message and final exit 0.
@@ -331,6 +335,16 @@ Examples include:
 - `sync-config.sh` failing to apply a security setting without failing the sync.
 
 **Fix:** capture every command result, fail the reconciliation when desired state was not applied, verify the resulting registry/passdb state, and expose health/metrics based on last successful convergence.
+
+**Implemented fix:** user reconciliation reads `tdbsam` and group membership
+back before publishing its managed boundary. Share reconciliation checks every
+directory, registry, session-revocation, and parameter mutation, then reads
+each parameter back; config reconciliation similarly verifies every global
+parameter and treats failed reload, audit fallback, session close, or WSDD
+transition as failure. A common nonblocking runner serializes each component
+and atomically records last-success/last-failure timestamps in a private state
+directory. Container health now fails when a component never converged, failed
+after its last success, or exceeded the configurable convergence age.
 
 ### P1-18: Text synchronization output is not safely validated
 

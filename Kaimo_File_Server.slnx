@@ -12,8 +12,10 @@
     <File Path="src/samba-vfs/entrypoint.sh" />
     <File Path="src/samba-vfs/entrypoint.vfs.sh" />
     <File Path="src/samba-vfs/generate-control-plane-certs.sh" />
+    <File Path="src/samba-vfs/run-sync.sh" />
     <File Path="src/samba-vfs/selftest.sh" />
     <File Path="src/samba-vfs/sync-config.sh" />
+    <File Path="src/samba-vfs/sync-health.sh" />
     <File Path="src/samba-vfs/sync-shares.sh" />
     <File Path="src/samba-vfs/sync-users.sh" />
     <Folder Name="conf">
@@ -44,6 +46,9 @@
       <File Path="src/samba-vfs/tests/test-decision-cache.cpp" />
       <File Path="src/samba-vfs/tests/test-local-protocol.cpp" />
       <File Path="src/samba-vfs/tests/test-sync-users.sh" />
+      <File Path="src/samba-vfs/tests/test-sync-config.sh" />
+      <File Path="src/samba-vfs/tests/test-sync-runner.sh" />
+      <File Path="src/samba-vfs/tests/test-sync-shares.sh" />
       <File Path="src/samba-vfs/tests/test-vfs-connect-status.py" />
       <File Path="src/samba-vfs/tests/test-vfs-io-deadline.py" />
       <File Path="src/samba-vfs/tests/test-vfs-snapshot-readonly.py" />

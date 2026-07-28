@@ -12,7 +12,8 @@
 #
 # Exit 0 only on successful retrieval from bridge (for retry loop in entrypoint).
 set -uo pipefail
-export PATH=/opt/samba/sbin:/opt/samba/bin:$PATH
+SAMBA_PATH_PREFIX="${KAIMO_SAMBA_PATH_PREFIX-/opt/samba/sbin:/opt/samba/bin}"
+[ -n "$SAMBA_PATH_PREFIX" ] && export PATH="$SAMBA_PATH_PREFIX:$PATH"
 
 OUT="$(kaimo_configsync 2>>/tmp/configsync.err)"
 rc=$?
@@ -23,8 +24,8 @@ fi
 
 IFS=$'\t' read -r min_proto max_proto req_sign req_enc enabled wsdd_on audit_on <<< "$OUT"
 if [ -z "${min_proto:-}" ] || [ -z "${max_proto:-}" ]; then
-    echo "[sync-config] empty/incomplete response, skipped."
-    exit 0
+    echo "[sync-config] empty/incomplete response." >&2
+    exit 1
 fi
 
 # Phase 5: on/off state. The authoritative gate is the bridge's AuthorizeConnect
@@ -36,11 +37,18 @@ if [ "${enabled:-1}" = "0" ]; then
     echo "[sync-config] smb service: DISABLED (bridge denies all TREE_CONNECT)."
     if pidof smbd >/dev/null 2>&1; then
         # Close each registry share -> disconnects clients currently using it.
-        net conf listshares 2>/dev/null | while IFS= read -r _share; do
+        if ! share_output="$(net conf listshares 2>/dev/null)"; then
+            echo "[sync-config] cannot enumerate shares for service disable." >&2
+            exit 1
+        fi
+        while IFS= read -r _share; do
             [ -z "$_share" ] && continue
             [ "$_share" = "global" ] && continue
-            smbcontrol smbd close-share "$_share" >/dev/null 2>&1 || true
-        done
+            smbcontrol smbd close-share "$_share" >/dev/null 2>&1 || {
+                echo "[sync-config] cannot disconnect share '$_share'." >&2
+                exit 1
+            }
+        done <<<"$share_output"
         echo "[sync-config] disabled: forced existing sessions off all shares."
     fi
 else
@@ -55,20 +63,30 @@ changed=0
 # apply <param> <value>: sets a global registry parameter only if it differs
 # from current (net conf getparm gives error on unset -> curr empty).
 apply() {
-    local param="$1" value="$2" curr
+    local param="$1" value="$2" curr actual
     curr="$(net conf getparm global "$param" 2>/dev/null)"
     if [ "${curr:-}" != "$value" ]; then
-        if net conf setparm global "$param" "$value" >/dev/null 2>&1; then
-            echo "[sync-config] $param: '${curr:-<unset>}' -> '$value'"
-            changed=1
-        fi
+        net conf setparm global "$param" "$value" >/dev/null 2>&1 || {
+            echo "[sync-config] FAILED to set '$param'." >&2
+            return 1
+        }
+        echo "[sync-config] $param: '${curr:-<unset>}' -> '$value'"
+        changed=1
+    fi
+    actual="$(net conf getparm global "$param" 2>/dev/null)" || {
+        echo "[sync-config] FAILED to read back '$param'." >&2
+        return 1
+    }
+    if [ "$actual" != "$value" ]; then
+        echo "[sync-config] FAILED verification for '$param': '$actual' != '$value'." >&2
+        return 1
     fi
 }
 
-apply "server min protocol" "$min_proto"
-apply "server max protocol" "$max_proto"
-apply "server signing"      "$signing"
-apply "smb encrypt"         "$encrypt"
+apply "server min protocol" "$min_proto" || exit 1
+apply "server max protocol" "$max_proto" || exit 1
+apply "server signing"      "$signing" || exit 1
+apply "smb encrypt"         "$encrypt" || exit 1
 
 # --- Audit log (backlog #7): toggle the full_audit VFS module globally ---
 # The module stack is set inline in smb.conf.vfs (`vfs objects = kaimo_bridge`);
@@ -77,19 +95,19 @@ apply "smb encrypt"         "$encrypt"
 # are harmless when the module isn't loaded. `full_audit:syslog = no` routes events
 # through smbd's debug system (container stdout) instead of syslog.
 if [ "${audit_on:-0}" = "1" ]; then
-    apply "vfs objects"        "kaimo_bridge full_audit"
-    apply "full_audit:syslog"  "no"
-    apply "full_audit:priority" "NOTICE"
-    apply "full_audit:prefix"  "%u|%I|%S"
+    apply "vfs objects"        "kaimo_bridge full_audit" || exit 1
+    apply "full_audit:syslog"  "no" || exit 1
+    apply "full_audit:priority" "NOTICE" || exit 1
+    apply "full_audit:prefix"  "%u|%I|%S" || exit 1
     # IMPORTANT: these MUST be valid Samba VFS operation names, or full_audit
     # rejects the list and *fails every TREE_CONNECT* (incl. IPC$ -> no logins).
     # Samba 4.19 (ABI 49) uses the *at-based names: openat/renameat/unlinkat/mkdirat
     # (there is no legacy `open`/`rename`/`unlink`/`mkdir`/`rmdir` op). rmdir is done
     # via unlinkat(AT_REMOVEDIR), so it's covered by unlinkat.
-    apply "full_audit:success" "connect disconnect openat close renameat unlinkat mkdirat"
-    apply "full_audit:failure" "connect openat renameat unlinkat mkdirat"
+    apply "full_audit:success" "connect disconnect openat close renameat unlinkat mkdirat" || exit 1
+    apply "full_audit:failure" "connect openat renameat unlinkat mkdirat" || exit 1
 else
-    apply "vfs objects"        "kaimo_bridge"
+    apply "vfs objects"        "kaimo_bridge" || exit 1
 fi
 
 if [ "$changed" = "1" ]; then
@@ -97,7 +115,8 @@ if [ "$changed" = "1" ]; then
         if smbcontrol smbd reload-config >/dev/null 2>&1; then
             echo "[sync-config] smbd reload-config triggered."
         else
-            echo "[sync-config] reload-config failed (smbd not ready?)."
+            echo "[sync-config] reload-config failed." >&2
+            exit 1
         fi
     else
         echo "[sync-config] smbd not yet running - registry will be read at startup."
@@ -120,8 +139,11 @@ if [ "${audit_on:-0}" = "1" ] && [ "${enabled:-1}" = "1" ] && pidof smbd >/dev/n
         echo "[sync-config] audit self-test: ok."
     else
         echo "[sync-config] AUDIT SELF-TEST FAILED -> stripping full_audit to keep SMB usable."
-        net conf setparm global "vfs objects" "kaimo_bridge" >/dev/null 2>&1 || true
-        smbcontrol smbd reload-config >/dev/null 2>&1 || true
+        net conf setparm global "vfs objects" "kaimo_bridge" >/dev/null 2>&1 || \
+            echo "[sync-config] emergency audit rollback failed." >&2
+        smbcontrol smbd reload-config >/dev/null 2>&1 || \
+            echo "[sync-config] emergency reload failed." >&2
+        exit 1
     fi
 fi
 
@@ -134,26 +156,41 @@ manage_wsdd() {
     local bin
     bin="$(command -v wsdd 2>/dev/null || command -v wsdd.py 2>/dev/null || true)"
     if [ -z "$bin" ]; then
-        [ "$want" = "1" ] && echo "[sync-config] wsdd requested but not installed - skipping."
+        if [ "$want" = "1" ]; then
+            echo "[sync-config] wsdd requested but not installed." >&2
+            return 1
+        fi
         return 0
     fi
     if [ "$want" = "1" ]; then
         if ! pgrep -f "$bin" >/dev/null 2>&1; then
             "$bin" >/dev/null 2>&1 &
+            wsdd_pid=$!
+            if ! kill -0 "$wsdd_pid" >/dev/null 2>&1; then
+                echo "[sync-config] wsdd failed to start." >&2
+                return 1
+            fi
             echo "[sync-config] wsdd started."
         fi
     else
         if pgrep -f "$bin" >/dev/null 2>&1; then
-            pkill -f "$bin" >/dev/null 2>&1 || true
+            pkill -f "$bin" >/dev/null 2>&1 || {
+                echo "[sync-config] wsdd failed to stop." >&2
+                return 1
+            }
+            if pgrep -f "$bin" >/dev/null 2>&1; then
+                echo "[sync-config] wsdd remains active after stop." >&2
+                return 1
+            fi
             echo "[sync-config] wsdd stopped."
         fi
     fi
 }
 
 if [ "${enabled:-1}" = "1" ] && [ "${wsdd_on:-0}" = "1" ]; then
-    manage_wsdd 1
+    manage_wsdd 1 || exit 1
 else
-    manage_wsdd 0
+    manage_wsdd 0 || exit 1
 fi
 
 exit 0
