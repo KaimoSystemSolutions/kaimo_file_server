@@ -46,6 +46,16 @@ namespace Kaimo_File_Server.Infrastructure.Services
             return await svc.ReadVersionAsync(shareId, filePath, snapshotTimestampUtc);
         }
 
+        public async Task<Stream> ReadVersionAsync(
+            Guid shareId, string filePath, DateTime snapshotTimestampUtc,
+            CancellationToken cancellationToken)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
+            return await svc.ReadVersionAsync(
+                shareId, filePath, snapshotTimestampUtc, cancellationToken);
+        }
+
         public async Task<List<FileVersion>> GetVersionsAsync(Guid shareId, string filePath)
         {
             using var scope = _serviceProvider.CreateScope();
@@ -65,6 +75,16 @@ namespace Kaimo_File_Server.Infrastructure.Services
             using var scope = _serviceProvider.CreateScope();
             var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
             return await svc.GetFolderSnapshotAsync(shareId, folderPath, asOfUtc);
+        }
+
+        public async Task<List<FileVersion>> GetFolderSnapshotAsync(
+            Guid shareId, string folderPath, DateTime asOfUtc,
+            CancellationToken cancellationToken)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
+            return await svc.GetFolderSnapshotAsync(
+                shareId, folderPath, asOfUtc, cancellationToken);
         }
 
         public async Task<FileVersion?> GetVersionAtAsync(Guid shareId, string filePath, DateTime snapshotTimestampUtc)

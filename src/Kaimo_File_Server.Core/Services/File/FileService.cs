@@ -907,13 +907,38 @@ public class FileService : IFileService
         var normalized = ShareRelativePath.Normalize(folderPath);
         await EnsureAccessAsync(user, normalized, true, FilePermission.ListReadData);
 
-        var versions = await _versionService.GetFolderSnapshotAsync(_shareId, normalized, asOfUtc);
+        var versions = await _versionService.GetFolderSnapshotAsync(
+            _shareId, normalized, asOfUtc);
+        if (versions.Count == 0) return versions;
+
+        var readable = await FilterReadablePathsAsync(
+            versions.Select(v => (v.FilePath, false)).ToList(), user);
+
+        return versions.Where(v => readable.Contains(v.FilePath)).ToList();
+    }
+
+    public async Task<List<FileVersion>> GetFolderSnapshotAsync(
+        string folderPath, DateTime asOfUtc, UserContext user,
+        CancellationToken cancellationToken)
+    {
+        if (_versionService == null) return new List<FileVersion>();
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var normalized = ShareRelativePath.Normalize(folderPath);
+        await EnsureAccessAsync(
+                user, normalized, true, FilePermission.ListReadData)
+            .WaitAsync(cancellationToken);
+
+        var versions = await _versionService.GetFolderSnapshotAsync(
+            _shareId, normalized, asOfUtc, cancellationToken);
         if (versions.Count == 0) return versions;
 
         // Hide files the user may not read (per-file ACLs can differ from the folder).
         var readable = await FilterReadablePathsAsync(
-            versions.Select(v => (v.FilePath, false)).ToList(), user);
+                versions.Select(v => (v.FilePath, false)).ToList(), user)
+            .WaitAsync(cancellationToken);
 
+        cancellationToken.ThrowIfCancellationRequested();
         return versions.Where(v => readable.Contains(v.FilePath)).ToList();
     }
 }

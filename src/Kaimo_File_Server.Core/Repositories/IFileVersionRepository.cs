@@ -60,6 +60,12 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <param name="asOfUtc">The upper bound (inclusive) for the snapshot timestamp.</param>
         Task<List<FileVersion>> GetLatestVersionsUnderPrefixAsync(Guid shareId, string pathPrefix, DateTime asOfUtc);
 
+        Task<List<FileVersion>> GetLatestVersionsUnderPrefixAsync(
+            Guid shareId, string pathPrefix, DateTime asOfUtc,
+            CancellationToken cancellationToken) =>
+            GetLatestVersionsUnderPrefixAsync(shareId, pathPrefix, asOfUtc)
+                .WaitAsync(cancellationToken);
+
         /// <summary>
         /// Persists a new version entry.
         /// </summary>

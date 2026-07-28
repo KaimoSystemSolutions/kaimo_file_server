@@ -511,9 +511,23 @@ skips active tokens, including orphan-share cleanup.
 
 ### P1-09: Folder materialization is unbounded and ignores cancellation
 
+> **Remediation status (2026-07-28): Implemented and managed-tested. Native/live
+> SMB verification remains pending.**
+
 A single folder snapshot request may decompress every historical file under a prefix. The per-share cap is enforced later by the background sweeper, not before or during materialization. gRPC cancellation tokens are not propagated.
 
 **Fix:** request-level file/byte/time quotas, preflight capacity reservation, incremental/lazy materialization, cancellation propagation, concurrency limits, and cleanup of abandoned temporary output.
+
+**Implemented fix:** the bridge now preflights the ACL-filtered projection
+against configurable file and byte limits before changing cache content, then
+reserves one slot from a process-wide bounded concurrency gate. A linked
+request timer covers folder metadata lookup, ACL filtering, cache validation,
+decompression, hashing, copying, and publication. Cancellation is propagated
+through the EF query, file-version read/decompression, content verification,
+and asynchronous file I/O. The eager projection required by Samba's relative
+child opens remains, but it is streamed incrementally within strict bounds.
+Aborted requests remove same-directory temporary files and any final projection
+files newly created by that request.
 
 ### P1-10: Disabled shares remain valid in bridge authorization
 
@@ -921,10 +935,11 @@ corruption, cancellation, and resource pressure.
 2. **Completed in source 2026-07-28:** coordinate materialization, open,
    invalidation, and cleanup with keyed locks/leases. Cleanup must skip active
    projections. Pinned native/live SMB verification remains a release gate.
-3. Enforce request-level file, byte, time, and concurrency quotas before and
-   during folder materialization; remove abandoned output.
-4. Propagate gRPC cancellation through repository calls, ACL filtering,
-   decompression, copying, and materialization.
+3. **Completed 2026-07-28:** enforce request-level file, byte, time, and
+   concurrency quotas before and during folder materialization; remove
+   abandoned output.
+4. **Completed 2026-07-28:** propagate gRPC cancellation through repository
+   calls, ACL filtering, decompression, copying, and materialization.
 5. Harden snapshot response parsing with bounded counts, overflow checks,
    consistent framing, and explicit pagination or truncation behavior.
 6. Validate cache configuration at startup and use content identity rather than
@@ -1944,6 +1959,49 @@ Docker Desktop's engine was not running.
 
 **Next planned finding:** P1-09 — bound folder snapshot materialization and
 propagate cancellation.
+
+### 2026-07-28 — P1-09: Bounded, cancellation-aware folder materialization
+
+**Status:** Implemented and managed-tested; native/live SMB verification
+remains pending.
+
+**Solution implemented**
+
+1. Added a singleton `SnapshotMaterializationLimiter` with configurable
+   per-request file, byte, and duration limits plus a process-wide concurrency
+   semaphore.
+2. The complete ACL-filtered folder result is preflighted with checked byte
+   arithmetic before projection reconciliation or file creation.
+3. A linked request budget now covers repository lookup, ACL filtering,
+   existing-cache verification, lease acquisition, decompression, hashing,
+   copying, flushing, and publication.
+4. Cancellation tokens now reach the EF Core folder query and the
+   file-version decompression/copy path; hash validation and all asynchronous
+   cache I/O are cancellation-aware.
+5. Cancellation is no longer swallowed by per-file resilience handling.
+   Same-directory temporary files and final files newly created by an
+   abandoned folder request are removed before its exclusive lease is
+   released.
+6. Compose exposes production overrides while retaining conservative defaults:
+   10,000 files, 1 GiB, two concurrent requests, and 25 seconds.
+
+**Validation completed**
+
+- Focused snapshot service suite: 15 passed, 0 failed, 0 skipped.
+- Full managed solution suite: 544 passed, 0 failed, 0 skipped.
+- New tests cover file-count rejection, byte-count rejection, concurrency
+  saturation cancellation, deadline cancellation, and abandoned-output
+  cleanup.
+
+**Validation still required**
+
+- Run the folder browse/copy regression through live Samba with deliberately
+  over-limit projections and a bridge-side timeout.
+- Confirm operational limits against representative production folder sizes
+  and storage throughput.
+
+**Next planned finding:** P1-10 — reject disabled shares consistently and
+define active-handle revocation semantics.
 
 ## 15. Source evidence index
 

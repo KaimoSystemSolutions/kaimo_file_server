@@ -46,6 +46,7 @@ builder.Services.AddGrpc(options =>
 // (<cache-root>/<share-id>) so it cannot grow without limit. Evicts by age
 // (Snapshots:Cache:TtlHours) and per-share size cap (Snapshots:Cache:MaxBytesPerShare).
 builder.Services.AddSingleton<SnapshotCacheLeaseManager>();
+builder.Services.AddSingleton<SnapshotMaterializationLimiter>();
 builder.Services.AddHostedService<SnapshotCacheCleanupService>();
 
 // The bridge is reachable only on its dedicated Compose control network, and

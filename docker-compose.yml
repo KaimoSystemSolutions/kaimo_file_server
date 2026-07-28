@@ -62,6 +62,12 @@ services:
       # Global internal cache, outside every configured share path.
       # Must match KAIMO_SNAPSHOT_CACHE_ROOT in the Samba container.
       Snapshots__Cache__RootPath: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}
+      # P1-09: preflight and runtime bounds for eager folder projections.
+      # Keep the duration below KAIMO_VFS_SNAPSHOT_TIMEOUT_MS.
+      Snapshots__Materialization__MaxFilesPerRequest: ${KAIMO_SNAPSHOT_MAX_FILES:-10000}
+      Snapshots__Materialization__MaxBytesPerRequest: ${KAIMO_SNAPSHOT_MAX_REQUEST_BYTES:-1073741824}
+      Snapshots__Materialization__MaxConcurrentRequests: ${KAIMO_SNAPSHOT_MAX_CONCURRENT_REQUESTS:-2}
+      Snapshots__Materialization__MaxDurationSeconds: ${KAIMO_SNAPSHOT_MAX_DURATION_SECONDS:-25}
     volumes:
       - *vol-storage-pool-01
       #- *vol-storage-pool-02

@@ -36,6 +36,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
     private readonly IFileVersionService _versions;
     private readonly IFileServiceFactory _fileServices;
     private readonly SnapshotCacheLeaseManager _leases;
+    private readonly SnapshotMaterializationLimiter _materializationLimiter;
     private readonly ILogger<SnapshotGrpcService> _logger;
     private readonly string _cacheRoot;
 
@@ -46,6 +47,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         IFileVersionService versions,
         IFileServiceFactory fileServices,
         SnapshotCacheLeaseManager leases,
+        SnapshotMaterializationLimiter materializationLimiter,
         IConfiguration configuration,
         ILogger<SnapshotGrpcService> logger)
     {
@@ -55,6 +57,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         _versions = versions;
         _fileServices = fileServices;
         _leases = leases;
+        _materializationLimiter = materializationLimiter;
         _cacheRoot = SnapshotCache.ConfiguredRoot(configuration);
         _logger = logger;
     }
@@ -142,6 +145,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         ResolveVersionRequest request, ServerCallContext context)
     {
         var notFound = new ResolveVersionReply { Found = false };
+        CancellationToken requestCancellation =
+            context?.CancellationToken ?? CancellationToken.None;
 
         // Diagnostic: prove whether the VFS module reaches the bridge for a file open,
         // and with what path/token. (Temporary high-visibility trace for @GMT debugging.)
@@ -149,8 +154,10 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             "ResolveVersion ENTER: user={User} share={Share} path=[{Path}] token={Token}",
             request.Username, request.Share, request.Path, request.GmtToken);
 
-        var user = await _auth.ResolveUserContextAsync(request.Username);
-        var share = await _shares.GetByNameAsync(request.Share);
+        var user = await _auth.ResolveUserContextAsync(request.Username)
+            .WaitAsync(requestCancellation);
+        var share = await _shares.GetByNameAsync(request.Share)
+            .WaitAsync(requestCancellation);
         if (user is null || share is null)
         {
             _logger.LogWarning(
@@ -184,7 +191,9 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             return notFound;
         }
 
-        var version = await _versions.GetVersionAtAsync(share.Id, normalized, ts.Value);
+        var version = await _versions
+            .GetVersionAtAsync(share.Id, normalized, ts.Value)
+            .WaitAsync(requestCancellation);
 
         // Point-in-time resolution (the actual @GMT "restore/open" fix). Folder
         // "Previous Versions" enumerates ONE share-wide timestamp per snapshot (the
@@ -197,7 +206,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         // listing uses, so the token consistently maps to the right version.
         if (version is null && normalized.Length > 0)
         {
-            var fileVersions = await _versions.GetVersionsAsync(share.Id, normalized);
+            var fileVersions = await _versions.GetVersionsAsync(share.Id, normalized)
+                .WaitAsync(requestCancellation);
             version = fileVersions
                 .Where(v => v.SnapshotTimestampUtc <= ts.Value)
                 .OrderByDescending(v => v.SnapshotTimestampUtc)
@@ -219,19 +229,36 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         if (version is null)
         {
             List<FileVersion> under;
+            using CancellationTokenSource folderBudget =
+                _materializationLimiter.CreateRequestBudget(
+                    requestCancellation);
+            CancellationToken folderCancellation = folderBudget.Token;
             try
             {
                 // P0-05: use the central ACL-aware path. It checks the requested
                 // directory with isDirectory=true and batch-filters every child.
                 under = await _fileServices
                     .CreateForShare(share.Id, share.Path)
-                    .GetFolderSnapshotAsync(normalized, ts.Value, user);
+                    .GetFolderSnapshotAsync(
+                        normalized, ts.Value, user, folderCancellation);
             }
             catch (UnauthorizedAccessException)
             {
                 _logger.LogInformation(
                     "ResolveVersion DENY directory: user={User} share={Share} path=[{Path}]",
                     request.Username, request.Share, request.Path);
+                return notFound;
+            }
+            catch (OperationCanceledException)
+                when (requestCancellation.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogWarning(ex,
+                    "ResolveVersion: folder snapshot lookup cancelled or timed out share={Share} path=[{Path}] token={Token}",
+                    request.Share, request.Path, request.GmtToken);
                 return notFound;
             }
 
@@ -249,6 +276,12 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                 string folderLeaseId;
                 try
                 {
+                    using SnapshotMaterializationLimiter.Reservation reservation =
+                        await _materializationLimiter.ReserveAsync(
+                            under, folderCancellation);
+                    CancellationToken materializationCancellation =
+                        reservation.CancellationToken;
+
                     string? existingLeaseId =
                         await _leases.TryAcquireExistingHandoffAsync(
                             _cacheRoot, share.Id, request.GmtToken,
@@ -256,7 +289,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                                 await HasExpectedProjectionAsync(
                                     scopeFull, dirFull, under,
                                     cancellationToken),
-                            context?.CancellationToken ?? default);
+                            materializationCancellation);
                     if (existingLeaseId is not null)
                     {
                         _logger.LogInformation(
@@ -275,14 +308,15 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                         materializationLease =
                         await _leases.AcquireMaterializationAsync(
                             _cacheRoot, share.Id, request.GmtToken,
-                            context?.CancellationToken ?? default);
+                            materializationCancellation);
+                    materializationCancellation.ThrowIfCancellationRequested();
                     SnapshotCache.EnsureDirectory(dirFull);
                     // A user's projection may contain files materialized before an
                     // ACL revocation. Remove everything below this directory that
                     // is not in the freshly filtered snapshot before returning it.
                     ReconcileUserProjection(
                         _cacheRoot, share.Id, request.GmtToken, cacheScope,
-                        normalized, under);
+                        normalized, under, materializationCancellation);
                     // Stamp the cache-age marker so the evictor keys off the real
                     // materialization time, not the historical file mtimes.
                     SnapshotCache.TouchMarker(
@@ -295,23 +329,63 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                     // gave us each file's state as of the snapshot; write them all now with
                     // their historical mtimes so browsing AND opening work natively.
                     // Per-file resilience: one unreadable version must not sink the folder.
-                    foreach (var fv in under)
+                    var createdFiles = new List<string>();
+                    try
                     {
-                        try
+                        foreach (var fv in under)
                         {
-                            await MaterializeVersionAsync(
-                                share.Id, request.GmtToken,
-                                cacheScope, fv);
+                            materializationCancellation.ThrowIfCancellationRequested();
+                            string destination = ProjectionPath(
+                                share.Id, request.GmtToken, cacheScope, fv);
+                            bool existed = File.Exists(destination);
+                            try
+                            {
+                                await MaterializeVersionAsync(
+                                    share.Id, request.GmtToken,
+                                    cacheScope, fv,
+                                    materializationCancellation);
+                                if (!existed)
+                                    createdFiles.Add(destination);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex,
+                                    "ResolveVersion: skipping file [{File}] in dir snapshot", fv.FilePath);
+                            }
                         }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex,
-                                "ResolveVersion: skipping file [{File}] in dir snapshot", fv.FilePath);
-                        }
+                        materializationCancellation.ThrowIfCancellationRequested();
+                    }
+                    catch
+                    {
+                        CleanupAbandonedProjection(createdFiles);
+                        throw;
                     }
                     try { Directory.SetLastWriteTimeUtc(dirFull, ts.Value); }
                     catch (Exception ex) { _logger.LogWarning(ex, "SetLastWriteTimeUtc (dir) failed for {Dir} (non-fatal)", dirFull); }
                     folderLeaseId = materializationLease.PublishHandoff();
+                }
+                catch (SnapshotMaterializationLimitException ex)
+                {
+                    _logger.LogWarning(ex,
+                        "ResolveVersion: folder snapshot exceeds materialization quota share={Share} path=[{Path}] token={Token}",
+                        request.Share, request.Path, request.GmtToken);
+                    return notFound;
+                }
+                catch (OperationCanceledException)
+                    when (requestCancellation.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (OperationCanceledException ex)
+                {
+                    _logger.LogWarning(ex,
+                        "ResolveVersion: folder snapshot cancelled or timed out share={Share} path=[{Path}] token={Token}",
+                        request.Share, request.Path, request.GmtToken);
+                    return notFound;
                 }
                 catch (Exception ex)
                 {
@@ -341,7 +415,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         // Reading a concrete version is a file read, never a directory check.
         if (!await _acl.HasAccessAsync(
                 user, share.Id, normalized, false,
-                FilePermission.ListReadData))
+                FilePermission.ListReadData).WaitAsync(requestCancellation))
         {
             _logger.LogInformation(
                 "ResolveVersion DENY file: user={User} share={Share} path=[{Path}]",
@@ -373,9 +447,9 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                         cancellationToken.ThrowIfCancellationRequested();
                         return await HasExpectedContentAsync(
                             existingCacheFull, version.Size,
-                            version.ContentHash);
+                            version.ContentHash, cancellationToken);
                     },
-                    context?.CancellationToken ?? default);
+                    requestCancellation);
             if (existingLeaseId is not null)
             {
                 _logger.LogInformation(
@@ -394,13 +468,19 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                 materializationLease =
                 await _leases.AcquireMaterializationAsync(
                     _cacheRoot, share.Id, request.GmtToken,
-                    context?.CancellationToken ?? default);
+                    requestCancellation);
             cacheRel = await MaterializeVersionAsync(
-                share.Id, request.GmtToken, cacheScope, version);
+                share.Id, request.GmtToken, cacheScope, version,
+                requestCancellation);
             // Stamp the cache-age marker (real materialization time) for the evictor.
             SnapshotCache.TouchMarker(
                 _cacheRoot, share.Id, request.GmtToken);
             leaseId = materializationLease.PublishHandoff();
+        }
+        catch (OperationCanceledException)
+            when (requestCancellation.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -455,7 +535,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
     /// </summary>
     private async Task<string> MaterializeVersionAsync(
         Guid shareId, string gmtToken,
-        string cacheScope, FileVersion v)
+        string cacheScope, FileVersion v,
+        CancellationToken cancellationToken)
     {
         if (!ShareRelativePath.IsValid(v.FilePath) ||
             ShareRelativePath.Normalize(v.FilePath).Length == 0)
@@ -470,7 +551,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
 
         ValidateVersionContentMetadata(v);
         bool reusable = await HasExpectedContentAsync(
-            full, v.Size, v.ContentHash);
+            full, v.Size, v.ContentHash, cancellationToken);
         if (!reusable)
         {
             SnapshotCache.EnsureDirectory(Path.GetDirectoryName(full)!);
@@ -478,9 +559,11 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             try
             {
                 await using var content = await _versions.ReadVersionAsync(
-                    shareId, v.FilePath, v.SnapshotTimestampUtc);
+                    shareId, v.FilePath, v.SnapshotTimestampUtc,
+                    cancellationToken);
                 await WriteVerifiedTemporaryFileAsync(
-                    content, temporary, v.Size, v.ContentHash);
+                    content, temporary, v.Size, v.ContentHash,
+                    cancellationToken);
 
                 SnapshotCache.SetReadOnlyProjectionMode(temporary);
                 File.SetLastWriteTimeUtc(temporary, v.SnapshotTimestampUtc);
@@ -535,7 +618,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
     }
 
     private static async Task<bool> HasExpectedContentAsync(
-        string path, long expectedLength, string expectedHash)
+        string path, long expectedLength, string expectedHash,
+        CancellationToken cancellationToken)
     {
         var existing = new FileInfo(path);
         if (!existing.Exists || existing.Length != expectedLength)
@@ -545,7 +629,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             path, FileMode.Open, FileAccess.Read, FileShare.Read,
             bufferSize: 81920, useAsync: true);
         string actualHash = Convert.ToHexString(
-            await SHA256.HashDataAsync(stream));
+            await SHA256.HashDataAsync(stream, cancellationToken));
         return string.Equals(
             actualHash, expectedHash, StringComparison.OrdinalIgnoreCase);
     }
@@ -597,7 +681,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!await HasExpectedContentAsync(
-                    path, version.Size, version.ContentHash))
+                    path, version.Size, version.ContentHash,
+                    cancellationToken))
                 return false;
         }
         return true;
@@ -607,7 +692,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         Stream content,
         string temporaryPath,
         long expectedLength,
-        string expectedHash)
+        string expectedHash,
+        CancellationToken cancellationToken)
     {
         await using var output = new FileStream(
             temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
@@ -619,14 +705,16 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
 
         while (true)
         {
-            int read = await content.ReadAsync(buffer);
+            int read = await content.ReadAsync(
+                buffer.AsMemory(), cancellationToken);
             if (read == 0)
                 break;
             if (written > expectedLength - read)
                 throw new InvalidDataException(
                     "Version content exceeds its declared size.");
 
-            await output.WriteAsync(buffer.AsMemory(0, read));
+            await output.WriteAsync(
+                buffer.AsMemory(0, read), cancellationToken);
             hash.AppendData(buffer, 0, read);
             written += read;
         }
@@ -641,7 +729,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             throw new InvalidDataException(
                 "Version content does not match its declared SHA-256 hash.");
 
-        await output.FlushAsync();
+        await output.FlushAsync(cancellationToken);
         output.Flush(flushToDisk: true);
     }
 
@@ -651,7 +739,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         string gmtToken,
         string cacheScope,
         string folderPath,
-        IReadOnlyCollection<FileVersion> readableVersions)
+        IReadOnlyCollection<FileVersion> readableVersions,
+        CancellationToken cancellationToken)
     {
         string scopeRoot = SnapshotCache.EnsureUserScope(
             cacheRoot, shareId, gmtToken, cacheScope);
@@ -674,6 +763,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         foreach (string file in Directory.EnumerateFiles(
                      folderFull, "*", SearchOption.AllDirectories))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!allowed.Contains(Path.GetFullPath(file)))
                 File.Delete(file);
         }
@@ -684,8 +774,48 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                      folderFull, "*", SearchOption.AllDirectories)
                  .OrderByDescending(path => path.Length))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!Directory.EnumerateFileSystemEntries(directory).Any())
                 Directory.Delete(directory);
+        }
+    }
+
+    private string ProjectionPath(
+        Guid shareId, string gmtToken, string cacheScope, FileVersion version)
+    {
+        string scopeRoot = SnapshotCache.EnsureUserScope(
+            _cacheRoot, shareId, gmtToken, cacheScope);
+        return GetScopedCachePath(scopeRoot, version.FilePath);
+    }
+
+    private void CleanupAbandonedProjection(IEnumerable<string> createdFiles)
+    {
+        foreach (string path in createdFiles.Reverse())
+        {
+            try
+            {
+                File.Delete(path);
+                string? directory = Path.GetDirectoryName(path);
+                while (directory is not null &&
+                       !string.Equals(
+                           Path.GetFullPath(directory),
+                           Path.GetFullPath(_cacheRoot),
+                           OperatingSystem.IsWindows()
+                               ? StringComparison.OrdinalIgnoreCase
+                               : StringComparison.Ordinal) &&
+                       Directory.Exists(directory) &&
+                       !Directory.EnumerateFileSystemEntries(directory).Any())
+                {
+                    Directory.Delete(directory);
+                    directory = Path.GetDirectoryName(directory);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Failed to remove abandoned snapshot projection file {Path}",
+                    path);
+            }
         }
     }
 

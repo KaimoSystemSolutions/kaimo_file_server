@@ -474,14 +474,14 @@ module does it via the bridge instead:
                 SmbBridge (.NET)                            SmbBridge (.NET)
                 GetSnapshotTimestamps/GetVersions           GetVersionAt + ReadVersion
                                                             → ACL-filter + materialize into
-                                                              /data/storage/.kaimo-snapshots/<share-id>/@GMT-…/<user-id>/
+                                                              /data/kaimo-system/.kaimo-snapshots/<share-id>/@GMT-…/<user-id>/
    labels (@GMT tokens)                        base_name rewritten to that copy → native read
 ```
 
 - **Enumeration** (`get_shadow_copy_data_fn`) returns the `@GMT-` labels for the
   file. **Resolution**: a timewarp open/stat (`smb_fname->twrp`) is turned into an
   `@GMT-` token, the bridge materializes that one version **decompressed** into the
-  global internal cache (`/data/storage/.kaimo-snapshots/<share-id>/@GMT-…/<user-id>/<relpath>`)
+  global internal cache (`/data/kaimo-system/.kaimo-snapshots/<share-id>/@GMT-…/<user-id>/<relpath>`)
   outside every Samba connectpath. The bridge returns only a cache-root-relative
   path; the VFS validates all components and joins its independently configured
   absolute root before redirecting the open.
@@ -494,6 +494,16 @@ module does it via the bridge instead:
   overlaps a share; `sync-shares.sh` also refuses to publish an overlapping share.
   The legacy top-level `.kaimo-snapshots` name remains denied in client-facing VFS
   path hooks while the cleanup service removes recognizable old cache trees.
+- **Bounded folder materialization:** before any projection mutation, the bridge
+  reserves one process-wide concurrency slot and validates the ACL-filtered
+  snapshot against configurable file and byte limits. A strict request timer
+  covers metadata lookup, ACL filtering, cache validation, decompression, hashing,
+  and publication. Cancellation removes newly created projection files and every
+  same-directory temporary file. Compose exposes
+  `KAIMO_SNAPSHOT_MAX_FILES`, `KAIMO_SNAPSHOT_MAX_REQUEST_BYTES`,
+  `KAIMO_SNAPSHOT_MAX_CONCURRENT_REQUESTS`, and
+  `KAIMO_SNAPSHOT_MAX_DURATION_SECONDS`; defaults are 10,000 files, 1 GiB,
+  two concurrent requests, and 25 seconds.
 - **.NET:** [`SnapshotGrpcService`](../src/Kaimo_File_Server.SmbBridge/Services/SnapshotGrpcService.cs)
   — thin facade over the already-complete `IFileVersionService`.
 - **C/C++:** `get_shadow_copy_data_fn` + `stat`/`lstat` + `create_file` twrp branch

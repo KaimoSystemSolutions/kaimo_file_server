@@ -129,5 +129,11 @@ namespace Kaimo_File_Server.Core.Services.File
         /// Requires list access on the folder.
         /// </summary>
         Task<List<FileVersion>> GetFolderSnapshotAsync(string folderPath, DateTime asOfUtc, UserContext user);
+
+        Task<List<FileVersion>> GetFolderSnapshotAsync(
+            string folderPath, DateTime asOfUtc, UserContext user,
+            CancellationToken cancellationToken) =>
+            GetFolderSnapshotAsync(folderPath, asOfUtc, user)
+                .WaitAsync(cancellationToken);
     }
 }

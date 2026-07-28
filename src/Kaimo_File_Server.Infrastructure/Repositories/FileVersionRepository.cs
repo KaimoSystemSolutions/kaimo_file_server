@@ -58,6 +58,12 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
 
         public async Task<List<FileVersion>> GetLatestVersionsUnderPrefixAsync(
             Guid shareId, string pathPrefix, DateTime asOfUtc)
+            => await GetLatestVersionsUnderPrefixAsync(
+                shareId, pathPrefix, asOfUtc, CancellationToken.None);
+
+        public async Task<List<FileVersion>> GetLatestVersionsUnderPrefixAsync(
+            Guid shareId, string pathPrefix, DateTime asOfUtc,
+            CancellationToken cancellationToken)
         {
             var query = _db.Set<FileVersion>()
                 .Where(v => v.ShareId == shareId && v.SnapshotTimestampUtc <= asOfUtc);
@@ -67,7 +73,7 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
 
             // Retention caps versions per file, so the candidate set stays small.
             // Group in memory to pick the newest snapshot at-or-before the cutoff.
-            var candidates = await query.ToListAsync();
+            var candidates = await query.ToListAsync(cancellationToken);
 
             return candidates
                 .GroupBy(v => v.FilePath)
