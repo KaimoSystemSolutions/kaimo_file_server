@@ -274,14 +274,18 @@ public class FileVersionService : IFileVersionService
         return removed.Count;
     }
 
-    public async Task RenamePathAsync(Guid shareId, string oldPath, string newPath)
+    public async Task RenamePathAsync(
+        Guid shareId,
+        string oldPath,
+        string newPath,
+        Guid? sambaLifecycleEventId = null)
     {
         var oldNormalized = ShareRelativePath.Normalize(oldPath);
         var newNormalized = ShareRelativePath.Normalize(newPath);
         if (string.Equals(oldNormalized, newNormalized, StringComparison.Ordinal)) return;
 
         var displaced = await _versionRepo.RenamePathAsync(
-            shareId, oldNormalized, newNormalized);
+            shareId, oldNormalized, newNormalized, sambaLifecycleEventId);
         await DeleteUnreferencedBlobsAsync(displaced);
     }
 

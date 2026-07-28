@@ -86,7 +86,11 @@ namespace Kaimo_File_Server.Core.Services.File
         Task<int> ApplyRetentionAsync(Guid shareId, string filePath, int? maxVersions = null, TimeSpan? maxAge = null);
 
         /// <summary>Moves a file or directory's complete version history to a new path.</summary>
-        Task RenamePathAsync(Guid shareId, string oldPath, string newPath);
+        Task RenamePathAsync(
+            Guid shareId,
+            string oldPath,
+            string newPath,
+            Guid? sambaLifecycleEventId = null);
 
         /// <summary>Deletes all versions at a file/directory path and reclaims unused blobs.</summary>
         Task<int> DeletePathAsync(Guid shareId, string path);

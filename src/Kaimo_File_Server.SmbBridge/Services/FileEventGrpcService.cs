@@ -117,7 +117,8 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
         if (!await ProcessOnceAsync(
                 eventId, "rename",
                 () => svc.NotifyExternalRenameAsync(
-                    request.OldPath, request.NewPath, request.IsDirectory),
+                    request.OldPath, request.NewPath, request.IsDirectory,
+                    eventId),
                 context?.CancellationToken ?? CancellationToken.None))
             return Fail();
         _logger.LogInformation("NotifyRename: share={Share} [{Old}] -> [{New}] dir={Dir}",

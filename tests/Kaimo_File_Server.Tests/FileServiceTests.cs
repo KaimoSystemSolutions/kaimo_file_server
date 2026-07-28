@@ -426,7 +426,7 @@ public class FileServiceTests
         _aclMock.Verify(a => a.RenameAclPathAsync(
             _shareId, "doc.txt", ".RECYCLE_BIN/doc_20260719.txt"), Times.Once);
         versions.Verify(v => v.RenamePathAsync(
-            _shareId, "doc.txt", ".RECYCLE_BIN/doc_20260719.txt"), Times.Once);
+            _shareId, "doc.txt", ".RECYCLE_BIN/doc_20260719.txt", null), Times.Once);
     }
 
     [Fact]
@@ -486,7 +486,8 @@ public class FileServiceTests
         await sut.RenameAsync("old", "new", ctx);
 
         _aclMock.Verify(a => a.RenameAclPathAsync(_shareId, "old", "new"), Times.Once);
-        versions.Verify(v => v.RenamePathAsync(_shareId, "old", "new"), Times.Once);
+        versions.Verify(v => v.RenamePathAsync(
+            _shareId, "old", "new", null), Times.Once);
     }
 
     [Fact]

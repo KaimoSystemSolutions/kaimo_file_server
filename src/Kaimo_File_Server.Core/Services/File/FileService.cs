@@ -277,7 +277,8 @@ public class FileService : IFileService
 
     private async Task ApplyRenameSideEffectsAsync(
         string oldRelativePath, string newRelativePath, bool isDirectory,
-        string oldAbsolutePath, string newAbsolutePath, bool bestEffort)
+        string oldAbsolutePath, string newAbsolutePath, bool bestEffort,
+        Guid? sambaLifecycleEventId = null)
     {
         var failures = new List<Exception>();
 
@@ -286,7 +287,12 @@ public class FileService : IFileService
 
         if (_versionService != null)
         {
-            try { await _versionService.RenamePathAsync(_shareId, oldRelativePath, newRelativePath); }
+            try
+            {
+                await _versionService.RenamePathAsync(
+                    _shareId, oldRelativePath, newRelativePath,
+                    sambaLifecycleEventId);
+            }
             catch (Exception ex) { failures.Add(ex); }
         }
 
@@ -419,7 +425,11 @@ public class FileService : IFileService
         await ApplyDeleteSideEffectsAsync(rel, isDirectory, abs, bestEffort: false);
     }
 
-    public async Task NotifyExternalRenameAsync(string oldPath, string newPath, bool isDirectory)
+    public async Task NotifyExternalRenameAsync(
+        string oldPath,
+        string newPath,
+        bool isDirectory,
+        Guid sambaLifecycleEventId)
     {
         var oldRel = ShareRelativePath.Normalize(oldPath);
         var newRel = ShareRelativePath.Normalize(newPath);
@@ -427,7 +437,8 @@ public class FileService : IFileService
         var newAbs = _storage.ToAbsolutePath(newRel);
 
         await ApplyRenameSideEffectsAsync(
-            oldRel, newRel, isDirectory, oldAbs, newAbs, bestEffort: false);
+            oldRel, newRel, isDirectory, oldAbs, newAbs, bestEffort: false,
+            sambaLifecycleEventId);
     }
 
     // ------------------ ACL helpers ------------------

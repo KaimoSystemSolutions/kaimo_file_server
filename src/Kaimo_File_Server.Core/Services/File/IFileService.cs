@@ -75,7 +75,11 @@ namespace Kaimo_File_Server.Core.Services.File
         Task NotifyExternalDeleteAsync(string path, bool isDirectory);
 
         /// <summary>A file/directory was renamed externally: realign ACL records and the search index.</summary>
-        Task NotifyExternalRenameAsync(string oldPath, string newPath, bool isDirectory);
+        Task NotifyExternalRenameAsync(
+            string oldPath,
+            string newPath,
+            bool isDirectory,
+            Guid sambaLifecycleEventId);
 
         /// <summary>
         /// Returns the subset of paths the user has ListReadData permission on.

@@ -12,6 +12,7 @@ public sealed class SambaLifecycleEventReceipt
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? LeaseUntilUtc { get; set; }
     public DateTime? CompletedAtUtc { get; set; }
+    public DateTime? RenameVersionsCompletedAtUtc { get; set; }
     public int AttemptCount { get; set; }
     public string? LastError { get; set; }
 }

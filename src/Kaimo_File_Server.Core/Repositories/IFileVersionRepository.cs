@@ -113,7 +113,10 @@ namespace Kaimo_File_Server.Core.Repositories
         /// has displaced that object.
         /// </summary>
         Task<List<FileVersion>> RenamePathAsync(
-            Guid shareId, string oldPath, string newPath);
+            Guid shareId,
+            string oldPath,
+            string newPath,
+            Guid? sambaLifecycleEventId = null);
 
         /// <summary>Deletes all version rows belonging to a share.</summary>
         Task<List<FileVersion>> DeleteShareAsync(Guid shareId);

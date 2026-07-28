@@ -102,11 +102,16 @@ namespace Kaimo_File_Server.Infrastructure.Services
             return await svc.ApplyRetentionAsync(shareId, filePath, maxVersions, maxAge);
         }
 
-        public async Task RenamePathAsync(Guid shareId, string oldPath, string newPath)
+        public async Task RenamePathAsync(
+            Guid shareId,
+            string oldPath,
+            string newPath,
+            Guid? sambaLifecycleEventId = null)
         {
             using var scope = _serviceProvider.CreateScope();
             var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
-            await svc.RenamePathAsync(shareId, oldPath, newPath);
+            await svc.RenamePathAsync(
+                shareId, oldPath, newPath, sambaLifecycleEventId);
         }
 
         public async Task<int> DeletePathAsync(Guid shareId, string path)

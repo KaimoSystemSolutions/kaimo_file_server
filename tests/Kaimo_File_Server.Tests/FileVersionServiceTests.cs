@@ -698,7 +698,11 @@ public class MockFileVersionRepository : IFileVersionRepository
         return Task.FromResult(removed);
     }
 
-    public Task<List<FileVersion>> RenamePathAsync(Guid shareId, string oldPath, string newPath)
+    public Task<List<FileVersion>> RenamePathAsync(
+        Guid shareId,
+        string oldPath,
+        string newPath,
+        Guid? sambaLifecycleEventId = null)
     {
         var oldPrefix = oldPath + "/";
         var newPrefix = newPath + "/";

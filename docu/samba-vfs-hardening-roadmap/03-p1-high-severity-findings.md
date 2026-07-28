@@ -246,9 +246,19 @@ Whichever option is chosen must preserve the data-path goals while guaranteeing 
 
 ### P1-13: Rename events are not idempotent and can delete version history
 
+> **Remediation status (2026-07-28): Implemented and managed-tested. Live
+> bridge-crash/retry verification remains pending.**
+
 `FileVersionRepository.RenamePathAsync()` removes destination versions not present in the source set. If the same rename event is delivered twice, the second call has an empty source set and can treat all destination versions as displaced.
 
 **Fix:** make rename lifecycle processing idempotent by event ID and state transition. A repeated already-applied old→new rename must be a no-op, never a destructive destination cleanup.
+
+**Implemented fix:** the stable Samba lifecycle event ID now reaches the version
+repository. For Samba renames, destination displacement, source-history movement,
+and a `RenameVersionsCompletedAtUtc` receipt checkpoint commit in one serializable
+database transaction. A retry that observes the checkpoint returns without
+touching either path, including versions created at the destination after the
+original rename. Non-Samba rename callers retain the existing behavior.
 
 ### P1-14: Directory rename events are reported as file renames
 

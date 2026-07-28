@@ -134,6 +134,48 @@ public sealed class FileEventGrpcServiceIdempotencyTests
     }
 
     [Fact]
+    public async Task RenameThreadsStableEventIdIntoVersionTransition()
+    {
+        var share = new ShareDefinition("docs", Path.GetTempPath());
+        var shares = new Mock<IShareRepository>();
+        shares.Setup(x => x.GetByNameAsync("docs")).ReturnsAsync(share);
+        var fileService = new Mock<IFileService>();
+        var eventId = Guid.NewGuid();
+        fileService.Setup(x => x.NotifyExternalRenameAsync(
+                "old.txt", "new.txt", false, eventId))
+            .Returns(Task.CompletedTask);
+        var factory = new Mock<IFileServiceFactory>();
+        factory.Setup(x => x.CreateForShare(share.Id, share.Path))
+            .Returns(fileService.Object);
+        var receipts = new Mock<ISambaLifecycleEventRepository>();
+        receipts.Setup(x => x.TryClaimAsync(
+                eventId, "rename", It.IsAny<TimeSpan>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(SambaEventClaimResult.Acquired);
+        receipts.Setup(x => x.CompleteAsync(
+                eventId, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        var service = new FileEventGrpcService(
+            factory.Object, shares.Object, Mock.Of<IAuthenticationLookup>(),
+            receipts.Object, NullLogger<FileEventGrpcService>.Instance);
+
+        var reply = await service.NotifyRename(
+            new NotifyRenameRequest
+            {
+                EventId = eventId.ToString("N"),
+                Share = "docs",
+                OldPath = "old.txt",
+                NewPath = "new.txt",
+                IsDirectory = false
+            },
+            null!);
+
+        Assert.True(reply.Ok);
+        fileService.Verify(x => x.NotifyExternalRenameAsync(
+            "old.txt", "new.txt", false, eventId), Times.Once);
+    }
+
+    [Fact]
     public async Task MissingStableEventId_IsRejectedBeforeSideEffects()
     {
         var factory = new Mock<IFileServiceFactory>();
