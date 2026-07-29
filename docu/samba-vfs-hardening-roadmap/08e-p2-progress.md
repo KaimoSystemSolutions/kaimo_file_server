@@ -1264,3 +1264,122 @@ trigger a production downgrade.
 
 **Next planned finding:** P2-15 — enforce the pinned Samba source version and
 VFS ABI expectations in CI and add the audit/VFS operation compatibility gate.
+
+### 2026-07-29 — P2-15: Enforced Samba source/version/VFS ABI compatibility gate
+
+**Status:** Implemented and verified in the pinned Samba 4.19.5
+`build-runtime` image. The complete deployable-stack release matrix remains a
+separate milestone-4 gate.
+
+**Problem**
+
+The production Dockerfile downloaded a version-named Samba archive and built
+the stub, runtime, and real module from that tree, but the assumption remained
+implicit. The archive content was not checksum-pinned, ABI 49 was documented
+rather than asserted, `testparm` was not a build gate, and the existing live
+VFS probes were copied into the image without being executed. A future
+Dockerfile edit, source substitution, ABI change, or renamed `full_audit`
+operation could therefore survive ordinary .NET CI and fail only after
+deployment.
+
+**Architecture decision**
+
+The deployable image build is the compatibility authority. A source-only
+workflow cannot prove that the installed `smbd`, its private libraries, the
+real Kaimo module, and Samba's runtime operation table agree. The CI workflow
+therefore builds the same `build-runtime` graph used by production and makes
+the live module/audit probe an image-build dependency.
+
+`samba-build.env` is the single review point for version, archive digest, and
+VFS interface. Upgrades are intentional multi-file compatibility changes, not
+automatic substitutions: the patch, callback signatures, operation names,
+access constants, live matrix, rollback image, and rollout plan must be
+reviewed together.
+
+**Implemented**
+
+1. Added `samba-build.env` with Samba 4.19.5, the pinned upstream tarball
+   SHA-256, and `SMB_VFS_INTERFACE_VERSION=49`.
+2. Changed both `Dockerfile.vfs` and `Dockerfile.src` to consume that contract,
+   verify the downloaded archive with `sha256sum` before extraction, and use a
+   version-independent `/build/samba-source` path. Alternate source-cache and
+   production builds can no longer drift through duplicated version literals.
+3. Added `verify-samba-build.sh`. It validates the pin-file syntax, requires
+   exact `smbd --version` equality, checks ABI 49 in Samba's source header,
+   locates the installed VFS module, requires the real Kaimo build marker, and
+   runs `testparm` against the installed configuration.
+4. Added `test-vfs-operation-compatibility.py`. It creates isolated Samba
+   private/state/cache/lock directories, an ephemeral POSIX/passdb identity,
+   and a mode-0600 smbclient authentication file. No reusable operational
+   credential or host state is used.
+5. The test starts the real self-built `smbd` with
+   `kaimo_bridge full_audit` and a protocol-v3 local authorization double. It
+   performs mkdir, upload/write, download/read, rename, delete, rmdir, and list
+   through SMB3, verifies downloaded content and final filesystem state, and
+   requires CONNECT, OPEN, DELETE_AUTH, and RENAME_AUTH to reach the VFS
+   authorization boundary.
+6. The same test requires successful audit records for `connect`,
+   `disconnect`, `openat`, `close`, `renameat`, `unlinkat`, and `mkdirat`.
+   A module-load failure, invalid/renamed audit operation, missing record,
+   denied SMB operation, content mismatch, or leftover object fails the build.
+7. Wired the static assertion and live matrix into `build-runtime` after the
+   existing native and shell suites. The test account and isolated state are
+   removed before the Docker layer is published.
+8. Added the path-filtered `.github/workflows/samba-vfs-compatibility.yml`.
+   Pushes and pull requests affecting `src/samba-vfs/**` build the pinned
+   `build-runtime` target on Ubuntu 24.04 with a dedicated BuildKit cache whose
+   layers are invalidated by the pin-file content. The workflow also supports
+   explicit manual execution.
+9. Documented the mandatory Samba upgrade procedure and clarified that this
+   minimum gate complements rather than replaces the complete milestone-4
+   deployable-stack matrix.
+
+**Security and release properties**
+
+- The downloaded source is content-pinned, not trusted solely because its file
+  name contains `4.19.5`.
+- The exact runtime version and source VFS ABI are executable assertions.
+- The module is proven loadable alongside the installed private Samba
+  libraries from the same build.
+- Every audit operation used by production configuration is resolved by the
+  pinned runtime and observed during a real SMB request.
+- Relevant Samba-VFS changes cannot pass CI by running only managed or
+  source-level tests.
+- The compatibility test credential is ephemeral, file-supplied, isolated to
+  the build, and never becomes a production health or startup dependency.
+
+**Validation completed**
+
+- Python syntax compilation passes for the new live compatibility test.
+- The workflow file limits execution to the intended Samba-VFS change surface
+  plus manual dispatch.
+- The checksum-pinned Samba 4.19.5 source build completes and compiles the real
+  `kaimo_bridge` module against VFS ABI 49.
+- `verify-samba-build.sh` confirms runtime version, source ABI, real module
+  marker, and `testparm`.
+- The live SMB/full_audit compatibility matrix passes every configured
+  operation name and verifies authorization call coverage, transferred bytes,
+  and cleanup.
+- All pre-existing native and shell build-runtime regressions continue to
+  pass.
+- The complete managed test project remains green.
+- `git diff --check` passes.
+
+**Remaining release work**
+
+- Run the full deployable Compose stack with the real bridge and
+  operator-provisioned short-lived credentials. Cover append, truncate,
+  delete-on-close, attributes, EAs, permissions, ownership, hardlinks,
+  symlinks, server-side copy, negative rename cases, snapshots, and concurrent
+  revocation.
+- Add Windows client coverage for Explorer enumeration and Previous Versions;
+  the Linux `smbclient` compatibility gate does not prove Windows UX behavior.
+- Exercise the documented Samba upgrade and rollback process once against a
+  candidate version before relying on it operationally.
+- Configure branch protection so `Samba VFS Compatibility` is a required
+  status check. The workflow is present in source, but repository policy is an
+  external control.
+
+**Next planned workstream:** complete the remaining milestone-4 live release
+matrix and reconcile its evidence with the older P0/P1 runtime-verification
+notes and section 11 checklists.

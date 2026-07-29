@@ -1,0 +1,42 @@
+name: Samba VFS Compatibility
+
+on:
+  push:
+    branches: ["master"]
+    paths:
+      - ".github/workflows/samba-vfs-compatibility.yml"
+      - "src/samba-vfs/**"
+  pull_request:
+    branches: ["master"]
+    paths:
+      - ".github/workflows/samba-vfs-compatibility.yml"
+      - "src/samba-vfs/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: samba-vfs-compatibility-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pinned-build-and-live-matrix:
+    name: Pinned source, VFS ABI, and live operation matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build pinned Samba, module, and compatibility gates
+        uses: docker/build-push-action@v6
+        with:
+          context: ./src/samba-vfs
+          file: ./src/samba-vfs/Dockerfile.vfs
+          target: build-runtime
+          push: false
+          tags: kaimo-samba-vfs-compatibility:${{ github.sha }}
+          cache-from: type=gha,scope=samba-vfs-compatibility
+          cache-to: type=gha,mode=max,scope=samba-vfs-compatibility

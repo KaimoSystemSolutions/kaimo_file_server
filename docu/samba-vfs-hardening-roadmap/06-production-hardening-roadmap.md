@@ -194,9 +194,11 @@ guarantee.
    explicitly deny it.
 3. Add native parser/path unit tests, ASan/UBSan, targeted concurrency tests,
    fuzzing, OOM/fault injection, deep UTF-8 paths, and exact boundary tests.
-4. Build and load the module against the pinned Samba version in CI. Assert
-   Samba 4.19.5/ABI 49, run `testparm`, and execute the minimum SMB operation
-   matrix for every relevant change.
+4. **Completed 2026-07-29:** build and load the module against the pinned Samba
+   version in path-filtered CI. A shared source contract pins the 4.19.5
+   archive by SHA-256 and ABI 49; the build asserts source/runtime identity,
+   runs `testparm`, loads `kaimo_bridge full_audit`, and executes the minimum
+   authenticated SMB/audit-operation matrix for every Samba-VFS change.
 5. Supervise `authd`; fail/restart the container when it is unavailable. Extend
    health checks to validate the authorization path without reusable
    credentials.

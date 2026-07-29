@@ -439,6 +439,33 @@ ping failure, and cleanup of both protected PID files.
 
 ### P2-15: Samba ABI pinning lacks a CI enforcement gate
 
+> **Remediation status (2026-07-29): Implemented and verified in the pinned
+> build-runtime image, including checksum validation, runtime/source ABI
+> assertions, real module loading, `testparm`, and a live SMB/full_audit
+> operation matrix.**
+
 The module is built against Samba 4.19.5/ABI 49. The source version is pinned, but the repository does not prove that changes or alternate Dockerfiles retain the same version and ABI expectations.
 
 **Fix:** add CI checks for the pinned tarball/version, build the module and Samba together, run `testparm`, load the module, and execute a minimal SMB operation matrix on every relevant change.
+
+**Implemented fix:** `samba-build.env` is now the authoritative version,
+archive-digest, and VFS-interface contract. Both source Dockerfiles consume the
+same file and reject a tarball whose SHA-256 differs before extraction.
+`verify-samba-build.sh` compares the installed `smbd --version` output and the
+source-tree `SMB_VFS_INTERFACE_VERSION` definition with that contract, requires
+the installed module to contain the real Kaimo build marker, and validates the
+effective configuration with `testparm`.
+
+The build-runtime stage also starts the self-built `smbd` with the real
+`kaimo_bridge full_audit` stack and a protocol-correct local authorization
+double. An ephemeral account supplied through a mode-0600 authentication file
+executes connect, directory creation, upload/write, download/read, rename,
+unlink, directory removal, listing, close, and disconnect. The gate requires
+successful `full_audit` records for every configured Samba 4.19 operation name:
+`connect`, `disconnect`, `openat`, `close`, `renameat`, `unlinkat`, and
+`mkdirat`.
+
+The path-filtered `Samba VFS Compatibility` GitHub Actions workflow builds the
+`build-runtime` target for every Samba-VFS change on pushes and pull requests.
+The same gate is therefore part of the release-producing Docker build graph and
+cannot be represented by a source-only lint success.

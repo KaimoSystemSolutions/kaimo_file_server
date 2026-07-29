@@ -62,6 +62,9 @@ A release should be blocked when any of the following is true:
 - Synchronization reports success without converging passdb/registry/config state.
 - Event retries can create duplicates or delete valid history.
 - The bridge accepts unauthenticated hash or snapshot RPCs.
+- The checksum-pinned Samba source, installed runtime version, source VFS ABI,
+  real Kaimo module, `testparm`, or configured `full_audit` operation names
+  differ from the repository compatibility contract.
 
 ## 12. Implementation checklist
 
@@ -85,6 +88,9 @@ implemented; their required release verification remains tracked in milestone 4.
 - [x] Snapshot response capacity is a compile-time wire invariant; over-limit
   histories deterministically expose the newest 2,048 distinct labels.
 - [x] All Unix-socket calls have deadlines and full I/O loops.
+- [x] CI checksum-pins Samba 4.19.5, asserts VFS ABI 49, loads the real module,
+  runs `testparm`, and exercises every configured `full_audit` operation name
+  through live SMB.
 
 ### Sidecar checklist
 

@@ -733,12 +733,51 @@ docker compose logs kaimo_samba | grep "kaimo_bridge:"
 
 ## Important facts from Phase 0
 
-- Samba runtime version: **4.19.5-Ubuntu** (`ubuntu:24.04` package).
+- Samba runtime version: self-built upstream **4.19.5** on Ubuntu 24.04.
 - **`SMB_VFS_INTERFACE_VERSION = 49`** — the VFS module must be built against exactly this ABI.
 - VFS module directory: `/usr/lib/x86_64-linux-gnu/samba/vfs/`.
 - Module init symbol: `vfs_kaimo_bridge_init` → registered under the name `kaimo_bridge`.
 - Build registration: `bld.SAMBA3_MODULE('vfs_kaimo_bridge', subsystem='vfs', …)` in
   `source3/modules/wscript_build`, plus entry in `default_shared_modules` in `source3/wscript`.
+
+### Pinned build contract and Samba upgrades
+
+[`samba-build.env`](samba-build.env) is the single operational contract for the
+upstream Samba version, archive SHA-256, and `SMB_VFS_INTERFACE_VERSION`.
+`Dockerfile.vfs` and the source-cache `Dockerfile.src` both consume it and
+verify the archive before extraction. Do not replace the version only in a
+Dockerfile or bypass the digest check.
+
+Every `src/samba-vfs/**` change triggers the `Samba VFS Compatibility` CI
+workflow. Its `build-runtime` target:
+
+1. builds Samba and `kaimo_bridge` from the same verified source tree;
+2. asserts the installed `smbd` version and the source-header VFS ABI;
+3. verifies the real module marker and runs `testparm`;
+4. starts the real module stack with `full_audit`; and
+5. executes authenticated connect, mkdir, create/write, read, rename, unlink,
+   rmdir, list, close, and disconnect operations while requiring audit records
+   for every configured operation name.
+
+A Samba upgrade is complete only when all of the following are reviewed in one
+change:
+
+- update the version, independently verified upstream archive digest, and
+  expected VFS interface in `samba-build.env`;
+- rebase and review `patches/0001-map-vfs-connect-errno.patch`;
+- compile the complete source tree and real module without relying on an old
+  Docker cache;
+- review every `vfs_fn_pointers` callback signature and access-mask constant
+  used by `vfs_kaimo_bridge.c`;
+- verify `full_audit` operation names against the new Samba implementation;
+- pass the compatibility workflow and the broader deployable-stack release
+  matrix; and
+- record the version/ABI change, test evidence, rollback image, and operational
+  rollout plan in the hardening journal.
+
+The CI matrix is deliberately a minimum compatibility gate. Windows Previous
+Versions UX, client interoperability, revocation timing, crash recovery, and
+the complete mutation/metadata matrix remain separate release gates.
 
 ## Next steps (after Phase 0)
 
