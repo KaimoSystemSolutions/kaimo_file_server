@@ -154,9 +154,22 @@ folder resolution.
 
 ### P2-07: Cleanup enumeration exception handling is incomplete
 
+> **Remediation status (2026-07-29): Implemented and regression-tested.**
+
 `SafeEnumerateDirectories()` returns a lazy enumerable from inside a `try`; exceptions may occur later during `foreach`, outside that local `try`.
 
 **Fix:** materialize the directory list inside the protected block or use enumeration options with per-entry error handling.
+
+**Implemented fix:** `SafeEnumerateDirectories()` now returns an
+`IReadOnlyList<string>` materialized with `ToArray()` inside the protected
+boundary. A directory that disappears concurrently is treated as an empty
+snapshot. I/O and access failures are contained, logged with the affected root,
+and likewise produce an empty snapshot, allowing the remaining sweep to
+continue. Unexpected process-level and programming exceptions are no longer
+hidden by an unqualified catch. All callers consume the stable snapshot, so no
+filesystem access is deferred into their `foreach` loops. Regressions prove
+that the returned collection does not change after a later directory creation
+and that an I/O failure raised during enumeration cannot escape to the caller.
 
 ### P2-08: Cache configuration is not validated
 

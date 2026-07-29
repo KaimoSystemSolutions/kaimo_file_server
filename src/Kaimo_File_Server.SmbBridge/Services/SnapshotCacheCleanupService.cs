@@ -172,10 +172,31 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
                 evictedLegacy, evictedOrphan);
     }
 
-    private static IEnumerable<string> SafeEnumerateDirectories(string root)
+    /// <summary>
+    /// Returns a stable snapshot of the immediate child directories. Directory
+    /// enumeration is lazy, so materialization must remain inside this method's
+    /// exception boundary; returning the enumerable would defer I/O failures to
+    /// an unprotected caller-side <c>foreach</c>.
+    /// </summary>
+    internal IReadOnlyList<string> SafeEnumerateDirectories(string root)
     {
-        try { return Directory.EnumerateDirectories(root); }
-        catch { return Array.Empty<string>(); }
+        try
+        {
+            return Directory.EnumerateDirectories(root).ToArray();
+        }
+        catch (DirectoryNotFoundException)
+        {
+            // A concurrent materializer or eviction may remove the directory
+            // between the existence check and enumeration.
+            return Array.Empty<string>();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex,
+                "Snapshot cache: failed to enumerate directories below {Dir}",
+                root);
+            return Array.Empty<string>();
+        }
     }
 
     private static bool LooksLikeManagedLegacyCache(string root)

@@ -107,6 +107,39 @@ public sealed class SnapshotCacheLeaseManagerTests : IDisposable
     }
 
     [Fact]
+    public void CleanupDirectoryEnumeration_ReturnsMaterializedSnapshot()
+    {
+        string first = Directory.CreateDirectory(
+            Path.Combine(_root, "first")).FullName;
+        string second = Directory.CreateDirectory(
+            Path.Combine(_root, "second")).FullName;
+        SnapshotCacheCleanupService cleanup = CreateCleanup(
+            new SnapshotCacheLeaseManager());
+
+        IReadOnlyList<string> snapshot =
+            cleanup.SafeEnumerateDirectories(_root);
+        Directory.CreateDirectory(Path.Combine(_root, "created-later"));
+
+        Assert.Equal(
+            [first, second],
+            snapshot.Order(StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task CleanupDirectoryEnumeration_ContainsDeferredIoFailure()
+    {
+        string fileInsteadOfDirectory = Path.Combine(_root, "projection.bin");
+        await File.WriteAllTextAsync(fileInsteadOfDirectory, "data");
+        SnapshotCacheCleanupService cleanup = CreateCleanup(
+            new SnapshotCacheLeaseManager());
+
+        IReadOnlyList<string> result =
+            cleanup.SafeEnumerateDirectories(fileInsteadOfDirectory);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
     public async Task HandoffBlocksEvictionUntilNativeAcknowledgement()
     {
         var leases = new SnapshotCacheLeaseManager();
@@ -175,5 +208,19 @@ public sealed class SnapshotCacheLeaseManagerTests : IDisposable
         using SnapshotCacheLeaseManager.MaterializationLease next =
             await leases.AcquireMaterializationAsync(
                 _root, _shareId, Token);
+    }
+
+    private SnapshotCacheCleanupService CreateCleanup(
+        SnapshotCacheLeaseManager leases)
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Snapshots:Cache:RootPath"] = _root
+            })
+            .Build();
+        return new SnapshotCacheCleanupService(
+            Mock.Of<IServiceScopeFactory>(), configuration, leases,
+            NullLogger<SnapshotCacheCleanupService>.Instance);
     }
 }

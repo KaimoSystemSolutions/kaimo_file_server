@@ -376,3 +376,58 @@ be exposed as historical content without reading the immutable version source.
 
 **Next planned finding:** P2-07 — make cleanup directory enumeration
 exception-safe by ensuring failures occur inside the protected boundary.
+
+### 2026-07-29 — P2-07: Exception-safe cleanup enumeration
+
+**Status:** Implemented and regression-tested.
+
+The snapshot cleanup helper returned `Directory.EnumerateDirectories()` from
+inside a `try`. That API is lazy: opening the filesystem enumerator and reading
+entries can occur only when a caller starts its `foreach`. The apparent local
+exception boundary therefore did not contain the failure it was intended to
+handle. A transient disappearance, I/O error, or access failure could abort the
+current share sweep and defer recovery until the background service's next
+interval.
+
+**Implemented**
+
+1. `SafeEnumerateDirectories()` now returns `IReadOnlyList<string>` and calls
+   `ToArray()` before leaving its exception boundary. Callers receive a stable
+   point-in-time snapshot with no deferred filesystem work.
+2. `DirectoryNotFoundException` is handled as a normal cleanup race. A root may
+   disappear between `Directory.Exists()` and enumeration because another
+   evictor or materializer changed the cache concurrently.
+3. `IOException` and `UnauthorizedAccessException` are contained and logged
+   with the affected directory before an empty snapshot is returned. The sweep
+   can continue safely without acting on an incomplete directory set.
+4. The former unqualified `catch` was removed. Unexpected exceptions such as
+   resource exhaustion or programming errors remain visible to the hosted
+   service's outer failure handler instead of being silently misclassified as
+   an empty cache.
+5. Both token enumeration under active shares and orphan-share cleanup consume
+   the same materialized helper result. Other cleanup scans were reviewed:
+   legacy-cache detection and recursive size calculation already perform their
+   lazy iteration within their own protected blocks.
+
+**Validation completed**
+
+- Added a regression that captures two child directories, creates a third
+  afterward, and proves the returned result remains the original materialized
+  snapshot.
+- Added a regression that passes a regular file where a directory is expected.
+  The deferred enumeration I/O failure is contained by the helper and the
+  caller receives an empty result.
+- The focused `SnapshotCacheLeaseManagerTests` suite passes: 9 tests, 0
+  failures, 0 skipped.
+- The cumulative managed test project passes: 604 tests, 0 failures, 0
+  skipped.
+
+**Operational note**
+
+An affected root is skipped for the current sweep after an I/O or access
+failure. No deletion is attempted from a partial view. The background service
+retries on its next configured sweep, while the warning identifies the root
+that requires investigation if the condition persists.
+
+**Next planned finding:** P2-08 — validate TTL, sweep interval, and per-share
+cache-cap configuration at startup with explicit safe bounds.

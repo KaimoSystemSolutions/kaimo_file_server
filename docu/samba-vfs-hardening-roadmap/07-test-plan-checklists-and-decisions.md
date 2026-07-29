@@ -30,6 +30,7 @@
 - Folder snapshot with child-level denies.
 - Direct internal cache path attempts.
 - Concurrent materialization, cancellation, and cleanup.
+- Cleanup enumeration snapshots and deferred filesystem failures.
 - Corrupt NT-hash rows and large user sets.
 - Duplicate, reordered, and retried lifecycle events.
 
