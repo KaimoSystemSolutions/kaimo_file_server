@@ -146,11 +146,11 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         if (share is null)
             return Deny($"unknown or disabled share '{request.Share}'");
 
-        if (!ShareRelativePath.IsValid(request.Path))
+        if (!TryResolveClientPath(
+                share.Path, request.Path, allowRoot: true,
+                out string normalized, out string full))
             return Deny($"invalid open path '{request.Path}'");
 
-        string normalized = ShareRelativePath.Normalize(request.Path);
-        string full = Path.Combine(share.Path, normalized);
         bool exists = File.Exists(full) || Directory.Exists(full);
         bool isDir = exists ? Directory.Exists(full) : request.CreateDirectory;
 
@@ -354,8 +354,9 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         if (share is null)
             return Deny($"unknown or disabled share '{request.Share}'");
 
-        string normalized = ShareRelativePath.Normalize(request.Path);
-        if (string.IsNullOrEmpty(normalized) || !ShareRelativePath.IsValid(request.Path))
+        if (!TryResolveClientPath(
+                share.Path, request.Path, allowRoot: false,
+                out string normalized, out _))
             return Deny($"invalid delete path '{request.Path}'");
 
         var decision = await CanDeleteAsync(
@@ -397,27 +398,26 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         if (share is null)
             return Deny($"unknown or disabled share '{request.Share}'");
 
-        if (!ShareRelativePath.IsValid(request.SourcePath) ||
-            !ShareRelativePath.IsValid(request.DestinationPath))
+        if (!TryResolveClientPath(
+                share.Path, request.SourcePath, allowRoot: false,
+                out string source, out string sourceFull) ||
+            !TryResolveClientPath(
+                share.Path, request.DestinationPath, allowRoot: false,
+                out string destination, out string destinationFull))
             return Deny("invalid rename path");
 
-        string source = ShareRelativePath.Normalize(request.SourcePath);
-        string destination = ShareRelativePath.Normalize(request.DestinationPath);
-        if (string.IsNullOrEmpty(source) || string.IsNullOrEmpty(destination) ||
-            string.Equals(source, destination, StringComparison.Ordinal))
+        if (string.Equals(source, destination, StringComparison.Ordinal))
             return Deny($"invalid rename '{source}' -> '{destination}'");
 
         // Cross-check the native request against the shared storage view. This
         // is not the final TOCTOU guard (the VFS performs that immediately
         // before renameat), but prevents authorization based on stale/type-
         // confused request metadata.
-        string sourceFull = Path.Combine(share.Path, source);
         bool sourceExists = File.Exists(sourceFull) || Directory.Exists(sourceFull);
         bool sourceIsDirectory = sourceExists && Directory.Exists(sourceFull);
         if (!sourceExists || sourceIsDirectory != request.SourceIsDirectory)
             return Deny("rename source no longer matches the native request");
 
-        string destinationFull = Path.Combine(share.Path, destination);
         bool destinationExists = File.Exists(destinationFull) || Directory.Exists(destinationFull);
         bool destinationIsDirectory = destinationExists && Directory.Exists(destinationFull);
         if (destinationExists != request.DestinationExists ||
@@ -494,5 +494,35 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     {
         _logger.LogInformation("Authz DENY: {Reason}", reason);
         return new AuthorizeReply { Allow = false, Reason = reason };
+    }
+
+    private static bool TryResolveClientPath(
+        string shareRoot,
+        string rawPath,
+        bool allowRoot,
+        out string normalized,
+        out string absolute)
+    {
+        absolute = "";
+        if (!ShareRelativePath.TryNormalizeStrict(
+                rawPath, out normalized, allowRoot,
+                allowInternalNamespace: false))
+            return false;
+
+        try
+        {
+            absolute = ShareRelativePath.ToContainedAbsolutePath(
+                shareRoot, normalized, allowRoot,
+                allowInternalNamespace: false);
+            return true;
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException or IOException or
+                  NotSupportedException or UnauthorizedAccessException)
+        {
+            normalized = "";
+            absolute = "";
+            return false;
+        }
     }
 }

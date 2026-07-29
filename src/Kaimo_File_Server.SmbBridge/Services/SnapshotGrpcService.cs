@@ -84,11 +84,10 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             return reply;
         }
 
-        if (!ShareRelativePath.IsValid(request.Path))
+        if (!ShareRelativePath.TryNormalizeStrict(
+                request.Path, out string normalized, allowRoot: true,
+                allowInternalNamespace: false))
             return reply;
-
-        string normalized = ShareRelativePath.Normalize(request.Path);
-        if (normalized == ".") normalized = ""; // SMB share-root atname -> root
 
         // A concrete file -> its own version timestamps; a folder or the share
         // root ("") -> ACL-aware folder timestamps. A path with exact file
@@ -172,11 +171,10 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             return notFound;
         }
 
-        if (!ShareRelativePath.IsValid(request.Path))
+        if (!ShareRelativePath.TryNormalizeStrict(
+                request.Path, out string normalized, allowRoot: true,
+                allowInternalNamespace: false))
             return notFound;
-
-        string normalized = ShareRelativePath.Normalize(request.Path);
-        if (normalized == ".") normalized = ""; // SMB share-root atname -> root
 
         var ts = FileVersion.ParseGmtToken(request.GmtToken);
         if (ts is null)
@@ -437,8 +435,11 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         {
             ValidateVersionContentMetadata(version);
             string cacheScope = user.User.Id.ToString("N");
-            string normalizedVersionPath =
-                ShareRelativePath.Normalize(version.FilePath);
+            if (!ShareRelativePath.TryNormalizeStrict(
+                    version.FilePath, out string normalizedVersionPath,
+                    allowRoot: false, allowInternalNamespace: false))
+                throw new InvalidDataException(
+                    "Version contains an invalid file path.");
             string shareScope =
                 SnapshotCache.RelativeShareRootFor(share.Id);
             cacheRel =
@@ -544,11 +545,10 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         string cacheScope, FileVersion v,
         CancellationToken cancellationToken)
     {
-        if (!ShareRelativePath.IsValid(v.FilePath) ||
-            ShareRelativePath.Normalize(v.FilePath).Length == 0)
+        if (!ShareRelativePath.TryNormalizeStrict(
+                v.FilePath, out string normalizedPath,
+                allowRoot: false, allowInternalNamespace: false))
             throw new InvalidDataException("Version contains an invalid file path.");
-
-        string normalizedPath = ShareRelativePath.Normalize(v.FilePath);
         string shareScope = SnapshotCache.RelativeShareRootFor(shareId);
         string rel = $"{shareScope}/{gmtToken}/{cacheScope}/{normalizedPath}";
         string scopeRoot = SnapshotCache.EnsureUserScope(
@@ -656,8 +656,9 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         foreach (FileVersion version in expectedVersions)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!ShareRelativePath.IsValid(version.FilePath) ||
-                ShareRelativePath.Normalize(version.FilePath).Length == 0)
+            if (!ShareRelativePath.TryNormalizeStrict(
+                    version.FilePath, out _,
+                    allowRoot: false, allowInternalNamespace: false))
                 return false;
             ValidateVersionContentMetadata(version);
             string fullPath = GetScopedCachePath(
@@ -750,19 +751,25 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
     {
         string scopeRoot = SnapshotCache.EnsureUserScope(
             cacheRoot, shareId, gmtToken, cacheScope);
-        string normalizedFolder = ShareRelativePath.Normalize(folderPath);
+        if (!ShareRelativePath.TryNormalizeStrict(
+                folderPath, out string normalizedFolder,
+                allowRoot: true, allowInternalNamespace: false))
+            throw new InvalidDataException(
+                "Folder projection contains an invalid path.");
         string folderFull = normalizedFolder.Length == 0
             ? scopeRoot
-            : Path.Combine(
-                scopeRoot,
-                normalizedFolder.Replace('/', Path.DirectorySeparatorChar));
+            : ShareRelativePath.ToContainedAbsolutePath(
+                scopeRoot, normalizedFolder, allowRoot: false,
+                allowInternalNamespace: false);
         SnapshotCache.EnsureDirectory(folderFull);
 
         StringComparer pathComparer = OperatingSystem.IsWindows()
             ? StringComparer.OrdinalIgnoreCase
             : StringComparer.Ordinal;
         var allowed = readableVersions
-            .Where(v => ShareRelativePath.IsValid(v.FilePath))
+            .Where(v => ShareRelativePath.TryNormalizeStrict(
+                v.FilePath, out _, allowRoot: false,
+                allowInternalNamespace: false))
             .Select(v => GetScopedCachePath(scopeRoot, v.FilePath))
             .ToHashSet(pathComparer);
 
@@ -828,28 +835,22 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
     private static string GetScopedCachePath(
         string scopeRoot, string relativePath)
     {
-        string root = Path.GetFullPath(scopeRoot);
-        string candidate = Path.GetFullPath(Path.Combine(
-            root,
-            ShareRelativePath.Normalize(relativePath)
-                .Replace('/', Path.DirectorySeparatorChar)));
-        string prefix = root.EndsWith(Path.DirectorySeparatorChar)
-            ? root
-            : root + Path.DirectorySeparatorChar;
-        StringComparison comparison = OperatingSystem.IsWindows()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
-        if (!candidate.StartsWith(prefix, comparison))
+        try
+        {
+            return ShareRelativePath.ToContainedAbsolutePath(
+                scopeRoot, relativePath, allowRoot: false,
+                allowInternalNamespace: false);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
             throw new InvalidDataException(
-                "Version path escapes the user snapshot cache scope.");
-        return candidate;
+                "Version path escapes the user snapshot cache scope.",
+                exception);
+        }
     }
 
     private static string GetCachePath(string cacheRoot, string relativePath)
     {
-        if (!ShareRelativePath.IsValid(relativePath) ||
-            ShareRelativePath.Normalize(relativePath).Length == 0)
-            throw new InvalidDataException("Invalid snapshot cache-relative path.");
         return GetScopedCachePath(cacheRoot, relativePath);
     }
 }

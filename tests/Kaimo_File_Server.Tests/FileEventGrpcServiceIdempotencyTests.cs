@@ -230,4 +230,37 @@ public sealed class FileEventGrpcServiceIdempotencyTests
         auth.VerifyNoOtherCalls();
         receipts.VerifyNoOtherCalls();
     }
+
+    [Theory]
+    [InlineData("/outside.txt")]
+    [InlineData("../outside.txt")]
+    [InlineData(".kaimo-close-captures/event.cap")]
+    [InlineData("C:/outside.txt")]
+    public async Task InvalidLifecyclePath_IsRejectedBeforeClaimAndResolution(
+        string path)
+    {
+        var factory = new Mock<IFileServiceFactory>();
+        var shares = new Mock<IShareRepository>();
+        var auth = new Mock<IAuthenticationLookup>();
+        var receipts = new Mock<ISambaLifecycleEventRepository>();
+        var service = new FileEventGrpcService(
+            factory.Object, shares.Object, auth.Object, receipts.Object,
+            NullLogger<FileEventGrpcService>.Instance);
+
+        var reply = await service.NotifyDelete(
+            new NotifyPathRequest
+            {
+                EventId = Guid.NewGuid().ToString("N"),
+                Username = "alice",
+                Share = "docs",
+                Path = path
+            },
+            null!);
+
+        Assert.False(reply.Ok);
+        factory.VerifyNoOtherCalls();
+        shares.VerifyNoOtherCalls();
+        auth.VerifyNoOtherCalls();
+        receipts.VerifyNoOtherCalls();
+    }
 }

@@ -43,6 +43,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
         if (!SambaName.IsValidContext(request.Username, request.Share)) return Fail();
         if (!TryParseEventId(request.EventId, out var eventId)) return Fail();
         if (!IsCaptureId(request.CaptureId)) return Fail();
+        if (!TryEventPath(request.Path, out string path)) return Fail();
         var (svc, user) = await ResolveAsync(
             request.Username, request.Share,
             context?.CancellationToken ?? CancellationToken.None);
@@ -53,7 +54,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
         if (!await ProcessOnceAsync(
                 eventId, "close",
                 () => svc.NotifyExternalCloseAsync(
-                    request.Path, user, () => OpenCaptureAsync(capturePath)),
+                    path, user, () => OpenCaptureAsync(capturePath)),
                 context?.CancellationToken ?? CancellationToken.None))
             return Fail();
         try
@@ -77,6 +78,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
     {
         if (!SambaName.IsValidContext(request.Username, request.Share)) return Fail();
         if (!TryParseEventId(request.EventId, out var eventId)) return Fail();
+        if (!TryEventPath(request.Path, out string path)) return Fail();
         var (svc, user) = await ResolveAsync(
             request.Username, request.Share,
             context?.CancellationToken ?? CancellationToken.None);
@@ -84,7 +86,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
 
         if (!await ProcessOnceAsync(
                 eventId, "mkdir",
-                () => svc.NotifyExternalMkdirAsync(request.Path, user),
+                () => svc.NotifyExternalMkdirAsync(path, user),
                 context?.CancellationToken ?? CancellationToken.None))
             return Fail();
         return Ok();
@@ -94,6 +96,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
     {
         if (!SambaName.IsValidContext(request.Username, request.Share)) return Fail();
         if (!TryParseEventId(request.EventId, out var eventId)) return Fail();
+        if (!TryEventPath(request.Path, out string path)) return Fail();
         var svc = await ResolveServiceAsync(
             request.Share,
             context?.CancellationToken ?? CancellationToken.None);
@@ -102,7 +105,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
         if (!await ProcessOnceAsync(
                 eventId, "delete",
                 () => svc.NotifyExternalDeleteAsync(
-                    request.Path, request.IsDirectory),
+                    path, request.IsDirectory),
                 context?.CancellationToken ?? CancellationToken.None))
             return Fail();
         _logger.LogInformation("NotifyDelete: share={Share} path=[{Path}] dir={Dir}",
@@ -114,6 +117,9 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
     {
         if (!SambaName.IsValidContext(request.Username, request.Share)) return Fail();
         if (!TryParseEventId(request.EventId, out var eventId)) return Fail();
+        if (!TryEventPath(request.OldPath, out string oldPath) ||
+            !TryEventPath(request.NewPath, out string newPath))
+            return Fail();
         var svc = await ResolveServiceAsync(
             request.Share,
             context?.CancellationToken ?? CancellationToken.None);
@@ -122,7 +128,7 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
         if (!await ProcessOnceAsync(
                 eventId, "rename",
                 () => svc.NotifyExternalRenameAsync(
-                    request.OldPath, request.NewPath, request.IsDirectory,
+                    oldPath, newPath, request.IsDirectory,
                     eventId),
                 context?.CancellationToken ?? CancellationToken.None))
             return Fail();
@@ -174,6 +180,11 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
     private static bool IsCaptureId(string value) =>
         value.Length == 32 && value.All(character =>
             character is >= '0' and <= '9' or >= 'a' and <= 'f');
+
+    private static bool TryEventPath(string rawPath, out string normalized) =>
+        ShareRelativePath.TryNormalizeStrict(
+            rawPath, out normalized, allowRoot: false,
+            allowInternalNamespace: false);
 
     private static Task<Stream> OpenCaptureAsync(string path)
     {

@@ -2,9 +2,9 @@
 
 This documentation contains the security, memory-safety, and coverage audit for the Samba VFS migration. The former monolithic document has been split by topic so findings, target architecture, implementation planning, and progress history can be maintained and reviewed independently.
 
-> **Current as of:** 2026-07-28  
-> **Most recently completed:** P2-02 – Unified share-relative canonicalization
-> **Next planned finding:** P2-03 – Unify bridge path validation and containment
+> **Current as of:** 2026-07-29
+> **Most recently completed:** P2-03 – Unified bridge path validation and containment
+> **Next planned finding:** P2-04 – Bound and strictly parse snapshot enumeration counts
 > **Production approval:** Still blocked until the remaining credential and synchronization risks, lifecycle reconciliation work, and release gates are complete.
 
 ## Table of contents

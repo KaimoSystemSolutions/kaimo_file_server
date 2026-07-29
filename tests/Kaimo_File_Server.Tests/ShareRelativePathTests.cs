@@ -66,4 +66,50 @@ public class ShareRelativePathTests
         // escapes upward, so "." must NOT be treated as traversal.
         Assert.True(ShareRelativePath.IsValid("./file.txt"));
     }
+
+    [Theory]
+    [InlineData("", true, "")]
+    [InlineData(".", true, "")]
+    [InlineData("./docs/./file.txt", false, "docs/file.txt")]
+    [InlineData("docs//file.txt/", false, "docs/file.txt")]
+    [InlineData("report..final.txt", false, "report..final.txt")]
+    public void TryNormalizeStrict_CanonicalizesSafeInput(
+        string input, bool allowRoot, string expected)
+    {
+        Assert.True(ShareRelativePath.TryNormalizeStrict(
+            input, out string actual, allowRoot));
+        Assert.Equal(expected, actual);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("/etc/passwd")]
+    [InlineData(@"\windows\system32")]
+    [InlineData("C:/Windows/System32")]
+    [InlineData("docs/../secret")]
+    [InlineData("docs/\0secret")]
+    [InlineData(".kaimo-close-captures/event.cap")]
+    [InlineData(".KAIMO-SNAPSHOTS/file.txt")]
+    public void TryNormalizeStrict_RejectsUntrustedBridgePaths(string? input)
+        => Assert.False(ShareRelativePath.TryNormalizeStrict(
+            input, out _, allowRoot: true));
+
+    [Fact]
+    public void ToContainedAbsolutePath_RejectsSiblingPrefixEscape()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "kaimo-root");
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            ShareRelativePath.ToContainedAbsolutePath(
+                root, "../kaimo-root-secret/file.txt"));
+    }
+
+    [Fact]
+    public void ToContainedAbsolutePath_AllowsExplicitInternalServerPath()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "kaimo-root");
+        string actual = ShareRelativePath.ToContainedAbsolutePath(
+            root, ".kaimo-close-captures/event.cap",
+            allowInternalNamespace: true);
+        Assert.StartsWith(Path.GetFullPath(root), actual);
+    }
 }

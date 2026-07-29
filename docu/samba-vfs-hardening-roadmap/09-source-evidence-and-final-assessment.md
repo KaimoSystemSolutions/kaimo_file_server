@@ -8,6 +8,7 @@
 |---|---|
 | Context allocation fail-open | `src/samba-vfs/module/vfs_kaimo_bridge.c:526-574` |
 | Path reconstruction/truncation | `vfs_kaimo_bridge.c:68-228`, `:320-382`, `:510-522`, `:583-991` |
+| Strict bridge path validation and containment | `Core/Helpers/ShareRelativePath.cs` (`TryNormalizeStrict`, `ToContainedAbsolutePath`); `Infrastructure/Storage/FileSystemStorage.cs` (`ToAbsolutePath`); `SmbBridge/Services/AuthzGrpcService.cs` (`TryResolveClientPath`); `FileEventGrpcService.cs` (`TryEventPath`); `SnapshotGrpcService.cs` (`GetScopedCachePath`, persisted-version validation); `ShareRelativePathTests.cs`; `AuthzGrpcServiceAccessMaskTests.cs`; `FileEventGrpcServiceIdempotencyTests.cs`; `SnapshotGrpcServiceAclTests.cs` |
 | Complete access mapping / original gap | `vfs_kaimo_bridge.c:89-197`, `:583-695`; `authd.cpp:53-130`, `:212-249`; `AuthzGrpcService.cs:25-327`; `Core/Security/FilePermissions.cs` |
 | Rename authorization / original gap | `vfs_kaimo_bridge.c` (`kaimo_authz_rename`, `kaimo_renameat`); `authd.cpp` (`do_rename`); `AuthzGrpcService.cs` (`AuthorizeRename`) |
 | Bounded sidecar workers / original detached-thread gap | `src/samba-vfs/module/authd.cpp` (`BoundedClientQueue`, socket deadlines, worker startup, overload rejection); `src/samba-vfs/tests/test-authd-capacity.py` |

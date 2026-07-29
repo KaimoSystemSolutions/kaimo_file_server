@@ -105,3 +105,78 @@ case: `/folder/file` was left absolute when the configured connectpath was `/`.
 
 **Next planned finding:** P2-03 — unify bridge path validation and route
 snapshot materialization through containment-checked storage resolution.
+
+### 2026-07-29 — P2-03: Unified bridge path validation and containment
+
+**Status:** Implemented and regression-tested in the complete managed test
+project. Live malformed-path probes through the deployable Samba stack remain
+release verification.
+
+The bridge previously applied different trust rules depending on the RPC.
+`Normalize()` removed leading separators, so an absolute input could become an
+apparently valid relative ACL path. Lifecycle events did not consistently
+validate their paths before durable claiming, and snapshot projections used
+local containment logic while persisted version paths were not checked at
+every output boundary.
+
+**Implemented**
+
+1. Added `ShareRelativePath.TryNormalizeStrict()` as the bridge-facing source
+   of truth. It validates the raw string before normalization and rejects null,
+   rooted/drive-qualified, control-character, complete traversal-segment, and
+   case-insensitive top-level `.kaimo-*` paths. It removes safe `.` components
+   and duplicate separators only after validation.
+2. Added `ShareRelativePath.ToContainedAbsolutePath()` as the shared lexical
+   resolver. It fully qualifies the configured root, preserves filesystem-root
+   semantics, applies platform-appropriate path comparison, and permits only
+   the root or a descendant across a complete separator boundary.
+3. Routed `FileSystemStorage.ToAbsolutePath()` through the shared resolver.
+   Server-owned internal paths remain explicitly allowed there because
+   `.kaimo-close-captures` is part of the durable close-event protocol.
+   Client-facing RPCs reject all `.kaimo-*` namespaces before reaching storage.
+4. Authz Open, Delete, and both Rename operands now use strict validation and
+   containment resolution. Their filesystem existence/type cross-checks no
+   longer use direct `Path.Combine()` calls on bridge input.
+5. Close, Mkdir, Delete, and Rename lifecycle RPCs validate and canonicalize
+   paths before resolving a share or claiming the event receipt. Handlers
+   receive the validated canonical path rather than the original protobuf
+   value.
+6. Snapshot Enumerate/Resolve ingress uses the same strict rules. Every
+   persisted `FileVersion.FilePath` is revalidated before constructing a
+   cache-relative response, checking an existing projection, reconciling a
+   folder, or writing content.
+7. Snapshot user-scope resolution now delegates to the shared containment API
+   instead of maintaining an independent `Path.Combine()`/prefix comparison.
+
+**Validation completed**
+
+- The focused managed project passes: 599 tests, 0 failures, 0 skipped.
+- Strict helper regressions cover Unix-rooted, Windows-rooted,
+  drive-qualified, traversal, NUL/control, internal namespace, sibling-prefix,
+  safe-dot, duplicate-separator, root, and server-owned internal-path cases.
+- Authz regressions prove invalid paths are denied before any ACL evaluation.
+- Lifecycle regressions prove invalid paths are rejected before share
+  resolution, event claiming, or file-service side effects.
+- Snapshot regressions prove traversal ingress is rejected before version
+  lookup and malformed persisted paths are never opened or materialized.
+- `git diff --check` passes.
+
+**Validation notes and remaining release work**
+
+- A complete `dotnet test Kaimo_File_Server.slnx --no-restore` invocation built
+  the Core, Infrastructure, Search, SmbBridge, Web, and test assemblies and
+  reported all tests successful, but MSBuild returned failure for the
+  `docker-compose.dcproj` because the sandbox account cannot read
+  `C:\Users\Marco\AppData\Local\Microsoft SDKs`.
+- The authoritative targeted command,
+  `dotnet test tests/Kaimo_File_Server.Tests/Kaimo_File_Server.Tests.csproj --no-restore`,
+  completed successfully and avoids that unrelated Docker tooling probe.
+- Exercise malformed absolute, traversal, control-character, `.kaimo-*`, root,
+  and valid dot-segment inputs through live SMB Open/Delete/Rename/Snapshot and
+  lifecycle operations in the deployable Compose stack.
+- Containment is lexical and intentionally matches the existing storage
+  contract. Native Samba remains responsible for descriptor-relative
+  mutation/TOCTOU checks and symlink policy.
+
+**Next planned finding:** P2-04 — replace unbounded snapshot-count parsing with
+strict overflow-aware parsing and a documented maximum.

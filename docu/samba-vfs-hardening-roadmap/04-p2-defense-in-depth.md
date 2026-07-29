@@ -46,9 +46,35 @@ weakening the prefix-collision rule.
 
 ### P2-03: Bridge path validation is inconsistent
 
+> **Remediation status (2026-07-29): Verified in the complete managed test
+> project. Live malformed-path probes through Samba remain part of the release
+> operation matrix.**
+
 Delete checks `ShareRelativePath.IsValid()`, while Open and Snapshot primarily call `Normalize()` only. Snapshot materialization also uses `Path.Combine()` directly rather than the storage layer's containment-checked `ToAbsolutePath()`.
 
 **Fix:** validate raw input before normalization, reject NUL/`..`/absolute/internal paths, then resolve through one containment-checked storage API. Validate persisted `FileVersion.FilePath` before using it as an output path.
+
+**Implemented fix:** `ShareRelativePath.TryNormalizeStrict()` now performs
+raw-input validation before canonicalization. It rejects null input, rooted and
+drive-qualified paths, control characters including NUL, complete `..`
+segments, disallowed roots, and every case-insensitive top-level `.kaimo-*`
+namespace. Safe `.` segments and duplicate separators are canonicalized only
+after those rejection checks.
+
+`ShareRelativePath.ToContainedAbsolutePath()` is the common lexical containment
+resolver used by `FileSystemStorage`, Authz filesystem state checks, and
+snapshot cache materialization. It resolves against a fully qualified root and
+accepts only the root itself or a descendant on a complete separator boundary.
+The storage layer explicitly permits server-owned internal paths because the
+durable close-capture workflow requires them; all client-facing Authz, Event,
+and Snapshot RPCs reject the same namespaces at ingress.
+
+Open, delete, rename source/destination, close, mkdir, lifecycle delete/rename,
+snapshot enumeration, and snapshot resolution now consume the normalized value
+returned by the strict validator. Invalid lifecycle events are rejected before
+share resolution and before an idempotency receipt is claimed. Persisted
+`FileVersion.FilePath` values are independently revalidated before cache-path
+construction, reuse checks, projection reconciliation, or materialization.
 
 ### P2-04: Snapshot enumeration parsing trusts an unbounded decimal count
 

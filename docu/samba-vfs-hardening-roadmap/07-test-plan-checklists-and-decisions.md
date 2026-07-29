@@ -60,14 +60,13 @@ A release should be blocked when any of the following is true:
 
 ## 12. Implementation checklist
 
-The checklist reflects the repository state on 2026-07-27. Checked items are
+The checklist reflects the repository state on 2026-07-29. Checked items are
 implemented; their required release verification remains tracked in milestone 4.
 
 ### Native VFS checklist
 
 - [x] Connection data uses Samba-owned lifetime and fail-closed allocation.
-- [x] One canonical share-relative path routine is used everywhere; raw-path
-  validation and containment checking remain P2-03.
+- [x] One canonical share-relative path routine is used everywhere.
 - [x] No fixed request-path buffer truncation can change the authorized target.
 - [x] User/share connection context cannot truncate or confuse identities;
   ingress is restricted to the bounded synchronization-safe ASCII syntax.
@@ -93,7 +92,9 @@ implemented; their required release verification remains tracked in milestone 4.
 - [x] Authenticated/authorized transport with mTLS and RPC allow-lists.
 - [ ] Enabled user/share/service checks are centralized. Share checks are now
   centralized; user and service checks still use separate paths.
-- [ ] Raw path validation and containment are consistent.
+- [x] Raw bridge paths are validated before normalization and resolved through
+  the common containment-checked path API; persisted snapshot paths are
+  independently revalidated.
 - [ ] Cancellation and limits propagate through all expensive work.
 - [x] Snapshot folder results are filtered per file.
 - [ ] Cache writes are atomic, hash-verified, read-only, and synchronized with cleanup.

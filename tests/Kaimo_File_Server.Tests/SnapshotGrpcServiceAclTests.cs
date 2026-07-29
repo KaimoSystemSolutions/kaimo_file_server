@@ -185,6 +185,33 @@ public sealed class SnapshotGrpcServiceAclTests : IDisposable
     }
 
     [Theory]
+    [InlineData("../escaped.txt")]
+    [InlineData("/escaped.txt")]
+    [InlineData(".kaimo-close-captures/event.cap")]
+    public async Task ResolveVersion_InvalidPersistedPath_IsNotMaterialized(
+        string persistedPath)
+    {
+        DateTime at = new(2026, 7, 20, 10, 11, 12, DateTimeKind.Utc);
+        const string requestPath = "docs/file.txt";
+        FileVersion version = Version(persistedPath, at, 4);
+        _versions.Setup(v => v.GetVersionAtAsync(
+                _share.Id, requestPath, at))
+            .ReturnsAsync(version);
+        _acl.Setup(a => a.HasAccessAsync(
+                _user, _share.Id, requestPath, false,
+                FilePermission.ListReadData))
+            .ReturnsAsync(true);
+
+        var reply = await ResolveAsync(
+            requestPath, "@GMT-2026.07.20-10.11.12");
+
+        Assert.False(reply.Found);
+        _versions.Verify(v => v.ReadVersionAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTime>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task ResolveVersion_CacheOverlappingShare_FailsClosed(
