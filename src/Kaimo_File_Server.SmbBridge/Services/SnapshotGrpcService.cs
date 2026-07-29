@@ -29,6 +29,9 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
 {
     // Same format Windows expects and FileVersion.ToGmtToken() emits.
     private const string GmtFormat = "'@GMT-'yyyy.MM.dd-HH.mm.ss";
+    // Must match KAIMO_LOCAL_MAX_SNAPSHOT_LABELS. Samba's shadow-copy
+    // enumeration is not paginated, so the contract returns the newest labels.
+    internal const int MaxEnumerationLabels = 2_048;
 
     private readonly IShareRepository _shares;
     private readonly IAuthenticationLookup _auth;
@@ -134,8 +137,22 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             }
         }
 
-        foreach (var ts in timestamps.Distinct().OrderByDescending(t => t))
-            reply.GmtTokens.Add(ts.ToString(GmtFormat, CultureInfo.InvariantCulture));
+        List<string> orderedLabels = timestamps
+            .OrderByDescending(timestamp => timestamp)
+            .Select(timestamp =>
+                timestamp.ToString(GmtFormat, CultureInfo.InvariantCulture))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (orderedLabels.Count > MaxEnumerationLabels)
+        {
+            _logger.LogWarning(
+                "EnumerateSnapshots: user={User} share={Share} path=[{Path}] has {Available} labels; returning newest {Maximum} and omitting {Omitted}",
+                request.Username, request.Share, request.Path,
+                orderedLabels.Count, MaxEnumerationLabels,
+                orderedLabels.Count - MaxEnumerationLabels);
+        }
+        reply.GmtTokens.AddRange(
+            orderedLabels.Take(MaxEnumerationLabels));
 
         _logger.LogInformation(
             "EnumerateSnapshots: user={User} share={Share} path=[{Path}] -> {Count} tokens",

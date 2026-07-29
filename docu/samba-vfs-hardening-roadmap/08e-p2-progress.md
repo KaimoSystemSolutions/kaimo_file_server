@@ -248,3 +248,71 @@ central proof that the declared count matched the complete received record set.
 
 **Next planned finding:** P2-05 — make snapshot response-buffer capacity and
 over-limit behavior explicit, consistent, and observable.
+
+### 2026-07-29 — P2-05: Explicit snapshot response-capacity contract
+
+**Status:** Implemented, regression-tested, and verified in the pinned Samba
+4.19.5 `build-runtime` image.
+
+P2-04 made the consumer parser bounded and exact, but an over-limit managed
+history still reached `kaimo_authd`, where it became a generic enumeration
+error. The 64-KiB response capacity and the desired behavior for histories
+larger than the wire contract were not yet enforced at the source or expressed
+as a compile-time invariant.
+
+**Architecture decision**
+
+Samba's `get_shadow_copy_data` callback returns one complete label array and
+does not expose continuation state. Kaimo therefore does not add pagination
+that the SMB-facing callback cannot consume. The supported contract is the
+newest 2,048 distinct, second-resolution `@GMT` labels. Older history remains
+stored and available through non-SMB application paths, but is omitted from
+SMB Previous Versions enumeration once the bound is exceeded.
+
+**Implemented**
+
+1. Added `SnapshotGrpcService.MaxEnumerationLabels = 2_048`, explicitly tied
+   by source comments and tests to `KAIMO_LOCAL_MAX_SNAPSHOT_LABELS`.
+2. Enumeration now sorts timestamps descending before formatting, deduplicates
+   the formatted 24-byte labels, and only then applies the limit. Sub-second
+   database timestamps that map to the same Windows label do not consume
+   multiple wire slots.
+3. When the distinct label count exceeds the contract, the bridge returns the
+   newest labels and logs the total available count, maximum returned count,
+   and number omitted. This turns a previously generic sidecar failure into an
+   observable, deterministic policy.
+4. Added `KAIMO_LOCAL_MAX_SNAPSHOT_ENUMERATION_PAYLOAD`, derived from the count,
+   per-record length prefix, and fixed token length. A preprocessor guard fails
+   the C/C++ build if the calculated 57,348-byte maximum ever exceeds
+   `KAIMO_LOCAL_MAX_RESPONSE_PAYLOAD` (65,536 bytes).
+5. Retained layered defensive checks: the sidecar rejects an out-of-contract
+   gRPC result, the builder publishes either a complete response or error, the
+   frame reader rejects an oversized declared payload before reading it, and
+   the VFS parser rejects incomplete or trailing records before allocation.
+
+**Validation completed**
+
+- Added a managed over-limit regression with 2,050 unique seconds plus one
+  sub-second duplicate. It proves exactly 2,048 labels are returned, the newest
+  label is first, the oldest retained boundary is correct, the oldest labels
+  are absent, and the formatted duplicate does not consume a slot.
+- The cumulative managed project passes: 600 tests, 0 failures, 0 skipped.
+- The native snapshot regression asserts the derived maximum is exactly 57,348
+  bytes and does not exceed the response-frame limit.
+- The Docker image `kaimo-samba-build-tests:p2-05` built successfully,
+  including the complete native helper suite and sidecar compilation.
+- The real `kaimo_bridge` module compiled and linked successfully against
+  pinned Samba 4.19.5 / ABI 49.
+- `git diff --check` passes.
+
+**Validation still required**
+
+- Exercise a live SMB client against 2,048 and more than 2,048 distinct version
+  timestamps, confirming Windows and `smbclient` receive the newest ordered
+  subset without an enumeration error.
+- Monitor the over-limit warning in production. Repeated occurrences may
+  justify a product-level SMB retention setting, but do not require a larger
+  local frame or an unsafe partial response.
+
+**Next planned finding:** P2-06 — verify cache hits by immutable content
+identity rather than file size alone.

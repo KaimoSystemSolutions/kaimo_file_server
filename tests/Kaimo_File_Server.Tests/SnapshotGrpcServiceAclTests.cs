@@ -86,6 +86,48 @@ public sealed class SnapshotGrpcServiceAclTests : IDisposable
     }
 
     [Fact]
+    public async Task EnumerateSnapshots_OverProtocolLimit_ReturnsNewestLabels()
+    {
+        DateTime oldest = new(
+            2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        List<DateTime> timestamps = Enumerable
+            .Range(0, SnapshotGrpcService.MaxEnumerationLabels + 2)
+            .Select(offset => oldest.AddSeconds(offset))
+            .Reverse()
+            .ToList();
+        // A sub-second duplicate formats to an already represented @GMT label
+        // and must not consume one of the bounded wire slots.
+        timestamps.Add(oldest.AddMilliseconds(500));
+        _files.Setup(f => f.GetFolderSnapshotTimestampsAsync("docs", _user))
+            .ReturnsAsync(timestamps);
+
+        var reply = await _sut.EnumerateSnapshots(
+            new EnumerateSnapshotsRequest
+            {
+                Username = "alice", Share = "share", Path = "docs"
+            }, null!);
+
+        Assert.Equal(
+            SnapshotGrpcService.MaxEnumerationLabels,
+            reply.GmtTokens.Count);
+        Assert.Equal(
+            timestamps.Max().ToString(
+                "'@GMT-'yyyy.MM.dd-HH.mm.ss",
+                System.Globalization.CultureInfo.InvariantCulture),
+            reply.GmtTokens[0]);
+        Assert.Equal(
+            oldest.AddSeconds(2).ToString(
+                "'@GMT-'yyyy.MM.dd-HH.mm.ss",
+                System.Globalization.CultureInfo.InvariantCulture),
+            reply.GmtTokens[^1]);
+        Assert.DoesNotContain(
+            oldest.ToString(
+                "'@GMT-'yyyy.MM.dd-HH.mm.ss",
+                System.Globalization.CultureInfo.InvariantCulture),
+            reply.GmtTokens);
+    }
+
+    [Fact]
     public async Task ResolveFolder_FiltersAndRemovesPreviouslyMaterializedDeniedFile()
     {
         DateTime at = new(2026, 7, 20, 10, 11, 12, DateTimeKind.Utc);

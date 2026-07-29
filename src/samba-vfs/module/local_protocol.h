@@ -36,6 +36,14 @@
  * bytes, leaving deterministic headroom in the 64-KiB response frame. */
 #define KAIMO_LOCAL_MAX_SNAPSHOT_LABELS 2048U
 #define KAIMO_LOCAL_SNAPSHOT_TOKEN_BYTES 24U
+#define KAIMO_LOCAL_MAX_SNAPSHOT_ENUMERATION_PAYLOAD \
+	(4U + KAIMO_LOCAL_MAX_SNAPSHOT_LABELS * \
+	 (4U + KAIMO_LOCAL_SNAPSHOT_TOKEN_BYTES))
+
+#if KAIMO_LOCAL_MAX_SNAPSHOT_ENUMERATION_PAYLOAD > \
+	KAIMO_LOCAL_MAX_RESPONSE_PAYLOAD
+#error "snapshot enumeration contract exceeds local response frame"
+#endif
 
 enum kaimo_local_operation {
 	KAIMO_LOCAL_OP_NONE = 0,

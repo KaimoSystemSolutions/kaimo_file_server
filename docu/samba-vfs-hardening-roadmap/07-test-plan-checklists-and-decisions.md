@@ -77,6 +77,8 @@ implemented; their required release verification remains tracked in milestone 4.
 - [x] Timewarp opens are read-only and use the VFS stack.
 - [x] Snapshot enumeration count and token records are bounded and validated
   before Samba label allocation.
+- [x] Snapshot response capacity is a compile-time wire invariant; over-limit
+  histories deterministically expose the newest 2,048 distinct labels.
 - [x] All Unix-socket calls have deadlines and full I/O loops.
 
 ### Sidecar checklist

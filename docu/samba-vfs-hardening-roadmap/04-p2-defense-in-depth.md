@@ -104,9 +104,33 @@ the shared `snapshot_enumeration.h` contract:
 
 ### P2-05: Snapshot response buffers impose undocumented truncation
 
+> **Remediation status (2026-07-29): Verified in managed tests, focused native
+> tests, and the pinned Samba 4.19.5 build-runtime image. Live SMB boundary
+> coverage remains part of the release operation matrix.**
+
 The VFS uses a 64 KiB response buffer for enumeration. The header may advertise more tokens than fit, while only a subset is parsed. The protocol does not signal truncation or pagination.
 
 **Fix:** add pagination/streaming or an explicit bounded count. Reject a response that exceeds the negotiated frame limit.
+
+**Implemented fix:** Samba's shadow-copy enumeration callback is not paginated,
+so Kaimo now uses an explicit newest-2,048 contract across the managed bridge,
+sidecar, local wire format, and VFS:
+
+- The managed bridge orders timestamps newest-first, formats and deduplicates
+  the final `@GMT` labels, and returns at most 2,048. When older labels are
+  omitted, it emits a warning with the available, returned, and omitted counts.
+- The protocol declares the maximum enumeration payload as 57,348 bytes and
+  fails compilation if that value ever exceeds the 65,536-byte response frame.
+- `kaimo_authd` retains independent maximum/token checks and the local builder
+  changes the entire response to error if serialization cannot complete.
+- Frame readers reject declared response lengths above 65,536 before reading
+  payload bytes. The P2-04 validator then requires the count and complete token
+  records to consume the payload exactly, so a partial subset is never exposed.
+
+The selected policy preserves the newest versions, which are the operationally
+most relevant in Windows Previous Versions, while keeping a fixed-memory,
+non-paginated Samba contract. Pagination is intentionally not introduced into a
+callback that cannot communicate continuation state to SMB clients.
 
 ### P2-06: Snapshot cache validity uses size instead of content identity
 

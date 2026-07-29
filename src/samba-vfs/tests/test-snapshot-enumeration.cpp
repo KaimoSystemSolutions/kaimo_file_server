@@ -49,6 +49,9 @@ static void expect_invalid(
 
 int main()
 {
+	assert(KAIMO_LOCAL_MAX_SNAPSHOT_ENUMERATION_PAYLOAD == 57348U);
+	assert(KAIMO_LOCAL_MAX_SNAPSHOT_ENUMERATION_PAYLOAD <=
+	       KAIMO_LOCAL_MAX_RESPONSE_PAYLOAD);
 	expect_valid(response(0, 0), 0);
 	expect_valid(response(1, 1), 1);
 	expect_valid(
