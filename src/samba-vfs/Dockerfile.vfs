@@ -77,6 +77,13 @@ COPY patches/0001-map-vfs-connect-errno.patch /tmp/
 RUN patch -p1 < /tmp/0001-map-vfs-connect-errno.patch \
     && grep -F "map_nt_error_from_unix(connect_errno)" source3/smbd/smb2_service.c
 
+# Samba 4.19.5 labels control-channel PING receipt as INFO but emits it at
+# warning level 1. Our accountless Docker healthcheck pings every 15 seconds,
+# so align that message with Samba's actual DBGLVL_INFO (5).
+COPY patches/0002-log-control-ping-at-info.patch /tmp/
+RUN patch -p1 < /tmp/0002-log-control-ping-at-info.patch \
+    && grep -F 'DEBUG(DBGLVL_INFO, ("INFO: Received PING message' source3/lib/messages.c
+
 # 1) Register module in build system (template: vfs_fake_perms). Constant strings.
 RUN cat >> source3/modules/wscript_build <<'PYEOF'
 

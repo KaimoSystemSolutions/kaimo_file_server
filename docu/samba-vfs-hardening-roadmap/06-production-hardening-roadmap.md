@@ -211,7 +211,8 @@ guarantee.
    crash and recovery, network partitions, active-session revocation, and
    multi-user snapshot isolation. The 2026-07-29 deployable-stack startup pass
    already caught and closed the `smb encrypt`/`server smb encrypt` registry
-   canonicalization defect; the broader matrix remains open.
+   canonicalization defect and the `wsdd` reconciliation-lock inheritance
+   defect; the broader matrix remains open.
 9. Decide whether bridge redundancy is required by the availability SLO and
    implement it if a single fail-closed bridge outage is unacceptable.
 

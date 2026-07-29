@@ -87,6 +87,14 @@ if ! bash "$CYCLE" users /bin/true >/dev/null \
     exit 1
 fi
 
+export RUNNER_EXIT_CODE=75
+if ! busy_output="$(bash "$CYCLE" config /bin/true 2>&1)" \
+    || [ -s "$REVOKER_LOG" ] \
+    || ! grep -Fq 'previous run is still active' <<<"$busy_output"; then
+    echo "FAIL: lock contention triggered revocation or was not reported as a skipped cycle."
+    exit 1
+fi
+
 export RUNNER_EXIT_CODE=7
 if ! bash "$CYCLE" shares /bin/false >/dev/null 2>&1 \
     || ! grep -Fqx 'shares reconciliation failure' "$REVOKER_LOG"; then

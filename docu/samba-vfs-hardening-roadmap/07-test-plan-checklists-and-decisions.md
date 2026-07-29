@@ -62,6 +62,8 @@ A release should be blocked when any of the following is true:
 - Synchronization reports success without converging passdb/registry/config state.
 - Configuration read-after-write verification uses an accepted input alias
   rather than the canonical key actually exposed by the pinned Samba registry.
+- A reconciler descendant can retain a component lock, or a harmless
+  overlapping cycle can trigger global active-session revocation.
 - Event retries can create duplicates or delete valid history.
 - The bridge accepts unauthenticated hash or snapshot RPCs.
 - The checksum-pinned Samba source, installed runtime version, source VFS ABI,
@@ -133,6 +135,9 @@ implemented; their required release verification remains tracked in milestone 4.
 - [x] Config verification supports explicit canonical Samba registry read
   names; `smb encrypt` is verified as `server smb encrypt` on Samba 4.19.5.
 - [x] Concurrent sync instances are locked out.
+- [x] Reconciliation commands and descendants cannot inherit the runner lock;
+  lock contention skips the overlapping cycle without publishing false
+  convergence or revoking sessions, while freshness detects a hung owner.
 - [x] Share/config polling is bounded to 1-5 seconds; hash-bearing user sync is
   fixed at 60 seconds. All three must converge before `smbd` starts.
 - [x] Disabled users, shares, and the global service forcibly close active

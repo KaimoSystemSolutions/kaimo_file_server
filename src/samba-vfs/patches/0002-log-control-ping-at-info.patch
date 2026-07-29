@@ -1,0 +1,13 @@
+diff --git a/source3/lib/messages.c b/source3/lib/messages.c
+index 9d9d5f1..44fe09e 100644
+--- a/source3/lib/messages.c
++++ b/source3/lib/messages.c
+@@ -125,7 +125,7 @@ static void ping_message(struct messaging_context *msg_ctx,
+ {
+ 	struct server_id_buf idbuf;
+ 
+-	DEBUG(1, ("INFO: Received PING message from PID %s [%.*s]\n",
++	DEBUG(DBGLVL_INFO, ("INFO: Received PING message from PID %s [%.*s]\n",
+ 		  server_id_str_buf(src, &idbuf), (int)data->length,
+ 		  data->data ? (char *)data->data : ""));
+ 

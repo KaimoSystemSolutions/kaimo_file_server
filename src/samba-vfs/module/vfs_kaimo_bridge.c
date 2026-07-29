@@ -1122,13 +1122,13 @@ static int kaimo_connect(vfs_handle_struct *handle,
 	}
 
 	if (!is_ipc && !kaimo_authz_connect(service, user)) {
-		DBG_ERR("kaimo_bridge: CONNECT DENIED share=[%s] user=[%s]\n",
+		DBG_INFO("kaimo_bridge: CONNECT DENIED share=[%s] user=[%s]\n",
 			service ? service : "(null)", user ? user : "(null)");
 		errno = EACCES;
 		return -1;
 	}
 
-	DBG_ERR("kaimo_bridge: CONNECT ALLOW share=[%s] user=[%s]\n",
+	DBG_INFO("kaimo_bridge: CONNECT ALLOW share=[%s] user=[%s]\n",
 		service ? service : "(null)", user ? user : "(null)");
 
 	/* Prepare the mandatory authorization context BEFORE connecting the next
@@ -1173,7 +1173,7 @@ static int kaimo_connect(vfs_handle_struct *handle,
 
 static void kaimo_disconnect(vfs_handle_struct *handle)
 {
-	DBG_ERR("kaimo_bridge: DISCONNECT\n");
+	DBG_INFO("kaimo_bridge: DISCONNECT\n");
 	SMB_VFS_NEXT_DISCONNECT(handle);
 }
 

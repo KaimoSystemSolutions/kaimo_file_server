@@ -1479,3 +1479,109 @@ errors even though no operator action occurred.
 release matrix. Treat every accepted Samba configuration alias as distinct
 from its persistent registry representation until verified against the pinned
 runtime.
+
+### 2026-07-29 — P2-17: Prevented reconciliation-lock inheritance
+
+**Status:** Implemented, regression-tested, and verified in the pinned
+build-runtime image. The deployable stack exposed the defect after P2-16
+allowed initial configuration convergence to complete. Final post-rebuild
+Compose observation is pending a running Visual Studio Bridge application.
+
+**Observed failure**
+
+Samba, authd, and the Bridge started successfully and Docker reported the
+Samba container as healthy. Immediately afterward, every two-second config
+cycle logged:
+
+- `config reconciliation is already running`;
+- `config reconciliation failed (rc=1); closing active sessions`;
+- `closed 6 active share boundary/boundaries`.
+
+The result was continuous disconnection of all registry shares despite no
+configuration change or operator action.
+
+**Root cause and evidence**
+
+`run-sync.sh` opened `/run/kaimo-sync/config.lock` as descriptor 9 and held a
+nonblocking `flock` while calling `sync-config.sh`. When configuration enabled
+WS-Discovery, that script launched `wsdd` in the background. The child and its
+daemon descendant inherited every open runner descriptor.
+
+Live process inspection proved the ownership leak:
+
+```text
+/proc/<wsdd-pid>/fd/9 -> /run/kaimo-sync/config.lock
+```
+
+The runner exited normally and published `config.last-success`, but the
+reparented `wsdd` process kept the same open file description and therefore
+the lock. All later runner instances failed before executing config export.
+Because the failure occurred at lock acquisition, it did not publish
+`config.last-failure`. The healthcheck consequently remained green until the
+180-second maximum age elapsed, while `sync-cycle.sh` treated each lock miss as
+uncertain state and revoked every share.
+
+**Implemented**
+
+1. Kept descriptor 9 open in the runner itself until command completion and
+   atomic last-success/last-failure publication.
+2. Executed every reconciliation command with descriptor 9 explicitly closed.
+   This applies generically to users, shares, and config; all child and
+   background descendant processes inherit the closed state.
+3. Reserved exit status 75 (`EX_TEMPFAIL`) for runner-owned nonblocking lock
+   contention.
+4. Changed `sync-cycle.sh` to recognize status 75 as a skipped overlap. It
+   neither publishes a synthetic failure nor invokes session revocation.
+5. Preserved stale-owner detection: a running owner must publish a new success;
+   otherwise `sync-health.sh` fails after the configured freshness window.
+6. Prevented status ambiguity by mapping a reconciler-originated exit 75 to a
+   normal published failure before returning to the cycle.
+7. Extended `test-sync-runner.sh` with a live long-running descendant. The test
+   proves the descendant stays alive without the lock descriptor and that an
+   immediate following config reconciliation can acquire the lock.
+8. Added assertions that genuine contention returns exactly 75 without a
+   failure marker and that command-originated 75 cannot masquerade as
+   contention.
+9. Extended `test-revocation-policy.sh` to prove a skipped overlapping cycle
+   does not call the revoker, while real reconciliation failures retain the
+   existing fail-closed containment behavior.
+10. Updated the operational guide, release gates, checklist, production
+    roadmap, and source-evidence index.
+
+**Security and availability properties**
+
+- Serialization still covers mutation plus durable result publication.
+- Reconcile descendants cannot outlive the command while retaining its lock.
+- Actual export, validation, mutation, read-back, or publication failures
+  still close active sessions.
+- Mere lock contention is no longer misrepresented as uncertain Samba state.
+- A stuck lock owner cannot remain healthy indefinitely; health freshness,
+  rather than repeated destructive revocation, is the escalation mechanism.
+- The special contention status cannot be forged accidentally by a failing
+  reconciler command.
+
+**Validation**
+
+- Focused runner/health regression passes, including contention, reserved
+  status translation, descendant lifetime, descriptor inspection, lock
+  reacquisition, failure publication, recovery, and stale-state rejection.
+- Focused revocation-policy regression passes for success, overlap, genuine
+  failure, successful containment, and unprovable containment.
+- The complete pinned `build-runtime` graph passes, including the new runner
+  and revocation regressions, real Samba registry integration, module/version/
+  ABI checks, and the live SMB/full_audit operation matrix.
+- The corrected Compose image was built and the Samba container was recreated.
+  Initial reconciliation correctly published `users.last-failure` while the
+  Bridge was absent. After the bounded retry window the container restarted
+  once under its declared policy. The Visual Studio Bridge container contained
+  only its debug-helper wait process, so initial convergence did not reach
+  config or start `wsdd`.
+- Once the Bridge application is running, deployable-stack observation must
+  confirm that the running `wsdd` process
+  has no descriptor for `/run/kaimo-sync/config.lock`, periodic config
+  reconciliations complete, no repeated share closures occur, and Docker
+  health remains green for a fresh successful state.
+
+**Next planned workstream:** continue the milestone-4 live release matrix and
+apply the same descendant-descriptor audit to any future background process
+started from a serialized reconciliation context.

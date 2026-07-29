@@ -77,11 +77,18 @@ fi
 
 export KAIMO_LOG_LEVEL=Debug
 if ! bash "$SUT" >/dev/null 2>&1 \
-    || ! grep -q $'^log level\t3$' "$CONFIG_STATE"; then
+    || ! grep -q $'^log level\t10$' "$CONFIG_STATE"; then
     echo "FAIL: KAIMO_LOG_LEVEL did not override the Settings log level."
     exit 1
 fi
 unset KAIMO_LOG_LEVEL
+
+printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":true,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Information"}}' >"$CONFIG_RESPONSE"
+if ! bash "$SUT" >/dev/null 2>&1 \
+    || ! grep -q $'^log level\t5$' "$CONFIG_STATE"; then
+    echo "FAIL: Settings Information level was not mapped to Samba DBGLVL_INFO (5)."
+    exit 1
+fi
 
 export NET_FAIL_PARAMETER="server signing"
 printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_10","max_protocol":"SMB3_11","require_signing":false,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}}' >"$CONFIG_RESPONSE"

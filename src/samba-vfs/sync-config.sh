@@ -135,8 +135,10 @@ fi
 # The environment variable is the explicit highest-priority manual override.
 effective_log_level="${KAIMO_LOG_LEVEL:-$app_log_level}"
 case "${effective_log_level,,}" in
-    debug)       samba_log_level="3" ;;
-    information) samba_log_level="2" ;;
+    # Samba's DBG_* severities use these numeric values (util/debug.h):
+    # ERR=0, WARNING=1, NOTICE=3, INFO=5, DEBUG=10.
+    debug)       samba_log_level="10" ;;
+    information) samba_log_level="5" ;;
     warning)     samba_log_level="1" ;;
     error)       samba_log_level="0" ;;
     *)

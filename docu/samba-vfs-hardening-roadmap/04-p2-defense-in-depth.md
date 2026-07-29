@@ -508,3 +508,44 @@ An additional build-runtime integration test uses the real Samba 4.19.5
 `net conf` binary with isolated private/state/cache/lock directories. It proves
 the canonical persisted key, rejection of the noncanonical lookup, and a
 no-change second reconciliation without mutating production image state.
+
+### P2-17: A reconciliation daemon can retain its component lock
+
+> **Remediation status (2026-07-29): Implemented, regression-tested, and
+> verified in the pinned build-runtime image with a live descendant process
+> and descriptor inspection. Final composed observation with the real Bridge
+> is pending because the Visual Studio Bridge application was not running
+> during post-rebuild verification.**
+
+`run-sync.sh` acquired each component's nonblocking `flock` on file descriptor
+9 and then executed the reconciler without closing that descriptor in the
+child. When `sync-config.sh` enabled WS-Discovery, the background `wsdd`
+process inherited descriptor 9. The initiating reconciliation completed and
+published success, but the long-running responder retained
+`/run/kaimo-sync/config.lock` indefinitely.
+
+Every subsequent two-second config cycle received “already running.”
+`sync-cycle.sh` treated every nonzero runner result as uncertain desired state
+and closed all active registry shares. This caused a persistent availability
+failure while Docker health remained green until the last-success timestamp
+exceeded its 180-second freshness bound. Lock contention occurred before
+failure publication, so no immediate `config.last-failure` existed.
+
+**Implemented fix:** the runner continues to own descriptor 9 until the
+reconcile result is atomically published, but invokes the reconcile command
+with descriptor 9 explicitly closed. Neither that command nor any background
+descendant can retain the lock after runner completion.
+
+Nonblocking lock contention now returns reserved `EX_TEMPFAIL` status 75.
+`sync-cycle.sh` recognizes only this runner-owned status as an overlapping
+cycle, reports it as skipped, and does not revoke sessions or publish a
+synthetic failure. The active owner remains responsible for its result; a
+genuinely hung owner is detected by the existing convergence-freshness limit.
+If an executed reconciler itself returns 75, the runner maps it to an ordinary
+published failure so it cannot bypass containment.
+
+Regression coverage proves that a long-lived background descendant remains
+alive without descriptor 9, a following reconciliation immediately obtains
+the lock, contention returns exactly 75 without creating a failure marker,
+command-originated status 75 remains a real failure, and skipped overlap does
+not invoke global session revocation.

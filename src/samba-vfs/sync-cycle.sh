@@ -24,6 +24,7 @@ shift
 
 runner="${KAIMO_SYNC_RUNNER:-/usr/local/bin/run-sync.sh}"
 revoker="${KAIMO_SESSION_REVOKER:-/usr/local/bin/revoke-samba-sessions.sh}"
+lock_busy_exit=75
 umask 077
 cycle_log="$(mktemp "${TMPDIR:-/tmp}/kaimo-sync-cycle.$component.XXXXXX")" || {
     echo "[sync-cycle] cannot create private cycle log." >&2
@@ -38,6 +39,14 @@ if [ "$rc" -eq 0 ]; then
 fi
 
 sed 's/^/[sync-cycle]   /' "$cycle_log" >&2
+if [ "$rc" -eq "$lock_busy_exit" ]; then
+    # An existing serialized run is not evidence of uncertain desired state.
+    # Do not disconnect clients and do not publish a synthetic failure. If the
+    # owner is hung, sync-health will fail once its last success becomes stale.
+    echo "[sync-cycle] $component reconciliation skipped; previous run is still active." >&2
+    exit 0
+fi
+
 echo "[sync-cycle] $component reconciliation failed (rc=$rc); closing active sessions." >&2
 if "$revoker" "$component reconciliation failure"; then
     # The uncertain state is contained. run-sync.sh has published the failed

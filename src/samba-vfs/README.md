@@ -147,6 +147,11 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
   private last-success/last-failure timestamps; `sync-health.sh` makes missing,
   failed, or stale convergence fail container health (180-second default,
   configurable with `KAIMO_SYNC_HEALTH_MAX_AGE_SECONDS`).
+- **P2-17 lock ownership:** the runner retains its component lock through
+  result publication but closes the lock descriptor in the reconcile command,
+  preventing `wsdd` or another background descendant from retaining it.
+  A concurrent cycle is skipped without disconnecting clients; it publishes no
+  false success, so the normal freshness limit still detects a hung owner.
 - **P1-18 structured records:** the three C++ exporters emit bounded version-1
   JSON documents. The shell reconcilers independently require exact schemas,
   types, unique safe names, exact NT hashes, valid protocol ranges, and share
