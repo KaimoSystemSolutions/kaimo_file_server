@@ -101,7 +101,8 @@ implemented; their required release verification remains tracked in milestone 4.
   independently revalidated.
 - [ ] Cancellation and limits propagate through all expensive work.
 - [x] Snapshot folder results are filtered per file.
-- [ ] Cache writes are atomic, hash-verified, read-only, and synchronized with cleanup.
+- [x] Cache writes are atomic, hash-verified, read-only, and synchronized with
+  cleanup; Linux-container and live-SMB behavior remain release gates.
 - [ ] Lifecycle handlers are idempotent.
 
 ### Synchronization checklist

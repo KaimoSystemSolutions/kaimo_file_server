@@ -316,3 +316,63 @@ SMB Previous Versions enumeration once the bound is exceeded.
 
 **Next planned finding:** P2-06 — verify cache hits by immutable content
 identity rather than file size alone.
+
+### 2026-07-29 — P2-06: Content-verified snapshot cache reuse
+
+**Status:** Implemented and regression-tested. The implementation was
+introduced as part of the earlier P1-07 atomic-materialization remediation;
+P2-06 is now independently verified and formally closed in the P2 roadmap.
+
+The original cache-hit predicate accepted any existing file with the expected
+length. Equal-length corruption, tampering, or a crash artifact could therefore
+be exposed as historical content without reading the immutable version source.
+
+**Implemented contract**
+
+1. `FileVersion.ContentHash` is the authoritative immutable content identity.
+   Version metadata must contain a non-negative length and a 64-character
+   hexadecimal SHA-256 digest before it can influence cache reuse or
+   publication.
+2. A concrete-file cache hit requires both exact length and a streamed SHA-256
+   match. A valid hit avoids decompression and blob access; size equality alone
+   is never sufficient.
+3. Complete folder projections apply the same per-file predicate and also
+   require the actual file set to equal the ACL-filtered expected set. Missing,
+   additional, malformed, or content-mismatched entries force reconciliation
+   and rematerialization.
+4. Replacement content is written to a unique same-directory temporary file.
+   Streaming is capped by the declared length, the final length and SHA-256
+   digest are verified, the file is flushed to durable storage, marked
+   read-only, timestamped, and atomically moved into place.
+5. Invalid metadata, short or oversized source streams, digest mismatches, and
+   cancellation fail closed. The final path is not published from unverified
+   data, and abandoned temporary files are removed.
+
+**Validation completed**
+
+- The focused `SnapshotGrpcServiceAclTests` suite passes: 21 tests, 0
+  failures, 0 skipped.
+- The cumulative managed test project passes: 602 tests, 0 failures, 0
+  skipped.
+- Added a positive cache-hit regression proving matching length and SHA-256
+  reuse the existing projection without calling `ReadVersionAsync`.
+- Retained the concrete-file regression proving a same-sized corrupt entry is
+  not reused and is replaced with verified immutable content.
+- Added the equivalent folder-projection regression, proving the directory
+  fast path cannot accept a same-sized corrupt child and that exactly one
+  verified rematerialization occurs.
+- Existing negative tests continue to cover source digest mismatch, short
+  source content, oversized source content, absence of a partial final file,
+  and temporary-file cleanup.
+
+**Validation still required**
+
+- Run the focused suite inside the Linux bridge container to cover the deployed
+  filesystem's async hashing, `fsync`, read-only mode, and atomic replacement
+  behavior.
+- Corrupt a same-sized cached projection in the deployable stack and verify
+  Windows Previous Versions plus `smbclient` receive repaired historical
+  content rather than the tampered entry.
+
+**Next planned finding:** P2-07 — make cleanup directory enumeration
+exception-safe by ensuring failures occur inside the protected boundary.

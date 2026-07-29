@@ -151,10 +151,12 @@ corruption, cancellation, and resource pressure.
    abandoned output.
 4. **Completed 2026-07-28:** propagate gRPC cancellation through repository
    calls, ACL filtering, decompression, copying, and materialization.
-5. Harden snapshot response parsing with bounded counts, overflow checks,
-   consistent framing, and explicit pagination or truncation behavior.
-6. Validate cache configuration at startup and use content identity rather than
-   file size for cache validity.
+5. **Completed 2026-07-29:** harden snapshot response parsing with bounded
+   counts, overflow checks, consistent framing, and deterministic newest-2,048
+   truncation behavior.
+6. Validate cache configuration at startup. **Content-identity cache
+   validation completed 2026-07-29:** individual-file and folder cache hits
+   require the immutable version SHA-256 digest as well as the expected length.
 7. Invalidate projections on version/share deletion and ACL revocation, while
    retaining an authorization check on every open.
 

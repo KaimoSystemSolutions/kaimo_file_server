@@ -3,8 +3,8 @@
 This documentation contains the security, memory-safety, and coverage audit for the Samba VFS migration. The former monolithic document has been split by topic so findings, target architecture, implementation planning, and progress history can be maintained and reviewed independently.
 
 > **Current as of:** 2026-07-29
-> **Most recently completed:** P2-05 – Explicit snapshot response-capacity contract
-> **Next planned finding:** P2-06 – Verify snapshot cache content identity
+> **Most recently completed:** P2-06 – Content-verified snapshot cache reuse
+> **Next planned finding:** P2-07 – Make cleanup enumeration exception-safe
 > **Production approval:** Still blocked until the remaining credential and synchronization risks, lifecycle reconciliation work, and release gates are complete.
 
 ## Table of contents

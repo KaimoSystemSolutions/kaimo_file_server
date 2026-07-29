@@ -134,9 +134,23 @@ callback that cannot communicate continuation state to SMB clients.
 
 ### P2-06: Snapshot cache validity uses size instead of content identity
 
+> **Remediation status (2026-07-29): Implemented and regression-tested. Linux
+> container and live SMB verification remain release gates.**
+
 A same-sized partial/corrupt/tampered file is accepted as a valid cache hit.
 
 **Fix:** include version ID/content hash in the cache key or verify the stored hash before reuse.
+
+**Implemented fix:** immutable `FileVersion.ContentHash` SHA-256 metadata is the
+content identity. Both individual-file and complete-folder cache-hit paths
+require the expected length and SHA-256 digest to match before reuse. A missing,
+short, oversized, or same-sized corrupt projection is rematerialized through a
+unique sibling temporary file; the streamed source is independently checked
+against the same length and digest before durable flush and atomic publication.
+Invalid version metadata and source-content mismatches fail closed without
+publishing a partial final file. Focused regressions cover a verified cache hit
+without blob access and same-sized corruption repair for both concrete-file and
+folder resolution.
 
 ### P2-07: Cleanup enumeration exception handling is incomplete
 

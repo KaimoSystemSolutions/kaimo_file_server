@@ -7,6 +7,7 @@ x-bounded-logging: &bounded-logging
     max-size: "10m"
     max-file: "3"
 
+
 services:
   # One-shot bootstrap for local development. It creates the complete mTLS PKI
   # on the first Compose start and becomes a no-op when all files already exist.

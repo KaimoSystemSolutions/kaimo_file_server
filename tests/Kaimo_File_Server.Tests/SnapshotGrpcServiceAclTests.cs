@@ -319,6 +319,56 @@ public sealed class SnapshotGrpcServiceAclTests : IDisposable
     }
 
     [Fact]
+    public async Task ResolveConcreteFile_ReusesContentVerifiedCacheWithoutBlobRead()
+    {
+        DateTime at = new(2026, 7, 20, 10, 11, 12, DateTimeKind.Utc);
+        string token = "@GMT-2026.07.20-10.11.12";
+        byte[] expected = Encoding.UTF8.GetBytes("verified");
+        FileVersion version = Version("docs/file.txt", at, expected);
+        AllowConcreteFile(version, expected);
+
+        string final = CachePath(token, version.FilePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(final)!);
+        await File.WriteAllBytesAsync(final, expected);
+
+        var reply = await ResolveAsync(version.FilePath, token);
+
+        Assert.True(reply.Found);
+        Assert.Equal(expected, await File.ReadAllBytesAsync(final));
+        _versions.Verify(v => v.ReadVersionAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<DateTime>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ResolveFolder_ReplacesSameSizedCorruptCachedChild()
+    {
+        DateTime at = new(2026, 7, 20, 10, 11, 12, DateTimeKind.Utc);
+        string token = "@GMT-2026.07.20-10.11.12";
+        byte[] expected = Encoding.UTF8.GetBytes("good");
+        FileVersion version = Version("docs/file.txt", at, expected);
+        SetupFolder("docs", at, version);
+        _versions.Setup(v => v.ReadVersionAsync(
+                _share.Id, version.FilePath, at,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => new MemoryStream(expected));
+
+        string final = CachePath(token, version.FilePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(final)!);
+        await File.WriteAllBytesAsync(final, Encoding.UTF8.GetBytes("evil"));
+
+        var reply = await ResolveAsync("docs", token);
+
+        Assert.True(reply.Found);
+        Assert.Equal(expected, await File.ReadAllBytesAsync(final));
+        _versions.Verify(v => v.ReadVersionAsync(
+            _share.Id, version.FilePath, at,
+            It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Empty(Directory.EnumerateFiles(
+            Path.GetDirectoryName(final)!, "*.kaimo-tmp-*"));
+    }
+
+    [Fact]
     public async Task ResolveConcreteFile_HashMismatchDoesNotPublishPartialFile()
     {
         DateTime at = new(2026, 7, 20, 10, 11, 12, DateTimeKind.Utc);
