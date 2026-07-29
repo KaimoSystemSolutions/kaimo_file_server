@@ -1383,3 +1383,99 @@ reviewed together.
 **Next planned workstream:** complete the remaining milestone-4 live release
 matrix and reconcile its evidence with the older P0/P1 runtime-verification
 notes and section 11 checklists.
+
+### 2026-07-29 — P2-16: Corrected canonical Samba registry verification
+
+**Status:** Implemented and regression-tested. The defect was identified by
+the first deployable-stack startup check after P2-15 and corrected without
+weakening mandatory initial convergence.
+
+**Observed failure**
+
+The Samba container repeatedly restarted before `smbd` supervision became
+ready. User and share synchronization succeeded once the bridge was available,
+but configuration synchronization emitted:
+
+- `smb encrypt: '<unset>' -> 'default'`;
+- `FAILED to read back 'smb encrypt'`;
+- `config did not converge; refusing to start Samba`.
+
+The composed healthcheck concurrently reported that the authorization socket
+was unavailable. That message was a downstream consequence: the entrypoint
+correctly refused to hand control to the authd/smbd supervisor after the
+mandatory configuration phase failed.
+
+**Root cause**
+
+The registry mutation itself succeeded. In the pinned Samba 4.19.5 runtime:
+
+- `net conf setparm global "smb encrypt" default` is accepted;
+- `net conf list` exposes `server smb encrypt = default`;
+- `net conf getparm global "smb encrypt"` fails because that exact registry
+  key does not exist;
+- `net conf getparm global "server smb encrypt"` and `testparm
+  --parameter-name="smb encrypt"` both return `default`.
+
+The generic `apply` helper assumed that Samba's accepted input name and
+persisted registry name were always identical. Its read-after-write check
+therefore classified a correct effective setting as divergence. Compose's
+restart policy made the deterministic startup failure appear as repeated new
+errors even though no operator action occurred.
+
+**Implemented**
+
+1. Extended `apply` with an optional canonical read parameter. Existing
+   callsites remain same-name set/get operations by default.
+2. Changed encryption reconciliation to write `smb encrypt` and compare/read
+   `server smb encrypt`.
+3. Applied the canonical name both before mutation and during final
+   verification. A converged state no longer causes a redundant write or
+   reload, while a missing, incorrect, failed, or ignored mutation still fails
+   closed.
+4. Improved failure diagnostics so future alias problems name both the
+   requested setting and the registry key used for verification.
+5. Changed the focused `net` test double to reproduce Samba 4.19.5
+   canonicalization rather than storing the input key verbatim.
+6. Added an explicit assertion that the resulting test registry contains
+   `server smb encrypt = required` and no noncanonical `smb encrypt` entry.
+7. Added `test-sync-config-samba-registry.sh` to run the reconciler against the
+   real pinned Samba `net conf` binary and isolated registry directories. It
+   verifies the canonical key, rejects the alias lookup, and requires a
+   no-change second pass.
+8. Wired that integration regression into the `build-runtime` gate so CI and
+   production-image builds exercise real Samba canonicalization.
+9. Updated the operational guide, release gates, synchronization checklist,
+   production roadmap, and source-evidence index.
+
+**Preserved security properties**
+
+- Initial user, share, and configuration synchronization remains mandatory
+  before Samba starts.
+- A genuine mutation or verification failure still prevents startup.
+- The effective value is verified from Samba's persistent registry state, not
+  inferred from a successful command exit or log line.
+- The change is limited to parameter-name canonicalization; it does not relax
+  signing, encryption, health, restart, or authorization policy.
+
+**Validation**
+
+- Shell syntax validation passes for the changed reconciler.
+- The focused synchronization regression passes with the Samba-compatible
+  registry test double, including the pre-existing mutation-failure,
+  ignored-mutation, invalid-schema, and size-limit cases.
+- The isolated integration regression passes against the real Samba 4.19.5
+  `net conf` implementation and proves idempotent canonical read-back.
+- The complete pinned `build-runtime` test graph passes, including the existing
+  shell/native suites, version/ABI/module assertions, `testparm`, and live
+  SMB/full_audit matrix.
+- The corrected Compose image was built and the Samba container was recreated.
+  No `FAILED to read back 'smb encrypt'` message occurred. Full initial
+  convergence could not complete because the Visual Studio Bridge container
+  contained only its debug-helper wait process at verification time; no Bridge
+  application was listening. This separate development-runtime prerequisite
+  must be restored before composed health can be asserted.
+
+**Next planned workstream:** continue the remaining milestone-4 deployable
+release matrix. Treat every accepted Samba configuration alias as distinct
+from its persistent registry representation until verified against the pinned
+runtime.

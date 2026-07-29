@@ -209,7 +209,9 @@ guarantee.
    documented Samba upgrade/ABI process. Exercise recovery.
 8. Run the full container matrix: Samba/client interoperability, bridge/authd
    crash and recovery, network partitions, active-session revocation, and
-   multi-user snapshot isolation.
+   multi-user snapshot isolation. The 2026-07-29 deployable-stack startup pass
+   already caught and closed the `smb encrypt`/`server smb encrypt` registry
+   canonicalization defect; the broader matrix remains open.
 9. Decide whether bridge redundancy is required by the availability SLO and
    implement it if a single fail-closed bridge outage is unacceptable.
 

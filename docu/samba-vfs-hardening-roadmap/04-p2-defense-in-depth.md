@@ -469,3 +469,42 @@ The path-filtered `Samba VFS Compatibility` GitHub Actions workflow builds the
 `build-runtime` target for every Samba-VFS change on pushes and pull requests.
 The same gate is therefore part of the release-producing Docker build graph and
 cannot be represented by a source-only lint success.
+
+### P2-16: Samba registry aliases can create false configuration divergence
+
+> **Remediation status (2026-07-29): Implemented and regression-tested.
+> Deployable-stack startup exposed the issue; the focused synchronization test
+> and an isolated real-Samba-registry integration test pass in the pinned
+> build-runtime suite. Full composed health recovery remains dependent on a
+> running Bridge application.**
+
+Samba 4.19.5 accepts `smb encrypt` as the `net conf setparm` input name but
+persists and exposes that global registry value as `server smb encrypt`.
+`sync-config.sh` originally used the input name for both mutation and
+read-after-write verification. The mutation therefore succeeded and the
+effective configuration was correct, while `net conf getparm global
+"smb encrypt"` returned “parameter not set.”
+
+Because mandatory initial synchronization correctly fails closed, this false
+negative prevented `smbd` and `authd` supervision from starting. Compose then
+restarted the container under `restart: unless-stopped`, producing repeated
+`FAILED to read back 'smb encrypt'`, `config did not converge`, and secondary
+authorization-socket health messages without any operator action.
+
+**Implemented fix:** the configuration helper now distinguishes the accepted
+set name from an optional canonical registry read name. All parameters retain
+same-name mutation and verification by default; encryption explicitly writes
+`smb encrypt` and reads `server smb encrypt`. Both the pre-mutation comparison
+and final read-after-write assertion use the canonical key, preserving
+idempotency and the existing fail-closed behavior.
+
+The focused test double reproduces Samba 4.19.5 canonicalization instead of
+storing arbitrary keys verbatim. It asserts that encryption converges only
+under `server smb encrypt` and that no noncanonical `smb encrypt` registry
+entry remains. Mutation failure and ignored-mutation tests continue to prove
+that the reconciler cannot report success for unapplied or unverifiable state.
+
+An additional build-runtime integration test uses the real Samba 4.19.5
+`net conf` binary with isolated private/state/cache/lock directories. It proves
+the canonical persisted key, rejection of the noncanonical lookup, and a
+no-change second reconciliation without mutating production image state.

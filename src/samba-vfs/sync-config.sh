@@ -146,11 +146,14 @@ case "${effective_log_level,,}" in
 esac
 
 changed=0
-# apply <param> <value>: sets a global registry parameter only if it differs
-# from current (net conf getparm gives error on unset -> curr empty).
+# apply <set-param> <value> [read-param]: sets a global registry parameter only
+# if it differs from the canonical registry value. Most parameters use the same
+# name for set/get. Samba 4.19 accepts "smb encrypt" on setparm but persists it
+# as "server smb encrypt", so callers can provide that canonical read-back name.
+# net conf getparm gives an error on unset -> curr empty.
 apply() {
-    local param="$1" value="$2" curr actual
-    curr="$(net conf getparm global "$param" 2>/dev/null)"
+    local param="$1" value="$2" read_param="${3:-$1}" curr actual
+    curr="$(net conf getparm global "$read_param" 2>/dev/null)"
     if [ "${curr:-}" != "$value" ]; then
         net conf setparm global "$param" "$value" >/dev/null 2>&1 || {
             echo "[sync-config] FAILED to set '$param'." >&2
@@ -159,12 +162,12 @@ apply() {
         echo "[sync-config] $param: '${curr:-<unset>}' -> '$value'"
         changed=1
     fi
-    actual="$(net conf getparm global "$param" 2>/dev/null)" || {
-        echo "[sync-config] FAILED to read back '$param'." >&2
+    actual="$(net conf getparm global "$read_param" 2>/dev/null)" || {
+        echo "[sync-config] FAILED to read back '$param' as registry parameter '$read_param'." >&2
         return 1
     }
     if [ "$actual" != "$value" ]; then
-        echo "[sync-config] FAILED verification for '$param': '$actual' != '$value'." >&2
+        echo "[sync-config] FAILED verification for '$param' via registry parameter '$read_param': '$actual' != '$value'." >&2
         return 1
     fi
 }
@@ -172,7 +175,7 @@ apply() {
 apply "server min protocol" "$min_proto" || exit 1
 apply "server max protocol" "$max_proto" || exit 1
 apply "server signing"      "$signing" || exit 1
-apply "smb encrypt"         "$encrypt" || exit 1
+apply "smb encrypt"         "$encrypt" "server smb encrypt" || exit 1
 apply "log level"           "$samba_log_level" || exit 1
 
 # --- Audit log (backlog #7): toggle the full_audit VFS module globally ---

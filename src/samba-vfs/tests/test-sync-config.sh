@@ -37,6 +37,9 @@ fi
 value="${5:-}"
 [ "$NET_FAIL_PARAMETER" != "$parameter" ] || exit 9
 [ "$NET_IGNORE_PARAMETER" != "$parameter" ] || exit 0
+# Match Samba 4.19 registry canonicalization: setparm accepts "smb encrypt",
+# while list/get expose the persisted key as "server smb encrypt".
+[ "$parameter" != "smb encrypt" ] || parameter="server smb encrypt"
 awk -F '\t' -v parameter="$parameter" '$1 != parameter' "$CONFIG_STATE" >"$CONFIG_STATE.tmp"
 printf '%s\t%s\n' "$parameter" "$value" >>"$CONFIG_STATE.tmp"
 mv "$CONFIG_STATE.tmp" "$CONFIG_STATE"
@@ -64,6 +67,11 @@ if ! bash "$SUT" >/dev/null 2>&1; then
 fi
 if ! grep -q $'^log level\t1$' "$CONFIG_STATE"; then
     echo "FAIL: Settings Warning level was not mapped to Samba log level 1."
+    exit 1
+fi
+if ! grep -q $'^server smb encrypt\trequired$' "$CONFIG_STATE" \
+    || grep -q $'^smb encrypt\t' "$CONFIG_STATE"; then
+    echo "FAIL: smb encrypt did not converge through Samba's canonical registry name."
     exit 1
 fi
 

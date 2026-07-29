@@ -3,7 +3,7 @@
 This documentation contains the security, memory-safety, and coverage audit for the Samba VFS migration. The former monolithic document has been split by topic so findings, target architecture, implementation planning, and progress history can be maintained and reviewed independently.
 
 > **Current as of:** 2026-07-29
-> **Most recently completed:** P2-15 – Enforce Samba version and VFS ABI pinning in CI
+> **Most recently completed:** P2-16 – Make configuration convergence use Samba's canonical registry parameter names
 > **Next planned workstream:** Milestone 4 deployable-stack release matrix and closure of the remaining live verification gates
 > **Production approval:** Still blocked until the remaining credential and synchronization risks, lifecycle reconciliation work, and release gates are complete.
 

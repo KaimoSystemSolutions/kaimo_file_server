@@ -540,6 +540,11 @@ docker compose exec kaimo_samba bash -lc '\
 - **Mapping** (in the bridge, so the shell remains Samba-agnostic): dialect enum → `server min/max
   protocol` (`SMB2_02`…`SMB3_11`); `RequireSigning` → `server signing = mandatory|auto`;
   `RequireEncryption` → `smb encrypt = required|default`.
+- **Canonical registry verification:** Samba 4.19.5 accepts `smb encrypt` for
+  `net conf setparm` but exposes the persisted global key as `server smb
+  encrypt`. The reconciler therefore uses the accepted input name for mutation
+  and the canonical key for both its idempotency comparison and mandatory
+  read-after-write verification.
 - **Precedence:** In [`conf/smb.conf.vfs`](conf/smb.conf.vfs), `include = registry` is **at the end** of
   the `[global]` section so DB values set via `net conf` override inline fallback defaults.
   smbd reads them on start or after `smbcontrol smbd reload-config` (new connections only; existing ones stay).
@@ -554,7 +559,8 @@ docker compose exec kaimo_samba bash -lc '\
   export PATH=/opt/samba/sbin:/opt/samba/bin:$PATH; \
   /usr/local/bin/sync-config.sh; \
   net conf getparm global "server min protocol"; \
-  net conf getparm global "server signing"'
+  net conf getparm global "server signing"; \
+  net conf getparm global "server smb encrypt"'
 ```
 
 ### Known issue — SMB write permissions (storage ownership)

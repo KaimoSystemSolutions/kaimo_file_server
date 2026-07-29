@@ -60,6 +60,8 @@ A release should be blocked when any of the following is true:
 - A missing context, malformed path, timeout, or parser error can continue an operation.
 - A denied live or historical file is observable through listing, direct open, cache path, rename, metadata operation, or snapshot restore.
 - Synchronization reports success without converging passdb/registry/config state.
+- Configuration read-after-write verification uses an accepted input alias
+  rather than the canonical key actually exposed by the pinned Samba registry.
 - Event retries can create duplicates or delete valid history.
 - The bridge accepts unauthenticated hash or snapshot RPCs.
 - The checksum-pinned Samba source, installed runtime version, source VFS ABI,
@@ -128,6 +130,8 @@ implemented; their required release verification remains tracked in milestone 4.
 - [x] Removed users and shares are reconciled.
 - [x] Every mutation error makes the sync fail.
 - [x] Final state is verified before recording success.
+- [x] Config verification supports explicit canonical Samba registry read
+  names; `smb encrypt` is verified as `server smb encrypt` on Samba 4.19.5.
 - [x] Concurrent sync instances are locked out.
 - [x] Share/config polling is bounded to 1-5 seconds; hash-bearing user sync is
   fixed at 60 seconds. All three must converge before `smbd` starts.
