@@ -24,11 +24,25 @@ storage. This will later replace the FileSystemWatcher/`SyncFromDb` mechanism fr
 ```bash
 # Build and start image
 docker build -t kaimo-samba-spike:phase0 .
-docker run -d --name kaimo-samba-spike -p 1445:445 kaimo-samba-spike:phase0
+docker run -d --name kaimo-samba-spike -p 1445:445 \
+  -e KAIMO_SPIKE_USER=testuser \
+  -e KAIMO_SPIKE_PASSWORD_FILE=/run/secrets/spike-password \
+  --mount type=bind,src=/secure/path/spike-password,dst=/run/secrets/spike-password,readonly \
+  --mount type=bind,src=/secure/path/smbclient-auth,dst=/run/secrets/smbclient-auth,readonly \
+  kaimo-samba-spike:phase0
 
 # Self-test (creates share live, writes/reads, removes it again)
-docker exec kaimo-samba-spike bash /usr/local/bin/selftest.sh
+docker exec \
+  -e KAIMO_SELFTEST_AUTH_FILE=/run/secrets/smbclient-auth \
+  kaimo-samba-spike bash /usr/local/bin/selftest.sh
 ```
+
+The two mounted files must be owned by the container user and must not grant
+group or other access. `spike-password` contains only the password on its first
+line. `smbclient-auth` uses Samba's authentication-file format (`username = ...`
+and `password = ...`). Provision both outside shell history, for example through
+the deployment secret manager. The self-test deliberately has no default
+identity or password.
 
 Files: [`Dockerfile`](Dockerfile), [`conf/smb.conf`](conf/smb.conf),
 [`entrypoint.sh`](entrypoint.sh), [`selftest.sh`](selftest.sh).
@@ -47,7 +61,7 @@ include = registry           # smbd reads shares LIVE from registry.tdb
 on a dynamically created share via `net conf`:
 
 ```
-kaimo_bridge: CONNECT service=[hooktest] user=[kaimotest]   <- TREE_CONNECT
+kaimo_bridge: CONNECT service=[hooktest] user=[testuser]    <- TREE_CONNECT
 kaimo_bridge: OPENAT  name=[x.txt]                          <- every file open
 kaimo_bridge: DISCONNECT
 ```
@@ -73,9 +87,13 @@ The actual I/O remains native (`SMB_VFS_NEXT_*`) — the file lands directly on 
 # Default: slim production runtime. Samba source, compiler and waf build tree
 # remain in cached intermediate stages and are not part of this image.
 docker build -f Dockerfile.vfs -t kaimo-samba-spike:vfs .
-docker run -d --name kaimo-samba-vfs -p 1446:445 kaimo-samba-spike:vfs
+docker run -d --name kaimo-samba-vfs -p 1446:445 \
+  --mount type=bind,src=/secure/path/smbclient-auth,dst=/run/secrets/smbclient-auth,readonly \
+  kaimo-samba-spike:vfs
 # Force file op and verify hooks in log
-docker exec kaimo-samba-vfs bash /usr/local/bin/selftest.sh
+docker exec \
+  -e KAIMO_SELFTEST_AUTH_FILE=/run/secrets/smbclient-auth \
+  kaimo-samba-vfs bash /usr/local/bin/selftest.sh
 docker logs kaimo-samba-vfs 2>&1 | grep "kaimo_bridge:"
 
 # Optional: unstripped native build environment for diagnostics/debugging.
@@ -120,10 +138,9 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
   locked with `nologin` and keeps its UID so file ownership remains stable;
   reactivation restores Samba access with that UID. The private ownership set
   is stored in `/var/lib/kaimo-user-sync/managed-users`. On its first run the
-  sync adopts existing passdb users except the comma-separated
-  `KAIMO_UNMANAGED_SAMBA_USERS` list (default: `KAIMO_TEST_USER`, otherwise
-  `kaimotest`). This blocks new logins but does not terminate an already
-  authenticated SMB session.
+  sync adopts all existing passdb users unless they are explicitly listed in
+  the comma-separated `KAIMO_UNMANAGED_SAMBA_USERS` operator escape hatch.
+  Production startup no longer creates or implicitly exempts a test account.
 - **P1-17 verified convergence:** all user/share/config reconcilers fail on
   unapplied mutations and read the resulting Samba state back before reporting
   success. `/usr/local/bin/run-sync.sh` serializes each component and publishes
@@ -159,16 +176,24 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
   necessarily credential-bearing only for their bounded operation lifetime.
 - **P2-12 fail-fast sidecar supervision:** the entrypoint hands PID 1 to
   `supervise-samba.sh`. It starts `kaimo_authd`, waits at most five seconds for
-  the protected Unix socket, publishes a root-owned mode-0600 PID file, and
+  the protected Unix socket, publishes root-owned mode-0600 PID files, and
   starts `smbd` only afterward. If either long-running process exits, the
   supervisor terminates and reaps the peer, removes readiness state, and exits
   non-zero. Container signals are forwarded to both processes with a bounded
-  five-second shutdown grace. `authd-health.sh` additionally validates socket,
-  PID-file ownership/mode, process liveness, and exact `/proc/<pid>/exe`
-  identity before the existing sync/SMB probes run. Compose uses
+  five-second shutdown grace. `authd-health.sh` validates the socket and authd
+  identity; `smbd-health.sh` validates the smbd PID file, process identity, and
+  `smbcontrol smbd ping`. Compose uses
   `restart: unless-stopped`, so a sidecar crash restarts the complete Samba
   security unit rather than leaving `smbd` alive in permanent fail-closed
   degradation.
+- **P2-14 credential-free operations:** production startup does not create a
+  reusable test account. Container health combines authd identity/readiness,
+  smbd identity/control-plane responsiveness, and synchronization freshness
+  without performing an authenticated SMB login. The former audit login probe
+  was removed; audit operation compatibility belongs to the pinned Samba
+  ABI/release test matrix. Manual protocol tests require an explicit,
+  owner-only `KAIMO_SELFTEST_AUTH_FILE` and call `smbclient -A`, keeping the
+  password out of process arguments and environment variables.
 - **P2-01 exact connection context:** usernames and share names are stored as
   exact owned strings instead of fixed arrays. Account/share creation, VFS,
   `authd`, and every identity-bearing bridge RPC enforce the same 32-byte
@@ -190,11 +215,13 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
 docker compose up -d kaimo_smb_bridge kaimo_samba
 docker compose exec kaimo_samba bash -lc '\
   export PATH=/opt/samba/sbin:/opt/samba/bin:$PATH; \
-  smbclient -L localhost -U admin%admin1234 -m SMB3;      # CORRECT  -> Shares
-  smbclient -L localhost -U admin%wrong     -m SMB3'      # WRONG    -> NT_STATUS_LOGON_FAILURE
+  smbclient -L localhost -A /run/secrets/smbclient-auth -m SMB3'
 ```
-> Prerequisite: demo users are seeded (`Seed:DemoData=true`, dev): `admin/admin1234`,
-> `marco.hanisch/1234`, `anna.weber/1234`, `lisa.mueller/1234`.
+> Prerequisite: provision a root-owned mode-0600 authentication file with a
+> deliberately selected test identity and mount it at
+> `/run/secrets/smbclient-auth`. Negative-password tests should use a separate
+> short-lived authentication file; do not put passwords in the command line or
+> environment.
 
 **Open for Phase 2:** Authorization (share access, ACL on open) doesn't run via gRPC yet —
 the VFS hooks (`connect`/`openat`) only log for now. Next they will call
@@ -491,7 +518,7 @@ docker compose exec kaimo_samba bash -lc '\
   export PATH=/opt/samba/sbin:/opt/samba/bin:$PATH; \
   /usr/local/bin/sync-shares.sh;               # Mirror registry from DB
   net conf listshares;                         # -> the enabled Kaimo shares
-  smbclient -L localhost -U admin%admin1234 -m SMB3'   # -> shares in enumeration
+  smbclient -L localhost -A /run/secrets/smbclient-auth -m SMB3' # -> shares
 ```
 
 ### Protocol settings from Kaimo DB (`ISmbConfigStore`)
@@ -688,11 +715,17 @@ docker compose up -d
   operationally.
 - **Port:** Samba owns host/container port **445** after the Phase-5 cutover.
 - **Storage:** same bind mount `./tests/data/storage:/data/storage` as host/web → Samba does file I/O directly.
-- **Healthcheck:** reports `healthy` once `smbd` accepts connections.
+- **Healthcheck:** reports `healthy` only when the protected authd and smbd PID
+  files identify the expected live processes, authd's private socket is ready,
+  `smbcontrol smbd ping` succeeds, and synchronization is current. It does not
+  create or use a reusable SMB account.
 
-Test after startup:
+Manual protocol test after startup (requires a separately provisioned,
+root-owned mode-0600 authentication file inside the container):
 ```bash
-docker compose exec kaimo_samba bash /usr/local/bin/selftest.sh
+docker compose exec \
+  -e KAIMO_SELFTEST_AUTH_FILE=/run/secrets/smbclient-auth \
+  kaimo_samba bash /usr/local/bin/selftest.sh
 docker compose logs kaimo_samba | grep "kaimo_bridge:"
 ```
 

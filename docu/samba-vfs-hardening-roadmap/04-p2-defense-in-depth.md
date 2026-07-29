@@ -391,9 +391,51 @@ increase plaintext credential processing.
 
 ### P2-14: Hard-coded development credentials are present in operational paths
 
-The entrypoint and health/audit probes use the default `kaimotest`/`Passw0rd!` credentials unless overridden. Passwords are also passed in command arguments.
+> **Remediation status (2026-07-29): Implemented, regression-tested, and
+> verified in the pinned Samba 4.19.5 `build-runtime` image. Live authenticated
+> SMB protocol checks remain an explicit release activity with
+> operator-provisioned test credentials.**
 
-**Fix:** remove production defaults, require secrets, avoid password-in-argv where possible, and use a dedicated health mechanism that does not depend on a reusable account.
+The original production entrypoint, container healthcheck, and audit probe
+shared the default `kaimotest`/`Passw0rd!` identity unless overridden. The
+health and audit commands additionally placed the password in `smbclient`
+arguments, making it visible through process inspection. The user reconciler
+implicitly exempted the same identity from managed-state removal.
+
+The production VFS entrypoint now creates no test account, and unmanaged Samba
+users must be explicitly named through `KAIMO_UNMANAGED_SAMBA_USERS`. Container
+health is accountless and composes three independent checks:
+
+1. `authd-health.sh` validates the protected socket, root-owned mode-0600 PID
+   file, live PID, and exact authd executable.
+2. `smbd-health.sh` applies equivalent PID-file/process-identity validation to
+   smbd and requires `smbcontrol smbd ping` to succeed.
+3. `sync-health.sh` proves that desired-state synchronization is present,
+   successful, and fresh.
+
+`supervise-samba.sh` atomically publishes and removes the protected smbd PID
+file together with the existing authd readiness state. This binds health to the
+process supervised as part of the same security unit instead of accepting an
+unrelated process name or reusable SMB login.
+
+The runtime audit login probe was removed. Its previous failure response
+silently stripped `full_audit`, weakening configured logging to preserve
+availability. Compatibility of the fixed audit operation list must instead be
+proven against the pinned Samba 4.19/ABI-49 build and live release matrix
+(P2-15), without retaining a production login credential.
+
+Manual `selftest.sh` execution now requires an explicitly provisioned,
+current-user-owned authentication file with no group/other access and uses
+`smbclient -A`. The legacy Phase-0 entrypoint likewise has no defaults: it
+requires `KAIMO_SPIKE_USER` plus an owner-only password file and supplies that
+password to `smbpasswd` through standard input. Passwords are not transported
+through process arguments or exported environment variables.
+
+Regression coverage statically rejects the former credential names/default
+variables in operational shell paths, proves that the self-test uses
+authentication-file mode, and verifies rejection of missing or over-permissive
+authentication files. Supervisor tests cover healthy smbd identity/ping state,
+ping failure, and cleanup of both protected PID files.
 
 ### P2-15: Samba ABI pinning lacks a CI enforcement gate
 

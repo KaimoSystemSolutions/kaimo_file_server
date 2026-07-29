@@ -90,8 +90,12 @@ and make disabled identities converge predictably.
    initially converge, and service/share/user disablement forcibly closes
    active handles. Uncertain state closes all shares; an unprovable close fails
    the complete supervised Samba unit.
-7. Remove reusable test credentials from production entrypoints and health
-   probes. Reject `KAIMO_AUTHZ_FAILOPEN=1` in production configuration.
+7. **Partially completed 2026-07-29:** reusable test credentials were removed
+   from production entrypoints, synchronization, audit probes, and health.
+   Accountless health now validates the supervised authd/smbd identities,
+   `smbcontrol` responsiveness, and synchronization freshness. Manual protocol
+   tests require protected authentication files. Production rejection of
+   `KAIMO_AUTHZ_FAILOPEN=1` remains a separate release-configuration gate.
 8. **Completed 2026-07-29:** paginate bulk user export in bounded 1,000-row
    projections, isolate corrupt rows, enforce exactly 16-byte NT hashes, and
    fail closed above the 100,000-row/16-MiB end-to-end limits.

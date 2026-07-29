@@ -6,8 +6,6 @@ set -euo pipefail
 export PATH=/opt/samba/sbin:/opt/samba/bin:$PATH
 
 STORAGE="${KAIMO_STORAGE:-/data/storage}"
-TEST_USER="${KAIMO_TEST_USER:-kaimotest}"
-TEST_PASS="${KAIMO_TEST_PASS:-Passw0rd!}"
 
 mkdir -p "$STORAGE"
 # P1-11 durable outbox. Owner-only permissions are reasserted on every start;
@@ -58,15 +56,6 @@ if command -v setfacl >/dev/null 2>&1 && setfacl -m g:"$STORAGE_GID":rwX "$STORA
 else
     echo "[entrypoint] Storage: no ACL support (e.g. drvfs/9p) -> fallback to create-mask + container umask."
 fi
-
-if ! id "$TEST_USER" >/dev/null 2>&1; then
-    useradd -M -s /usr/sbin/nologin "$TEST_USER"
-fi
-usermod -aG "${KAIMO_STORAGE_GROUP:-kaimo}" "$TEST_USER" 2>/dev/null || true
-usermod -aG "$KAIMO_AUTHD_GROUP" "$TEST_USER" 2>/dev/null || true
-
-printf '%s\n%s\n' "$TEST_PASS" "$TEST_PASS" | smbpasswd -s -a "$TEST_USER" >/dev/null 2>&1 || \
-printf '%s\n%s\n' "$TEST_PASS" "$TEST_PASS" | smbpasswd -s "$TEST_USER" >/dev/null 2>&1 || true
 
 echo "[entrypoint] smbd: $(command -v smbd)  ($(smbd --version))"
 echo "[entrypoint] VFS module present?"

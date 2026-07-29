@@ -135,6 +135,9 @@ implemented; their required release verification remains tracked in milestone 4.
   private tmpfs and are unlinked at the end of their processing phase.
 - [x] Credentials are not exposed in process arguments or environment
   variables.
+- [x] Production startup, synchronization, audit probes, and container health
+  do not create, exempt, or authenticate with a reusable development account.
+  Manual SMB protocol tests require an explicit owner-only authentication file.
 
 ## 13. Decisions that must be made explicitly
 

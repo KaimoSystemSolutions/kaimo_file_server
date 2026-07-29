@@ -189,7 +189,7 @@ services:
       - default
       - kaimo_smb_control
     healthcheck:
-      test: ["CMD-SHELL", "/usr/local/bin/authd-health.sh && /usr/local/bin/sync-health.sh && /opt/samba/bin/smbclient -L localhost -U kaimotest%Passw0rd! -m SMB3 >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "/usr/local/bin/authd-health.sh && /usr/local/bin/smbd-health.sh && /usr/local/bin/sync-health.sh || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 6

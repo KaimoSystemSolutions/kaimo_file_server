@@ -3,8 +3,8 @@
 This documentation contains the security, memory-safety, and coverage audit for the Samba VFS migration. The former monolithic document has been split by topic so findings, target architecture, implementation planning, and progress history can be maintained and reviewed independently.
 
 > **Current as of:** 2026-07-29
-> **Most recently completed:** P2-13 – Enforce bounded polling-based revocation
-> **Next planned finding:** P2-14 – Remove development credentials from operational paths
+> **Most recently completed:** P2-14 – Remove development credentials from operational paths
+> **Next planned finding:** P2-15 – Enforce Samba version and VFS ABI pinning in CI
 > **Production approval:** Still blocked until the remaining credential and synchronization risks, lifecycle reconciliation work, and release gates are complete.
 
 ## Table of contents

@@ -212,28 +212,6 @@ else
     echo "[sync-config] no change."
 fi
 
-# --- Audit self-test guard (backlog #7 safety net) ---
-# full_audit fails EVERY TREE_CONNECT (incl. IPC$ -> no logins at all) if its op
-# list is invalid — e.g. after a Samba upgrade renames a VFS op. The audit-log
-# toggle must NEVER be able to take down the whole service. So whenever audit is
-# active and smbd is up, probe a real connect (smbclient -L hits IPC$, exactly where
-# full_audit would fail); if it fails, strip full_audit and reload so SMB stays
-# usable. With valid op names this is a no-op.
-if [ "${audit_on:-0}" = "1" ] && [ "${enabled:-1}" = "1" ] && pidof smbd >/dev/null 2>&1; then
-    probe_user="${KAIMO_TEST_USER:-kaimotest}"
-    probe_pass="${KAIMO_TEST_PASS:-Passw0rd!}"
-    if smbclient -L localhost -U "${probe_user}%${probe_pass}" -m SMB3 >/dev/null 2>&1; then
-        echo "[sync-config] audit self-test: ok."
-    else
-        echo "[sync-config] AUDIT SELF-TEST FAILED -> stripping full_audit to keep SMB usable."
-        net conf setparm global "vfs objects" "kaimo_bridge" >/dev/null 2>&1 || \
-            echo "[sync-config] emergency audit rollback failed." >&2
-        smbcontrol smbd reload-config >/dev/null 2>&1 || \
-            echo "[sync-config] emergency reload failed." >&2
-        exit 1
-    fi
-fi
-
 # --- WS-Discovery (backlog #7): manage the wsdd responder daemon ---
 # There is no smb.conf parameter for WS-Discovery; it is a separate UDP responder
 # (port 3702) that makes the server appear in Windows Explorer's "Network" view.

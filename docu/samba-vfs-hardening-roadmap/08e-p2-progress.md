@@ -1133,3 +1133,134 @@ would defeat its abuse limit and unnecessarily process credentials.
 
 **Next planned finding:** P2-14 — remove hard-coded development credentials
 from operational startup and health paths.
+
+### 2026-07-29 — P2-14: Removed development credentials from operational paths
+
+**Status:** Implemented and regression-tested. A live authenticated SMB
+operation matrix with operator-provisioned, short-lived test credentials
+remains a release gate.
+
+**Problem**
+
+The production VFS entrypoint created a fixed test account by default. The
+container healthcheck and the runtime audit guard reused that account and
+placed its password directly in `smbclient` command arguments. The user
+reconciler also treated the same default identity as implicitly unmanaged.
+Consequently, a development credential could survive into an operational
+deployment, evade desired-state cleanup, and be observable through process
+inspection.
+
+The legacy Phase-0 entrypoint and the manual self-test repeated the same
+defaults. Although those paths are diagnostic rather than production
+orchestration, keeping functional fallback credentials in executable artifacts
+made accidental insecure use too easy.
+
+**Architecture decision**
+
+Liveness/readiness must not depend on any reusable SMB identity. The health
+contract is therefore split by responsibility:
+
+1. authd health proves the protected socket, PID-file trust properties,
+   liveness, and executable identity;
+2. smbd health proves equivalent PID-file/process identity and a successful
+   `smbcontrol smbd ping`; and
+3. synchronization health proves that the local Samba desired state is recent
+   and successfully converged.
+
+This combination verifies the supervised security unit without maintaining a
+credential solely for health. An authenticated SMB request remains valuable
+as an end-to-end release test, but its identity must be explicitly provisioned
+for that test and must not become a runtime dependency.
+
+The former audit login guard is not retained in a different credential form.
+On probe failure it removed `full_audit`, silently weakening the configured
+audit policy to preserve availability. Audit operation-name compatibility is
+instead owned by the pinned Samba 4.19/ABI-49 build and the P2-15 live operation
+matrix. Invalid audit configuration must fail release validation rather than
+trigger a production downgrade.
+
+**Implemented**
+
+1. Removed test-user creation, password defaults, and `smbpasswd` invocation
+   from `entrypoint.vfs.sh`. The production runtime now receives Samba
+   identities only through the managed user reconciliation path.
+2. Changed `sync-users.sh` so the unmanaged-user set is empty by default.
+   Operators can still declare exceptional pre-existing identities explicitly
+   with `KAIMO_UNMANAGED_SAMBA_USERS`; no development identity is implicitly
+   protected from reconciliation.
+3. Removed the credential-bearing `smbclient` audit probe and its automatic
+   `full_audit` rollback from `sync-config.sh`.
+4. Added `smbd-health.sh`. It rejects a missing, symlinked, non-regular,
+   non-root-owned, or group/other-accessible PID file; rejects a malformed or
+   dead PID; compares `/proc/<pid>/exe` with the expected smbd executable; and
+   requires `smbcontrol smbd ping`.
+5. Extended `supervise-samba.sh` to publish the smbd PID atomically as a
+   root-owned mode-0600 readiness file after process start and to remove both
+   authd and smbd PID files on startup cleanup, signal handling, peer failure,
+   and normal exit.
+6. Replaced the Compose health login with the accountless authd, smbd, and
+   synchronization checks.
+7. Changed `selftest.sh` to require `KAIMO_SELFTEST_AUTH_FILE`. It rejects
+   missing, symlinked, non-regular, foreign-owned, or group/other-accessible
+   files, extracts only a validated username needed for local ownership setup,
+   and invokes every SMB operation through `smbclient -A`.
+8. Changed the Phase-0 `entrypoint.sh` to require an explicit
+   `KAIMO_SPIKE_USER` and `KAIMO_SPIKE_PASSWORD_FILE`. The protected secret is
+   read only for the bounded import operation and reaches `smbpasswd` through
+   standard input, never an argument or exported environment variable.
+9. Updated the Samba operational guide so examples use protected
+   authentication files, describe secret provisioning and permissions, and
+   distinguish accountless container health from explicit end-to-end protocol
+   testing.
+10. Added `test-operational-credentials.sh` to reject the former literal
+    credential/default variables in operational scripts, enforce `smbclient
+    -A`, and prove that the manual self-test refuses absent or over-permissive
+    authentication files. Extended the supervisor regression with smbd PID,
+    identity, control-ping failure, and cleanup assertions.
+
+**Security properties**
+
+- The production image contains no automatically created reusable SMB health
+  or audit identity.
+- No operational health, audit, or documented client command places a password
+  in a process argument or environment variable.
+- Health binds readiness to the exact authd and smbd processes started by PID 1
+  and to successfully converged synchronization state.
+- Manual authenticated checks are opt-in, use an owner-only file, and fail
+  closed when that file is absent or unsafe.
+- Explicit unmanaged Samba identities remain possible for controlled
+  migrations, but require a visible operator configuration decision.
+
+**Validation completed**
+
+- Shell syntax validation passes for every changed and added shell script.
+- The focused operational-credential and supervisor regressions pass under
+  Bash 5.2, including smbd control-ping failure and unsafe authentication-file
+  rejection.
+- `docker compose config --quiet` accepts the accountless composed healthcheck.
+- The uncached pinned Samba 4.19.5 `build-runtime` stage passes the complete
+  shell/native helper suite, rebuilds and links the ABI-49 VFS module, and
+  packages the new health script.
+- The complete managed test project passes: 647 tests, 0 failures, 0 skipped.
+- `git diff --check` passes.
+
+**Validation still required**
+
+- In the deployable stack, kill and replace smbd independently and prove the
+  protected PID identity check, control ping, supervisor exit, Compose restart,
+  mandatory initial convergence, and health recovery behave as documented.
+- Run positive and negative authenticated SMB enumeration/open/write/rename/
+  unlink tests with a short-lived release account supplied only through an
+  owner-only authentication file. Inspect `/proc/*/cmdline`, container
+  environment, logs, and the final passdb to confirm the password and any
+  undeclared test identity are absent.
+- Enable every supported audit operation against the pinned runtime and execute
+  the corresponding SMB operation matrix. A renamed/invalid operation must
+  block release; production configuration must never strip the audit module
+  automatically.
+- Verify the target secret-management mechanism creates the Phase-0 password
+  and release-test authentication files with the documented owner and mode
+  inside the container namespace.
+
+**Next planned finding:** P2-15 — enforce the pinned Samba source version and
+VFS ABI expectations in CI and add the audit/VFS operation compatibility gate.

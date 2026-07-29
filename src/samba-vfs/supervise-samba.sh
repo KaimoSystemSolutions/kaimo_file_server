@@ -9,6 +9,7 @@ SMBD_PID=""
 WATCHDOG_PID=""
 AUTHD_SOCKET="${KAIMO_AUTHD_SOCK:-/var/run/kaimo/authz.sock}"
 AUTHD_PID_FILE="${KAIMO_AUTHD_PID_FILE:-/var/run/kaimo/authd.pid}"
+SMBD_PID_FILE="${KAIMO_SMBD_PID_FILE:-/var/run/kaimo/smbd.pid}"
 READY_ATTEMPTS="${KAIMO_AUTHD_READY_ATTEMPTS:-50}"
 STOP_GRACE_SECONDS="${KAIMO_SUPERVISOR_STOP_GRACE_SECONDS:-5}"
 
@@ -34,7 +35,7 @@ validate_bounded_integer KAIMO_SUPERVISOR_STOP_GRACE_SECONDS \
     "$STOP_GRACE_SECONDS" 1 30 || exit 1
 
 remove_runtime_state() {
-    rm -f -- "$AUTHD_PID_FILE"
+    rm -f -- "$AUTHD_PID_FILE" "$SMBD_PID_FILE"
     [ -S "$AUTHD_SOCKET" ] && rm -f -- "$AUTHD_SOCKET"
 }
 
@@ -70,7 +71,7 @@ trap 'handle_signal 2' INT
 trap 'handle_signal 3' QUIT
 trap 'handle_signal 15' TERM
 
-rm -f -- "$AUTHD_PID_FILE"
+rm -f -- "$AUTHD_PID_FILE" "$SMBD_PID_FILE"
 if [ -e "$AUTHD_SOCKET" ] || [ -L "$AUTHD_SOCKET" ]; then
     if [ -L "$AUTHD_SOCKET" ] || [ ! -S "$AUTHD_SOCKET" ]; then
         echo "[supervisor] Refusing unsafe pre-existing authd socket path." >&2
@@ -107,12 +108,20 @@ if [ "$authd_ready" -ne 1 ] || ! kill -0 "$AUTHD_PID" 2>/dev/null; then
 fi
 
 umask 077
-pid_tmp="${AUTHD_PID_FILE}.tmp.$$"
-if ! printf '%s\n' "$AUTHD_PID" >"$pid_tmp" \
-    || ! chmod 0600 "$pid_tmp" \
-    || ! mv -f -- "$pid_tmp" "$AUTHD_PID_FILE"; then
+publish_pid_file() {
+    local pid="$1" destination="$2" description="$3" pid_tmp
+    pid_tmp="${destination}.tmp.$$"
+    if printf '%s\n' "$pid" >"$pid_tmp" \
+        && chmod 0600 "$pid_tmp" \
+        && mv -f -- "$pid_tmp" "$destination"; then
+        return 0
+    fi
     rm -f -- "$pid_tmp"
-    echo "[supervisor] Cannot publish the authd readiness PID file." >&2
+    echo "[supervisor] Cannot publish the $description readiness PID file." >&2
+    return 1
+}
+
+if ! publish_pid_file "$AUTHD_PID" "$AUTHD_PID_FILE" authd; then
     terminate_children
     exit 1
 fi
@@ -120,6 +129,11 @@ fi
 echo "[supervisor] kaimo_authd ready (pid=$AUTHD_PID); starting smbd ..."
 smbd --foreground --no-process-group --debug-stdout &
 SMBD_PID=$!
+if ! kill -0 "$SMBD_PID" 2>/dev/null \
+    || ! publish_pid_file "$SMBD_PID" "$SMBD_PID_FILE" smbd; then
+    terminate_children
+    exit 1
+fi
 
 exited_pid=""
 wait -n -p exited_pid "$AUTHD_PID" "$SMBD_PID"

@@ -5,6 +5,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SUPERVISOR="${AUTHD_SUPERVISOR_SUT:-$HERE/../supervise-samba.sh}"
 HEALTH="${AUTHD_HEALTH_SUT:-$HERE/../authd-health.sh}"
+SMBD_HEALTH="${SMBD_HEALTH_SUT:-$HERE/../smbd-health.sh}"
 WORK="$(mktemp -d)"
 ACTIVE_SUPERVISOR=""
 
@@ -58,7 +59,7 @@ PYEOF
 
 cat >"$WORK/bin/smbd" <<'SHEOF'
 #!/bin/bash
-printf '%s\n' "$$" >"$FAKE_SMBD_PID_FILE"
+printf '%s\n' "$$" >"$FAKE_SMBD_STARTED_FILE"
 trap 'exit 0' TERM INT HUP QUIT
 if [ -n "${FAKE_SMBD_EXIT_AFTER:-}" ]; then
     sleep "$FAKE_SMBD_EXIT_AFTER"
@@ -67,26 +68,38 @@ fi
 while true; do sleep 1; done
 SHEOF
 
-chmod +x "$WORK/bin/kaimo_authd" "$WORK/bin/smbd"
+cat >"$WORK/bin/smbcontrol" <<'SHEOF'
+#!/bin/bash
+[ "${1:-} ${2:-}" = "smbd ping" ] || exit 2
+exit "${SMBCONTROL_EXIT_CODE:-0}"
+SHEOF
+
+chmod +x "$WORK/bin/kaimo_authd" "$WORK/bin/smbd" "$WORK/bin/smbcontrol"
 export PATH="$WORK/bin:$PATH"
 export KAIMO_AUTHD_SOCK="$WORK/run/authz.sock"
 export KAIMO_AUTHD_PID_FILE="$WORK/run/authd.pid"
+export KAIMO_SMBD_PID_FILE="$WORK/run/smbd.pid"
 export KAIMO_AUTHD_READY_ATTEMPTS=20
 export KAIMO_SUPERVISOR_STOP_GRACE_SECONDS=1
 export KAIMO_AUTHD_EXPECTED_EXECUTABLE="$(readlink -f /usr/bin/python3)"
-export FAKE_SMBD_PID_FILE="$WORK/run/smbd.pid"
+export KAIMO_SMBD_EXPECTED_EXECUTABLE="$(readlink -f /usr/bin/bash)"
+export KAIMO_SMBCONTROL_COMMAND="$WORK/bin/smbcontrol"
+export FAKE_SMBD_STARTED_FILE="$WORK/run/smbd.started"
 
 reset_case() {
     unset FAKE_AUTHD_FAIL_BEFORE_READY FAKE_AUTHD_EXIT_AFTER \
-        FAKE_AUTHD_EXIT_STATUS FAKE_SMBD_EXIT_AFTER FAKE_SMBD_EXIT_STATUS
-    rm -f "$KAIMO_AUTHD_SOCK" "$KAIMO_AUTHD_PID_FILE" "$FAKE_SMBD_PID_FILE"
+        FAKE_AUTHD_EXIT_STATUS FAKE_SMBD_EXIT_AFTER FAKE_SMBD_EXIT_STATUS \
+        SMBCONTROL_EXIT_CODE
+    rm -f "$KAIMO_AUTHD_SOCK" "$KAIMO_AUTHD_PID_FILE" \
+        "$KAIMO_SMBD_PID_FILE" "$FAKE_SMBD_STARTED_FILE"
 }
 
 wait_ready() {
     for _ in $(seq 1 50); do
         [ -S "$KAIMO_AUTHD_SOCK" ] \
             && [ -s "$KAIMO_AUTHD_PID_FILE" ] \
-            && [ -s "$FAKE_SMBD_PID_FILE" ] \
+            && [ -s "$KAIMO_SMBD_PID_FILE" ] \
+            && [ -s "$FAKE_SMBD_STARTED_FILE" ] \
             && return 0
         kill -0 "$ACTIVE_SUPERVISOR" 2>/dev/null || return 1
         sleep 0.05
@@ -116,8 +129,18 @@ wait_ready || {
     echo "FAIL: healthy supervised authd was rejected." >&2
     exit 1
 }
+"$SMBD_HEALTH" || {
+    echo "FAIL: healthy supervised smbd was rejected." >&2
+    exit 1
+}
+export SMBCONTROL_EXIT_CODE=9
+if "$SMBD_HEALTH" >/dev/null 2>&1; then
+    echo "FAIL: smbd health ignored a failed local control ping." >&2
+    exit 1
+fi
+unset SMBCONTROL_EXIT_CODE
 authd_pid="$(cat "$KAIMO_AUTHD_PID_FILE")"
-smbd_pid="$(cat "$FAKE_SMBD_PID_FILE")"
+smbd_pid="$(cat "$KAIMO_SMBD_PID_FILE")"
 kill -TERM "$authd_pid"
 wait "$ACTIVE_SUPERVISOR"
 supervisor_status=$?
@@ -131,6 +154,10 @@ if "$HEALTH" >/dev/null 2>&1; then
     echo "FAIL: health remained successful after authd exit." >&2
     exit 1
 fi
+if "$SMBD_HEALTH" >/dev/null 2>&1; then
+    echo "FAIL: smbd health remained successful after supervised shutdown." >&2
+    exit 1
+fi
 echo "  ok: authd exit fails the unit, stops smbd, and removes readiness"
 
 # 2) authd failure before socket readiness must prevent smbd startup and retain
@@ -139,7 +166,7 @@ reset_case
 export FAKE_AUTHD_FAIL_BEFORE_READY=1
 "$SUPERVISOR" >"$WORK/startup-failure.log" 2>&1
 supervisor_status=$?
-if [ "$supervisor_status" -ne 23 ] || [ -e "$FAKE_SMBD_PID_FILE" ]; then
+if [ "$supervisor_status" -ne 23 ] || [ -e "$FAKE_SMBD_STARTED_FILE" ]; then
     echo "FAIL: pre-readiness authd failure was not propagated." >&2
     cat "$WORK/startup-failure.log" >&2
     exit 1
@@ -164,6 +191,10 @@ assert_dead "$authd_pid" || exit 1
     echo "FAIL: smbd exit left authd readiness state behind." >&2
     exit 1
 }
+[ ! -e "$KAIMO_SMBD_PID_FILE" ] || {
+    echo "FAIL: smbd exit left smbd readiness state behind." >&2
+    exit 1
+}
 echo "  ok: smbd exit stops authd and fails the long-running unit"
 
 # 4) Container shutdown signals are forwarded to both children, with bounded
@@ -176,7 +207,7 @@ wait_ready || {
     exit 1
 }
 authd_pid="$(cat "$KAIMO_AUTHD_PID_FILE")"
-smbd_pid="$(cat "$FAKE_SMBD_PID_FILE")"
+smbd_pid="$(cat "$KAIMO_SMBD_PID_FILE")"
 kill -TERM "$ACTIVE_SUPERVISOR"
 wait "$ACTIVE_SUPERVISOR"
 supervisor_status=$?

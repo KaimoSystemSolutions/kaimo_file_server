@@ -244,12 +244,15 @@ COPY validate-sync-interval.sh /usr/local/bin/validate-sync-interval.sh
 COPY sync-health.sh           /usr/local/bin/sync-health.sh
 COPY supervise-samba.sh       /usr/local/bin/supervise-samba.sh
 COPY authd-health.sh          /usr/local/bin/authd-health.sh
+COPY smbd-health.sh           /usr/local/bin/smbd-health.sh
 COPY tests/test-sync-users.sh /tmp/test-sync-users.sh
 COPY tests/test-sync-shares.sh /tmp/test-sync-shares.sh
 COPY tests/test-sync-config.sh /tmp/test-sync-config.sh
 COPY tests/test-sync-runner.sh /tmp/test-sync-runner.sh
 COPY tests/test-revocation-policy.sh /tmp/test-revocation-policy.sh
 COPY tests/test-authd-supervisor.sh /tmp/test-authd-supervisor.sh
+COPY tests/test-operational-credentials.sh /tmp/test-operational-credentials.sh
+COPY entrypoint.sh /tmp/phase0-entrypoint.sh
 COPY tests/test-vfs-io-deadline.py /usr/local/bin/test-vfs-io-deadline.py
 COPY tests/test-vfs-snapshot-readonly.py /usr/local/bin/test-vfs-snapshot-readonly.py
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
@@ -261,10 +264,13 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
                        /usr/local/bin/sync-health.sh \
                        /usr/local/bin/supervise-samba.sh \
                        /usr/local/bin/authd-health.sh \
+                       /usr/local/bin/smbd-health.sh \
                        /tmp/test-sync-users.sh \
                        /tmp/test-sync-shares.sh /tmp/test-sync-config.sh \
                        /tmp/test-sync-runner.sh /tmp/test-revocation-policy.sh \
                        /tmp/test-authd-supervisor.sh \
+                       /tmp/test-operational-credentials.sh \
+                       /tmp/phase0-entrypoint.sh \
                        /usr/local/bin/test-vfs-io-deadline.py \
                        /usr/local/bin/test-vfs-snapshot-readonly.py \
     && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
@@ -276,6 +282,7 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
              /usr/local/bin/sync-health.sh \
              /usr/local/bin/supervise-samba.sh \
              /usr/local/bin/authd-health.sh \
+             /usr/local/bin/smbd-health.sh \
              /usr/local/bin/test-vfs-io-deadline.py \
              /usr/local/bin/test-vfs-snapshot-readonly.py \
     && SYNC_USERS_SUT=/usr/local/bin/sync-users.sh bash /tmp/test-sync-users.sh \
@@ -290,11 +297,19 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
        bash /tmp/test-revocation-policy.sh \
     && AUTHD_SUPERVISOR_SUT=/usr/local/bin/supervise-samba.sh \
        AUTHD_HEALTH_SUT=/usr/local/bin/authd-health.sh \
+       SMBD_HEALTH_SUT=/usr/local/bin/smbd-health.sh \
        bash /tmp/test-authd-supervisor.sh \
+    && CREDENTIAL_ENTRYPOINT_SUT=/usr/local/bin/entrypoint.sh \
+       CREDENTIAL_PHASE0_ENTRYPOINT_SUT=/tmp/phase0-entrypoint.sh \
+       CREDENTIAL_SELFTEST_SUT=/usr/local/bin/selftest.sh \
+       CREDENTIAL_SYNC_USERS_SUT=/usr/local/bin/sync-users.sh \
+       CREDENTIAL_SYNC_CONFIG_SUT=/usr/local/bin/sync-config.sh \
+       bash /tmp/test-operational-credentials.sh \
     && rm /tmp/test-sync-users.sh /tmp/test-sync-shares.sh \
           /tmp/test-sync-config.sh /tmp/test-sync-runner.sh \
           /tmp/test-revocation-policy.sh \
-          /tmp/test-authd-supervisor.sh
+          /tmp/test-authd-supervisor.sh \
+          /tmp/test-operational-credentials.sh /tmp/phase0-entrypoint.sh
 
 # Package the installed runtime separately. Stripping is intentionally performed
 # on the copy only: `docker build --target build-runtime` still yields the full
