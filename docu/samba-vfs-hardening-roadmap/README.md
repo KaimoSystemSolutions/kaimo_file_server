@@ -3,8 +3,8 @@
 This documentation contains the security, memory-safety, and coverage audit for the Samba VFS migration. The former monolithic document has been split by topic so findings, target architecture, implementation planning, and progress history can be maintained and reviewed independently.
 
 > **Current as of:** 2026-07-29
-> **Most recently completed:** P2-09 – Complete bridge RPC cancellation boundaries
-> **Next planned finding:** P2-10 – Bound and batch bulk user export
+> **Most recently completed:** P2-10 – Bound and batch bulk user export
+> **Next planned finding:** P2-11 – Minimize and clear decrypted credentials
 > **Production approval:** Still blocked until the remaining credential and synchronization risks, lifecycle reconciliation work, and release gates are complete.
 
 ## Table of contents

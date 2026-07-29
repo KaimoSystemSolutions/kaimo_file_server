@@ -589,3 +589,135 @@ history without an interruption point.
 
 **Next planned finding:** P2-10 — replace unbounded sequential NT-hash export
 with a bounded, batched contract and corrupt-row isolation.
+
+### 2026-07-29 — P2-10: Bounded, batched NT-hash export
+
+**Status:** Implemented, regression-tested, and verified in the pinned Samba
+4.19.5 `build-runtime` image. Live multi-page reconciliation remains a release
+gate.
+
+**Problem**
+
+The original `ListUsers` method materialized every user entity, including
+fields irrelevant to Samba, then issued one additional username lookup and
+decryption per user. This produced three coupled risks:
+
+1. database work and the unary gRPC response grew without a per-message bound;
+2. the N+1 lookup pattern made synchronization latency proportional to both
+   user count and database round trips; and
+3. one malformed encrypted/legacy NT hash threw out of `ListUsers`, preventing
+   every otherwise valid account from converging.
+
+The native client did impose 100,000-record and 16-MiB post-response checks, but
+those checks ran only after the bridge had already materialized and serialized
+the unbounded protobuf response. They therefore did not protect bridge memory,
+gRPC message size, or database query shape.
+
+**Contract and policy decisions**
+
+1. `ListUsersRequest` now carries `offset` and `page_size`;
+   `ListUsersReply` carries `next_offset`, `has_more`, and the count of rejected
+   source rows. Page size is required and limited to 1-1,000; offsets at or
+   above 100,000 are rejected. Rejecting the protobuf zero default ensures an
+   older, non-paginating client fails closed during a mixed-version rollout
+   instead of importing only the first page and revoking the remainder.
+2. The bridge fetches one extra source row as look-ahead. This establishes
+   `has_more` without a second count query and keeps each data query bounded to
+   at most 1,001 minimal rows.
+3. The existing fixed-window rate limit is charged on offset zero, which is one
+   permit per logical export. Every continuation requires a short-lived
+   HMAC-authenticated token bound to the authenticated client identity and the
+   exact next offset. Continuation pages remain bounded, allow-listed,
+   cancellable, and audited without allowing an arbitrary offset to bypass the
+   rate limiter.
+4. More than 100,000 active source rows is a hard synchronization failure. The
+   last allowable page returns `ResourceExhausted` if look-ahead proves another
+   page exists, so the native importer cannot mistake a truncated account set
+   for authoritative desired state and revoke omitted accounts.
+5. Offset pagination is an eventual-convergence contract rather than a
+   cross-request database snapshot. Concurrent account changes may shift a
+   later page; the periodic reconciler repairs the view on its next run. The
+   tighter disable/revocation guarantee remains explicitly owned by P2-13.
+
+**Implemented**
+
+1. Added `SambaCredentialSource`, a repository projection containing only
+   username and protected NT hash. `UserRepository` filters disabled users,
+   orders deterministically by username and identity, applies `Skip`/`Take`,
+   uses `AsNoTracking`, and passes the RPC cancellation token directly into
+   `ToListAsync`.
+2. Added the bounded `SambaCredentialBatch` authentication contract.
+   `AuthenticationLookup` decrypts only the current page, filters the
+   well-known empty-password hash, validates the common Samba username
+   contract, decodes strict hexadecimal, and accepts only 16 decoded bytes.
+   Invalid names, malformed legacy hex, malformed/tampered ciphertext, and
+   wrong-length values are rejected independently while valid neighbors remain
+   exportable.
+3. Tightened the single-user `GetNtHash` boundary to the same exact 16-byte
+   requirement.
+4. `AuthGrpcService` enforces page and total limits before serialization,
+   validates internal batch metadata, copies only exact 16-byte records to
+   protobuf, and logs page/rejection counts without logging hashes or
+   usernames.
+5. Reworked `kaimo_authsync` into a bounded continuation loop. It requests
+   1,000-row pages, requires monotonic offsets, validates per-page and
+   cumulative limits, and accumulates only validated username/hash pairs.
+   Standard output remains empty until the final page succeeds. It also
+   requires a continuation token exactly when `has_more` is true. Any failed
+   RPC, malformed/expired continuation, invalid record, over-limit source set,
+   or over-limit JSON estimate terminates without producing a partial version-1
+   document for `sync-users.sh`.
+6. Kept the reconciler's independent JSON schema, uniqueness, record-count, and
+   byte-size validation unchanged. Pagination is therefore additive
+   defense-in-depth and does not weaken the pre-mutation validation boundary.
+
+**Regression coverage**
+
+- `AuthenticationLookupNtHashTests` now proves exact-length rejection, one
+  page projection rather than per-user lookup, look-ahead semantics,
+  empty-password filtering, corrupt-row isolation, invalid username rejection,
+  and independent wrong-length rejection.
+- `SambaCredentialRepositoryTests` uses the production EF model on relational
+  in-memory SQLite to prove deterministic paging, query bounds, protected-hash
+  projection, and disabled-user exclusion.
+- `AuthGrpcServiceUserExportTests` covers required/max page behavior,
+  continuation metadata, rejection accounting, missing/oversized/`uint32`
+  boundary rejection before lookup, and both crossing forms at the
+  100,000-source-row boundary.
+- The updated cancellation regression verifies the simplified authentication
+  service dependency boundary still interrupts single-hash lookup.
+
+**Validation completed**
+
+- The focused managed P2-10/security selection passes: 20/20 tests.
+- The complete managed test project passes: 641/641 tests, zero skipped.
+- `dotnet build tests/Kaimo_File_Server.Tests/Kaimo_File_Server.Tests.csproj
+  --no-restore` succeeds. Existing repository warnings remain unchanged.
+- The pinned Samba 4.19.5 `build-runtime` image
+  `kaimo-samba-build-tests:p2-10` builds successfully. This regenerates the C++
+  protobuf/gRPC stubs, compiles and links the paginated `kaimo_authsync`,
+  executes the native helper tests, and compiles the real ABI-49 VFS module.
+- `git diff --check` passes.
+
+**Validation still required**
+
+- Run a live bridge/Samba reconciliation with 0, 1, 1,000, 1,001, and a
+  representative large user set; confirm `tdbsam`, POSIX group membership, and
+  private managed-user state converge exactly.
+- Inject one malformed protected hash between valid rows in a deployment-shaped
+  database and confirm the count-only warning, valid-neighbor import, and
+  absence of credential material or usernames from logs.
+- Change enable/delete state while a multi-page export is in flight and measure
+  convergence on the next periodic run. P2-13 must define whether the resulting
+  polling window is acceptable for credential revocation.
+- Verify an over-100,000 source set leaves the prior passdb desired state
+  untouched and marks synchronization unhealthy.
+
+P2-10 bounds where credentials are fetched and transported, but it does not
+claim zero-copy or secure clearing. Managed strings/arrays, protobuf storage,
+native strings, captured JSON, and the private import file remain the explicit
+scope of P2-11.
+
+**Next planned finding:** P2-11 — minimize credential copies and lifetime, clear
+mutable buffers where practical, and remove avoidable text/file exposure from
+the import path.

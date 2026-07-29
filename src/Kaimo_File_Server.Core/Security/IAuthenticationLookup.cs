@@ -17,6 +17,16 @@ namespace Kaimo_File_Server.Core.Security
         Task<byte[]?> GetNtHashAsync(string username);
 
         /// <summary>
+        /// Reads and validates one bounded page of active Samba credentials.
+        /// Invalid stored credentials are isolated instead of aborting the
+        /// complete synchronization.
+        /// </summary>
+        Task<SambaCredentialBatch> GetSambaCredentialBatchAsync(
+            int offset,
+            int pageSize,
+            CancellationToken cancellationToken);
+
+        /// <summary>
         /// Resolves a username to a fully populated UserContext (with groups, roles, permissions).
         /// Returns null if the user doesn't exist.
         /// </summary>
@@ -36,4 +46,14 @@ namespace Kaimo_File_Server.Core.Security
         /// </summary>
         Task<bool> CanAccessShareAsync(Guid shareID, Guid principalId);
     }
+
+    public sealed record SambaCredential(
+        string Username,
+        byte[] NtHash);
+
+    public sealed record SambaCredentialBatch(
+        IReadOnlyList<SambaCredential> Credentials,
+        IReadOnlyList<string> RejectedUsernames,
+        int SourceCount,
+        bool HasMore);
 }

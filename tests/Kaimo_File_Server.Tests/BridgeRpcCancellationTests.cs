@@ -25,7 +25,7 @@ public sealed class BridgeRpcCancellationTests
             .Returns(new TaskCompletionSource<byte[]?>(
                 TaskCreationOptions.RunContinuationsAsynchronously).Task);
         var sut = new AuthGrpcService(
-            auth.Object, Mock.Of<IUserRepository>(),
+            auth.Object,
             new HashExportRateLimiter(
                 Options.Create(new HashExportRateLimitOptions())),
             NullLogger<AuthGrpcService>.Instance);

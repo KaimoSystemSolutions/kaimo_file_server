@@ -58,7 +58,73 @@ namespace Kaimo_File_Server.Infrastructure.Services
             if (string.Equals(ntHashHex, _emptyPasswordNtHash, StringComparison.OrdinalIgnoreCase))
                 return null;
 
-            return Convert.FromHexString(ntHashHex);
+            byte[] hash = Convert.FromHexString(ntHashHex);
+            return hash.Length == 16 ? hash : null;
+        }
+
+        public async Task<SambaCredentialBatch> GetSambaCredentialBatchAsync(
+            int offset,
+            int pageSize,
+            CancellationToken cancellationToken)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
+            IReadOnlyList<SambaCredentialSource> sources =
+                await _userRepo.GetSambaCredentialBatchAsync(
+                    offset,
+                    checked(pageSize + 1),
+                    cancellationToken);
+            bool hasMore = sources.Count > pageSize;
+            var credentials = new List<SambaCredential>(pageSize);
+            var rejectedUsernames = new List<string>();
+
+            foreach (SambaCredentialSource source in sources.Take(pageSize))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (!Kaimo_File_Server.Core.Helpers.SambaName.IsValidUsername(
+                        source.Username))
+                {
+                    rejectedUsernames.Add(source.Username);
+                    continue;
+                }
+
+                try
+                {
+                    string ntHashHex =
+                        _ntHashProtector.Unprotect(source.StoredNtHash);
+                    if (string.Equals(
+                            ntHashHex,
+                            _emptyPasswordNtHash,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    byte[] hash = Convert.FromHexString(ntHashHex);
+                    if (hash.Length != 16)
+                    {
+                        rejectedUsernames.Add(source.Username);
+                        continue;
+                    }
+
+                    credentials.Add(new SambaCredential(
+                        source.Username,
+                        hash));
+                }
+                catch (Exception exception) when (
+                    exception is FormatException
+                    or ArgumentException
+                    or System.Security.Cryptography.CryptographicException)
+                {
+                    rejectedUsernames.Add(source.Username);
+                }
+            }
+
+            return new SambaCredentialBatch(
+                credentials,
+                rejectedUsernames,
+                Math.Min(sources.Count, pageSize),
+                hasMore);
         }
 
         public async Task<UserContext?> ResolveUserContextAsync(string username)

@@ -70,6 +70,30 @@ public sealed class ControlPlaneSecurityTests
         Assert.True(limiter.TryAcquire(ControlPlaneAccessPolicy.SambaClient, out _));
     }
 
+    [Fact]
+    public void HashExportContinuationToken_IsBoundToClientAndOffset()
+    {
+        var clock = new MutableTimeProvider(
+            new DateTimeOffset(2026, 7, 29, 12, 0, 0, TimeSpan.Zero));
+        var limiter = new HashExportRateLimiter(
+            Options.Create(new HashExportRateLimitOptions()),
+            clock);
+        string token = limiter.CreateContinuationToken("kaimo-samba", 1_000);
+
+        Assert.True(limiter.IsValidContinuationToken(
+            "kaimo-samba", 1_000, token));
+        Assert.False(limiter.IsValidContinuationToken(
+            "other-client", 1_000, token));
+        Assert.False(limiter.IsValidContinuationToken(
+            "kaimo-samba", 2_000, token));
+        Assert.False(limiter.IsValidContinuationToken(
+            "kaimo-samba", 1_000, token + "tampered"));
+
+        clock.Advance(TimeSpan.FromMinutes(11));
+        Assert.False(limiter.IsValidContinuationToken(
+            "kaimo-samba", 1_000, token));
+    }
+
     private sealed class MutableTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         private DateTimeOffset _utcNow = utcNow;

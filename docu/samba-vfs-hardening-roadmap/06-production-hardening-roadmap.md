@@ -89,8 +89,12 @@ and make disabled identities converge predictably.
    treated.
 7. Remove reusable test credentials from production entrypoints and health
    probes. Reject `KAIMO_AUTHZ_FAILOPEN=1` in production configuration.
-8. Paginate or stream bulk user export, isolate corrupt rows, enforce exactly
-   16-byte NT hashes, and minimize/clear decrypted credential copies.
+8. **Completed 2026-07-29:** paginate bulk user export in bounded 1,000-row
+   projections, isolate corrupt rows, enforce exactly 16-byte NT hashes, and
+   fail closed above the 100,000-row/16-MiB end-to-end limits.
+9. Minimize and clear decrypted credential copies across managed arrays,
+   protobuf messages, native strings, structured output, and the private
+   `smbpasswd` import transaction.
 
 **Exit criteria:**
 

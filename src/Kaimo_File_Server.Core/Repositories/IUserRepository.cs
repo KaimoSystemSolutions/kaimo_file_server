@@ -28,6 +28,15 @@ namespace Kaimo_File_Server.Core.Repositories
         Task<IEnumerable<User>> GetAllAsync();
 
         /// <summary>
+        /// Returns one deterministic, bounded projection of active Samba
+        /// credential source rows. Stored NT hashes remain protected.
+        /// </summary>
+        Task<IReadOnlyList<SambaCredentialSource>> GetSambaCredentialBatchAsync(
+            int offset,
+            int count,
+            CancellationToken cancellationToken);
+
+        /// <summary>
         /// Creates a new user account.
         /// </summary>
         /// <returns>The created user with server-generated fields populated.</returns>
@@ -94,4 +103,9 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <param name="canChangePassword">Whether the user is allowed to change their own password.</param>
         Task UpdateProfileAsync(Guid userId, string description, string email, bool isEnabled, bool canChangePassword);
     }
+
+    /// <summary>Minimal database projection used by Samba credential export.</summary>
+    public sealed record SambaCredentialSource(
+        string Username,
+        string StoredNtHash);
 }

@@ -29,6 +29,11 @@ public class AuthenticationLookupNtHashTests
         var userRepo = new Mock<IUserRepository>();
         userRepo.Setup(r => r.GetByUsernameAsync(It.IsAny<string>())).ReturnsAsync(user);
 
+        return BuildSut(userRepo);
+    }
+
+    private AuthenticationLookup BuildSut(Mock<IUserRepository> userRepo)
+    {
         return new AuthenticationLookup(
             userRepo.Object,
             Mock.Of<IShareRepository>(),
@@ -87,5 +92,79 @@ public class AuthenticationLookupNtHashTests
         var sut = BuildSut(user: null);
 
         Assert.Null(await sut.GetNtHashAsync("ghost"));
+    }
+
+    [Fact]
+    public async Task GetNtHashAsync_WrongLengthHash_ReturnsNull()
+    {
+        var sut = BuildSut(MakeUser("00112233"));
+
+        Assert.Null(await sut.GetNtHashAsync("test"));
+    }
+
+    [Fact]
+    public async Task GetSambaCredentialBatchAsync_UsesOneBoundedProjectionAndIsolatesCorruptRows()
+    {
+        const string validHash = "0123456789ABCDEF0123456789ABCDEF";
+        string emptyHash = _passwords.ComputeNtHash(string.Empty);
+        var userRepo = new Mock<IUserRepository>();
+        userRepo.Setup(repository => repository.GetSambaCredentialBatchAsync(
+                25,
+                4,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new SambaCredentialSource("alice", _protector.Protect(validHash)),
+                new SambaCredentialSource("broken", "not-a-hex-hash"),
+                new SambaCredentialSource("empty", _protector.Protect(emptyHash)),
+                new SambaCredentialSource("lookahead", validHash),
+            ]);
+        var sut = BuildSut(userRepo);
+
+        SambaCredentialBatch batch = await sut.GetSambaCredentialBatchAsync(
+            25,
+            3,
+            CancellationToken.None);
+
+        SambaCredential credential = Assert.Single(batch.Credentials);
+        Assert.Equal("alice", credential.Username);
+        Assert.Equal(Convert.FromHexString(validHash), credential.NtHash);
+        Assert.Equal(["broken"], batch.RejectedUsernames);
+        Assert.Equal(3, batch.SourceCount);
+        Assert.True(batch.HasMore);
+        userRepo.Verify(repository => repository.GetSambaCredentialBatchAsync(
+            25,
+            4,
+            It.IsAny<CancellationToken>()), Times.Once);
+        userRepo.Verify(
+            repository => repository.GetByUsernameAsync(It.IsAny<string>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task GetSambaCredentialBatchAsync_RejectsInvalidUsernameAndHashLengthIndividually()
+    {
+        var userRepo = new Mock<IUserRepository>();
+        userRepo.Setup(repository => repository.GetSambaCredentialBatchAsync(
+                0,
+                4,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new SambaCredentialSource("-invalid", "0123456789ABCDEF0123456789ABCDEF"),
+                new SambaCredentialSource("short", "00112233"),
+                new SambaCredentialSource("valid", "FEDCBA9876543210FEDCBA9876543210"),
+            ]);
+        var sut = BuildSut(userRepo);
+
+        SambaCredentialBatch batch = await sut.GetSambaCredentialBatchAsync(
+            0,
+            3,
+            CancellationToken.None);
+
+        Assert.Equal(["-invalid", "short"], batch.RejectedUsernames);
+        Assert.Equal("valid", Assert.Single(batch.Credentials).Username);
+        Assert.Equal(3, batch.SourceCount);
+        Assert.False(batch.HasMore);
     }
 }

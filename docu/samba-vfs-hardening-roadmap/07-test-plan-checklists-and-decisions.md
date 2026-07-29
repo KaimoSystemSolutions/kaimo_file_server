@@ -121,6 +121,9 @@ implemented; their required release verification remains tracked in milestone 4.
 - [x] Every mutation error makes the sync fail.
 - [x] Final state is verified before recording success.
 - [x] Concurrent sync instances are locked out.
+- [x] Bulk user export uses bounded pages and projections, isolates corrupt
+  credential rows, validates monotonic continuation metadata, and fails before
+  emitting a partial desired-state document.
 - [ ] Credentials are not exposed in process arguments.
 
 ## 13. Decisions that must be made explicitly

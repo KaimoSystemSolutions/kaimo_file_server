@@ -99,9 +99,9 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
 **Flow:**
 
 ```
- Kaimo-DB ──► SmbBridge (.NET gRPC, :5080 mTLS) ──gRPC ListUsers──► kaimo_authsync (C++)
-                 IAuthenticationLookup.GetNtHashAsync                 │  username + NT hash
-                 (decrypted, filters disabled/empty)                  ▼
+ Kaimo-DB ──► SmbBridge (.NET gRPC, :5080 mTLS) ──paged ListUsers──► kaimo_authsync (C++)
+                 bounded projected credential batches               │  username + 16-byte NT hash
+                 (decrypts, filters, isolates corrupt rows)          ▼
                                                           sync-users.sh ──pdbedit──► Samba's tdbsam
                                                                                         │
                                              smbd verifies NTLMv2 locally against NT hash ─┘
@@ -134,6 +134,17 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
   JSON documents. The shell reconcilers independently require exact schemas,
   types, unique safe names, exact NT hashes, valid protocol ranges, and share
   paths canonically contained below `KAIMO_STORAGE_ROOT`/`KAIMO_STORAGE`.
+- **P2-10 bounded credential export:** `ListUsers` reads active credential
+  sources in ordered database projections of at most 1,000 rows. Each page is
+  independently bounded and each credential must have a valid Samba username
+  plus an exact 16-byte decoded NT hash; corrupt rows are counted and skipped
+  without exposing their username or hash in logs. Continuations require a
+  short-lived, client/offset-bound authenticated token, so non-zero offsets
+  cannot bypass the logical export's rate-limit permit. `kaimo_authsync`
+  validates monotonic offsets, continuation-token shape, the
+  100,000-source-row ceiling, and the existing 16-MiB JSON ceiling. It emits no
+  desired-state JSON until every page has completed, so `sync-users.sh` never
+  reconciles a partial export.
 - **P2-01 exact connection context:** usernames and share names are stored as
   exact owned strings instead of fixed arrays. Account/share creation, VFS,
   `authd`, and every identity-bearing bridge RPC enforce the same 32-byte

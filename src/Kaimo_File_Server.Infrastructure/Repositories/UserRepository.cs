@@ -35,6 +35,29 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             => await _db.Users.ToListAsync();
 
         /// <inheritdoc />
+        public async Task<IReadOnlyList<SambaCredentialSource>>
+            GetSambaCredentialBatchAsync(
+                int offset,
+                int count,
+                CancellationToken cancellationToken)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(offset);
+            ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
+
+            return await _db.Users
+                .AsNoTracking()
+                .Where(user => user.IsEnabled)
+                .OrderBy(user => user.Username)
+                .ThenBy(user => user.Id)
+                .Skip(offset)
+                .Take(count)
+                .Select(user => new SambaCredentialSource(
+                    user.Username,
+                    user.NtHash))
+                .ToListAsync(cancellationToken);
+        }
+
+        /// <inheritdoc />
         public async Task<User> CreateAsync(User user)
         {
             _db.Users.Add(user);

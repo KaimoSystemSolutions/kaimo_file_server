@@ -15,7 +15,8 @@ service AuthService {
   // assigns this method to no current workload identity.
   rpc GetNtHash(GetNtHashRequest) returns (GetNtHashReply);
 
-  // All active users + NT-Hash for tdbsam sync (Phase 1).
+  // One bounded page of active users + NT hashes for tdbsam sync. Callers
+  // start at offset zero and continue while has_more is true.
   rpc ListUsers(ListUsersRequest) returns (ListUsersReply);
 }
 
@@ -28,7 +29,11 @@ message GetNtHashReply {
   bytes nt_hash = 2; // raw 16 bytes; empty if not found/disabled
 }
 
-message ListUsersRequest {}
+message ListUsersRequest {
+  uint32 offset    = 1;
+  uint32 page_size = 2; // required: 1-1000; zero fails closed for old clients
+  string continuation_token = 3;
+}
 
 message UserEntry {
   string username = 1;
@@ -37,6 +42,10 @@ message UserEntry {
 
 message ListUsersReply {
   repeated UserEntry users = 1;
+  uint32 next_offset       = 2;
+  bool   has_more          = 3;
+  uint32 rejected_users    = 4;
+  string continuation_token = 5;
 }
 
 // Authorization portion of the Control Plane (Phase 2). Decides whether a

@@ -222,9 +222,44 @@ cancellation-aware APIs rather than only detaching the wait.
 
 ### P2-10: Bulk user export is unbounded and sequential
 
+> **Remediation status (2026-07-29): Implemented, regression-tested, and
+> verified in the pinned Samba 4.19.5 build-runtime image. Live multi-page
+> reconciliation and concurrent-account-change behavior remain release
+> verification.**
+
 `ListUsers` loads all users and calls `GetNtHashAsync` one at a time. One corrupt hash can abort the whole RPC, and a large response can exceed gRPC message limits.
 
 **Fix:** validate hashes individually, isolate corrupt rows, paginate/stream users, enforce exactly 16 bytes, and avoid an N+1 lookup/decryption pattern.
+
+**Implemented fix:** `ListUsers` is now an explicit offset/page-size contract.
+The bridge requires a non-zero page size and caps pages at 1,000 source rows.
+Rejecting the protobuf default prevents an older, non-paginating native client
+from treating the first page as a complete desired state during a mixed-version
+rollout. The bridge also rejects offsets at or above 100,000 and fails with
+`ResourceExhausted` rather than returning a partial desired state when another
+page would cross that total limit. One rate-limit permit covers the logical
+export's first page; bounded continuation pages require a short-lived
+HMAC-authenticated token bound to the workload identity and exact next offset,
+then retain request/completion audit events. An arbitrary non-zero offset
+therefore cannot bypass the export rate limit.
+
+`UserRepository` performs one `AsNoTracking` projection per page, ordered by
+username and identity, selecting only active usernames and protected NT hashes.
+`AuthenticationLookup` decrypts that bounded projection in memory, filters the
+empty-password hash, enforces the common Samba username contract and exactly
+16 decoded bytes, and isolates malformed ciphertext, invalid hex, invalid
+names, and wrong-length values per row. Rejection logs contain counts only,
+never hashes or usernames.
+
+The native `kaimo_authsync` client requests 1,000-row pages, validates monotonic
+continuation metadata, presence/absence of continuation tokens, and all
+per-page/total/JSON limits, and buffers no more than 100,000 validated records
+or 16 MiB of structured output. It emits the versioned JSON document only after
+every page succeeds. A failed, malformed, expired, or over-limit continuation
+therefore cannot become a partial `tdbsam` desired state. Offset pagination
+intentionally provides bounded eventual convergence, not a database snapshot
+across RPCs; account changes during one export are reconciled by the next
+periodic run and remain part of the P2-13 revocation-SLA work.
 
 ### P2-11: Decrypted credentials are not minimized or cleared
 
