@@ -13,7 +13,7 @@ export NET_FAIL_PARAMETER=""
 export NET_IGNORE_PARAMETER=""
 export KAIMO_SAMBA_PATH_PREFIX=""
 mkdir -p "$WORK/bin"
-printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":true,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false}}' >"$CONFIG_RESPONSE"
+printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":true,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}}' >"$CONFIG_RESPONSE"
 : >"$CONFIG_STATE"
 
 cat >"$WORK/bin/kaimo_configsync" <<'EOF'
@@ -62,9 +62,21 @@ if ! bash "$SUT" >/dev/null 2>&1; then
     echo "FAIL: valid configuration did not converge."
     exit 1
 fi
+if ! grep -q $'^log level\t1$' "$CONFIG_STATE"; then
+    echo "FAIL: Settings Warning level was not mapped to Samba log level 1."
+    exit 1
+fi
+
+export KAIMO_LOG_LEVEL=Debug
+if ! bash "$SUT" >/dev/null 2>&1 \
+    || ! grep -q $'^log level\t3$' "$CONFIG_STATE"; then
+    echo "FAIL: KAIMO_LOG_LEVEL did not override the Settings log level."
+    exit 1
+fi
+unset KAIMO_LOG_LEVEL
 
 export NET_FAIL_PARAMETER="server signing"
-printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_10","max_protocol":"SMB3_11","require_signing":false,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false}}' >"$CONFIG_RESPONSE"
+printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_10","max_protocol":"SMB3_11","require_signing":false,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}}' >"$CONFIG_RESPONSE"
 if bash "$SUT" >/dev/null 2>&1; then
     echo "FAIL: failed setparm mutation reported success."
     exit 1
@@ -82,11 +94,11 @@ cp "$CONFIG_STATE" "$WORK/config-before-invalid"
 for invalid_case in \
     '' \
     '{"version":2,"config":{}}' \
-    '{"version":1,"config":{"min_protocol":"NT1","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false}}' \
-    '{"version":1,"config":{"min_protocol":"SMB3_11","max_protocol":"SMB2_02","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false}}' \
-    '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":"true","require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false}}' \
-    '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"unexpected":true}}' \
-    '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false}} {"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false}}'; do
+    '{"version":1,"config":{"min_protocol":"NT1","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}}' \
+    '{"version":1,"config":{"min_protocol":"SMB3_11","max_protocol":"SMB2_02","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}}' \
+    '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":"true","require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}}' \
+    '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning","unexpected":true}}' \
+    '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}} {"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":false,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}}'; do
     printf '%s\n' "$invalid_case" >"$CONFIG_RESPONSE"
     if bash "$SUT" >/dev/null 2>&1 \
         || ! cmp -s "$WORK/config-before-invalid" "$CONFIG_STATE"; then

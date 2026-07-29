@@ -52,7 +52,7 @@ if ! CONFIG_RECORD="$(printf '%s' "$OUT" | jq -s -e -r '
        or (.config | exact_keys([
             "min_protocol", "max_protocol", "require_signing",
             "require_encryption", "enabled", "enable_ws_discovery",
-            "enable_audit_log"]) | not)
+            "enable_audit_log", "log_level"]) | not)
        or ((.config.min_protocol | type) != "string")
        or (.config.min_protocol | dialect | not)
        or ((.config.max_protocol | type) != "string")
@@ -62,6 +62,11 @@ if ! CONFIG_RECORD="$(printf '%s' "$OUT" | jq -s -e -r '
        or (.config.enabled | type) != "boolean"
        or (.config.enable_ws_discovery | type) != "boolean"
        or (.config.enable_audit_log | type) != "boolean"
+       or ((.config.log_level | type) != "string")
+       or ((.config.log_level == "Debug"
+            or .config.log_level == "Information"
+            or .config.log_level == "Warning"
+            or .config.log_level == "Error") | not)
     then error("invalid config sync schema")
     else .config | [
         .min_protocol, .max_protocol,
@@ -69,14 +74,15 @@ if ! CONFIG_RECORD="$(printf '%s' "$OUT" | jq -s -e -r '
         (if .require_encryption then "1" else "0" end),
         (if .enabled then "1" else "0" end),
         (if .enable_ws_discovery then "1" else "0" end),
-        (if .enable_audit_log then "1" else "0" end)
+        (if .enable_audit_log then "1" else "0" end),
+        .log_level
     ] | @tsv
     end
 ')"; then
     echo "[sync-config] Invalid structured config response." >&2
     exit 1
 fi
-IFS=$'\t' read -r min_proto max_proto req_sign req_enc enabled wsdd_on audit_on <<<"$CONFIG_RECORD"
+IFS=$'\t' read -r min_proto max_proto req_sign req_enc enabled wsdd_on audit_on app_log_level <<<"$CONFIG_RECORD"
 
 dialect_rank() {
     case "$1" in
@@ -126,6 +132,19 @@ fi
 [ "${req_sign:-0}" = "1" ] && signing="mandatory" || signing="auto"
 [ "${req_enc:-0}"  = "1" ] && encrypt="required"  || encrypt="default"
 
+# The environment variable is the explicit highest-priority manual override.
+effective_log_level="${KAIMO_LOG_LEVEL:-$app_log_level}"
+case "${effective_log_level,,}" in
+    debug)       samba_log_level="3" ;;
+    information) samba_log_level="2" ;;
+    warning)     samba_log_level="1" ;;
+    error)       samba_log_level="0" ;;
+    *)
+        echo "[sync-config] Invalid KAIMO_LOG_LEVEL/log level '$effective_log_level'." >&2
+        exit 1
+        ;;
+esac
+
 changed=0
 # apply <param> <value>: sets a global registry parameter only if it differs
 # from current (net conf getparm gives error on unset -> curr empty).
@@ -154,6 +173,7 @@ apply "server min protocol" "$min_proto" || exit 1
 apply "server max protocol" "$max_proto" || exit 1
 apply "server signing"      "$signing" || exit 1
 apply "smb encrypt"         "$encrypt" || exit 1
+apply "log level"           "$samba_log_level" || exit 1
 
 # --- Audit log (backlog #7): toggle the full_audit VFS module globally ---
 # The module stack is set inline in smb.conf.vfs (`vfs objects = kaimo_bridge`);

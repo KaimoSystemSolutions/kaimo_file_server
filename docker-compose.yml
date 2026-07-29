@@ -29,6 +29,8 @@ services:
     # support (drvfs/9p on Windows dev machine); on ext4 the default ACLs from the
     # Samba entrypoint handle this. See src/samba-vfs/README.md (Storage Ownership).
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Host.dll"]
+    #environment:
+      #KAIMO_LOG_LEVEL: ${#KAIMO_LOG_LEVEL:-}
     volumes:
       - *vol-storage-pool-01
       #- *vol-storage-pool-02
@@ -60,6 +62,7 @@ services:
       kaimo_smb_pki_init:
         condition: service_completed_successfully
     environment:
+      #KAIMO_LOG_LEVEL: ${#KAIMO_LOG_LEVEL:-}
       # Global internal cache, outside every configured share path.
       # Must match KAIMO_SNAPSHOT_CACHE_ROOT in the Samba container.
       Snapshots__Cache__RootPath: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}
@@ -121,6 +124,9 @@ services:
     depends_on:
       - kaimo_smb_bridge
     environment:
+      # Highest-priority manual override for .NET, Samba and native stack logging.
+      # Allowed: Debug, Information, Warning, Error. Empty = Settings page controls it.
+      #KAIMO_LOG_LEVEL: ${#KAIMO_LOG_LEVEL:-}
       # Address of gRPC bridge for NT hash sync (kaimo_authsync).
       KAIMO_BRIDGE_ADDR: kaimo_smb_bridge:5080
       # Authz fail mode when the bridge/authd is unreachable. Default is fail-CLOSED
@@ -186,6 +192,7 @@ services:
       - 8443:8443
     environment:
       TZ: Europe/Berlin
+      #KAIMO_LOG_LEVEL: ${#KAIMO_LOG_LEVEL:-}
       GOOGLE_APPLICATION_CREDENTIALS: /tests/data/logins/google-service-account.json
         
     # umask 002 -> new files 0664 (group-writable) so that Samba side

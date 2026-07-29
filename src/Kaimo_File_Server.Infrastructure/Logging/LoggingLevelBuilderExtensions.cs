@@ -6,15 +6,14 @@ namespace Kaimo_File_Server.Infrastructure.Logging;
 public static class LoggingLevelBuilderExtensions
 {
     /// <summary>
-    /// Enables the DB-backed, live-reloadable global log level for this process.
-    /// Adds the override configuration source (so a stored level beats
-    /// <c>appsettings.json</c>), registers it in DI, and starts the reloader that
-    /// polls the config store and pushes changes in. Call from every process
-    /// (Web + SMB host). Requires <c>AddInfrastructure</c> (for the config store).
+    /// Enables the live-reloadable global log level for this process.
+    /// Priority is KAIMO_LOG_LEVEL environment override, Settings/DB value, then
+    /// appsettings fallback. Requires AddInfrastructure for the config store.
     /// </summary>
     public static void AddDynamicLogLevel(this IHostApplicationBuilder builder)
     {
-        var source = new LoggingLevelConfigurationSource();
+        var source = new LoggingLevelConfigurationSource(
+            builder.Configuration[Core.Logging.LoggingConfigKeys.EnvironmentVariable]);
 
         // Added last → highest priority, so it overrides the appsettings Default.
         builder.Configuration.Sources.Add(source);

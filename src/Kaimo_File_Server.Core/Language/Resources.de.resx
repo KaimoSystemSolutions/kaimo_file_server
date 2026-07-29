@@ -1198,7 +1198,10 @@
     <value>Globales Log-Level</value>
   </data>
   <data name="Web_Settings_Logging_Desc" xml:space="preserve">
-    <value>Gilt für die gesamte Applikation (Web und die Dateidienste). Debug ist sehr detailliert; Information ergänzt Benutzeraktivität wie Anmeldungen; Warning meldet potenzielle Probleme und Sicherheitsrisiken; Error meldet nur fehlgeschlagene Operationen. Standard ist Warning. Änderungen greifen innerhalb weniger Sekunden – ohne Neustart.</value>
+    <value>Gilt für Web, Host, SMB-Bridge und Samba. Debug ist sehr detailliert; Information ergänzt normale Abläufe; Warning meldet potenzielle Probleme; Error meldet nur fehlgeschlagene Operationen. Standard ist Warning. Änderungen greifen innerhalb einer Minute – ohne Neustart.</value>
+  </data>
+  <data name="Web_Settings_Logging_EnvironmentOverride" xml:space="preserve">
+    <value>Environment-Override aktiv: KAIMO_LOG_LEVEL={0}. Er hat derzeit Vorrang vor dieser gespeicherten Einstellung.</value>
   </data>
   <data name="Web_Settings_Logging_Saved" xml:space="preserve">
     <value>Log-Level gespeichert.</value>

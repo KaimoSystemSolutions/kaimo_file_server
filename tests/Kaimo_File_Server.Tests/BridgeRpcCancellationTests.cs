@@ -1,10 +1,12 @@
 using Grpc.Core;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.SmbBridge.Grpc;
 using Kaimo_File_Server.SmbBridge.Security;
 using Kaimo_File_Server.SmbBridge.Services;
+using Kaimo_File_Server.Infrastructure.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -54,7 +56,9 @@ public sealed class BridgeRpcCancellationTests
             .Returns(new TaskCompletionSource<SmbProtocolSettings>(
                 TaskCreationOptions.RunContinuationsAsynchronously).Task);
         var sut = new ConfigGrpcService(
-            config.Object, NullLogger<ConfigGrpcService>.Instance);
+            config.Object, Mock.Of<ILoggingConfigStore>(),
+            new LoggingLevelConfigurationSource(),
+            NullLogger<ConfigGrpcService>.Instance);
 
         await AssertRpcCancellationAsync(context => sut.GetProtocolSettings(
             new GetProtocolSettingsRequest(), context));

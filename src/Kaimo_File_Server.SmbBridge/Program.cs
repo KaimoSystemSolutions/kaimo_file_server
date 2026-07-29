@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Configuration;
+using Kaimo_File_Server.Infrastructure.Logging;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.SmbBridge.Security;
 using Kaimo_File_Server.SmbBridge.Services;
@@ -15,6 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Reuse existing Kaimo services (DB, repos, AuthenticationLookup,
 // NtHashProtector). Needs the same NtHash:EncryptionKey as Host/Web.
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.AddDynamicLogLevel();
 
 // Real Elasticsearch search service — MUST come before AddCoreServices so it wins
 // the NoOp fallback (Phase 3: SMB writes are indexed like web uploads).

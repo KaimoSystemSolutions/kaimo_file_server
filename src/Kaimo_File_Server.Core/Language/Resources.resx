@@ -1198,7 +1198,10 @@
     <value>Global log level</value>
   </data>
   <data name="Web_Settings_Logging_Desc" xml:space="preserve">
-    <value>Applies to the whole application (Web and the file services). Debug is very detailed; Information adds user activity such as logins; Warning reports potential problems and security risks; Error only reports failed operations. The default is Warning. Changes take effect within a few seconds — no restart required.</value>
+    <value>Applies to Web, Host, SMB Bridge and Samba. Debug is very detailed; Information adds normal operations; Warning reports potential problems; Error only reports failed operations. The default is Warning. Changes take effect within one minute — no restart required.</value>
+  </data>
+  <data name="Web_Settings_Logging_EnvironmentOverride" xml:space="preserve">
+    <value>Environment override active: KAIMO_LOG_LEVEL={0}. It currently has priority over this saved setting.</value>
   </data>
   <data name="Web_Settings_Logging_Saved" xml:space="preserve">
     <value>Log level saved.</value>

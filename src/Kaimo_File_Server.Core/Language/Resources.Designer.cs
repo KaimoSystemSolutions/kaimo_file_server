@@ -2210,6 +2210,12 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Settings_Logging_Desc", resourceCulture);
             }
         }
+
+        public static string Web_Settings_Logging_EnvironmentOverride {
+            get {
+                return ResourceManager.GetString("Web_Settings_Logging_EnvironmentOverride", resourceCulture);
+            }
+        }
         
         public static string Web_Settings_Logging_Saved {
             get {

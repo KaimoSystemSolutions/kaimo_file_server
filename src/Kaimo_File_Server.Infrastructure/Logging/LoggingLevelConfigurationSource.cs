@@ -4,45 +4,71 @@ using Microsoft.Extensions.Configuration;
 namespace Kaimo_File_Server.Infrastructure.Logging;
 
 /// <summary>
-/// An in-memory, reloadable configuration source that contributes a single
-/// <c>Logging:LogLevel:Default</c> entry — the global application log level stored
-/// in the database. It is added to the host's configuration AFTER the JSON/env
-/// sources so it overrides the <c>appsettings.json</c> default, and is also
-/// registered in DI so <see cref="LoggingLevelReloader"/> can push new values into
-/// it. Pushing a value raises the configuration change token, which the logging
-/// framework watches — so the effective filter changes live, no restart.
-///
-/// When no level has been pushed yet (startup, or the DB is unreachable) it
-/// contributes nothing and the <c>appsettings.json</c> default applies. More
-/// specific category rules from <c>appsettings.json</c> (e.g. the EF Core
-/// suppressions) are never touched, so they keep damping ORM noise even at Debug.
+/// Reloadable source for <c>Logging:LogLevel:Default</c>.
+/// Priority is the process-level <c>KAIMO_LOG_LEVEL</c> override, then the
+/// Settings/DB value, then the normal appsettings fallback.
 /// </summary>
 public sealed class LoggingLevelConfigurationSource : IConfigurationSource
 {
+    private readonly string? _manualOverrideLevel;
     private LoggingLevelConfigurationProvider? _provider;
 
+    public LoggingLevelConfigurationSource(string? manualOverrideLevel = null)
+    {
+        var normalizedOverride = LoggingConfigKeys.Normalize(manualOverrideLevel);
+        if (!string.IsNullOrWhiteSpace(manualOverrideLevel) &&
+            normalizedOverride is null)
+        {
+            throw new InvalidOperationException(
+                $"{LoggingConfigKeys.EnvironmentVariable} must be one of: " +
+                string.Join(", ", LoggingConfigKeys.AllowedLevels));
+        }
+
+        _manualOverrideLevel = normalizedOverride;
+    }
+
+    /// <summary>The active environment override, if configured.</summary>
+    public string? ManualOverrideLevel => _manualOverrideLevel;
+
+    /// <summary>Resolves environment override before the supplied DB value.</summary>
+    public string? ResolveLevel(string? databaseLevel)
+        => _manualOverrideLevel ?? LoggingConfigKeys.Normalize(databaseLevel);
+
     public IConfigurationProvider Build(IConfigurationBuilder builder)
-        => _provider ??= new LoggingLevelConfigurationProvider();
+        => _provider ??= new LoggingLevelConfigurationProvider(_manualOverrideLevel);
 
     /// <summary>
-    /// Sets the global level and triggers a live reload. Ignored (and the current
-    /// override cleared) when <paramref name="level"/> is not an allowed level name.
+    /// Pushes a new Settings/DB value. An active environment override remains
+    /// authoritative.
     /// </summary>
-    public void SetLevel(string? level) => _provider?.SetLevel(level);
+    public void SetLevel(string? level) => _provider?.SetDatabaseLevel(level);
 
     private sealed class LoggingLevelConfigurationProvider : ConfigurationProvider
     {
-        // Load() is called once when the source is built; keep whatever has been set.
-        public override void Load() { }
+        private readonly string? _manualOverrideLevel;
 
-        public void SetLevel(string? level)
+        public LoggingLevelConfigurationProvider(string? manualOverrideLevel)
+        {
+            _manualOverrideLevel = manualOverrideLevel;
+        }
+
+        public override void Load() => Apply(databaseLevel: null, reload: false);
+
+        public void SetDatabaseLevel(string? level)
+            => Apply(level, reload: true);
+
+        private void Apply(string? databaseLevel, bool reload)
         {
             var data = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-            if (LoggingConfigKeys.IsAllowed(level))
-                data["Logging:LogLevel:Default"] = level;
+            var effectiveLevel =
+                _manualOverrideLevel ?? LoggingConfigKeys.Normalize(databaseLevel);
+
+            if (effectiveLevel is not null)
+                data["Logging:LogLevel:Default"] = effectiveLevel;
 
             Data = data;
-            OnReload(); // fires the change token → LoggerFilterOptions rebind
+            if (reload)
+                OnReload();
         }
     }
 }

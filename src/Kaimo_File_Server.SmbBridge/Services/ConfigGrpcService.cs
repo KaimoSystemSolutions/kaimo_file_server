@@ -1,5 +1,7 @@
 using Grpc.Core;
+using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Infrastructure.Logging;
 using Kaimo_File_Server.SmbBridge.Grpc;
 
 namespace Kaimo_File_Server.SmbBridge.Services;
@@ -20,11 +22,19 @@ namespace Kaimo_File_Server.SmbBridge.Services;
 public sealed class ConfigGrpcService : ConfigService.ConfigServiceBase
 {
     private readonly ISmbConfigStore _config;
+    private readonly ILoggingConfigStore _loggingConfig;
+    private readonly LoggingLevelConfigurationSource _loggingSource;
     private readonly ILogger<ConfigGrpcService> _logger;
 
-    public ConfigGrpcService(ISmbConfigStore config, ILogger<ConfigGrpcService> logger)
+    public ConfigGrpcService(
+        ISmbConfigStore config,
+        ILoggingConfigStore loggingConfig,
+        LoggingLevelConfigurationSource loggingSource,
+        ILogger<ConfigGrpcService> logger)
     {
         _config = config;
+        _loggingConfig = loggingConfig;
+        _loggingSource = loggingSource;
         _logger = logger;
     }
 
@@ -37,6 +47,10 @@ public sealed class ConfigGrpcService : ConfigService.ConfigServiceBase
             .WaitAsync(cancellationToken); // already normalized (Min <= Max)
         bool enabled = await _config.IsSmbEnabledAsync()
             .WaitAsync(cancellationToken);
+        string databaseLogLevel = await _loggingConfig.GetLevelAsync()
+            .WaitAsync(cancellationToken);
+        string effectiveLogLevel =
+            _loggingSource.ResolveLevel(databaseLogLevel) ?? LoggingConfigKeys.DefaultLevel;
 
         var reply = new ProtocolSettingsReply
         {
@@ -47,12 +61,13 @@ public sealed class ConfigGrpcService : ConfigService.ConfigServiceBase
             Enabled = enabled,
             EnableWsDiscovery = s.EnableWsDiscovery,
             EnableAuditLog = s.EnableAuditLog,
+            LogLevel = effectiveLogLevel,
         };
 
         _logger.LogInformation(
-            "GetProtocolSettings -> min={Min} max={Max} signing={Sign} encrypt={Enc} enabled={Enabled} wsdd={Wsdd} audit={Audit}",
+            "GetProtocolSettings -> min={Min} max={Max} signing={Sign} encrypt={Enc} enabled={Enabled} wsdd={Wsdd} audit={Audit} log={LogLevel}",
             reply.MinProtocol, reply.MaxProtocol, reply.RequireSigning, reply.RequireEncryption,
-            reply.Enabled, reply.EnableWsDiscovery, reply.EnableAuditLog);
+            reply.Enabled, reply.EnableWsDiscovery, reply.EnableAuditLog, reply.LogLevel);
         return reply;
     }
 

@@ -68,6 +68,7 @@ int main() {
               << ",\"enabled\":" << kaimo::sync_json::boolean(reply.enabled())
               << ",\"enable_ws_discovery\":" << kaimo::sync_json::boolean(reply.enable_ws_discovery())
               << ",\"enable_audit_log\":" << kaimo::sync_json::boolean(reply.enable_audit_log())
+              << ",\"log_level\":" << kaimo::sync_json::quote(reply.log_level())
               << "}}\n";
     std::cerr << "kaimo_configsync: settings received (addr=" << addr << ")." << std::endl;
     return 0;

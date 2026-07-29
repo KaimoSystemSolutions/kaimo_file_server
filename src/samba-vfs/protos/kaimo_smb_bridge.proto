@@ -214,6 +214,10 @@ message ProtocolSettingsReply {
   // to the server log. Applied by sync-config.sh by toggling the `full_audit` VFS
   // module in the global `vfs objects` (kaimo_bridge [full_audit]).
   bool   enable_audit_log    = 7;
+
+  // Global application log level from Settings (or KAIMO_LOG_LEVEL when set).
+  // sync-config.sh maps this to Samba's numeric `log level`.
+  string log_level           = 8;
 }
 
 // Snapshots / "Previous Versions" over SMB (Phase 5). Windows requests the list

@@ -126,6 +126,12 @@ public class SettingsViewModel
     /// <summary>The single global application log level (working copy). One of <see cref="LogLevels"/>.</summary>
     public string LogLevel { get; set; } = LoggingConfigKeys.DefaultLevel;
 
+    /// <summary>
+    /// Active highest-priority process override. The DB value can still be edited
+    /// and becomes effective after the environment override is removed.
+    /// </summary>
+    public string? LogLevelEnvironmentOverride => _loggingSource.ManualOverrideLevel;
+
     /// <summary>Selectable log levels, most→least verbose.</summary>
     public static IReadOnlyList<string> LogLevels => LoggingConfigKeys.AllowedLevels;
 
