@@ -2,6 +2,7 @@ using Kaimo_File_Server.SmbBridge.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -85,14 +86,10 @@ public sealed class SnapshotCacheLeaseManagerTests : IDisposable
         await File.WriteAllTextAsync(
             Path.Combine(tokenRoot, "projection.txt"), "data");
 
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Snapshots:Cache:RootPath"] = _root
-            })
-            .Build();
         var cleanup = new SnapshotCacheCleanupService(
-            Mock.Of<IServiceScopeFactory>(), configuration, leases,
+            Mock.Of<IServiceScopeFactory>(),
+            Options.Create(new SnapshotCacheOptions { RootPath = _root }),
+            leases,
             NullLogger<SnapshotCacheCleanupService>.Instance);
 
         Assert.False(cleanup.TryDeleteTokenDir(
@@ -213,14 +210,10 @@ public sealed class SnapshotCacheLeaseManagerTests : IDisposable
     private SnapshotCacheCleanupService CreateCleanup(
         SnapshotCacheLeaseManager leases)
     {
-        IConfiguration configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Snapshots:Cache:RootPath"] = _root
-            })
-            .Build();
         return new SnapshotCacheCleanupService(
-            Mock.Of<IServiceScopeFactory>(), configuration, leases,
+            Mock.Of<IServiceScopeFactory>(),
+            Options.Create(new SnapshotCacheOptions { RootPath = _root }),
+            leases,
             NullLogger<SnapshotCacheCleanupService>.Instance);
     }
 }

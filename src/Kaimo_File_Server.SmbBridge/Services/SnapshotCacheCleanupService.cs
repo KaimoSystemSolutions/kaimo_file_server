@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Repositories;
+using Microsoft.Extensions.Options;
 
 namespace Kaimo_File_Server.SmbBridge.Services;
 
@@ -23,32 +24,23 @@ namespace Kaimo_File_Server.SmbBridge.Services;
 public sealed class SnapshotCacheCleanupService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopes;
-    private readonly IConfiguration _config;
+    private readonly SnapshotCacheOptions _options;
     private readonly SnapshotCacheLeaseManager _leases;
     private readonly ILogger<SnapshotCacheCleanupService> _logger;
     private readonly string _cacheRoot;
 
     public SnapshotCacheCleanupService(
         IServiceScopeFactory scopes,
-        IConfiguration config,
+        IOptions<SnapshotCacheOptions> options,
         SnapshotCacheLeaseManager leases,
         ILogger<SnapshotCacheCleanupService> logger)
     {
         _scopes = scopes;
-        _config = config;
+        _options = options.Value;
         _leases = leases;
-        _cacheRoot = SnapshotCache.ConfiguredRoot(config);
+        _cacheRoot = Path.GetFullPath(_options.RootPath);
         _logger = logger;
     }
-
-    private TimeSpan Ttl =>
-        TimeSpan.FromHours(_config.GetValue("Snapshots:Cache:TtlHours", 24.0));
-
-    private long MaxBytesPerShare =>
-        _config.GetValue("Snapshots:Cache:MaxBytesPerShare", 5L * 1024 * 1024 * 1024); // 5 GiB
-
-    private TimeSpan SweepInterval =>
-        TimeSpan.FromMinutes(_config.GetValue("Snapshots:Cache:SweepMinutes", 30.0));
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -71,7 +63,7 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
                 _logger.LogError(ex, "Snapshot cache sweep failed; retrying next interval.");
             }
 
-            try { await Task.Delay(SweepInterval, stoppingToken); }
+            try { await Task.Delay(_options.SweepInterval, stoppingToken); }
             catch (OperationCanceledException) { break; }
         }
     }
@@ -85,8 +77,8 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
             shares = await repo.GetAllAsync();
         }
 
-        TimeSpan ttl = Ttl;
-        long cap = MaxBytesPerShare;
+        TimeSpan ttl = _options.Ttl;
+        long cap = _options.MaxBytesPerShare;
         DateTime cutoff = DateTime.UtcNow - ttl;
 
         int evictedTtl = 0, evictedSize = 0, evictedLegacy = 0, evictedOrphan = 0;

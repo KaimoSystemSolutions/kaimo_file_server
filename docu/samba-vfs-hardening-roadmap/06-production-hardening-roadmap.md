@@ -154,9 +154,10 @@ corruption, cancellation, and resource pressure.
 5. **Completed 2026-07-29:** harden snapshot response parsing with bounded
    counts, overflow checks, consistent framing, and deterministic newest-2,048
    truncation behavior.
-6. Validate cache configuration at startup. **Content-identity cache
-   validation completed 2026-07-29:** individual-file and folder cache hits
-   require the immutable version SHA-256 digest as well as the expected length.
+6. **Completed 2026-07-29:** validate cache configuration at startup with
+   finite, explicit minimum/maximum TTL, sweep, and per-share capacity bounds.
+   Individual-file and folder cache hits also require the immutable version
+   SHA-256 digest as well as the expected length.
 7. Invalidate projections on version/share deletion and ACL revocation, while
    retaining an authorization check on every open.
 

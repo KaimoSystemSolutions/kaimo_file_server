@@ -173,9 +173,23 @@ and that an I/O failure raised during enumeration cannot escape to the caller.
 
 ### P2-08: Cache configuration is not validated
 
+> **Remediation status (2026-07-29): Implemented and regression-tested.**
+
 Negative, zero, NaN, or extreme TTL/sweep/cap values can cause unexpected deletion, service termination, or a tight failure loop.
 
 **Fix:** bind validated options at startup with minimum/maximum values and fail configuration validation before serving requests.
+
+**Implemented fix:** `SnapshotCacheOptions` is bound from `Snapshots:Cache`
+and validated through `IValidateOptions<T>` plus `ValidateOnStart()`. The bridge
+refuses startup unless the cache root is an absolute valid path, TTL is finite
+and between 1 minute and 365 days, sweep interval is finite and between 1 minute
+and 24 hours, and the per-share cap is between 1 MiB and 100 TiB. Exact bounds
+are accepted. The cleanup service receives one validated `IOptions` value and
+no longer reparses mutable configuration during every sweep. Compose and
+`.env.example` expose the same three policy settings with production defaults
+and documented ranges. Regressions cover defaults, exact boundaries, relative
+and empty roots, zero/negative values, `NaN`, positive infinity, underflow,
+overflow, and DI-bound validation failure with configuration-key diagnostics.
 
 ### P2-09: RPC cancellation is not propagated
 

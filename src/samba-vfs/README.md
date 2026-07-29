@@ -568,6 +568,13 @@ module does it via the bridge instead:
   overlaps a share; `sync-shares.sh` also refuses to publish an overlapping share.
   The legacy top-level `.kaimo-snapshots` name remains denied in client-facing VFS
   path hooks while the cleanup service removes recognizable old cache trees.
+- **Validated cache policy:** the bridge validates cache settings before it
+  starts serving. TTL must be 1 minute–365 days, the cleanup sweep interval
+  1 minute–24 hours, and the per-share cap 1 MiB–100 TiB. Configure them with
+  `KAIMO_SNAPSHOT_CACHE_TTL_HOURS`,
+  `KAIMO_SNAPSHOT_CACHE_SWEEP_MINUTES`, and
+  `KAIMO_SNAPSHOT_CACHE_MAX_BYTES_PER_SHARE`; zero, negative, non-finite, and
+  out-of-range values fail startup.
 - **Bounded folder materialization:** before any projection mutation, the bridge
   reserves one process-wide concurrency slot and validates the ACL-filtered
   snapshot against configurable file and byte limits. A strict request timer

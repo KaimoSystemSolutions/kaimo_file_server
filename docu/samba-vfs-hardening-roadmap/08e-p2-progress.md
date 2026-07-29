@@ -431,3 +431,73 @@ that requires investigation if the condition persists.
 
 **Next planned finding:** P2-08 — validate TTL, sweep interval, and per-share
 cache-cap configuration at startup with explicit safe bounds.
+
+### 2026-07-29 — P2-08: Startup-validated snapshot cache policy
+
+**Status:** Implemented and regression-tested.
+
+The cleanup service previously converted `TtlHours`, `SweepMinutes`, and
+`MaxBytesPerShare` directly from `IConfiguration` during operation. The
+settings had no upper bounds, and floating-point values were not required to be
+finite. Zero or negative TTL could evict current projections immediately, zero
+or negative sweep intervals could create a tight retry loop or terminate the
+hosted service, and extreme retention/capacity values defeated the intended
+operational bound.
+
+**Architecture and bounds**
+
+The cache policy now has explicit inclusive bounds:
+
+| Setting | Minimum | Default | Maximum |
+|---|---:|---:|---:|
+| `TtlHours` | 1 minute (`1/60` hour) | 24 hours | 365 days (`8,760` hours) |
+| `SweepMinutes` | 1 minute | 30 minutes | 24 hours (`1,440` minutes) |
+| `MaxBytesPerShare` | 1 MiB (`1,048,576`) | 5 GiB (`5,368,709,120`) | 100 TiB (`109,951,162,777,600`) |
+
+The minimum TTL and sweep interval prevent immediate deletion and tight loops.
+The maxima prevent accidental effectively-unbounded retention or scheduling
+while remaining well above expected production requirements. The capacity
+maximum constrains arithmetic and configuration mistakes without imposing a
+practical small-installation ceiling.
+
+**Implemented**
+
+1. Added `SnapshotCacheOptions` as the single typed contract for
+   `Snapshots:Cache`, including defaults, range constants, and derived
+   `TimeSpan` values.
+2. Added `SnapshotCacheOptionsValidator`. It requires a non-empty, valid,
+   absolute cache root; finite in-range TTL and sweep values; and an in-range
+   signed 64-bit capacity.
+3. Registered the validator with `ValidateOnStart()`. Invalid configuration
+   now prevents bridge startup before gRPC requests or cleanup work are served.
+   Diagnostics retain the exact configuration key for operational correction.
+4. `SnapshotCacheCleanupService` now consumes a validated `IOptions` snapshot.
+   It does not rebind or reinterpret configuration between sweeps.
+5. Added Compose environment mappings for TTL, sweep interval, and per-share
+   capacity. `.env.example`, bridge `appsettings.json`, and the Samba VFS
+   operations guide document identical defaults and accepted ranges.
+
+**Validation completed**
+
+- Defaults and every exact minimum/maximum boundary validate successfully.
+- Negative and zero TTL/sweep values are rejected.
+- `NaN`, positive infinity, and above-maximum floating-point values are
+  rejected before `TimeSpan` conversion or `Task.Delay`.
+- Empty and relative cache roots are rejected.
+- Capacity values below 1 MiB and above 100 TiB are rejected.
+- A DI-bound configuration regression proves multiple invalid settings produce
+  an `OptionsValidationException` containing all affected keys.
+- The focused cache options plus cleanup/lease suites pass: 26 tests, 0
+  failures, 0 skipped.
+- The cumulative managed test project passes: 621 tests, 0 failures, 0
+  skipped.
+
+**Operational note**
+
+Deployments that override cache cleanup settings must use values inside the
+documented inclusive ranges. An invalid override is intentionally a hard
+startup failure; silently substituting a default would conceal an operator
+error and could violate the expected retention or disk-usage policy.
+
+**Next planned finding:** P2-09 — complete cancellation-token propagation
+through remaining RPC repository, ACL, and file-work paths.

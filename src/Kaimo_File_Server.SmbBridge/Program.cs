@@ -45,6 +45,12 @@ builder.Services.AddGrpc(options =>
 // Phase 5 hardening: bound the isolated @GMT snapshot materialization cache
 // (<cache-root>/<share-id>) so it cannot grow without limit. Evicts by age
 // (Snapshots:Cache:TtlHours) and per-share size cap (Snapshots:Cache:MaxBytesPerShare).
+builder.Services.AddSingleton<
+    Microsoft.Extensions.Options.IValidateOptions<SnapshotCacheOptions>,
+    SnapshotCacheOptionsValidator>();
+builder.Services.AddOptions<SnapshotCacheOptions>()
+    .Bind(builder.Configuration.GetSection(SnapshotCacheOptions.SectionName))
+    .ValidateOnStart();
 builder.Services.AddSingleton<SnapshotCacheLeaseManager>();
 builder.Services.AddSingleton<SnapshotMaterializationLimiter>();
 builder.Services.AddHostedService<SnapshotCacheCleanupService>();
