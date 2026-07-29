@@ -43,6 +43,7 @@
 #include "event_spool.h"
 #include "kaimo_smb_bridge.grpc.pb.h"
 #include "local_protocol.h"
+#include "snapshot_enumeration.h"
 
 using namespace kaimo::smb::bridge::v1;
 
@@ -644,8 +645,26 @@ static uint8_t do_snapenum(const std::string& user, const std::string& share,
         std::cerr << "kaimo_authd: EnumerateSnapshots: " << st.error_message() << std::endl;
         return KAIMO_LOCAL_STATUS_ERROR;
     }
+    if (reply.gmt_tokens_size() < 0 ||
+        static_cast<uint64_t>(reply.gmt_tokens_size()) >
+            KAIMO_LOCAL_MAX_SNAPSHOT_LABELS) {
+        std::cerr << "kaimo_authd: EnumerateSnapshots returned "
+                  << reply.gmt_tokens_size() << " labels; maximum is "
+                  << KAIMO_LOCAL_MAX_SNAPSHOT_LABELS << std::endl;
+        return KAIMO_LOCAL_STATUS_ERROR;
+    }
     tokens.reserve(static_cast<size_t>(reply.gmt_tokens_size()));
-    for (const auto& token : reply.gmt_tokens()) tokens.push_back(token);
+    for (const auto& token : reply.gmt_tokens()) {
+        if (token.size() != KAIMO_LOCAL_SNAPSHOT_TOKEN_BYTES ||
+            !kaimo_snapshot_token_valid(
+                reinterpret_cast<const uint8_t*>(token.data()),
+                static_cast<uint32_t>(token.size()))) {
+            std::cerr << "kaimo_authd: EnumerateSnapshots returned a "
+                         "malformed label" << std::endl;
+            return KAIMO_LOCAL_STATUS_ERROR;
+        }
+        tokens.push_back(token);
+    }
     return KAIMO_LOCAL_STATUS_OK;
 }
 
@@ -875,7 +894,7 @@ static void handle_client(const ClientConnection& connection) {
             std::vector<std::string> tokens;
             status = do_snapenum(user, share, path, tokens);
             if (status == KAIMO_LOCAL_STATUS_OK &&
-                tokens.size() <= UINT32_MAX) {
+                tokens.size() <= KAIMO_LOCAL_MAX_SNAPSHOT_LABELS) {
                 kaimo_local_builder_u32(
                     &output, static_cast<uint32_t>(tokens.size()));
                 for (const auto& snapshot_token : tokens)

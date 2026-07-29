@@ -180,3 +180,71 @@ every output boundary.
 
 **Next planned finding:** P2-04 — replace unbounded snapshot-count parsing with
 strict overflow-aware parsing and a documented maximum.
+
+### 2026-07-29 — P2-04: Bounded snapshot enumeration parsing
+
+**Status:** Implemented, regression-tested, and verified in the pinned Samba
+4.19.5 `build-runtime` image.
+
+The audit finding referred to the original newline-delimited sidecar response,
+where the VFS passed an unbounded decimal count through `atoi()` before
+allocation. P1-03 removed that immediate integer-overflow primitive by replacing
+the text protocol with a framed binary response and a big-endian `uint32`
+count. The binary parser still lacked a documented semantic maximum and one
+central proof that the declared count matched the complete received record set.
+
+**Implemented**
+
+1. Defined `KAIMO_LOCAL_MAX_SNAPSHOT_LABELS` as 2,048 and the wire token length
+   as 24 bytes in `local_protocol.h`. A maximum response occupies 57,348 bytes:
+   four bytes for the count plus 2,048 records of a four-byte length and a
+   24-byte token. This leaves 8,188 bytes of headroom below the 65,536-byte
+   framed-response limit.
+2. Added the C/C++-compatible `snapshot_enumeration.h` helper. It validates the
+   fixed `@GMT-yyyy.MM.dd-HH.mm.ss` wire shape and the complete enumeration
+   payload without allocation.
+3. The validator reads the unsigned binary count, rejects values above 2,048,
+   prechecks that the remaining payload can contain the advertised minimum
+   record bytes, validates every length-prefixed token, and requires the reader
+   to finish exactly at the payload boundary.
+4. `kaimo_get_shadow_copy_data()` now completes that validation before calling
+   `talloc_zero_array()`. Only a proven count can influence Samba label
+   allocation. A malformed, truncated, oversized, inconsistent, or trailing
+   response is ignored as an empty snapshot list; no partial label set is
+   published.
+5. `kaimo_authd` enforces the same maximum and token shape on the gRPC result
+   before reserving or serializing the local token vector. The response builder
+   retains its existing all-or-error behavior if the framed payload cannot be
+   encoded.
+6. Added `test-snapshot-enumeration.cpp` to the native `build-runtime` gate and
+   copied the shared header into both the sidecar and real Samba module build
+   contexts.
+
+**Validation completed**
+
+- The standalone native regression passes at zero, one, and exactly 2,048
+  labels.
+- Negative cases pass for 2,049 advertised labels, fewer records than declared,
+  additional records, truncated content, trailing bytes, malformed separators,
+  invalid token text, absent payload, and a null output pointer.
+- The Docker image `kaimo-samba-build-tests:p2-04` built successfully.
+- That image compiled `kaimo_authd`, ran the complete native helper suite
+  including the new enumeration regression, and compiled/linked the real
+  `kaimo_bridge` module against pinned Samba 4.19.5 / ABI 49.
+- The cumulative managed test project remains green at 599 tests.
+- `git diff --check` passes.
+
+**Design boundary and remaining release work**
+
+- P2-04 establishes a safe count and exact parser semantics. P2-05 remains the
+  explicit review of response-buffer behavior, producer-side framing guarantees,
+  and the operational policy when more snapshots exist than can be represented.
+- The current producer fails the enumeration response rather than silently
+  truncating when more than 2,048 timestamps are returned. P2-05 must decide
+  whether that behavior remains fail-closed or becomes an explicitly ordered
+  newest-N/paginated contract.
+- Run a live SMB enumeration at 0, 1, 2,048, and over-limit version timestamps
+  to verify Windows/smbclient behavior at the operational boundary.
+
+**Next planned finding:** P2-05 — make snapshot response-buffer capacity and
+over-limit behavior explicit, consistent, and observable.

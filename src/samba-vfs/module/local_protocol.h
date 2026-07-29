@@ -32,6 +32,10 @@
 #define KAIMO_LOCAL_MAX_STRING_BYTES 8191U
 #define KAIMO_LOCAL_MAX_USERNAME_BYTES 32U
 #define KAIMO_LOCAL_MAX_SHARE_BYTES 64U
+/* 4-byte count + 2,048 * (4-byte length + 24-byte @GMT token) = 57,348
+ * bytes, leaving deterministic headroom in the 64-KiB response frame. */
+#define KAIMO_LOCAL_MAX_SNAPSHOT_LABELS 2048U
+#define KAIMO_LOCAL_SNAPSHOT_TOKEN_BYTES 24U
 
 enum kaimo_local_operation {
 	KAIMO_LOCAL_OP_NONE = 0,

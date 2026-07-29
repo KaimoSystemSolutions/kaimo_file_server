@@ -40,6 +40,7 @@
 #include "local_protocol.h"
 #include "rename_event.h"
 #include "share_path.h"
+#include "snapshot_enumeration.h"
 
 #undef DBGC_CLASS
 #define DBGC_CLASS DBGC_VFS
@@ -943,14 +944,13 @@ static int kaimo_get_shadow_copy_data(vfs_handle_struct *handle,
 
 	struct kaimo_local_reader reader;
 	uint32_t count;
-	kaimo_local_reader_init(&reader, payload, response.payload_length);
-	if (!kaimo_local_reader_u32(&reader, &count) ||
-	    count > INT_MAX ||
-	    count > (response.payload_length - reader.offset) / 4) {
-		DBG_WARNING("kaimo_bridge: malformed SNAPENUM count, ignored\n");
+	if (!kaimo_snapshot_enumeration_validate(
+		    payload, response.payload_length, &count)) {
+		DBG_WARNING("kaimo_bridge: malformed or oversized SNAPENUM "
+			    "payload, ignored\n");
 		return 0;
 	}
-	if (count == 0 && kaimo_local_reader_finished(&reader))
+	if (count == 0)
 		return 0;
 
 	SHADOW_COPY_LABEL *lbl = NULL;
@@ -963,11 +963,19 @@ static int kaimo_get_shadow_copy_data(vfs_handle_struct *handle,
 		}
 	}
 
+	kaimo_local_reader_init(&reader, payload, response.payload_length);
+	uint32_t encoded_count;
+	if (!kaimo_local_reader_u32(&reader, &encoded_count) ||
+	    encoded_count != count) {
+		TALLOC_FREE(lbl);
+		return 0;
+	}
 	for (uint32_t i = 0; i < count; ++i) {
 		const uint8_t *token;
 		uint32_t token_length;
 		if (!kaimo_local_reader_string(
-		     &reader, &token, &token_length) ||
+			    &reader, &token, &token_length) ||
+		    !kaimo_snapshot_token_valid(token, token_length) ||
 		    token_length >= sizeof(SHADOW_COPY_LABEL)) {
 			DBG_WARNING("kaimo_bridge: malformed SNAPENUM token, ignored\n");
 			TALLOC_FREE(lbl);

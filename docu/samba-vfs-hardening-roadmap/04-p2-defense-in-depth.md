@@ -78,9 +78,29 @@ construction, reuse checks, projection reconciliation, or materialization.
 
 ### P2-04: Snapshot enumeration parsing trusts an unbounded decimal count
 
+> **Remediation status (2026-07-29): Verified in focused native tests and the
+> pinned Samba 4.19.5 build-runtime image.**
+
 The native parser uses `atoi()` on a sidecar response and allocates based on the result. Invalid or overflowing input is not robustly handled.
 
 **Fix:** use `strtol`/`strtoul` with full error checking, a maximum snapshot count, and a consistency check between count and received token records.
+
+**Implemented fix:** P1-03 had already replaced the original decimal text
+response and `atoi()` call with an unsigned, big-endian `uint32` field in the
+framed local protocol. P2-04 completes the remaining semantic hardening through
+the shared `snapshot_enumeration.h` contract:
+
+- Snapshot enumeration is limited to 2,048 labels. At the fixed 24-byte
+  `@GMT-yyyy.MM.dd-HH.mm.ss` representation, the complete payload is 57,348
+  bytes and therefore remains below the 65,536-byte local response limit.
+- `kaimo_authd` rejects oversized gRPC results and malformed token shapes before
+  reserving/copying the local response vector.
+- The VFS validates the complete response before allocating Samba label
+  storage: count bound, minimum record bytes, every token's length/shape,
+  exact record count, and absence of trailing payload must all hold.
+- Malformed or oversized enumeration replies fail closed to an empty snapshot
+  list, preserving the existing behavior for an unavailable snapshot service
+  without exposing partially parsed labels.
 
 ### P2-05: Snapshot response buffers impose undocumented truncation
 

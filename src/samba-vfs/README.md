@@ -549,6 +549,13 @@ module does it via the bridge instead:
   outside every Samba connectpath. The bridge returns only a cache-root-relative
   path; the VFS validates all components and joins its independently configured
   absolute root before redirecting the open.
+- **Enumeration bound:** the local protocol accepts at most 2,048 labels in the
+  exact 24-byte `@GMT-yyyy.MM.dd-HH.mm.ss` form. The resulting maximum payload is
+  57,348 bytes, below the 65,536-byte response-frame limit. `kaimo_authd` rejects
+  oversized/malformed gRPC results before serialization; the VFS verifies the
+  count, every length-prefixed token, exact record count, and end of payload
+  before allocating Samba label storage. Invalid responses yield no snapshots,
+  never a partially parsed list.
 - **ACL parity:** concrete files require `ListReadData`; folders go through
   `IFileService.GetFolderSnapshotAsync`, which checks the directory and batch-filters
   every historical child. Before returning a folder, the bridge removes stale files

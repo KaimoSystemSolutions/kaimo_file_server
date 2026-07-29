@@ -75,6 +75,8 @@ implemented; their required release verification remains tracked in milestone 4.
 - [ ] All mutating VFS operations are inventoried and covered or explicitly denied.
 - [x] Snapshot client paths cannot reach the isolated internal cache.
 - [x] Timewarp opens are read-only and use the VFS stack.
+- [x] Snapshot enumeration count and token records are bounded and validated
+  before Samba label allocation.
 - [x] All Unix-socket calls have deadlines and full I/O loops.
 
 ### Sidecar checklist
