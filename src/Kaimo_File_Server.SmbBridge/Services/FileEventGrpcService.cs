@@ -159,7 +159,11 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
         try
         {
             await handler();
-            await _events.CompleteAsync(eventId, cancellationToken);
+            // Once the non-cooperative lifecycle handler has committed its side
+            // effects, completion is a correctness write and must survive client
+            // cancellation. Releasing the receipt here could let a retry duplicate
+            // a close/version, delete, rename, or mkdir mutation.
+            await _events.CompleteAsync(eventId, CancellationToken.None);
             return true;
         }
         catch (Exception error)
@@ -200,7 +204,8 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
         string share,
         CancellationToken cancellationToken)
     {
-        var user = await _auth.ResolveUserContextAsync(username);
+        var user = await _auth.ResolveUserContextAsync(username)
+            .WaitAsync(cancellationToken);
         var svc = await ResolveServiceAsync(share, cancellationToken);
         return (svc, user);
     }

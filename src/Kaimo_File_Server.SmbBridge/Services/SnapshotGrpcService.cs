@@ -71,14 +71,17 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         var reply = new EnumerateSnapshotsReply();
         if (!SambaName.IsValidContext(request.Username, request.Share))
             return reply;
+        CancellationToken cancellationToken =
+            context?.CancellationToken ?? CancellationToken.None;
 
         _logger.LogInformation(
             "EnumerateSnapshots ENTER: user={User} share={Share} path=[{Path}]",
             request.Username, request.Share, request.Path);
 
-        var user = await _auth.ResolveUserContextAsync(request.Username);
+        var user = await _auth.ResolveUserContextAsync(request.Username)
+            .WaitAsync(cancellationToken);
         var share = await _shares.ResolveEnabledShareAsync(
-            request.Share, context?.CancellationToken ?? CancellationToken.None);
+            request.Share, cancellationToken);
         if (user is null || share is null)
         {
             _logger.LogInformation(
@@ -98,12 +101,15 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         List<DateTime> timestamps;
         if (normalized.Length > 0)
         {
-            var fileVersions = await _versions.GetVersionsAsync(share.Id, normalized);
+            var fileVersions = await _versions
+                .GetVersionsAsync(share.Id, normalized)
+                .WaitAsync(cancellationToken);
             if (fileVersions.Count > 0)
             {
                 if (!await _acl.HasAccessAsync(
                         user, share.Id, normalized, false,
-                        FilePermission.ListReadData))
+                        FilePermission.ListReadData)
+                    .WaitAsync(cancellationToken))
                     return reply;
                 timestamps = fileVersions
                     .Select(v => v.SnapshotTimestampUtc)
@@ -115,7 +121,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                 {
                     timestamps = await _fileServices
                         .CreateForShare(share.Id, share.Path)
-                        .GetFolderSnapshotTimestampsAsync(normalized, user);
+                        .GetFolderSnapshotTimestampsAsync(normalized, user)
+                        .WaitAsync(cancellationToken);
                 }
                 catch (UnauthorizedAccessException)
                 {
@@ -129,7 +136,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             {
                 timestamps = await _fileServices
                     .CreateForShare(share.Id, share.Path)
-                    .GetFolderSnapshotTimestampsAsync("", user);
+                    .GetFolderSnapshotTimestampsAsync("", user)
+                    .WaitAsync(cancellationToken);
             }
             catch (UnauthorizedAccessException)
             {
@@ -137,12 +145,16 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             }
         }
 
-        List<string> orderedLabels = timestamps
-            .OrderByDescending(timestamp => timestamp)
-            .Select(timestamp =>
-                timestamp.ToString(GmtFormat, CultureInfo.InvariantCulture))
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
+        var orderedLabels = new List<string>();
+        var seenLabels = new HashSet<string>(StringComparer.Ordinal);
+        foreach (DateTime timestamp in timestamps.OrderByDescending(value => value))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string label = timestamp.ToString(
+                GmtFormat, CultureInfo.InvariantCulture);
+            if (seenLabels.Add(label))
+                orderedLabels.Add(label);
+        }
         if (orderedLabels.Count > MaxEnumerationLabels)
         {
             _logger.LogWarning(

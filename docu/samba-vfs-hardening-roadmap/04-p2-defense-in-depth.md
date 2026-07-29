@@ -193,9 +193,32 @@ overflow, and DI-bound validation failure with configuration-key diagnostics.
 
 ### P2-09: RPC cancellation is not propagated
 
+> **Remediation status (2026-07-29): Implemented and regression-tested at every
+> bridge RPC boundary. Native live-timeout verification remains a release
+> gate.**
+
 Repository, ACL, version, and file-copy work generally ignores `ServerCallContext.CancellationToken`.
 
 **Fix:** add cancellation-aware interfaces where missing and pass the request token through database calls, loops, and stream copies.
+
+**Implemented fix:** every asynchronous bridge RPC now binds its repository,
+authentication, configuration, ACL, version, share, or folder task to
+`ServerCallContext.CancellationToken`. Authz rule/traversal loops, bulk user and
+share projection loops, and snapshot label formatting check cancellation
+between work units. Snapshot folder queries, materialization reservations,
+leases, decompression, hashing, output writes, and cleanup already accept the
+token directly from P1-09. Lifecycle receipt claim operations and pre-claim
+user/share resolution are cancellation-aware. Once a durable lifecycle handler
+has begun, it deliberately completes its idempotency receipt with
+`CancellationToken.None`: abandoning a non-cooperative mutation and releasing
+its receipt could permit a concurrent retry and duplicate side effects.
+
+Legacy Core read interfaces that do not yet accept a token are wrapped with
+`Task.WaitAsync(requestToken)`. This releases the RPC and its continuation
+immediately; a database provider operation already dispatched through such a
+legacy interface may finish in its scoped context. Those operations are bounded
+single reads. Expensive version queries and all streaming/copy work use native
+cancellation-aware APIs rather than only detaching the wait.
 
 ### P2-10: Bulk user export is unbounded and sequential
 

@@ -33,6 +33,8 @@
 - Cleanup enumeration snapshots and deferred filesystem failures.
 - Snapshot cache configuration defaults, exact bounds, non-finite values, and
   startup rejection.
+- Cancellation while authentication, share, configuration, authorization, and
+  snapshot dependencies are blocked; durable lifecycle post-claim completion.
 - Corrupt NT-hash rows and large user sets.
 - Duplicate, reordered, and retried lifecycle events.
 
@@ -102,7 +104,8 @@ implemented; their required release verification remains tracked in milestone 4.
 - [x] Raw bridge paths are validated before normalization and resolved through
   the common containment-checked path API; persisted snapshot paths are
   independently revalidated.
-- [ ] Cancellation and limits propagate through all expensive work.
+- [ ] Request cancellation now covers every bridge RPC and all expensive
+  snapshot work; non-snapshot global resource limits remain incomplete.
 - [x] Snapshot folder results are filtered per file.
 - [x] Cache writes are atomic, hash-verified, read-only, and synchronized with
   cleanup; Linux-container and live-SMB behavior remain release gates.

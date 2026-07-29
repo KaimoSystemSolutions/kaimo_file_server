@@ -31,8 +31,12 @@ public sealed class ConfigGrpcService : ConfigService.ConfigServiceBase
     public override async Task<ProtocolSettingsReply> GetProtocolSettings(
         GetProtocolSettingsRequest request, ServerCallContext context)
     {
-        var s = await _config.GetProtocolSettingsAsync(); // already normalized (Min <= Max)
-        bool enabled = await _config.IsSmbEnabledAsync();
+        CancellationToken cancellationToken =
+            context?.CancellationToken ?? CancellationToken.None;
+        var s = await _config.GetProtocolSettingsAsync()
+            .WaitAsync(cancellationToken); // already normalized (Min <= Max)
+        bool enabled = await _config.IsSmbEnabledAsync()
+            .WaitAsync(cancellationToken);
 
         var reply = new ProtocolSettingsReply
         {

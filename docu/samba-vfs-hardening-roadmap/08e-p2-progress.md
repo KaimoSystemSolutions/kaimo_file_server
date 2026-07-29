@@ -501,3 +501,91 @@ error and could violate the expected retention or disk-usage policy.
 
 **Next planned finding:** P2-09 — complete cancellation-token propagation
 through remaining RPC repository, ACL, and file-work paths.
+
+### 2026-07-29 — P2-09: Complete bridge RPC cancellation boundaries
+
+**Status:** Implemented and regression-tested. Live native deadline/cancellation
+probes remain part of the release gate.
+
+P1-09 already propagated cancellation through expensive snapshot folder
+queries, concurrency reservations, decompression, hashing, copying, flushing,
+and materialization. Other bridge RPCs still awaited authentication,
+configuration, share, user, and ACL tasks without observing the gRPC request
+token. Authz loops could continue evaluating permissions after the caller and
+native deadline had gone away, and snapshot enumeration formatted a complete
+history without an interruption point.
+
+**Implemented**
+
+1. `GetNtHash` and `ListUsers` bind authentication and user-repository waits to
+   the request token. Bulk export checks cancellation between users and before
+   each hash lookup. P2-10 still owns response bounding, batching, corrupt-row
+   isolation, and removal of the sequential N+1 pattern.
+2. `ListShares` binds its repository query to the request and checks
+   cancellation while translating definitions into protobuf records.
+3. `GetProtocolSettings` binds both the fresh protocol-settings read and the
+   service-enabled read to the same request token. Cancellation after the first
+   read prevents the second query and reply construction.
+4. Connect, Open, Delete, and Rename authorization now use one captured request
+   token for user, share, service-state, access, and ACL decisions.
+   Traversal, specific-right, maximum-access, delete-parent, and rename-source/
+   destination loops check or await that token between permission rules.
+5. Snapshot enumeration binds user resolution, share resolution, version
+   lookup, ACL evaluation, and folder timestamp lookup to the request. Ordered
+   label formatting now uses an explicit loop with a cancellation check per
+   timestamp while retaining the P2-05 newest/distinct/2,048 contract.
+6. Snapshot resolution retains the deeper P1-09 contract: request or budget
+   cancellation reaches folder/version queries, lease waits, materialization
+   reservation, content reads, hashing, writes, and cleanup.
+7. Lifecycle user/share resolution and durable receipt claiming observe the
+   request token. After a claimed non-cooperative handler has committed its
+   filesystem/version/index side effects, receipt completion intentionally uses
+   a non-cancelled token. Releasing or abandoning that receipt merely because
+   the client disconnected could allow the sidecar retry to duplicate a
+   mutation.
+
+**Cancellation contract**
+
+- A cancelled RPC stops awaiting a blocked legacy dependency through
+  `Task.WaitAsync(requestToken)` and does not continue its bridge-side loop or
+  reply construction.
+- A legacy single-read interface may have already dispatched a provider query
+  that finishes inside its own scope after the RPC wait is released. These
+  reads are bounded and do not publish side effects.
+- Expensive snapshot queries and all content streaming/copy work use native
+  cancellation-aware overloads, so cancellation reaches the actual operation.
+- A lifecycle mutation already past its durable claim is a correctness
+  boundary: it completes or fails and records that result; client cancellation
+  cannot turn an in-flight mutation into an uncoordinated retry.
+
+**Validation completed**
+
+- Added a reusable cancellation-aware `ServerCallContext` test double.
+- Blocking authentication lookup cancellation passes for `GetNtHash`.
+- Blocking share repository cancellation passes for `ListShares`.
+- Blocking configuration lookup cancellation passes and proves the second
+  configuration read is not started.
+- Blocking user-context resolution cancellation passes for Authz Open.
+- Blocking snapshot user-context resolution cancellation passes for snapshot
+  enumeration.
+- Cancellation after a claimed lifecycle mutation proves receipt completion
+  uses a non-cancelled token and is not released for a duplicate retry.
+- The focused cancellation/Authz/lifecycle/snapshot suite passes: 87 tests, 0
+  failures, 0 skipped.
+- The cumulative managed test project passes: 627 tests, 0 failures, 0
+  skipped.
+- The SmbBridge project builds successfully.
+
+**Validation still required**
+
+- Cancel and deadline-expire every native local operation while its
+  corresponding bridge dependency is delayed, then confirm `smbd` workers and
+  bridge requests return within the configured deadline.
+- Interrupt snapshot enumeration, folder materialization, and version copying
+  in the deployable Linux stack and confirm no temporary projection or lease is
+  stranded.
+- Interrupt a lifecycle delivery before claim and after handler completion,
+  proving the first is retried and the second remains exactly-once complete.
+
+**Next planned finding:** P2-10 — replace unbounded sequential NT-hash export
+with a bounded, batched contract and corrupt-row isolation.

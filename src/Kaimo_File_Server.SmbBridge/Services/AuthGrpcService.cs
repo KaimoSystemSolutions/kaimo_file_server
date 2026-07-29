@@ -38,7 +38,10 @@ public sealed class AuthGrpcService : AuthService.AuthServiceBase
         if (!SambaName.IsValidUsername(request.Username))
             return new GetNtHashReply { Found = false };
 
-        byte[]? hash = await _auth.GetNtHashAsync(request.Username);
+        CancellationToken cancellationToken =
+            context?.CancellationToken ?? CancellationToken.None;
+        byte[]? hash = await _auth.GetNtHashAsync(request.Username)
+            .WaitAsync(cancellationToken);
         if (hash is not { Length: > 0 })
             return new GetNtHashReply { Found = false };
 
@@ -52,6 +55,8 @@ public sealed class AuthGrpcService : AuthService.AuthServiceBase
     public override async Task<ListUsersReply> ListUsers(
         ListUsersRequest request, ServerCallContext context)
     {
+        ArgumentNullException.ThrowIfNull(context);
+        CancellationToken cancellationToken = context.CancellationToken;
         string clientId =
             context.GetHttpContext().Items.TryGetValue(
                 ControlPlaneAuthorizationInterceptor.ClientIdItemKey,
@@ -79,11 +84,14 @@ public sealed class AuthGrpcService : AuthService.AuthServiceBase
             clientId);
         var reply = new ListUsersReply();
 
-        foreach (var user in await _users.GetAllAsync())
+        var users = await _users.GetAllAsync().WaitAsync(cancellationToken);
+        foreach (var user in users)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // GetNtHashAsync already filters out disabled accounts and empty passwords
             // (returns null) — such users are not synchronized to Samba.
-            byte[]? hash = await _auth.GetNtHashAsync(user.Username);
+            byte[]? hash = await _auth.GetNtHashAsync(user.Username)
+                .WaitAsync(cancellationToken);
             if (hash is not { Length: > 0 })
                 continue;
 

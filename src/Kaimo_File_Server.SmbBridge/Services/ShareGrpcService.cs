@@ -31,11 +31,15 @@ public sealed class ShareGrpcService : ShareService.ShareServiceBase
     public override async Task<ListSharesReply> ListShares(
         ListSharesRequest request, ServerCallContext context)
     {
-        var defs = await _shares.GetAllEnabledAsync();
+        CancellationToken cancellationToken =
+            context?.CancellationToken ?? CancellationToken.None;
+        var defs = await _shares.GetAllEnabledAsync()
+            .WaitAsync(cancellationToken);
 
         var reply = new ListSharesReply();
         foreach (var def in defs)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             reply.Shares.Add(new ShareEntry
             {
                 Name = def.Name,
