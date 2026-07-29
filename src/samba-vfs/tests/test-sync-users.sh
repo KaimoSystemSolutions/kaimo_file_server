@@ -23,10 +23,12 @@ export IMPORT_CAPTURE="$WORK/imported.smbpasswd"
 export IMPORT_PATH_LOG="$WORK/import-path"
 export IMPORT_MODE_LOG="$WORK/import-mode"
 export IMPORT_RUNTIME_LOG="$WORK/import-runtime"
+export SESSION_REVOKE_LOG="$WORK/session-revoke.log"
 export KAIMO_SYNC_RUNTIME_DIR="$WORK/runtime"
 export KAIMO_SYNC_STATE_DIR="$WORK/state"
 export KAIMO_SAMBA_PATH_PREFIX=""
 export KAIMO_UNMANAGED_SAMBA_USERS="kaimotest"
+export KAIMO_SESSION_REVOKER="$WORK/bin/revoke-samba-sessions"
 
 cat >"$PASSWD_FILE" <<'EOF'
 stale.user:1401
@@ -51,6 +53,7 @@ EOF
 : >"$LOCK_LOG"
 : >"$DELETE_LOG"
 : >"$AUTH_CALL_LOG"
+: >"$SESSION_REVOKE_LOG"
 echo 1500 >"$PASSWD_FILE.cnt"
 
 mkdir -m 0700 "$KAIMO_SYNC_STATE_DIR"
@@ -65,6 +68,12 @@ cat >"$WORK/bin/kaimo_authsync" <<'EOF'
 #!/bin/bash
 printf 'called\n' >>"$AUTH_CALL_LOG"
 cat "$AUTH_USERS_FILE"
+EOF
+
+cat >"$WORK/bin/revoke-samba-sessions" <<'EOF'
+#!/bin/bash
+printf '%s\n' "$*" >>"$SESSION_REVOKE_LOG"
+exit "${SESSION_REVOKE_EXIT_CODE:-0}"
 EOF
 
 cat >"$WORK/bin/id" <<'EOF'
@@ -211,6 +220,11 @@ if has_passdb_user stale.user \
 else
     note "ok: stale credential/groups revoked while UID 1401 is retained and locked"
 fi
+if ! grep -Fqx '1 managed user(s) revoked' "$SESSION_REVOKE_LOG"; then
+    echo "FAIL: stale-user revocation did not terminate active Samba sessions"; fail=1
+else
+    note "ok: user revocation terminates active Samba sessions"
+fi
 
 # 3) The new managed-user boundary is private and contains exactly the desired
 # identities. A legacy stderr diagnostic previously persisted as a username is
@@ -231,7 +245,28 @@ else
     note "ok: credential staging is minimized and private files are cleaned"
 fi
 
-# 4) A held lock rejects another run before exporting hashes.
+# 4) A failed active-session close must not publish a completed managed-user
+# boundary. The retry still owns the stale identity and repeats revocation.
+printf 'revoker.fail:1499\n' >>"$PASSWD_FILE"
+printf 'revoker.fail:1499:Revoker failure user\n' >>"$PASSDB_FILE"
+printf 'kaimo:revoker.fail\nkaimo-authd:revoker.fail\n' >>"$GROUP_STATE"
+printf 'revoker.fail\n' >>"$KAIMO_SYNC_STATE_DIR/managed-users"
+sort -u -o "$KAIMO_SYNC_STATE_DIR/managed-users" "$KAIMO_SYNC_STATE_DIR/managed-users"
+export SESSION_REVOKE_EXIT_CODE=9
+bash "$SUT" >/dev/null 2>&1
+revoker_failure_rc=$?
+unset SESSION_REVOKE_EXIT_CODE
+if [ "$revoker_failure_rc" -eq 0 ] \
+    || ! grep -Fqx 'revoker.fail' "$KAIMO_SYNC_STATE_DIR/managed-users"; then
+    echo "FAIL: session-close failure published completed user state"; fail=1
+elif ! bash "$SUT" >/dev/null 2>&1 \
+    || grep -Fqx 'revoker.fail' "$KAIMO_SYNC_STATE_DIR/managed-users"; then
+    echo "FAIL: retry did not repeat and complete user-session revocation"; fail=1
+else
+    note "ok: session-close failure preserves retry ownership"
+fi
+
+# 5) A held lock rejects another run before exporting hashes.
 before_calls="$(wc -l <"$AUTH_CALL_LOG")"
 (
     exec 8>"$KAIMO_SYNC_RUNTIME_DIR/sync-users.lock"
@@ -246,7 +281,7 @@ else
     note "ok: synchronization lock rejects concurrent reconciliation"
 fi
 
-# 5) Failed import returns failure, cleans files, and does not publish a new
+# 6) Failed import returns failure, cleans files, and does not publish a new
 # managed state (P1-16 must not forget stale identities on a partial run).
 cp "$KAIMO_SYNC_STATE_DIR/managed-users" "$WORK/state-before-failure"
 export PDBEDIT_EXIT_CODE=7
@@ -263,7 +298,7 @@ else
     note "ok: failed import preserves retry state and leaves no hash residue"
 fi
 
-# 6) A passdb deletion followed by a reported failure keeps the old ownership
+# 7) A passdb deletion followed by a reported failure keeps the old ownership
 # boundary. Retry must finish group/lock convergence even though passdb no
 # longer contains that user.
 printf 'partial.user:1551\n' >>"$PASSWD_FILE"
@@ -288,7 +323,7 @@ else
     note "ok: partial passdb deletion remains owned and converges on retry"
 fi
 
-# 7) Reactivation restores passdb/groups while preserving the retained UID.
+# 8) Reactivation restores passdb/groups while preserving the retained UID.
 jq '.users += [{"username":"stale.user","nt_hash":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}]' \
     "$AUTH_USERS_FILE" >"$AUTH_USERS_FILE.tmp"
 mv "$AUTH_USERS_FILE.tmp" "$AUTH_USERS_FILE"
@@ -302,7 +337,7 @@ else
     note "ok: reactivation restores access with the original retained UID"
 fi
 
-# 8) First-run bootstrap adopts existing passdb identities, excludes reserved
+# 9) First-run bootstrap adopts existing passdb identities, excludes reserved
 # users, and revokes an absent legacy Kaimo credential.
 printf 'legacy.user:1601\n' >>"$PASSWD_FILE"
 printf 'legacy.user:1601:Legacy user\n' >>"$PASSDB_FILE"
@@ -317,7 +352,7 @@ else
     note "ok: bootstrap adopts legacy passdb users and excludes reserved accounts"
 fi
 
-# 9) Structured records fail before any local mutation when their schema,
+# 10) Structured records fail before any local mutation when their schema,
 # hash, identity, or uniqueness is unsafe.
 cp "$AUTH_USERS_FILE" "$WORK/auth-users-valid"
 cp "$PASSDB_FILE" "$WORK/passdb-before-invalid"
@@ -346,7 +381,7 @@ if [ "$fail" -eq 0 ]; then
     note "ok: invalid structured user records fail before passdb mutation"
 fi
 
-# 10) Unexpected stdout from `pdbedit -L` is rejected as malformed machine
+# 11) Unexpected stdout from `pdbedit -L` is rejected as malformed machine
 # data. Diagnostics on stderr are allowed and already covered by every run.
 cp "$PASSDB_FILE" "$WORK/passdb-before-malformed-list"
 cp "$KAIMO_SYNC_STATE_DIR/managed-users" "$WORK/state-before-malformed-list"

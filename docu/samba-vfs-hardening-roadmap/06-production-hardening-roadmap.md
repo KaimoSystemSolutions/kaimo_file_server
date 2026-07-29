@@ -84,9 +84,12 @@ and make disabled identities converge predictably.
    configured storage root fail before mutation.
 5. Centralize enabled service/share/user resolution and use it in every Authz,
    Event, Snapshot, and synchronization RPC.
-6. Define the revocation SLA and close affected shares/sessions when a service,
-   share, or user is disabled. Explicitly decide how already-open handles are
-   treated.
+6. **Completed 2026-07-29:** share/config polling is startup-validated at one
+   to five seconds (two seconds by default); the rate-limited hash-bearing user
+   sync is fixed at 60 seconds. All components must
+   initially converge, and service/share/user disablement forcibly closes
+   active handles. Uncertain state closes all shares; an unprovable close fails
+   the complete supervised Samba unit.
 7. Remove reusable test credentials from production entrypoints and health
    probes. Reject `KAIMO_AUTHZ_FAILOPEN=1` in production configuration.
 8. **Completed 2026-07-29:** paginate bulk user export in bounded 1,000-row

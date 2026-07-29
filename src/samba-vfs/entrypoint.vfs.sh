@@ -75,55 +75,59 @@ find /opt/samba -name 'kaimo_bridge.so' -o -name '*kaimo_bridge*.so' 2>/dev/null
 echo "[entrypoint] Config check (testparm):"
 testparm -s 2>/dev/null | sed -n '1,40p' || true
 
-# --- Phase 1: Sync Kaimo user NT-Hashes from bridge into tdbsam ---
-# Try once at startup (with retries until bridge is reachable)
-# so real Kaimo logins work immediately.
-echo "[entrypoint] Initial NT-Hash sync from bridge ..."
-for i in $(seq 1 30); do
-    if /usr/local/bin/run-sync.sh users /usr/local/bin/sync-users.sh; then break; fi
-    sleep 2
-done
+# --- P2-13: bounded control-plane convergence and revocation ---
+# Polling remains deliberate: these exports are small, bounded desired-state
+# documents, while introducing a second push channel would add another durable
+# delivery protocol. Every component must converge before smbd starts.
+initial_sync() {
+    local component="$1" description="$2" command="$3" attempt
+    echo "[entrypoint] Initial $description ..."
+    for attempt in $(seq 1 30); do
+        if /usr/local/bin/run-sync.sh "$component" "$command"; then
+            return 0
+        fi
+        [ "$attempt" -eq 30 ] || sleep 2
+    done
+    echo "[entrypoint] $component did not converge; refusing to start Samba." >&2
+    return 1
+}
 
-# Then periodically follow up (new/changed users, without restart).
-( while true; do sleep 60; /usr/local/bin/run-sync.sh users /usr/local/bin/sync-users.sh >/dev/null 2>&1 || true; done ) &
-
-# --- Phase 4: Share provisioning from Kaimo DB into Samba registry (net conf) ---
-# Initially once with retries (until bridge is reachable), so shares
-# are ready at first client connect. Replaces SmbServer.SyncFromDb().
-echo "[entrypoint] Initial share sync from bridge ..."
-for i in $(seq 1 30); do
-    if /usr/local/bin/run-sync.sh shares /usr/local/bin/sync-shares.sh; then break; fi
-    sleep 2
-done
-
-# Then continuously reconcile new/changed/deleted shares. Disabled and deleted
-# shares are removed from the registry and `smbcontrol close-share` forcibly
-# disconnects their active tree connections. Keep this interval short: it is
-# the maximum active-handle revocation delay after the database commit.
+USER_SYNC_INTERVAL_SECONDS="${KAIMO_USER_SYNC_INTERVAL_SECONDS:-60}"
 SHARE_SYNC_INTERVAL_SECONDS="${KAIMO_SHARE_SYNC_INTERVAL_SECONDS:-2}"
-case "$SHARE_SYNC_INTERVAL_SECONDS" in
-    ''|*[!0-9]*|0)
-        echo "[entrypoint] Invalid KAIMO_SHARE_SYNC_INTERVAL_SECONDS='$SHARE_SYNC_INTERVAL_SECONDS' (expected a positive integer)." >&2
-        exit 1
-        ;;
-esac
-( while true; do
-    sleep "$SHARE_SYNC_INTERVAL_SECONDS"
-    /usr/local/bin/run-sync.sh shares /usr/local/bin/sync-shares.sh >/dev/null 2>&1 || true
-done ) &
+CONFIG_SYNC_INTERVAL_SECONDS="${KAIMO_CONFIG_SYNC_INTERVAL_SECONDS:-2}"
+# The hash-bearing user export is intentionally limited to two calls per
+# 60-second window (P2-10/P2-11). Do not turn it into a high-frequency
+# revocation feed; a shorter user SLA requires a separate hash-free endpoint.
+/usr/local/bin/validate-sync-interval.sh \
+    KAIMO_USER_SYNC_INTERVAL_SECONDS "$USER_SYNC_INTERVAL_SECONDS" 60 60
+/usr/local/bin/validate-sync-interval.sh \
+    KAIMO_SHARE_SYNC_INTERVAL_SECONDS "$SHARE_SYNC_INTERVAL_SECONDS" 1 5
+/usr/local/bin/validate-sync-interval.sh \
+    KAIMO_CONFIG_SYNC_INTERVAL_SECONDS "$CONFIG_SYNC_INTERVAL_SECONDS" 1 5
 
-# --- Phase 4: Protocol settings from Kaimo DB into Samba global registry ---
-# Initially BEFORE smbd start (with retries), so smbd reads the dialect range/signing/
-# encryption from registry at first startup. Mirrors
-# SmbServer.LoadProtocolSettings().
-echo "[entrypoint] Initial protocol settings sync from bridge ..."
-for i in $(seq 1 30); do
-    if /usr/local/bin/run-sync.sh config /usr/local/bin/sync-config.sh; then break; fi
-    sleep 2
-done
+initial_sync users "NT-Hash/user sync from bridge" /usr/local/bin/sync-users.sh
+initial_sync shares "share sync from bridge" /usr/local/bin/sync-shares.sh
+initial_sync config "protocol settings sync from bridge" /usr/local/bin/sync-config.sh
 
-# Then periodically follow up (web UI changes, reload only on change).
-( while true; do sleep 60; /usr/local/bin/run-sync.sh config /usr/local/bin/sync-config.sh >/dev/null 2>&1 || true; done ) &
+# A failed cycle closes every active share. If that fail-closed action cannot
+# be proven, terminate PID 1; the supervisor then reaps authd/smbd and Compose
+# restarts the complete security unit.
+start_periodic_sync() {
+    local component="$1" interval="$2" command="$3"
+    (
+        while sleep "$interval"; do
+            if ! /usr/local/bin/sync-cycle.sh "$component" "$command"; then
+                echo "[entrypoint] Fatal $component revocation failure; terminating Samba unit." >&2
+                kill -TERM 1
+                exit 1
+            fi
+        done
+    ) &
+}
+
+start_periodic_sync users "$USER_SYNC_INTERVAL_SECONDS" /usr/local/bin/sync-users.sh
+start_periodic_sync shares "$SHARE_SYNC_INTERVAL_SECONDS" /usr/local/bin/sync-shares.sh
+start_periodic_sync config "$CONFIG_SYNC_INTERVAL_SECONDS" /usr/local/bin/sync-config.sh
 
 # --- Phase 2: Start authorization sidecar (Unix socket <-> gRPC) ---
 # The VFS module (connect hook) asks here "may <user> access <share>?".

@@ -385,12 +385,20 @@ while IFS= read -r stale_user; do
     fi
 done <"$PREVIOUS_MANAGED"
 
-# Publish the new ownership boundary only after import and revocation complete.
-# A failed run therefore leaves the prior state available for an idempotent retry.
+[ "$revoked" -gt 0 ] && echo "[sync-users] $revoked stale users revoked; POSIX UIDs retained."
+if [ "$revoked" -gt 0 ]; then
+    session_revoker="${KAIMO_SESSION_REVOKER:-/usr/local/bin/revoke-samba-sessions.sh}"
+    "$session_revoker" "$revoked managed user(s) revoked" || {
+        echo "[sync-users] Cannot terminate sessions after user revocation." >&2
+        exit 1
+    }
+fi
+
+# Publish the new ownership boundary only after credential/group revocation and
+# active-session termination complete. A failed run therefore leaves every
+# stale identity owned by the next idempotent retry.
 publish_managed_state "$DESIRED_USERS" || {
     echo "[sync-users] Cannot publish reconciled managed-user state."
     exit 1
 }
-
-[ "$revoked" -gt 0 ] && echo "[sync-users] $revoked stale users revoked; POSIX UIDs retained."
 exit 0

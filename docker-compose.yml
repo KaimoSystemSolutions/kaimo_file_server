@@ -170,9 +170,11 @@ services:
       KAIMO_EVENT_MAX_ATTEMPTS: ${KAIMO_EVENT_MAX_ATTEMPTS:-20}
       KAIMO_EVENT_RETRY_BASE_MS: ${KAIMO_EVENT_RETRY_BASE_MS:-1000}
       KAIMO_EVENT_RETRY_MAX_MS: ${KAIMO_EVENT_RETRY_MAX_MS:-60000}
-      # P1-10: maximum polling delay before a disabled/deleted share is removed
-      # from Samba and all of its active tree connections are force-closed.
+      # P2-13: normal-operation polling bounds. The hash-bearing user export
+      # remains fixed at 60s; share/service state uses the tighter 1-5s contract.
+      KAIMO_USER_SYNC_INTERVAL_SECONDS: ${KAIMO_USER_SYNC_INTERVAL_SECONDS:-60}
       KAIMO_SHARE_SYNC_INTERVAL_SECONDS: ${KAIMO_SHARE_SYNC_INTERVAL_SECONDS:-2}
+      KAIMO_CONFIG_SYNC_INTERVAL_SECONDS: ${KAIMO_CONFIG_SYNC_INTERVAL_SECONDS:-2}
       # Health fails after any sync failure or when users/shares/config have not
       # all converged within this window.
       KAIMO_SYNC_HEALTH_MAX_AGE_SECONDS: ${KAIMO_SYNC_HEALTH_MAX_AGE_SECONDS:-180}

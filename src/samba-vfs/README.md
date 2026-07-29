@@ -435,32 +435,46 @@ replaces the FileSystemWatcher/`SyncFromDb()` mechanism from
   resolves its share through the central `ResolveEnabledShareAsync` gate.
   Registered in [`Program.cs`](../src/Kaimo_File_Server.SmbBridge/Program.cs).
 - **C++:** [`module/sharesync.cpp`](module/sharesync.cpp) (gRPC client) +
-  [`sync-shares.sh`](sync-shares.sh). The entrypoint syncs on start (with retries until bridge
-  is reachable) and then every `KAIMO_SHARE_SYNC_INTERVAL_SECONDS` (default:
-  2 seconds).
+  [`sync-shares.sh`](sync-shares.sh). The entrypoint requires user, share, and
+  configuration convergence before starting Samba. It then reconciles at the
+  independently configured `KAIMO_*_SYNC_INTERVAL_SECONDS` values. Share and
+  configuration intervals must be 1-5 seconds and default to 2 seconds. User
+  sync is fixed at 60 seconds because it is the
+  rate-limited, hash-bearing credential export.
 - **Reconciliation** in `sync-shares.sh` is idempotent: new shares → `net conf addshare`,
   changed (path/visibility) → `net conf setparm`, removed/disabled → `net conf delshare`.
   A path change or removal additionally runs `smbcontrol smbd close-share` so an
   existing client cannot remain attached to the old service path. `global` is
   never touched.
 
-#### Disabled-share revocation semantics
+#### User, share, and service revocation semantics
 
 - Once the disabled state is committed, every new bridge authorization,
   lifecycle-event, and snapshot request fails closed on its next database
   lookup; it does not wait for Samba registry reconciliation.
-- An already-open Samba tree connection may continue using existing handles
-  until the next successful share reconciliation. Under healthy operation,
-  the revocation target is therefore `KAIMO_SHARE_SYNC_INTERVAL_SECONDS` plus
-  the `ListShares` RPC/reconciliation runtime (2 seconds plus runtime by
-  default).
+- Under healthy operation, the next relevant reconciliation begins within its
+  configured interval after the commit becomes visible. The default target is
+  2 seconds plus runtime for share/service state and 60 seconds plus runtime
+  for user state.
 - Reconciliation removes the registry share first and then calls
   `smbcontrol smbd close-share`, which forcibly disconnects every active tree
   connection for that share. Clients must reconnect after it is enabled again.
-- If the bridge is unreachable, the synchronizer cannot safely infer which
-  existing shares were disabled. Registry state and active sessions remain
-  until a successful reconciliation; operators must alert on repeated
-  share-sync failures.
+- Global service disable closes every registry share. Disabled/deleted users
+  lose passdb credentials and Kaimo groups before every registry share is
+  closed. Samba 4.19 has no reliable username-selective close primitive, so
+  this deliberately disconnects unaffected clients to guarantee that the
+  revoked identity retains no session or open handle.
+- A failed periodic export or mutation makes local state uncertain and closes
+  every registry share. New operations remain protected by fail-closed VFS
+  authorization. If the global close cannot be proven, PID 1 is terminated so
+  the P2-12 supervisor and Compose restart the complete Samba security unit.
+- Arbitrary ACL edits are not a desired-state polling event. Subsequent
+  authorization operations observe them within the separate authd cache TTL,
+  but handles already opened under the former ACL are not selectively closed.
+- A shorter user-revocation target requires a separate hash-free identity
+  revision/invalidation feed. Raising the frequency of the NT-hash export would
+  defeat its two-per-60-second rate limit and unnecessarily extend credential
+  exposure.
 
 ### Visibility (ABE) — Decision: hidden flag only
 

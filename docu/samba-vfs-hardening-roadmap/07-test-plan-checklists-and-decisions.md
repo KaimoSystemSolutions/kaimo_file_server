@@ -123,6 +123,10 @@ implemented; their required release verification remains tracked in milestone 4.
 - [x] Every mutation error makes the sync fail.
 - [x] Final state is verified before recording success.
 - [x] Concurrent sync instances are locked out.
+- [x] Share/config polling is bounded to 1-5 seconds; hash-bearing user sync is
+  fixed at 60 seconds. All three must converge before `smbd` starts.
+- [x] Disabled users, shares, and the global service forcibly close active
+  handles; uncertain sync state closes all shares or fails the Samba unit.
 - [x] Bulk user export uses bounded pages and projections, isolates corrupt
   credential rows, validates monotonic continuation metadata, and fails before
   emitting a partial desired-state document.

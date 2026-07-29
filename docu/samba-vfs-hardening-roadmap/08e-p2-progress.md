@@ -1014,3 +1014,122 @@ retains the validated five-second default.
 **Next planned finding:** P2-13 — define the accepted user/service/share
 revocation SLA, reduce or eliminate polling windows, and specify how already
 open sessions and handles are terminated.
+
+### 2026-07-29 — P2-13: Bounded polling and active-handle revocation
+
+**Status:** Implemented and regression-tested. Deployment-shaped timing and
+real SMB handle verification remain release gates.
+
+**Problem**
+
+The three desired-state reconcilers did not share one defensible revocation
+contract. Share polling had already been reduced to two seconds by P1-10 and
+closed a removed or moved share, while user and configuration polling still
+ran every 60 seconds. User removal revoked the reusable credential and local
+groups but left existing authenticated sessions and open handles alive.
+Initial reconciliation also exhausted its retries and then continued to start
+Samba, potentially exposing stale passdb, registry, or global configuration.
+
+A failed periodic reconciliation was recorded by health state, but the loop
+ignored the failure. Docker does not restart a merely unhealthy container by
+default, so active sessions could remain attached to an uncertain effective
+state indefinitely.
+
+**Architecture decision and SLA**
+
+Polling is retained for these three small, bounded desired-state exports. A
+second push/invalidation transport would need its own authenticated durable
+delivery, replay, ordering, and restart semantics and would not remove the need
+for full reconciliation.
+
+The production default is two seconds for shares and global configuration,
+with an enforced one-to-five-second range. User sync is fixed at 60 seconds
+because it is the hash-bearing credential
+export protected by the separate two-per-60-second rate limit. Under healthy
+operation, the next reconciliation starts within the relevant interval after
+a committed change becomes visible to the bridge; revocation completes after
+the bounded RPC/export and verified local mutation runtime. This is an
+operational target rather than a database-to-Samba real-time transaction.
+
+Already-open handles must be terminated when the global SMB service, a share,
+or a managed user is explicitly disabled or deleted. Share removal/path change
+uses a targeted `close-share`; service disable closes all shares. Samba 4.19
+does not provide a reliable username-selective close operation, so user
+revocation deliberately closes every registry share. The availability impact
+to unaffected clients is accepted in favor of deterministic identity
+revocation.
+
+General ACL edits remain outside this desired-state polling contract.
+Subsequent VFS authorization observes them subject to the bounded authd cache
+TTL, while already-open handles are not selectively invalidated without a
+future ACL-revision push/index capable of identifying affected sessions.
+A user-revocation target below 60 seconds likewise requires a hash-free
+identity revision/invalidation feed; increasing the NT-hash export frequency
+would defeat its abuse limit and unnecessarily process credentials.
+
+**Implemented**
+
+1. Added validated `KAIMO_USER_SYNC_INTERVAL_SECONDS`,
+   `KAIMO_SHARE_SYNC_INTERVAL_SECONDS`, and
+   `KAIMO_CONFIG_SYNC_INTERVAL_SECONDS`. User values other than 60 seconds and
+   share/config values outside 1-5 seconds stop the entrypoint. Compose and
+   `.env.example` expose the 60/2/2-second production defaults. The shared
+   `validate-sync-interval.sh` helper makes the exact bounds independently
+   regression-testable.
+2. Refactored startup reconciliation into a common required gate. Samba no
+   longer starts after merely exhausting 30 bridge/local retries: users,
+   shares, and configuration must each publish successful convergence.
+3. Added `revoke-samba-sessions.sh`. It enumerates registry shares, excludes
+   `global`, and closes every active share through `smbcontrol smbd
+   close-share`. Absence of `smbd` during initial convergence is a successful
+   no-op; enumeration or close failure is fatal.
+4. User reconciliation invokes the global revoker after passdb credential,
+   storage/authd group, and POSIX-lock convergence whenever one or more managed
+   users disappear.
+5. The new managed-user ownership boundary is published only after session
+   revocation succeeds. A partial close therefore leaves stale identities
+   owned by the next idempotent retry.
+6. Added `sync-cycle.sh` around every periodic component run. A failed export,
+   validation, mutation, or verification closes all active registry shares
+   because the effective local state is uncertain. The runner's failure state
+   remains visible to `sync-health.sh`; a later successful cycle restores it.
+   Successful high-frequency cycles stay quiet. Per-cycle output is captured
+   in a private temporary file, emitted only on failure, and always removed.
+7. If fail-closed session termination cannot be proven, the periodic entrypoint
+   worker sends SIGTERM to PID 1. The P2-12 supervisor terminates and reaps
+   `authd`/`smbd`; Compose's `unless-stopped` policy restarts the complete
+   security unit.
+8. Added a focused shell regression covering accepted/rejected interval
+   boundaries, exact registry-share closure, exclusion of `global`, pre-smbd
+   no-op behavior, no revocation on a successful cycle, global containment on
+   sync failure, and fatal escalation when the close action fails.
+9. Extended the user-sync regression to prove a removed managed identity
+   invokes active-session revocation and that a close failure preserves the
+   former managed boundary until a retry repeats and completes the action.
+
+**Validation completed**
+
+- The focused P2-13 revocation-policy regression passes under Bash 5.2.
+- `docker compose config --quiet` succeeds with the 60/2/2-second defaults.
+- The uncached pinned Samba 4.19.5 `build-runtime` stage passes. It executes the
+  complete shell/native helper suite, rebuilds and links the real ABI-49 VFS
+  module, and packages the current runtime scripts.
+- The complete managed test project passes: 647 tests, 0 failures, 0 skipped.
+- `git diff --check` passes.
+
+**Validation still required**
+
+- With a file held open over SMB, disable its user and measure commit-to-handle
+  failure. Repeat for share disable/delete, share path change, and global
+  service disable at interval values 1, 2, and 5 seconds, and user disable at
+  60 seconds.
+- Inject bridge unavailability, malformed exporter output, registry failure,
+  and `smbcontrol` failure during active sessions. Confirm the first three
+  close all shares and recover health after convergence; confirm an unprovable
+  close terminates/restarts the complete container unit.
+- Verify clients receive an expected disconnect/reconnect experience and that
+  durable close-event processing remains correct when revocation terminates
+  handles abruptly.
+
+**Next planned finding:** P2-14 — remove hard-coded development credentials
+from operational startup and health paths.

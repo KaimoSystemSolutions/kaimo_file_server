@@ -341,9 +341,53 @@ defaults are 50 attempts (five seconds) and five seconds respectively.
 
 ### P2-13: Disabled service/share behavior is polling-based
 
+> **Remediation status (2026-07-29): Implemented, regression-tested, and
+> verified in the pinned Samba 4.19.5 `build-runtime` image.
+> Deployment-shaped timing and active-handle verification remain release
+> gates.**
+
 Configuration, share, and user sync run every 60 seconds. Existing open handles can continue even after desired state changes, and registry deletion alone does not revoke already-open file handles.
 
 **Fix:** define a revocation SLA, add push/invalidation where needed, close affected shares/sessions immediately, and decide whether active file handles must be forcibly closed.
+
+**Implemented fix:** user, share, and configuration reconciliation now use
+independently validated intervals. Share and configuration state use a
+one-to-five-second range and a two-second production default. User sync uses a
+fixed 60-second interval because it is the separately
+rate-limited, hash-bearing credential export. Under healthy operation, the
+next reconciliation begins no later than the configured interval after a
+committed change is visible to the bridge; convergence then requires the
+bounded exporter and local mutation runtime. Samba refuses startup unless all
+three desired-state documents have converged.
+
+Disabled/deleted shares and path changes retain targeted `close-share`
+behavior. Global service disable closes every registry share. A
+disabled/deleted managed user now loses passdb credentials and Kaimo groups,
+then triggers a global registry-share close because Samba 4.19 has no reliable
+username-selective handle-revocation operation. This intentionally disconnects
+unaffected clients as the cost of deterministically terminating the disabled
+identity's sessions and open handles. The new managed-user boundary is
+published only after that session revocation succeeds, preserving retry
+ownership after a partial failure.
+
+Any periodic user/share/config reconciliation failure makes the effective
+local state uncertain and therefore closes every active registry share.
+New tree connects and opens remain protected by the VFS bridge authorization
+and fail closed during bridge loss. If the global close cannot be proven, the
+periodic worker terminates PID 1; the P2-12 supervisor closes/reaps `authd` and
+`smbd`, and Compose restarts the complete security unit.
+
+This policy applies to service, share, and identity enablement state. General
+ACL edits are evaluated on subsequent authorization operations, subject to the
+separate bounded authd decision-cache TTL; they do not currently provide a
+push signal capable of locating and closing only handles authorized by the old
+ACL. Existing handles are therefore forcibly closed for explicit
+service/share/user revocation, but not for an arbitrary ACL edit.
+
+A user-revocation target below 60 seconds requires a separate hash-free
+identity revision/invalidation feed. Reusing the NT-hash export at high
+frequency would violate its two-per-60-second abuse limit and unnecessarily
+increase plaintext credential processing.
 
 ### P2-14: Hard-coded development credentials are present in operational paths
 
