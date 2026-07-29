@@ -23,7 +23,7 @@ namespace Kaimo_File_Server.Infrastructure.Services
         /// 31D6CFE0D16AE931B73C59D7E0C089C0). Computed once so we can reject any account that
         /// effectively has no password — "no login without a password".
         /// </summary>
-        private readonly string _emptyPasswordNtHash;
+        private readonly byte[] _emptyPasswordNtHash;
 
         public AuthenticationLookup(
             IUserRepository userRepo,
@@ -38,7 +38,8 @@ namespace Kaimo_File_Server.Infrastructure.Services
             _aclService = aclService;
             _contextFactory = contextFactory;
             _ntHashProtector = ntHashProtector;
-            _emptyPasswordNtHash = passwordService.ComputeNtHash(string.Empty);
+            _emptyPasswordNtHash =
+                Convert.FromHexString(passwordService.ComputeNtHash(string.Empty));
         }
 
         public async Task<byte[]?> GetNtHashAsync(string username)
@@ -49,17 +50,26 @@ namespace Kaimo_File_Server.Infrastructure.Services
             // Disabled accounts must never authenticate, regardless of correct credentials.
             if (!user.IsEnabled) return null;
 
-            // Decrypt the at-rest NT hash (legacy plaintext rows pass through unchanged).
-            string ntHashHex = _ntHashProtector.Unprotect(user.NtHash);
-
-            // No login without a password: refuse the well-known empty-password NT hash so an
-            // account that ended up with a blank password can never authenticate over SMB/NTLM
-            // (a blank-password NTLM bind would otherwise match and succeed).
-            if (string.Equals(ntHashHex, _emptyPasswordNtHash, StringComparison.OrdinalIgnoreCase))
+            try
+            {
+                byte[] hash = _ntHashProtector.UnprotectToBytes(user.NtHash);
+                if (hash.Length != 16
+                    || System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                        hash,
+                        _emptyPasswordNtHash))
+                {
+                    System.Security.Cryptography.CryptographicOperations.ZeroMemory(hash);
+                    return null;
+                }
+                return hash;
+            }
+            catch (Exception exception) when (
+                exception is FormatException
+                or ArgumentException
+                or System.Security.Cryptography.CryptographicException)
+            {
                 return null;
-
-            byte[] hash = Convert.FromHexString(ntHashHex);
-            return hash.Length == 16 ? hash : null;
+            }
         }
 
         public async Task<SambaCredentialBatch> GetSambaCredentialBatchAsync(
@@ -90,20 +100,14 @@ namespace Kaimo_File_Server.Infrastructure.Services
 
                 try
                 {
-                    string ntHashHex =
-                        _ntHashProtector.Unprotect(source.StoredNtHash);
-                    if (string.Equals(
-                            ntHashHex,
-                            _emptyPasswordNtHash,
-                            StringComparison.OrdinalIgnoreCase))
+                    byte[] hash =
+                        _ntHashProtector.UnprotectToBytes(source.StoredNtHash);
+                    if (hash.Length != 16
+                        || System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                            hash,
+                            _emptyPasswordNtHash))
                     {
-                        continue;
-                    }
-
-                    byte[] hash = Convert.FromHexString(ntHashHex);
-                    if (hash.Length != 16)
-                    {
-                        rejectedUsernames.Add(source.Username);
+                        System.Security.Cryptography.CryptographicOperations.ZeroMemory(hash);
                         continue;
                     }
 

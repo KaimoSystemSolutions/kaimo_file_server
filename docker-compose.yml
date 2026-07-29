@@ -118,6 +118,11 @@ services:
       - kaimo_samba_event_spool:/var/lib/kaimo/event-spool
       # Mount the single Samba workload identity and public control-plane CA.
       - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
+    # P2-11: decrypted NT hashes exist only in short-lived mode-0600 staging
+    # files during validation/import. Keep those files off the writable image
+    # layer and discard the complete runtime directory on container stop.
+    tmpfs:
+      - /run/kaimo-user-sync:rw,noexec,nosuid,nodev,mode=0700,uid=0,gid=0
     build:
       context: ./src/samba-vfs
       dockerfile: Dockerfile.vfs

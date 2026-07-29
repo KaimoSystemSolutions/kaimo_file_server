@@ -16,6 +16,7 @@ STATE_DIR="${KAIMO_SYNC_STATE_DIR:-/var/lib/kaimo-user-sync}"
 MANAGED_STATE="$STATE_DIR/managed-users"
 UNMANAGED_USERS="${KAIMO_UNMANAGED_SAMBA_USERS:-${KAIMO_TEST_USER:-kaimotest}}"
 SMBPASSWD=""
+AUTH_JSON=""
 AUTH_ERR=""
 PDBEDIT_LOG=""
 PDBEDIT_USERS_RAW=""
@@ -27,6 +28,7 @@ USER_RECORDS=""
 
 cleanup() {
     [ -n "$SMBPASSWD" ] && rm -f -- "$SMBPASSWD"
+    [ -n "$AUTH_JSON" ] && rm -f -- "$AUTH_JSON"
     [ -n "$AUTH_ERR" ] && rm -f -- "$AUTH_ERR"
     [ -n "$PDBEDIT_LOG" ] && rm -f -- "$PDBEDIT_LOG"
     [ -n "$PDBEDIT_USERS_RAW" ] && rm -f -- "$PDBEDIT_USERS_RAW"
@@ -154,6 +156,7 @@ if ! flock -n 9; then
 fi
 
 SMBPASSWD="$(mktemp "$RUNTIME_DIR/smbpasswd.XXXXXX")" || exit 1
+AUTH_JSON="$(mktemp "$RUNTIME_DIR/auth-users.XXXXXX")" || exit 1
 AUTH_ERR="$(mktemp "$RUNTIME_DIR/authsync.XXXXXX")" || exit 1
 PDBEDIT_LOG="$(mktemp "$RUNTIME_DIR/pdbedit.XXXXXX")" || exit 1
 PDBEDIT_USERS_RAW="$(mktemp "$RUNTIME_DIR/pdbedit-users.XXXXXX")" || exit 1
@@ -169,7 +172,7 @@ command -v jq >/dev/null 2>&1 || {
     echo "[sync-users] jq is required for structured synchronization."
     exit 1
 }
-OUT="$(kaimo_authsync 2>>"$AUTH_ERR")"
+kaimo_authsync >"$AUTH_JSON" 2>>"$AUTH_ERR"
 rc=$?
 if [ $rc -ne 0 ]; then
     echo "[sync-users] Bridge unreachable (rc=$rc)."
@@ -182,11 +185,15 @@ case "$MAX_JSON_BYTES" in
         exit 1
         ;;
 esac
-if [ "${#OUT}" -gt "$MAX_JSON_BYTES" ]; then
+AUTH_JSON_BYTES="$(stat -c '%s' -- "$AUTH_JSON" 2>/dev/null)" || {
+    echo "[sync-users] Cannot inspect structured response."
+    exit 1
+}
+if [ "$AUTH_JSON_BYTES" -gt "$MAX_JSON_BYTES" ]; then
     echo "[sync-users] Structured response exceeds size limit."
     exit 1
 fi
-if ! printf '%s' "$OUT" | jq -s -e -r '
+if ! jq -s -e -r '
     def exact_keys($expected): (keys | sort) == ($expected | sort);
     if length != 1 then error("expected exactly one JSON document")
     else .[0]
@@ -208,10 +215,13 @@ if ! printf '%s' "$OUT" | jq -s -e -r '
     then error("invalid user sync schema")
     else .users[] | [.username, (.nt_hash | ascii_upcase)] | @tsv
     end
-' >"$USER_RECORDS"; then
+' "$AUTH_JSON" >"$USER_RECORDS"; then
     echo "[sync-users] Invalid structured user response."
     exit 1
 fi
+rm -f -- "$AUTH_JSON"
+AUTH_JSON=""
+unset AUTH_JSON_BYTES
 while IFS=$'\t' read -r validated_user validated_hash; do
     [ -z "${validated_user:-}" ] && continue
     if is_reserved_posix_user "$validated_user"; then
@@ -219,6 +229,7 @@ while IFS=$'\t' read -r validated_user validated_hash; do
         exit 1
     fi
 done <"$USER_RECORDS"
+unset validated_hash
 
 # Capture local passdb state before importing. On the first P1-16 run, existing
 # tdbsam users are adopted as Kaimo-managed except for explicitly reserved
@@ -300,6 +311,9 @@ while IFS=$'\t' read -r user nthash; do
     printf '%s\n' "$user" >>"$DESIRED_USERS"
     count=$((count + 1))
 done <"$USER_RECORDS"
+unset nthash
+rm -f -- "$USER_RECORDS"
+USER_RECORDS=""
 sort -u -o "$DESIRED_USERS" "$DESIRED_USERS"
 
 if [ "$count" -gt 0 ]; then
@@ -307,8 +321,12 @@ if [ "$count" -gt 0 ]; then
         echo "[sync-users] tdbsam import failed."
         exit 1
     fi
+    rm -f -- "$SMBPASSWD"
+    SMBPASSWD=""
     echo "[sync-users] $count users imported into tdbsam."
 else
+    rm -f -- "$SMBPASSWD"
+    SMBPASSWD=""
     echo "[sync-users] no active users received."
 fi
 

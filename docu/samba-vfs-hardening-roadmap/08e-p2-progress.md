@@ -721,3 +721,139 @@ scope of P2-11.
 **Next planned finding:** P2-11 — minimize credential copies and lifetime, clear
 mutable buffers where practical, and remove avoidable text/file exposure from
 the import path.
+
+### 2026-07-29 — P2-11: Minimized and cleared decrypted credentials
+
+**Status:** Implemented, regression-tested, and verified in the pinned Samba
+4.19.5 `build-runtime` image. Live memory inspection and deployment tmpfs
+verification remain release gates.
+
+**Problem**
+
+P2-10 bounded each credential export, but every accepted NT hash still crossed
+several avoidable representations:
+
+1. AES-GCM decryption produced a managed plaintext hexadecimal string and then
+   decoded that string into a second raw byte array.
+2. The lookup-owned raw array remained reachable after gRPC had copied it into
+   protobuf. Bulk arrays were likewise retained by the batch object until
+   garbage collection, including error and cancellation paths.
+3. `kaimo_authsync` retained every raw hash in `std::string`, converted each one
+   into a second hexadecimal `std::string`, and relied on ordinary allocator
+   release rather than clearing its owned memory.
+4. `sync-users.sh` captured the complete JSON document in the shell variable
+   `OUT`, then held JSON, TSV, and `smbpasswd` file representations until the
+   final process-level cleanup even after a phase no longer needed them.
+5. Although staging files were random, private, and mode 0600, the default
+   container path was not explicitly a tmpfs and could therefore enter the
+   container's writable image layer.
+
+An NT hash is password-equivalent for NTLM. Garbage collection, allocator
+release, or eventual process exit is not a sufficient lifetime boundary when
+the application directly owns a mutable credential buffer.
+
+**Architecture and limits**
+
+The implementation uses explicit clearing only where it is technically
+meaningful and under Kaimo's ownership:
+
+- Managed `byte[]` plaintext and raw-hash arrays are cleared with
+  `CryptographicOperations.ZeroMemory`.
+- C++ raw hashes use fixed mutable storage and a volatile write loop before
+  storage release.
+- Transient files are unlinked at the end of the phase that consumes them and
+  live on a private tmpfs in the deployable Compose stack.
+- Credentials are not placed in process arguments, environment variables,
+  diagnostics, audit logs, or durable synchronization state.
+
+The implementation does not make an unverifiable zero-copy claim. Immutable
+.NET strings already loaded from the database, protobuf/serializer internals,
+kernel pipe buffers, `jq`, `pdbedit`, and Samba's own passdb importer may retain
+their operational copy until that bounded operation or process releases it.
+Those buffers are not exposed through a Kaimo persistence or logging boundary.
+
+**Implemented**
+
+1. Extended `INtHashProtector` with `UnprotectToBytes()`. AES-GCM ciphertext is
+   decrypted into a mutable ASCII buffer and decoded directly into the exact
+   16-byte result without creating another plaintext hash string. Legacy
+   plaintext rows are decoded directly from their existing stored string.
+2. The protector clears decrypted ASCII, decoded encryption blobs,
+   key-derivation input bytes, encryption plaintext, and assembled encryption
+   blobs in `finally` blocks. Tamper, format, and wrong-length failures retain
+   the established fail-closed behavior.
+3. `AuthenticationLookup` keeps the well-known empty-password hash as raw
+   bytes, uses a fixed-time comparison, and clears every empty/wrong-length
+   rejected buffer. Accepted arrays transfer to the bridge as the explicit
+   next owner.
+4. `AuthGrpcService.GetNtHash` copies the exact value into `ByteString` and
+   clears the lookup array in `finally`. `ListUsers` wraps metadata validation,
+   response construction, cancellation, continuation generation, and return in
+   one `try/finally`, clearing every batch-owned hash on every exit path.
+5. `kaimo_authsync` replaces the `pair<string,string>` credential collection
+   with a move-only credential type containing a fixed 16-byte array. Copying
+   is disabled; moves clear their source; destruction wipes the retained bytes.
+   The protobuf field is cleared immediately after the fixed buffer is filled.
+6. Native hexadecimal emission writes digits directly to the output stream.
+   It no longer allocates a second hash-bearing `std::string`.
+7. `sync-users.sh` redirects exporter output into a random private file rather
+   than command-substituting it into shell memory. The independent 16-MiB
+   boundary and complete JSON/schema/uniqueness validation remain unchanged.
+8. The JSON staging file is removed immediately after successful validation.
+   The TSV record file is removed immediately after the private `smbpasswd`
+   import is assembled. The `smbpasswd` file is removed immediately after a
+   successful `pdbedit` import, before revocation/read-back/state publication.
+   The existing `EXIT` trap remains the fail-safe for every error or signal.
+9. `validated_hash`, `nthash`, and temporary size variables are explicitly
+   unset after their final use. No hash is interpolated into a command argument
+   or exported environment variable.
+10. Compose mounts `/run/kaimo-user-sync` as root-owned mode 0700 tmpfs with
+    `noexec`, `nosuid`, and `nodev`. The durable
+    `/var/lib/kaimo-user-sync/managed-users` file continues to contain only
+    usernames and never credential material.
+
+**Regression coverage**
+
+- `AesGcmNtHashProtectorTests` verifies raw-byte decode for both encrypted and
+  legacy rows plus malformed legacy input rejection.
+- `AuthGrpcServiceUserExportTests` proves that single-user and paged export
+  replies retain the correct protobuf value after their source arrays have
+  been zeroed.
+- The synchronization regression records the runtime directory at the exact
+  `pdbedit` import boundary and proves JSON and TSV credential staging files
+  have already been removed. Existing success and failure checks continue to
+  prove random mode-0600 import, end-of-run cleanup, pre-mutation schema
+  rejection, and state preservation after failed import.
+
+**Validation completed**
+
+- The focused managed credential selection passes: 31/31 tests.
+- The complete managed test project passes: 647/647 tests, zero skipped.
+- The pinned Samba 4.19.5 `build-runtime` image
+  `kaimo-samba-build-tests:p2-11` builds successfully. It regenerates and
+  compiles the C++ protobuf/gRPC client, runs the hardened synchronization
+  shell regression and all native helper tests, and compiles the real ABI-49
+  VFS module.
+- `docker compose config --quiet` succeeds. The fully resolved configuration
+  retains `/run/kaimo-user-sync:rw,noexec,nosuid,nodev,mode=0700,uid=0,gid=0`.
+- `git diff --check` passes.
+
+**Validation still required**
+
+- Inspect a live Samba container during a deliberately paused large import:
+  verify `/run/kaimo-user-sync` is a tmpfs, owner/mode are 0/0700, all transient
+  files are 0600, no hash appears in `/proc/*/cmdline` or `/proc/*/environ`, and
+  JSON/TSV/import files disappear at their documented phase boundaries.
+- Capture bridge and Samba logs during successful, corrupt-row, failed-import,
+  cancellation, and bridge-unavailable runs; scan for known test hashes and
+  confirm only count-level diagnostics are present.
+- Perform controlled process-memory inspection around bridge serialization,
+  native JSON output, `jq`, and `pdbedit` to document the unavoidable bounded
+  copies and confirm Kaimo-owned buffers do not outlive their handoff boundary.
+- Run the deployment-shaped multi-page reconciliation cases retained from
+  P2-10 and confirm the lifetime changes do not alter exact `tdbsam`, group, or
+  managed-user convergence.
+
+**Next planned finding:** P2-12 — supervise `kaimo_authd` independently and make
+loss of the authorization sidecar transition the container to an unhealthy or
+restarted state within a bounded interval.

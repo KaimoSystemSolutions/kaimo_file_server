@@ -22,6 +22,7 @@ export AUTH_CALL_LOG="$WORK/auth-calls"
 export IMPORT_CAPTURE="$WORK/imported.smbpasswd"
 export IMPORT_PATH_LOG="$WORK/import-path"
 export IMPORT_MODE_LOG="$WORK/import-mode"
+export IMPORT_RUNTIME_LOG="$WORK/import-runtime"
 export KAIMO_SYNC_RUNTIME_DIR="$WORK/runtime"
 export KAIMO_SYNC_STATE_DIR="$WORK/state"
 export KAIMO_SAMBA_PATH_PREFIX=""
@@ -157,6 +158,8 @@ done
 cp -- "$import_path" "$IMPORT_CAPTURE"
 printf '%s\n' "$import_path" >"$IMPORT_PATH_LOG"
 stat -c '%a' -- "$import_path" >"$IMPORT_MODE_LOG"
+find "$KAIMO_SYNC_RUNTIME_DIR" -maxdepth 1 -type f -printf '%f\n' \
+    | sort >"$IMPORT_RUNTIME_LOG"
 [ "${PDBEDIT_EXIT_CODE:-0}" -eq 0 ] || exit "$PDBEDIT_EXIT_CODE"
 while IFS=: read -r user uid _; do
     awk -F: -v user="$user" '$1 != user' "$PASSDB_FILE" >"$PASSDB_FILE.tmp"
@@ -220,11 +223,12 @@ if ! cmp -s "$expected_managed" "$KAIMO_SYNC_STATE_DIR/managed-users" \
     || [ "$(stat -c '%a' "$KAIMO_SYNC_STATE_DIR/managed-users")" != "600" ]; then
     echo "FAIL: managed-user state is not exact/private"; fail=1
 elif [ "$(cat "$IMPORT_MODE_LOG" 2>/dev/null)" != "600" ] \
+    || grep -Eq '^(auth-users|user-records)\.' "$IMPORT_RUNTIME_LOG" \
     || [ -e "$import_path" ] \
     || find "$KAIMO_SYNC_RUNTIME_DIR" -type f ! -name 'sync-users.lock' | grep -q .; then
     echo "FAIL: private per-run files were not cleaned"; fail=1
 else
-    note "ok: managed state self-heals stderr pollution and private files are cleaned"
+    note "ok: credential staging is minimized and private files are cleaned"
 fi
 
 # 4) A held lock rejects another run before exporting hashes.

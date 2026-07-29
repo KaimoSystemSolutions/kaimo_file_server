@@ -13,9 +13,49 @@ namespace Kaimo_File_Server.Tests;
 public sealed class AuthGrpcServiceUserExportTests
 {
     [Fact]
+    public async Task GetNtHash_CopiesReplyAndClearsLookupBuffer()
+    {
+        byte[] sourceHash = Convert.FromHexString(
+            "0123456789ABCDEF0123456789ABCDEF");
+        var auth = new Mock<IAuthenticationLookup>();
+        auth.Setup(lookup => lookup.GetNtHashAsync("alice"))
+            .ReturnsAsync(sourceHash);
+        var sut = BuildSut(auth);
+
+        GetNtHashReply reply = await sut.GetNtHash(
+            new GetNtHashRequest { Username = "alice" },
+            new UnitServerCallContext());
+
+        Assert.True(reply.Found);
+        Assert.Equal(
+            Convert.FromHexString("0123456789ABCDEF0123456789ABCDEF"),
+            reply.NtHash.ToByteArray());
+        Assert.All(sourceHash, value => Assert.Equal((byte)0, value));
+    }
+
+    [Fact]
+    public async Task GetNtHash_ClearsInvalidLookupBuffer()
+    {
+        byte[] sourceHash = [1, 2, 3];
+        var auth = new Mock<IAuthenticationLookup>();
+        auth.Setup(lookup => lookup.GetNtHashAsync("alice"))
+            .ReturnsAsync(sourceHash);
+        var sut = BuildSut(auth);
+
+        GetNtHashReply reply = await sut.GetNtHash(
+            new GetNtHashRequest { Username = "alice" },
+            new UnitServerCallContext());
+
+        Assert.False(reply.Found);
+        Assert.All(sourceHash, value => Assert.Equal((byte)0, value));
+    }
+
+    [Fact]
     public async Task ListUsers_ExportsOneBoundedPageWithContinuationMetadata()
     {
         var auth = new Mock<IAuthenticationLookup>();
+        byte[] sourceHash = Convert.FromHexString(
+            "0123456789ABCDEF0123456789ABCDEF");
         auth.Setup(lookup => lookup.GetSambaCredentialBatchAsync(
                 0,
                 AuthGrpcService.MaximumPageSize,
@@ -24,8 +64,7 @@ public sealed class AuthGrpcServiceUserExportTests
                 [
                     new SambaCredential(
                         "alice",
-                        Convert.FromHexString(
-                            "0123456789ABCDEF0123456789ABCDEF")),
+                        sourceHash),
                 ],
                 ["broken"],
                 AuthGrpcService.MaximumPageSize,
@@ -46,6 +85,10 @@ public sealed class AuthGrpcServiceUserExportTests
             reply.NextOffset);
         Assert.True(reply.HasMore);
         Assert.NotEmpty(reply.ContinuationToken);
+        Assert.Equal(
+            Convert.FromHexString("0123456789ABCDEF0123456789ABCDEF"),
+            Assert.Single(reply.Users).NtHash.ToByteArray());
+        Assert.All(sourceHash, value => Assert.Equal((byte)0, value));
         auth.Verify(lookup => lookup.GetSambaCredentialBatchAsync(
             0,
             AuthGrpcService.MaximumPageSize,

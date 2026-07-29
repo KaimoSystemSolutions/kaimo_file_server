@@ -1,5 +1,6 @@
 using Google.Protobuf;
 using Grpc.Core;
+using System.Security.Cryptography;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.SmbBridge.Grpc;
@@ -41,14 +42,26 @@ public sealed class AuthGrpcService : AuthService.AuthServiceBase
             context?.CancellationToken ?? CancellationToken.None;
         byte[]? hash = await _auth.GetNtHashAsync(request.Username)
             .WaitAsync(cancellationToken);
-        if (hash is not { Length: 16 })
+        if (hash is null)
             return new GetNtHashReply { Found = false };
-
-        return new GetNtHashReply
+        if (hash.Length != 16)
         {
-            Found = true,
-            NtHash = ByteString.CopyFrom(hash),
-        };
+            CryptographicOperations.ZeroMemory(hash);
+            return new GetNtHashReply { Found = false };
+        }
+
+        try
+        {
+            return new GetNtHashReply
+            {
+                Found = true,
+                NtHash = ByteString.CopyFrom(hash),
+            };
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(hash);
+        }
     }
 
     public override async Task<ListUsersReply> ListUsers(
@@ -118,77 +131,88 @@ public sealed class AuthGrpcService : AuthService.AuthServiceBase
                 offset,
                 pageSize,
                 cancellationToken);
-        if (batch.SourceCount < 0
-            || batch.SourceCount > pageSize
-            || (batch.HasMore && batch.SourceCount != pageSize)
-            || batch.Credentials.Count > batch.SourceCount
-            || batch.RejectedUsernames.Count > batch.SourceCount
-            || batch.Credentials.Count + batch.RejectedUsernames.Count
-                > batch.SourceCount)
+        try
         {
-            _logger.LogError(
-                "NT-hash export produced invalid batch metadata at offset {Offset}: source count {SourceCount}, page size {PageSize}, has more {HasMore}.",
-                offset,
-                batch.SourceCount,
-                pageSize,
-                batch.HasMore);
-            throw new RpcException(new Status(
-                StatusCode.Internal,
-                "Credential batch metadata is inconsistent."));
-        }
-
-        var reply = new ListUsersReply();
-        foreach (SambaCredential credential in batch.Credentials)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!SambaName.IsValidUsername(credential.Username)
-                || credential.NtHash is not { Length: 16 })
+            if (batch.SourceCount < 0
+                || batch.SourceCount > pageSize
+                || (batch.HasMore && batch.SourceCount != pageSize)
+                || batch.Credentials.Count > batch.SourceCount
+                || batch.RejectedUsernames.Count > batch.SourceCount
+                || batch.Credentials.Count + batch.RejectedUsernames.Count
+                    > batch.SourceCount)
             {
-                _logger.LogWarning(
-                    "NT-hash export rejected an invalid in-memory credential record.");
-                continue;
+                _logger.LogError(
+                    "NT-hash export produced invalid batch metadata at offset {Offset}: source count {SourceCount}, page size {PageSize}, has more {HasMore}.",
+                    offset,
+                    batch.SourceCount,
+                    pageSize,
+                    batch.HasMore);
+                throw new RpcException(new Status(
+                    StatusCode.Internal,
+                    "Credential batch metadata is inconsistent."));
             }
 
-            reply.Users.Add(new UserEntry
+            var reply = new ListUsersReply();
+            foreach (SambaCredential credential in batch.Credentials)
             {
-                Username = credential.Username,
-                NtHash = ByteString.CopyFrom(credential.NtHash),
-            });
-        }
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!SambaName.IsValidUsername(credential.Username)
+                    || credential.NtHash is not { Length: 16 })
+                {
+                    _logger.LogWarning(
+                        "NT-hash export rejected an invalid in-memory credential record.");
+                    continue;
+                }
 
-        int nextOffset = checked(offset + batch.SourceCount);
-        if (nextOffset > MaximumExportUsers
-            || (batch.HasMore && nextOffset >= MaximumExportUsers))
-        {
-            throw new RpcException(new Status(
-                StatusCode.ResourceExhausted,
-                $"NT-hash export exceeds the {MaximumExportUsers}-user safety limit."));
-        }
+                reply.Users.Add(new UserEntry
+                {
+                    Username = credential.Username,
+                    NtHash = ByteString.CopyFrom(credential.NtHash),
+                });
+            }
 
-        reply.HasMore = batch.HasMore;
-        reply.NextOffset = checked((uint)nextOffset);
-        reply.RejectedUsers = checked((uint)batch.RejectedUsernames.Count);
-        if (reply.HasMore)
-        {
-            reply.ContinuationToken =
-                _rateLimiter.CreateContinuationToken(
-                    clientId,
-                    reply.NextOffset);
-        }
-        if (batch.RejectedUsernames.Count > 0)
-        {
-            _logger.LogWarning(
-                "NT-hash export skipped {RejectedCount} invalid credential rows in the current page.",
-                batch.RejectedUsernames.Count);
-        }
+            int nextOffset = checked(offset + batch.SourceCount);
+            if (nextOffset > MaximumExportUsers
+                || (batch.HasMore && nextOffset >= MaximumExportUsers))
+            {
+                throw new RpcException(new Status(
+                    StatusCode.ResourceExhausted,
+                    $"NT-hash export exceeds the {MaximumExportUsers}-user safety limit."));
+            }
 
-        _logger.LogInformation(
-            "NT-hash export page completed for control-plane client {ClientId}: {Count} active users, {RejectedCount} rejected rows, has more {HasMore}.",
-            clientId,
-            reply.Users.Count,
-            reply.RejectedUsers,
-            reply.HasMore);
-        return reply;
+            reply.HasMore = batch.HasMore;
+            reply.NextOffset = checked((uint)nextOffset);
+            reply.RejectedUsers = checked((uint)batch.RejectedUsernames.Count);
+            if (reply.HasMore)
+            {
+                reply.ContinuationToken =
+                    _rateLimiter.CreateContinuationToken(
+                        clientId,
+                        reply.NextOffset);
+            }
+            if (batch.RejectedUsernames.Count > 0)
+            {
+                _logger.LogWarning(
+                    "NT-hash export skipped {RejectedCount} invalid credential rows in the current page.",
+                    batch.RejectedUsernames.Count);
+            }
+
+            _logger.LogInformation(
+                "NT-hash export page completed for control-plane client {ClientId}: {Count} active users, {RejectedCount} rejected rows, has more {HasMore}.",
+                clientId,
+                reply.Users.Count,
+                reply.RejectedUsers,
+                reply.HasMore);
+            return reply;
+        }
+        finally
+        {
+            foreach (SambaCredential credential in batch.Credentials)
+            {
+                if (credential.NtHash is not null)
+                    CryptographicOperations.ZeroMemory(credential.NtHash);
+            }
+        }
     }
 
     private static string ResolveClientId(ServerCallContext context)

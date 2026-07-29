@@ -263,9 +263,49 @@ periodic run and remain part of the P2-13 revocation-SLA work.
 
 ### P2-11: Decrypted credentials are not minimized or cleared
 
+> **Remediation status (2026-07-29): Implemented, regression-tested, and
+> verified in the pinned Samba 4.19.5 build-runtime image. Live process-memory
+> and tmpfs-mount verification remain release gates.**
+
 NT hashes exist in managed byte arrays, protobuf copies, C++ strings, stdout capture, shell memory, and a temporary smbpasswd file.
 
 **Fix:** minimize copies and lifetime, avoid shell text transport, zero mutable buffers where practical, and never persist hashes beyond the import transaction.
+
+**Implemented fix:** the NT-hash protector now exposes a raw-byte decrypt path.
+Encrypted hashes are decoded directly from a mutable 32-byte ASCII plaintext
+buffer, and both that buffer and the decoded encryption blob are cleared in a
+`finally` block. Legacy hex rows are decoded directly from their already
+persisted string without making another plaintext string. Mutable key-derivation
+and encryption plaintext buffers are likewise cleared.
+
+The authentication lookup compares the raw 16-byte value against the
+empty-password hash and clears every rejected buffer. `AuthGrpcService` copies
+accepted bytes into protobuf and clears every lookup/batch-owned source array in
+`finally`, including metadata failures and cancellation. Protobuf necessarily
+owns its transport copy until serialization completes; managed runtimes cannot
+guarantee clearing immutable strings or internal serializer buffers.
+
+`kaimo_authsync` stores each retained hash in a move-only fixed 16-byte buffer.
+Move operations clear the source, protobuf fields are released immediately
+after copying, destruction wipes the retained bytes through a volatile write
+loop, and hexadecimal JSON is streamed directly without constructing another
+hash string.
+
+`sync-users.sh` no longer captures the complete JSON document in a shell
+variable. It writes exporter output to a random mode-0600 validation file,
+checks the byte limit, validates the complete schema, and unlinks that JSON
+before any Samba/POSIX mutation. The validated record file is unlinked as soon
+as the private `smbpasswd` import is assembled; the import file is unlinked
+immediately after `pdbedit` returns successfully, rather than at end of the
+complete reconciliation. Error paths retain the existing `EXIT` cleanup.
+Compose mounts `/run/kaimo-user-sync` as a root-owned 0700 `tmpfs` with
+`noexec,nosuid,nodev`, so transient hash-bearing files never enter the
+container's persistent writable layer.
+
+Hashes remain necessarily present for bounded periods in gRPC/protobuf, kernel
+pipe buffers, `jq`, `pdbedit`, and Samba's passdb import implementation. They
+are never passed in process arguments or environment variables, never logged,
+and are not retained in the durable managed-user state.
 
 ### P2-12: `authd` is not supervised independently
 

@@ -145,6 +145,18 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
   100,000-source-row ceiling, and the existing 16-MiB JSON ceiling. It emits no
   desired-state JSON until every page has completed, so `sync-users.sh` never
   reconciles a partial export.
+- **P2-11 minimized credential lifetime:** the bridge decrypts directly to raw
+  bytes, clears rejected values and source arrays after protobuf copies, and
+  avoids an additional managed plaintext hash string. `kaimo_authsync` retains
+  hashes in move-only fixed buffers, clears protobuf fields after copying, and
+  wipes retained bytes on move/destruction. The shell no longer captures the
+  JSON export in a variable: random mode-0600 JSON, validated-record, and
+  `smbpasswd` files are unlinked immediately after their respective validation,
+  assembly, and import phases. Compose backs `/run/kaimo-user-sync` with a
+  root-owned 0700 `tmpfs` (`noexec,nosuid,nodev`), and no credential is placed
+  in an argument, environment variable, log, or durable managed-user state.
+  Protobuf/serializer, pipe, `jq`, `pdbedit`, and Samba memory remain
+  necessarily credential-bearing only for their bounded operation lifetime.
 - **P2-01 exact connection context:** usernames and share names are stored as
   exact owned strings instead of fixed arrays. Account/share creation, VFS,
   `authd`, and every identity-bearing bridge RPC enforce the same 32-byte

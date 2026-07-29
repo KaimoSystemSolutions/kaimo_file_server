@@ -124,7 +124,11 @@ implemented; their required release verification remains tracked in milestone 4.
 - [x] Bulk user export uses bounded pages and projections, isolates corrupt
   credential rows, validates monotonic continuation metadata, and fails before
   emitting a partial desired-state document.
-- [ ] Credentials are not exposed in process arguments.
+- [x] Decrypted credential buffers are minimized and cleared where their
+  ownership is under application control; transient import files live on a
+  private tmpfs and are unlinked at the end of their processing phase.
+- [x] Credentials are not exposed in process arguments or environment
+  variables.
 
 ## 13. Decisions that must be made explicitly
 

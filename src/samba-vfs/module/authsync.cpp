@@ -6,6 +6,8 @@
 //
 // Also proves that gRPC works from the C/C++ environment of the Samba container
 // (last toolchain risk from Phase 0).
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -24,15 +26,61 @@ using kaimo::smb::bridge::v1::AuthService;
 using kaimo::smb::bridge::v1::ListUsersReply;
 using kaimo::smb::bridge::v1::ListUsersRequest;
 
-static std::string to_hex(const std::string& bytes) {
-    static const char* digits = "0123456789ABCDEF";
-    std::string out;
-    out.reserve(bytes.size() * 2);
-    for (unsigned char c : bytes) {
-        out.push_back(digits[c >> 4]);
-        out.push_back(digits[c & 0x0F]);
+static void secure_zero(void* data, std::size_t size) noexcept {
+    volatile unsigned char* current =
+        static_cast<volatile unsigned char*>(data);
+    while (size-- > 0) {
+        *current++ = 0;
     }
-    return out;
+}
+
+struct credential {
+    std::string username;
+    std::array<unsigned char, 16> nt_hash{};
+
+    credential(std::string name, const std::string& hash)
+        : username(std::move(name)) {
+        std::copy(hash.begin(), hash.end(), nt_hash.begin());
+    }
+
+    credential(const credential&) = delete;
+    credential& operator=(const credential&) = delete;
+
+    credential(credential&& other) noexcept
+        : username(std::move(other.username)), nt_hash(other.nt_hash) {
+        secure_zero(other.nt_hash.data(), other.nt_hash.size());
+    }
+
+    credential& operator=(credential&& other) noexcept {
+        if (this != &other) {
+            secure_zero(nt_hash.data(), nt_hash.size());
+            username = std::move(other.username);
+            nt_hash = other.nt_hash;
+            secure_zero(other.nt_hash.data(), other.nt_hash.size());
+        }
+        return *this;
+    }
+
+    ~credential() {
+        secure_zero(nt_hash.data(), nt_hash.size());
+    }
+};
+
+static void write_hex(std::ostream& output,
+                      const std::array<unsigned char, 16>& bytes) {
+    static constexpr char digits[] = "0123456789ABCDEF";
+    output.put('"');
+    for (unsigned char value : bytes) {
+        output.put(digits[value >> 4]);
+        output.put(digits[value & 0x0f]);
+    }
+    output.put('"');
+}
+
+static void clear_reply_hashes(ListUsersReply& reply) {
+    for (auto& user : *reply.mutable_users()) {
+        user.clear_nt_hash();
+    }
 }
 
 int main() {
@@ -59,7 +107,7 @@ int main() {
     std::uint32_t rejected_users = 0;
     std::string continuation_token;
     std::size_t estimated_json_bytes = 32;
-    std::vector<std::pair<std::string, std::string>> users;
+    std::vector<credential> users;
     users.reserve(page_size);
 
     for (;;) {
@@ -91,16 +139,18 @@ int main() {
                 > static_cast<std::uint64_t>(reply.next_offset() - offset)
             || (reply.has_more() && reply.continuation_token().empty())
             || (!reply.has_more() && !reply.continuation_token().empty())) {
+            clear_reply_hashes(reply);
             std::cerr << "kaimo_authsync: invalid pagination metadata rejected."
                       << std::endl;
             return 1;
         }
         rejected_users += reply.rejected_users();
 
-        for (const auto& user : reply.users()) {
+        for (auto& user : *reply.mutable_users()) {
             const std::string& hash = user.nt_hash();
             if (!kaimo::sync_json::valid_username(user.username())
                 || hash.size() != 16) {
+                clear_reply_hashes(reply);
                 std::cerr << "kaimo_authsync: invalid user record rejected."
                           << std::endl;
                 return 1;
@@ -108,12 +158,16 @@ int main() {
             estimated_json_bytes += user.username().size() + 80;
             if (users.size() >= maximum_users
                 || estimated_json_bytes > 16 * 1024 * 1024) {
+                clear_reply_hashes(reply);
                 std::cerr
                     << "kaimo_authsync: structured response exceeds safety limit."
                     << std::endl;
                 return 1;
             }
             users.emplace_back(user.username(), hash);
+            // The move-only credential owns the only application-level copy
+            // retained across pages. Release protobuf's mutable copy now.
+            user.clear_nt_hash();
         }
 
         if (!reply.has_more()) break;
@@ -127,11 +181,13 @@ int main() {
         if (!first) std::cout << ',';
         first = false;
         std::cout << "{\"username\":"
-                  << kaimo::sync_json::quote(user.first)
-                  << ",\"nt_hash\":"
-                  << kaimo::sync_json::quote(to_hex(user.second)) << '}';
+                  << kaimo::sync_json::quote(user.username)
+                  << ",\"nt_hash\":";
+        write_hex(std::cout, user.nt_hash);
+        std::cout << '}';
     }
     std::cout << "]}\n";
+    std::cout.flush();
     std::cerr << "kaimo_authsync: " << users.size()
               << " users received in bounded pages; " << rejected_users
               << " invalid credential rows skipped (addr=" << addr << ")."

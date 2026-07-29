@@ -20,4 +20,11 @@ public interface INtHashProtector
 
     /// <summary>Returns the plaintext NT-hash hex string for a stored value (encrypted or legacy plaintext).</summary>
     string Unprotect(string storedNtHash);
+
+    /// <summary>
+    /// Returns the decoded raw NT-hash bytes without materializing an
+    /// additional managed plaintext string. Implementations must reject
+    /// malformed hex and clear temporary plaintext buffers before returning.
+    /// </summary>
+    byte[] UnprotectToBytes(string storedNtHash);
 }

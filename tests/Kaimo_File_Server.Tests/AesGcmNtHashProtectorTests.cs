@@ -54,6 +54,29 @@ public class AesGcmNtHashProtectorTests
         Assert.Equal(SampleHash, sut.Unprotect(SampleHash));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnprotectToBytes_DecodesLegacyAndEncryptedValues(bool encrypted)
+    {
+        var sut = WithKey("some-server-secret");
+        string stored = encrypted ? sut.Protect(SampleHash) : SampleHash;
+
+        byte[] raw = sut.UnprotectToBytes(stored);
+
+        Assert.Equal(Convert.FromHexString(SampleHash), raw);
+    }
+
+    [Theory]
+    [InlineData("SHORT")]
+    [InlineData("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ")]
+    public void UnprotectToBytes_RejectsMalformedLegacyValues(string stored)
+    {
+        var sut = WithKey("some-server-secret");
+
+        Assert.Throws<FormatException>(() => sut.UnprotectToBytes(stored));
+    }
+
     [Fact]
     public void Protect_AlreadyEncrypted_IsNotDoubleWrapped()
     {
