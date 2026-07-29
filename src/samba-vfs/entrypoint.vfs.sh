@@ -129,10 +129,5 @@ done
 # The VFS module (connect hook) asks here "may <user> access <share>?".
 install -d -m 0750 -o root -g "$KAIMO_AUTHD_GROUP" /var/run/kaimo
 export KAIMO_AUTHD_SOCK="${KAIMO_AUTHD_SOCK:-/var/run/kaimo/authz.sock}"
-echo "[entrypoint] Starting kaimo_authd (Authz sidecar) ..."
-kaimo_authd &
-# Wait briefly for the socket, so first TREE_CONNECT doesn't hit empty.
-for i in $(seq 1 20); do [ -S "$KAIMO_AUTHD_SOCK" ] && break; sleep 0.2; done
-
-echo "[entrypoint] Starting self-built smbd (foreground) ..."
-exec smbd --foreground --no-process-group --debug-stdout
+echo "[entrypoint] Handing authd and smbd to the fail-fast supervisor ..."
+exec /usr/local/bin/supervise-samba.sh

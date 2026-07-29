@@ -94,7 +94,9 @@ implemented; their required release verification remains tracked in milestone 4.
 - [x] Bounded cache with expiry and documented maximum revocation delay.
 - [ ] Push invalidation exists for decisions that must revoke before TTL expiry.
 - [ ] Durable event spool and acknowledgement.
-- [ ] Sidecar health is supervised.
+- [x] `authd` and `smbd` are supervised as one fail-fast container unit;
+  readiness includes socket, protected PID state, live PID, and executable
+  identity. Live orchestrator restart timing remains a release gate.
 
 ### Bridge checklist
 

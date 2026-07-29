@@ -857,3 +857,160 @@ Those buffers are not exposed through a Kaimo persistence or logging boundary.
 **Next planned finding:** P2-12 — supervise `kaimo_authd` independently and make
 loss of the authorization sidecar transition the container to an unhealthy or
 restarted state within a bounded interval.
+
+### 2026-07-29 — P2-12: Fail-fast `authd`/`smbd` supervision
+
+**Status:** Implemented, regression-tested, and verified in the pinned Samba
+4.19.5 `build-runtime` image. Live container crash/restart timing remains a
+release gate.
+
+**Problem**
+
+The former entrypoint launched `kaimo_authd` with a background `&`, waited
+briefly for its socket, and then replaced PID 1 with foreground `smbd`. This
+created an asymmetric lifetime:
+
+1. `smbd` determined container lifetime, while `authd` had no owner observing
+   its exit status.
+2. An `authd` startup failure or later crash could leave the container running
+   indefinitely. Authorization would fail closed, but every new connect/open,
+   lifecycle delivery, and snapshot operation would remain unavailable until
+   an operator noticed and restarted the container.
+3. The existing healthcheck covered synchronization freshness and a local SMB
+   login/list probe, but it did not prove that the expected `authd` process
+   owned a live authorization socket.
+4. Container shutdown signals reached `smbd` as PID 1 but did not provide an
+   explicit bounded shutdown/reaping contract for the sidecar.
+
+Fail-closed VFS behavior prevents an authorization bypass, but permanent silent
+degradation is still an availability and operations defect. `authd` also owns
+event-spool delivery and snapshot bridge operations, so supervision must treat
+it as part of the Samba runtime rather than an optional helper.
+
+**Architecture decision**
+
+`kaimo_authd` and `smbd` are now one coupled container unit. The supervisor does
+not attempt an in-place sidecar restart while preserving `smbd`:
+
+- Existing SMB worker processes and handles may have observed the missing
+  sidecar. Restarting only `authd` would preserve an ambiguous partially
+  degraded session state.
+- Restarting the complete container closes sessions, recreates the local socket
+  trust boundary, recovers the durable lifecycle spool, and reruns user/share/
+  protocol reconciliation.
+- Compose's `restart: unless-stopped` supplies the restart policy. The
+  supervisor's responsibility is deterministic failure, signal forwarding,
+  partner termination, and child reaping.
+
+This intentionally favors a short explicit outage and clean security-unit
+restart over indefinite fail-closed service degradation.
+
+**Implemented**
+
+1. Added `supervise-samba.sh` as the final PID-1 process. The entrypoint
+   completes storage preparation and initial synchronization, creates the
+   protected authd runtime directory, then `exec`s the supervisor.
+2. Before launch, the supervisor removes only a genuine stale Unix socket and
+   refuses a symlink or non-socket object at the configured path.
+3. `kaimo_authd` starts first. The supervisor checks process liveness while
+   waiting for the Unix socket and refuses to start `smbd` unless readiness is
+   reached within 50 100-ms attempts (five seconds by default).
+4. Once ready, the supervisor atomically publishes the authd PID through a
+   same-directory temporary file and rename. The readiness file is mode 0600
+   under the root-owned, non-group-writable runtime directory.
+5. `smbd` starts only after socket readiness and PID publication. Both
+   long-running PIDs are passed explicitly to `wait -n`; unrelated periodic
+   reconciliation children cannot be mistaken for a supervised-process exit.
+6. Any `authd` or `smbd` exit terminates the peer. A non-zero child status is
+   propagated; a zero status is converted to failure because a clean exit is
+   still unexpected for this long-running container unit.
+7. HUP, INT, QUIT, and TERM traps forward termination to both children. A
+   watchdog enforces the bounded shutdown grace and sends SIGKILL after five
+   seconds by default. Both child statuses are reaped before PID 1 exits.
+8. Socket and PID readiness state are removed after shutdown or peer failure,
+   preventing a stale health success during restart.
+9. Readiness attempts are validated in the inclusive range 1-600. Shutdown
+   grace is validated in the inclusive range 1-30 seconds. Invalid values fail
+   before either runtime process starts.
+10. Added `authd-health.sh`. It requires:
+    - a live Unix socket;
+    - a regular, non-symlink, root-owned mode-0600 supervisor PID file;
+    - a positive numeric live PID; and
+    - an exact canonical `/proc/<pid>/exe` match to the installed
+      `kaimo_authd` executable.
+11. The Compose healthcheck evaluates authd identity before synchronization
+    freshness and the existing SMB login/list probe.
+12. The Samba service now declares `restart: unless-stopped`. An unexpected
+    supervised-process exit therefore restarts the entire Samba security unit;
+    an explicit operator stop remains stopped.
+
+**Regression coverage**
+
+`test-authd-supervisor.sh` runs the production supervisor and health script
+against stateful authd/smbd test processes and proves:
+
+- ready socket + protected PID state + matching executable pass health;
+- terminating `authd` fails PID 1, terminates `smbd`, removes readiness, and
+  makes health fail;
+- an `authd` status 23 before readiness is propagated and `smbd` never starts;
+- a clean `smbd` exit is converted to container failure, terminates `authd`,
+  and removes its PID state; and
+- SIGTERM sent to PID 1 reaches both children, both are reaped, and the
+  supervisor returns the conventional status 143.
+
+The test uses a one-second grace to keep failure coverage fast; production
+retains the validated five-second default.
+
+**Validation completed**
+
+- The supervisor/health shell regression passes all four lifecycle scenarios.
+- The existing user/share/config synchronization regressions continue to pass
+  in the same image build.
+- The pinned Samba 4.19.5 `build-runtime` image
+  `kaimo-samba-build-tests:p2-12` builds successfully. The final runtime package
+  contains the supervisor and health scripts alongside the real authd, smbd,
+  helpers, and ABI-49 VFS module.
+- The slim production stage builds as
+  `kaimo-samba-runtime-tests:p2-12`. A direct container assertion confirms
+  `supervise-samba.sh`, `authd-health.sh`, `kaimo_authd`, and the self-built
+  `smbd` are all present and executable in that final image.
+- `docker compose config` succeeds. The resolved Samba service retains both
+  `restart: unless-stopped` and the `authd-health.sh`-first health command.
+- The complete managed test project remains green: 647/647 tests, zero
+  skipped.
+- `git diff --check` passes.
+
+**Operational behavior**
+
+- Persistent bridge unavailability does not itself kill `authd`; requests
+  continue to fail closed and event delivery retries through the durable spool.
+  P2-12 supervises process availability, not downstream bridge health.
+- A crashing/misconfigured `authd` may enter an intentional Compose restart
+  loop. Logs retain the child status or readiness failure that caused each
+  restart. This is preferable to presenting a nominally running Samba service
+  that cannot authorize or deliver lifecycle work.
+- Complete-unit restart disconnects active SMB sessions. This is an explicit
+  consequence of restoring a clean authorization boundary and must be included
+  in availability/runbook expectations.
+- Docker restart backoff and deployment-orchestrator alerting remain platform
+  concerns; the container now emits an unambiguous non-zero failure for them to
+  act on.
+
+**Validation still required**
+
+- In the deployable stack, send SIGKILL to the real `kaimo_authd`; measure time
+  until PID 1 exits, confirm `smbd` and active sessions terminate, observe
+  Compose restart, and verify the service returns healthy after initial
+  reconciliation.
+- Repeat with real `smbd` failure and confirm `authd` is reaped and the durable
+  event spool is recovered after restart.
+- Stop the complete container normally and confirm signal forwarding finishes
+  within the five-second grace without SIGKILL or orphan processes.
+- Replace/remove the authd socket and PID file independently and verify health
+  transitions on the next probe even before a process exit is observed.
+- Force persistent authd configuration failure and verify restart-loop logging,
+  operator alerting, and recovery after configuration correction.
+
+**Next planned finding:** P2-13 — define the accepted user/service/share
+revocation SLA, reduce or eliminate polling windows, and specify how already
+open sessions and handles are terminated.

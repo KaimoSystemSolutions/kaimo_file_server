@@ -99,6 +99,10 @@ services:
   kaimo_samba:
     image: ${DOCKER_REGISTRY-}kaimosamba
     container_name: kaimo_samba
+    # authd and smbd are one supervised security unit. Any unexpected exit
+    # fails the container; restart the complete unit instead of leaving Samba
+    # alive indefinitely without its authorization sidecar.
+    restart: unless-stopped
     logging: *bounded-logging
     # Neutralize search domain inherited from host (e.g., home.lab). Otherwise the
     # gRPC C++ client (c-ares, NOT glibc/NSS) appends it to the bridge service name
@@ -183,7 +187,7 @@ services:
       - default
       - kaimo_smb_control
     healthcheck:
-      test: ["CMD-SHELL", "/usr/local/bin/sync-health.sh && /opt/samba/bin/smbclient -L localhost -U kaimotest%Passw0rd! -m SMB3 >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "/usr/local/bin/authd-health.sh && /usr/local/bin/sync-health.sh && /opt/samba/bin/smbclient -L localhost -U kaimotest%Passw0rd! -m SMB3 >/dev/null 2>&1 || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 6

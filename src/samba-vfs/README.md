@@ -157,6 +157,18 @@ a wrong password is rejected. The NT hashes come live from the Kaimo DB.
   in an argument, environment variable, log, or durable managed-user state.
   Protobuf/serializer, pipe, `jq`, `pdbedit`, and Samba memory remain
   necessarily credential-bearing only for their bounded operation lifetime.
+- **P2-12 fail-fast sidecar supervision:** the entrypoint hands PID 1 to
+  `supervise-samba.sh`. It starts `kaimo_authd`, waits at most five seconds for
+  the protected Unix socket, publishes a root-owned mode-0600 PID file, and
+  starts `smbd` only afterward. If either long-running process exits, the
+  supervisor terminates and reaps the peer, removes readiness state, and exits
+  non-zero. Container signals are forwarded to both processes with a bounded
+  five-second shutdown grace. `authd-health.sh` additionally validates socket,
+  PID-file ownership/mode, process liveness, and exact `/proc/<pid>/exe`
+  identity before the existing sync/SMB probes run. Compose uses
+  `restart: unless-stopped`, so a sidecar crash restarts the complete Samba
+  security unit rather than leaving `smbd` alive in permanent fail-closed
+  degradation.
 - **P2-01 exact connection context:** usernames and share names are stored as
   exact owned strings instead of fixed arrays. Account/share creation, VFS,
   `authd`, and every identity-bearing bridge RPC enforce the same 32-byte

@@ -309,9 +309,35 @@ and are not retained in the durable managed-user state.
 
 ### P2-12: `authd` is not supervised independently
 
+> **Remediation status (2026-07-29): Implemented, regression-tested, and
+> verified in the pinned Samba 4.19.5 build-runtime and slim runtime images.
+> Live crash/restart behavior remains a release gate.**
+
 The entrypoint starts `kaimo_authd` in the background and then replaces itself with `smbd`. If `authd` exits, the container can remain nominally running while authorization fails closed indefinitely.
 
 **Fix:** use a proper init/supervisor or merge process health into container health. Restart/fail the container when the sidecar is unavailable beyond a short threshold.
+
+**Implemented fix:** `supervise-samba.sh` is now the container's final PID-1
+process. It starts `kaimo_authd`, requires its Unix socket within a bounded
+five-second readiness window, atomically publishes a root-owned mode-0600 PID
+file, and only then starts `smbd`. It waits for both long-running processes. An
+exit by either process terminates and reaps the peer, removes socket/PID
+readiness state, and exits non-zero; even a clean child exit is abnormal for
+the container unit. HUP, INT, QUIT, and TERM are forwarded to both children,
+with a bounded five-second grace period before SIGKILL.
+
+`authd-health.sh` independently requires the Unix socket, a non-symlink
+root-owned mode-0600 supervisor PID file, a live PID, and an exact
+`/proc/<pid>/exe` match to the installed `kaimo_authd` binary. The Compose
+healthcheck runs this before synchronization and SMB login probes. The Samba
+service uses `restart: unless-stopped`, so an unexpected `authd` or `smbd` exit
+restarts the complete coupled unit instead of preserving SMB sessions against
+a missing authorization/event/snapshot sidecar.
+
+The supervisor refuses an unsafe pre-existing socket path and rejects invalid
+readiness-attempt or shutdown-grace configuration. Startup readiness is bounded
+to 1-600 100-ms attempts; shutdown grace is bounded to 1-30 seconds. Production
+defaults are 50 attempts (five seconds) and five seconds respectively.
 
 ### P2-13: Disabled service/share behavior is polling-based
 
