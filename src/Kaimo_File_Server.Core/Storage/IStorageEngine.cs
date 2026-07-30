@@ -5,6 +5,11 @@ namespace Kaimo_File_Server.Core.Storage
     public interface IStorageEngine
     {
         Task<Stream> ReadAsync(string path);
+        /// <summary>
+        /// Replaces the destination atomically after the complete input stream has
+        /// been persisted. A failed or cancelled write must leave an existing
+        /// destination unchanged and must not publish a partial new file.
+        /// </summary>
         Task WriteAsync(string path, Stream data, CancellationToken cancellationToken = default);
         Task CreateDirectory(string path);
         Task DeleteAsync(string path);

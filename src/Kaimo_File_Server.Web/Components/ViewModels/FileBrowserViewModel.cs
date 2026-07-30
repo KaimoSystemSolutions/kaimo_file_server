@@ -957,17 +957,6 @@ public class FileBrowserViewModel
         {
             _logger.LogError(ex, "Upload failed for '{Path}'", targetPath);
 
-            // Clean up the partial file
-            try
-            {
-                await _fileService.DeleteFileAsync(targetPath, userContext, isRecycleEnabled: false);
-                _logger.LogInformation("Cleaned up partial upload: '{Path}'", targetPath);
-            }
-            catch (Exception cleanupEx)
-            {
-                _logger.LogWarning(cleanupEx, "Failed to clean up partial upload: '{Path}'", targetPath);
-            }
-
             return ex switch
             {
                 OperationCanceledException => OperationResult.Fail(Resources.Web_Upload_Aborted),

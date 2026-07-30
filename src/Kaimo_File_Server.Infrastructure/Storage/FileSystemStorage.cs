@@ -221,19 +221,47 @@ public class FileSystemStorage : IStorageEngine
     {
         var fullPath = ToAbsolutePath(path);
         Stream stream = new FileStream(
-            fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true);
+            fullPath, FileMode.Open, FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete, 4096, true);
         return Task.FromResult(stream);
     }
 
     public async Task WriteAsync(string path, Stream data, CancellationToken cancellationToken = default)
     {
         var fullPath = ToAbsolutePath(path);
-        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        var parentPath = Path.GetDirectoryName(fullPath)!;
+        Directory.CreateDirectory(parentPath);
 
-        await using var file = new FileStream(
-            fullPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite, 4096, true);
-        
-        await data.CopyToAsync(file, cancellationToken);
+        // Publish only a completely persisted file. In particular, an interrupted
+        // web overwrite must never truncate or delete the previous destination.
+        var tempPath = Path.Combine(
+            parentPath,
+            $".{Path.GetFileName(fullPath)}.kaimo-{Guid.NewGuid():N}.tmp");
+
+        try
+        {
+            await using (var file = new FileStream(
+                tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                81920, FileOptions.Asynchronous | FileOptions.SequentialScan))
+            {
+                await data.CopyToAsync(file, cancellationToken);
+                await file.FlushAsync(cancellationToken);
+                file.Flush(flushToDisk: true);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (File.Exists(fullPath))
+                File.Replace(tempPath, fullPath, destinationBackupFileName: null);
+            else
+                File.Move(tempPath, fullPath);
+        }
+        finally
+        {
+            // No-op after the successful move; removes only unpublished data after
+            // cancellation/failure and never touches the requested destination.
+            try { File.Delete(tempPath); }
+            catch { /* preserve the original write exception */ }
+        }
     }
 
     public Task SetModifiedDateAsync(string path, DateTime time)

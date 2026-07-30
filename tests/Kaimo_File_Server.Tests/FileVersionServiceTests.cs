@@ -52,6 +52,13 @@ public class FileVersionServiceTests : IDisposable
         return Convert.ToHexString(sha.ComputeHash(data));
     }
 
+    private string BlobPathFor(byte[] data)
+    {
+        var hash = ComputeHash(data);
+        return Path.Combine(
+            _versionRoot, hash[..2], hash[2..4], hash + ".bin.gz");
+    }
+
     // ═══════════════════════════════════════════
     //  Version Creation
     // ═══════════════════════════════════════════
@@ -197,6 +204,46 @@ public class FileVersionServiceTests : IDisposable
         Assert.Empty(Directory.GetFiles(root, "*.bin.gz", SearchOption.AllDirectories));
     }
 
+    [Fact]
+    public async Task CreateVersionAsync_CorruptExistingBlob_IsReplacedBeforeUse()
+    {
+        var data = System.Text.Encoding.UTF8.GetBytes("repair this blob");
+        var blobPath = BlobPathFor(data);
+        Directory.CreateDirectory(Path.GetDirectoryName(blobPath)!);
+        await File.WriteAllBytesAsync(blobPath, [1, 2, 3, 4]);
+
+        var version = await _sut.CreateVersionAsync(
+            ShareA, "repair.txt", ToStream(data));
+        await using var restored = await _sut.ReadVersionAsync(
+            ShareA, "repair.txt", version!.SnapshotTimestampUtc);
+        using var copy = new MemoryStream();
+        await restored.CopyToAsync(copy);
+
+        Assert.Equal(data, copy.ToArray());
+        Assert.Empty(Directory.GetFiles(
+            Path.GetDirectoryName(blobPath)!, "*.tmp"));
+    }
+
+    [Fact]
+    public async Task CreateVersionAsync_UnchangedVersion_RepairsCorruptReferencedBlob()
+    {
+        var data = System.Text.Encoding.UTF8.GetBytes("referenced repair");
+        var version = await _sut.CreateVersionAsync(
+            ShareA, "same.txt", ToStream(data));
+        var blobPath = Path.Combine(_versionRoot, version!.StoragePath);
+        await File.WriteAllBytesAsync(blobPath, [1, 2, 3, 4]);
+
+        var duplicate = await _sut.CreateVersionAsync(
+            ShareA, "same.txt", ToStream(data));
+        await using var restored = await _sut.ReadVersionAsync(
+            ShareA, "same.txt", version.SnapshotTimestampUtc);
+        using var copy = new MemoryStream();
+        await restored.CopyToAsync(copy);
+
+        Assert.Null(duplicate);
+        Assert.Equal(data, copy.ToArray());
+    }
+
     // ═══════════════════════════════════════════
     //  Version Reading
     // ═══════════════════════════════════════════
@@ -284,6 +331,19 @@ public class FileVersionServiceTests : IDisposable
 
         await stream.DisposeAsync();
         Assert.Empty(Directory.GetFiles(cacheDir, "*.tmp"));
+    }
+
+    [Fact]
+    public async Task ReadVersionAsync_CorruptBlob_ThrowsAndReturnsNoPartialStream()
+    {
+        var version = await _sut.CreateVersionAsync(
+            ShareA, "corrupt.txt", ToStream("valid content"));
+        var blobPath = Path.Combine(_versionRoot, version!.StoragePath);
+        await File.WriteAllBytesAsync(blobPath, [1, 2, 3, 4]);
+
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            _sut.ReadVersionAsync(
+                ShareA, "corrupt.txt", version.SnapshotTimestampUtc));
     }
 
     // ═══════════════════════════════════════════

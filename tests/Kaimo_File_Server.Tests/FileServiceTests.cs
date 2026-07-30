@@ -707,6 +707,37 @@ public class FileServiceTests
             () => _sut.OpenAsync("/doc.txt", OpenMode.Open, AccessIntent.Read, ShareIntent.Read, ctx));
     }
 
+    [Fact]
+    public async Task RestoreFileVersionAsync_CorruptVersion_DoesNotWriteLiveFile()
+    {
+        var ctx = CreateContext();
+        var versionService = new Mock<IFileVersionService>();
+        var service = new FileService(
+            _storageMock.Object, _aclMock.Object, null, _shareId,
+            versionService.Object);
+        var timestamp = DateTime.UtcNow;
+
+        AllowAccess(FilePermission.CreateWriteData);
+        _storageMock.Setup(s => s.ExistsAsync("document.txt")).ReturnsAsync(true);
+        _storageMock.Setup(s => s.ReadAsync("document.txt"))
+            .ReturnsAsync(new MemoryStream([1, 2, 3]));
+        versionService
+            .Setup(v => v.CreateVersionAsync(
+                _shareId, "document.txt", It.IsAny<Stream>(), It.IsAny<string?>()))
+            .ReturnsAsync((FileVersion?)null);
+        versionService
+            .Setup(v => v.ReadVersionAsync(_shareId, "document.txt", timestamp))
+            .ThrowsAsync(new InvalidDataException("corrupt version blob"));
+
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            service.RestoreFileVersionAsync("document.txt", timestamp, ctx));
+
+        _storageMock.Verify(
+            s => s.WriteAsync(
+                It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     // ═══════════════════ Directory operations ═══════════════════
 
     [Fact]

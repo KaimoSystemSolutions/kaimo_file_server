@@ -922,7 +922,10 @@ public class FileService : IFileService
             await _versionService.CreateVersionAsync(_shareId, normalized, current, user.User.Id.ToString());
         }
 
-        // Overwrite the live file with the chosen version's content.
+        // ReadVersionAsync fully decompresses and verifies size/hash before it
+        // returns. IStorageEngine.WriteAsync then publishes the verified content
+        // atomically, so a corrupt snapshot or failed write leaves the live file
+        // untouched.
         await using var restored = await _versionService.ReadVersionAsync(_shareId, normalized, snapshotTimestampUtc);
         await _storage.WriteAsync(normalized, restored);
 

@@ -71,36 +71,38 @@ public class FileVersionService : IFileVersionService
         var hash = await ComputeHashAsync(content);
         content.Position = 0;
 
-        // 2. Skip if content unchanged since last version
-        if (await _versionRepo.ExistsWithHashAsync(shareId, normalizedPath, hash))
-            return null;
+        var contentSize = content.Length;
+        var versionAlreadyExists =
+            await _versionRepo.ExistsWithHashAsync(shareId, normalizedPath, hash);
 
-        // 3. Store blob compressed (content-addressable)
+        // 2. Store the blob compressed (content-addressable). Even when the
+        // version record already exists, validate/repair its physical blob before
+        // returning so a crash-left partial file cannot become permanent.
         var blobRelativePath = HashToPath(hash);
         var blobFullPath = Path.Combine(_versionStorageRoot, blobRelativePath);
         long compressedSize;
         var createdBlob = false;
-        FileVersion version;
-        int versionNumber;
+        FileVersion? version = null;
+        int versionNumber = 0;
 
         var blobLock = GetBlobLock(blobFullPath);
         await blobLock.WaitAsync();
         try
         {
-            if (!System.IO.File.Exists(blobFullPath))
+            var blobExisted = System.IO.File.Exists(blobFullPath);
+            var blobIsValid = blobExisted
+                && await ValidateBlobAsync(blobFullPath, hash, contentSize, Stream.Null);
+
+            if (!blobIsValid)
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(blobFullPath)!);
+                if (blobExisted)
+                    _logger.LogWarning(
+                        "Replacing corrupt version blob {StoragePath}", blobRelativePath);
 
-                await using var fs = new FileStream(
-                    blobFullPath, FileMode.CreateNew,
-                    FileAccess.Write, FileShare.None, 4096, true);
-                await using var gzip = new GZipStream(fs, CompressionLevel.Optimal, leaveOpen: true);
-
-                await content.CopyToAsync(gzip);
-                await gzip.FlushAsync();
-
-                compressedSize = fs.Length;
-                createdBlob = true;
+                content.Position = 0;
+                compressedSize = await WriteValidatedBlobAsync(
+                    blobFullPath, content, hash, contentSize);
+                createdBlob = !blobExisted;
             }
             else
             {
@@ -109,7 +111,10 @@ public class FileVersionService : IFileVersionService
 
             content.Position = 0;
 
-            // 4. Create version record while holding the blob stripe. A concurrent
+            if (versionAlreadyExists)
+                return null;
+
+            // 3. Create version record while holding the blob stripe. A concurrent
             // delete cannot reclaim the blob between the existence check and insert.
             versionNumber = await _versionRepo.GetMaxVersionNumberAsync(shareId, normalizedPath) + 1;
             var now = TruncateToSeconds(_timeProvider.GetUtcNow().UtcDateTime);
@@ -124,7 +129,7 @@ public class FileVersionService : IFileVersionService
                 snapshotTimestampUtc: now,
                 storagePath: blobRelativePath,
                 contentHash: hash,
-                size: content.Length,
+                size: contentSize,
                 createdBy: userId,
                 versionNumber: versionNumber);
 
@@ -145,13 +150,13 @@ public class FileVersionService : IFileVersionService
 
         if (_logger.IsEnabled(LogLevel.Debug))
             _logger.LogDebug(LogEvents.FileVersionCreated, LogMessages.FileVersionCreated,
-                versionNumber, normalizedPath, content.Length, compressedSize,
-                ((double)compressedSize / Math.Max(content.Length, 1)).ToString("P0"));
+                versionNumber, normalizedPath, contentSize, compressedSize,
+                ((double)compressedSize / Math.Max(contentSize, 1)).ToString("P0"));
 
-        // 5. Enforce retention
+        // 4. Enforce retention
         await ApplyRetentionAsync(shareId, normalizedPath, _defaultMaxVersions, _defaultMaxAge);
 
-        return version;
+        return version!;
     }
 
     public async Task<Stream> ReadVersionAsync(
@@ -195,11 +200,9 @@ public class FileVersionService : IFileVersionService
 
         try
         {
-            await using var fs = new FileStream(
-                blobFullPath, FileMode.Open,
-                FileAccess.Read, FileShare.Read | FileShare.Delete, 4096, true);
-            await using var gzip = new GZipStream(fs, CompressionMode.Decompress);
-            await gzip.CopyToAsync(output, cancellationToken);
+            await ValidateBlobAsync(
+                blobFullPath, version.ContentHash, version.Size, output,
+                cancellationToken, throwOnInvalid: true);
             output.Position = 0;
             return output;
         }
@@ -311,6 +314,89 @@ public class FileVersionService : IFileVersionService
         using var sha256 = SHA256.Create();
         var hashBytes = await sha256.ComputeHashAsync(stream);
         return Convert.ToHexString(hashBytes);
+    }
+
+    private static async Task<long> WriteValidatedBlobAsync(
+        string blobFullPath, Stream content, string expectedHash, long expectedSize)
+    {
+        var directory = Path.GetDirectoryName(blobFullPath)!;
+        Directory.CreateDirectory(directory);
+        var tempPath = Path.Combine(
+            directory,
+            $".{Path.GetFileName(blobFullPath)}.{Guid.NewGuid():N}.tmp");
+
+        try
+        {
+            await using (var fs = new FileStream(
+                tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                81920, FileOptions.Asynchronous | FileOptions.SequentialScan))
+            {
+                await using (var gzip = new GZipStream(
+                    fs, CompressionLevel.Optimal, leaveOpen: true))
+                {
+                    await content.CopyToAsync(gzip);
+                }
+
+                await fs.FlushAsync();
+                fs.Flush(flushToDisk: true);
+            }
+
+            await ValidateBlobAsync(
+                tempPath, expectedHash, expectedSize, Stream.Null,
+                CancellationToken.None, throwOnInvalid: true);
+
+            var compressedSize = new FileInfo(tempPath).Length;
+            System.IO.File.Move(tempPath, blobFullPath, overwrite: true);
+            return compressedSize;
+        }
+        finally
+        {
+            try { System.IO.File.Delete(tempPath); }
+            catch { /* preserve the compression/validation exception */ }
+        }
+    }
+
+    private static async Task<bool> ValidateBlobAsync(
+        string blobFullPath, string expectedHash, long expectedSize, Stream output,
+        CancellationToken cancellationToken = default, bool throwOnInvalid = false)
+    {
+        try
+        {
+            await using var fs = new FileStream(
+                blobFullPath, FileMode.Open, FileAccess.Read,
+                FileShare.Read | FileShare.Delete, 81920,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            await using var gzip = new GZipStream(fs, CompressionMode.Decompress);
+            using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+
+            var buffer = new byte[81920];
+            long actualSize = 0;
+            while (true)
+            {
+                var read = await gzip.ReadAsync(buffer, cancellationToken);
+                if (read == 0) break;
+
+                actualSize = checked(actualSize + read);
+                hasher.AppendData(buffer, 0, read);
+                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+            }
+
+            var actualHash = Convert.ToHexString(hasher.GetHashAndReset());
+            if (actualSize == expectedSize
+                && string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (!throwOnInvalid)
+                return false;
+
+            throw new InvalidDataException(
+                $"Version blob integrity check failed. Expected {expectedSize} bytes/{expectedHash}, " +
+                $"got {actualSize} bytes/{actualHash}.");
+        }
+        catch (InvalidDataException) when (!throwOnInvalid)
+        {
+            return false;
+        }
     }
 
     /// <summary>

@@ -181,6 +181,50 @@ public class FileSystemStorageTests : IDisposable
         Assert.Equal([9, 8], content);
     }
 
+    [Fact]
+    public async Task WriteAsync_CancelledOverwrite_PreservesExistingFile()
+    {
+        var fullPath = Path.Combine(_testRoot, "preserved.txt");
+        await File.WriteAllBytesAsync(fullPath, [1, 2, 3, 4]);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            _sut.WriteAsync("preserved.txt", new MemoryStream([9, 8]), cts.Token));
+
+        Assert.Equal([1, 2, 3, 4], await File.ReadAllBytesAsync(fullPath));
+        Assert.Empty(Directory.GetFiles(_testRoot, "*.tmp"));
+    }
+
+    [Fact]
+    public async Task WriteAsync_CancelledCreate_DoesNotPublishPartialFile()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            _sut.WriteAsync("not-created.txt", new MemoryStream([9, 8]), cts.Token));
+
+        Assert.False(File.Exists(Path.Combine(_testRoot, "not-created.txt")));
+        Assert.Empty(Directory.GetFiles(_testRoot, "*.tmp"));
+    }
+
+    [Fact]
+    public async Task WriteAsync_OverwriteWhileOldVersionIsBeingRead_PublishesNewFile()
+    {
+        await _sut.WriteAsync("concurrent.txt", new MemoryStream([1, 2, 3]));
+        await using var oldReader = await _sut.ReadAsync("concurrent.txt");
+
+        await _sut.WriteAsync("concurrent.txt", new MemoryStream([9, 8]));
+
+        Assert.Equal(
+            [9, 8],
+            await File.ReadAllBytesAsync(Path.Combine(_testRoot, "concurrent.txt")));
+        using var oldCopy = new MemoryStream();
+        await oldReader.CopyToAsync(oldCopy);
+        Assert.Equal([1, 2, 3], oldCopy.ToArray());
+    }
+
     // ═══════════════════ Large file ═══════════════════
 
     [Fact]
