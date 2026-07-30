@@ -97,7 +97,8 @@
             <h3 class="modal-title">@Resources.Web_CreateFolder_Title</h3>
             <input class="modal-input" type="text" placeholder="@Resources.Web_CreateFolder_Placeholder"
                    @bind="_newFolderName" @bind:event="oninput"
-                   @onkeydown="OnCreateFolderKeyDown"/>
+                   @onkeydown="OnCreateFolderKeyDown"
+                   @onkeydown:stopPropagation="true"/>
             @if (_createFolderError is not null)
             {
                 <div class="modal-error">@_createFolderError</div>

@@ -334,6 +334,39 @@ public class FileServiceTests
         Assert.False(indexedContent.CanRead);
     }
 
+    [Fact]
+    public async Task WriteFileAsync_DoesNotWaitForSearchIndex()
+    {
+        var search = new Mock<ISearchService>();
+        var searchCompletion = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        search.Setup(s => s.onFileCreated(
+                "/storage/test.txt",
+                It.IsAny<Task<Stream>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(searchCompletion.Task);
+        _storageMock.Setup(s => s.IsDirectoryAsync("test.txt")).ReturnsAsync(false);
+        _storageMock.Setup(s => s.ExistsAsync("test.txt")).ReturnsAsync(false);
+        _storageMock.Setup(s => s.ToAbsolutePath("test.txt"))
+            .Returns("/storage/test.txt");
+        _storageMock.Setup(s => s.ReadAsync("test.txt"))
+            .ReturnsAsync(() => new MemoryStream([1, 2, 3]));
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, search.Object, _shareId);
+        var ctx = CreateContext();
+        AllowAccess(FilePermission.CreateWriteData);
+
+        await sut.WriteFileAsync(
+                "test.txt", new MemoryStream([1, 2, 3]), ctx)
+            .WaitAsync(TimeSpan.FromSeconds(1));
+
+        search.Verify(s => s.onFileCreated(
+            "/storage/test.txt",
+            It.IsAny<Task<Stream>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        searchCompletion.SetResult();
+    }
+
     // ═══════════════════ CreateFileAsync ═══════════════════
 
     [Fact]
@@ -368,6 +401,28 @@ public class FileServiceTests
         await _sut.CreateDirectoryAsync("/newdir", ctx);
         _storageMock.Verify(
             s => s.CreateDirectory(It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateDirectoryAsync_DoesNotWaitForSearchIndex()
+    {
+        var search = new Mock<ISearchService>();
+        var searchCompletion = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        search.Setup(s => s.onDirectoryCreated("/storage/newdir"))
+            .Returns(searchCompletion.Task);
+        _storageMock.Setup(s => s.ToAbsolutePath("newdir"))
+            .Returns("/storage/newdir");
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, search.Object, _shareId);
+        var ctx = CreateContext();
+        AllowAccess(FilePermission.CreateWriteData);
+
+        await sut.CreateDirectoryAsync("/newdir", ctx)
+            .WaitAsync(TimeSpan.FromSeconds(1));
+
+        search.Verify(s => s.onDirectoryCreated("/storage/newdir"), Times.Once);
+        searchCompletion.SetResult();
     }
 
     [Fact]
@@ -410,6 +465,29 @@ public class FileServiceTests
     }
 
     [Fact]
+    public async Task DeleteFileAsync_DoesNotWaitForSearchIndex()
+    {
+        var search = new Mock<ISearchService>();
+        var searchCompletion = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        search.Setup(s => s.onFileDeleted("/storage/doc.txt"))
+            .Returns(searchCompletion.Task);
+        _storageMock.Setup(s => s.IsDirectoryAsync("doc.txt")).ReturnsAsync(false);
+        _storageMock.Setup(s => s.ToAbsolutePath("doc.txt"))
+            .Returns("/storage/doc.txt");
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, search.Object, _shareId);
+        var ctx = CreateContext();
+        AllowAccess(FilePermission.Delete);
+
+        await sut.DeleteFileAsync("doc.txt", ctx, isRecycleEnabled: false)
+            .WaitAsync(TimeSpan.FromSeconds(1));
+
+        search.Verify(s => s.onFileDeleted("/storage/doc.txt"), Times.Once);
+        searchCompletion.SetResult();
+    }
+
+    [Fact]
     public async Task DeleteFileAsync_RecycleMove_RenamesMetadataAndVersionsToActualPath()
     {
         var versions = new Mock<IFileVersionService>();
@@ -427,6 +505,49 @@ public class FileServiceTests
             _shareId, "doc.txt", ".RECYCLE_BIN/doc_20260719.txt"), Times.Once);
         versions.Verify(v => v.RenamePathAsync(
             _shareId, "doc.txt", ".RECYCLE_BIN/doc_20260719.txt", null), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteFileAsync_RecycleBinEntry_IsDeletedPermanently()
+    {
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, null, _shareId);
+        var ctx = CreateContext();
+        _storageMock.Setup(s => s.IsDirectoryAsync(
+            ".RECYCLE_BIN/doc.txt")).ReturnsAsync(false);
+        AllowAccess(FilePermission.Delete);
+
+        await sut.DeleteFileAsync(
+            ".RECYCLE_BIN/doc.txt", ctx, isRecycleEnabled: true);
+
+        _storageMock.Verify(
+            s => s.DeleteAsync(".RECYCLE_BIN/doc.txt"), Times.Once);
+        _storageMock.Verify(
+            s => s.MoveAsync(It.IsAny<string>(), It.IsAny<string>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteFileAsync_SimilarRecyclePrefix_IsRecycled()
+    {
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, null, _shareId);
+        var ctx = CreateContext();
+        const string source = ".RECYCLE_BIN_backup/doc.txt";
+        const string destination =
+            ".RECYCLE_BIN/.RECYCLE_BIN_backup/doc.txt";
+        _storageMock.Setup(s => s.IsDirectoryAsync(source))
+            .ReturnsAsync(false);
+        _storageMock.Setup(s => s.MoveAsync(source, destination))
+            .ReturnsAsync(destination);
+        AllowAccess(FilePermission.Delete);
+
+        await sut.DeleteFileAsync(source, ctx, isRecycleEnabled: true);
+
+        _storageMock.Verify(
+            s => s.MoveAsync(source, destination), Times.Once);
+        _storageMock.Verify(
+            s => s.DeleteAsync(It.IsAny<string>()), Times.Never);
     }
 
     [Fact]

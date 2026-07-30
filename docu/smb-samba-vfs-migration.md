@@ -355,9 +355,11 @@ module matches the source.
 
 ### P3 — Cosmetic / by-design
 
-- **#5 (B.5) — No recycle bin on SMB delete.** Deliberate parity with the old path.
-  **Status: DEFERRED by design** — add an `unlinkat` → `.RECYCLE_BIN` path if product
-  requires it.
+- **#5 (B.5) — Shared recycle bin on SMB delete.**
+  **Status: IMPLEMENTED** — `AuthorizeDelete` returns the per-share recycle
+  disposition; `unlinkat` atomically moves enabled deletes to
+  `.RECYCLE_BIN/<original-path>` and emits the exact destination as a durable
+  rename lifecycle event. Deletes already inside the bin remain permanent.
 
 - **#4 (A.4) — `connect` deny surfaced as `NT_STATUS_UNSUCCESSFUL`** instead of
   `ACCESS_DENIED` because Samba hardcoded the generic status for VFS connect

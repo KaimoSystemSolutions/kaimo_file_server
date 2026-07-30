@@ -458,15 +458,27 @@ static OpenResult do_open(const std::string& user, const std::string& share,
     };
 }
 
-static uint8_t do_delete(const std::string& user, const std::string& share,
-                         bool isdir, const std::string& path) {
+struct DeleteResult {
+    uint8_t status;
+    bool recycle;
+};
+
+static DeleteResult do_delete(const std::string& user, const std::string& share,
+                              bool isdir, const std::string& path) {
     AuthorizeDeleteRequest req;
     req.set_username(user); req.set_share(share); req.set_path(path); req.set_is_directory(isdir);
     grpc::ClientContext ctx; ctx.set_deadline(deadline(5));
     AuthorizeReply reply;
     grpc::Status st = g_authz->AuthorizeDelete(&ctx, req, &reply);
-    if (!st.ok()) { std::cerr << "kaimo_authd: AuthorizeDelete: " << st.error_message() << std::endl; return KAIMO_LOCAL_STATUS_ERROR; }
-    return reply.allow() ? KAIMO_LOCAL_STATUS_ALLOW : KAIMO_LOCAL_STATUS_DENY;
+    if (!st.ok()) {
+        std::cerr << "kaimo_authd: AuthorizeDelete: "
+                  << st.error_message() << std::endl;
+        return {KAIMO_LOCAL_STATUS_ERROR, false};
+    }
+    return {
+        reply.allow() ? KAIMO_LOCAL_STATUS_ALLOW : KAIMO_LOCAL_STATUS_DENY,
+        reply.allow() && reply.recycle_delete()
+    };
 }
 
 static uint8_t do_rename(const std::string& user, const std::string& share,
@@ -818,8 +830,13 @@ static void handle_client(const ClientConnection& connection) {
         break;
     case KAIMO_LOCAL_OP_DELETE_AUTH:
         if (read_boolean(input, first) && read_string(input, path) &&
-            kaimo_local_reader_finished(&input))
-            status = do_delete(user, share, first, path);
+            kaimo_local_reader_finished(&input)) {
+            DeleteResult result = do_delete(user, share, first, path);
+            status = result.status;
+            if (status == KAIMO_LOCAL_STATUS_ALLOW)
+                kaimo_local_builder_u8(
+                    &output, result.recycle ? 1 : 0);
+        }
         break;
     case KAIMO_LOCAL_OP_RENAME_AUTH:
         if (read_boolean(input, first) && read_boolean(input, second) &&

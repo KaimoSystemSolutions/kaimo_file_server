@@ -129,14 +129,29 @@ public partial class FileBrowser
     private async Task ConfirmCreateFolder()
     {
         if (string.IsNullOrWhiteSpace(_newFolderName)) return;
-        var result = await VM.CreateFolderAsync(_newFolderName.Trim());
+        var folderName = _newFolderName.Trim();
+
+        _showCreateFolder = false;
+        _createFolderError = null;
+        await RenderClosedDialogAsync();
+
+        var toastId = Toast.Show(Resources.Web_Common_Creating, ToastType.Progress);
+        var result = await VM.CreateFolderAsync(folderName);
         if (result.Success)
         {
-            _showCreateFolder = false;
-            await VM.LoadShareAsync(ShareName, SubPath ?? "");
+            Toast.Update(
+                toastId,
+                Resources.Web_Folder_Created,
+                type: ToastType.Success);
+            await VM.RefreshCurrentDirectoryAsync();
         }
         else
-            _createFolderError = result.Error;
+        {
+            Toast.Update(
+                toastId,
+                result.Error ?? Resources.Web_Error_CreateFolderFailed,
+                type: ToastType.Error);
+        }
     }
 
     // ========== Key Input detection ==========
@@ -198,28 +213,49 @@ public partial class FileBrowser
         var targets = _deleteTargets.ToList();
         var deletedNames = new List<string>();
 
+        _showDeleteConfirm = false;
+        _deleteTargets.Clear();
+        _deleteError = null;
+        _selectedItems.Clear();
+        await RenderClosedDialogAsync();
+
+        var toastId = Toast.Show(Resources.Web_Common_Deleting, ToastType.Progress);
+
         foreach (var target in targets)
         {
             var result = await VM.DeleteAsync(target);
             if (!result.Success)
             {
-                _deleteError = result.Error;
+                Toast.Update(
+                    toastId,
+                    result.Error ?? Resources.Web_Error_DeleteFailed,
+                    type: ToastType.Error);
+                await VM.LoadShareAsync(ShareName, SubPath ?? "");
                 return;
             }
 
             deletedNames.Add(target.Name);
         }
 
-        Toast.Show(
+        Toast.Update(
+            toastId,
             deletedNames.Count == 1
                 ? string.Format(Resources.Web_Delete_Success, deletedNames[0])
                 : string.Format(Resources.Web_Delete_BatchSuccess, deletedNames.Count),
-            ToastType.Success);
-
-        _showDeleteConfirm = false;
-        _deleteTargets.Clear();
-        _selectedItems.Clear();
+            type: ToastType.Success);
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
+    }
+
+    /// <summary>
+    /// Blazor normally renders after the complete event handler returns. Explicitly
+    /// render a dialog close before starting filesystem and refresh work.
+    /// </summary>
+    private async Task RenderClosedDialogAsync()
+    {
+        await InvokeAsync(StateHasChanged);
+        // An actually incomplete await lets Blazor flush the render batch to the
+        // browser before a following operation happens to complete synchronously.
+        await Task.Delay(1);
     }
 
     // ========== Rename ==========

@@ -19,6 +19,7 @@ RUNTIME_DIRECTORY = Path(f"/tmp/kaimo-authd-peer-{os.getpid()}")
 SOCKET_PATH = RUNTIME_DIRECTORY / "authz.sock"
 COPIED_PYTHON = RUNTIME_DIRECTORY / "untrusted-python"
 HEADER = struct.Struct("!4sBBBBI")
+PROTOCOL_VERSION = 4
 
 
 def encoded_string(value: str) -> bytes:
@@ -31,7 +32,9 @@ def request_for(username: str) -> bytes:
     # user/share prefix. An authorized peer therefore gets protocol ERROR (5)
     # without a gRPC call, while an identity mismatch gets UNAUTHORIZED_PEER (7).
     payload = encoded_string(username) + encoded_string("share") + b"x"
-    return HEADER.pack(b"KAIM", 1, 1, 1, 0, len(payload)) + payload
+    return HEADER.pack(
+        b"KAIM", PROTOCOL_VERSION, 1, 1, 0, len(payload)
+    ) + payload
 
 
 def receive_header(client: socket.socket) -> tuple[bytes, int, int, int, int, int]:
@@ -102,7 +105,11 @@ payload = field(claimed) + field("share") + b"x"
 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
     client.settimeout(2)
     client.connect(path)
-    client.sendall(header.pack(b"KAIM", 1, 1, 1, 0, len(payload)) + payload)
+    client.sendall(
+        header.pack(
+            b"KAIM", PROTOCOL_VERSION, 1, 1, 0, len(payload)
+        ) + payload
+    )
     data = b""
     while len(data) != header.size:
         chunk = client.recv(header.size - len(data))
@@ -150,13 +157,15 @@ def main() -> int:
 
         # A verified privileged peer (the test's stand-in for root smbd) may
         # carry the authenticated session identity from Samba.
-        assert claim("daemon") == (b"KAIM", 1, 1, 2, 5, 0)
+        assert claim("daemon") == (
+            b"KAIM", PROTOCOL_VERSION, 1, 2, 5, 0
+        )
 
         matching = run_claim_as("nobody", "nobody", True)
-        assert "'KAIM', 1, 1, 2, 5, 0" in matching, matching
+        assert f"'KAIM', {PROTOCOL_VERSION}, 1, 2, 5, 0" in matching, matching
 
         mismatched = run_claim_as("nobody", "daemon", True)
-        assert "'KAIM', 1, 1, 2, 7, 0" in mismatched, mismatched
+        assert f"'KAIM', {PROTOCOL_VERSION}, 1, 2, 7, 0" in mismatched, mismatched
 
         no_group = run_claim_as("nobody", "nobody", False)
         assert no_group.startswith("PermissionError:"), no_group
@@ -173,7 +182,7 @@ def main() -> int:
             capture_output=True,
             text=True,
         ).stdout.strip()
-        assert "'KAIM', 1, 0, 2, 7, 0" in wrong_executable, wrong_executable
+        assert f"'KAIM', {PROTOCOL_VERSION}, 0, 2, 7, 0" in wrong_executable, wrong_executable
 
         print("authd peer-security runtime tests passed")
         return 0

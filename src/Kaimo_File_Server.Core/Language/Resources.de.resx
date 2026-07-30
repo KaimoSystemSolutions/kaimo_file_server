@@ -1767,6 +1767,12 @@
   <data name="Web_Upload_BatchProgressWithSpeed" xml:space="preserve">
   <value>Lade Datei {0} von {1} hoch: {2} ({3})</value>
 </data>
+  <data name="Web_Upload_Processing" xml:space="preserve">
+  <value>{0} wird verarbeitet…</value>
+</data>
+  <data name="Web_Upload_BatchProcessing" xml:space="preserve">
+  <value>Datei {0} von {1} wird verarbeitet: {2}</value>
+</data>
   <data name="Web_Error_MoveFailed" xml:space="preserve">
   <value>Verschieben des Elements fehlgeschlagen.</value>
 </data>

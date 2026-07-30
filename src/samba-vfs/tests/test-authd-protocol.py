@@ -14,6 +14,7 @@ from pathlib import Path
 RUNTIME_DIRECTORY = Path(f"/tmp/kaimo-authd-protocol-{os.getpid()}")
 SOCKET_PATH = RUNTIME_DIRECTORY / "authz.sock"
 HEADER = struct.Struct("!4sBBBBI")
+PROTOCOL_VERSION = 4
 
 
 def wait_for_socket(process: subprocess.Popen[str]) -> None:
@@ -55,24 +56,36 @@ def assert_protocol_error_for_fragmented_request() -> None:
     # operation payload invalid. Sending every byte separately proves authd
     # does not depend on one read() corresponding to one message.
     payload = encoded_string(b"user\tname") + encoded_string(b"share\nname") + b"x"
-    frame = HEADER.pack(b"KAIM", 1, 1, 1, 0, len(payload)) + payload
+    frame = HEADER.pack(
+        b"KAIM", PROTOCOL_VERSION, 1, 1, 0, len(payload)
+    ) + payload
     with connect() as client:
         for byte in frame:
             client.sendall(bytes((byte,)))
         response = HEADER.unpack(recv_exact(client, HEADER.size))
-        assert response == (b"KAIM", 1, 1, 2, 5, 0), response
+        assert response == (
+            b"KAIM", PROTOCOL_VERSION, 1, 2, 5, 0
+        ), response
 
 
 def assert_truncated_payload_is_rejected() -> None:
     with connect() as client:
-        client.sendall(HEADER.pack(b"KAIM", 1, 1, 1, 0, 5) + b"ab")
+        client.sendall(
+            HEADER.pack(
+                b"KAIM", PROTOCOL_VERSION, 1, 1, 0, 5
+            ) + b"ab"
+        )
         client.shutdown(socket.SHUT_WR)
         assert client.recv(1) == b""
 
 
 def assert_oversized_frame_is_rejected_before_payload() -> None:
     with connect() as client:
-        client.sendall(HEADER.pack(b"KAIM", 1, 1, 1, 0, 8193))
+        client.sendall(
+            HEADER.pack(
+                b"KAIM", PROTOCOL_VERSION, 1, 1, 0, 8193
+            )
+        )
         assert client.recv(1) == b""
 
 

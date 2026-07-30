@@ -82,6 +82,10 @@ message AuthorizeReply {
   // AuthorizeOpen only: normalized/attenuated specific access bits that Samba
   // may grant. Zero for the other authorization RPCs and for denied requests.
   uint32 granted_access_mask = 3;
+  // AuthorizeDelete only: move the entry into Kaimo's .RECYCLE_BIN instead of
+  // unlinking it. False for denied requests, other RPCs, and deletes that
+  // already target an entry below .RECYCLE_BIN.
+  bool recycle_delete = 4;
 }
 
 message AuthorizeOpenRequest {

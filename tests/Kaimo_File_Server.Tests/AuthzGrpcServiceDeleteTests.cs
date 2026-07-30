@@ -70,8 +70,50 @@ public sealed class AuthzGrpcServiceDeleteTests : IDisposable
         var reply = await AuthorizeAsync("docs/report.txt", isDirectory: false);
 
         Assert.True(reply.Allow);
+        Assert.False(reply.RecycleDelete);
         _acl.Verify(a => a.HasAccessAsync(
             _user, _share.Id, "docs", true, FilePermission.DeleteSubItems), Times.Never);
+    }
+
+    [Fact]
+    public async Task AuthorizeDelete_RecycleEnabled_RequestsRecycleMove()
+    {
+        _share.IsRecycleEnabled = true;
+        Allow("docs/report.txt", isDirectory: false, FilePermission.Delete);
+
+        var reply = await AuthorizeAsync("docs/report.txt", isDirectory: false);
+
+        Assert.True(reply.Allow);
+        Assert.True(reply.RecycleDelete);
+    }
+
+    [Theory]
+    [InlineData(".RECYCLE_BIN/report.txt")]
+    [InlineData(".recycle_bin/folder/report.txt")]
+    public async Task AuthorizeDelete_AlreadyInRecycleBin_RequestsPermanentDelete(
+        string path)
+    {
+        _share.IsRecycleEnabled = true;
+        Allow(path, isDirectory: false, FilePermission.Delete);
+
+        var reply = await AuthorizeAsync(path, isDirectory: false);
+
+        Assert.True(reply.Allow);
+        Assert.False(reply.RecycleDelete);
+    }
+
+    [Fact]
+    public async Task AuthorizeDelete_SimilarPrefix_StillRequestsRecycleMove()
+    {
+        _share.IsRecycleEnabled = true;
+        Allow(".RECYCLE_BIN_backup/report.txt",
+            isDirectory: false, FilePermission.Delete);
+
+        var reply = await AuthorizeAsync(
+            ".RECYCLE_BIN_backup/report.txt", isDirectory: false);
+
+        Assert.True(reply.Allow);
+        Assert.True(reply.RecycleDelete);
     }
 
     [Fact]

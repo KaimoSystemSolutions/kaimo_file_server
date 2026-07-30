@@ -25,7 +25,7 @@
 | SMB enable/disable | Connect gate plus periodic close-share | Existing handles and delay; bridge methods do not all enforce state |
 | Snapshot enumeration | GMT tokens returned through VFS; folder timestamps pass through the central directory ACL boundary | Buffer/count limits, directory flag, live per-file visibility verification |
 | Snapshot resolution | File ACL checks plus ACL-filtered, reconciled per-user projections in an external overlap-checked cache | Writable/raw open, materialization/cleanup races, unbounded per-request work |
-| Recycle bin | Deliberately absent for SMB | Product decision, not memory-safety issue |
+| Recycle bin | Shared `.RECYCLE_BIN` for Web and SMB | Atomic no-replace move plus durable rename lifecycle event |
 | Share enumeration ABE | Hidden flag only | Per-user share visibility intentionally deferred |
 
 ## 9. Recommended target architecture

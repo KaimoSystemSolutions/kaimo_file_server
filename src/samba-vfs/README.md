@@ -418,8 +418,14 @@ bridge handles the same cross-cutting effects as earlier `FileSession.DisposeAsy
   `KAIMO_AUTHD_CACHE_TTL_MS` defaults to 3000 ms and is the documented
   maximum ACL-revocation delay for a cached decision (accepted range
   100–10,000 ms).
-- **Recycle bin** deliberately **not** implemented: the old SMB path (`MarkDeleteOnClose`) also doesn't recycle —
-  recycle only exists in web `DeleteFileAsync`. So this is faithful parity.
+- **Recycle bin:** SMB and Web use the same per-share `IsRecycleEnabled`
+  setting and `.RECYCLE_BIN` namespace. `AuthorizeDelete` returns the delete
+  disposition to the VFS. An enabled SMB delete is atomically renamed to
+  `.RECYCLE_BIN/<original-path>` with collision suffixes; the exact destination
+  is delivered through the durable rename-event path so ACL, version,
+  ownership, and search metadata follow the file. Deleting an entry already
+  below `.RECYCLE_BIN`, or deleting while the setting is disabled, performs a
+  permanent native `unlinkat`/`rmdir`.
 
 **Verified:**
 

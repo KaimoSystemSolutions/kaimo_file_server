@@ -3345,6 +3345,18 @@ namespace Kaimo_File_Server.Core.Language {
             }
         }
         
+        public static string Web_Upload_Processing {
+            get {
+                return ResourceManager.GetString("Web_Upload_Processing", resourceCulture);
+            }
+        }
+
+        public static string Web_Upload_BatchProcessing {
+            get {
+                return ResourceManager.GetString("Web_Upload_BatchProcessing", resourceCulture);
+            }
+        }
+
         public static string Web_Error_MoveFailed {
             get {
                 return ResourceManager.GetString("Web_Error_MoveFailed", resourceCulture);

@@ -33,7 +33,7 @@ UPLOAD_PATH = ROOT / "replacement.txt"
 USER = "kaimosnapshot"
 PASSWORD = "SnapshotPassw0rd!"
 GMT = "@GMT-2024.01.02-03.04.05"
-PROTOCOL_VERSION = 3
+PROTOCOL_VERSION = 4
 HEADER = struct.Struct("!4sBBBBI")
 
 
@@ -89,7 +89,9 @@ def serve_requests(ready: threading.Event, stop: threading.Event) -> None:
                         0,
                     )
                     recv_exact(connection, length)
-                    if operation in (1, 3, 4):
+                    if operation == 3:
+                        connection.sendall(response(operation, 2, b"\x00"))
+                    elif operation in (1, 4):
                         connection.sendall(response(operation, 2))
                     elif operation == 2:
                         # Deliberately claim every specific right. The VFS must

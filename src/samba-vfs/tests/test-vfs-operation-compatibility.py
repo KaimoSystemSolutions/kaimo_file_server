@@ -26,7 +26,7 @@ USER = f"kaimoci{os.getpid()}"
 PASSWORD = "Ephemeral-CI-Only-7f3!"
 HEADER = struct.Struct("!4sBBBBI")
 MAGIC = b"KAIM"
-VERSION = 3
+VERSION = 4
 REQUEST = 1
 RESPONSE = 2
 STATUS_OK = 1
@@ -36,6 +36,7 @@ OP_CONNECT = 1
 OP_OPEN = 2
 OP_DELETE_AUTH = 3
 OP_RENAME_AUTH = 4
+OP_RENAME = 8
 OP_SNAPSHOT_ENUMERATE = 9
 OP_SNAPSHOT_RESOLVE = 10
 OP_SNAPSHOT_RELEASE = 11
@@ -99,9 +100,17 @@ def serve_authorization(
                     # Return Samba 4.19.5 FILE_GENERIC_ALL after generic
                     # expansion. The VFS accepts only specific access bits.
                     response_payload = struct.pack("!I", 0x001F01FF)
+                elif operation == OP_DELETE_AUTH:
+                    response_status = STATUS_ALLOW
+                    # Recycle the file delete, then permanently remove the now
+                    # empty source directory. This exercises both unlinkat
+                    # dispositions in one live SMB session.
+                    delete_number = observed.count(OP_DELETE_AUTH)
+                    response_payload = (
+                        b"\x01" if delete_number == 1 else b"\x00"
+                    )
                 elif operation in {
                     OP_CONNECT,
-                    OP_DELETE_AUTH,
                     OP_RENAME_AUTH,
                 }:
                     response_status = STATUS_ALLOW
@@ -318,9 +327,16 @@ def main() -> int:
         "P2-15 operation compatibility\n"
     ), diagnostics
     assert not (SHARE_PATH / "matrix").exists(), diagnostics
+    recycled = (
+        SHARE_PATH / ".RECYCLE_BIN" / "matrix" / "renamed.txt"
+    )
+    assert recycled.read_text(encoding="utf-8") == (
+        "P2-15 operation compatibility\n"
+    ), diagnostics
     assert {OP_CONNECT, OP_OPEN, OP_DELETE_AUTH, OP_RENAME_AUTH}.issubset(
         observed
     ), diagnostics
+    assert OP_RENAME in observed, diagnostics
     assert "kaimo_bridge build [" in log_text, diagnostics
     assert "Failed to load module" not in log_text, diagnostics
     assert "could not find opname" not in log_text.lower(), diagnostics

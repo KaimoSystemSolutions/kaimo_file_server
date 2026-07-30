@@ -397,7 +397,23 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
                 "AuthorizeDelete DENY: user={User} share={Share} path=[{Path}] dir={Dir} — {Reason}",
                 request.Username, request.Share, normalized, request.IsDirectory, reason);
 
-        return new AuthorizeReply { Allow = allow, Reason = reason };
+        return new AuthorizeReply
+        {
+            Allow = allow,
+            Reason = reason,
+            RecycleDelete = allow &&
+                share.IsRecycleEnabled &&
+                !IsRecycleBinPath(normalized)
+        };
+    }
+
+    private static bool IsRecycleBinPath(string normalizedPath)
+    {
+        const string recycleBin = ".RECYCLE_BIN";
+        return normalizedPath.Equals(
+                   recycleBin, StringComparison.OrdinalIgnoreCase) ||
+               normalizedPath.StartsWith(
+                   recycleBin + "/", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

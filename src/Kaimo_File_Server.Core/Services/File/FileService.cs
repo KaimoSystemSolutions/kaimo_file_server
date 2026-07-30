@@ -199,6 +199,7 @@ public class FileService : IFileService
     private readonly IFileOwnershipService? _ownershipService;
     private readonly ILogger<FileService> _logger;
     private readonly Guid _shareId;
+    private readonly SemaphoreSlim _searchSideEffectLock = new(1, 1);
 
     private const string RecycleBinFolder = ".RECYCLE_BIN";
 
@@ -245,7 +246,8 @@ public class FileService : IFileService
     }
 
     private async Task ApplyDeleteSideEffectsAsync(
-        string relativePath, bool isDirectory, string absolutePath, bool bestEffort)
+        string relativePath, bool isDirectory, string absolutePath, bool bestEffort,
+        bool includeSearch = true)
     {
         var failures = new List<Exception>();
 
@@ -258,7 +260,7 @@ public class FileService : IFileService
             catch (Exception ex) { failures.Add(ex); }
         }
 
-        if (_searchService != null)
+        if (includeSearch && _searchService != null)
         {
             try
             {
@@ -278,7 +280,7 @@ public class FileService : IFileService
     private async Task ApplyRenameSideEffectsAsync(
         string oldRelativePath, string newRelativePath, bool isDirectory,
         string oldAbsolutePath, string newAbsolutePath, bool bestEffort,
-        Guid? sambaLifecycleEventId = null)
+        Guid? sambaLifecycleEventId = null, bool includeSearch = true)
     {
         var failures = new List<Exception>();
 
@@ -296,7 +298,7 @@ public class FileService : IFileService
             catch (Exception ex) { failures.Add(ex); }
         }
 
-        if (_searchService != null)
+        if (includeSearch && _searchService != null)
         {
             try
             {
@@ -313,6 +315,58 @@ public class FileService : IFileService
         if (!bestEffort) throw aggregate;
         _logger.LogWarning(aggregate, "Rename lifecycle cleanup failed for {OldPath} -> {NewPath}",
             oldRelativePath, newRelativePath);
+    }
+
+    /// <summary>
+    /// Starts a rebuildable search-index update without extending the user-facing
+    /// filesystem operation. Failures are observed and logged; authoritative ACL
+    /// and version metadata are still completed synchronously by the caller.
+    /// </summary>
+    private void StartSearchSideEffect(
+        Func<Task> action, string operation, string path)
+    {
+        if (_searchService is null) return;
+        _ = ObserveSearchSideEffectAsync(action, operation, path);
+    }
+
+    private async Task ObserveSearchSideEffectAsync(
+        Func<Task> action, string operation, string path)
+    {
+        await _searchSideEffectLock.WaitAsync();
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Background search-index {Operation} failed for {Path}",
+                operation,
+                path);
+        }
+        finally
+        {
+            _searchSideEffectLock.Release();
+        }
+    }
+
+    private async Task IndexStoredFileAsync(
+        string relativePath, string absolutePath)
+    {
+        var fileData = _storage.ReadAsync(relativePath);
+        try
+        {
+            await OnFileCreated(absolutePath, fileData);
+        }
+        catch
+        {
+            // The search implementation may fail before it takes ownership of the
+            // stream. Dispose it here as a safe, idempotent fallback.
+            try { await DrainStreamAsync(fileData); }
+            catch { /* preserve the indexing failure as the useful diagnostic */ }
+            throw;
+        }
     }
 
 
@@ -621,26 +675,14 @@ public class FileService : IFileService
             }
         }
 
-        // Search indexing is a derived, rebuildable side effect. A transient search
-        // outage must not turn a successfully persisted upload into a failed write
-        // (the web layer would otherwise delete the file as "partial"). This matches
-        // the best-effort semantics used by session close and the SMB bridge.
-        var fileData = _storage.ReadAsync(normalized);
-        try
-        {
-            await OnFileCreated(ToAbsolutePath(normalized), fileData);
-        }
-        catch (Exception ex)
-        {
-            // The search implementation may fail before it takes ownership of the
-            // eagerly opened stream. Dispose it here as a safe, idempotent fallback.
-            try { await DrainStreamAsync(fileData); }
-            catch { /* the indexing failure is the useful diagnostic */ }
-
-            _logger.LogWarning(
-                LogEvents.FileSearchHookFailed, ex,
-                LogMessages.FileSearchHookFailed, normalized);
-        }
+        // Search indexing is derived and rebuildable. Open the persisted file inside
+        // the observed background operation so upload completion does not wait for
+        // Elasticsearch reachability checks or indexing.
+        var absolutePath = ToAbsolutePath(normalized);
+        StartSearchSideEffect(
+            () => IndexStoredFileAsync(normalized, absolutePath),
+            "file create",
+            normalized);
     }
 
     public string ToAbsolutePath(string path)
@@ -707,7 +749,11 @@ public class FileService : IFileService
         var normalized = ShareRelativePath.Normalize(path);
         await _storage.CreateDirectory(normalized);
         await RecordOwnerAsync(normalized, isDirectory: true, user);
-        await onDirectoryCreated(ToAbsolutePath(path));
+        var absolutePath = ToAbsolutePath(normalized);
+        StartSearchSideEffect(
+            () => _searchService!.onDirectoryCreated(absolutePath),
+            "directory create",
+            normalized);
     }
 
     public async Task DeleteFileAsync(string path, UserContext user, bool isRecycleEnabled)
@@ -717,8 +763,11 @@ public class FileService : IFileService
 
         await EnsureAccessAsync(user, normalized, isDir, FilePermission.Delete);
 
-        var isAlreadyInRecycleBin = normalized.StartsWith(
-            RecycleBinFolder, StringComparison.OrdinalIgnoreCase);
+        var isAlreadyInRecycleBin =
+            normalized.Equals(
+                RecycleBinFolder, StringComparison.OrdinalIgnoreCase) ||
+            normalized.StartsWith(
+                RecycleBinFolder + "/", StringComparison.OrdinalIgnoreCase);
 
         var absolutePath = ToAbsolutePath(normalized);
         
@@ -728,15 +777,30 @@ public class FileService : IFileService
             // MoveAsync may append a timestamp suffix on a name collision in the
             // recycle bin — align the ACL with the path that actually landed on disk.
             var actualRecyclePath = await _storage.MoveAsync(normalized, recyclePath);
+            var actualRecycleAbsolutePath = ToAbsolutePath(actualRecyclePath);
             await ApplyRenameSideEffectsAsync(
                 normalized, actualRecyclePath, isDir,
-                absolutePath, ToAbsolutePath(actualRecyclePath), bestEffort: false);
+                absolutePath, actualRecycleAbsolutePath, bestEffort: false,
+                includeSearch: false);
+            StartSearchSideEffect(
+                () => isDir
+                    ? _searchService!.onDirectoryRenamed(absolutePath, actualRecycleAbsolutePath)
+                    : _searchService!.onFileRenamed(absolutePath, actualRecycleAbsolutePath),
+                "recycle move",
+                normalized);
         }
         else
         {
             await _storage.DeleteAsync(normalized);
             await ApplyDeleteSideEffectsAsync(
-                normalized, isDir, absolutePath, bestEffort: false);
+                normalized, isDir, absolutePath, bestEffort: false,
+                includeSearch: false);
+            StartSearchSideEffect(
+                () => isDir
+                    ? _searchService!.onDirectoryDeleted(absolutePath)
+                    : _searchService!.onFileDeleted(absolutePath),
+                "delete",
+                normalized);
         }
     }
 

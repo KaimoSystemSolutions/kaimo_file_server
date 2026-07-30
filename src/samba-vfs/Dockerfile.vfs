@@ -166,12 +166,14 @@ COPY module/event_spool.h ./
 COPY module/local_protocol.h ./
 COPY module/snapshot_enumeration.h ./
 COPY module/rename_event.h ./
+COPY module/recycle_move.h ./
 COPY module/sync_json.h ./
 COPY tests/test-decision-cache.cpp ./
 COPY tests/test-event-spool.cpp ./
 COPY tests/test-local-protocol.cpp ./
 COPY tests/test-snapshot-enumeration.cpp ./
 COPY tests/test-rename-event.cpp ./
+COPY tests/test-recycle-move.cpp ./
 COPY module/share_path.h ./
 COPY tests/test-share-path.cpp ./
 COPY tests/test-sync-json.cpp ./
@@ -218,6 +220,10 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
     && /tmp/test-rename-event \
     && rm /tmp/test-rename-event \
     && g++ -std=c++17 -O2 -I. \
+       test-recycle-move.cpp -o /tmp/test-recycle-move \
+    && /tmp/test-recycle-move \
+    && rm /tmp/test-recycle-move \
+    && g++ -std=c++17 -O2 -I. \
        test-share-path.cpp -o /tmp/test-share-path \
     && /tmp/test-share-path \
     && rm /tmp/test-share-path \
@@ -234,7 +240,7 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
 # This is the layer that reruns on a module edit -> a single object + relink.
 # The installed .so is located by name (not a hardcoded path) and overwritten.
 WORKDIR /build/samba-source
-COPY module/vfs_kaimo_bridge.c module/local_protocol.h module/rename_event.h module/share_path.h module/snapshot_enumeration.h source3/modules/
+COPY module/vfs_kaimo_bridge.c module/local_protocol.h module/recycle_move.h module/rename_event.h module/share_path.h module/snapshot_enumeration.h source3/modules/
 RUN PYTHONHASHSEED=1 ./buildtools/bin/waf build --targets=vfs_kaimo_bridge \
     && built="bin/modules/vfs/kaimo_bridge.so" \
     && dest="$(find /opt/samba -name '*kaimo_bridge*.so' | head -n1)" \

@@ -230,6 +230,40 @@ public class FileBrowserViewModel
         }
     }
 
+    /// <summary>
+    /// Refreshes only the already-open directory. Unlike <see cref="LoadShareAsync"/>,
+    /// this keeps the current file service and cached share/management context, avoiding
+    /// redundant database and authorization work after a local file operation.
+    /// </summary>
+    public async Task RefreshCurrentDirectoryAsync()
+    {
+        if (_fileService is null || CurrentShare is null)
+            return;
+
+        var userContext = await GetCurrentUserContextAsync();
+        if (userContext is null)
+        {
+            ErrorMessage = Resources.Web_Error_NotAuthenticated;
+            return;
+        }
+
+        try
+        {
+            ErrorMessage = null;
+            Items = await _fileService.ListAsync(CurrentPath, userContext);
+            _ = LoadDirectorySizesInBackgroundAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = Resources.Web_Error_LoadFilesFailed;
+            _logger.LogError(
+                ex,
+                "Error refreshing share {ShareName} path {SubPath}",
+                CurrentShare.Name,
+                CurrentPath);
+        }
+    }
+
 
     public async Task CreateFolderAtAsync(string path)
     {

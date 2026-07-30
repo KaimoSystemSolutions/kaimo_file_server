@@ -57,6 +57,11 @@ public partial class FileBrowser
                 Toast.Update(toastId, Resources.Web_Upload_BatchCancelled, type: ToastType.Error);
                 return Task.CompletedTask;
             });
+        // Give the renderer a turn before opening/consuming the browser stream.
+        // Otherwise a tiny upload can finish its transfer before the initial toast
+        // ever becomes visible.
+        await InvokeAsync(StateHasChanged);
+        await Task.Yield();
 
         foreach (var file in files)
         {
@@ -64,6 +69,7 @@ public partial class FileBrowser
                 break;
 
             long fileBytesUploaded = 0;
+            bool processingShown = false;
 
             Stream stream;
             try
@@ -85,6 +91,24 @@ public partial class FileBrowser
                     {
                         totalUploadedBytes += bytesRead - fileBytesUploaded;
                         fileBytesUploaded = bytesRead;
+
+                        var transferComplete = total == 0
+                            ? bytesRead == 0
+                            : bytesRead >= total;
+                        if (transferComplete && !processingShown)
+                        {
+                            processingShown = true;
+                            InvokeAsync(() =>
+                            {
+                                Toast.Update(
+                                    toastId,
+                                    BuildProcessingText(
+                                        file.Name, completedCount, files.Count),
+                                    progress: 100);
+                                StateHasChanged();
+                            });
+                            return;
+                        }
 
                         var elapsedSinceSample = stopwatch.Elapsed - lastSampleTime;
                         if (elapsedSinceSample.TotalMilliseconds >= 500)
@@ -111,9 +135,6 @@ public partial class FileBrowser
 
                     if (!result.Success)
                         failedFiles.Add(file.Name);
-                    
-                    StateHasChanged();
-                    await VM.LoadShareAsync(ShareName, SubPath ?? "");
                 }
             }
             catch (OperationCanceledException)
@@ -166,6 +187,16 @@ public partial class FileBrowser
         return totalCount == 1
             ? string.Format(Resources.Web_Upload_ProgressWithSpeed, currentFileName, speedText)
             : string.Format(Resources.Web_Upload_BatchProgressWithSpeed, completedCount + 1, totalCount, currentFileName, speedText);
+    }
+
+    private static string BuildProcessingText(
+        string currentFileName, int completedCount, int totalCount)
+    {
+        return totalCount == 1
+            ? string.Format(Resources.Web_Upload_Processing, currentFileName)
+            : string.Format(
+                Resources.Web_Upload_BatchProcessing,
+                completedCount + 1, totalCount, currentFileName);
     }
 
     private static string FormatSpeed(double bytesPerSec)
