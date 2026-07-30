@@ -26,7 +26,7 @@ public class FileVersionRepositoryLifecycleDatabaseTests : DatabaseTestBase
             await db.SaveChangesAsync();
         }
 
-        var removed = await new FileVersionRepository(NewContext())
+        var removed = await new FileVersionRepository(DbFactory)
             .RenamePathAsync(shareId, "old", "new");
 
         Assert.Contains(removed, v => v.Id == displaced.Id);
@@ -56,7 +56,7 @@ public class FileVersionRepositoryLifecycleDatabaseTests : DatabaseTestBase
             await db.SaveChangesAsync();
         }
 
-        var removed = await new FileVersionRepository(NewContext())
+        var removed = await new FileVersionRepository(DbFactory)
             .RenamePathAsync(shareId, "old.txt", "new.txt", eventId);
         Assert.Contains(removed, version => version.Id == displaced.Id);
 
@@ -67,7 +67,7 @@ public class FileVersionRepositoryLifecycleDatabaseTests : DatabaseTestBase
             await db.SaveChangesAsync();
         }
 
-        var retryRemoved = await new FileVersionRepository(NewContext())
+        var retryRemoved = await new FileVersionRepository(DbFactory)
             .RenamePathAsync(shareId, "old.txt", "new.txt", eventId);
 
         Assert.Empty(retryRemoved);
@@ -90,7 +90,7 @@ public class FileVersionRepositoryLifecycleDatabaseTests : DatabaseTestBase
             await db.SaveChangesAsync();
         }
 
-        var removed = await new FileVersionRepository(NewContext())
+        var removed = await new FileVersionRepository(DbFactory)
             .DeletePathAsync(shareId, "folder");
 
         Assert.Equal(2, removed.Count);

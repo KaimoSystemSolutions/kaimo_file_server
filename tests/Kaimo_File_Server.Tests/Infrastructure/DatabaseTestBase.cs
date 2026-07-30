@@ -74,18 +74,18 @@ public abstract class DatabaseTestBase : IDisposable
     protected ApplicationDbContext NewContext() => DbFactory.CreateDbContext();
 
     // ─────────────────────── Real repositories ───────────────────────
-    // Repos that take a bare ApplicationDbContext get their own fresh context;
-    // because every context shares one connection, their SaveChanges is visible
-    // to any later NewContext() used for assertions.
+    // Every repository receives the production-shaped context factory. Because
+    // every created context shares one connection, its SaveChanges is visible to
+    // any later NewContext() used for assertions.
 
     protected ShareRepository ShareRepo() => new(DbFactory, null);
-    protected UserRepository UserRepo() => new(NewContext());
-    protected GroupRepository GroupRepo() => new(NewContext());
-    protected RoleRepository RoleRepo() => new(NewContext());
-    protected AclRepository AclRepo() => new(NewContext());
-    protected DepartmentRepository DepartmentRepo() => new(NewContext());
-    protected FileMetadataRepository FileMetadataRepo() => new(NewContext());
-    protected ScopedRoleAssignmentRepository ScopedRoleRepo() => new(NewContext());
+    protected UserRepository UserRepo() => new(DbFactory);
+    protected GroupRepository GroupRepo() => new(DbFactory);
+    protected RoleRepository RoleRepo() => new(DbFactory);
+    protected AclRepository AclRepo() => new(DbFactory);
+    protected DepartmentRepository DepartmentRepo() => new(DbFactory);
+    protected FileMetadataRepository FileMetadataRepo() => new(DbFactory);
+    protected ScopedRoleAssignmentRepository ScopedRoleRepo() => new(DbFactory);
 
     // ─────────────────────── Real ACL evaluation ───────────────────────
 
@@ -109,10 +109,9 @@ public abstract class DatabaseTestBase : IDisposable
     {
         var services = new ServiceCollection();
         services.AddSingleton<IDbContextFactory<ApplicationDbContext>>(DbFactory);
-        services.AddTransient(_ => DbFactory.CreateDbContext());
-        services.AddTransient<IAclRepository>(sp => new AclRepository(sp.GetRequiredService<ApplicationDbContext>()));
+        services.AddTransient<IAclRepository>(_ => new AclRepository(DbFactory));
         services.AddTransient<IShareRepository>(_ => new ShareRepository(DbFactory, null));
-        services.AddTransient<IDepartmentRepository>(sp => new DepartmentRepository(sp.GetRequiredService<ApplicationDbContext>()));
+        services.AddTransient<IDepartmentRepository>(_ => new DepartmentRepository(DbFactory));
         return services.BuildServiceProvider();
     }
 

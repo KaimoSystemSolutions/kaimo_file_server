@@ -3,6 +3,7 @@ using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Infrastructure.Logging;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Primitives;
@@ -144,14 +145,14 @@ public class LoggingConfigTests : DatabaseTestBase
 
     /// <summary>
     /// A real <see cref="LoggingConfigStore"/> over this test's database: a scope
-    /// factory that resolves the real <see cref="ConfigRepository"/> (scoped context +
+    /// factory that resolves the real <see cref="ConfigRepository"/> (context factory +
     /// shared memory cache) — every call reads/writes the actual ConfigSettings table.
     /// </summary>
     private LoggingConfigStore BuildStore()
     {
         var services = new ServiceCollection();
         services.AddMemoryCache();
-        services.AddScoped<ApplicationDbContext>(_ => DbFactory.CreateDbContext());
+        services.AddSingleton<IDbContextFactory<ApplicationDbContext>>(DbFactory);
         services.AddScoped<IConfigRepository, ConfigRepository>();
         var provider = services.BuildServiceProvider();
 
