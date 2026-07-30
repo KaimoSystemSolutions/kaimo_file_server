@@ -2,6 +2,7 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Infrastructure.Persistence;
+using System.Data;
 
 namespace Kaimo_File_Server.Infrastructure.Repositories
 {
@@ -58,6 +59,12 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
 
         public async Task<List<FileVersion>> GetLatestVersionsUnderPrefixAsync(
             Guid shareId, string pathPrefix, DateTime asOfUtc)
+            => await GetLatestVersionsUnderPrefixAsync(
+                shareId, pathPrefix, asOfUtc, CancellationToken.None);
+
+        public async Task<List<FileVersion>> GetLatestVersionsUnderPrefixAsync(
+            Guid shareId, string pathPrefix, DateTime asOfUtc,
+            CancellationToken cancellationToken)
         {
             var query = _db.Set<FileVersion>()
                 .Where(v => v.ShareId == shareId && v.SnapshotTimestampUtc <= asOfUtc);
@@ -67,7 +74,7 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
 
             // Retention caps versions per file, so the candidate set stays small.
             // Group in memory to pick the newest snapshot at-or-before the cutoff.
-            var candidates = await query.ToListAsync();
+            var candidates = await query.ToListAsync(cancellationToken);
 
             return candidates
                 .GroupBy(v => v.FilePath)
@@ -140,8 +147,39 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         }
 
         public async Task<List<FileVersion>> RenamePathAsync(
-            Guid shareId, string oldPath, string newPath)
+            Guid shareId,
+            string oldPath,
+            string newPath,
+            Guid? sambaLifecycleEventId = null)
         {
+            // Serializable isolation also closes the rare overlap where an
+            // expired event lease is reclaimed while the prior worker commits.
+            await using var transaction = sambaLifecycleEventId.HasValue
+                ? await _db.Database.BeginTransactionAsync(
+                    IsolationLevel.Serializable)
+                : null;
+            SambaLifecycleEventReceipt? receipt = null;
+            if (sambaLifecycleEventId.HasValue)
+            {
+                receipt = await _db.SambaLifecycleEventReceipts.SingleOrDefaultAsync(
+                    eventReceipt => eventReceipt.EventId == sambaLifecycleEventId.Value);
+                if (receipt is null ||
+                    !StringComparer.Ordinal.Equals(receipt.EventType, "rename"))
+                {
+                    throw new InvalidOperationException(
+                        $"Samba rename event {sambaLifecycleEventId.Value:N} has no matching receipt.");
+                }
+
+                // The version rows and this checkpoint are committed together.
+                // A retry after any later lifecycle effect failed must never
+                // reinterpret the now-empty source as a fresh replace rename.
+                if (receipt.RenameVersionsCompletedAtUtc.HasValue)
+                {
+                    await transaction!.CommitAsync();
+                    return [];
+                }
+            }
+
             var oldPrefix = oldPath.Length == 0 ? "" : oldPath + "/";
             var newPrefix = newPath.Length == 0 ? "" : newPath + "/";
 
@@ -175,6 +213,13 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
 
             if (source.Count > 0)
                 await _db.SaveChangesAsync();
+
+            if (receipt is not null)
+            {
+                receipt.RenameVersionsCompletedAtUtc = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+                await transaction!.CommitAsync();
+            }
 
             return displaced;
         }

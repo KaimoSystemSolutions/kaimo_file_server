@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Configuration;
+using Kaimo_File_Server.Infrastructure.Logging;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.SmbBridge.Security;
 using Kaimo_File_Server.SmbBridge.Services;
@@ -15,6 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Reuse existing Kaimo services (DB, repos, AuthenticationLookup,
 // NtHashProtector). Needs the same NtHash:EncryptionKey as Host/Web.
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.AddDynamicLogLevel();
 
 // Real Elasticsearch search service — MUST come before AddCoreServices so it wins
 // the NoOp fallback (Phase 3: SMB writes are indexed like web uploads).
@@ -45,7 +47,16 @@ builder.Services.AddGrpc(options =>
 // Phase 5 hardening: bound the isolated @GMT snapshot materialization cache
 // (<cache-root>/<share-id>) so it cannot grow without limit. Evicts by age
 // (Snapshots:Cache:TtlHours) and per-share size cap (Snapshots:Cache:MaxBytesPerShare).
+builder.Services.AddSingleton<
+    Microsoft.Extensions.Options.IValidateOptions<SnapshotCacheOptions>,
+    SnapshotCacheOptionsValidator>();
+builder.Services.AddOptions<SnapshotCacheOptions>()
+    .Bind(builder.Configuration.GetSection(SnapshotCacheOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton<SnapshotCacheLeaseManager>();
+builder.Services.AddSingleton<SnapshotMaterializationLimiter>();
 builder.Services.AddHostedService<SnapshotCacheCleanupService>();
+builder.Services.AddHostedService<SambaEventReceiptCleanupService>();
 
 // The bridge is reachable only on its dedicated Compose control network, and
 // every connection must also present a client certificate issued by the
@@ -67,6 +78,11 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 var app = builder.Build();
+
+// P1-11 receipts are part of the bridge's correctness boundary. Do not depend
+// on Host/Web winning startup first; the shared advisory lock makes concurrent
+// migration/seeding safe.
+await app.InitializeDatabaseAsync();
 
 app.MapGrpcService<AuthGrpcService>();       // Phase 1: NT-Hashes (GetNtHash/ListUsers)
 app.MapGrpcService<AuthzGrpcService>();      // Phase 2: Autorisierung (Connect/Open)

@@ -1,10 +1,18 @@
-# Intermediate image: unpacked Samba source tree 4.19.5 (matching distro ABI 49).
+# Intermediate image: unpacked, checksum-verified Samba source matching the
+# repository's authoritative version/VFS ABI contract.
 # Serves only to cache the source download so module iterations are fast.
 #   docker build -f Dockerfile.src -t kaimo-samba-src:4.19.5 .
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -qq && apt-get install -y -qq wget && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
-RUN wget -q https://download.samba.org/pub/samba/stable/samba-4.19.5.tar.gz \
-    && tar xf samba-4.19.5.tar.gz \
-    && rm samba-4.19.5.tar.gz
+COPY samba-build.env /usr/local/share/kaimo/samba-build.env
+RUN set -eu; \
+    . /usr/local/share/kaimo/samba-build.env; \
+    archive="samba-${SAMBA_VERSION}.tar.gz"; \
+    wget -q "https://download.samba.org/pub/samba/stable/${archive}"; \
+    printf '%s  %s\n' "$SAMBA_TARBALL_SHA256" "$archive" | sha256sum -c -; \
+    mkdir /build/samba-source; \
+    tar -xzf "$archive" --strip-components=1 -C /build/samba-source; \
+    rm "$archive"
+WORKDIR /build/samba-source

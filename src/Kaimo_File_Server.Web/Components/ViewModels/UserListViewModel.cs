@@ -853,6 +853,8 @@ public class UserListViewModel
         ErrorMessage = null;
 
         if (string.IsNullOrWhiteSpace(CreateUserUsername)) { ErrorMessage = Resources.Web_User_NameRequired; return; }
+        if (!SambaName.IsValidUsername(CreateUserUsername.Trim()))
+        { ErrorMessage = $"Username must be 1-{SambaName.MaxUsernameBytes} ASCII bytes and contain only letters, digits, '.', '_' or '-'."; return; }
         if (string.IsNullOrWhiteSpace(CreateUserName)) { ErrorMessage = Resources.Web_Error_NameRequired; return; }
         if (string.IsNullOrWhiteSpace(CreateUserPassword))
         { ErrorMessage = Resources.Web_User_PasswordMinLength; return; }

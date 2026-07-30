@@ -6,10 +6,12 @@ set -euo pipefail
 export PATH=/opt/samba/sbin:/opt/samba/bin:$PATH
 
 STORAGE="${KAIMO_STORAGE:-/data/storage}"
-TEST_USER="${KAIMO_TEST_USER:-kaimotest}"
-TEST_PASS="${KAIMO_TEST_PASS:-Passw0rd!}"
 
 mkdir -p "$STORAGE"
+# P1-11 durable outbox. Owner-only permissions are reasserted on every start;
+# authd independently verifies ownership, mode, and non-symlink directory type.
+install -d -m 0700 -o root -g root \
+    "${KAIMO_EVENT_SPOOL_PATH:-/var/lib/kaimo/event-spool}"
 
 # --- Storage write permissions via a shared group (risk: storage ownership) ---
 # Each Kaimo user has their OWN UID (per-user identity/SID), but share
@@ -55,15 +57,6 @@ else
     echo "[entrypoint] Storage: no ACL support (e.g. drvfs/9p) -> fallback to create-mask + container umask."
 fi
 
-if ! id "$TEST_USER" >/dev/null 2>&1; then
-    useradd -M -s /usr/sbin/nologin "$TEST_USER"
-fi
-usermod -aG "${KAIMO_STORAGE_GROUP:-kaimo}" "$TEST_USER" 2>/dev/null || true
-usermod -aG "$KAIMO_AUTHD_GROUP" "$TEST_USER" 2>/dev/null || true
-
-printf '%s\n%s\n' "$TEST_PASS" "$TEST_PASS" | smbpasswd -s -a "$TEST_USER" >/dev/null 2>&1 || \
-printf '%s\n%s\n' "$TEST_PASS" "$TEST_PASS" | smbpasswd -s "$TEST_USER" >/dev/null 2>&1 || true
-
 echo "[entrypoint] smbd: $(command -v smbd)  ($(smbd --version))"
 echo "[entrypoint] VFS module present?"
 find /opt/samba -name 'kaimo_bridge.so' -o -name '*kaimo_bridge*.so' 2>/dev/null | sed 's/^/  /' || true
@@ -71,51 +64,63 @@ find /opt/samba -name 'kaimo_bridge.so' -o -name '*kaimo_bridge*.so' 2>/dev/null
 echo "[entrypoint] Config check (testparm):"
 testparm -s 2>/dev/null | sed -n '1,40p' || true
 
-# --- Phase 1: Sync Kaimo user NT-Hashes from bridge into tdbsam ---
-# Try once at startup (with retries until bridge is reachable)
-# so real Kaimo logins work immediately.
-echo "[entrypoint] Initial NT-Hash sync from bridge ..."
-for i in $(seq 1 30); do
-    if /usr/local/bin/sync-users.sh; then break; fi
-    sleep 2
-done
+# --- P2-13: bounded control-plane convergence and revocation ---
+# Polling remains deliberate: these exports are small, bounded desired-state
+# documents, while introducing a second push channel would add another durable
+# delivery protocol. Every component must converge before smbd starts.
+initial_sync() {
+    local component="$1" description="$2" command="$3" attempt
+    echo "[entrypoint] Initial $description ..."
+    for attempt in $(seq 1 30); do
+        if /usr/local/bin/run-sync.sh "$component" "$command"; then
+            return 0
+        fi
+        [ "$attempt" -eq 30 ] || sleep 2
+    done
+    echo "[entrypoint] $component did not converge; refusing to start Samba." >&2
+    return 1
+}
 
-# Then periodically follow up (new/changed users, without restart).
-( while true; do sleep 60; /usr/local/bin/sync-users.sh >/dev/null 2>&1 || true; done ) &
+USER_SYNC_INTERVAL_SECONDS="${KAIMO_USER_SYNC_INTERVAL_SECONDS:-60}"
+SHARE_SYNC_INTERVAL_SECONDS="${KAIMO_SHARE_SYNC_INTERVAL_SECONDS:-2}"
+CONFIG_SYNC_INTERVAL_SECONDS="${KAIMO_CONFIG_SYNC_INTERVAL_SECONDS:-2}"
+# The hash-bearing user export is intentionally limited to two calls per
+# 60-second window (P2-10/P2-11). Do not turn it into a high-frequency
+# revocation feed; a shorter user SLA requires a separate hash-free endpoint.
+/usr/local/bin/validate-sync-interval.sh \
+    KAIMO_USER_SYNC_INTERVAL_SECONDS "$USER_SYNC_INTERVAL_SECONDS" 60 60
+/usr/local/bin/validate-sync-interval.sh \
+    KAIMO_SHARE_SYNC_INTERVAL_SECONDS "$SHARE_SYNC_INTERVAL_SECONDS" 1 5
+/usr/local/bin/validate-sync-interval.sh \
+    KAIMO_CONFIG_SYNC_INTERVAL_SECONDS "$CONFIG_SYNC_INTERVAL_SECONDS" 1 5
 
-# --- Phase 4: Share provisioning from Kaimo DB into Samba registry (net conf) ---
-# Initially once with retries (until bridge is reachable), so shares
-# are ready at first client connect. Replaces SmbServer.SyncFromDb().
-echo "[entrypoint] Initial share sync from bridge ..."
-for i in $(seq 1 30); do
-    if /usr/local/bin/sync-shares.sh; then break; fi
-    sleep 2
-done
+initial_sync users "NT-Hash/user sync from bridge" /usr/local/bin/sync-users.sh
+initial_sync shares "share sync from bridge" /usr/local/bin/sync-shares.sh
+initial_sync config "protocol settings sync from bridge" /usr/local/bin/sync-config.sh
 
-# Then periodically follow up (new/changed/deleted shares, without restart).
-( while true; do sleep 60; /usr/local/bin/sync-shares.sh >/dev/null 2>&1 || true; done ) &
+# A failed cycle closes every active share. If that fail-closed action cannot
+# be proven, terminate PID 1; the supervisor then reaps authd/smbd and Compose
+# restarts the complete security unit.
+start_periodic_sync() {
+    local component="$1" interval="$2" command="$3"
+    (
+        while sleep "$interval"; do
+            if ! /usr/local/bin/sync-cycle.sh "$component" "$command"; then
+                echo "[entrypoint] Fatal $component revocation failure; terminating Samba unit." >&2
+                kill -TERM 1
+                exit 1
+            fi
+        done
+    ) &
+}
 
-# --- Phase 4: Protocol settings from Kaimo DB into Samba global registry ---
-# Initially BEFORE smbd start (with retries), so smbd reads the dialect range/signing/
-# encryption from registry at first startup. Mirrors
-# SmbServer.LoadProtocolSettings().
-echo "[entrypoint] Initial protocol settings sync from bridge ..."
-for i in $(seq 1 30); do
-    if /usr/local/bin/sync-config.sh; then break; fi
-    sleep 2
-done
-
-# Then periodically follow up (web UI changes, reload only on change).
-( while true; do sleep 60; /usr/local/bin/sync-config.sh >/dev/null 2>&1 || true; done ) &
+start_periodic_sync users "$USER_SYNC_INTERVAL_SECONDS" /usr/local/bin/sync-users.sh
+start_periodic_sync shares "$SHARE_SYNC_INTERVAL_SECONDS" /usr/local/bin/sync-shares.sh
+start_periodic_sync config "$CONFIG_SYNC_INTERVAL_SECONDS" /usr/local/bin/sync-config.sh
 
 # --- Phase 2: Start authorization sidecar (Unix socket <-> gRPC) ---
 # The VFS module (connect hook) asks here "may <user> access <share>?".
 install -d -m 0750 -o root -g "$KAIMO_AUTHD_GROUP" /var/run/kaimo
 export KAIMO_AUTHD_SOCK="${KAIMO_AUTHD_SOCK:-/var/run/kaimo/authz.sock}"
-echo "[entrypoint] Starting kaimo_authd (Authz sidecar) ..."
-kaimo_authd &
-# Wait briefly for the socket, so first TREE_CONNECT doesn't hit empty.
-for i in $(seq 1 20); do [ -S "$KAIMO_AUTHD_SOCK" ] && break; sleep 0.2; done
-
-echo "[entrypoint] Starting self-built smbd (foreground) ..."
-exec smbd --foreground --no-process-group --debug-stdout
+echo "[entrypoint] Handing authd and smbd to the fail-fast supervisor ..."
+exec /usr/local/bin/supervise-samba.sh

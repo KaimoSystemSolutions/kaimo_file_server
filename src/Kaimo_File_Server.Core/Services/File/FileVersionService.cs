@@ -156,6 +156,12 @@ public class FileVersionService : IFileVersionService
 
     public async Task<Stream> ReadVersionAsync(
         Guid shareId, string filePath, DateTime snapshotTimestampUtc)
+        => await ReadVersionAsync(
+            shareId, filePath, snapshotTimestampUtc, CancellationToken.None);
+
+    public async Task<Stream> ReadVersionAsync(
+        Guid shareId, string filePath, DateTime snapshotTimestampUtc,
+        CancellationToken cancellationToken)
     {
         var normalizedPath = ShareRelativePath.Normalize(filePath);
 
@@ -193,7 +199,7 @@ public class FileVersionService : IFileVersionService
                 blobFullPath, FileMode.Open,
                 FileAccess.Read, FileShare.Read | FileShare.Delete, 4096, true);
             await using var gzip = new GZipStream(fs, CompressionMode.Decompress);
-            await gzip.CopyToAsync(output);
+            await gzip.CopyToAsync(output, cancellationToken);
             output.Position = 0;
             return output;
         }
@@ -215,8 +221,15 @@ public class FileVersionService : IFileVersionService
     }
 
     public async Task<List<FileVersion>> GetFolderSnapshotAsync(Guid shareId, string folderPath, DateTime asOfUtc)
+        => await GetFolderSnapshotAsync(
+            shareId, folderPath, asOfUtc, CancellationToken.None);
+
+    public async Task<List<FileVersion>> GetFolderSnapshotAsync(
+        Guid shareId, string folderPath, DateTime asOfUtc,
+        CancellationToken cancellationToken)
     {
-        return await _versionRepo.GetLatestVersionsUnderPrefixAsync(shareId, FolderPrefix(folderPath), asOfUtc);
+        return await _versionRepo.GetLatestVersionsUnderPrefixAsync(
+            shareId, FolderPrefix(folderPath), asOfUtc, cancellationToken);
     }
 
     /// <summary>
@@ -261,14 +274,18 @@ public class FileVersionService : IFileVersionService
         return removed.Count;
     }
 
-    public async Task RenamePathAsync(Guid shareId, string oldPath, string newPath)
+    public async Task RenamePathAsync(
+        Guid shareId,
+        string oldPath,
+        string newPath,
+        Guid? sambaLifecycleEventId = null)
     {
         var oldNormalized = ShareRelativePath.Normalize(oldPath);
         var newNormalized = ShareRelativePath.Normalize(newPath);
         if (string.Equals(oldNormalized, newNormalized, StringComparison.Ordinal)) return;
 
         var displaced = await _versionRepo.RenamePathAsync(
-            shareId, oldNormalized, newNormalized);
+            shareId, oldNormalized, newNormalized, sambaLifecycleEventId);
         await DeleteUnreferencedBlobsAsync(displaced);
     }
 

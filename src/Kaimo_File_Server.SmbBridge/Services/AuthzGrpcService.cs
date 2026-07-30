@@ -97,22 +97,30 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     public override async Task<AuthorizeReply> AuthorizeConnect(
         AuthorizeConnectRequest request, ServerCallContext context)
     {
+        if (!SambaName.IsValidContext(request.Username, request.Share))
+            return Deny("invalid user/share context");
+        CancellationToken cancellationToken =
+            context?.CancellationToken ?? CancellationToken.None;
+
         // Phase 5 cutover: the SMB on/off toggle. The old in-process SmbServer was
         // start/stopped by the host reconciler; smbd now runs in its own container.
         // Enforcing the flag here (deny every TREE_CONNECT when disabled) is what
         // makes "SMB off" actually block clients — no share becomes enterable.
-        if (!await _config.IsSmbEnabledAsync())
+        if (!await _config.IsSmbEnabledAsync().WaitAsync(cancellationToken))
             return Deny($"smb service disabled (services.smb.enabled=false)");
 
-        var user = await _users.GetByUsernameAsync(request.Username);
+        var user = await _users.GetByUsernameAsync(request.Username)
+            .WaitAsync(cancellationToken);
         if (user is null || !user.IsEnabled)
             return Deny($"unknown or disabled user '{request.Username}'");
 
-        var share = await _shares.GetByNameAsync(request.Share);
+        var share = await _shares.ResolveEnabledShareAsync(
+            request.Share, cancellationToken);
         if (share is null)
-            return Deny($"unknown share '{request.Share}'");
+            return Deny($"unknown or disabled share '{request.Share}'");
 
-        bool allow = await _auth.CanAccessShareAsync(share.Id, user.Id);
+        bool allow = await _auth.CanAccessShareAsync(share.Id, user.Id)
+            .WaitAsync(cancellationToken);
 
         _logger.LogInformation(
             "AuthorizeConnect: user={User} share={Share} -> {Decision}",
@@ -130,19 +138,26 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     public override async Task<AuthorizeReply> AuthorizeOpen(
         AuthorizeOpenRequest request, ServerCallContext context)
     {
-        var user = await _auth.ResolveUserContextAsync(request.Username);
+        if (!SambaName.IsValidContext(request.Username, request.Share))
+            return Deny("invalid user/share context");
+        CancellationToken cancellationToken =
+            context?.CancellationToken ?? CancellationToken.None;
+
+        var user = await _auth.ResolveUserContextAsync(request.Username)
+            .WaitAsync(cancellationToken);
         if (user is null)
             return Deny($"unknown user '{request.Username}'");
 
-        var share = await _shares.GetByNameAsync(request.Share);
+        var share = await _shares.ResolveEnabledShareAsync(
+            request.Share, cancellationToken);
         if (share is null)
-            return Deny($"unknown share '{request.Share}'");
+            return Deny($"unknown or disabled share '{request.Share}'");
 
-        if (!ShareRelativePath.IsValid(request.Path))
+        if (!TryResolveClientPath(
+                share.Path, request.Path, allowRoot: true,
+                out string normalized, out string full))
             return Deny($"invalid open path '{request.Path}'");
 
-        string normalized = ShareRelativePath.Normalize(request.Path);
-        string full = Path.Combine(share.Path, normalized);
         bool exists = File.Exists(full) || Directory.Exists(full);
         bool isDir = exists ? Directory.Exists(full) : request.CreateDirectory;
 
@@ -159,7 +174,7 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         uint specific = expanded & ~MaximumAllowed;
 
         string? traversalDeny = await CheckTraversalAsync(
-            user, share.Id, normalized);
+            user, share.Id, normalized, cancellationToken);
         if (traversalDeny is not null)
             return Deny(traversalDeny);
 
@@ -170,7 +185,8 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
                 ? FilePermission.CreateAppendData
                 : FilePermission.CreateWriteData;
             if (!await _acl.HasAccessAsync(
-                    user, share.Id, parent, true, createPermission))
+                    user, share.Id, parent, true, createPermission)
+                .WaitAsync(cancellationToken))
                 return Deny(
                     $"create denied: parent '{parent}' lacks {createPermission}");
         }
@@ -183,9 +199,11 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
             specific |= FileReadAttributes;
 
         AccessDecision decision = wantsMaximum
-            ? await CalculateMaximumAllowedAsync(user, share.Id, normalized, isDir)
+            ? await CalculateMaximumAllowedAsync(
+                user, share.Id, normalized, isDir, cancellationToken)
             : await RequireSpecificAccessAsync(
-                user, share.Id, normalized, isDir, specific);
+                user, share.Id, normalized, isDir, specific,
+                cancellationToken);
 
         bool allow = decision.Allowed;
         uint granted = allow ? decision.GrantedMask : 0;
@@ -238,17 +256,20 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     }
 
     private async Task<string?> CheckTraversalAsync(
-        UserContext user, Guid shareId, string normalized)
+        UserContext user, Guid shareId, string normalized,
+        CancellationToken cancellationToken)
     {
         var hierarchy = ShareRelativePath.BuildHierarchy(normalized);
         // The last component is the target. Every preceding component is a
         // directory that Samba traverses, including the share root.
         for (int i = 0; i < hierarchy.Count - 1; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             string ancestor = hierarchy[i];
             if (!await _acl.HasAccessAsync(
                     user, shareId, ancestor, true,
-                    FilePermission.TraverseExecute))
+                    FilePermission.TraverseExecute)
+                .WaitAsync(cancellationToken))
                 return $"traverse denied: ancestor '{ancestor}' lacks TraverseExecute";
         }
         return null;
@@ -256,10 +277,12 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
 
     private async Task<AccessDecision> RequireSpecificAccessAsync(
         UserContext user, Guid shareId, string normalized,
-        bool isDirectory, uint specific)
+        bool isDirectory, uint specific,
+        CancellationToken cancellationToken)
     {
         foreach (AccessRule rule in AccessRules)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if ((specific & rule.Mask) == 0)
                 continue;
 
@@ -272,7 +295,8 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
             if (rule.Mask == DeleteAccess)
             {
                 var deleteDecision = await CanDeleteAsync(
-                    user, shareId, normalized, isDirectory);
+                    user, shareId, normalized, isDirectory,
+                    cancellationToken);
                 allowed = deleteDecision.Allowed;
                 reason = deleteDecision.Reason;
             }
@@ -280,7 +304,7 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
             {
                 allowed = await _acl.HasAccessAsync(
                     user, shareId, normalized, isDirectory,
-                    rule.Permission);
+                    rule.Permission).WaitAsync(cancellationToken);
                 reason = $"access denied: {rule.Name}";
             }
 
@@ -292,11 +316,13 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     }
 
     private async Task<AccessDecision> CalculateMaximumAllowedAsync(
-        UserContext user, Guid shareId, string normalized, bool isDirectory)
+        UserContext user, Guid shareId, string normalized, bool isDirectory,
+        CancellationToken cancellationToken)
     {
         uint granted = 0;
         foreach (AccessRule rule in AccessRules)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (rule.Mask == FileDeleteChild && !isDirectory)
                 continue;
 
@@ -304,14 +330,15 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
             if (rule.Mask == DeleteAccess)
             {
                 var deleteDecision = await CanDeleteAsync(
-                    user, shareId, normalized, isDirectory);
+                    user, shareId, normalized, isDirectory,
+                    cancellationToken);
                 allowed = deleteDecision.Allowed;
             }
             else
             {
                 allowed = await _acl.HasAccessAsync(
                     user, shareId, normalized, isDirectory,
-                    rule.Permission);
+                    rule.Permission).WaitAsync(cancellationToken);
             }
 
             if (allowed)
@@ -334,20 +361,29 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     public override async Task<AuthorizeReply> AuthorizeDelete(
         AuthorizeDeleteRequest request, ServerCallContext context)
     {
-        var user = await _auth.ResolveUserContextAsync(request.Username);
+        if (!SambaName.IsValidContext(request.Username, request.Share))
+            return Deny("invalid user/share context");
+        CancellationToken cancellationToken =
+            context?.CancellationToken ?? CancellationToken.None;
+
+        var user = await _auth.ResolveUserContextAsync(request.Username)
+            .WaitAsync(cancellationToken);
         if (user is null)
             return Deny($"unknown user '{request.Username}'");
 
-        var share = await _shares.GetByNameAsync(request.Share);
+        var share = await _shares.ResolveEnabledShareAsync(
+            request.Share, cancellationToken);
         if (share is null)
-            return Deny($"unknown share '{request.Share}'");
+            return Deny($"unknown or disabled share '{request.Share}'");
 
-        string normalized = ShareRelativePath.Normalize(request.Path);
-        if (string.IsNullOrEmpty(normalized) || !ShareRelativePath.IsValid(request.Path))
+        if (!TryResolveClientPath(
+                share.Path, request.Path, allowRoot: false,
+                out string normalized, out _))
             return Deny($"invalid delete path '{request.Path}'");
 
         var decision = await CanDeleteAsync(
-            user, share.Id, normalized, request.IsDirectory);
+            user, share.Id, normalized, request.IsDirectory,
+            cancellationToken);
         bool allow = decision.Allowed;
         string reason = decision.Reason;
 
@@ -373,35 +409,41 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     public override async Task<AuthorizeReply> AuthorizeRename(
         AuthorizeRenameRequest request, ServerCallContext context)
     {
-        var user = await _auth.ResolveUserContextAsync(request.Username);
+        if (!SambaName.IsValidContext(request.Username, request.Share))
+            return Deny("invalid user/share context");
+        CancellationToken cancellationToken =
+            context?.CancellationToken ?? CancellationToken.None;
+
+        var user = await _auth.ResolveUserContextAsync(request.Username)
+            .WaitAsync(cancellationToken);
         if (user is null)
             return Deny($"unknown user '{request.Username}'");
 
-        var share = await _shares.GetByNameAsync(request.Share);
+        var share = await _shares.ResolveEnabledShareAsync(
+            request.Share, cancellationToken);
         if (share is null)
-            return Deny($"unknown share '{request.Share}'");
+            return Deny($"unknown or disabled share '{request.Share}'");
 
-        if (!ShareRelativePath.IsValid(request.SourcePath) ||
-            !ShareRelativePath.IsValid(request.DestinationPath))
+        if (!TryResolveClientPath(
+                share.Path, request.SourcePath, allowRoot: false,
+                out string source, out string sourceFull) ||
+            !TryResolveClientPath(
+                share.Path, request.DestinationPath, allowRoot: false,
+                out string destination, out string destinationFull))
             return Deny("invalid rename path");
 
-        string source = ShareRelativePath.Normalize(request.SourcePath);
-        string destination = ShareRelativePath.Normalize(request.DestinationPath);
-        if (string.IsNullOrEmpty(source) || string.IsNullOrEmpty(destination) ||
-            string.Equals(source, destination, StringComparison.Ordinal))
+        if (string.Equals(source, destination, StringComparison.Ordinal))
             return Deny($"invalid rename '{source}' -> '{destination}'");
 
         // Cross-check the native request against the shared storage view. This
         // is not the final TOCTOU guard (the VFS performs that immediately
         // before renameat), but prevents authorization based on stale/type-
         // confused request metadata.
-        string sourceFull = Path.Combine(share.Path, source);
         bool sourceExists = File.Exists(sourceFull) || Directory.Exists(sourceFull);
         bool sourceIsDirectory = sourceExists && Directory.Exists(sourceFull);
         if (!sourceExists || sourceIsDirectory != request.SourceIsDirectory)
             return Deny("rename source no longer matches the native request");
 
-        string destinationFull = Path.Combine(share.Path, destination);
         bool destinationExists = File.Exists(destinationFull) || Directory.Exists(destinationFull);
         bool destinationIsDirectory = destinationExists && Directory.Exists(destinationFull);
         if (destinationExists != request.DestinationExists ||
@@ -415,17 +457,18 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
             return Deny("missing rename destination cannot have an object type");
 
         string? sourceTraversalDeny = await CheckTraversalAsync(
-            user, share.Id, source);
+            user, share.Id, source, cancellationToken);
         if (sourceTraversalDeny is not null)
             return Deny(sourceTraversalDeny);
 
         string? destinationTraversalDeny = await CheckTraversalAsync(
-            user, share.Id, destination);
+            user, share.Id, destination, cancellationToken);
         if (destinationTraversalDeny is not null)
             return Deny(destinationTraversalDeny);
 
         var sourceDelete = await CanDeleteAsync(
-            user, share.Id, source, request.SourceIsDirectory);
+            user, share.Id, source, request.SourceIsDirectory,
+            cancellationToken);
         if (!sourceDelete.Allowed)
             return Deny(sourceDelete.Reason);
 
@@ -434,7 +477,8 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
             ? FilePermission.CreateAppendData
             : FilePermission.CreateWriteData;
         if (!await _acl.HasAccessAsync(
-                user, share.Id, destinationParent, true, createPermission))
+                user, share.Id, destinationParent, true, createPermission)
+            .WaitAsync(cancellationToken))
             return Deny(
                 $"rename denied: destination parent '{destinationParent}' lacks {createPermission}");
 
@@ -443,7 +487,7 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         {
             var replacementDelete = await CanDeleteAsync(
                 user, share.Id, destination,
-                request.DestinationIsDirectory);
+                request.DestinationIsDirectory, cancellationToken);
             if (!replacementDelete.Allowed)
                 return Deny(replacementDelete.Reason);
             replacementSource = replacementDelete.Source;
@@ -459,15 +503,18 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     }
 
     private async Task<(bool Allowed, string Source, string Reason)> CanDeleteAsync(
-        UserContext user, Guid shareId, string normalized, bool isDirectory)
+        UserContext user, Guid shareId, string normalized, bool isDirectory,
+        CancellationToken cancellationToken)
     {
         if (await _acl.HasAccessAsync(
-                user, shareId, normalized, isDirectory, FilePermission.Delete))
+                user, shareId, normalized, isDirectory, FilePermission.Delete)
+            .WaitAsync(cancellationToken))
             return (true, "Delete", "");
 
         string parent = ShareRelativePath.GetParent(normalized);
         if (await _acl.HasAccessAsync(
-                user, shareId, parent, true, FilePermission.DeleteSubItems))
+                user, shareId, parent, true, FilePermission.DeleteSubItems)
+            .WaitAsync(cancellationToken))
             return (true, "DeleteSubItems", "");
 
         return (false, "none",
@@ -478,5 +525,35 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     {
         _logger.LogInformation("Authz DENY: {Reason}", reason);
         return new AuthorizeReply { Allow = false, Reason = reason };
+    }
+
+    private static bool TryResolveClientPath(
+        string shareRoot,
+        string rawPath,
+        bool allowRoot,
+        out string normalized,
+        out string absolute)
+    {
+        absolute = "";
+        if (!ShareRelativePath.TryNormalizeStrict(
+                rawPath, out normalized, allowRoot,
+                allowInternalNamespace: false))
+            return false;
+
+        try
+        {
+            absolute = ShareRelativePath.ToContainedAbsolutePath(
+                shareRoot, normalized, allowRoot,
+                allowInternalNamespace: false);
+            return true;
+        }
+        catch (Exception exception)
+            when (exception is ArgumentException or IOException or
+                  NotSupportedException or UnauthorizedAccessException)
+        {
+            normalized = "";
+            absolute = "";
+            return false;
+        }
     }
 }

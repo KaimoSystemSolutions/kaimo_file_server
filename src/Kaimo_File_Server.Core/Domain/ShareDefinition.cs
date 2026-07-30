@@ -97,9 +97,8 @@ namespace Kaimo_File_Server.Core.Domain
         {
             Id = Guid.NewGuid();
 
-            Name = !string.IsNullOrWhiteSpace(name)
-                ? name
-                : throw new ArgumentException("Name must not be empty.", nameof(name));
+            SambaName.EnsureValidShareName(name, nameof(name));
+            Name = name;
 
             Path = !string.IsNullOrWhiteSpace(path)
                 ? path

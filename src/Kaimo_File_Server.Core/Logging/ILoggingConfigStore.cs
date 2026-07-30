@@ -21,6 +21,12 @@ public static class LoggingConfigKeys
     /// <summary>Config-store key holding the level name.</summary>
     public const string LevelKey = "logging.level";
 
+    /// <summary>
+    /// Optional process-level override. When set, this wins over the DB-backed
+    /// Settings value and every appsettings source.
+    /// </summary>
+    public const string EnvironmentVariable = "KAIMO_LOG_LEVEL";
+
     /// <summary>Default when nothing is stored: only warnings and errors.</summary>
     public const string DefaultLevel = "Warning";
 
@@ -34,4 +40,9 @@ public static class LoggingConfigKeys
     public static bool IsAllowed(string? level)
         => level is not null && Array.Exists(AllowedLevels,
             l => string.Equals(l, level, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Returns the canonical level spelling, or <see langword="null"/>.</summary>
+    public static string? Normalize(string? level)
+        => Array.Find(AllowedLevels,
+            l => string.Equals(l, level?.Trim(), StringComparison.OrdinalIgnoreCase));
 }

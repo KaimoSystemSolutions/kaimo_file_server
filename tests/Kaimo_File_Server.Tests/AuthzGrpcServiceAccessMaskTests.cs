@@ -261,6 +261,22 @@ public sealed class AuthzGrpcServiceAccessMaskTests : IDisposable
         _acl.VerifyNoOtherCalls();
     }
 
+    [Theory]
+    [InlineData("/docs/report.txt")]
+    [InlineData(@"\docs\report.txt")]
+    [InlineData("C:/docs/report.txt")]
+    [InlineData("docs/../report.txt")]
+    [InlineData(".kaimo-close-captures/event.cap")]
+    public async Task AuthorizeOpen_RejectsNonClientRelativePathBeforeAcl(
+        string path)
+    {
+        var reply = await AuthorizeAsync(0x00000001, path);
+
+        Assert.False(reply.Allow);
+        Assert.Contains("invalid open path", reply.Reason);
+        _acl.VerifyNoOtherCalls();
+    }
+
     private Task<AuthorizeReply> AuthorizeAsync(
         uint accessMask,
         string path = "docs/report.txt",

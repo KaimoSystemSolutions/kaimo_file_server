@@ -226,7 +226,11 @@ public class FileService : IFileService
     /// underlying file operation, so it is swallowed and logged. No-op when ownership
     /// tracking is not configured.
     /// </summary>
-    private async Task RecordOwnerAsync(string normalizedPath, bool isDirectory, UserContext user)
+    private async Task RecordOwnerAsync(
+        string normalizedPath,
+        bool isDirectory,
+        UserContext user,
+        bool bestEffort = true)
     {
         if (_ownershipService is null) return;
         try
@@ -235,6 +239,7 @@ public class FileService : IFileService
         }
         catch (Exception ex)
         {
+            if (!bestEffort) throw;
             _logger.LogWarning(LogEvents.FileOwnerRecordFailed, ex, LogMessages.FileOwnerRecordFailed, normalizedPath);
         }
     }
@@ -272,7 +277,8 @@ public class FileService : IFileService
 
     private async Task ApplyRenameSideEffectsAsync(
         string oldRelativePath, string newRelativePath, bool isDirectory,
-        string oldAbsolutePath, string newAbsolutePath, bool bestEffort)
+        string oldAbsolutePath, string newAbsolutePath, bool bestEffort,
+        Guid? sambaLifecycleEventId = null)
     {
         var failures = new List<Exception>();
 
@@ -281,7 +287,12 @@ public class FileService : IFileService
 
         if (_versionService != null)
         {
-            try { await _versionService.RenamePathAsync(_shareId, oldRelativePath, newRelativePath); }
+            try
+            {
+                await _versionService.RenamePathAsync(
+                    _shareId, oldRelativePath, newRelativePath,
+                    sambaLifecycleEventId);
+            }
             catch (Exception ex) { failures.Add(ex); }
         }
 
@@ -336,27 +347,37 @@ public class FileService : IFileService
     //
     // Samba performs the raw file I/O itself, then the VFS bridge calls these so the same
     // cross-cutting effects as FileSession.DisposeAsync happen: versioning, search indexing,
-    // ownership. All best-effort — a hook failure must never surface as an SMB error.
+    // ownership. P1-11 surfaces failures to the bridge so authd retains and
+    // retries the durable event. The native SMB operation has already completed.
 
-    public async Task NotifyExternalCloseAsync(string path, UserContext user)
+    public async Task NotifyExternalCloseAsync(
+        string path,
+        UserContext user,
+        Func<Task<Stream>> openCapturedContent)
     {
+        ArgumentNullException.ThrowIfNull(openCapturedContent);
         var rel = ShareRelativePath.Normalize(path);
         var abs = _storage.ToAbsolutePath(rel);
+        var failures = new List<Exception>();
 
-        // Ownership (idempotent, swallows its own errors).
-        await RecordOwnerAsync(rel, isDirectory: false, user);
+        try
+        {
+            await RecordOwnerAsync(
+                rel, isDirectory: false, user, bestEffort: false);
+        }
+        catch (Exception ex) { failures.Add(ex); }
 
         // Versioning: snapshot the freshly written content (mirrors DisposeAsync).
         if (_versionService != null)
         {
             try
             {
-                await using var content = await _storage.ReadAsync(rel);
+                await using var content = await openCapturedContent();
                 await _versionService.CreateVersionAsync(_shareId, rel, content, user.User.Id.ToString());
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(LogEvents.FileVersionSnapshotFailed, ex, LogMessages.FileVersionSnapshotFailed, rel);
+                failures.Add(ex);
             }
         }
 
@@ -365,31 +386,50 @@ public class FileService : IFileService
         // before the scope/DbContext is torn down — and surface errors.
         if (_searchService != null)
         {
-            try { await _searchService.onFileCreated(abs, _storage.ReadAsync(rel)); }
-            catch (Exception ex) { _logger.LogWarning(LogEvents.FileSearchHookFailed, ex, LogMessages.FileSearchHookFailed, rel); }
+            try { await _searchService.onFileCreated(abs, openCapturedContent()); }
+            catch (Exception ex) { failures.Add(ex); }
         }
+
+        if (failures.Count != 0)
+            throw new AggregateException(
+                $"One or more close side effects failed for '{rel}'.",
+                failures);
     }
 
     public async Task NotifyExternalMkdirAsync(string path, UserContext user)
     {
         var rel = ShareRelativePath.Normalize(path);
         var abs = _storage.ToAbsolutePath(rel);
-        await RecordOwnerAsync(rel, isDirectory: true, user);
+        var failures = new List<Exception>();
+        try
+        {
+            await RecordOwnerAsync(
+                rel, isDirectory: true, user, bestEffort: false);
+        }
+        catch (Exception ex) { failures.Add(ex); }
         if (_searchService != null)
         {
             try { await _searchService.onDirectoryCreated(abs); }
-            catch (Exception ex) { _logger.LogWarning(LogEvents.FileSearchHookFailed, ex, LogMessages.FileSearchHookFailed, rel); }
+            catch (Exception ex) { failures.Add(ex); }
         }
+        if (failures.Count != 0)
+            throw new AggregateException(
+                $"One or more mkdir side effects failed for '{rel}'.",
+                failures);
     }
 
     public async Task NotifyExternalDeleteAsync(string path, bool isDirectory)
     {
         var rel = ShareRelativePath.Normalize(path);
         var abs = _storage.ToAbsolutePath(rel);
-        await ApplyDeleteSideEffectsAsync(rel, isDirectory, abs, bestEffort: true);
+        await ApplyDeleteSideEffectsAsync(rel, isDirectory, abs, bestEffort: false);
     }
 
-    public async Task NotifyExternalRenameAsync(string oldPath, string newPath, bool isDirectory)
+    public async Task NotifyExternalRenameAsync(
+        string oldPath,
+        string newPath,
+        bool isDirectory,
+        Guid sambaLifecycleEventId)
     {
         var oldRel = ShareRelativePath.Normalize(oldPath);
         var newRel = ShareRelativePath.Normalize(newPath);
@@ -397,7 +437,8 @@ public class FileService : IFileService
         var newAbs = _storage.ToAbsolutePath(newRel);
 
         await ApplyRenameSideEffectsAsync(
-            oldRel, newRel, isDirectory, oldAbs, newAbs, bestEffort: true);
+            oldRel, newRel, isDirectory, oldAbs, newAbs, bestEffort: false,
+            sambaLifecycleEventId);
     }
 
     // ------------------ ACL helpers ------------------
@@ -907,13 +948,38 @@ public class FileService : IFileService
         var normalized = ShareRelativePath.Normalize(folderPath);
         await EnsureAccessAsync(user, normalized, true, FilePermission.ListReadData);
 
-        var versions = await _versionService.GetFolderSnapshotAsync(_shareId, normalized, asOfUtc);
+        var versions = await _versionService.GetFolderSnapshotAsync(
+            _shareId, normalized, asOfUtc);
+        if (versions.Count == 0) return versions;
+
+        var readable = await FilterReadablePathsAsync(
+            versions.Select(v => (v.FilePath, false)).ToList(), user);
+
+        return versions.Where(v => readable.Contains(v.FilePath)).ToList();
+    }
+
+    public async Task<List<FileVersion>> GetFolderSnapshotAsync(
+        string folderPath, DateTime asOfUtc, UserContext user,
+        CancellationToken cancellationToken)
+    {
+        if (_versionService == null) return new List<FileVersion>();
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var normalized = ShareRelativePath.Normalize(folderPath);
+        await EnsureAccessAsync(
+                user, normalized, true, FilePermission.ListReadData)
+            .WaitAsync(cancellationToken);
+
+        var versions = await _versionService.GetFolderSnapshotAsync(
+            _shareId, normalized, asOfUtc, cancellationToken);
         if (versions.Count == 0) return versions;
 
         // Hide files the user may not read (per-file ACLs can differ from the folder).
         var readable = await FilterReadablePathsAsync(
-            versions.Select(v => (v.FilePath, false)).ToList(), user);
+                versions.Select(v => (v.FilePath, false)).ToList(), user)
+            .WaitAsync(cancellationToken);
 
+        cancellationToken.ThrowIfCancellationRequested();
         return versions.Where(v => readable.Contains(v.FilePath)).ToList();
     }
 }

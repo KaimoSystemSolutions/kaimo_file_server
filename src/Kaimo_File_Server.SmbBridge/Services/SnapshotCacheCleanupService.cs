@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Repositories;
+using Microsoft.Extensions.Options;
 
 namespace Kaimo_File_Server.SmbBridge.Services;
 
@@ -23,29 +24,23 @@ namespace Kaimo_File_Server.SmbBridge.Services;
 public sealed class SnapshotCacheCleanupService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopes;
-    private readonly IConfiguration _config;
+    private readonly SnapshotCacheOptions _options;
+    private readonly SnapshotCacheLeaseManager _leases;
     private readonly ILogger<SnapshotCacheCleanupService> _logger;
     private readonly string _cacheRoot;
 
     public SnapshotCacheCleanupService(
         IServiceScopeFactory scopes,
-        IConfiguration config,
+        IOptions<SnapshotCacheOptions> options,
+        SnapshotCacheLeaseManager leases,
         ILogger<SnapshotCacheCleanupService> logger)
     {
         _scopes = scopes;
-        _config = config;
-        _cacheRoot = SnapshotCache.ConfiguredRoot(config);
+        _options = options.Value;
+        _leases = leases;
+        _cacheRoot = Path.GetFullPath(_options.RootPath);
         _logger = logger;
     }
-
-    private TimeSpan Ttl =>
-        TimeSpan.FromHours(_config.GetValue("Snapshots:Cache:TtlHours", 24.0));
-
-    private long MaxBytesPerShare =>
-        _config.GetValue("Snapshots:Cache:MaxBytesPerShare", 5L * 1024 * 1024 * 1024); // 5 GiB
-
-    private TimeSpan SweepInterval =>
-        TimeSpan.FromMinutes(_config.GetValue("Snapshots:Cache:SweepMinutes", 30.0));
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -68,7 +63,7 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
                 _logger.LogError(ex, "Snapshot cache sweep failed; retrying next interval.");
             }
 
-            try { await Task.Delay(SweepInterval, stoppingToken); }
+            try { await Task.Delay(_options.SweepInterval, stoppingToken); }
             catch (OperationCanceledException) { break; }
         }
     }
@@ -82,8 +77,8 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
             shares = await repo.GetAllAsync();
         }
 
-        TimeSpan ttl = Ttl;
-        long cap = MaxBytesPerShare;
+        TimeSpan ttl = _options.Ttl;
+        long cap = _options.MaxBytesPerShare;
         DateTime cutoff = DateTime.UtcNow - ttl;
 
         int evictedTtl = 0, evictedSize = 0, evictedLegacy = 0, evictedOrphan = 0;
@@ -116,6 +111,7 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
 
             string root = SnapshotCache.ShareRootFor(_cacheRoot, share.Id);
             if (!Directory.Exists(root)) continue;
+            string shareScope = SnapshotCache.RelativeShareRootFor(share.Id);
 
             // Token dirs are the immediate children of a share-id cache root.
             var tokens = new List<(string dir, DateTime cachedAt, long size)>();
@@ -124,7 +120,7 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
                 DateTime cachedAt = SnapshotCache.CachedAtUtc(dir);
                 if (cachedAt < cutoff)
                 {
-                    if (TryDeleteDir(dir)) evictedTtl++;
+                    if (TryDeleteTokenDir(shareScope, dir)) evictedTtl++;
                     continue;
                 }
                 tokens.Add((dir, cachedAt, DirectorySize(dir)));
@@ -137,7 +133,7 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
                 foreach (var t in tokens.OrderBy(t => t.cachedAt))
                 {
                     if (total <= cap) break;
-                    if (TryDeleteDir(t.dir))
+                    if (TryDeleteTokenDir(shareScope, t.dir))
                     {
                         total -= t.size;
                         evictedSize++;
@@ -153,8 +149,9 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
             foreach (string root in SafeEnumerateDirectories(_cacheRoot))
             {
                 ct.ThrowIfCancellationRequested();
-                if (!activeShareIds.Contains(Path.GetFileName(root)) &&
-                    TryDeleteDir(root))
+                string shareScope = Path.GetFileName(root);
+                if (!activeShareIds.Contains(shareScope) &&
+                    TryDeleteOrphanShareRoot(shareScope, root, ct))
                     evictedOrphan++;
             }
         }
@@ -167,10 +164,31 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
                 evictedLegacy, evictedOrphan);
     }
 
-    private static IEnumerable<string> SafeEnumerateDirectories(string root)
+    /// <summary>
+    /// Returns a stable snapshot of the immediate child directories. Directory
+    /// enumeration is lazy, so materialization must remain inside this method's
+    /// exception boundary; returning the enumerable would defer I/O failures to
+    /// an unprotected caller-side <c>foreach</c>.
+    /// </summary>
+    internal IReadOnlyList<string> SafeEnumerateDirectories(string root)
     {
-        try { return Directory.EnumerateDirectories(root); }
-        catch { return Array.Empty<string>(); }
+        try
+        {
+            return Directory.EnumerateDirectories(root).ToArray();
+        }
+        catch (DirectoryNotFoundException)
+        {
+            // A concurrent materializer or eviction may remove the directory
+            // between the existence check and enumeration.
+            return Array.Empty<string>();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex,
+                "Snapshot cache: failed to enumerate directories below {Dir}",
+                root);
+            return Array.Empty<string>();
+        }
     }
 
     private static bool LooksLikeManagedLegacyCache(string root)
@@ -198,6 +216,50 @@ public sealed class SnapshotCacheCleanupService : BackgroundService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Snapshot cache: failed to evict {Dir}", dir);
+            return false;
+        }
+    }
+
+    internal bool TryDeleteTokenDir(string shareScope, string tokenDir)
+    {
+        IDisposable? lease = _leases.TryAcquireEviction(
+            _cacheRoot, shareScope, Path.GetFileName(tokenDir));
+        if (lease is null)
+            return false;
+
+        using (lease)
+            return TryDeleteDir(tokenDir);
+    }
+
+    private bool TryDeleteOrphanShareRoot(
+        string shareScope, string root, CancellationToken ct)
+    {
+        foreach (string tokenDir in SafeEnumerateDirectories(root))
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!TryDeleteTokenDir(shareScope, tokenDir))
+                return false;
+        }
+
+        try
+        {
+            Directory.Delete(root, recursive: false);
+            return true;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return true;
+        }
+        catch (IOException)
+        {
+            // A concurrent materializer recreated a token after the final
+            // per-token lease was released. Leave the share root for next sweep.
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Snapshot cache: failed to evict orphan share root {Dir}", root);
             return false;
         }
     }

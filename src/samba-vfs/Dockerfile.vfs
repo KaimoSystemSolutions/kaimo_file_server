@@ -35,9 +35,15 @@ FROM ubuntu:24.04 AS src
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -qq && apt-get install -y -qq wget && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
-RUN wget -q https://download.samba.org/pub/samba/stable/samba-4.19.5.tar.gz \
-    && tar xf samba-4.19.5.tar.gz \
-    && rm samba-4.19.5.tar.gz
+COPY samba-build.env /usr/local/share/kaimo/samba-build.env
+RUN set -eu; \
+    . /usr/local/share/kaimo/samba-build.env; \
+    archive="samba-${SAMBA_VERSION}.tar.gz"; \
+    wget -q "https://download.samba.org/pub/samba/stable/${archive}"; \
+    printf '%s  %s\n' "$SAMBA_TARBALL_SHA256" "$archive" | sha256sum -c -; \
+    mkdir /build/samba-source; \
+    tar -xzf "$archive" --strip-components=1 -C /build/samba-source; \
+    rm "$archive"
 
 # ---------- Stage 2: expensive, cache-stable Samba build (stub module) ----------
 # This stage MUST NOT depend on the real module content. Its only module input is
@@ -61,7 +67,7 @@ RUN apt-get update \
        libgrpc++-dev libprotobuf-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /build/samba-4.19.5
+WORKDIR /build/samba-source
 
 # Samba otherwise converts every failure from a VFS connect hook to the generic
 # NT_STATUS_UNSUCCESSFUL. Preserve EACCES as NT_STATUS_ACCESS_DENIED so Windows
@@ -70,6 +76,13 @@ WORKDIR /build/samba-4.19.5
 COPY patches/0001-map-vfs-connect-errno.patch /tmp/
 RUN patch -p1 < /tmp/0001-map-vfs-connect-errno.patch \
     && grep -F "map_nt_error_from_unix(connect_errno)" source3/smbd/smb2_service.c
+
+# Samba 4.19.5 labels control-channel PING receipt as INFO but emits it at
+# warning level 1. Our accountless Docker healthcheck pings every 15 seconds,
+# so align that message with Samba's actual DBGLVL_INFO (5).
+COPY patches/0002-log-control-ping-at-info.patch /tmp/
+RUN patch -p1 < /tmp/0002-log-control-ping-at-info.patch \
+    && grep -F 'DEBUG(DBGLVL_INFO, ("INFO: Received PING message' source3/lib/messages.c
 
 # 1) Register module in build system (template: vfs_fake_perms). Constant strings.
 RUN cat >> source3/modules/wscript_build <<'PYEOF'
@@ -136,7 +149,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # toggle) is a standard Samba module already built into /opt/samba by the source
 # build above — no extra package needed.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends wsdd procps \
+    && apt-get install -y --no-install-recommends wsdd procps jq \
     && rm -rf /var/lib/apt/lists/*
 
 # Phase 1: build gRPC C++ clients (authsync/authd/sharesync/configsync) for
@@ -149,9 +162,19 @@ COPY module/sharesync.cpp ./
 COPY module/configsync.cpp ./
 COPY module/bridge_channel.h ./
 COPY module/decision_cache.h ./
+COPY module/event_spool.h ./
 COPY module/local_protocol.h ./
+COPY module/snapshot_enumeration.h ./
+COPY module/rename_event.h ./
+COPY module/sync_json.h ./
 COPY tests/test-decision-cache.cpp ./
+COPY tests/test-event-spool.cpp ./
 COPY tests/test-local-protocol.cpp ./
+COPY tests/test-snapshot-enumeration.cpp ./
+COPY tests/test-rename-event.cpp ./
+COPY module/share_path.h ./
+COPY tests/test-share-path.cpp ./
+COPY tests/test-sync-json.cpp ./
 RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
     && protoc --grpc_out=. --plugin=protoc-gen-grpc="$(which grpc_cpp_plugin)" kaimo_smb_bridge.proto \
     && g++ -std=c++17 -O2 \
@@ -179,9 +202,29 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
     && /tmp/test-decision-cache \
     && rm /tmp/test-decision-cache \
     && g++ -std=c++17 -O2 -pthread -I. \
+       test-event-spool.cpp -o /tmp/test-event-spool \
+    && /tmp/test-event-spool \
+    && rm /tmp/test-event-spool \
+    && g++ -std=c++17 -O2 -pthread -I. \
        test-local-protocol.cpp -o /tmp/test-local-protocol \
     && /tmp/test-local-protocol \
     && rm /tmp/test-local-protocol \
+    && g++ -std=c++17 -O2 -I. \
+       test-snapshot-enumeration.cpp -o /tmp/test-snapshot-enumeration \
+    && /tmp/test-snapshot-enumeration \
+    && rm /tmp/test-snapshot-enumeration \
+    && g++ -std=c++17 -O2 -I. \
+       test-rename-event.cpp -o /tmp/test-rename-event \
+    && /tmp/test-rename-event \
+    && rm /tmp/test-rename-event \
+    && g++ -std=c++17 -O2 -I. \
+       test-share-path.cpp -o /tmp/test-share-path \
+    && /tmp/test-share-path \
+    && rm /tmp/test-share-path \
+    && g++ -std=c++17 -O2 -I. \
+       test-sync-json.cpp -o /tmp/test-sync-json \
+    && /tmp/test-sync-json \
+    && rm /tmp/test-sync-json \
     && test -x /usr/local/bin/kaimo_authsync \
     && test -x /usr/local/bin/kaimo_authd \
     && test -x /usr/local/bin/kaimo_sharesync \
@@ -190,8 +233,8 @@ RUN protoc --cpp_out=. kaimo_smb_bridge.proto \
 # Real VFS module: overwrite the stub and relink ONLY this target (no reconfigure).
 # This is the layer that reruns on a module edit -> a single object + relink.
 # The installed .so is located by name (not a hardcoded path) and overwritten.
-WORKDIR /build/samba-4.19.5
-COPY module/vfs_kaimo_bridge.c module/local_protocol.h source3/modules/
+WORKDIR /build/samba-source
+COPY module/vfs_kaimo_bridge.c module/local_protocol.h module/rename_event.h module/share_path.h module/snapshot_enumeration.h source3/modules/
 RUN PYTHONHASHSEED=1 ./buildtools/bin/waf build --targets=vfs_kaimo_bridge \
     && built="bin/modules/vfs/kaimo_bridge.so" \
     && dest="$(find /opt/samba -name '*kaimo_bridge*.so' | head -n1)" \
@@ -207,18 +250,94 @@ COPY selftest.sh              /usr/local/bin/selftest.sh
 COPY sync-users.sh            /usr/local/bin/sync-users.sh
 COPY sync-shares.sh           /usr/local/bin/sync-shares.sh
 COPY sync-config.sh           /usr/local/bin/sync-config.sh
+COPY run-sync.sh              /usr/local/bin/run-sync.sh
+COPY sync-cycle.sh            /usr/local/bin/sync-cycle.sh
+COPY revoke-samba-sessions.sh /usr/local/bin/revoke-samba-sessions.sh
+COPY validate-sync-interval.sh /usr/local/bin/validate-sync-interval.sh
+COPY sync-health.sh           /usr/local/bin/sync-health.sh
+COPY supervise-samba.sh       /usr/local/bin/supervise-samba.sh
+COPY authd-health.sh          /usr/local/bin/authd-health.sh
+COPY smbd-health.sh           /usr/local/bin/smbd-health.sh
+COPY verify-samba-build.sh    /tmp/verify-samba-build.sh
+COPY tests/test-sync-users.sh /tmp/test-sync-users.sh
+COPY tests/test-sync-shares.sh /tmp/test-sync-shares.sh
+COPY tests/test-sync-config.sh /tmp/test-sync-config.sh
+COPY tests/test-sync-config-samba-registry.sh /tmp/test-sync-config-samba-registry.sh
+COPY tests/test-sync-runner.sh /tmp/test-sync-runner.sh
+COPY tests/test-revocation-policy.sh /tmp/test-revocation-policy.sh
+COPY tests/test-authd-supervisor.sh /tmp/test-authd-supervisor.sh
+COPY tests/test-operational-credentials.sh /tmp/test-operational-credentials.sh
+COPY entrypoint.sh /tmp/phase0-entrypoint.sh
 COPY tests/test-vfs-io-deadline.py /usr/local/bin/test-vfs-io-deadline.py
 COPY tests/test-vfs-snapshot-readonly.py /usr/local/bin/test-vfs-snapshot-readonly.py
+COPY tests/test-vfs-operation-compatibility.py /tmp/test-vfs-operation-compatibility.py
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
                        /usr/local/bin/sync-users.sh /usr/local/bin/sync-shares.sh \
                        /usr/local/bin/sync-config.sh \
+                       /usr/local/bin/run-sync.sh /usr/local/bin/sync-cycle.sh \
+                       /usr/local/bin/revoke-samba-sessions.sh \
+                       /usr/local/bin/validate-sync-interval.sh \
+                       /usr/local/bin/sync-health.sh \
+                       /usr/local/bin/supervise-samba.sh \
+                       /usr/local/bin/authd-health.sh \
+                       /usr/local/bin/smbd-health.sh \
+                       /tmp/verify-samba-build.sh \
+                       /tmp/test-sync-users.sh \
+                       /tmp/test-sync-shares.sh /tmp/test-sync-config.sh \
+                       /tmp/test-sync-config-samba-registry.sh \
+                       /tmp/test-sync-runner.sh /tmp/test-revocation-policy.sh \
+                       /tmp/test-authd-supervisor.sh \
+                       /tmp/test-operational-credentials.sh \
+                       /tmp/phase0-entrypoint.sh \
                        /usr/local/bin/test-vfs-io-deadline.py \
                        /usr/local/bin/test-vfs-snapshot-readonly.py \
+                       /tmp/test-vfs-operation-compatibility.py \
     && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
              /usr/local/bin/sync-users.sh /usr/local/bin/sync-shares.sh \
              /usr/local/bin/sync-config.sh \
+             /usr/local/bin/run-sync.sh /usr/local/bin/sync-cycle.sh \
+             /usr/local/bin/revoke-samba-sessions.sh \
+             /usr/local/bin/validate-sync-interval.sh \
+             /usr/local/bin/sync-health.sh \
+             /usr/local/bin/supervise-samba.sh \
+             /usr/local/bin/authd-health.sh \
+             /usr/local/bin/smbd-health.sh \
+             /tmp/verify-samba-build.sh \
              /usr/local/bin/test-vfs-io-deadline.py \
-             /usr/local/bin/test-vfs-snapshot-readonly.py
+             /usr/local/bin/test-vfs-snapshot-readonly.py \
+    && SYNC_USERS_SUT=/usr/local/bin/sync-users.sh bash /tmp/test-sync-users.sh \
+    && SYNC_SHARES_SUT=/usr/local/bin/sync-shares.sh bash /tmp/test-sync-shares.sh \
+    && SYNC_CONFIG_SUT=/usr/local/bin/sync-config.sh bash /tmp/test-sync-config.sh \
+    && SYNC_CONFIG_SUT=/usr/local/bin/sync-config.sh \
+       SAMBA_NET_BIN=/opt/samba/bin/net \
+       bash /tmp/test-sync-config-samba-registry.sh \
+    && SYNC_RUNNER_SUT=/usr/local/bin/run-sync.sh \
+       SYNC_HEALTH_SUT=/usr/local/bin/sync-health.sh \
+       bash /tmp/test-sync-runner.sh \
+    && SESSION_REVOKER_SUT=/usr/local/bin/revoke-samba-sessions.sh \
+       SYNC_CYCLE_SUT=/usr/local/bin/sync-cycle.sh \
+       SYNC_INTERVAL_VALIDATOR_SUT=/usr/local/bin/validate-sync-interval.sh \
+       bash /tmp/test-revocation-policy.sh \
+    && AUTHD_SUPERVISOR_SUT=/usr/local/bin/supervise-samba.sh \
+       AUTHD_HEALTH_SUT=/usr/local/bin/authd-health.sh \
+       SMBD_HEALTH_SUT=/usr/local/bin/smbd-health.sh \
+       bash /tmp/test-authd-supervisor.sh \
+    && CREDENTIAL_ENTRYPOINT_SUT=/usr/local/bin/entrypoint.sh \
+       CREDENTIAL_PHASE0_ENTRYPOINT_SUT=/tmp/phase0-entrypoint.sh \
+       CREDENTIAL_SELFTEST_SUT=/usr/local/bin/selftest.sh \
+       CREDENTIAL_SYNC_USERS_SUT=/usr/local/bin/sync-users.sh \
+       CREDENTIAL_SYNC_CONFIG_SUT=/usr/local/bin/sync-config.sh \
+       bash /tmp/test-operational-credentials.sh \
+    && /tmp/verify-samba-build.sh \
+    && python3 /tmp/test-vfs-operation-compatibility.py \
+    && rm /tmp/test-sync-users.sh /tmp/test-sync-shares.sh \
+          /tmp/test-sync-config.sh /tmp/test-sync-config-samba-registry.sh \
+          /tmp/test-sync-runner.sh \
+          /tmp/test-revocation-policy.sh \
+          /tmp/test-authd-supervisor.sh \
+          /tmp/test-operational-credentials.sh /tmp/phase0-entrypoint.sh \
+          /tmp/verify-samba-build.sh \
+          /tmp/test-vfs-operation-compatibility.py
 
 # Package the installed runtime separately. Stripping is intentionally performed
 # on the copy only: `docker build --target build-runtime` still yields the full
@@ -242,7 +361,7 @@ RUN set -eux; \
       | xargs -r -n1 readlink -f \
       | sort -u > /tmp/runtime-libraries.txt; \
     { \
-        printf '%s\n' acl ca-certificates login passwd procps sysvinit-utils wsdd; \
+        printf '%s\n' acl ca-certificates jq login passwd procps sysvinit-utils util-linux wsdd; \
         while IFS= read -r library_path; do \
             owner="$(dpkg-query -S "$library_path" | head -n1)"; \
             printf '%s\n' "${owner%%:*}"; \
@@ -259,7 +378,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 COPY --from=build-runtime /runtime/runtime-packages.txt /tmp/runtime-packages.txt
 RUN apt-get update \
     && xargs -r apt-get install -y --no-install-recommends < /tmp/runtime-packages.txt \
-    && rm -rf /var/lib/apt/lists/* /tmp/runtime-packages.txt
+    && rm -rf /var/lib/apt/lists/* /tmp/runtime-packages.txt \
+    && command -v flock >/dev/null \
+    && command -v jq >/dev/null \
+    && command -v mktemp >/dev/null \
+    && command -v stat >/dev/null
 
 COPY --from=build-runtime /runtime/opt/samba/ /opt/samba/
 COPY --from=build-runtime /runtime/usr/local/bin/ /usr/local/bin/

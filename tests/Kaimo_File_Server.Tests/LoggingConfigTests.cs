@@ -64,6 +64,39 @@ public class LoggingConfigTests : DatabaseTestBase
         Assert.True(fired, "Setting the level should raise the configuration change token.");
     }
 
+    [Fact]
+    public void Environment_override_wins_over_database_changes()
+    {
+        var source = new LoggingLevelConfigurationSource("Error");
+        IConfiguration config = new ConfigurationBuilder().Add(source).Build();
+
+        Assert.Equal("Error", config["Logging:LogLevel:Default"]);
+
+        source.SetLevel("Debug");
+
+        Assert.Equal("Error", config["Logging:LogLevel:Default"]);
+        Assert.Equal("Error", source.ManualOverrideLevel);
+        Assert.Equal("Error", source.ResolveLevel("Information"));
+    }
+
+    [Fact]
+    public void Environment_override_is_case_insensitive_and_canonicalized()
+    {
+        var source = new LoggingLevelConfigurationSource(" warning ");
+        IConfiguration config = new ConfigurationBuilder().Add(source).Build();
+
+        Assert.Equal("Warning", config["Logging:LogLevel:Default"]);
+    }
+
+    [Fact]
+    public void Invalid_environment_override_fails_fast()
+    {
+        var error = Assert.Throws<InvalidOperationException>(
+            () => new LoggingLevelConfigurationSource("Verbose"));
+
+        Assert.Contains(LoggingConfigKeys.EnvironmentVariable, error.Message);
+    }
+
     // ───────────────────────── config store (real DB) ─────────────────────────
 
     [Fact]

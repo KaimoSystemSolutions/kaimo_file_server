@@ -293,7 +293,10 @@ public sealed class HttpsCertificateProvider : IHttpsCertificateProvider
     }
 
     private static X509Certificate2 LoadPfx(byte[] pfx) =>
-        X509CertificateLoader.LoadPkcs12(pfx, null, X509KeyStorageFlags.Exportable);
+        X509CertificateLoader.LoadPkcs12(
+            pfx,
+            null,
+            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.EphemeralKeySet);
 
     // ── Custom-certificate import: format auto-detection ──
 
@@ -322,7 +325,10 @@ public sealed class HttpsCertificateProvider : IHttpsCertificateProvider
     {
         try
         {
-            return X509CertificateLoader.LoadPkcs12(data, password, X509KeyStorageFlags.Exportable);
+            return X509CertificateLoader.LoadPkcs12(
+                data,
+                password,
+                X509KeyStorageFlags.Exportable | X509KeyStorageFlags.EphemeralKeySet);
         }
         catch (CryptographicException ex)
         {

@@ -1,7 +1,5 @@
 <Solution>
-  <Project Path="docker-compose.dcproj">
-    <Build />
-  </Project>
+  <Folder Name="/src/" />
 
   <Folder Name="/src/samba-vfs/">
     <File Path="src/samba-vfs/Dockerfile" />
@@ -12,8 +10,10 @@
     <File Path="src/samba-vfs/entrypoint.sh" />
     <File Path="src/samba-vfs/entrypoint.vfs.sh" />
     <File Path="src/samba-vfs/generate-control-plane-certs.sh" />
+    <File Path="src/samba-vfs/run-sync.sh" />
     <File Path="src/samba-vfs/selftest.sh" />
     <File Path="src/samba-vfs/sync-config.sh" />
+    <File Path="src/samba-vfs/sync-health.sh" />
     <File Path="src/samba-vfs/sync-shares.sh" />
     <File Path="src/samba-vfs/sync-users.sh" />
     <Folder Name="conf">
@@ -27,6 +27,7 @@
       <File Path="src/samba-vfs/module/configsync.cpp" />
       <File Path="src/samba-vfs/module/decision_cache.h" />
       <File Path="src/samba-vfs/module/local_protocol.h" />
+      <File Path="src/samba-vfs/module/sync_json.h" />
       <File Path="src/samba-vfs/module/sharesync.cpp" />
       <File Path="src/samba-vfs/module/vfs_kaimo_bridge.c" />
     </Folder>
@@ -44,16 +45,22 @@
       <File Path="src/samba-vfs/tests/test-decision-cache.cpp" />
       <File Path="src/samba-vfs/tests/test-local-protocol.cpp" />
       <File Path="src/samba-vfs/tests/test-sync-users.sh" />
+      <File Path="src/samba-vfs/tests/test-sync-config.sh" />
+      <File Path="src/samba-vfs/tests/test-sync-runner.sh" />
+      <File Path="src/samba-vfs/tests/test-sync-shares.sh" />
+      <File Path="src/samba-vfs/tests/test-sync-json.cpp" />
       <File Path="src/samba-vfs/tests/test-vfs-connect-status.py" />
       <File Path="src/samba-vfs/tests/test-vfs-io-deadline.py" />
       <File Path="src/samba-vfs/tests/test-vfs-snapshot-readonly.py" />
     </Folder>
   </Folder>
-
-  <Project Path="src/Kaimo_File_Server.Search/Kaimo_File_Server.Search.csproj" />
+  <Project Path="docker-compose.dcproj">
+    <Build />
+  </Project>
   <Project Path="src/Kaimo_File_Server.Core/Kaimo_File_Server.Core.csproj" />
   <Project Path="src/Kaimo_File_Server.Host/Kaimo_File_Server.Host.csproj" />
   <Project Path="src/Kaimo_File_Server.Infrastructure/Kaimo_File_Server.Infrastructure.csproj" />
+  <Project Path="src/Kaimo_File_Server.Search/Kaimo_File_Server.Search.csproj" />
   <Project Path="src/Kaimo_File_Server.SmbBridge/Kaimo_File_Server.SmbBridge.csproj" />
   <Project Path="src/Kaimo_File_Server.Web/Kaimo_File_Server.Web.csproj" Id="25b5aa0a-5188-49d6-81f9-1442ebf1dd91" />
   <Project Path="tests/Kaimo_File_Server.Tests/Kaimo_File_Server.Tests.csproj" />

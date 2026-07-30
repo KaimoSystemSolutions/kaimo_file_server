@@ -207,32 +207,12 @@ public class FileSystemStorage : IStorageEngine
 
     public string ToAbsolutePath(string shareRelativePath)
     {
-        var normalized = ShareRelativePath.Normalize(shareRelativePath);
-
-        // Defense in depth: reject ".." segments / NUL bytes before they ever
-        // reach the filesystem. Path.GetFullPath would happily resolve a "../"
-        // out of the share root.
-        if (!ShareRelativePath.IsValid(normalized))
-            throw new UnauthorizedAccessException("Path traversal detected");
-
-        var rootFull = Path.GetFullPath(_rootPath)
-            .TrimEnd(Path.DirectorySeparatorChar);
-        var rootWithSep = rootFull + Path.DirectorySeparatorChar;
-
-        var full = string.IsNullOrEmpty(normalized)
-            ? rootFull
-            : Path.GetFullPath(Path.Combine(rootWithSep, normalized));
-
-        // The resolved path must be the root itself or live strictly beneath it.
-        // The trailing separator in rootWithSep is essential: comparing against
-        // the bare root would let a SIBLING directory whose name merely starts
-        // with the root name (e.g. "<root>" vs "<root>-secret") pass the check
-        // and escape the share boundary.
-        if (!string.Equals(full, rootFull, StringComparison.OrdinalIgnoreCase)
-            && !full.StartsWith(rootWithSep, StringComparison.OrdinalIgnoreCase))
-            throw new UnauthorizedAccessException("Path traversal detected");
-
-        return full;
+        // Internal server-owned paths (for example immutable Samba close
+        // captures) are valid storage paths. Client-facing bridge ingress
+        // rejects those namespaces before invoking the storage layer.
+        return ShareRelativePath.ToContainedAbsolutePath(
+            _rootPath, shareRelativePath,
+            allowRoot: true, allowInternalNamespace: true);
     }
 
     // ------------------ Read / Write / Delete ------------------

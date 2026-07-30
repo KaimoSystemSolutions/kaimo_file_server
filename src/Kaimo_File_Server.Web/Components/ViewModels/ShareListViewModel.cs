@@ -240,7 +240,7 @@ public partial class ShareListViewModel
         if (string.IsNullOrEmpty(name))
         { error = Resources.Web_Validation_NameEmpty; return false; }
 
-        if (name.Length > 64)
+        if (name.Length > SambaName.MaxShareNameBytes)
         { error = Resources.Web_ShareName_MaxLength; return false; }
 
         if (!SafeShareNameRegex().IsMatch(name))
@@ -248,6 +248,12 @@ public partial class ShareListViewModel
 
         if (name.StartsWith('.') || name.EndsWith('.'))
         { error = Resources.Web_ShareName_NoLeadingTrailingDot; return false; }
+
+        if (!SambaName.IsValidShareName(name))
+        {
+            error = string.Format(Resources.Web_Validation_ReservedName, name);
+            return false;
+        }
 
         return true;
     }

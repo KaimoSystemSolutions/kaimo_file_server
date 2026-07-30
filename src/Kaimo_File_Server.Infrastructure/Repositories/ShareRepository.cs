@@ -60,6 +60,7 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
 
         public async Task<ShareDefinition> CreateAsync(ShareDefinition share)
         {
+            SambaName.EnsureValidShareName(share.Name, nameof(share));
             await using var db = await _dbFactory.CreateDbContextAsync();
             db.ShareDefinitions.Add(share);
             await db.SaveChangesAsync();
@@ -68,6 +69,7 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
 
         public async Task UpdateAsync(ShareDefinition share)
         {
+            SambaName.EnsureValidShareName(share.Name, nameof(share));
             await using var db = await _dbFactory.CreateDbContextAsync();
             db.ShareDefinitions.Update(share);
             await db.SaveChangesAsync();

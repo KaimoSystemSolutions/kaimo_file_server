@@ -60,6 +60,12 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <param name="asOfUtc">The upper bound (inclusive) for the snapshot timestamp.</param>
         Task<List<FileVersion>> GetLatestVersionsUnderPrefixAsync(Guid shareId, string pathPrefix, DateTime asOfUtc);
 
+        Task<List<FileVersion>> GetLatestVersionsUnderPrefixAsync(
+            Guid shareId, string pathPrefix, DateTime asOfUtc,
+            CancellationToken cancellationToken) =>
+            GetLatestVersionsUnderPrefixAsync(shareId, pathPrefix, asOfUtc)
+                .WaitAsync(cancellationToken);
+
         /// <summary>
         /// Persists a new version entry.
         /// </summary>
@@ -107,7 +113,10 @@ namespace Kaimo_File_Server.Core.Repositories
         /// has displaced that object.
         /// </summary>
         Task<List<FileVersion>> RenamePathAsync(
-            Guid shareId, string oldPath, string newPath);
+            Guid shareId,
+            string oldPath,
+            string newPath,
+            Guid? sambaLifecycleEventId = null);
 
         /// <summary>Deletes all version rows belonging to a share.</summary>
         Task<List<FileVersion>> DeleteShareAsync(Guid shareId);

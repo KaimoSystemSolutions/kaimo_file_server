@@ -251,6 +251,61 @@ public class FileServiceTests
     }
 
     [Fact]
+    public async Task NotifyExternalClose_UsesCapturedHandleBytes_NotLivePath()
+    {
+        var versionMock = new Mock<IFileVersionService>();
+        var searchMock = new Mock<ISearchService>();
+        var capturedBytes = new byte[] { 1, 2, 3, 4 };
+        byte[]? versioned = null;
+        byte[]? indexed = null;
+        var opens = 0;
+        versionMock
+            .Setup(v => v.CreateVersionAsync(
+                _shareId, "test.txt", It.IsAny<Stream>(), It.IsAny<string>()))
+            .Returns(async (
+                Guid _, string _, Stream content, string? _) =>
+            {
+                using var copy = new MemoryStream();
+                await content.CopyToAsync(copy);
+                versioned = copy.ToArray();
+                return null;
+            });
+        searchMock
+            .Setup(s => s.onFileCreated(
+                "/storage/test.txt", It.IsAny<Task<Stream>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(async (
+                string _, Task<Stream> contentTask, CancellationToken _) =>
+            {
+                await using var content = await contentTask;
+                using var copy = new MemoryStream();
+                await content.CopyToAsync(copy);
+                indexed = copy.ToArray();
+            });
+        _storageMock.Setup(s => s.ToAbsolutePath("test.txt"))
+            .Returns("/storage/test.txt");
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, searchMock.Object, _shareId,
+            versionMock.Object);
+        var user = CreateContext();
+
+        await sut.NotifyExternalCloseAsync(
+            "test.txt", user,
+            () =>
+            {
+                opens++;
+                return Task.FromResult<Stream>(
+                    new MemoryStream(capturedBytes, writable: false));
+            });
+
+        Assert.Equal(capturedBytes, versioned);
+        Assert.Equal(capturedBytes, indexed);
+        Assert.Equal(2, opens);
+        _storageMock.Verify(
+            s => s.ReadAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
     public async Task WriteFileAsync_SearchFailure_DoesNotFailPersistedUpload()
     {
         // Search is a rebuildable side effect. In particular, first-use index
@@ -371,7 +426,7 @@ public class FileServiceTests
         _aclMock.Verify(a => a.RenameAclPathAsync(
             _shareId, "doc.txt", ".RECYCLE_BIN/doc_20260719.txt"), Times.Once);
         versions.Verify(v => v.RenamePathAsync(
-            _shareId, "doc.txt", ".RECYCLE_BIN/doc_20260719.txt"), Times.Once);
+            _shareId, "doc.txt", ".RECYCLE_BIN/doc_20260719.txt", null), Times.Once);
     }
 
     [Fact]
@@ -431,7 +486,28 @@ public class FileServiceTests
         await sut.RenameAsync("old", "new", ctx);
 
         _aclMock.Verify(a => a.RenameAclPathAsync(_shareId, "old", "new"), Times.Once);
-        versions.Verify(v => v.RenamePathAsync(_shareId, "old", "new"), Times.Once);
+        versions.Verify(v => v.RenamePathAsync(
+            _shareId, "old", "new", null), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExternalDirectoryRename_UsesDirectorySearchLifecycle()
+    {
+        var search = new Mock<ISearchService>();
+        _storageMock.Setup(s => s.ToAbsolutePath("old"))
+            .Returns("/storage/old");
+        _storageMock.Setup(s => s.ToAbsolutePath("new"))
+            .Returns("/storage/new");
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, search.Object, _shareId);
+
+        await sut.NotifyExternalRenameAsync(
+            "old", "new", isDirectory: true, Guid.NewGuid());
+
+        search.Verify(s => s.onDirectoryRenamed(
+            "/storage/old", "/storage/new"), Times.Once);
+        search.Verify(s => s.onFileRenamed(
+            It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]

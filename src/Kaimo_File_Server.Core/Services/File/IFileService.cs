@@ -55,10 +55,18 @@ namespace Kaimo_File_Server.Core.Services.File
         // ---- External-writer close hooks (Samba VFS direct I/O) ----
         // Samba performs the raw I/O natively, then calls these so the same
         // cross-cutting effects as FileSession.DisposeAsync run: versioning,
-        // search indexing, ownership. Best-effort (failures logged, not thrown).
+        // search indexing, ownership. Failures reach the bridge so the durable
+        // event remains unacknowledged and is retried.
 
-        /// <summary>A file was written+closed externally: snapshot a version, index it, stamp owner.</summary>
-        Task NotifyExternalCloseAsync(string path, UserContext user);
+        /// <summary>
+        /// A file was written+closed externally: snapshot a version, index it,
+        /// and stamp its owner from the immutable content captured from the
+        /// exact closing handle.
+        /// </summary>
+        Task NotifyExternalCloseAsync(
+            string path,
+            UserContext user,
+            Func<Task<Stream>> openCapturedContent);
 
         /// <summary>A directory was created externally: index it and stamp owner.</summary>
         Task NotifyExternalMkdirAsync(string path, UserContext user);
@@ -67,7 +75,11 @@ namespace Kaimo_File_Server.Core.Services.File
         Task NotifyExternalDeleteAsync(string path, bool isDirectory);
 
         /// <summary>A file/directory was renamed externally: realign ACL records and the search index.</summary>
-        Task NotifyExternalRenameAsync(string oldPath, string newPath, bool isDirectory);
+        Task NotifyExternalRenameAsync(
+            string oldPath,
+            string newPath,
+            bool isDirectory,
+            Guid sambaLifecycleEventId);
 
         /// <summary>
         /// Returns the subset of paths the user has ListReadData permission on.
@@ -129,5 +141,11 @@ namespace Kaimo_File_Server.Core.Services.File
         /// Requires list access on the folder.
         /// </summary>
         Task<List<FileVersion>> GetFolderSnapshotAsync(string folderPath, DateTime asOfUtc, UserContext user);
+
+        Task<List<FileVersion>> GetFolderSnapshotAsync(
+            string folderPath, DateTime asOfUtc, UserContext user,
+            CancellationToken cancellationToken) =>
+            GetFolderSnapshotAsync(folderPath, asOfUtc, user)
+                .WaitAsync(cancellationToken);
     }
 }

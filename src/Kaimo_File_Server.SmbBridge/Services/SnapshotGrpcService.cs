@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using Grpc.Core;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
@@ -28,12 +29,17 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
 {
     // Same format Windows expects and FileVersion.ToGmtToken() emits.
     private const string GmtFormat = "'@GMT-'yyyy.MM.dd-HH.mm.ss";
+    // Must match KAIMO_LOCAL_MAX_SNAPSHOT_LABELS. Samba's shadow-copy
+    // enumeration is not paginated, so the contract returns the newest labels.
+    internal const int MaxEnumerationLabels = 2_048;
 
     private readonly IShareRepository _shares;
     private readonly IAuthenticationLookup _auth;
     private readonly IAclService _acl;
     private readonly IFileVersionService _versions;
     private readonly IFileServiceFactory _fileServices;
+    private readonly SnapshotCacheLeaseManager _leases;
+    private readonly SnapshotMaterializationLimiter _materializationLimiter;
     private readonly ILogger<SnapshotGrpcService> _logger;
     private readonly string _cacheRoot;
 
@@ -43,6 +49,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         IAclService acl,
         IFileVersionService versions,
         IFileServiceFactory fileServices,
+        SnapshotCacheLeaseManager leases,
+        SnapshotMaterializationLimiter materializationLimiter,
         IConfiguration configuration,
         ILogger<SnapshotGrpcService> logger)
     {
@@ -51,6 +59,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         _acl = acl;
         _versions = versions;
         _fileServices = fileServices;
+        _leases = leases;
+        _materializationLimiter = materializationLimiter;
         _cacheRoot = SnapshotCache.ConfiguredRoot(configuration);
         _logger = logger;
     }
@@ -59,26 +69,31 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         EnumerateSnapshotsRequest request, ServerCallContext context)
     {
         var reply = new EnumerateSnapshotsReply();
+        if (!SambaName.IsValidContext(request.Username, request.Share))
+            return reply;
+        CancellationToken cancellationToken =
+            context?.CancellationToken ?? CancellationToken.None;
 
         _logger.LogInformation(
             "EnumerateSnapshots ENTER: user={User} share={Share} path=[{Path}]",
             request.Username, request.Share, request.Path);
 
-        var user = await _auth.ResolveUserContextAsync(request.Username);
-        var share = await _shares.GetByNameAsync(request.Share);
+        var user = await _auth.ResolveUserContextAsync(request.Username)
+            .WaitAsync(cancellationToken);
+        var share = await _shares.ResolveEnabledShareAsync(
+            request.Share, cancellationToken);
         if (user is null || share is null)
         {
             _logger.LogInformation(
-                "EnumerateSnapshots: unknown user/share (user={User} share={Share}) -> 0",
+                "EnumerateSnapshots: unknown user or unknown/disabled share (user={User} share={Share}) -> 0",
                 request.Username, request.Share);
             return reply;
         }
 
-        if (!ShareRelativePath.IsValid(request.Path))
+        if (!ShareRelativePath.TryNormalizeStrict(
+                request.Path, out string normalized, allowRoot: true,
+                allowInternalNamespace: false))
             return reply;
-
-        string normalized = ShareRelativePath.Normalize(request.Path);
-        if (normalized == ".") normalized = ""; // SMB share-root atname -> root
 
         // A concrete file -> its own version timestamps; a folder or the share
         // root ("") -> ACL-aware folder timestamps. A path with exact file
@@ -86,12 +101,15 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         List<DateTime> timestamps;
         if (normalized.Length > 0)
         {
-            var fileVersions = await _versions.GetVersionsAsync(share.Id, normalized);
+            var fileVersions = await _versions
+                .GetVersionsAsync(share.Id, normalized)
+                .WaitAsync(cancellationToken);
             if (fileVersions.Count > 0)
             {
                 if (!await _acl.HasAccessAsync(
                         user, share.Id, normalized, false,
-                        FilePermission.ListReadData))
+                        FilePermission.ListReadData)
+                    .WaitAsync(cancellationToken))
                     return reply;
                 timestamps = fileVersions
                     .Select(v => v.SnapshotTimestampUtc)
@@ -103,7 +121,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                 {
                     timestamps = await _fileServices
                         .CreateForShare(share.Id, share.Path)
-                        .GetFolderSnapshotTimestampsAsync(normalized, user);
+                        .GetFolderSnapshotTimestampsAsync(normalized, user)
+                        .WaitAsync(cancellationToken);
                 }
                 catch (UnauthorizedAccessException)
                 {
@@ -117,7 +136,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             {
                 timestamps = await _fileServices
                     .CreateForShare(share.Id, share.Path)
-                    .GetFolderSnapshotTimestampsAsync("", user);
+                    .GetFolderSnapshotTimestampsAsync("", user)
+                    .WaitAsync(cancellationToken);
             }
             catch (UnauthorizedAccessException)
             {
@@ -125,8 +145,26 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             }
         }
 
-        foreach (var ts in timestamps.Distinct().OrderByDescending(t => t))
-            reply.GmtTokens.Add(ts.ToString(GmtFormat, CultureInfo.InvariantCulture));
+        var orderedLabels = new List<string>();
+        var seenLabels = new HashSet<string>(StringComparer.Ordinal);
+        foreach (DateTime timestamp in timestamps.OrderByDescending(value => value))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string label = timestamp.ToString(
+                GmtFormat, CultureInfo.InvariantCulture);
+            if (seenLabels.Add(label))
+                orderedLabels.Add(label);
+        }
+        if (orderedLabels.Count > MaxEnumerationLabels)
+        {
+            _logger.LogWarning(
+                "EnumerateSnapshots: user={User} share={Share} path=[{Path}] has {Available} labels; returning newest {Maximum} and omitting {Omitted}",
+                request.Username, request.Share, request.Path,
+                orderedLabels.Count, MaxEnumerationLabels,
+                orderedLabels.Count - MaxEnumerationLabels);
+        }
+        reply.GmtTokens.AddRange(
+            orderedLabels.Take(MaxEnumerationLabels));
 
         _logger.LogInformation(
             "EnumerateSnapshots: user={User} share={Share} path=[{Path}] -> {Count} tokens",
@@ -138,6 +176,11 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         ResolveVersionRequest request, ServerCallContext context)
     {
         var notFound = new ResolveVersionReply { Found = false };
+        if (!SambaName.IsValidContext(request.Username, request.Share))
+            return notFound;
+
+        CancellationToken requestCancellation =
+            context?.CancellationToken ?? CancellationToken.None;
 
         // Diagnostic: prove whether the VFS module reaches the bridge for a file open,
         // and with what path/token. (Temporary high-visibility trace for @GMT debugging.)
@@ -145,21 +188,22 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             "ResolveVersion ENTER: user={User} share={Share} path=[{Path}] token={Token}",
             request.Username, request.Share, request.Path, request.GmtToken);
 
-        var user = await _auth.ResolveUserContextAsync(request.Username);
-        var share = await _shares.GetByNameAsync(request.Share);
+        var user = await _auth.ResolveUserContextAsync(request.Username)
+            .WaitAsync(requestCancellation);
+        var share = await _shares.ResolveEnabledShareAsync(
+            request.Share, requestCancellation);
         if (user is null || share is null)
         {
             _logger.LogWarning(
-                "ResolveVersion: unknown user/share (user={User} share={Share}) -> notFound",
+                "ResolveVersion: unknown user or unknown/disabled share (user={User} share={Share}) -> notFound",
                 request.Username, request.Share);
             return notFound;
         }
 
-        if (!ShareRelativePath.IsValid(request.Path))
+        if (!ShareRelativePath.TryNormalizeStrict(
+                request.Path, out string normalized, allowRoot: true,
+                allowInternalNamespace: false))
             return notFound;
-
-        string normalized = ShareRelativePath.Normalize(request.Path);
-        if (normalized == ".") normalized = ""; // SMB share-root atname -> root
 
         var ts = FileVersion.ParseGmtToken(request.GmtToken);
         if (ts is null)
@@ -180,7 +224,9 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             return notFound;
         }
 
-        var version = await _versions.GetVersionAtAsync(share.Id, normalized, ts.Value);
+        var version = await _versions
+            .GetVersionAtAsync(share.Id, normalized, ts.Value)
+            .WaitAsync(requestCancellation);
 
         // Point-in-time resolution (the actual @GMT "restore/open" fix). Folder
         // "Previous Versions" enumerates ONE share-wide timestamp per snapshot (the
@@ -193,7 +239,8 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         // listing uses, so the token consistently maps to the right version.
         if (version is null && normalized.Length > 0)
         {
-            var fileVersions = await _versions.GetVersionsAsync(share.Id, normalized);
+            var fileVersions = await _versions.GetVersionsAsync(share.Id, normalized)
+                .WaitAsync(requestCancellation);
             version = fileVersions
                 .Where(v => v.SnapshotTimestampUtc <= ts.Value)
                 .OrderByDescending(v => v.SnapshotTimestampUtc)
@@ -215,19 +262,36 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         if (version is null)
         {
             List<FileVersion> under;
+            using CancellationTokenSource folderBudget =
+                _materializationLimiter.CreateRequestBudget(
+                    requestCancellation);
+            CancellationToken folderCancellation = folderBudget.Token;
             try
             {
                 // P0-05: use the central ACL-aware path. It checks the requested
                 // directory with isDirectory=true and batch-filters every child.
                 under = await _fileServices
                     .CreateForShare(share.Id, share.Path)
-                    .GetFolderSnapshotAsync(normalized, ts.Value, user);
+                    .GetFolderSnapshotAsync(
+                        normalized, ts.Value, user, folderCancellation);
             }
             catch (UnauthorizedAccessException)
             {
                 _logger.LogInformation(
                     "ResolveVersion DENY directory: user={User} share={Share} path=[{Path}]",
                     request.Username, request.Share, request.Path);
+                return notFound;
+            }
+            catch (OperationCanceledException)
+                when (requestCancellation.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogWarning(ex,
+                    "ResolveVersion: folder snapshot lookup cancelled or timed out share={Share} path=[{Path}] token={Token}",
+                    request.Share, request.Path, request.GmtToken);
                 return notFound;
             }
 
@@ -239,15 +303,53 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                     ? $"{shareScope}/{request.GmtToken}/{cacheScope}"
                     : $"{shareScope}/{request.GmtToken}/{cacheScope}/{normalized}";
                 string dirFull = GetCachePath(_cacheRoot, dirRel);
+                string scopeFull = GetCachePath(
+                    _cacheRoot,
+                    $"{shareScope}/{request.GmtToken}/{cacheScope}");
+                string folderLeaseId;
                 try
                 {
+                    using SnapshotMaterializationLimiter.Reservation reservation =
+                        await _materializationLimiter.ReserveAsync(
+                            under, folderCancellation);
+                    CancellationToken materializationCancellation =
+                        reservation.CancellationToken;
+
+                    string? existingLeaseId =
+                        await _leases.TryAcquireExistingHandoffAsync(
+                            _cacheRoot, share.Id, request.GmtToken,
+                            async cancellationToken =>
+                                await HasExpectedProjectionAsync(
+                                    scopeFull, dirFull, under,
+                                    cancellationToken),
+                            materializationCancellation);
+                    if (existingLeaseId is not null)
+                    {
+                        _logger.LogInformation(
+                            "ResolveVersion: reused verified directory projection path=[{Path}] token={Token}",
+                            request.Path, request.GmtToken);
+                        return new ResolveVersionReply
+                        {
+                            Found = true,
+                            CachePath = dirRel,
+                            Size = 0,
+                            LeaseId = existingLeaseId
+                        };
+                    }
+
+                    using SnapshotCacheLeaseManager.MaterializationLease
+                        materializationLease =
+                        await _leases.AcquireMaterializationAsync(
+                            _cacheRoot, share.Id, request.GmtToken,
+                            materializationCancellation);
+                    materializationCancellation.ThrowIfCancellationRequested();
                     SnapshotCache.EnsureDirectory(dirFull);
                     // A user's projection may contain files materialized before an
                     // ACL revocation. Remove everything below this directory that
                     // is not in the freshly filtered snapshot before returning it.
                     ReconcileUserProjection(
                         _cacheRoot, share.Id, request.GmtToken, cacheScope,
-                        normalized, under);
+                        normalized, under, materializationCancellation);
                     // Stamp the cache-age marker so the evictor keys off the real
                     // materialization time, not the historical file mtimes.
                     SnapshotCache.TouchMarker(
@@ -260,22 +362,63 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                     // gave us each file's state as of the snapshot; write them all now with
                     // their historical mtimes so browsing AND opening work natively.
                     // Per-file resilience: one unreadable version must not sink the folder.
-                    foreach (var fv in under)
+                    var createdFiles = new List<string>();
+                    try
                     {
-                        try
+                        foreach (var fv in under)
                         {
-                            await MaterializeVersionAsync(
-                                share.Id, request.GmtToken,
-                                cacheScope, fv);
+                            materializationCancellation.ThrowIfCancellationRequested();
+                            string destination = ProjectionPath(
+                                share.Id, request.GmtToken, cacheScope, fv);
+                            bool existed = File.Exists(destination);
+                            try
+                            {
+                                await MaterializeVersionAsync(
+                                    share.Id, request.GmtToken,
+                                    cacheScope, fv,
+                                    materializationCancellation);
+                                if (!existed)
+                                    createdFiles.Add(destination);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex,
+                                    "ResolveVersion: skipping file [{File}] in dir snapshot", fv.FilePath);
+                            }
                         }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex,
-                                "ResolveVersion: skipping file [{File}] in dir snapshot", fv.FilePath);
-                        }
+                        materializationCancellation.ThrowIfCancellationRequested();
+                    }
+                    catch
+                    {
+                        CleanupAbandonedProjection(createdFiles);
+                        throw;
                     }
                     try { Directory.SetLastWriteTimeUtc(dirFull, ts.Value); }
                     catch (Exception ex) { _logger.LogWarning(ex, "SetLastWriteTimeUtc (dir) failed for {Dir} (non-fatal)", dirFull); }
+                    folderLeaseId = materializationLease.PublishHandoff();
+                }
+                catch (SnapshotMaterializationLimitException ex)
+                {
+                    _logger.LogWarning(ex,
+                        "ResolveVersion: folder snapshot exceeds materialization quota share={Share} path=[{Path}] token={Token}",
+                        request.Share, request.Path, request.GmtToken);
+                    return notFound;
+                }
+                catch (OperationCanceledException)
+                    when (requestCancellation.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (OperationCanceledException ex)
+                {
+                    _logger.LogWarning(ex,
+                        "ResolveVersion: folder snapshot cancelled or timed out share={Share} path=[{Path}] token={Token}",
+                        request.Share, request.Path, request.GmtToken);
+                    return notFound;
                 }
                 catch (Exception ex)
                 {
@@ -288,7 +431,13 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                 _logger.LogInformation(
                     "ResolveVersion: user={User} share={Share} path=[{Path}] token={Token} -> DIR {Cache} ({Count} files)",
                     request.Username, request.Share, request.Path, request.GmtToken, dirRel, under.Count);
-                return new ResolveVersionReply { Found = true, CachePath = dirRel, Size = 0 };
+                return new ResolveVersionReply
+                {
+                    Found = true,
+                    CachePath = dirRel,
+                    Size = 0,
+                    LeaseId = folderLeaseId
+                };
             }
             _logger.LogWarning(
                 "ResolveVersion: NO version and NOT a historical dir -> notFound. path=[{Path}] token={Token}",
@@ -299,7 +448,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         // Reading a concrete version is a file read, never a directory check.
         if (!await _acl.HasAccessAsync(
                 user, share.Id, normalized, false,
-                FilePermission.ListReadData))
+                FilePermission.ListReadData).WaitAsync(requestCancellation))
         {
             _logger.LogInformation(
                 "ResolveVersion DENY file: user={User} share={Share} path=[{Path}]",
@@ -310,14 +459,64 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         // A concrete versioned file: materialize its content (decompressed) with the
         // historical mtime and hand back the cache-root-relative path.
         string cacheRel;
+        string leaseId;
         try
         {
+            ValidateVersionContentMetadata(version);
             string cacheScope = user.User.Id.ToString("N");
+            if (!ShareRelativePath.TryNormalizeStrict(
+                    version.FilePath, out string normalizedVersionPath,
+                    allowRoot: false, allowInternalNamespace: false))
+                throw new InvalidDataException(
+                    "Version contains an invalid file path.");
+            string shareScope =
+                SnapshotCache.RelativeShareRootFor(share.Id);
+            cacheRel =
+                $"{shareScope}/{request.GmtToken}/{cacheScope}/{normalizedVersionPath}";
+            string existingCacheFull =
+                GetCachePath(_cacheRoot, cacheRel);
+            string? existingLeaseId =
+                await _leases.TryAcquireExistingHandoffAsync(
+                    _cacheRoot, share.Id, request.GmtToken,
+                    async cancellationToken =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        return await HasExpectedContentAsync(
+                            existingCacheFull, version.Size,
+                            version.ContentHash, cancellationToken);
+                    },
+                    requestCancellation);
+            if (existingLeaseId is not null)
+            {
+                _logger.LogInformation(
+                    "ResolveVersion: reused verified file projection path=[{Path}] token={Token}",
+                    request.Path, request.GmtToken);
+                return new ResolveVersionReply
+                {
+                    Found = true,
+                    CachePath = cacheRel,
+                    Size = version.Size,
+                    LeaseId = existingLeaseId
+                };
+            }
+
+            using SnapshotCacheLeaseManager.MaterializationLease
+                materializationLease =
+                await _leases.AcquireMaterializationAsync(
+                    _cacheRoot, share.Id, request.GmtToken,
+                    requestCancellation);
             cacheRel = await MaterializeVersionAsync(
-                share.Id, request.GmtToken, cacheScope, version);
+                share.Id, request.GmtToken, cacheScope, version,
+                requestCancellation);
             // Stamp the cache-age marker (real materialization time) for the evictor.
             SnapshotCache.TouchMarker(
                 _cacheRoot, share.Id, request.GmtToken);
+            leaseId = materializationLease.PublishHandoff();
+        }
+        catch (OperationCanceledException)
+            when (requestCancellation.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -338,15 +537,32 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             Found = true,
             CachePath = cacheRel,
             Size = version.Size,
+            LeaseId = leaseId,
         };
+    }
+
+    public override Task<ReleaseVersionLeaseReply> ReleaseVersionLease(
+        ReleaseVersionLeaseRequest request, ServerCallContext context)
+    {
+        bool released = _leases.ReleaseHandoff(request.LeaseId);
+        if (!released)
+            _logger.LogDebug(
+                "Snapshot lease {LeaseId} was already released, expired, or unknown.",
+                request.LeaseId);
+        return Task.FromResult(new ReleaseVersionLeaseReply
+        {
+            Released = released
+        });
     }
 
     /// <summary>
     /// Writes one version's decompressed content into the isolated snapshot cache
     /// (<c>&lt;cache-root&gt;/&lt;share-id&gt;/&lt;@GMT&gt;/&lt;user-id&gt;/&lt;filePath&gt;</c>) and stamps
     /// the historical modification time onto it. Idempotent: a version is
-    /// content-addressed and immutable, so an existing cache file of the right
-    /// (uncompressed) size is reused; the mtime is (re)applied every call.
+    /// content-addressed and immutable, so an existing cache file with the exact
+    /// expected size and SHA-256 hash is reused; the mtime is (re)applied every
+    /// call. New content is verified in a same-directory temporary file and
+    /// atomically published, so readers never observe a partial final file.
     ///
     /// The historical mtime matters twice: Windows "Previous Versions" HIDES any
     /// snapshot whose file mtime equals the live file's, and distinct per-version
@@ -355,27 +571,57 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
     /// </summary>
     private async Task<string> MaterializeVersionAsync(
         Guid shareId, string gmtToken,
-        string cacheScope, FileVersion v)
+        string cacheScope, FileVersion v,
+        CancellationToken cancellationToken)
     {
-        if (!ShareRelativePath.IsValid(v.FilePath) ||
-            ShareRelativePath.Normalize(v.FilePath).Length == 0)
+        if (!ShareRelativePath.TryNormalizeStrict(
+                v.FilePath, out string normalizedPath,
+                allowRoot: false, allowInternalNamespace: false))
             throw new InvalidDataException("Version contains an invalid file path.");
-
-        string normalizedPath = ShareRelativePath.Normalize(v.FilePath);
         string shareScope = SnapshotCache.RelativeShareRootFor(shareId);
         string rel = $"{shareScope}/{gmtToken}/{cacheScope}/{normalizedPath}";
         string scopeRoot = SnapshotCache.EnsureUserScope(
             _cacheRoot, shareId, gmtToken, cacheScope);
         string full = GetScopedCachePath(scopeRoot, normalizedPath);
 
-        var existing = new FileInfo(full);
-        if (!existing.Exists || existing.Length != v.Size)
+        ValidateVersionContentMetadata(v);
+        bool reusable = await HasExpectedContentAsync(
+            full, v.Size, v.ContentHash, cancellationToken);
+        if (!reusable)
         {
             SnapshotCache.EnsureDirectory(Path.GetDirectoryName(full)!);
-            await using var content = await _versions.ReadVersionAsync(shareId, v.FilePath, v.SnapshotTimestampUtc);
-            await using var outFs = new FileStream(
-                full, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true);
-            await content.CopyToAsync(outFs);
+            string temporary = full + ".kaimo-tmp-" + Guid.NewGuid().ToString("N");
+            try
+            {
+                await using var content = await _versions.ReadVersionAsync(
+                    shareId, v.FilePath, v.SnapshotTimestampUtc,
+                    cancellationToken);
+                await WriteVerifiedTemporaryFileAsync(
+                    content, temporary, v.Size, v.ContentHash,
+                    cancellationToken);
+
+                SnapshotCache.SetReadOnlyProjectionMode(temporary);
+                File.SetLastWriteTimeUtc(temporary, v.SnapshotTimestampUtc);
+
+                // The temporary file lives beside the destination, so rename is
+                // atomic and cannot cross filesystem boundaries. Concurrent
+                // publishers may replace one another, but only after both have
+                // independently verified the same immutable version content.
+                File.Move(temporary, full, overwrite: true);
+            }
+            finally
+            {
+                try
+                {
+                    File.Delete(temporary);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Failed to remove abandoned snapshot temporary file {Path}",
+                        temporary);
+                }
+            }
         }
         SnapshotCache.SetReadOnlyProjectionMode(full);
 
@@ -395,35 +641,171 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         return rel;
     }
 
+    private static void ValidateVersionContentMetadata(FileVersion version)
+    {
+        if (version.Size < 0)
+            throw new InvalidDataException("Version contains a negative size.");
+        if (string.IsNullOrEmpty(version.ContentHash) ||
+            version.ContentHash.Length != 64 ||
+            !version.ContentHash.All(Uri.IsHexDigit))
+            throw new InvalidDataException(
+                "Version contains an invalid SHA-256 content hash.");
+    }
+
+    private static async Task<bool> HasExpectedContentAsync(
+        string path, long expectedLength, string expectedHash,
+        CancellationToken cancellationToken)
+    {
+        var existing = new FileInfo(path);
+        if (!existing.Exists || existing.Length != expectedLength)
+            return false;
+
+        await using var stream = new FileStream(
+            path, FileMode.Open, FileAccess.Read, FileShare.Read,
+            bufferSize: 81920, useAsync: true);
+        string actualHash = Convert.ToHexString(
+            await SHA256.HashDataAsync(stream, cancellationToken));
+        return string.Equals(
+            actualHash, expectedHash, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static async ValueTask<bool> HasExpectedProjectionAsync(
+        string scopeRoot,
+        string directory,
+        IReadOnlyCollection<FileVersion> expectedVersions,
+        CancellationToken cancellationToken)
+    {
+        if (!Directory.Exists(directory))
+            return false;
+
+        var expectedFiles = new Dictionary<string, FileVersion>(
+            OperatingSystem.IsWindows()
+                ? StringComparer.OrdinalIgnoreCase
+                : StringComparer.Ordinal);
+        foreach (FileVersion version in expectedVersions)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!ShareRelativePath.TryNormalizeStrict(
+                    version.FilePath, out _,
+                    allowRoot: false, allowInternalNamespace: false))
+                return false;
+            ValidateVersionContentMetadata(version);
+            string fullPath = GetScopedCachePath(
+                scopeRoot, version.FilePath);
+            expectedFiles[fullPath] = version;
+        }
+
+        string[] actualFiles;
+        try
+        {
+            actualFiles = Directory.GetFiles(
+                directory, "*", SearchOption.AllDirectories);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+
+        if (actualFiles.Length != expectedFiles.Count)
+            return false;
+
+        foreach ((string path, FileVersion version) in expectedFiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!await HasExpectedContentAsync(
+                    path, version.Size, version.ContentHash,
+                    cancellationToken))
+                return false;
+        }
+        return true;
+    }
+
+    private static async Task WriteVerifiedTemporaryFileAsync(
+        Stream content,
+        string temporaryPath,
+        long expectedLength,
+        string expectedHash,
+        CancellationToken cancellationToken)
+    {
+        await using var output = new FileStream(
+            temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+            bufferSize: 81920,
+            options: FileOptions.Asynchronous | FileOptions.SequentialScan);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        byte[] buffer = new byte[81920];
+        long written = 0;
+
+        while (true)
+        {
+            int read = await content.ReadAsync(
+                buffer.AsMemory(), cancellationToken);
+            if (read == 0)
+                break;
+            if (written > expectedLength - read)
+                throw new InvalidDataException(
+                    "Version content exceeds its declared size.");
+
+            await output.WriteAsync(
+                buffer.AsMemory(0, read), cancellationToken);
+            hash.AppendData(buffer, 0, read);
+            written += read;
+        }
+
+        if (written != expectedLength)
+            throw new InvalidDataException(
+                $"Version content length {written} does not match declared size {expectedLength}.");
+
+        string actualHash = Convert.ToHexString(hash.GetHashAndReset());
+        if (!string.Equals(
+                actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException(
+                "Version content does not match its declared SHA-256 hash.");
+
+        await output.FlushAsync(cancellationToken);
+        output.Flush(flushToDisk: true);
+    }
+
     private static void ReconcileUserProjection(
         string cacheRoot,
         Guid shareId,
         string gmtToken,
         string cacheScope,
         string folderPath,
-        IReadOnlyCollection<FileVersion> readableVersions)
+        IReadOnlyCollection<FileVersion> readableVersions,
+        CancellationToken cancellationToken)
     {
         string scopeRoot = SnapshotCache.EnsureUserScope(
             cacheRoot, shareId, gmtToken, cacheScope);
-        string normalizedFolder = ShareRelativePath.Normalize(folderPath);
+        if (!ShareRelativePath.TryNormalizeStrict(
+                folderPath, out string normalizedFolder,
+                allowRoot: true, allowInternalNamespace: false))
+            throw new InvalidDataException(
+                "Folder projection contains an invalid path.");
         string folderFull = normalizedFolder.Length == 0
             ? scopeRoot
-            : Path.Combine(
-                scopeRoot,
-                normalizedFolder.Replace('/', Path.DirectorySeparatorChar));
+            : ShareRelativePath.ToContainedAbsolutePath(
+                scopeRoot, normalizedFolder, allowRoot: false,
+                allowInternalNamespace: false);
         SnapshotCache.EnsureDirectory(folderFull);
 
         StringComparer pathComparer = OperatingSystem.IsWindows()
             ? StringComparer.OrdinalIgnoreCase
             : StringComparer.Ordinal;
         var allowed = readableVersions
-            .Where(v => ShareRelativePath.IsValid(v.FilePath))
+            .Where(v => ShareRelativePath.TryNormalizeStrict(
+                v.FilePath, out _, allowRoot: false,
+                allowInternalNamespace: false))
             .Select(v => GetScopedCachePath(scopeRoot, v.FilePath))
             .ToHashSet(pathComparer);
 
         foreach (string file in Directory.EnumerateFiles(
                      folderFull, "*", SearchOption.AllDirectories))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!allowed.Contains(Path.GetFullPath(file)))
                 File.Delete(file);
         }
@@ -434,36 +816,70 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
                      folderFull, "*", SearchOption.AllDirectories)
                  .OrderByDescending(path => path.Length))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!Directory.EnumerateFileSystemEntries(directory).Any())
                 Directory.Delete(directory);
+        }
+    }
+
+    private string ProjectionPath(
+        Guid shareId, string gmtToken, string cacheScope, FileVersion version)
+    {
+        string scopeRoot = SnapshotCache.EnsureUserScope(
+            _cacheRoot, shareId, gmtToken, cacheScope);
+        return GetScopedCachePath(scopeRoot, version.FilePath);
+    }
+
+    private void CleanupAbandonedProjection(IEnumerable<string> createdFiles)
+    {
+        foreach (string path in createdFiles.Reverse())
+        {
+            try
+            {
+                File.Delete(path);
+                string? directory = Path.GetDirectoryName(path);
+                while (directory is not null &&
+                       !string.Equals(
+                           Path.GetFullPath(directory),
+                           Path.GetFullPath(_cacheRoot),
+                           OperatingSystem.IsWindows()
+                               ? StringComparison.OrdinalIgnoreCase
+                               : StringComparison.Ordinal) &&
+                       Directory.Exists(directory) &&
+                       !Directory.EnumerateFileSystemEntries(directory).Any())
+                {
+                    Directory.Delete(directory);
+                    directory = Path.GetDirectoryName(directory);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Failed to remove abandoned snapshot projection file {Path}",
+                    path);
+            }
         }
     }
 
     private static string GetScopedCachePath(
         string scopeRoot, string relativePath)
     {
-        string root = Path.GetFullPath(scopeRoot);
-        string candidate = Path.GetFullPath(Path.Combine(
-            root,
-            ShareRelativePath.Normalize(relativePath)
-                .Replace('/', Path.DirectorySeparatorChar)));
-        string prefix = root.EndsWith(Path.DirectorySeparatorChar)
-            ? root
-            : root + Path.DirectorySeparatorChar;
-        StringComparison comparison = OperatingSystem.IsWindows()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
-        if (!candidate.StartsWith(prefix, comparison))
+        try
+        {
+            return ShareRelativePath.ToContainedAbsolutePath(
+                scopeRoot, relativePath, allowRoot: false,
+                allowInternalNamespace: false);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
             throw new InvalidDataException(
-                "Version path escapes the user snapshot cache scope.");
-        return candidate;
+                "Version path escapes the user snapshot cache scope.",
+                exception);
+        }
     }
 
     private static string GetCachePath(string cacheRoot, string relativePath)
     {
-        if (!ShareRelativePath.IsValid(relativePath) ||
-            ShareRelativePath.Normalize(relativePath).Length == 0)
-            throw new InvalidDataException("Invalid snapshot cache-relative path.");
         return GetScopedCachePath(cacheRoot, relativePath);
     }
 }

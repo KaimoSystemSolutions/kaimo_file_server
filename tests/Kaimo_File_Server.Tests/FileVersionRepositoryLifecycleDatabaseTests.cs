@@ -37,6 +37,47 @@ public class FileVersionRepositoryLifecycleDatabaseTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task SambaRenameRetry_PreservesVersionsCreatedAfterAtomicCheckpoint()
+    {
+        var shareId = Guid.NewGuid();
+        var eventId = Guid.NewGuid();
+        var displaced = Version(shareId, "new.txt", "DISPLACED");
+        await using (var db = NewContext())
+        {
+            db.FileVersions.Add(displaced);
+            db.SambaLifecycleEventReceipts.Add(new SambaLifecycleEventReceipt
+            {
+                EventId = eventId,
+                EventType = "rename",
+                CreatedAtUtc = DateTime.UtcNow,
+                LeaseUntilUtc = DateTime.UtcNow.AddMinutes(1),
+                AttemptCount = 1
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var removed = await new FileVersionRepository(NewContext())
+            .RenamePathAsync(shareId, "old.txt", "new.txt", eventId);
+        Assert.Contains(removed, version => version.Id == displaced.Id);
+
+        var laterVersion = Version(shareId, "new.txt", "LATER", 2);
+        await using (var db = NewContext())
+        {
+            db.FileVersions.Add(laterVersion);
+            await db.SaveChangesAsync();
+        }
+
+        var retryRemoved = await new FileVersionRepository(NewContext())
+            .RenamePathAsync(shareId, "old.txt", "new.txt", eventId);
+
+        Assert.Empty(retryRemoved);
+        await using var assertionDb = NewContext();
+        Assert.NotNull(await assertionDb.FileVersions.FindAsync(laterVersion.Id));
+        var receipt = await assertionDb.SambaLifecycleEventReceipts.FindAsync(eventId);
+        Assert.NotNull(receipt!.RenameVersionsCompletedAtUtc);
+    }
+
+    [Fact]
     public async Task DeletePathAsync_UsesSegmentBoundaryAndReturnsRemovedRows()
     {
         var shareId = Guid.NewGuid();

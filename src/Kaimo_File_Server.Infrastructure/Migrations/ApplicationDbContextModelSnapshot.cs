@@ -192,6 +192,45 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.ToTable("user_groups", (string)null);
                 });
 
+            modelBuilder.Entity("Kaimo_File_Server.Core.Domain.SambaLifecycleEventReceipt", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("LeaseUntilUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("RenameVersionsCompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("EventId");
+
+                    b.HasIndex("CompletedAtUtc");
+
+                    b.HasIndex("LeaseUntilUtc");
+
+                    b.ToTable("samba_lifecycle_event_receipts", (string)null);
+                });
+
             modelBuilder.Entity("Kaimo_File_Server.Core.Domain.ShareDefinition", b =>
                 {
                     b.Property<Guid>("Id")

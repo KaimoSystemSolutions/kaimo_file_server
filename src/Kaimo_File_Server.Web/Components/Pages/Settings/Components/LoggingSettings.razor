@@ -3,6 +3,13 @@
 <div class="detail-section">
     <span class="detail-label">@Resources.Web_Settings_Logging_Detail</span>
     <p class="settings-description">@Resources.Web_Settings_Logging_Desc</p>
+    @if (VM.LogLevelEnvironmentOverride is not null)
+    {
+        <p class="settings-description">
+            @string.Format(Resources.Web_Settings_Logging_EnvironmentOverride,
+                VM.LogLevelEnvironmentOverride)
+        </p>
+    }
     <div class="settings-row">
         <select class="edit-input settings-select" @bind="VM.LogLevel">
             @foreach (var level in SettingsViewModel.LogLevels) { <option value="@level">@level</option> }

@@ -15,7 +15,8 @@ service AuthService {
   // assigns this method to no current workload identity.
   rpc GetNtHash(GetNtHashRequest) returns (GetNtHashReply);
 
-  // All active users + NT-Hash for tdbsam sync (Phase 1).
+  // One bounded page of active users + NT hashes for tdbsam sync. Callers
+  // start at offset zero and continue while has_more is true.
   rpc ListUsers(ListUsersRequest) returns (ListUsersReply);
 }
 
@@ -28,7 +29,11 @@ message GetNtHashReply {
   bytes nt_hash = 2; // raw 16 bytes; empty if not found/disabled
 }
 
-message ListUsersRequest {}
+message ListUsersRequest {
+  uint32 offset    = 1;
+  uint32 page_size = 2; // required: 1-1000; zero fails closed for old clients
+  string continuation_token = 3;
+}
 
 message UserEntry {
   string username = 1;
@@ -37,6 +42,10 @@ message UserEntry {
 
 message ListUsersReply {
   repeated UserEntry users = 1;
+  uint32 next_offset       = 2;
+  bool   has_more          = 3;
+  uint32 rejected_users    = 4;
+  string continuation_token = 5;
 }
 
 // Authorization portion of the Control Plane (Phase 2). Decides whether a
@@ -111,9 +120,10 @@ message AuthorizeRenameRequest {
   bool   replace_intent           = 8;
 }
 
-// Close/Event hooks (Phase 3). Samba performs I/O natively and reports the event
-// afterward; .NET handles cross-cutting concerns (versioning, search index,
-// ownership) as previously in FileSession.DisposeAsync. Fire-and-forget, best-effort.
+// Close/Event hooks (Phase 3/P1-11). Samba performs I/O natively and reports the
+// event afterward. authd durably spools each event before acknowledging the VFS
+// and retries until this service explicitly acknowledges it. event_id is stable
+// across retries and is the bridge's persistent idempotency key.
 service EventService {
   rpc NotifyClose (NotifyCloseRequest)  returns (NotifyReply); // file written and closed
   rpc NotifyMkdir (NotifyPathRequest)   returns (NotifyReply); // directory created
@@ -125,6 +135,11 @@ message NotifyCloseRequest {
   string username = 1;
   string share    = 2;
   string path     = 3;
+  string event_id = 4;
+  // Opaque 128-bit id of the immutable, descriptor-backed close capture.
+  // The bridge derives the actual path below the resolved share root; it never
+  // accepts an arbitrary filesystem path from the control plane.
+  string capture_id = 5;
 }
 
 message NotifyPathRequest {
@@ -132,6 +147,7 @@ message NotifyPathRequest {
   string share        = 2;
   string path         = 3;
   bool   is_directory = 4;
+  string event_id     = 5;
 }
 
 message NotifyRenameRequest {
@@ -140,6 +156,7 @@ message NotifyRenameRequest {
   string old_path     = 3;
   string new_path     = 4;
   bool   is_directory = 5;
+  string event_id     = 6;
 }
 
 message NotifyReply { bool ok = 1; }
@@ -206,6 +223,10 @@ message ProtocolSettingsReply {
   // to the server log. Applied by sync-config.sh by toggling the `full_audit` VFS
   // module in the global `vfs objects` (kaimo_bridge [full_audit]).
   bool   enable_audit_log    = 7;
+
+  // Global application log level from Settings (or KAIMO_LOG_LEVEL when set).
+  // sync-config.sh maps this to Samba's numeric `log level`.
+  string log_level           = 8;
 }
 
 // Snapshots / "Previous Versions" over SMB (Phase 5). Windows requests the list
@@ -227,6 +248,11 @@ service SnapshotService {
   // open/stat there and serves it natively. Idempotent: an already-materialized
   // version is reused.
   rpc ResolveVersion(ResolveVersionRequest) returns (ResolveVersionReply);
+
+  // Completes the atomic bridge-to-VFS lease handoff after the native module
+  // has acquired its shared token lock. Idempotent: an expired/already-released
+  // lease is reported as released=false and requires no further action.
+  rpc ReleaseVersionLease(ReleaseVersionLeaseRequest) returns (ReleaseVersionLeaseReply);
 }
 
 message EnumerateSnapshotsRequest {
@@ -253,4 +279,15 @@ message ResolveVersionReply {
   // The native VFS validates every component before joining its configured root.
   string cache_path = 2;
   int64  size       = 3;
+  // Opaque, short-lived lease held by the bridge until the VFS has locked the
+  // token itself. It expires server-side if the caller disappears.
+  string lease_id   = 4;
+}
+
+message ReleaseVersionLeaseRequest {
+  string lease_id = 1;
+}
+
+message ReleaseVersionLeaseReply {
+  bool released = 1;
 }

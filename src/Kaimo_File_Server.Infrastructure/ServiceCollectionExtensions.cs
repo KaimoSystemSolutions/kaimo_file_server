@@ -51,6 +51,7 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IDepartmentRepository, DepartmentRepository>();
             services.AddScoped<IScopedRoleAssignmentRepository, ScopedRoleAssignmentRepository>();
             services.AddScoped<IFileVersionRepository, FileVersionRepository>();
+            services.AddScoped<ISambaLifecycleEventRepository, SambaLifecycleEventRepository>();
 
             // -- Services (infrastructure-level) --
             services.AddScoped<IDepartmentPermissionService, DepartmentPermissionService>();

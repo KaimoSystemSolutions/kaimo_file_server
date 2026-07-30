@@ -33,6 +33,8 @@
 /// </summary>
 public static class ShareRelativePath
 {
+    private const string InternalNamespacePrefix = ".kaimo-";
+
     /// <summary>
     /// Normalizes any path to the canonical format:
     /// forward slashes, no leading/trailing slashes, no double slashes.
@@ -147,6 +149,110 @@ public static class ShareRelativePath
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Validates untrusted share-relative input before normalization and returns
+    /// its canonical representation.
+    /// </summary>
+    /// <remarks>
+    /// Unlike <see cref="Normalize"/>, this method never turns an absolute path
+    /// into an apparently safe relative path. It also rejects control
+    /// characters, traversal segments, and (by default) Kaimo's reserved
+    /// <c>.kaimo-*</c> top-level namespaces. Single-dot segments are removed.
+    /// </remarks>
+    public static bool TryNormalizeStrict(
+        string? path,
+        out string normalized,
+        bool allowRoot = true,
+        bool allowInternalNamespace = false)
+    {
+        normalized = "";
+        if (path is null)
+            return false;
+
+        if (path.Length > 0 &&
+            (path[0] is '/' or '\\' ||
+             path.Length >= 2 && path[1] == ':'))
+            return false;
+
+        foreach (char character in path)
+        {
+            if (char.IsControl(character))
+                return false;
+        }
+
+        string slashPath = path.Replace('\\', '/');
+        var segments = new List<string>();
+        foreach (string segment in slashPath.Split(
+                     '/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (segment == ".")
+                continue;
+            if (segment == "..")
+                return false;
+            segments.Add(segment);
+        }
+
+        normalized = string.Join('/', segments);
+        if (normalized.Length == 0)
+            return allowRoot &&
+                   (path.Length == 0 || path == "." || path == "./");
+
+        if (!allowInternalNamespace &&
+            segments[0].StartsWith(
+                InternalNamespacePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = "";
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Resolves an untrusted share-relative path beneath <paramref name="rootPath"/>.
+    /// Raw input is validated before normalization, and the fully resolved result
+    /// must be either the root itself or a descendant on a complete path boundary.
+    /// </summary>
+    public static string ToContainedAbsolutePath(
+        string rootPath,
+        string relativePath,
+        bool allowRoot = true,
+        bool allowInternalNamespace = true)
+    {
+        if (!TryNormalizeStrict(
+                relativePath, out string normalized, allowRoot,
+                allowInternalNamespace))
+            throw new UnauthorizedAccessException(
+                "Path is not a valid share-relative path.");
+
+        string rootFull = Path.GetFullPath(rootPath);
+        string pathRoot = Path.GetPathRoot(rootFull) ?? "";
+        if (rootFull.Length > pathRoot.Length)
+        {
+            rootFull = rootFull.TrimEnd(
+                Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+        string rootWithSeparator = rootFull.EndsWith(
+            Path.DirectorySeparatorChar)
+            ? rootFull
+            : rootFull + Path.DirectorySeparatorChar;
+        string full = normalized.Length == 0
+            ? rootFull
+            : Path.GetFullPath(Path.Combine(
+                rootWithSeparator,
+                normalized.Replace('/', Path.DirectorySeparatorChar)));
+
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        if (!string.Equals(full, rootFull, comparison) &&
+            !full.StartsWith(rootWithSeparator, comparison))
+            throw new UnauthorizedAccessException(
+                "Path escapes its configured root.");
+
+        return full;
     }
 
     /// <summary>

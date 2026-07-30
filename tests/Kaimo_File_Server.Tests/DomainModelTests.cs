@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;
 using Xunit;
 
@@ -17,6 +18,28 @@ public class DomainModelTests
         Assert.Equal("marco.hanisch", user.Username);
         Assert.Equal("bcrypt_hash", user.PasswordHash);
         Assert.Equal("nt_hash", user.NtHash);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(".alice")]
+    [InlineData("alice/name")]
+    [InlineData("aliceä")]
+    [InlineData("abcdefghijklmnopqrstuvwxyz1234567")]
+    public void User_Constructor_RejectsNonSambaUsername(string username)
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new User(Guid.NewGuid(), "Alice", username, "hash", "nt"));
+    }
+
+    [Fact]
+    public void User_Constructor_AcceptsExactUsernameByteLimit()
+    {
+        var username = new string('a', SambaName.MaxUsernameBytes);
+
+        var user = new User(Guid.NewGuid(), "Alice", username, "hash", "nt");
+
+        Assert.Equal(username, user.Username);
     }
 
     [Fact] public void Group_Constructor_SetsIdAndName() { var id = Guid.NewGuid(); var g = new Group(id, "Admins"); Assert.Equal(id, g.Id); Assert.Equal("Admins", g.Name); }
@@ -39,6 +62,28 @@ public class DomainModelTests
 
     [Fact] public void ShareDefinition_Constructor_SetsDefaults() { var s = new ShareDefinition("projekte", "/data/storage/projekte"); Assert.NotEqual(Guid.Empty, s.Id); Assert.Equal("projekte", s.Name); Assert.True(s.IsEnabled); }
     [Fact] public void ShareDefinition_Constructor_CanBeDisabled() { Assert.False(new ShareDefinition("archiv", "/data/storage/archiv", isEnabled: false).IsEnabled); }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(".hidden")]
+    [InlineData("trailing.")]
+    [InlineData("share/name")]
+    [InlineData("IPC$")]
+    public void ShareDefinition_Constructor_RejectsNonSambaShareName(string name)
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new ShareDefinition(name, "/data/storage/share"));
+    }
+
+    [Fact]
+    public void ShareDefinition_Constructor_AcceptsExactShareByteLimit()
+    {
+        var name = new string('s', SambaName.MaxShareNameBytes);
+
+        var share = new ShareDefinition(name, "/data/storage/share");
+
+        Assert.Equal(name, share.Name);
+    }
     [Fact]
     public void AccessEntry_Constructor_SetsValues()
     {

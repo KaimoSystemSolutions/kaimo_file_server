@@ -28,6 +28,9 @@ internal static class SnapshotCache
     /// <summary>Per-@GMT-token marker file recording real materialization time (UTC).</summary>
     internal const string MarkerName = ".kaimo-cached-at";
 
+    /// <summary>Cross-process advisory lock held by bridge and Samba readers.</summary>
+    internal const string LeaseFileName = ".kaimo-lease";
+
     internal static string ConfiguredRoot(IConfiguration config)
     {
         string configured = config["Snapshots:Cache:RootPath"] ?? DefaultRoot;
@@ -45,9 +48,12 @@ internal static class SnapshotCache
     internal static string RelativeShareRootFor(Guid shareId) =>
         shareId.ToString("N");
 
-    /// <summary>Creates each security boundary in a user projection as 0750.</summary>
-    internal static string EnsureUserScope(
-        string cacheRoot, Guid shareId, string gmtToken, string userScope)
+    internal static string TokenRootFor(
+        string cacheRoot, string shareScope, string gmtToken) =>
+        Path.Combine(Path.GetFullPath(cacheRoot), shareScope, gmtToken);
+
+    internal static string EnsureTokenRoot(
+        string cacheRoot, Guid shareId, string gmtToken)
     {
         string root = Path.GetFullPath(cacheRoot);
         EnsureDirectory(root);
@@ -55,6 +61,27 @@ internal static class SnapshotCache
         EnsureDirectory(shareRoot);
         string tokenRoot = Path.Combine(shareRoot, gmtToken);
         EnsureDirectory(tokenRoot);
+        return tokenRoot;
+    }
+
+    internal static string EnsureLeaseFile(string tokenRoot)
+    {
+        EnsureDirectory(tokenRoot);
+        string path = Path.Combine(tokenRoot, LeaseFileName);
+        using (new FileStream(
+                   path, FileMode.OpenOrCreate, FileAccess.Write,
+                   FileShare.ReadWrite | FileShare.Delete))
+        {
+        }
+        SetReadOnlyProjectionMode(path);
+        return path;
+    }
+
+    /// <summary>Creates each security boundary in a user projection as 0750.</summary>
+    internal static string EnsureUserScope(
+        string cacheRoot, Guid shareId, string gmtToken, string userScope)
+    {
+        string tokenRoot = EnsureTokenRoot(cacheRoot, shareId, gmtToken);
         string userRoot = Path.Combine(tokenRoot, userScope);
         EnsureDirectory(userRoot);
         return userRoot;

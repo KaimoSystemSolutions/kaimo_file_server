@@ -24,6 +24,7 @@ public static class ControlPlaneAccessPolicy
             "/kaimo.smb.bridge.v1.EventService/NotifyRename",
             "/kaimo.smb.bridge.v1.SnapshotService/EnumerateSnapshots",
             "/kaimo.smb.bridge.v1.SnapshotService/ResolveVersion",
+            "/kaimo.smb.bridge.v1.SnapshotService/ReleaseVersionLease",
         };
 
     public static bool IsKnownClient(string clientId) =>

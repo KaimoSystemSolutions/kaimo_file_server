@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services.DataServices;
@@ -90,6 +91,24 @@ public sealed class AuthzGrpcServiceDeleteTests : IDisposable
         var reply = await AuthorizeAsync("../outside.txt", isDirectory: false);
 
         Assert.False(reply.Allow);
+        _acl.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task AuthorizeDelete_OversizedIdentityContext_IsDeniedBeforeLookup()
+    {
+        var reply = await _sut.AuthorizeDelete(
+            new AuthorizeDeleteRequest
+            {
+                Username = new string('u', SambaName.MaxUsernameBytes + 1),
+                Share = "share",
+                Path = "docs/report.txt"
+            },
+            null!);
+
+        Assert.False(reply.Allow);
+        _auth.VerifyNoOtherCalls();
+        _shares.VerifyNoOtherCalls();
         _acl.VerifyNoOtherCalls();
     }
 

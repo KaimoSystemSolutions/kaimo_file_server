@@ -40,6 +40,12 @@ namespace Kaimo_File_Server.Core.Services.File
         /// </summary>
         Task<Stream> ReadVersionAsync(Guid shareId, string filePath, DateTime snapshotTimestampUtc);
 
+        Task<Stream> ReadVersionAsync(
+            Guid shareId, string filePath, DateTime snapshotTimestampUtc,
+            CancellationToken cancellationToken) =>
+            ReadVersionAsync(shareId, filePath, snapshotTimestampUtc)
+                .WaitAsync(cancellationToken);
+
         /// <summary>
         /// Get all versions of a file (newest first).
         /// </summary>
@@ -60,6 +66,12 @@ namespace Kaimo_File_Server.Core.Services.File
         /// </summary>
         Task<List<FileVersion>> GetFolderSnapshotAsync(Guid shareId, string folderPath, DateTime asOfUtc);
 
+        Task<List<FileVersion>> GetFolderSnapshotAsync(
+            Guid shareId, string folderPath, DateTime asOfUtc,
+            CancellationToken cancellationToken) =>
+            GetFolderSnapshotAsync(shareId, folderPath, asOfUtc)
+                .WaitAsync(cancellationToken);
+
         /// <summary>
         /// Get metadata for a file at a specific snapshot time.
         /// Used to resolve @GMT- paths in SMB and version-specific requests in HTTP.
@@ -74,7 +86,11 @@ namespace Kaimo_File_Server.Core.Services.File
         Task<int> ApplyRetentionAsync(Guid shareId, string filePath, int? maxVersions = null, TimeSpan? maxAge = null);
 
         /// <summary>Moves a file or directory's complete version history to a new path.</summary>
-        Task RenamePathAsync(Guid shareId, string oldPath, string newPath);
+        Task RenamePathAsync(
+            Guid shareId,
+            string oldPath,
+            string newPath,
+            Guid? sambaLifecycleEventId = null);
 
         /// <summary>Deletes all versions at a file/directory path and reclaims unused blobs.</summary>
         Task<int> DeletePathAsync(Guid shareId, string path);
