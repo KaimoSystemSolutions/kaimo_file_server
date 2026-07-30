@@ -428,5 +428,11 @@ public partial class FileBrowser
     /// </summary>
     public bool CanManageAcls()
         => !VM.IsLoading && VM.ErrorMessage is null && VM.CanManageAcls;
+    
+    public bool CanManageSyncs()
+        => !VM.IsLoading && VM.ErrorMessage is null && VM.CanManageSyncs;
+    
+    
+    
 }
 

@@ -90,7 +90,7 @@ public class ManagementAuthService : IManagementAuthService
             _ => Task.FromResult(false)
         });
     }
-
+    
     // -- Department Management --
 
     public Task<bool> CanManageDepartmentAsync(

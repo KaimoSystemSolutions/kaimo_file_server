@@ -37,11 +37,8 @@ namespace Kaimo_File_Server.Infrastructure
                 ?? "Host=kaimo_file_server_db;Database=kaimo_file_server;Username=kaimo_test_user;Password=change_me";
 
             // -- EF Core --
-            services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseNpgsql(connectionString));
-
             services.AddDbContextFactory<ApplicationDbContext>(options =>
-                options.UseNpgsql(connectionString), ServiceLifetime.Scoped);
+                options.UseNpgsql(connectionString));
 
             // -- Repositories --
             services.AddScoped<IUserRepository, UserRepository>();

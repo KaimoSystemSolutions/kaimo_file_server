@@ -46,6 +46,12 @@
         ManageDataServices = 1L << 41,  // start/stop data services (SMB, future NFS/FTP)
         ManageCertificates = 1L << 42,  // view/download/replace the HTTPS server certificate
 
+        // -- Sync --
+        CreateSyncs = 1L << 48, // sync a folder with an external cloud
+        DeleteSyncs = 1L << 49, // delete a sync folder
+        ConfigureSyncs = 1L << 50, // edit the frequency of syncing
+        SyncManually = 1L << 51, // manually cause a sync to occour
+        
         // -- Shortcuts --
         UserAdmin = CreateUsers | DeleteUsers | EditUserProfiles
                   | ResetPasswords | EnableDisableUsers,
@@ -64,6 +70,8 @@
         FullAdmin = UserAdmin | GroupAdmin | ShareAdmin
                   | AssignGroups | AssignRoles | AssignDepartments
                   | EditDepartment | ViewDepartment
-                  | SystemAdmin
+                  | SystemAdmin,
+        
+        SyncAdmin = CreateSyncs | DeleteSyncs | ConfigureSyncs | SyncManually,
     }
 }

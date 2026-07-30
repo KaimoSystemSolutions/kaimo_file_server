@@ -7,19 +7,25 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
 
 public class ScopedRoleAssignmentRepository : IScopedRoleAssignmentRepository
 {
-    private readonly ApplicationDbContext _db;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
 
-    public ScopedRoleAssignmentRepository(ApplicationDbContext db)
+    public ScopedRoleAssignmentRepository(IDbContextFactory<ApplicationDbContext> dbFactory)
     {
-        _db = db;
+        _dbFactory = dbFactory;
     }
 
     public async Task<ScopedRoleAssignment?> GetByIdAsync(Guid id)
-        => await _db.ScopedRoleAssignments.FindAsync(id);
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.ScopedRoleAssignments.FindAsync(id);
+    }
 
     public async Task<List<ScopedRoleAssignment>> GetByPrincipalAsync(Guid principalId)
     {
-        return await _db.ScopedRoleAssignments
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        
+        return await db.ScopedRoleAssignments
             .Where(a => a.PrincipalId == principalId)
             .ToListAsync();
     }
@@ -30,7 +36,9 @@ public class ScopedRoleAssignmentRepository : IScopedRoleAssignmentRepository
     /// </summary>
     public async Task<List<ScopedRoleAssignment>> GetByRoleAsync(Guid roleId)
     {
-        return await _db.ScopedRoleAssignments
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        return await db.ScopedRoleAssignments
             .Where(a => a.RoleId == roleId)
             .ToListAsync();
     }
@@ -38,7 +46,9 @@ public class ScopedRoleAssignmentRepository : IScopedRoleAssignmentRepository
     public async Task<List<ScopedRoleAssignment>> GetByScopeAsync(
         ScopeType scopeType, Guid scopeId)
     {
-        return await _db.ScopedRoleAssignments
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        return await db.ScopedRoleAssignments
             .Where(a => a.ScopeType == scopeType && a.ScopeId == scopeId)
             .ToListAsync();
     }
@@ -46,7 +56,9 @@ public class ScopedRoleAssignmentRepository : IScopedRoleAssignmentRepository
     public async Task<List<ScopedRoleAssignment>> GetByPrincipalAndScopeAsync(
         Guid principalId, ScopeType scopeType, Guid scopeId)
     {
-        return await _db.ScopedRoleAssignments
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        return await db.ScopedRoleAssignments
             .Where(a => a.PrincipalId == principalId
                      && a.ScopeType == scopeType
                      && a.ScopeId == scopeId)
@@ -56,38 +68,46 @@ public class ScopedRoleAssignmentRepository : IScopedRoleAssignmentRepository
     public async Task<List<ScopedRoleAssignment>> GetEffectiveAssignmentsAsync(
         Guid userId, IEnumerable<Guid> groupIds)
     {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
         var allPrincipalIds = new List<Guid> { userId };
         allPrincipalIds.AddRange(groupIds);
 
-        return await _db.ScopedRoleAssignments
+        return await db.ScopedRoleAssignments
             .Where(a => allPrincipalIds.Contains(a.PrincipalId))
             .ToListAsync();
     }
 
     public async Task<ScopedRoleAssignment> CreateAsync(ScopedRoleAssignment assignment)
     {
-        _db.ScopedRoleAssignments.Add(assignment);
-        await _db.SaveChangesAsync();
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        db.ScopedRoleAssignments.Add(assignment);
+        await db.SaveChangesAsync();
         return assignment;
     }
 
     public async Task DeleteAsync(Guid id)
     {
-        var entry = await _db.ScopedRoleAssignments.FindAsync(id);
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var entry = await db.ScopedRoleAssignments.FindAsync(id);
         if (entry != null)
         {
-            _db.ScopedRoleAssignments.Remove(entry);
-            await _db.SaveChangesAsync();
+            db.ScopedRoleAssignments.Remove(entry);
+            await db.SaveChangesAsync();
         }
     }
 
     public async Task DeleteByScopeAsync(ScopeType scopeType, Guid scopeId)
     {
-        var entries = await _db.ScopedRoleAssignments
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var entries = await db.ScopedRoleAssignments
             .Where(a => a.ScopeType == scopeType && a.ScopeId == scopeId)
             .ToListAsync();
 
-        _db.ScopedRoleAssignments.RemoveRange(entries);
-        await _db.SaveChangesAsync();
+        db.ScopedRoleAssignments.RemoveRange(entries);
+        await db.SaveChangesAsync();
     }
 }
