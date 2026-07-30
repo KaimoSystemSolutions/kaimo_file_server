@@ -97,6 +97,7 @@ public class FileBrowserViewModel
     /// Drives the ACL panel, badges and permission actions in the view.
     /// </summary>
     public bool CanManageAcls { get; private set; }
+    public bool CanManageSyncs { get; private set; }
 
     // -- Computed --
 
@@ -143,6 +144,7 @@ public class FileBrowserViewModel
             IsLoading = true;
             ErrorMessage = null;
             CanManageAcls = false;
+            CanManageSyncs = false;
             _fileService = null;
 
             CurrentShare = await _shareRepo.GetByNameAsync(shareName);
@@ -195,6 +197,8 @@ public class FileBrowserViewModel
             CanManageAcls = await _mgmtAuth.CanManageShareAsync(
                 userContext, CurrentShare.Id, ManagementPermission.ManageShareAcls);
 
+            CanManageSyncs = await _mgmtAuth.HasAnyPermissionAsync(userContext, ManagementPermission.SyncAdmin);
+            
             _logger.LogDebug("Loading path: '{CurrentPath}' (share={ShareName}, user={User})",
                 CurrentPath, shareName, userContext.User.Username);
 
@@ -209,18 +213,21 @@ public class FileBrowserViewModel
         {
             ErrorMessage = Resources.Web_Error_FileOrFolderNotFound;
             CanManageAcls = false;
+            CanManageSyncs = false;
             Items = [];
         }
         catch (UnauthorizedAccessException)
         {
             ErrorMessage = Resources.Web_Error_AccessDenied;
             CanManageAcls = false;
+            CanManageSyncs = false;
             Items = [];
         }
         catch (Exception ex)
         {
             ErrorMessage = Resources.Web_Error_LoadFilesFailed;
             CanManageAcls = false;
+            CanManageSyncs = false;
             _logger.LogError(ex, "Error loading share {ShareName} path {SubPath}", shareName, subPath);
             Items = [];
         }

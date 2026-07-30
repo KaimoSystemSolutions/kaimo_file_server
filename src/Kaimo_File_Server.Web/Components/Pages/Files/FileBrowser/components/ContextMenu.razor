@@ -109,6 +109,8 @@
             "extract" when scope == ContextMenuScope.MultiSelection
                 => selected.All(f => !f.IsDirectory && FileHelper.IsArchive(f.Name)),
                 
+            "sync" when scope == ContextMenuScope.Folder => FileBrowser.CanManageSyncs(),
+            
             _ => true,
         };
 
@@ -121,8 +123,6 @@
         "open"
             => async () => {  CloseContextMenu(); await FilePreviewComponent.OpenFilePreview(target!); },
 
-        "sync" when target is { IsDirectory: true} 
-            => async () => { CloseContextMenu(); await FileBrowser.OpenSyncDialog(target!); },
         
         "extract" when scope == ContextMenuScope.MultiSelection
             => async () =>
@@ -153,7 +153,10 @@
             => async () => { foreach (var item in selected) await ContextDelete(item); },
         "delete"
             => async () => { await ContextDelete(target!); },
-
+        
+        "sync" when scope == ContextMenuScope.Folder && FileBrowser.CanManageSyncs()
+            => async () => { CloseContextMenu(); await FileBrowser.OpenSyncDialog(selected.Single()); },
+        
         "permissions" => () => { ContextAcl(target!); return Task.CompletedTask; },
 
         "properties" => async () => { CloseContextMenu(); await FileBrowser.OpenPropertiesDialog(target!); },
