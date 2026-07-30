@@ -58,7 +58,10 @@ if [ -z "$module_path" ]; then
     echo "[samba-compat] installed kaimo_bridge module was not found." >&2
     exit 1
 fi
-if ! strings "$module_path" | grep -Fq "kaimo_bridge build ["; then
+# Search the ELF directly. With `set -o pipefail`, the previous
+# `strings | grep -q` pipeline could report failure after grep found the marker:
+# grep exited early and strings then received SIGPIPE.
+if ! LC_ALL=C grep -aFq -- "kaimo_bridge build [" "$module_path"; then
     echo "[samba-compat] installed module is not the real Kaimo VFS build." >&2
     exit 1
 fi
