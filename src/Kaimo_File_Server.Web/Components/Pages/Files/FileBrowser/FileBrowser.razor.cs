@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Diagnostics;
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser.components;
 using Kaimo_File_Server.Web.Components.ViewModels;
@@ -121,6 +122,11 @@ public partial class FileBrowser
     // Single sequence for <Virtualize>: directories first (each group sorted), then files.
     // Materialized because Virtualize needs an indexable collection.
     private List<FileMetadata> SortedEntries => SortedDirectories.Concat(SortedFiles).ToList();
+
+    private static bool IsRecycleBinEntry(FileMetadata entry) =>
+        entry.IsDirectory &&
+        ShareEntryPolicy.Classify(entry.Path).Kind ==
+            ShareEntryKind.RecycleBin;
 
     private IEnumerable<FileMetadata> ApplySort(IEnumerable<FileMetadata> items)
     {

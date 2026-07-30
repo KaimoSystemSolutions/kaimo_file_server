@@ -293,7 +293,7 @@ else
                      data-path="@entry.Path"
                      @ondragstart="() => OnDragStart(entry)"
                      @ondragend="OnDragEnd">
-                    @if (entry.IsDirectory && entry.Name == ".RECYCLE_BIN")
+                    @if (IsRecycleBinEntry(entry))
                     {
                         @Assets.SVG("trash.svg", new SvgOptions(Width: 20, Height: 20, CssClass: "file-icon"))
                     }

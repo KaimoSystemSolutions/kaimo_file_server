@@ -240,6 +240,18 @@ public sealed class AuthzGrpcServiceRenameTests : IDisposable
         _acl.VerifyNoOtherCalls();
     }
 
+    [Fact]
+    public async Task AuthorizeRename_ReservedDestination_IsDeniedBeforeAclChecks()
+    {
+        var reply = await AuthorizeAsync(
+            "docs/report.txt", ".RECYCLE_BIN/report.txt",
+            sourceIsDirectory: false);
+
+        Assert.False(reply.Allow);
+        Assert.Contains("reserved Kaimo namespace", reply.Reason);
+        _acl.VerifyNoOtherCalls();
+    }
+
     private Task<AuthorizeReply> AuthorizeAsync(
         string sourcePath,
         string destinationPath,

@@ -60,6 +60,8 @@ public class FileService : IFileService
             if (string.Equals(oldRel, newRel, StringComparison.Ordinal))
                 return;
 
+            EnsureUserWriteTargetAllowed(newRel);
+
             bool isDir = _handle.IsDirectory;
 
             // ACL: the source needs Delete, the destination needs Create/Write.
@@ -200,8 +202,6 @@ public class FileService : IFileService
     private readonly ILogger<FileService> _logger;
     private readonly Guid _shareId;
     private readonly SemaphoreSlim _searchSideEffectLock = new(1, 1);
-
-    private const string RecycleBinFolder = ".RECYCLE_BIN";
 
     public FileService(
     IStorageEngine storage,
@@ -505,6 +505,9 @@ public class FileService : IFileService
     private async Task<bool> CheckAccessAsync(string path, UserContext user, FilePermission permission)
     {
         var normalized = ShareRelativePath.Normalize(path);
+        if (IsUserWritePermission(permission) &&
+            ShareEntryPolicy.IsReservedForUserWrites(normalized))
+            return false;
         var isDir = await _storage.IsDirectoryAsync(normalized);
         return await _acl.HasAccessAsync(user, _shareId, normalized, isDir, permission);
     }
@@ -517,9 +520,24 @@ public class FileService : IFileService
     private async Task EnsureAccessAsync(
         UserContext user, string normalizedPath, bool isDirectory, FilePermission permission)
     {
+        if (IsUserWritePermission(permission))
+            EnsureUserWriteTargetAllowed(normalizedPath);
+
         if (!await _acl.HasAccessAsync(user, _shareId, normalizedPath, isDirectory, permission))
             throw new UnauthorizedAccessException(
                 $"Access denied ({permission}) for '{normalizedPath}'");
+    }
+
+    private static bool IsUserWritePermission(FilePermission permission) =>
+        (permission &
+            (FilePermission.CreateWriteData |
+             FilePermission.CreateAppendData)) != 0;
+
+    private static void EnsureUserWriteTargetAllowed(string normalizedPath)
+    {
+        if (ShareEntryPolicy.IsReservedForUserWrites(normalizedPath))
+            throw new UnauthorizedAccessException(
+                $"Share path '{normalizedPath}' uses a reserved Kaimo namespace.");
     }
 
     // ------------------ Directory Listing ------------------
@@ -527,6 +545,10 @@ public class FileService : IFileService
     public async Task<List<FileMetadata>> ListAsync(string directoryPath, UserContext user)
     {
         var normalizedDir = ShareRelativePath.Normalize(directoryPath);
+
+        if (!ShareEntryPolicy.IsVisibleInFileBrowser(normalizedDir))
+            throw new UnauthorizedAccessException(
+                $"Internal share path '{normalizedDir}' is not browser-visible.");
 
         if (!await _acl.HasAccessAsync(user, _shareId, normalizedDir, true, FilePermission.ListReadData))
             throw new UnauthorizedAccessException($"List denied for '{normalizedDir}'");
@@ -543,19 +565,26 @@ public class FileService : IFileService
 
         var items = await _storage.ListAsync(normalizedDir);
 
-        var itemsToCheck = items
-            .Select(i => (ShareRelativePath.Combine(normalizedDir, i.Name), i.IsDirectory))
+        var browserItems = items
+            .Select(item => (
+                Item: item,
+                Path: ShareRelativePath.Combine(normalizedDir, item.Name)))
+            .Where(entry =>
+                ShareEntryPolicy.IsVisibleInFileBrowser(entry.Path))
+            .ToList();
+
+        var itemsToCheck = browserItems
+            .Select(entry => (entry.Path, entry.Item.IsDirectory))
             .ToList();
 
         var accessMap = await _acl.HasAccessBatchAsync(
             user, _shareId, itemsToCheck, FilePermission.ListReadData);
 
-        var visible = new List<FileMetadata>(items.Count);
-        foreach (var item in items)
+        var visible = new List<FileMetadata>(browserItems.Count);
+        foreach (var entry in browserItems)
         {
-            var itemPath = ShareRelativePath.Combine(normalizedDir, item.Name);
-            if (accessMap.TryGetValue(itemPath, out var allowed) && allowed)
-                visible.Add(item);
+            if (accessMap.TryGetValue(entry.Path, out var allowed) && allowed)
+                visible.Add(entry.Item);
         }
 
         
@@ -598,6 +627,9 @@ public class FileService : IFileService
 
     public async Task<bool> CanCreateAsync(string path, UserContext user)
     {
+        var normalized = ShareRelativePath.Normalize(path);
+        if (ShareEntryPolicy.IsReservedForUserWrites(normalized))
+            return false;
         var parentPath = ShareRelativePath.GetParent(path);
         return await _acl.HasAccessAsync(user, _shareId, parentPath, true, FilePermission.CreateWriteData);
     }
@@ -608,6 +640,8 @@ public class FileService : IFileService
     public async Task<bool> CanListAsync(string path, UserContext user)
     {
         var normalized = ShareRelativePath.Normalize(path);
+        if (!ShareEntryPolicy.IsVisibleInFileBrowser(normalized))
+            return false;
         return await _acl.HasAccessAsync(user, _shareId, normalized, true, FilePermission.ListReadData);
     }
 
@@ -694,6 +728,7 @@ public class FileService : IFileService
     public async Task ArchiveAsync(List<string> sourcePaths, string targetPath, string format, UserContext user)
     {
         var normalizedTarget = ShareRelativePath.Normalize(targetPath);
+        EnsureUserWriteTargetAllowed(normalizedTarget);
 
         // Check read on all sources
         foreach (var source in sourcePaths)
@@ -717,6 +752,7 @@ public class FileService : IFileService
     {
         var normalizedZip = ShareRelativePath.Normalize(zipPath);
         var normalizedTarget = ShareRelativePath.Normalize(targetPath);
+        EnsureUserWriteTargetAllowed(normalizedTarget);
 
         // Check read permission on the zip
         await EnsureAccessAsync(user, normalizedZip, false, FilePermission.ListReadData);
@@ -731,22 +767,24 @@ public class FileService : IFileService
 
     public async Task CreateFileAsync(string path, UserContext user)
     {
-        var parentPath = ShareRelativePath.GetParent(path);
+        var normalized = ShareRelativePath.Normalize(path);
+        EnsureUserWriteTargetAllowed(normalized);
+        var parentPath = ShareRelativePath.GetParent(normalized);
 
         await EnsureAccessAsync(user, parentPath, true, FilePermission.CreateWriteData);
 
-        var normalized = ShareRelativePath.Normalize(path);
         await _storage.WriteAsync(normalized, Stream.Null);
         await RecordOwnerAsync(normalized, isDirectory: false, user);
     }
 
     public async Task CreateDirectoryAsync(string path, UserContext user)
     {
-        var parentPath = ShareRelativePath.GetParent(path);
+        var normalized = ShareRelativePath.Normalize(path);
+        EnsureUserWriteTargetAllowed(normalized);
+        var parentPath = ShareRelativePath.GetParent(normalized);
 
         await EnsureAccessAsync(user, parentPath, true, FilePermission.CreateWriteData);
 
-        var normalized = ShareRelativePath.Normalize(path);
         await _storage.CreateDirectory(normalized);
         await RecordOwnerAsync(normalized, isDirectory: true, user);
         var absolutePath = ToAbsolutePath(normalized);
@@ -764,16 +802,14 @@ public class FileService : IFileService
         await EnsureAccessAsync(user, normalized, isDir, FilePermission.Delete);
 
         var isAlreadyInRecycleBin =
-            normalized.Equals(
-                RecycleBinFolder, StringComparison.OrdinalIgnoreCase) ||
-            normalized.StartsWith(
-                RecycleBinFolder + "/", StringComparison.OrdinalIgnoreCase);
+            ShareEntryPolicy.IsRecycleBinPath(normalized);
 
         var absolutePath = ToAbsolutePath(normalized);
         
         if (isRecycleEnabled && !isAlreadyInRecycleBin)
         {
-            var recyclePath = ShareRelativePath.Combine(RecycleBinFolder, normalized);
+            var recyclePath = ShareRelativePath.Combine(
+                ShareEntryPolicy.RecycleBinName, normalized);
             // MoveAsync may append a timestamp suffix on a name collision in the
             // recycle bin — align the ACL with the path that actually landed on disk.
             var actualRecyclePath = await _storage.MoveAsync(normalized, recyclePath);
@@ -862,6 +898,11 @@ public class FileService : IFileService
         bool wantsWrite = (intent & AccessIntent.Write) != 0;
         bool wantsCreate = mode is OpenMode.Create or OpenMode.OpenOrCreate
                                   or OpenMode.CreateOrTruncate or OpenMode.Supersede;
+
+        if ((wantsWrite || !exists && wantsCreate) &&
+            ShareEntryPolicy.IsReservedForUserWrites(normalized))
+            throw new UnauthorizedAccessException(
+                $"Share path '{normalized}' uses a reserved Kaimo namespace.");
 
         // Single permission check at open. No more per-Read/per-Write checks.
         if (!exists)

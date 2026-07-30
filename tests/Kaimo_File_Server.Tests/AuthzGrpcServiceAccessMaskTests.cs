@@ -216,6 +216,36 @@ public sealed class AuthzGrpcServiceAccessMaskTests : IDisposable
             FilePermission.CreateWriteData), Times.Once);
     }
 
+    [Theory]
+    [InlineData(".RECYCLE_BIN/new-file.txt", false, 0x00000002u)]
+    [InlineData(".RECYCLE_BIN/new-folder", true, 0x00000004u)]
+    public async Task AuthorizeOpen_RecycleNamespaceCreate_IsDeniedBeforeAcl(
+        string path, bool createDirectory, uint accessMask)
+    {
+        var reply = await AuthorizeAsync(
+            accessMask, path, wantsCreate: true,
+            createDirectory: createDirectory);
+
+        Assert.False(reply.Allow);
+        Assert.Contains("reserved Kaimo namespace", reply.Reason);
+        _acl.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task AuthorizeOpen_RecycleNamespaceExplicitWrite_IsDeniedBeforeAcl()
+    {
+        Directory.CreateDirectory(Path.Combine(_tempRoot, ".RECYCLE_BIN"));
+        File.WriteAllText(
+            Path.Combine(_tempRoot, ".RECYCLE_BIN", "existing.txt"), "test");
+
+        var reply = await AuthorizeAsync(
+            0x00000002u, ".RECYCLE_BIN/existing.txt");
+
+        Assert.False(reply.Allow);
+        Assert.Contains("reserved Kaimo namespace", reply.Reason);
+        _acl.VerifyNoOtherCalls();
+    }
+
     [Fact]
     public async Task AuthorizeOpen_DirectoryListing_DoesNotInventReadAttributes()
     {

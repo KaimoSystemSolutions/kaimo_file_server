@@ -50,6 +50,9 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     private const uint FileGenericWrite = 0x00120116;
     private const uint FileGenericExecute = 0x001200A0;
     private const uint SupportedSpecificAccess = FileGenericAll;
+    private const uint UserContentMutationAccess =
+        FileWriteData | FileAppendData | FileWriteEa |
+        FileWriteAttributes | WriteDac | WriteOwner;
 
     private static readonly AccessRule[] AccessRules =
     [
@@ -172,6 +175,14 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
 
         bool wantsMaximum = (expanded & MaximumAllowed) != 0;
         uint specific = expanded & ~MaximumAllowed;
+        bool reservedUserTarget =
+            ShareEntryPolicy.IsReservedForUserWrites(normalized);
+
+        if (reservedUserTarget &&
+            (!exists && request.WantsCreate ||
+             (specific & UserContentMutationAccess) != 0))
+            return Deny(
+                $"open denied: '{normalized}' is a reserved Kaimo namespace");
 
         string? traversalDeny = await CheckTraversalAsync(
             user, share.Id, normalized, cancellationToken);
@@ -215,6 +226,8 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
             // as well because SMB clients may set/ignore it freely.
             if ((specific & Synchronize) != 0 || wantsMaximum)
                 granted |= Synchronize;
+            if (reservedUserTarget && wantsMaximum)
+                granted &= ~UserContentMutationAccess;
         }
 
         if (allow)
@@ -403,17 +416,8 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
             Reason = reason,
             RecycleDelete = allow &&
                 share.IsRecycleEnabled &&
-                !IsRecycleBinPath(normalized)
+                !ShareEntryPolicy.IsRecycleBinPath(normalized)
         };
-    }
-
-    private static bool IsRecycleBinPath(string normalizedPath)
-    {
-        const string recycleBin = ".RECYCLE_BIN";
-        return normalizedPath.Equals(
-                   recycleBin, StringComparison.OrdinalIgnoreCase) ||
-               normalizedPath.StartsWith(
-                   recycleBin + "/", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -450,6 +454,9 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
 
         if (string.Equals(source, destination, StringComparison.Ordinal))
             return Deny($"invalid rename '{source}' -> '{destination}'");
+        if (ShareEntryPolicy.IsReservedForUserWrites(destination))
+            return Deny(
+                $"rename denied: destination '{destination}' is a reserved Kaimo namespace");
 
         // Cross-check the native request against the shared storage view. This
         // is not the final TOCTOU guard (the VFS performs that immediately

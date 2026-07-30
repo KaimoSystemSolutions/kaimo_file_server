@@ -33,8 +33,6 @@
 /// </summary>
 public static class ShareRelativePath
 {
-    private const string InternalNamespacePrefix = ".kaimo-";
-
     /// <summary>
     /// Normalizes any path to the canonical format:
     /// forward slashes, no leading/trailing slashes, no double slashes.
@@ -200,8 +198,7 @@ public static class ShareRelativePath
                    (path.Length == 0 || path == "." || path == "./");
 
         if (!allowInternalNamespace &&
-            segments[0].StartsWith(
-                InternalNamespacePrefix, StringComparison.OrdinalIgnoreCase))
+            ShareEntryPolicy.IsInternalPath(normalized))
         {
             normalized = "";
             return false;

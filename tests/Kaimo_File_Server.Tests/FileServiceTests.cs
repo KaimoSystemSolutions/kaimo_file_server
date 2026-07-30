@@ -132,6 +132,17 @@ public class FileServiceTests
         Assert.False(await _sut.CanCreateAsync("/dir/test.txt", ctx));
     }
 
+    [Theory]
+    [InlineData(".RECYCLE_BIN")]
+    [InlineData(".RECYCLE_BIN/upload.txt")]
+    [InlineData(".kaimo-close-captures")]
+    public async Task CanCreateAsync_ReservedNamespace_ReturnsFalseWithoutAcl(
+        string path)
+    {
+        Assert.False(await _sut.CanCreateAsync(path, CreateContext()));
+        _aclMock.VerifyNoOtherCalls();
+    }
+
     // ═══════════════════ CanListAsync ═══════════════════
 
     [Fact]
@@ -200,6 +211,23 @@ public class FileServiceTests
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(
             () => _sut.WriteFileAsync("/test.txt", Stream.Null, ctx));
+    }
+
+    [Theory]
+    [InlineData(".RECYCLE_BIN/upload.txt")]
+    [InlineData(".kaimo-upload")]
+    public async Task WriteFileAsync_ReservedNamespace_IsDeniedBeforeStorage(
+        string path)
+    {
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => _sut.WriteFileAsync(path, Stream.Null, CreateContext()));
+
+        _storageMock.Verify(
+            s => s.WriteAsync(
+                It.IsAny<string>(), It.IsAny<Stream>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+        _aclMock.VerifyNoOtherCalls();
     }
 
     [Fact]
@@ -435,6 +463,33 @@ public class FileServiceTests
             () => _sut.CreateDirectoryAsync("/newdir", ctx));
     }
 
+    [Theory]
+    [InlineData(".RECYCLE_BIN")]
+    [InlineData(".kaimo-user-folder")]
+    public async Task CreateDirectoryAsync_ReservedRootName_IsDeniedBeforeStorage(
+        string path)
+    {
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => _sut.CreateDirectoryAsync(path, CreateContext()));
+
+        _storageMock.Verify(
+            s => s.CreateDirectory(It.IsAny<string>()), Times.Never);
+        _aclMock.VerifyNoOtherCalls();
+    }
+
+    [Theory]
+    [InlineData(".RECYCLE_BIN_backup")]
+    [InlineData("documents/.kaimo-notes")]
+    public async Task CreateDirectoryAsync_SimilarOrNestedName_RemainsAllowed(
+        string path)
+    {
+        AllowAccess(FilePermission.CreateWriteData);
+
+        await _sut.CreateDirectoryAsync(path, CreateContext());
+
+        _storageMock.Verify(s => s.CreateDirectory(path), Times.Once);
+    }
+
     // ═══════════════════ DeleteFileAsync ═══════════════════
 
     [Fact]
@@ -611,6 +666,30 @@ public class FileServiceTests
             _shareId, "old", "new", null), Times.Once);
     }
 
+    [Theory]
+    [InlineData(".RECYCLE_BIN/old.txt")]
+    [InlineData(".kaimo-renamed")]
+    public async Task RenameAsync_ReservedDestination_IsDeniedBeforeStorage(
+        string destination)
+    {
+        _storageMock.Setup(s => s.IsDirectoryAsync("old.txt"))
+            .ReturnsAsync(false);
+        AllowAccess(FilePermission.Delete);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => _sut.RenameAsync(
+                "old.txt", destination, CreateContext()));
+
+        _storageMock.Verify(
+            s => s.RenameFileAsync(
+                It.IsAny<string>(), It.IsAny<string>()),
+            Times.Never);
+        _storageMock.Verify(
+            s => s.RenameDirectoryAsync(
+                It.IsAny<string>(), It.IsAny<string>()),
+            Times.Never);
+    }
+
     [Fact]
     public async Task ExternalDirectoryRename_UsesDirectorySearchLifecycle()
     {
@@ -717,6 +796,76 @@ public class FileServiceTests
         var result = await _sut.ListAsync("dir", ctx);
         Assert.Single(result);
         Assert.Equal("visible.txt", result[0].Name);
+    }
+
+    [Fact]
+    public async Task ListAsync_Root_HidesInternalNamespacesButKeepsRecycleBin()
+    {
+        var ctx = CreateContext();
+        var items = new List<FileMetadata>
+        {
+            new()
+            {
+                Name = ".kaimo-close-captures",
+                IsDirectory = true,
+                Path = ".kaimo-close-captures"
+            },
+            new()
+            {
+                Name = ".KAIMO-temporary",
+                IsDirectory = true,
+                Path = ".KAIMO-temporary"
+            },
+            new()
+            {
+                Name = ".RECYCLE_BIN",
+                IsDirectory = true,
+                Path = ".RECYCLE_BIN"
+            },
+            new() { Name = "docs", IsDirectory = true, Path = "docs" }
+        };
+        _storageMock.Setup(s => s.ExistsAsync("")).ReturnsAsync(true);
+        _storageMock.Setup(s => s.IsDirectoryAsync("")).ReturnsAsync(true);
+        _storageMock.Setup(s => s.ListAsync("")).ReturnsAsync(items);
+        _aclMock.Setup(a => a.HasAccessAsync(
+                ctx, _shareId, "", true, FilePermission.ListReadData))
+            .ReturnsAsync(true);
+
+        IReadOnlyList<(string Path, bool IsDirectory)>? checkedItems = null;
+        _aclMock.Setup(a => a.HasAccessBatchAsync(
+                ctx, _shareId,
+                It.IsAny<IReadOnlyList<(string, bool)>>(),
+                FilePermission.ListReadData))
+            .Callback<UserContext, Guid,
+                IReadOnlyList<(string Path, bool IsDirectory)>,
+                FilePermission>((_, _, entries, _) => checkedItems = entries)
+            .ReturnsAsync((UserContext _, Guid _,
+                IReadOnlyList<(string Path, bool IsDirectory)> entries,
+                FilePermission _) =>
+                entries.ToDictionary(entry => entry.Path, _ => true));
+
+        var result = await _sut.ListAsync("", ctx);
+
+        Assert.Equal([".RECYCLE_BIN", "docs"],
+            result.Select(item => item.Name));
+        Assert.NotNull(checkedItems);
+        Assert.Equal([".RECYCLE_BIN", "docs"],
+            checkedItems.Select(item => item.Path));
+    }
+
+    [Fact]
+    public async Task ListAsync_InternalNamespace_IsDeniedBeforeAclOrStorage()
+    {
+        var ctx = CreateContext();
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            _sut.ListAsync(".kaimo-close-captures", ctx));
+
+        _aclMock.Verify(a => a.HasAccessAsync(
+            It.IsAny<UserContext>(), It.IsAny<Guid>(),
+            It.IsAny<string>(), It.IsAny<bool>(),
+            It.IsAny<FilePermission>()), Times.Never);
+        _storageMock.VerifyNoOtherCalls();
     }
 
     [Fact]
