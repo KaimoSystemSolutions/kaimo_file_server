@@ -9,11 +9,11 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
 
 public class DepartmentRepository : IDepartmentRepository
 {
-    private readonly ApplicationDbContext _db;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
 
-    public DepartmentRepository(ApplicationDbContext db)
+    public DepartmentRepository(IDbContextFactory<ApplicationDbContext> db)
     {
-        _db = db;
+        _dbFactory = db;
     }
 
     // ══════════════════════════════════════════
@@ -21,34 +21,49 @@ public class DepartmentRepository : IDepartmentRepository
     // ══════════════════════════════════════════
 
     public async Task<Department?> GetByIdAsync(Guid id)
-        => await _db.Departments.FindAsync(id);
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.Departments.FindAsync(id);
+    } 
 
     public async Task<Department?> GetByNameAsync(string name)
-        => await _db.Departments.FirstOrDefaultAsync(d => d.Name == name);
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.Departments.FirstOrDefaultAsync(d => d.Name == name);
+    } 
 
     public async Task<List<Department>> GetAllAsync()
-        => await _db.Departments.OrderBy(d => d.Name).ToListAsync();
-
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.Departments.OrderBy(d => d.Name).ToListAsync();
+    } 
+    
     public async Task<Department> CreateAsync(Department department)
     {
-        _db.Departments.Add(department);
-        await _db.SaveChangesAsync();
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        db.Departments.Add(department);
+        await db.SaveChangesAsync();
         return department;
     }
 
     public async Task UpdateAsync(Department department)
     {
-        _db.Departments.Update(department);
-        await _db.SaveChangesAsync();
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        db.Departments.Update(department);
+        await db.SaveChangesAsync();
     }
 
     public async Task DeleteAsync(Guid id)
     {
-        var dept = await _db.Departments.FindAsync(id);
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var dept = await db.Departments.FindAsync(id);
         if (dept != null)
         {
-            _db.Departments.Remove(dept);
-            await _db.SaveChangesAsync();
+            db.Departments.Remove(dept);
+            await db.SaveChangesAsync();
         }
         
     }
@@ -58,18 +73,24 @@ public class DepartmentRepository : IDepartmentRepository
     // ══════════════════════════════════════════
 
     public async Task<List<Department>> GetChildrenAsync(Guid parentId)
-        => await _db.Departments
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        return await db.Departments
             .Where(d => d.ParentDepartmentId == parentId)
             .OrderBy(d => d.Name)
             .ToListAsync();
+    } 
 
     /// <inheritdoc />
     public async Task<List<Department>> GetAncestorChainAsync(Guid departmentId)
     {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
         var ancestors = new List<Department>();
         var visited = new HashSet<Guid> { departmentId }; // cycle protection
 
-        var current = await _db.Departments.FindAsync(departmentId);
+        var current = await db.Departments.FindAsync(departmentId);
         if (current == null) return ancestors;
 
         var parentId = current.ParentDepartmentId;
@@ -77,7 +98,7 @@ public class DepartmentRepository : IDepartmentRepository
         while (parentId.HasValue && !visited.Contains(parentId.Value))
         {
             visited.Add(parentId.Value);
-            var parent = await _db.Departments.FindAsync(parentId.Value);
+            var parent = await db.Departments.FindAsync(parentId.Value);
             if (parent == null) break;
 
             ancestors.Add(parent);
@@ -90,12 +111,14 @@ public class DepartmentRepository : IDepartmentRepository
     /// <inheritdoc />
     public async Task<HashSet<Guid>> GetDescendantIdsAsync(Guid departmentId)
     {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
         var result = new HashSet<Guid>();
         var queue = new Queue<Guid>();
         queue.Enqueue(departmentId);
 
         // Load all departments once to avoid N+1
-        var allDepts = await _db.Departments
+        var allDepts = await db.Departments
             .Select(d => new { d.Id, d.ParentDepartmentId })
             .ToListAsync();
 
@@ -124,10 +147,12 @@ public class DepartmentRepository : IDepartmentRepository
     /// <inheritdoc />
     public async Task<List<Department>> GetDescendantsAsync(Guid departmentId)
     {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
         var ids = await GetDescendantIdsAsync(departmentId);
         if (ids.Count == 0) return [];
 
-        return await _db.Departments
+        return await db.Departments
             .Where(d => ids.Contains(d.Id))
             .OrderBy(d => d.Name)
             .ToListAsync();
@@ -139,53 +164,65 @@ public class DepartmentRepository : IDepartmentRepository
 
     public async Task<List<User>> GetUsersAsync(Guid departmentId)
     {
-        return await _db.DepartmentUsers
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        return await db.DepartmentUsers
             .Where(du => du.DepartmentId == departmentId)
-            .Join(_db.Users, du => du.UserId, u => u.Id, (_, u) => u)
+            .Join(db.Users, du => du.UserId, u => u.Id, (_, u) => u)
             .OrderBy(u => u.Name)
             .ToListAsync();
     }
 
     public async Task<List<Department>> GetDepartmentsForUserAsync(Guid userId)
     {
-        return await _db.DepartmentUsers
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        return await db.DepartmentUsers
             .Where(du => du.UserId == userId)
-            .Join(_db.Departments, du => du.DepartmentId, d => d.Id, (_, d) => d)
+            .Join(db.Departments, du => du.DepartmentId, d => d.Id, (_, d) => d)
             .OrderBy(d => d.Name)
             .ToListAsync();
     }
 
     public async Task AddUserAsync(Guid departmentId, Guid userId)
     {
-        var exists = await _db.DepartmentUsers.AnyAsync(
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var exists = await db.DepartmentUsers.AnyAsync(
             du => du.DepartmentId == departmentId && du.UserId == userId);
         if (!exists)
         {
-            _db.DepartmentUsers.Add(new DepartmentUser(departmentId, userId));
-            await _db.SaveChangesAsync();
+            db.DepartmentUsers.Add(new DepartmentUser(departmentId, userId));
+            await db.SaveChangesAsync();
         }
     }
 
     public async Task RemoveUserAsync(Guid departmentId, Guid userId)
     {
-        var entry = await _db.DepartmentUsers.FirstOrDefaultAsync(
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var entry = await db.DepartmentUsers.FirstOrDefaultAsync(
             du => du.DepartmentId == departmentId && du.UserId == userId);
         if (entry != null)
         {
-            _db.DepartmentUsers.Remove(entry);
-            await _db.SaveChangesAsync();
+            db.DepartmentUsers.Remove(entry);
+            await db.SaveChangesAsync();
         }
     }
 
     public async Task<bool> IsUserInDepartmentAsync(Guid userId, Guid departmentId)
     {
-        return await _db.DepartmentUsers.AnyAsync(
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        return await db.DepartmentUsers.AnyAsync(
             du => du.UserId == userId && du.DepartmentId == departmentId);
     }
 
     /// <inheritdoc />
     public async Task<bool> IsUserInDepartmentOrDescendantAsync(Guid userId, Guid departmentId)
     {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
         // Check direct membership first (fast path)
         if (await IsUserInDepartmentAsync(userId, departmentId))
             return true;
@@ -194,7 +231,7 @@ public class DepartmentRepository : IDepartmentRepository
         var descendantIds = await GetDescendantIdsAsync(departmentId);
         if (descendantIds.Count == 0) return false;
 
-        return await _db.DepartmentUsers.AnyAsync(
+        return await db.DepartmentUsers.AnyAsync(
             du => du.UserId == userId && descendantIds.Contains(du.DepartmentId));
     }
 
@@ -204,7 +241,9 @@ public class DepartmentRepository : IDepartmentRepository
 
     public async Task<List<Group>> GetGroupsAsync(Guid departmentId)
     {
-        return await _db.Groups
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        return await db.Groups
             .Where(group => group.DepartmentId == departmentId)
             .OrderBy(group => group.Name)
             .ToListAsync();
@@ -212,7 +251,9 @@ public class DepartmentRepository : IDepartmentRepository
 
     public async Task<bool> IsGroupInDepartmentAsync(Guid groupId, Guid departmentId)
     {
-        return await _db.Groups.AnyAsync(
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        return await db.Groups.AnyAsync(
             group => group.Id == groupId && group.DepartmentId == departmentId);
     }
 
@@ -222,7 +263,9 @@ public class DepartmentRepository : IDepartmentRepository
 
     public async Task<List<ShareDefinition>> GetSharesAsync(Guid departmentId)
     {
-        return await _db.ShareDefinitions
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        return await db.ShareDefinitions
             .Where(share => share.DepartmentId == departmentId)
             .OrderBy(share => share.Name)
             .ToListAsync();
@@ -230,7 +273,9 @@ public class DepartmentRepository : IDepartmentRepository
 
     public async Task<bool> IsShareInDepartmentAsync(Guid shareId, Guid departmentId)
     {
-        return await _db.ShareDefinitions.AnyAsync(
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        return await db.ShareDefinitions.AnyAsync(
             share => share.Id == shareId && share.DepartmentId == departmentId);
     }
 }

@@ -10,53 +10,67 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
     /// </summary>
     public class GroupRepository : IGroupRepository
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IDbContextFactory<ApplicationDbContext> dbFactory;
 
-        public GroupRepository(ApplicationDbContext db)
+        public GroupRepository(IDbContextFactory<ApplicationDbContext> db)
         {
-            _db = db;
+            dbFactory = db;
         }
 
         /// <inheritdoc />
         public async Task<Group?> GetByIdAsync(Guid id)
-            => await _db.Groups.FindAsync(id);
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+            return await db.Groups.FindAsync(id);
+        }
 
         /// <inheritdoc />
         public async Task<IEnumerable<Group>> GetAllAsync()
-            => await _db.Groups.ToListAsync();
-
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+            return await db.Groups.ToListAsync();
+        }
+            
         /// <inheritdoc />
         public async Task<Group> CreateAsync(Group group)
         {
-            _db.Groups.Add(group);
-            await _db.SaveChangesAsync();
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            db.Groups.Add(group);
+            await db.SaveChangesAsync();
             return group;
         }
 
         /// <inheritdoc />
         public async Task UpdateAsync(Group group)
         {
-            _db.Groups.Update(group);
-            await _db.SaveChangesAsync();
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            db.Groups.Update(group);
+            await db.SaveChangesAsync();
         }
 
         /// <inheritdoc />
         public async Task DeleteAsync(Guid id)
         {
-            var group = await _db.Groups.FindAsync(id);
+            await using var db = await dbFactory.CreateDbContextAsync();
+            
+            var group = await db.Groups.FindAsync(id);
             if (group != null)
             {
-                _db.Groups.Remove(group);
-                await _db.SaveChangesAsync();
+                db.Groups.Remove(group);
+                await db.SaveChangesAsync();
             }
         }
 
         /// <inheritdoc />
         public async Task<List<User>> GetMembersAsync(Guid groupId)
         {
-            return await _db.UserGroups
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            return await db.UserGroups
                 .Where(ug => ug.GroupId == groupId)
-                .Join(_db.Users, ug => ug.UserId, u => u.Id, (_, u) => u)
+                .Join(db.Users, ug => ug.UserId, u => u.Id, (_, u) => u)
                 .OrderBy(u => u.Name)
                 .ToListAsync();
         }
@@ -64,10 +78,12 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         /// <inheritdoc />
         public async Task SetMembersAsync(Guid groupId, List<Guid> userIds)
         {
-            var existing = _db.UserGroups.Where(ug => ug.GroupId == groupId);
-            _db.UserGroups.RemoveRange(existing);
-            _db.UserGroups.AddRange(userIds.Select(uId => new UserGroup(uId, groupId)));
-            await _db.SaveChangesAsync();
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            var existing = db.UserGroups.Where(ug => ug.GroupId == groupId);
+            db.UserGroups.RemoveRange(existing);
+            db.UserGroups.AddRange(userIds.Select(uId => new UserGroup(uId, groupId)));
+            await db.SaveChangesAsync();
         }
     }
 }

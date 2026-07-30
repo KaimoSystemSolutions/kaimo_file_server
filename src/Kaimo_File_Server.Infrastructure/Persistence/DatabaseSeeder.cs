@@ -29,20 +29,20 @@ namespace Kaimo_File_Server.Infrastructure.Persistence;
 /// </summary>
 public class DatabaseSeeder
 {
-    private readonly ApplicationDbContext _db;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
     private readonly IPasswordService _passwordService;
     private readonly INtHashProtector _ntHashProtector;
     private readonly ILogger<DatabaseSeeder> _logger;
     private readonly IConfiguration _configuration;
 
     public DatabaseSeeder(
-        ApplicationDbContext db,
+        IDbContextFactory<ApplicationDbContext> db,
         IPasswordService passwordService,
         INtHashProtector ntHashProtector,
         ILogger<DatabaseSeeder> logger,
         IConfiguration configuration)
     {
-        _db = db;
+        _dbFactory = db;
         _passwordService = passwordService;
         _ntHashProtector = ntHashProtector;
         _logger = logger;
@@ -91,7 +91,9 @@ public class DatabaseSeeder
     /// </summary>
     private async Task SeedBootstrapAdminAsync()
     {
-        if (await _db.Users.AnyAsync())
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        if (await db.Users.AnyAsync())
         {
             _logger.LogDebug(LogEvents.SeedBootstrapAdminSkipped, LogMessages.SeedBootstrapAdminSkipped);
             return;
@@ -112,12 +114,12 @@ public class DatabaseSeeder
             "Administrator", "admin", password,
             "Built-in administrator account", "admin@kaimo.local");
 
-        _db.Users.Add(admin);
-        await _db.SaveChangesAsync();
+        db.Users.Add(admin);
+        await db.SaveChangesAsync();
 
-        _db.ScopedRoleAssignments.Add(
+        db.ScopedRoleAssignments.Add(
             ScopedRoleAssignment.Global(admin.Id, adminRole.Id));
-        await _db.SaveChangesAsync();
+        await db.SaveChangesAsync();
 
         if (generated)
         {
@@ -153,7 +155,9 @@ public class DatabaseSeeder
     /// </summary>
     private async Task SeedGlobalDepartmentAsync()
     {
-        var exists = await _db.Departments
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var exists = await db.Departments
             .AnyAsync(d => d.Id == WellKnownGUIDs.DEPARTMENT_GLOBAL);
 
         if (exists)
@@ -164,8 +168,8 @@ public class DatabaseSeeder
             Id = WellKnownGUIDs.DEPARTMENT_GLOBAL
         };
 
-        _db.Departments.Add(global);
-        await _db.SaveChangesAsync();
+        db.Departments.Add(global);
+        await db.SaveChangesAsync();
 
         _logger.LogDebug(LogEvents.SeedGlobalDepartmentCreated, LogMessages.SeedGlobalDepartmentCreated,
             WellKnownGUIDs.DEPARTMENT_GLOBAL);
@@ -193,7 +197,9 @@ public class DatabaseSeeder
 
     private async Task SeedRolesAsync()
     {
-        var existing = await _db.Roles.ToListAsync();
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var existing = await db.Roles.ToListAsync();
         var byName = existing.ToDictionary(r => r.Name, StringComparer.OrdinalIgnoreCase);
         var changed = false;
 
@@ -211,14 +217,14 @@ public class DatabaseSeeder
             }
             else
             {
-                _db.Roles.Add(new Role(uuid, name, perms, isSystem));
+                db.Roles.Add(new Role(uuid, name, perms, isSystem));
                 _logger.LogDebug(LogEvents.SeedRoleCreated, LogMessages.SeedRoleCreated, name, perms);
                 changed = true;
             }
         }
 
         if (changed)
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
     }
 
     // ══════════════════════════════════════════
@@ -233,7 +239,9 @@ public class DatabaseSeeder
 
     private async Task SeedGroupsAsync()
     {
-        var existingNames = (await _db.Groups.Select(g => g.Name).ToListAsync())
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        
+        var existingNames = (await db.Groups.Select(g => g.Name).ToListAsync())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var changed = false;
@@ -244,14 +252,14 @@ public class DatabaseSeeder
             {
                 // All default groups start in Global department.
                 // Department-specific groups get reassigned in SeedTestUsersAsync.
-                _db.Groups.Add(new Group(Guid.NewGuid(), name));
+                db.Groups.Add(new Group(Guid.NewGuid(), name));
                 _logger.LogDebug(LogEvents.SeedGroupCreated, LogMessages.SeedGroupCreated, name);
                 changed = true;
             }
         }
 
         if (changed)
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
     }
 
     // ══════════════════════════════════════════
@@ -277,8 +285,10 @@ public class DatabaseSeeder
     /// </summary>
     private async Task SeedDepartmentsAsync()
     {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
         // Global is already seeded — only add the others if they don't exist yet
-        if (await _db.Departments.CountAsync() > 1)
+        if (await db.Departments.CountAsync() > 1)
             return;
 
         // "Schreiben" in the UI = the full write bit set (CreateWriteData |
@@ -297,15 +307,15 @@ public class DatabaseSeeder
         var geschaeftsl = new Department("Geschäftsleitung", "Unternehmensführung")
         { DefaultFilePermission = (long)(FilePermission.ReadAll | FilePermission.WriteAll) };
 
-        _db.Departments.AddRange(entwicklung, marketing, geschaeftsl);
-        await _db.SaveChangesAsync();
+        db.Departments.AddRange(entwicklung, marketing, geschaeftsl);
+        await db.SaveChangesAsync();
 
         // Children (inherit permission from Entwicklung)
         var backend = new Department("Backend", "Backend-Entwicklung", entwicklung.Id);
         var frontend = new Department("Frontend", "Frontend-Entwicklung", entwicklung.Id);
 
-        _db.Departments.AddRange(backend, frontend);
-        await _db.SaveChangesAsync();
+        db.Departments.AddRange(backend, frontend);
+        await db.SaveChangesAsync();
 
         _logger.LogDebug(LogEvents.SeedDepartmentsCreated, LogMessages.SeedDepartmentsCreated);
     }
@@ -316,7 +326,9 @@ public class DatabaseSeeder
 
     private async Task SeedTestUsersAsync()
     {
-        if (await _db.Users.AnyAsync())
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        if (await db.Users.AnyAsync())
         {
             _logger.LogDebug(LogEvents.SeedTestUsersSkipped, LogMessages.SeedTestUsersSkipped);
             return;
@@ -333,24 +345,24 @@ public class DatabaseSeeder
         var defaultPoolPath =
             _configuration["Storage:Pools:0:Path"] ?? "/data/storage/pool01";
         var shares = CreateShares(departments, defaultPoolPath);
-        _db.ShareDefinitions.AddRange(shares.Values);
+        db.ShareDefinitions.AddRange(shares.Values);
 
         // Create users
         var users = CreateUsers();
-        _db.Users.AddRange(users.Values);
+        db.Users.AddRange(users.Values);
 
         // Wire everything together
-        AssignUsersToGroups(users, groups);
-        AssignUsersToRoles(users, roles);
-        AssignShareAccess(users, groups, shares);
-        AssignUsersToDepartments(users, departments);
-        AssignGroupsToDepartments(groups, departments);
+        AssignUsersToGroups(db, users, groups);
+        AssignUsersToRoles(db, users, roles);
+        AssignShareAccess(db, users, groups, shares);
+        AssignUsersToDepartments(db, users, departments);
+        AssignGroupsToDepartments(db, groups, departments);
 
-        await _db.SaveChangesAsync();
+        await db.SaveChangesAsync();
 
         // Scoped role assignments (need saved IDs)
-        CreateScopedAssignments(users, roles, departments, groups, shares);
-        await _db.SaveChangesAsync();
+        CreateScopedAssignments(db, users, roles, departments, groups, shares);
+        await db.SaveChangesAsync();
 
         LogTestUserSummary(users);
     }
@@ -358,13 +370,13 @@ public class DatabaseSeeder
     // -- Lookups --
 
     private async Task<Dictionary<string, Role>> LoadRoleLookupAsync()
-        => (await _db.Roles.ToListAsync()).ToDictionary(r => r.Name, StringComparer.OrdinalIgnoreCase);
+        => (await (await _dbFactory.CreateDbContextAsync()).Roles.ToListAsync()).ToDictionary(r => r.Name, StringComparer.OrdinalIgnoreCase);
 
     private async Task<Dictionary<string, Group>> LoadGroupLookupAsync()
-        => (await _db.Groups.ToListAsync()).ToDictionary(g => g.Name, StringComparer.OrdinalIgnoreCase);
+        => (await (await _dbFactory.CreateDbContextAsync()).Groups.ToListAsync()).ToDictionary(g => g.Name, StringComparer.OrdinalIgnoreCase);
 
     private async Task<Dictionary<string, Department>> LoadDepartmentLookupAsync()
-        => (await _db.Departments.ToListAsync()).ToDictionary(d => d.Name, StringComparer.OrdinalIgnoreCase);
+        => (await (await _dbFactory.CreateDbContextAsync()).Departments.ToListAsync()).ToDictionary(d => d.Name, StringComparer.OrdinalIgnoreCase);
 
     // -- Shares (with direct DepartmentId) --
 
@@ -426,9 +438,11 @@ public class DatabaseSeeder
     // -- Group Assignments --
 
     private void AssignUsersToGroups(
+        ApplicationDbContext db,
         Dictionary<string, User> users,
         Dictionary<string, Group> groups)
     {
+        
         var assignments = new (string User, string[] Groups)[]
         {
             ("admin", ["Admins", "Everyone"]),
@@ -441,7 +455,7 @@ public class DatabaseSeeder
         {
             foreach (var groupName in groupNames)
             {
-                _db.UserGroups.Add(new UserGroup(users[userKey].Id, groups[groupName].Id));
+                db.UserGroups.Add(new UserGroup(users[userKey].Id, groups[groupName].Id));
             }
         }
     }
@@ -449,6 +463,7 @@ public class DatabaseSeeder
     // -- Role Assignments (global-scoped ScopedRoleAssignments) --
 
     private void AssignUsersToRoles(
+        ApplicationDbContext db,
         Dictionary<string, User> users,
         Dictionary<string, Role> roles)
     {
@@ -464,7 +479,7 @@ public class DatabaseSeeder
         {
             foreach (var roleName in roleNames)
             {
-                _db.ScopedRoleAssignments.Add(
+                db.ScopedRoleAssignments.Add(
                     ScopedRoleAssignment.Global(users[userKey].Id, roles[roleName].Id));
             }
         }
@@ -473,6 +488,7 @@ public class DatabaseSeeder
     // -- Share Access (visibility) --
 
     private void AssignShareAccess(
+        ApplicationDbContext db,
         Dictionary<string, User> users,
         Dictionary<string, Group> groups,
         Dictionary<string, ShareDefinition> shares)
@@ -498,6 +514,7 @@ public class DatabaseSeeder
     // -- Department → User (M:N stays) --
 
     private void AssignUsersToDepartments(
+        ApplicationDbContext db,
         Dictionary<string, User> users,
         Dictionary<string, Department> departments)
     {
@@ -509,7 +526,7 @@ public class DatabaseSeeder
         };
 
         foreach (var (user, dept) in assignments)
-            _db.DepartmentUsers.Add(new DepartmentUser(departments[dept].Id, users[user].Id));
+            db.DepartmentUsers.Add(new DepartmentUser(departments[dept].Id, users[user].Id));
     }
 
     // -- Group → Department (direct FK on Group) --
@@ -520,6 +537,7 @@ public class DatabaseSeeder
     /// This method reassigns department-specific groups.
     /// </summary>
     private void AssignGroupsToDepartments(
+        ApplicationDbContext db,
         Dictionary<string, Group> groups,
         Dictionary<string, Department> departments)
     {
@@ -551,6 +569,7 @@ public class DatabaseSeeder
     ///   Backend-Team → ShareManager → backend-docs Share
     /// </summary>
     private void CreateScopedAssignments(
+        ApplicationDbContext db,
         Dictionary<string, User> users,
         Dictionary<string, Role> roles,
         Dictionary<string, Department> departments,
@@ -559,15 +578,15 @@ public class DatabaseSeeder
     {
         // admin → Administrator (Global) is already assigned in AssignUsersToRoles.
 
-        _db.ScopedRoleAssignments.Add(
+        db.ScopedRoleAssignments.Add(
             ScopedRoleAssignment.ForDepartment(
                 users["marco"].Id, roles["DepartmentAdmin"].Id, departments["Entwicklung"].Id));
 
-        _db.ScopedRoleAssignments.Add(
+        db.ScopedRoleAssignments.Add(
             ScopedRoleAssignment.ForDepartment(
                 users["lisa"].Id, roles["DepartmentAdmin"].Id, departments["Marketing"].Id));
 
-        _db.ScopedRoleAssignments.Add(
+        db.ScopedRoleAssignments.Add(
             ScopedRoleAssignment.ForShare(
                 groups["Backend-Team"].Id, roles["ShareManager"].Id, shares["backend-docs"].Id));
     }
@@ -575,10 +594,12 @@ public class DatabaseSeeder
     // -- Config --
     private async Task SeedConfigAsync()
     {
-        if (await _db.ConfigSettings.AnyAsync())
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        if (await db.ConfigSettings.AnyAsync())
             return;
 
-        _db.ConfigSettings.AddRange(
+        db.ConfigSettings.AddRange(
             new ConfigSetting { Key = "app.language", Value = "de" },
             new ConfigSetting { Key = "app.user.defaultRole", Value = "User" },
             new ConfigSetting { Key = "app.user.isActiveOnCreation", Value = "true" },
@@ -591,7 +612,7 @@ public class DatabaseSeeder
             new ConfigSetting { Key = "app.group.allowSelfJoin", Value = "false" }
         );
 
-        await _db.SaveChangesAsync();
+        await db.SaveChangesAsync();
         _logger.LogDebug(LogEvents.SeedConfigEntries, LogMessages.SeedConfigEntries);
     }
 
@@ -613,17 +634,21 @@ public class DatabaseSeeder
     /// </summary>
     private async Task CleanupDuplicatesAsync()
     {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
         var cleaned = false;
         cleaned |= await DeduplicateRolesAsync();
         cleaned |= await DeduplicateGroupsAsync();
 
         if (cleaned)
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
     }
 
     private async Task<bool> DeduplicateRolesAsync()
     {
-        var allRoles = await _db.Roles.ToListAsync();
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var allRoles = await db.Roles.ToListAsync();
         var dupes = allRoles
             .GroupBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
             .Where(g => g.Count() > 1);
@@ -638,7 +663,7 @@ public class DatabaseSeeder
 
             await MigrateScopedAssignmentsAsync(removeIds, keep.Id);
 
-            _db.Roles.RemoveRange(remove);
+            db.Roles.RemoveRange(remove);
             _logger.LogInformation(LogEvents.SeedDuplicateRolesRemoved, LogMessages.SeedDuplicateRolesRemoved,
                 remove.Count, group.Key);
             cleaned = true;
@@ -649,7 +674,9 @@ public class DatabaseSeeder
 
     private async Task<bool> DeduplicateGroupsAsync()
     {
-        var allGroups = await _db.Groups.ToListAsync();
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var allGroups = await db.Groups.ToListAsync();
         var dupes = allGroups
             .GroupBy(g => g.Name, StringComparer.OrdinalIgnoreCase)
             .Where(g => g.Count() > 1);
@@ -668,7 +695,7 @@ public class DatabaseSeeder
             // duplicate groups just get removed, the kept one
             // retains its DepartmentId.
 
-            _db.Groups.RemoveRange(remove);
+            db.Groups.RemoveRange(remove);
             _logger.LogInformation(LogEvents.SeedDuplicateGroupsRemoved, LogMessages.SeedDuplicateGroupsRemoved,
                 remove.Count, group.Key);
             cleaned = true;
@@ -681,37 +708,41 @@ public class DatabaseSeeder
 
     private async Task MigrateScopedAssignmentsAsync(HashSet<Guid> fromRoleIds, Guid toRoleId)
     {
-        var affected = await _db.ScopedRoleAssignments
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var affected = await db.ScopedRoleAssignments
             .Where(a => fromRoleIds.Contains(a.RoleId))
             .ToListAsync();
 
         foreach (var a in affected)
         {
-            var exists = await _db.ScopedRoleAssignments.AnyAsync(x =>
+            var exists = await db.ScopedRoleAssignments.AnyAsync(x =>
                 x.PrincipalId == a.PrincipalId &&
                 x.RoleId == toRoleId &&
                 x.ScopeType == a.ScopeType &&
                 x.ScopeId == a.ScopeId);
 
             if (!exists)
-                _db.ScopedRoleAssignments.Add(
+                db.ScopedRoleAssignments.Add(
                     new ScopedRoleAssignment(a.PrincipalId, toRoleId, a.ScopeType, a.ScopeId));
 
-            _db.ScopedRoleAssignments.Remove(a);
+            db.ScopedRoleAssignments.Remove(a);
         }
     }
 
     private async Task MigrateUserGroupsAsync(HashSet<Guid> fromGroupIds, Guid toGroupId)
     {
-        var affected = await _db.UserGroups
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var affected = await db.UserGroups
             .Where(ug => fromGroupIds.Contains(ug.GroupId))
             .ToListAsync();
 
         foreach (var ug in affected)
         {
-            if (!await _db.UserGroups.AnyAsync(x => x.UserId == ug.UserId && x.GroupId == toGroupId))
-                _db.UserGroups.Add(new UserGroup(ug.UserId, toGroupId));
-            _db.UserGroups.Remove(ug);
+            if (!await db.UserGroups.AnyAsync(x => x.UserId == ug.UserId && x.GroupId == toGroupId))
+                db.UserGroups.Add(new UserGroup(ug.UserId, toGroupId));
+            db.UserGroups.Remove(ug);
         }
     }
 }

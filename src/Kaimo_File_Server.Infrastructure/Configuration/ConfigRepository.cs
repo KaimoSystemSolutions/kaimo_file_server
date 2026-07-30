@@ -7,13 +7,13 @@ namespace Kaimo_File_Server.Infrastructure.Configuration;
 
 public class ConfigRepository : IConfigRepository
 {
-    private readonly ApplicationDbContext _db;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
     private readonly IMemoryCache _cache;
     private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(10);
 
-    public ConfigRepository(ApplicationDbContext db, IMemoryCache cache)
+    public ConfigRepository(IDbContextFactory<ApplicationDbContext> db, IMemoryCache cache)
     {
-        _db = db;
+        _dbFactory = db;
         _cache = cache;
     }
 
@@ -38,12 +38,14 @@ public class ConfigRepository : IConfigRepository
     /// <summary>Deserializes a JSON value into T, or returns the fallback.</summary>
     public async Task<T> GetAsync<T>(string key, T fallback)
     {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
         var cacheKey = $"cfg:{key}";
 
         if (_cache.TryGetValue(cacheKey, out T? cached))
             return cached!;
 
-        var setting = await _db.ConfigSettings
+        var setting = await db.ConfigSettings
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.Key == key);
 
@@ -58,9 +60,11 @@ public class ConfigRepository : IConfigRepository
     /// <summary>Reads straight from the store, bypassing the cache, then refreshes it.</summary>
     public async Task<T> GetFreshAsync<T>(string key, T fallback)
     {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
         var cacheKey = $"cfg:{key}";
 
-        var setting = await _db.ConfigSettings
+        var setting = await db.ConfigSettings
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.Key == key);
 
@@ -80,12 +84,14 @@ public class ConfigRepository : IConfigRepository
     /// <summary>Sets a single config value. Creates or updates.</summary>
     public async Task SetAsync<T>(string key, T value)
     {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
         var serialized = Serialize(value);
 
-        var setting = await _db.ConfigSettings.FindAsync(key);
+        var setting = await db.ConfigSettings.FindAsync(key);
         if (setting is null)
         {
-            _db.ConfigSettings.Add(new ConfigSetting
+            db.ConfigSettings.Add(new ConfigSetting
             {
                 Key = key,
                 Value = serialized,
@@ -98,15 +104,17 @@ public class ConfigRepository : IConfigRepository
             setting.UpdatedAt = DateTime.UtcNow;
         }
 
-        await _db.SaveChangesAsync();
+        await db.SaveChangesAsync();
         _cache.Remove($"cfg:{key}");
     }
 
     /// <summary>Sets multiple config values in a single transaction.</summary>
     public async Task SetManyAsync(Dictionary<string, object> values)
     {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
         var keys = values.Keys.ToList();
-        var existing = await _db.ConfigSettings
+        var existing = await db.ConfigSettings
             .Where(s => keys.Contains(s.Key))
             .ToDictionaryAsync(s => s.Key);
 
@@ -121,7 +129,7 @@ public class ConfigRepository : IConfigRepository
             }
             else
             {
-                _db.ConfigSettings.Add(new ConfigSetting
+                db.ConfigSettings.Add(new ConfigSetting
                 {
                     Key = key,
                     Value = serialized,
@@ -132,7 +140,7 @@ public class ConfigRepository : IConfigRepository
             _cache.Remove($"cfg:{key}");
         }
 
-        await _db.SaveChangesAsync();
+        await db.SaveChangesAsync();
     }
 
     // ── Query ──────────────────────────────────
@@ -140,7 +148,9 @@ public class ConfigRepository : IConfigRepository
     /// <summary>Returns all config entries whose key starts with the given prefix.</summary>
     public async Task<Dictionary<string, string>> GetSectionAsync(string prefix)
     {
-        return await _db.ConfigSettings
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        return await db.ConfigSettings
             .AsNoTracking()
             .Where(s => s.Key.StartsWith(prefix))
             .ToDictionaryAsync(s => s.Key, s => s.Value);
@@ -151,11 +161,13 @@ public class ConfigRepository : IConfigRepository
     /// <summary>Removes a config entry. Returns false if the key didn't exist.</summary>
     public async Task<bool> DeleteAsync(string key)
     {
-        var setting = await _db.ConfigSettings.FindAsync(key);
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var setting = await db.ConfigSettings.FindAsync(key);
         if (setting is null) return false;
 
-        _db.ConfigSettings.Remove(setting);
-        await _db.SaveChangesAsync();
+        db.ConfigSettings.Remove(setting);
+        await db.SaveChangesAsync();
         _cache.Remove($"cfg:{key}");
         return true;
     }

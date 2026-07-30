@@ -11,11 +11,11 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
     /// </summary>
     public class UserRepository : IUserRepository
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IDbContextFactory<ApplicationDbContext> dbFactory;
 
-        public UserRepository(ApplicationDbContext db)
+        public UserRepository(IDbContextFactory<ApplicationDbContext> db)
         {
-            _db = db;
+            dbFactory = db;
         }
 
         // --------------------------------------------
@@ -24,15 +24,26 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
 
         /// <inheritdoc />
         public async Task<User?> GetByIdAsync(Guid id)
-            => await _db.Users.FindAsync(id);
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+            return await db.Users.FindAsync(id);
+        }
 
         /// <inheritdoc />
         public async Task<User?> GetByUsernameAsync(string username)
-            => await _db.Users.FirstOrDefaultAsync(u => u.Username == username);
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+            return await db.Users.FirstOrDefaultAsync(u => u.Username == username);
+
+        }
 
         /// <inheritdoc />
         public async Task<IEnumerable<User>> GetAllAsync()
-            => await _db.Users.ToListAsync();
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+            return await db.Users.ToListAsync();
+
+        }
 
         /// <inheritdoc />
         public async Task<IReadOnlyList<SambaCredentialSource>>
@@ -41,10 +52,12 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
                 int count,
                 CancellationToken cancellationToken)
         {
+            await using var db = await dbFactory.CreateDbContextAsync();
+
             ArgumentOutOfRangeException.ThrowIfNegative(offset);
             ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
 
-            return await _db.Users
+            return await db.Users
                 .AsNoTracking()
                 .Where(user => user.IsEnabled)
                 .OrderBy(user => user.Username)
@@ -60,26 +73,32 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         /// <inheritdoc />
         public async Task<User> CreateAsync(User user)
         {
-            _db.Users.Add(user);
-            await _db.SaveChangesAsync();
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            db.Users.Add(user);
+            await db.SaveChangesAsync();
             return user;
         }
 
         /// <inheritdoc />
         public async Task UpdateAsync(User user)
         {
-            _db.Users.Update(user);
-            await _db.SaveChangesAsync();
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            db.Users.Update(user);
+            await db.SaveChangesAsync();
         }
 
         /// <inheritdoc />
         public async Task DeleteAsync(Guid id)
         {
-            var user = await _db.Users.FindAsync(id);
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            var user = await db.Users.FindAsync(id);
             if (user != null)
             {
-                _db.Users.Remove(user);
-                await _db.SaveChangesAsync();
+                db.Users.Remove(user);
+                await db.SaveChangesAsync();
             }
         }
 
@@ -90,9 +109,11 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         /// <inheritdoc />
         public async Task<List<Group>> GetGroupsForUserAsync(Guid userId)
         {
-            return await _db.UserGroups
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            return await db.UserGroups
                 .Where(ug => ug.UserId == userId)
-                .Join(_db.Groups, ug => ug.GroupId, g => g.Id, (_, g) => g)
+                .Join(db.Groups, ug => ug.GroupId, g => g.Id, (_, g) => g)
                 .OrderBy(g => g.Name)
                 .ToListAsync();
         }
@@ -100,10 +121,12 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         /// <inheritdoc />
         public async Task<List<Role>> GetRolesForUserAsync(Guid userId)
         {
+            await using var db = await dbFactory.CreateDbContextAsync();
+
             // A user's "direct" roles are its own GLOBAL-scoped role assignments.
-            return await _db.ScopedRoleAssignments
+            return await db.ScopedRoleAssignments
                 .Where(a => a.PrincipalId == userId && a.ScopeType == ScopeType.Global)
-                .Join(_db.Roles, a => a.RoleId, r => r.Id, (_, r) => r)
+                .Join(db.Roles, a => a.RoleId, r => r.Id, (_, r) => r)
                 .Distinct()
                 .OrderBy(r => r.Name)
                 .ToListAsync();
@@ -112,24 +135,28 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         /// <inheritdoc />
         public async Task SetGroupsForUserAsync(Guid userId, List<Guid> groupIds)
         {
-            var existing = _db.UserGroups.Where(ug => ug.UserId == userId);
-            _db.UserGroups.RemoveRange(existing);
-            _db.UserGroups.AddRange(groupIds.Select(gId => new UserGroup(userId, gId)));
-            await _db.SaveChangesAsync();
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            var existing = db.UserGroups.Where(ug => ug.UserId == userId);
+            db.UserGroups.RemoveRange(existing);
+            db.UserGroups.AddRange(groupIds.Select(gId => new UserGroup(userId, gId)));
+            await db.SaveChangesAsync();
         }
 
         /// <inheritdoc />
         public async Task SetRolesForUserAsync(Guid userId, List<Guid> roleIds)
         {
+            await using var db = await dbFactory.CreateDbContextAsync();
+
             // Replaces only the user's OWN global-scoped assignments. Scoped
             // (department/share) assignments and group-inherited roles are left
             // untouched — they are managed through the scoped-assignment UI.
-            var existing = _db.ScopedRoleAssignments
+            var existing = db.ScopedRoleAssignments
                 .Where(a => a.PrincipalId == userId && a.ScopeType == ScopeType.Global);
-            _db.ScopedRoleAssignments.RemoveRange(existing);
-            _db.ScopedRoleAssignments.AddRange(
+            db.ScopedRoleAssignments.RemoveRange(existing);
+            db.ScopedRoleAssignments.AddRange(
                 roleIds.Select(rId => ScopedRoleAssignment.Global(userId, rId)));
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
         }
 
         // --------------------------------------------
@@ -139,7 +166,9 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         /// <inheritdoc />
         public async Task UpdateNameAsync(Guid userId, string newName)
         {
-            await _db.Users
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            await db.Users
                 .Where(u => u.Id == userId)
                 .ExecuteUpdateAsync(u => u.SetProperty(x => x.Name, newName));
         }
@@ -147,7 +176,9 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         /// <inheritdoc />
         public async Task UpdatePasswordAsync(Guid userId, string passwordHash, string ntHash)
         {
-            await _db.Users
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            await db.Users
                 .Where(u => u.Id == userId)
                 .ExecuteUpdateAsync(u => u
                     .SetProperty(x => x.PasswordHash, passwordHash)
@@ -159,7 +190,9 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             Guid userId, string description, string email,
             bool isEnabled, bool canChangePassword)
         {
-            var user = await _db.Users.FindAsync(userId)
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            var user = await db.Users.FindAsync(userId)
                 ?? throw new KeyNotFoundException($"User {userId} not found");
 
             user.Description = description;
@@ -167,7 +200,7 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             user.IsEnabled = isEnabled;
             user.CanChangePassword = canChangePassword;
 
-            await _db.SaveChangesAsync();
+            await db.SaveChangesAsync();
         }
     }
 }

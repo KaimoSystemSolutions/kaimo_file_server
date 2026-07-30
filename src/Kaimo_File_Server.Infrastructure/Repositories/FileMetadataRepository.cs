@@ -8,17 +8,19 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
 
 public class FileMetadataRepository : IFileMetadataRepository
 {
-    private readonly ApplicationDbContext _db;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
 
-    public FileMetadataRepository(ApplicationDbContext db)
+    public FileMetadataRepository(IDbContextFactory<ApplicationDbContext> db)
     {
-        _db = db;
+        _dbFactory = db;
     }
 
     public async Task<FileMetadata?> GetByPathAsync(string path)
     {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
         var normalized = ShareRelativePath.Normalize(path);
-        return await _db.FileMetadata
+        return await db.FileMetadata
             .Include(m => m.Acl)
             .FirstOrDefaultAsync(m => m.Path == normalized);
     }
@@ -26,9 +28,11 @@ public class FileMetadataRepository : IFileMetadataRepository
     public async Task<FileMetadata> GetOrCreateAsync(
         string path, bool isDirectory, Guid userId, Guid shareId)
     {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
         var normalized = ShareRelativePath.Normalize(path);
 
-        var existing = await _db.FileMetadata
+        var existing = await db.FileMetadata
             .Include(m => m.Acl)
             .FirstOrDefaultAsync(m => m.ShareId == shareId && m.Path == normalized);
 
@@ -48,8 +52,8 @@ public class FileMetadataRepository : IFileMetadataRepository
             ModifiedAt = DateTime.UtcNow
         };
 
-        _db.FileMetadata.Add(meta);
-        await _db.SaveChangesAsync();
+        db.FileMetadata.Add(meta);
+        await db.SaveChangesAsync();
         return meta;
     }
 }
