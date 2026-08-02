@@ -136,6 +136,71 @@ public class SettingsViewModelSmbTests
             Times.Never);
     }
 
+    [Fact]
+    public async Task LoadAsync_WithSettingsPermission_LoadsAllStoragePools()
+    {
+        var pools = new List<StorageUsageInfo>
+        {
+            new("/data/storage/pool01", "/dev/sda", 1_000, 400, 600, true),
+            new("/data/storage/pool02", "/dev/sdb", 2_000, 500, 1_500, true),
+        };
+        var systemInfo = new Mock<ISystemInfoService>();
+        systemInfo.SetupGet(s => s.HostName).Returns("kaimo");
+        systemInfo.Setup(s => s.GetNetworkAddresses()).Returns([]);
+        systemInfo.Setup(s => s.GetStorageUsage()).Returns(pools);
+        systemInfo.Setup(s => s.GetMemoryUsage()).Returns(
+            new MemoryUsageInfo(100, 100, 50, 1_000));
+
+        var h = new Harness(
+            canManageDataServices: false,
+            canManageSettings: true,
+            systemInfo: systemInfo.Object);
+
+        await h.Vm.LoadAsync();
+
+        Assert.Equal(pools, h.Vm.StorageUsages);
+        systemInfo.Verify(s => s.GetStorageUsage(), Times.Once);
+    }
+
+    [Fact]
+    public async Task LoadAsync_WithSettingsPermission_DefersSearchProbeUntilSearchTabLoads()
+    {
+        var h = new Harness(canManageDataServices: false, canManageSettings: true);
+
+        await h.Vm.LoadAsync();
+
+        h.SearchAdmin.Verify(
+            s => s.GetStateAsync(It.IsAny<CancellationToken>()), Times.Never);
+
+        await h.Vm.LoadSearchStateAsync();
+
+        h.SearchAdmin.Verify(
+            s => s.GetStateAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RefreshMemoryInfo_DoesNotRefreshNetworkOrStorage()
+    {
+        var systemInfo = new Mock<ISystemInfoService>();
+        systemInfo.SetupGet(s => s.HostName).Returns("kaimo");
+        systemInfo.Setup(s => s.GetNetworkAddresses()).Returns([]);
+        systemInfo.Setup(s => s.GetStorageUsage()).Returns([]);
+        systemInfo.Setup(s => s.GetMemoryUsage()).Returns(
+            new MemoryUsageInfo(100, 100, 50, 1_000));
+        var h = new Harness(
+            canManageDataServices: false,
+            canManageSettings: true,
+            systemInfo: systemInfo.Object);
+        await h.Vm.LoadAsync();
+        systemInfo.Invocations.Clear();
+
+        h.Vm.RefreshMemoryInfo();
+
+        systemInfo.Verify(s => s.GetMemoryUsage(), Times.Once);
+        systemInfo.Verify(s => s.GetNetworkAddresses(), Times.Never);
+        systemInfo.Verify(s => s.GetStorageUsage(), Times.Never);
+    }
+
     // ─────────────────────────── SettingsViewModel: save ───────────────────────────
 
     [Fact]
@@ -229,12 +294,17 @@ public class SettingsViewModelSmbTests
     private sealed class Harness
     {
         public Mock<IConfigRepository> Config { get; } = new();
+        public Mock<ISearchAdminService> SearchAdmin { get; } = new();
         public SettingsViewModel Vm { get; }
 
         /// <summary>The <see cref="SmbProtocolSettings"/> captured on the last SetAsync write.</summary>
         public SmbProtocolSettings? SavedProtocol { get; private set; }
 
-        public Harness(bool canManageDataServices, SmbProtocolSettings? storedProtocol = null)
+        public Harness(
+            bool canManageDataServices,
+            SmbProtocolSettings? storedProtocol = null,
+            bool canManageSettings = false,
+            ISystemInfoService? systemInfo = null)
         {
             storedProtocol ??= SmbProtocolSettings.Default();
 
@@ -254,24 +324,31 @@ public class SettingsViewModelSmbTests
                 .ReturnsAsync(actor);
 
             var mgmt = new Mock<IManagementAuthService>();
-            mgmt.Setup(m => m.HasGlobalPermissionAsync(
-                    It.IsAny<UserContext>(), ManagementPermission.ManageDataServices))
-                .ReturnsAsync(canManageDataServices);
-            // Keep the global-settings branch out of these tests so we only
-            // need to mock the data-service path.
-            mgmt.Setup(m => m.HasGlobalPermissionAsync(
-                    It.IsAny<UserContext>(), ManagementPermission.ManageSystemSettings))
-                .ReturnsAsync(false);
+            var globalPermissions = ManagementPermission.None;
+            if (canManageDataServices)
+                globalPermissions |= ManagementPermission.ManageDataServices;
+            if (canManageSettings)
+                globalPermissions |= ManagementPermission.ManageSystemSettings;
+            mgmt.Setup(m => m.GetEffectivePermissionsAtAsync(
+                    It.IsAny<UserContext>(), ScopeType.Global, Guid.Empty))
+                .ReturnsAsync(globalPermissions);
+
+            SearchAdmin.Setup(s => s.GetStateAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new SearchEngineState(true, true, true));
+            SearchAdmin.Setup(s => s.GetReindexProgress()).Returns(ReindexProgress.Idle);
+
+            var loggingStore = new Mock<Kaimo_File_Server.Core.Logging.ILoggingConfigStore>();
+            loggingStore.Setup(s => s.GetLevelAsync()).ReturnsAsync("Warning");
 
             Vm = new SettingsViewModel(
                 Config.Object,
                 mgmt.Object,
                 userFactory.Object,
                 new StubAuthProvider("admin"),
-                Mock.Of<ISystemInfoService>(),
-                Mock.Of<ISearchAdminService>(),
+                systemInfo ?? Mock.Of<ISystemInfoService>(),
+                SearchAdmin.Object,
                 Mock.Of<IHttpsCertificateProvider>(),
-                Mock.Of<Kaimo_File_Server.Core.Logging.ILoggingConfigStore>(),
+                loggingStore.Object,
                 new Kaimo_File_Server.Infrastructure.Logging.LoggingLevelConfigurationSource(),
                 NullLogger<SettingsViewModel>.Instance);
         }

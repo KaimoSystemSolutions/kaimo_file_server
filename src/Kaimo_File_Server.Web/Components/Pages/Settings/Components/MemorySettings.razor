@@ -5,14 +5,14 @@
 
 <div class="detail-section">
     <span class="detail-label">Aktuelle RAM-Auslastung</span>
-    <p class="settings-description">Speicherverbrauch des laufenden Kaimo-Files-Prozesses.</p>
+    <p class="settings-description">Speicherverbrauch des laufenden Kaimo-Files-Prozesses. Der .NET-Heap ist der Snapshot nach der letzten Garbage Collection; beim Aktualisieren wird keine GC erzwungen.</p>
     @if (VM.MemoryUsage is { } m)
     {
         <div class="stat-hero"><span class="stat-hero-value">@VM.FormatBytes(m.WorkingSetBytes)</span><span class="stat-hero-unit">Arbeitsspeicher · @Pct(m.WorkingSetPercent) % von @VM.FormatBytes(m.TotalAvailableBytes)</span></div>
         <div class="usage-bar"><div class="usage-bar-fill @(m.WorkingSetPercent >= 90 ? "is-critical" : "")" style="width: @Pct(m.WorkingSetPercent)%;"></div></div>
         <div class="info-card">
             <div class="info-row"><span class="info-key">Privater Speicher</span><span class="info-val">@VM.FormatBytes(m.PrivateBytes)</span></div>
-            <div class="info-row"><span class="info-key">.NET-Heap (verwaltet)</span><span class="info-val">@VM.FormatBytes(m.ManagedHeapBytes)</span></div>
+            <div class="info-row"><span class="info-key">.NET-Heap (letzter GC)</span><span class="info-val">@VM.FormatBytes(m.ManagedHeapBytes)</span></div>
             <div class="info-row"><span class="info-key">Verfügbar</span><span class="info-val">@VM.FormatBytes(m.TotalAvailableBytes)</span></div>
         </div>
     }
@@ -23,6 +23,6 @@
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
     private static string Pct(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
-    private void Refresh() { VM.RefreshSystemInfo(); StateHasChanged(); }
+    private void Refresh() { VM.RefreshMemoryInfo(); StateHasChanged(); }
 }
 

@@ -118,6 +118,9 @@ public class SettingsViewModel
     /// <summary>True if ES is both enabled and reachable → actually in use.</summary>
     public bool SearchEsEffective { get; private set; }
 
+    /// <summary>True while the search tab is actively probing Elasticsearch.</summary>
+    public bool SearchStateLoading { get; private set; }
+
     /// <summary>Progress of the last/running manual reindex.</summary>
     public ReindexProgress ReindexProgress { get; private set; } = ReindexProgress.Idle;
 
@@ -189,7 +192,7 @@ public class SettingsViewModel
 
     public string HostName { get; private set; } = "";
     public IReadOnlyList<NetworkAddressInfo> NetworkAddresses { get; private set; } = [];
-    public StorageUsageInfo? StorageUsage { get; private set; }
+    public IReadOnlyList<StorageUsageInfo> StorageUsages { get; private set; } = [];
     public MemoryUsageInfo? MemoryUsage { get; private set; }
 
     /// <summary>The server's public IP, once resolved. Null = not (yet) resolved.</summary>
@@ -211,17 +214,29 @@ public class SettingsViewModel
 
             if (CanManageSettings)
             {
-                SelectedLanguage = await _config.GetStringAsync("app.language", "de");
-                CtxConfig = await _config.GetAsync(
+                var languageTask = _config.GetStringAsync("app.language", "de");
+                var contextMenuTask = _config.GetAsync(
                     ContextMenuConfig.ConfigKey, ContextMenuConfig.Default());
-                PwPolicy = await _config.GetAsync(
+                var passwordPolicyTask = _config.GetAsync(
                     PasswordPolicy.ConfigKey, PasswordPolicy.Default());
-                SessionRevalidationSeconds = await _config.GetIntAsync(
+                var sessionSecurityTask = _config.GetIntAsync(
                     SessionSecuritySettings.RevalidationSecondsKey,
                     SessionSecuritySettings.DefaultRevalidationSeconds);
+                var loggingTask = _loggingStore.GetLevelAsync();
+
+                await Task.WhenAll(
+                    languageTask,
+                    contextMenuTask,
+                    passwordPolicyTask,
+                    sessionSecurityTask,
+                    loggingTask);
+
+                SelectedLanguage = await languageTask;
+                CtxConfig = await contextMenuTask;
+                PwPolicy = await passwordPolicyTask;
+                SessionRevalidationSeconds = await sessionSecurityTask;
+                LogLevel = await loggingTask;
                 RefreshSystemInfo();
-                await LoadSearchStateAsync();
-                LogLevel = await _loggingStore.GetLevelAsync();
             }
 
             if (CanManageCertificates)
@@ -257,16 +272,17 @@ public class SettingsViewModel
         {
             CanManageSettings = false;
             CanManageDataServices = false;
+            CanManageCertificates = false;
             return;
         }
 
-        // Global settings are unrestricted/global by nature → require Global scope.
-        CanManageSettings = await _mgmtAuth.HasGlobalPermissionAsync(
-            actor, ManagementPermission.ManageSystemSettings);
-        CanManageDataServices = await _mgmtAuth.HasGlobalPermissionAsync(
-            actor, ManagementPermission.ManageDataServices);
-        CanManageCertificates = await _mgmtAuth.HasGlobalPermissionAsync(
-            actor, ManagementPermission.ManageCertificates);
+        // Resolve the complete global permission mask once. Three individual
+        // checks would repeat the same assignment and role lookups.
+        var permissions = await _mgmtAuth.GetEffectivePermissionsAtAsync(
+            actor, ScopeType.Global, Guid.Empty);
+        CanManageSettings = permissions.HasFlag(ManagementPermission.ManageSystemSettings);
+        CanManageDataServices = permissions.HasFlag(ManagementPermission.ManageDataServices);
+        CanManageCertificates = permissions.HasFlag(ManagementPermission.ManageCertificates);
     }
 
     private async Task<UserContext?> BuildActorContextAsync()
@@ -496,6 +512,7 @@ public class SettingsViewModel
     public async Task LoadSearchStateAsync()
     {
         if (!CanManageSettings) return;
+        SearchStateLoading = true;
         try
         {
             var state = await _searchAdmin.GetStateAsync();
@@ -507,6 +524,10 @@ public class SettingsViewModel
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to load search engine state");
+        }
+        finally
+        {
+            SearchStateLoading = false;
         }
     }
 
@@ -759,9 +780,27 @@ public class SettingsViewModel
     public void RefreshSystemInfo()
     {
         if (!CanManageSettings) return;
+        RefreshNetworkInfo();
+        RefreshStorageInfo();
+        RefreshMemoryInfo();
+    }
+
+    public void RefreshNetworkInfo()
+    {
+        if (!CanManageSettings) return;
         HostName = _sysInfo.HostName;
         NetworkAddresses = _sysInfo.GetNetworkAddresses();
-        //StorageUsage = _sysInfo.GetStorageUsage();
+    }
+
+    public void RefreshStorageInfo()
+    {
+        if (!CanManageSettings) return;
+        StorageUsages = _sysInfo.GetStorageUsage();
+    }
+
+    public void RefreshMemoryInfo()
+    {
+        if (!CanManageSettings) return;
         MemoryUsage = _sysInfo.GetMemoryUsage();
     }
 

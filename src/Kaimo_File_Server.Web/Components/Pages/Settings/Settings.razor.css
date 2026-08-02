@@ -149,6 +149,72 @@
 .settings-page ::deep .settings-hint { color: var(--text-tertiary); font-size: 12px; }
 .settings-page ::deep .settings-download { text-decoration: none; }
 
+.settings-page ::deep .storage-pool-list {
+    display: grid;
+    gap: 14px;
+}
+
+.settings-page ::deep .storage-pool-card {
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg-tertiary);
+}
+
+.settings-page ::deep .storage-pool-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.settings-page ::deep .storage-pool-header > div {
+    min-width: 0;
+}
+
+.settings-page ::deep .storage-pool-name,
+.settings-page ::deep .storage-pool-path {
+    display: block;
+}
+
+.settings-page ::deep .storage-pool-name {
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.settings-page ::deep .storage-pool-path {
+    margin-top: 3px;
+    overflow: hidden;
+    color: var(--text-tertiary);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.settings-page ::deep .storage-pool-percent {
+    flex: 0 0 auto;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.settings-page ::deep .storage-pool-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px 16px;
+    margin-top: 12px;
+    color: var(--text-tertiary);
+    font-size: 12px;
+}
+
+.settings-page ::deep .storage-pool-stats strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
 /* Design-spec rollout */
 
 .settings-page-header {
@@ -313,5 +379,14 @@
 
     .settings-page ::deep .settings-field-label {
         min-width: 0;
+    }
+
+    .settings-page ::deep .storage-pool-header {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .settings-page ::deep .storage-pool-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }

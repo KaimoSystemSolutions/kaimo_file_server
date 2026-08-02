@@ -4,26 +4,57 @@
 @inject AssetProvider Icons
 
 <div class="detail-section">
-    <span class="detail-label">Gesamtspeicherauslastung</span>
-    <p class="settings-description">Auslastung des Laufwerks, auf dem die Dateien gespeichert werden.</p>
-    @if (VM.StorageUsage is { Available: true } s)
+    <span class="detail-label">Speicher-Pools</span>
+    <p class="settings-description">Auslastung der konfigurierten Speicher-Pools. Die bestehende Pool- und Verzeichnisstruktur wird unverändert angezeigt.</p>
+    @if (VM.StorageUsages.Count > 0)
     {
-        <div class="stat-hero"><span class="stat-hero-value">@Pct(s.UsedPercent) %</span><span class="stat-hero-unit">belegt · @VM.FormatBytes(s.UsedBytes) von @VM.FormatBytes(s.TotalBytes)</span></div>
-        <div class="usage-bar"><div class="usage-bar-fill @(s.UsedPercent >= 90 ? "is-critical" : "")" style="width: @Pct(s.UsedPercent)%;"></div></div>
-        <div class="info-card">
-            <div class="info-row"><span class="info-key">Frei</span><span class="info-val">@VM.FormatBytes(s.FreeBytes)</span></div>
-            <div class="info-row"><span class="info-key">Gesamt</span><span class="info-val">@VM.FormatBytes(s.TotalBytes)</span></div>
-            <div class="info-row"><span class="info-key">Laufwerk</span><span class="info-val">@s.DriveName</span></div>
-            <div class="info-row"><span class="info-key">Speicherpfad</span><span class="info-val is-muted">@s.StoragePath</span></div>
+        <div class="storage-pool-list">
+            @foreach (var pool in VM.StorageUsages)
+            {
+                <article class="storage-pool-card">
+                    <div class="storage-pool-header">
+                        <div>
+                            <span class="storage-pool-name">@PoolName(pool.StoragePath)</span>
+                            <span class="storage-pool-path" title="@pool.StoragePath">@pool.StoragePath</span>
+                        </div>
+                        @if (pool.Available)
+                        {
+                            <span class="storage-pool-percent">@Pct(pool.UsedPercent) % belegt</span>
+                        }
+                    </div>
+
+                    @if (pool.Available)
+                    {
+                        <div class="usage-bar" role="progressbar" aria-label="Auslastung von @PoolName(pool.StoragePath)" aria-valuenow="@Pct(pool.UsedPercent)" aria-valuemin="0" aria-valuemax="100">
+                            <div class="usage-bar-fill @(pool.UsedPercent >= 90 ? "is-critical" : "")" style="width: @Pct(pool.UsedPercent)%;"></div>
+                        </div>
+                        <div class="storage-pool-stats">
+                            <span><strong>@VM.FormatBytes(pool.UsedBytes)</strong> belegt</span>
+                            <span><strong>@VM.FormatBytes(pool.FreeBytes)</strong> frei</span>
+                            <span><strong>@VM.FormatBytes(pool.TotalBytes)</strong> gesamt</span>
+                            <span>Laufwerk <strong>@pool.DriveName</strong></span>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="settings-empty">Speicherinformationen sind für diesen Pool nicht verfügbar.</p>
+                    }
+                </article>
+            }
         </div>
     }
-    else { <p class="settings-empty">Speicherinformationen sind nicht verfügbar.</p> }
+    else { <p class="settings-empty">Keine Speicher-Pools gefunden oder Speicherinformationen sind nicht verfügbar.</p> }
     <div class="settings-actions"><button class="btn-icon" title="Aktualisieren" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button></div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
     private static string Pct(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
-    private void Refresh() { VM.RefreshSystemInfo(); StateHasChanged(); }
+    private static string PoolName(string path)
+    {
+        var trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return Path.GetFileName(trimmed) is { Length: > 0 } name ? name : path;
+    }
+    private void Refresh() { VM.RefreshStorageInfo(); StateHasChanged(); }
 }
 

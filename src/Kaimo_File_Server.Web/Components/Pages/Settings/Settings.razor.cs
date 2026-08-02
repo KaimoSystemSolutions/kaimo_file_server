@@ -3,6 +3,7 @@ namespace Kaimo_File_Server.Web.Components.Pages.Settings;
 public partial class Settings
 {
     private SettingsTab _activeTab = SettingsTab.Language;
+    private bool _initialLoadComplete;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -19,6 +20,7 @@ public partial class Settings
                 _activeTab = SettingsTab.Certificate;
         }
 
+        _initialLoadComplete = true;
         StateHasChanged();
     }
 
@@ -30,7 +32,11 @@ public partial class Settings
         if (tab == SettingsTab.Network)
             await VM.LoadPublicIpAsync();
         else if (tab == SettingsTab.Search)
-            await VM.LoadSearchStateAsync();
+        {
+            var loadTask = VM.LoadSearchStateAsync();
+            StateHasChanged();
+            await loadTask;
+        }
         else if (tab == SettingsTab.Certificate)
             await VM.LoadCertificateStateAsync();
 

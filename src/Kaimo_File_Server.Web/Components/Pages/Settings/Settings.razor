@@ -12,7 +12,7 @@
     </div>
 </div>
 
-@if (VM.IsLoading)
+@if (!_initialLoadComplete || VM.IsLoading)
 {
     <div class="loading-state"><div class="spinner"></div><p>Lade Einstellungen…</p></div>
 }

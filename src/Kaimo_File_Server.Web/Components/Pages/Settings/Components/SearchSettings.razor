@@ -6,6 +6,12 @@
 <div class="detail-section">
     <span class="detail-label">Volltext-Suche (Elasticsearch)</span>
     <p class="settings-description">Ist Elasticsearch aktiviert und erreichbar, werden Dateiinhalte indexiert und durchsuchbar. Andernfalls – oder wenn der Container nicht gestartet wurde – wird automatisch eine einfache Suche nach Dateinamen verwendet.</p>
+    @if (VM.SearchStateLoading)
+    {
+        <div class="loading-state"><div class="spinner"></div><p>Prüfe Elasticsearch-Status…</p></div>
+    }
+    else
+    {
     <div class="service-row">
         <div class="service-info"><span class="service-name">Elasticsearch</span><span class="service-status service-status--@(VM.SearchEsEffective ? "running" : "stopped")">@SearchStatusLabel()</span></div>
         <label class="toggle-switch" title="Elasticsearch aktivieren/deaktivieren"><input type="checkbox" @bind="VM.SearchEsEnabled" /><span class="toggle-slider"></span></label>
@@ -34,6 +40,7 @@
         <button class="btn-primary" disabled="@(!VM.SearchEsEffective || VM.ReindexProgress.Running)" @onclick="StartReindex">Indexierung starten</button>
         <button class="btn-icon" title="Fortschritt aktualisieren" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button>
     </div>
+    }
 </div>
 
 @code {

@@ -21,6 +21,6 @@
 
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
-    private async Task Refresh() { VM.RefreshSystemInfo(); await VM.LoadPublicIpAsync(force: true); StateHasChanged(); }
+    private async Task Refresh() { VM.RefreshNetworkInfo(); await VM.LoadPublicIpAsync(force: true); StateHasChanged(); }
 }
 

@@ -130,7 +130,13 @@ public class SystemInfoService : ISystemInfoService
         return new MemoryUsageInfo(
             WorkingSetBytes: process.WorkingSet64,
             PrivateBytes: process.PrivateMemorySize64,
-            ManagedHeapBytes: GC.GetTotalMemory(forceFullCollection: false),
+            // A non-collecting GetTotalMemory call includes dead objects that the GC
+            // has not reclaimed yet. That made every Blazor refresh appear to leak.
+            // HeapSizeBytes is the stable heap snapshot captured by the last GC and
+            // avoids both that false signal and an expensive forced collection.
+            ManagedHeapBytes: gc.HeapSizeBytes > 0
+                ? gc.HeapSizeBytes
+                : GC.GetTotalMemory(forceFullCollection: false),
             TotalAvailableBytes: gc.TotalAvailableMemoryBytes);
     }
 }
