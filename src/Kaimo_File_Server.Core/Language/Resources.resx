@@ -1158,6 +1158,9 @@
   <data name="Web_Perm_ManageCertificates" xml:space="preserve">
     <value>Manage HTTPS certificate</value>
   </data>
+  <data name="Web_Perm_ViewSystemLogs" xml:space="preserve">
+    <value>View and download system logs</value>
+  </data>
   <data name="Web_Settings_Tab_Certificate" xml:space="preserve">
     <value>Certificate</value>
   </data>
@@ -1205,6 +1208,90 @@
   </data>
   <data name="Web_Settings_Logging_Saved" xml:space="preserve">
     <value>Log level saved.</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Title" xml:space="preserve">
+    <value>Stored system logs</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Description" xml:space="preserve">
+    <value>The archive retains log entries from Information through Critical regardless of the output level above. Up to the newest 1,000 matching entries are displayed.</value>
+  </data>
+  <data name="Web_Settings_LogViewer_LiveTitle" xml:space="preserve">
+    <value>Automatically refresh every three seconds</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Live" xml:space="preserve">
+    <value>Live</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Web_Settings_LogViewer_DownloadDateUtc" xml:space="preserve">
+    <value>Download date (UTC)</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Unauthorized" xml:space="preserve">
+    <value>You do not have permission to view system logs.</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Sources" xml:space="preserve">
+    <value>Services</value>
+  </data>
+  <data name="Web_Settings_LogViewer_NoSources" xml:space="preserve">
+    <value>No log sources are available yet.</value>
+  </data>
+  <data name="Web_Settings_LogViewer_MinimumLevel" xml:space="preserve">
+    <value>Minimum level</value>
+  </data>
+  <data name="Web_Settings_LogViewer_LevelInformation" xml:space="preserve">
+    <value>Information</value>
+  </data>
+  <data name="Web_Settings_LogViewer_LevelWarning" xml:space="preserve">
+    <value>Warning</value>
+  </data>
+  <data name="Web_Settings_LogViewer_LevelError" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="Web_Settings_LogViewer_LevelCritical" xml:space="preserve">
+    <value>Critical</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Search" xml:space="preserve">
+    <value>Search</value>
+  </data>
+  <data name="Web_Settings_LogViewer_SearchPlaceholder" xml:space="preserve">
+    <value>Message, category, exception…</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ResultCount" xml:space="preserve">
+    <value>Matches: {0}</value>
+  </data>
+  <data name="Web_Settings_LogViewer_HasMore" xml:space="preserve">
+    <value>More entries match; the display is limited to 1,000 entries.</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Updating" xml:space="preserve">
+    <value>Refreshing…</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Paused" xml:space="preserve">
+    <value>Live refresh paused</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Empty" xml:space="preserve">
+    <value>No matching log entries.</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Details" xml:space="preserve">
+    <value>Details</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Instance" xml:space="preserve">
+    <value>Instance</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Category" xml:space="preserve">
+    <value>Category</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Event" xml:space="preserve">
+    <value>Event</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Trace" xml:space="preserve">
+    <value>Trace</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ReadFailed" xml:space="preserve">
+    <value>The system logs could not be read.</value>
   </data>
   <data name="Web_Settings_Tab_Ram" xml:space="preserve">
     <value>RAM</value>

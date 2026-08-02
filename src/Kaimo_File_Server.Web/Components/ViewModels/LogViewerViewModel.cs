@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Logging;
+using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
@@ -70,7 +71,7 @@ public sealed class LogViewerViewModel(
         catch (Exception exception)
         {
             logger.LogWarning(exception, "Log archive query failed");
-            ErrorMessage = "Die Protokolle konnten nicht gelesen werden.";
+            ErrorMessage = Resources.Web_Settings_LogViewer_ReadFailed;
         }
         finally
         {

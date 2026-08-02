@@ -1,4 +1,5 @@
 @using Kaimo_File_Server.Core.Logging
+@using Kaimo_File_Server.Core.Language
 @using Microsoft.Extensions.Logging
 @implements IAsyncDisposable
 @inject LogViewerViewModel Viewer
@@ -7,42 +8,39 @@
 <div class="detail-section log-viewer-section">
     <div class="log-viewer-heading">
         <div>
-            <span class="detail-label">Gespeicherte Systemprotokolle</span>
-            <p class="settings-description">
-                Das Archiv enthält Information bis Critical, unabhängig von der Ausgabestufe oben.
-                Angezeigt werden höchstens die neuesten 1.000 Treffer.
-            </p>
+            <span class="detail-label">@Resources.Web_Settings_LogViewer_Title</span>
+            <p class="settings-description">@Resources.Web_Settings_LogViewer_Description</p>
         </div>
         <div class="log-viewer-actions">
-            <label class="log-live-toggle" title="Automatische Aktualisierung alle drei Sekunden">
+            <label class="log-live-toggle" title="@Resources.Web_Settings_LogViewer_LiveTitle">
                 <input type="checkbox" checked="@(!Viewer.IsLivePaused)" @onchange="LiveChangedAsync" />
-                <span>Live</span>
+                <span>@Resources.Web_Settings_LogViewer_Live</span>
             </label>
-            <button class="btn-icon" title="Aktualisieren" @onclick="RefreshAsync" disabled="@Viewer.IsLoading">↻</button>
+            <button class="btn-icon" title="@Resources.Web_Settings_LogViewer_Refresh" @onclick="RefreshAsync" disabled="@Viewer.IsLoading">↻</button>
             <label class="log-download-date">
-                <span>Download-Tag (UTC)</span>
+                <span>@Resources.Web_Settings_LogViewer_DownloadDateUtc</span>
                 <input class="edit-input"
                        type="date"
                        value="@Viewer.DownloadDateUtc.ToString("yyyy-MM-dd")"
                        @onchange="DownloadDateChanged" />
             </label>
-            <button class="btn-primary" @onclick="Download" disabled="@(Viewer.SelectedSources.Count == 0)">Herunterladen</button>
+            <button class="btn-primary" @onclick="Download" disabled="@(Viewer.SelectedSources.Count == 0)">@Resources.Web_Settings_LogViewer_Download</button>
         </div>
     </div>
 
     @if (!Viewer.IsAuthorized)
     {
-        <div class="error-banner">Keine Berechtigung zum Anzeigen der Systemprotokolle.</div>
+        <div class="error-banner">@Resources.Web_Settings_LogViewer_Unauthorized</div>
     }
     else
     {
         <div class="log-viewer-filters">
             <div class="log-filter-block log-source-filter">
-                <span class="log-filter-label">Dienste</span>
+                <span class="log-filter-label">@Resources.Web_Settings_LogViewer_Sources</span>
                 <div class="log-source-list">
                     @if (Viewer.Sources.Count == 0)
                     {
-                        <span class="settings-hint">Noch keine Protokollquellen vorhanden.</span>
+                        <span class="settings-hint">@Resources.Web_Settings_LogViewer_NoSources</span>
                     }
                     @foreach (var source in Viewer.Sources)
                     {
@@ -57,22 +55,22 @@
             </div>
 
             <label class="log-filter-block">
-                <span class="log-filter-label">Mindeststufe</span>
+                <span class="log-filter-label">@Resources.Web_Settings_LogViewer_MinimumLevel</span>
                 <select class="edit-input log-level-select" value="@Viewer.MinimumLevel" @onchange="LevelChangedAsync">
-                    <option value="Information">Information</option>
-                    <option value="Warning">Warning</option>
-                    <option value="Error">Error</option>
-                    <option value="Critical">Critical</option>
+                    <option value="Information">@Resources.Web_Settings_LogViewer_LevelInformation</option>
+                    <option value="Warning">@Resources.Web_Settings_LogViewer_LevelWarning</option>
+                    <option value="Error">@Resources.Web_Settings_LogViewer_LevelError</option>
+                    <option value="Critical">@Resources.Web_Settings_LogViewer_LevelCritical</option>
                 </select>
             </label>
 
             <label class="log-filter-block log-search-filter">
-                <span class="log-filter-label">Suche</span>
+                <span class="log-filter-label">@Resources.Web_Settings_LogViewer_Search</span>
                 <input class="edit-input"
                        type="search"
                        value="@Viewer.SearchText"
                        maxlength="200"
-                       placeholder="Nachricht, Kategorie, Exception …"
+                       placeholder="@Resources.Web_Settings_LogViewer_SearchPlaceholder"
                        @oninput="SearchChangedAsync" />
             </label>
         </div>
@@ -83,25 +81,25 @@
         }
 
         <div class="log-result-summary">
-            <span>@Viewer.Entries.Count Treffer</span>
+            <span>@string.Format(Resources.Web_Settings_LogViewer_ResultCount, Viewer.Entries.Count)</span>
             @if (Viewer.HasMore)
             {
-                <span>Es gibt weitere Treffer – der Download enthält alle.</span>
+                <span>@Resources.Web_Settings_LogViewer_HasMore</span>
             }
             @if (Viewer.IsLoading)
             {
-                <span>Aktualisiere …</span>
+                <span>@Resources.Web_Settings_LogViewer_Updating</span>
             }
             else if (Viewer.IsLivePaused)
             {
-                <span>Live-Aktualisierung pausiert</span>
+                <span>@Resources.Web_Settings_LogViewer_Paused</span>
             }
         </div>
 
         <div class="log-list" role="log" aria-live="polite">
             @if (Viewer.Entries.Count == 0 && !Viewer.IsLoading)
             {
-                <div class="log-empty">Keine passenden Protokolleinträge.</div>
+                <div class="log-empty">@Resources.Web_Settings_LogViewer_Empty</div>
             }
             else
             {
@@ -109,7 +107,7 @@
                     <div class="log-row">
                         <div class="log-row-summary">
                             <time title="@entry.TimestampUtc.ToString("O")">@entry.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff")</time>
-                            <span class="log-level log-level-@entry.Level.ToString().ToLowerInvariant()">@entry.Level</span>
+                            <span class="log-level log-level-@entry.Level.ToString().ToLowerInvariant()">@LevelLabel(entry.Level)</span>
                             <span class="log-source" title="@entry.Instance">@entry.Service</span>
                             <span class="log-category" title="@entry.Category">@ShortCategory(entry.Category)</span>
                             <span class="log-message">@entry.Message</span>
@@ -117,22 +115,22 @@
                         @if (HasDetails(entry))
                         {
                             <details class="log-details">
-                                <summary>Details</summary>
+                                <summary>@Resources.Web_Settings_LogViewer_Details</summary>
                                 @if (!string.IsNullOrEmpty(entry.Exception))
                                 {
                                     <pre>@entry.Exception</pre>
                                 }
                                 <dl>
                                     <dt>UTC</dt><dd>@entry.TimestampUtc.ToString("O")</dd>
-                                    <dt>Instanz</dt><dd>@entry.Instance</dd>
-                                    <dt>Kategorie</dt><dd>@entry.Category</dd>
+                                    <dt>@Resources.Web_Settings_LogViewer_Instance</dt><dd>@entry.Instance</dd>
+                                    <dt>@Resources.Web_Settings_LogViewer_Category</dt><dd>@entry.Category</dd>
                                     @if (entry.EventId != 0 || entry.EventName is not null)
                                     {
-                                        <dt>Event</dt><dd>@entry.EventId @entry.EventName</dd>
+                                        <dt>@Resources.Web_Settings_LogViewer_Event</dt><dd>@entry.EventId @entry.EventName</dd>
                                     }
                                     @if (entry.TraceId is not null)
                                     {
-                                        <dt>Trace</dt><dd>@entry.TraceId</dd>
+                                        <dt>@Resources.Web_Settings_LogViewer_Trace</dt><dd>@entry.TraceId</dd>
                                     }
                                     @if (entry.Properties is not null)
                                     {
@@ -249,6 +247,15 @@
 
     private static string ShortCategory(string category)
         => category[(category.LastIndexOf('.') + 1)..];
+
+    private static string LevelLabel(LogLevel level) => level switch
+    {
+        LogLevel.Information => Resources.Web_Settings_LogViewer_LevelInformation,
+        LogLevel.Warning => Resources.Web_Settings_LogViewer_LevelWarning,
+        LogLevel.Error => Resources.Web_Settings_LogViewer_LevelError,
+        LogLevel.Critical => Resources.Web_Settings_LogViewer_LevelCritical,
+        _ => level.ToString()
+    };
 
     private static bool HasDetails(LogArchiveEntry entry)
         => entry.Exception is not null || entry.Properties is not null || entry.EventId != 0 || entry.TraceId is not null;

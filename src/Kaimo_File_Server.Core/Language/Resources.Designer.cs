@@ -3434,6 +3434,12 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Perm_ManageCertificates", resourceCulture);
             }
         }
+
+        public static string Web_Perm_ViewSystemLogs {
+            get {
+                return ResourceManager.GetString("Web_Perm_ViewSystemLogs", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Manage data services ähnelt.
@@ -4125,6 +4131,174 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Settings_Logging_Saved {
             get {
                 return ResourceManager.GetString("Web_Settings_Logging_Saved", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Category {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Category", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Description {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Description", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Details {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Details", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Download {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Download", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_DownloadDateUtc {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_DownloadDateUtc", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Empty {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Empty", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Event {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Event", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_HasMore {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_HasMore", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Instance {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Instance", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_LevelCritical {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_LevelCritical", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_LevelError {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_LevelError", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_LevelInformation {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_LevelInformation", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_LevelWarning {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_LevelWarning", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Live {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Live", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_LiveTitle {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_LiveTitle", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_MinimumLevel {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_MinimumLevel", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_NoSources {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_NoSources", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Paused {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Paused", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_ReadFailed {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_ReadFailed", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Refresh {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Refresh", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_ResultCount {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_ResultCount", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Search {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Search", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_SearchPlaceholder {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_SearchPlaceholder", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Sources {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Sources", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Title {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Title", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Trace {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Trace", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Unauthorized {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Unauthorized", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_Updating {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Updating", resourceCulture);
             }
         }
         

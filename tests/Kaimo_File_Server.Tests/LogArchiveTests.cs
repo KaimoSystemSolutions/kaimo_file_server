@@ -1,4 +1,6 @@
 using System.Text;
+using System.Globalization;
+using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Infrastructure.Logging;
 using Microsoft.Extensions.Logging;
@@ -149,6 +151,49 @@ public sealed class LogArchiveTests : IAsyncLifetime
         await reader.WriteDownloadAsync(
             new LogArchiveQuery(["samba"], UtcDate: new DateOnly(2026, 8, 2)), download);
         Assert.Empty(download.ToArray());
+    }
+
+    [Fact]
+    public void Log_viewer_resources_exist_in_default_and_german_cultures()
+    {
+        var keys = new[]
+        {
+            "Web_Perm_ViewSystemLogs",
+            "Web_Settings_LogViewer_Category",
+            "Web_Settings_LogViewer_Description",
+            "Web_Settings_LogViewer_Details",
+            "Web_Settings_LogViewer_Download",
+            "Web_Settings_LogViewer_DownloadDateUtc",
+            "Web_Settings_LogViewer_Empty",
+            "Web_Settings_LogViewer_Event",
+            "Web_Settings_LogViewer_HasMore",
+            "Web_Settings_LogViewer_Instance",
+            "Web_Settings_LogViewer_LevelCritical",
+            "Web_Settings_LogViewer_LevelError",
+            "Web_Settings_LogViewer_LevelInformation",
+            "Web_Settings_LogViewer_LevelWarning",
+            "Web_Settings_LogViewer_Live",
+            "Web_Settings_LogViewer_LiveTitle",
+            "Web_Settings_LogViewer_MinimumLevel",
+            "Web_Settings_LogViewer_NoSources",
+            "Web_Settings_LogViewer_Paused",
+            "Web_Settings_LogViewer_ReadFailed",
+            "Web_Settings_LogViewer_Refresh",
+            "Web_Settings_LogViewer_ResultCount",
+            "Web_Settings_LogViewer_Search",
+            "Web_Settings_LogViewer_SearchPlaceholder",
+            "Web_Settings_LogViewer_Sources",
+            "Web_Settings_LogViewer_Title",
+            "Web_Settings_LogViewer_Trace",
+            "Web_Settings_LogViewer_Unauthorized",
+            "Web_Settings_LogViewer_Updating"
+        };
+
+        foreach (var key in keys)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(Resources.ResourceManager.GetString(key, CultureInfo.InvariantCulture)), key);
+            Assert.False(string.IsNullOrWhiteSpace(Resources.ResourceManager.GetString(key, CultureInfo.GetCultureInfo("de"))), key);
+        }
     }
 
     public Task InitializeAsync() => Task.CompletedTask;

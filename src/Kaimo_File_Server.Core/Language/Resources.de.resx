@@ -1158,6 +1158,9 @@
   <data name="Web_Perm_ManageCertificates" xml:space="preserve">
     <value>HTTPS-Zertifikat verwalten</value>
   </data>
+  <data name="Web_Perm_ViewSystemLogs" xml:space="preserve">
+    <value>Systemprotokolle anzeigen und herunterladen</value>
+  </data>
   <data name="Web_Settings_Tab_Certificate" xml:space="preserve">
     <value>Zertifikat</value>
   </data>
@@ -1205,6 +1208,90 @@
   </data>
   <data name="Web_Settings_Logging_Saved" xml:space="preserve">
     <value>Log-Level gespeichert.</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Title" xml:space="preserve">
+    <value>Gespeicherte Systemprotokolle</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Description" xml:space="preserve">
+    <value>Das Archiv speichert unabhängig von der Ausgabestufe oben Einträge von Information bis Kritisch. Angezeigt werden höchstens die neuesten 1.000 passenden Einträge.</value>
+  </data>
+  <data name="Web_Settings_LogViewer_LiveTitle" xml:space="preserve">
+    <value>Alle drei Sekunden automatisch aktualisieren</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Live" xml:space="preserve">
+    <value>Live</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Refresh" xml:space="preserve">
+    <value>Aktualisieren</value>
+  </data>
+  <data name="Web_Settings_LogViewer_DownloadDateUtc" xml:space="preserve">
+    <value>Download-Tag (UTC)</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Download" xml:space="preserve">
+    <value>Herunterladen</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Unauthorized" xml:space="preserve">
+    <value>Keine Berechtigung zum Anzeigen der Systemprotokolle.</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Sources" xml:space="preserve">
+    <value>Dienste</value>
+  </data>
+  <data name="Web_Settings_LogViewer_NoSources" xml:space="preserve">
+    <value>Noch keine Protokollquellen vorhanden.</value>
+  </data>
+  <data name="Web_Settings_LogViewer_MinimumLevel" xml:space="preserve">
+    <value>Mindeststufe</value>
+  </data>
+  <data name="Web_Settings_LogViewer_LevelInformation" xml:space="preserve">
+    <value>Information</value>
+  </data>
+  <data name="Web_Settings_LogViewer_LevelWarning" xml:space="preserve">
+    <value>Warnung</value>
+  </data>
+  <data name="Web_Settings_LogViewer_LevelError" xml:space="preserve">
+    <value>Fehler</value>
+  </data>
+  <data name="Web_Settings_LogViewer_LevelCritical" xml:space="preserve">
+    <value>Kritisch</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Search" xml:space="preserve">
+    <value>Suche</value>
+  </data>
+  <data name="Web_Settings_LogViewer_SearchPlaceholder" xml:space="preserve">
+    <value>Nachricht, Kategorie, Ausnahme…</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ResultCount" xml:space="preserve">
+    <value>Treffer: {0}</value>
+  </data>
+  <data name="Web_Settings_LogViewer_HasMore" xml:space="preserve">
+    <value>Es gibt weitere Treffer; die Anzeige ist auf 1.000 Einträge begrenzt.</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Updating" xml:space="preserve">
+    <value>Aktualisiere…</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Paused" xml:space="preserve">
+    <value>Live-Aktualisierung pausiert</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Empty" xml:space="preserve">
+    <value>Keine passenden Protokolleinträge.</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Details" xml:space="preserve">
+    <value>Details</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Instance" xml:space="preserve">
+    <value>Instanz</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Category" xml:space="preserve">
+    <value>Kategorie</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Event" xml:space="preserve">
+    <value>Event</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Trace" xml:space="preserve">
+    <value>Trace</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ReadFailed" xml:space="preserve">
+    <value>Die Systemprotokolle konnten nicht gelesen werden.</value>
   </data>
   <data name="Web_Settings_Tab_Ram" xml:space="preserve">
     <value>Arbeitsspeicher</value>
