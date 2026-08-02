@@ -14,7 +14,7 @@
     flex-direction: column;
     position: relative;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 7px;
     background: var(--bg-secondary);
     overflow: hidden;
     width: 100%;
@@ -29,7 +29,7 @@
 
     .file-grid-header > div {
         background: var(--bg-tertiary);
-        padding: 10px 12px;
+        padding: 8px 12px;
         font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
@@ -93,7 +93,7 @@
 }
 
     .file-grid-row > div {
-        padding: 10px 12px;
+        padding: 8px 12px;
         user-select: none;
         font-size: 13px;
         color: var(--text-secondary);
@@ -230,7 +230,7 @@
     margin-left: 8px;
     padding: 1px 6px 1px 4px;
     background: var(--accent-subtle);
-    border: 1px solid rgba(127, 172, 245, 0.25);
+    border: 1px solid var(--accent-border);
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.15s;
@@ -255,9 +255,7 @@
     line-height: 1;
 }
 
-[data-theme="light"] .acl-indicator {
-    border-color: rgba(37, 99, 235, 0.2);
-}
+[data-theme="light"] .acl-indicator { border-color: var(--accent-border); }
 
 /* ══════════════════════════════════════════════════════════
    File Upload Drag-Over
@@ -484,4 +482,83 @@
 .size-loading {
     color: var(--text-tertiary);
     font-style: italic;
+}
+
+/* Design-spec rollout */
+
+.file-page-header {
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.file-page-actions {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.page-command {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 11px;
+    background: var(--bg-secondary);
+    white-space: nowrap;
+}
+
+.page-command--active {
+    border-color: var(--accent-border);
+    background: var(--accent-subtle);
+    color: var(--accent-strong);
+}
+
+.selection-toolbar {
+    min-height: 42px;
+    margin-bottom: 10px;
+    padding: 5px 8px 5px 12px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg-tertiary);
+    box-shadow: none;
+}
+
+.selection-toolbar--inactive {
+    opacity: 1;
+    background: var(--bg-sunken);
+}
+
+.toolbar-btn {
+    min-height: 30px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+    border-color: var(--border);
+    background: var(--bg-hover);
+}
+
+@media (max-width: 620px) {
+    .file-page-header {
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .file-page-actions {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .page-command { min-height: 40px; }
+
+    .file-table-wrap {
+        margin-inline: -16px;
+        width: calc(100% + 32px);
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+    }
 }

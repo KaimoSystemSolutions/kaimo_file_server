@@ -1,0 +1,200 @@
+.share-table {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg-secondary);
+}
+
+.share-table-header,
+.share-table-row {
+    display: grid;
+    align-items: center;
+    column-gap: 16px;
+}
+
+.share-table--compact .share-table-header,
+.share-table--compact .share-table-row {
+    grid-template-columns: minmax(170px, 1fr) minmax(112px, 0.42fr);
+}
+
+.share-table--extended .share-table-header,
+.share-table--extended .share-table-row {
+    grid-template-columns: minmax(160px, 1.25fr) minmax(110px, 0.7fr) minmax(110px, 0.9fr) minmax(88px, 0.55fr) minmax(78px, 0.5fr);
+}
+
+.share-table-header {
+    min-height: 36px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.045em;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.share-table-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.share-table-row {
+    width: 100%;
+    min-height: 54px;
+    padding: 8px 14px;
+    border: 0;
+    border-bottom: 1px solid var(--border-light);
+    border-radius: 0;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 110ms ease, box-shadow 110ms ease;
+}
+
+.share-table-row:last-child {
+    border-bottom: 0;
+}
+
+.share-table-row:hover {
+    background: var(--bg-hover);
+}
+
+.share-table-row--selected {
+    background: var(--accent-subtle);
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.share-table-row--selected:hover {
+    background: var(--accent-selected);
+}
+
+.share-table-row--storage-unavailable {
+    background: color-mix(in srgb, var(--danger-subtle) 46%, var(--bg-secondary));
+}
+
+.share-table-row--storage-unavailable:hover {
+    background: color-mix(in srgb, var(--danger-subtle) 68%, var(--bg-hover));
+}
+
+.share-table-cell {
+    min-width: 0;
+    color: var(--text-secondary);
+    font-size: 12.5px;
+}
+
+.share-table-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.share-icon {
+    width: 26px;
+    height: 26px;
+    flex: 0 0 26px;
+    display: grid;
+    place-items: center;
+}
+
+.share-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-primary);
+    font-size: 13.5px;
+    font-weight: 650;
+}
+
+.share-availability {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.share-availability--usable .share-status-dot {
+    background: var(--success);
+}
+
+.share-availability--unusable {
+    color: var(--danger);
+}
+
+.share-availability--unusable .share-status-dot {
+    background: var(--danger);
+}
+
+.share-status-dot {
+    width: 7px;
+    height: 7px;
+    flex: 0 0 7px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.share-pool {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.share-state {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 2px 7px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 650;
+}
+
+.share-state--positive {
+    border-color: color-mix(in srgb, var(--success) 38%, var(--border));
+    background: var(--success-subtle);
+    color: var(--success);
+}
+
+.share-state--negative {
+    border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+    background: var(--danger-subtle);
+    color: var(--danger);
+}
+
+@media (max-width: 1280px) {
+    .share-table--extended .share-table-header,
+    .share-table--extended .share-table-row {
+        grid-template-columns: minmax(150px, 1fr) minmax(106px, 0.7fr) minmax(100px, 0.8fr);
+    }
+
+    .share-table--extended .share-table-header > :nth-child(n + 4),
+    .share-table--extended .share-table-row > :nth-child(n + 4) {
+        display: none;
+    }
+}
+
+@media (max-width: 620px) {
+    .share-table-header {
+        display: none;
+    }
+
+    .share-table--compact .share-table-row,
+    .share-table--extended .share-table-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+    }
+
+    .share-table--extended .share-table-row > :nth-child(n + 3) {
+        display: none;
+    }
+}

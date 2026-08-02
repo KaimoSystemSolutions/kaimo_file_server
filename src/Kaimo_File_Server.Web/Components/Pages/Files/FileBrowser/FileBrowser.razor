@@ -19,7 +19,7 @@
 
 <PageTitle>@(VM.CurrentShare?.Name ?? Resources.Web_Files) - Kaimo Files</PageTitle>
 
-<div class="page-header">
+<div class="page-header file-page-header">
     <div class="breadcrumb-bar">
         <a class="breadcrumb-link" href="/files">@Resources.Web_Breadcrumb_Shares</a>
         <span class="breadcrumb-sep">/</span>
@@ -30,19 +30,21 @@
             <a class="breadcrumb-link" href="/files/@ShareName/@fullPath">@name</a>
         }
     </div>
-    <div style="display: flex; gap: 0.5rem; align-items: center;">
-        <button class="btn-icon" title="@Resources.Web_CreateFolder_Title"
+    <div class="file-page-actions">
+        <button class="btn-secondary page-command" title="@Resources.Web_CreateFolder_Title"
                 @onclick="ShowCreateFolderDialog"
                 @onkeydown="OnCreateFolderKeyDown"
                 disabled="@(VM.IsLoading || VM.ErrorMessage is not null)">
-            @Assets.SVG("folder.svg", new SvgOptions())
+            @Assets.SVG("folder.svg", new SvgOptions(Width: 16, Height: 16, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)"))
+            <span>@Resources.Web_CreateFolder_Title</span>
         </button>
         @if (CanManageAcls())
         {
-            <button class="btn-icon" title="@Resources.Web_ManagePermissions"
+            <button class="btn-secondary page-command @(_showAclPanel ? "page-command--active" : "")" title="@Resources.Web_ManagePermissions"
                     @onclick="ToggleAclPanel">
 
                 @Assets.SVG("acl_panel.svg", new SvgOptions(Color: _showAclPanel ? "var(--accent)" : "currentColor"))
+                <span>@Resources.Web_ManagePermissions</span>
             </button>
             var rootCount = GetAclCount(_aclPath);
             @if (rootCount > 0)

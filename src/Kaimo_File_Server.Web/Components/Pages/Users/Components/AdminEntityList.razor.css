@@ -1,22 +1,140 @@
-.user-list-container { max-height: 600px; overflow: hidden auto; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-secondary); }
-.user-list-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 160px) minmax(96px, auto); align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--border); transition: background 0.1s; }
-.user-list-row:last-child { border-bottom: none; }
-.user-list-row:hover { background: var(--bg-hover); }
-.user-list-header { position: sticky; top: 0; z-index: 1; background: var(--bg-tertiary); color: var(--text-tertiary); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
-.user-list-header:hover { background: var(--bg-tertiary); }
-.user-list-selectable { cursor: pointer; }
-.user-list-selected { padding-left: 13px; border-left: 3px solid var(--accent); background: var(--accent-selected) !important; }
-.user-cell-name { display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.user-cell-username { min-width: 0; overflow: hidden; color: var(--text-secondary); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.user-cell-status { display: flex; align-items: center; justify-content: flex-end; }
-.status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
-.status-badge--active { background: var(--success-subtle); color: var(--success); }
-.status-badge--disabled { background: var(--danger-subtle); color: var(--danger); }
-.status-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; }
+.user-list-container {
+    max-height: 640px;
+    overflow: hidden auto;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg-secondary);
+}
+
+.user-list-row {
+    width: 100%;
+    min-height: 54px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 160px) minmax(96px, auto);
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
+    border: 0;
+    border-bottom: 1px solid var(--border-light);
+    border-radius: 0;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font: inherit;
+    text-align: left;
+    transition: background 110ms ease, box-shadow 110ms ease;
+}
+
+.entity-list-row {
+    grid-template-columns: minmax(0, 1fr) minmax(120px, 0.55fr);
+}
+
+.user-list-row:last-child {
+    border-bottom: 0;
+}
+
+.user-list-selectable {
+    cursor: pointer;
+}
+
+.user-list-selectable:hover {
+    background: var(--bg-hover);
+}
+
+.user-list-header {
+    min-height: 36px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg-tertiary);
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.045em;
+    text-transform: uppercase;
+}
+
+.user-list-selected {
+    background: var(--accent-subtle);
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.user-list-selected:hover {
+    background: var(--accent-selected);
+}
+
+.user-cell-name {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+    color: var(--text-primary);
+    font-size: 13.5px;
+    font-weight: 620;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-cell-username,
+.user-cell-meta {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-cell-status {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 7px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 650;
+}
+
+.status-badge--active {
+    border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+    background: var(--success-subtle);
+    color: var(--success);
+}
+
+.status-badge--disabled {
+    border-color: color-mix(in srgb, var(--danger) 32%, var(--border));
+    background: var(--danger-subtle);
+    color: var(--danger);
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    flex: 0 0 6px;
+    border-radius: 50%;
+}
+
 .status-dot--active { background: var(--success); }
 .status-dot--disabled { background: var(--danger); }
 
-@media (max-width: 768px) {
-    .user-list-row { grid-template-columns: minmax(0, 1fr) minmax(96px, auto); }
-    .user-cell-username { display: none; }
+@media (max-width: 620px) {
+    .user-list-header {
+        display: none;
+    }
+
+    .user-list-row,
+    .entity-list-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .user-cell-username {
+        display: none;
+    }
 }

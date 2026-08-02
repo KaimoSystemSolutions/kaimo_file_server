@@ -28,38 +28,41 @@ else if (!VM.CanAccessPage)
 }
 else
 {
-    <div class="page-header">
+    <div class="page-header entity-page-header">
         <div>
             <h1>@Resources.Web_Admin_Heading</h1>
             <p class="subtitle">@VM.TabSubtitle</p>
         </div>
-        <div style="display: flex; gap: 0.5rem;">
+        <div class="entity-page-actions">
             @if (VM.ActiveTab == AdminTab.Users && VM.CanCreateUsers)
             {
-                <button class="btn-icon" title="@Resources.Web_Admin_CreateUser" @onclick="() => VM.StartCreateUser()">
-                    @Icons.SVG("plus.svg", new SvgOptions(Width: 20, Height: 20, StrokeWidth: 2))
+                <button class="btn-primary entity-create-button" type="button" @onclick="() => VM.StartCreateUser()">
+                    @Icons.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                    <span>@Resources.Web_Admin_CreateUser</span>
                 </button>
             }
             else if (VM.ActiveTab == AdminTab.Groups && VM.CanManageGroups)
             {
-                <button class="btn-icon" title="@Resources.Web_Admin_CreateGroup" @onclick="() => VM.StartCreateGroup()">
-                    @Icons.SVG("plus.svg", new SvgOptions(Width: 20, Height: 20, StrokeWidth: 2))
+                <button class="btn-primary entity-create-button" type="button" @onclick="() => VM.StartCreateGroup()">
+                    @Icons.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                    <span>@Resources.Web_Admin_CreateGroup</span>
                 </button>
             }
             else if (VM.ActiveTab == AdminTab.Roles && VM.CanEditRoleDefinitions)
             {
-                <button class="btn-icon" title="@Resources.Web_Admin_CreateRole" @onclick="() => VM.StartCreateRole()">
-                    @Icons.SVG("plus.svg", new SvgOptions(Width: 20, Height: 20, StrokeWidth: 2))
+                <button class="btn-primary entity-create-button" type="button" @onclick="() => VM.StartCreateRole()">
+                    @Icons.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                    <span>@Resources.Web_Admin_CreateRole</span>
                 </button>
             }
         </div>
     </div>
 
     @* -- Tabs -- *@
-    <div class="admin-tabs">
+    <div class="admin-tabs entity-tabs" role="tablist">
         @if (VM.CanCreateUsers || VM.AuthorizedDepartmentsForView.Any())
         {
-            <button class="admin-tab @(VM.ActiveTab == AdminTab.Users ? "active" : "")"
+            <button class="admin-tab entity-tab entity-tab--users @(VM.ActiveTab == AdminTab.Users ? "active" : "")" type="button" role="tab" aria-selected="@(VM.ActiveTab == AdminTab.Users)"
                     @onclick="() => SwitchTab(AdminTab.Users)">
                 @Icons.SVG("user_transparent.svg", new SvgOptions())
                 @Resources.Web_Admin_Tab_Users
@@ -67,7 +70,7 @@ else
         }
         @if (VM.CanManageGroups)
         {
-            <button class="admin-tab @(VM.ActiveTab == AdminTab.Groups ? "active" : "")"
+            <button class="admin-tab entity-tab entity-tab--groups @(VM.ActiveTab == AdminTab.Groups ? "active" : "")" type="button" role="tab" aria-selected="@(VM.ActiveTab == AdminTab.Groups)"
                     @onclick="() => SwitchTab(AdminTab.Groups)">
                 @Icons.SVG("users_transparent.svg", new SvgOptions())
                 @Resources.Web_Admin_Tab_Groups
@@ -75,7 +78,7 @@ else
         }
         @if (VM.CanManageRoles)
         {
-            <button class="admin-tab @(VM.ActiveTab == AdminTab.Roles ? "active" : "")"
+            <button class="admin-tab entity-tab entity-tab--roles @(VM.ActiveTab == AdminTab.Roles ? "active" : "")" type="button" role="tab" aria-selected="@(VM.ActiveTab == AdminTab.Roles)"
                     @onclick="() => SwitchTab(AdminTab.Roles)">
                 @Icons.SVG("shield_transparent.svg", new SvgOptions())
                 @Resources.Web_Admin_Tab_Roles
@@ -92,14 +95,14 @@ else
     }
     else
     {
-        <div class="admin-content">
+        <div class="admin-content entity-workspace">
 
             <AdminEntityList VM="VM" OnChanged="StateHasChanged" />
 
             @* ════════════════════ DETAIL PANEL ════════════════════ *@
             @if (VM.SelectedUser is not null || VM.SelectedGroup is not null || VM.SelectedRole is not null)
             {
-                <div class="admin-detail">
+                <aside class="admin-detail entity-detail">
 
                     @if (VM.SuccessMessage is not null)
                     {
@@ -110,7 +113,7 @@ else
                     <GroupDetailsPanel VM="VM" OnChanged="StateHasChanged" />
                     <RoleDetailsPanel VM="VM" OnChanged="StateHasChanged" />
 
-                </div>
+                </aside>
             }
 
         </div>

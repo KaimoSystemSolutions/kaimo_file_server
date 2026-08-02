@@ -211,3 +211,116 @@ select.edit-input {
 .multi-select-text {
     font-size: 12px;
 }
+
+/* Design-spec rollout */
+
+.department-page-header {
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.department-page-header h1 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+
+.department-page-actions,
+.department-create-button {
+    display: flex;
+    align-items: center;
+}
+
+.department-create-button {
+    min-height: 34px;
+    gap: 7px;
+    padding: 0 13px;
+    white-space: nowrap;
+}
+
+.department-create-button svg { stroke: currentColor; }
+
+.department-workspace {
+    display: flex;
+    gap: 0;
+    min-height: min(650px, calc(100vh - 190px));
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg-secondary);
+}
+
+.department-workspace ::deep .dept-tree {
+    flex: 1;
+    min-width: 0;
+    align-self: stretch;
+    margin: 0;
+    padding-block: 0;
+    border: 0;
+    border-radius: 0;
+}
+
+.department-detail {
+    width: 430px;
+    min-width: 360px;
+    align-self: stretch;
+    position: static;
+    padding: 18px;
+    border: 0;
+    border-left: 1px solid var(--border);
+    border-radius: 0;
+    background: var(--bg-tertiary);
+    box-shadow: none;
+}
+
+.department-detail .detail-header h3 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+}
+
+.department-detail .detail-field-value {
+    min-height: 32px;
+    padding: 6px 9px;
+    border-radius: 5px;
+    background: var(--bg-secondary);
+}
+
+.department-detail .detail-actions {
+    padding-top: 15px;
+    border-top: 1px solid var(--border);
+}
+
+@media (max-width: 920px) {
+    .department-workspace {
+        flex-direction: column;
+        overflow: visible;
+    }
+
+    .department-detail {
+        width: 100%;
+        min-width: 0;
+        border-top: 1px solid var(--border);
+        border-left: 0;
+    }
+}
+
+@media (max-width: 620px) {
+    .department-page-header {
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .department-create-button { min-height: 40px; }
+
+    .department-workspace {
+        margin-inline: -16px;
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+    }
+}

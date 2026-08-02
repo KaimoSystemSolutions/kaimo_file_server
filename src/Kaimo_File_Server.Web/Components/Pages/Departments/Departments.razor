@@ -29,16 +29,17 @@ else if (!VM.CanAccessPage)
 }
 else
 {
-    <div class="page-header">
+    <div class="page-header department-page-header">
         <div>
             <h1>@Resources.Web_Dept_Heading</h1>
             <p class="subtitle">@string.Format(Resources.Web_Dept_Count, VM.Departments.Count)</p>
         </div>
-        <div style="display: flex; gap: 4px; align-items: center;">
+        <div class="department-page-actions">
             @if (VM.CanEdit)
             {
-                <button class="btn-icon" title="@Resources.Web_Dept_CreateTitle" @onclick="() => VM.StartCreate()">
-                    @Assets.SVG("plus.svg", new SvgOptions(Width: 20, Height: 20, StrokeWidth: 2f))
+                <button class="btn-primary department-create-button" type="button" @onclick="() => VM.StartCreate()">
+                    @Assets.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2f))
+                    <span>@Resources.Web_Dept_CreateTitle</span>
                 </button>
             }
         </div>
@@ -90,14 +91,14 @@ else
         <div class="error-banner">@VM.ErrorMessage</div>
     }
 
-    <div class="admin-content">
+    <div class="admin-content department-workspace">
 
         <DepartmentTree VM="VM" OnChanged="StateHasChanged" />
 
         @* ════════════ DETAIL ════════════ *@
         @if (VM.Selected is not null)
         {
-            <div class="admin-detail">
+            <aside class="admin-detail department-detail">
 
                 @if (VM.SuccessMessage is not null)
                 {
@@ -403,7 +404,7 @@ else
                         }
                     </div>
                 }
-            </div>
+            </aside>
         }
     </div>
 }

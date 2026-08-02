@@ -5,7 +5,7 @@
 
 <PageTitle>@Resources.Web_Nav_Settings - Kaimo Files</PageTitle>
 
-<div class="page-header">
+<div class="page-header settings-page-header">
     <div>
         <h1>@Resources.Web_Nav_Settings</h1>
         <p class="subtitle">Globale Konfiguration</p>
@@ -22,9 +22,9 @@ else if (!VM.CanAccessPage)
 }
 else
 {
-    <div class="admin-content">
+    <div class="admin-content settings-workspace">
         <div class="admin-detail settings-page">
-            <div class="detail-tabs">
+            <div class="detail-tabs settings-nav" role="tablist">
                 @if (VM.CanManageSettings)
                 {
                     <SettingsTabButton Active="@(_activeTab == SettingsTab.Language)" Icon="globe.svg" Label="@Resources.Web_Settings_Tab_Language" OnClick="() => SwitchTab(SettingsTab.Language)" />
@@ -46,22 +46,24 @@ else
                 }
             </div>
 
-            @if (VM.SuccessMessage is not null) { <div class="success-banner">@VM.SuccessMessage</div> }
-            @if (VM.ErrorMessage is not null) { <div class="error-banner">@VM.ErrorMessage</div> }
+            <div class="settings-content">
+                @if (VM.SuccessMessage is not null) { <div class="success-banner">@VM.SuccessMessage</div> }
+                @if (VM.ErrorMessage is not null) { <div class="error-banner">@VM.ErrorMessage</div> }
 
-            @switch (_activeTab)
-            {
-                case SettingsTab.Language when VM.CanManageSettings: <LanguageSettings VM="VM" /> break;
-                case SettingsTab.ContextMenu when VM.CanManageSettings: <ContextMenuSettings VM="VM" /> break;
-                case SettingsTab.PasswordPolicy when VM.CanManageSettings: <PasswordPolicySettings VM="VM" /> break;
-                case SettingsTab.Network when VM.CanManageSettings: <NetworkSettings VM="VM" /> break;
-                case SettingsTab.Storage when VM.CanManageSettings: <StorageSettings VM="VM" /> break;
-                case SettingsTab.Memory when VM.CanManageSettings: <MemorySettings VM="VM" /> break;
-                case SettingsTab.Search when VM.CanManageSettings: <SearchSettings VM="VM" /> break;
-                case SettingsTab.Logging when VM.CanManageSettings: <LoggingSettings VM="VM" /> break;
-                case SettingsTab.DataServices when VM.CanManageDataServices: <DataServiceSettings VM="VM" /> break;
-                case SettingsTab.Certificate when VM.CanManageCertificates: <CertificateSettings VM="VM" /> break;
-            }
+                @switch (_activeTab)
+                {
+                    case SettingsTab.Language when VM.CanManageSettings: <LanguageSettings VM="VM" /> break;
+                    case SettingsTab.ContextMenu when VM.CanManageSettings: <ContextMenuSettings VM="VM" /> break;
+                    case SettingsTab.PasswordPolicy when VM.CanManageSettings: <PasswordPolicySettings VM="VM" /> break;
+                    case SettingsTab.Network when VM.CanManageSettings: <NetworkSettings VM="VM" /> break;
+                    case SettingsTab.Storage when VM.CanManageSettings: <StorageSettings VM="VM" /> break;
+                    case SettingsTab.Memory when VM.CanManageSettings: <MemorySettings VM="VM" /> break;
+                    case SettingsTab.Search when VM.CanManageSettings: <SearchSettings VM="VM" /> break;
+                    case SettingsTab.Logging when VM.CanManageSettings: <LoggingSettings VM="VM" /> break;
+                    case SettingsTab.DataServices when VM.CanManageDataServices: <DataServiceSettings VM="VM" /> break;
+                    case SettingsTab.Certificate when VM.CanManageCertificates: <CertificateSettings VM="VM" /> break;
+                }
+            </div>
         </div>
     </div>
 }

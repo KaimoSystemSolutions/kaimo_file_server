@@ -7,11 +7,11 @@
     display: flex;
     flex-direction: column;
     gap: 0;
-    padding: 6px 0;
+    padding: 4px 0;
     overflow: hidden;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 7px;
 }
 
 /* -- Row -- */
@@ -19,12 +19,12 @@
 .dept-tree-row {
     display: flex;
     align-items: stretch;
-    margin: 0 6px;
+    margin: 0;
     padding-right: 14px;
-    padding-left: 7px;
+    padding-left: 10px;
     cursor: pointer;
     border-left: 3px solid transparent;
-    border-radius: 9px;
+    border-radius: 0;
     user-select: none;
 }
 
@@ -33,7 +33,7 @@
     }
 
 .dept-tree-row--selected {
-    background: var(--accent-selected);
+    background: var(--accent-subtle);
     border-left-color: var(--accent);
 }
 
@@ -45,7 +45,7 @@
 .dept-tree-row-content {
     display: flex;
     align-items: center;
-    min-height: 44px;
+    min-height: 48px;
     flex: 1;
     padding: 3px 0;
 }
@@ -139,7 +139,9 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    margin-right: 10px;
+    width: 30px;
+    height: 30px;
+    margin-right: 9px;
 }
 
 /* -- Name -- */
@@ -149,14 +151,14 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 14.5px;
-    font-weight: 500;
+    font-size: 13.5px;
+    font-weight: 600;
     color: var(--text-primary);
     line-height: 1.35;
 }
 
 .dept-tree-name--selected {
-    color: var(--accent);
+    color: var(--text-primary);
     font-weight: 700;
 }
 

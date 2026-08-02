@@ -32,26 +32,26 @@
         <div class="sidebar-nav">
             <NavLink class="nav-item" href="/" Match="NavLinkMatch.All">
                 @Assets.SVG("folder.svg", new SvgOptions())
-                @Resources.Web_Nav_Shares
+                <span class="nav-label">@Resources.Web_Nav_Shares</span>
             </NavLink>
             <NavLink class="nav-item" href="/users" Match="NavLinkMatch.All">
                 @Assets.SVG("users.svg", new SvgOptions())
-                @Resources.Web_Nav_Users
+                <span class="nav-label">@Resources.Web_Nav_Users</span>
             </NavLink>
             <NavLink class="nav-item" href="/departments" Match="NavLinkMatch.All">
                 @Assets.SVG("users.svg", new SvgOptions())
-                @Resources.Web_Nav_Departments
+                <span class="nav-label">@Resources.Web_Nav_Departments</span>
             </NavLink>
             <NavLink class="nav-item" href="/files" Match="NavLinkMatch.All">
                 @Assets.SVG("compass.svg", new SvgOptions())
-                @Resources.Web_Nav_BrowseFiles
+                <span class="nav-label">@Resources.Web_Nav_BrowseFiles</span>
             </NavLink>
             
             @if (hasShareSelected() && canManageSyncs())
             {
                 <NavLink class="nav-item" href="@($"/sync/{getSelectedShare()}")" Match="NavLinkMatch.All">
                     @Assets.SVG("sync.svg", new SvgOptions())
-                    Cloud Sync
+                    <span class="nav-label">Cloud Sync</span>
                 </NavLink>
             
             }
@@ -62,7 +62,7 @@
         <div class="sidebar-footer">
             <NavLink class="nav-item" href="/settings" Match="NavLinkMatch.All">
                 @Assets.SVG("gear.svg", new SvgOptions())
-                @Resources.Web_Nav_Settings
+                <span class="nav-label">@Resources.Web_Nav_Settings</span>
             </NavLink>
             @if (!string.IsNullOrEmpty(_displayName))
             {
@@ -95,6 +95,7 @@
                 @Assets.SVG("search.svg", new SvgOptions())
                 <input type="text"
                        class="search-input"
+                       aria-label="@Resources.Web_Search_Searching"
                        placeholder="@Resources.Web_Search_Searching"
                        @bind="_searchQuery"
                        @bind:event="oninput"
@@ -104,7 +105,7 @@
                        @onfocusout="HideDropdownDelayed" />
                 @if (!string.IsNullOrEmpty(_searchQuery))
                 {
-                    <button class="search-clear" @onclick="ClearSearch">✕</button>
+                    <button class="search-clear" type="button" title="Suche löschen" aria-label="Suche löschen" @onclick="ClearSearch">✕</button>
                 }
         
                 @if (_dropdownVisible && _searchResults.Any())

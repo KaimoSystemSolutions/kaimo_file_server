@@ -7,14 +7,14 @@
 
 <PageTitle>Kaimo Files – @Resources.Web_ShareBrowser_PageTitle</PageTitle>
 
-<div class="page-header">
+<div class="page-header share-browser-header">
     <div>
         <h1>@Resources.Web_ShareBrowser_Heading</h1>
     </div>
-    <div style="display: flex; gap: 0.5rem;">
+    <div class="share-browser-actions">
         @if (VM.CanManageShares)
         {
-            <NavLink class="nav-item" href="/" Match="NavLinkMatch.All" title="@Resources.Web_ShareBrowser_ManageShares">
+            <NavLink class="btn-secondary share-manage-link" href="/" Match="NavLinkMatch.All" title="@Resources.Web_ShareBrowser_ManageShares">
                 @Assets.SVG("folder.svg", new SvgOptions())
                 @Resources.Web_ShareBrowser_ManageShares
             </NavLink>
@@ -49,13 +49,13 @@ else
         </div>
         @foreach (var share in VM.Shares)
         {
-            <div class="file-row file-row-dir" @onclick="() => OpenShare(share.Name)">
+            <button class="file-row file-row-dir share-browser-row" type="button" @onclick="() => OpenShare(share.Name)">
                 <div class="file-cell file-name">
                     @Assets.SVG("folder.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)", CssClass: "file-icon"))
                     <span>@share.Name</span>
                 </div>
                 <div class="file-cell file-share-path">@share.Path</div>
-            </div>
+            </button>
         }
     </div>
 }

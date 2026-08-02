@@ -6,10 +6,9 @@
 @inject AssetProvider Icons
 
 @* ════════════ TREE LIST ════════════ *@
-        <div class="admin-list">
             @if (!VM.Departments.Any())
             {
-                <div class="empty-state"><p>@Resources.Web_Dept_NoDepartments</p></div>
+                <div class="dept-tree empty-state"><p>@Resources.Web_Dept_NoDepartments</p></div>
             }
             else
             {
@@ -57,21 +56,21 @@
                                     <span class="dept-tree-toggle-spacer"></span>
                                 }
 
-                                <span class="dept-tree-icon">
+                                <span class="dept-tree-icon @(isGlobal ? "dept-tree-icon--global" : "dept-tree-icon--department")">
                                     @if (isGlobal)
                                     {
                                         @Icons.SVG("compass.svg", new SvgOptions(
                                             Width: 18, Height: 18,
-                                            Color: isSelected ? "var(--accent)" : "var(--text-tertiary)",
-                                            StrokeWidth: 1.5f))
+                                            Color: "var(--accent-brand)",
+                                            StrokeWidth: 1.8f))
                                     }
                                     else
                                     {
                                         @Icons.SVG("folder.svg", new SvgOptions(
                                             Width: 18, Height: 18,
-                                            Color: isSelected ? "var(--accent)" : "var(--text-tertiary)",
-                                            Fill: isSelected ? "var(--accent-subtle)" : "none",
-                                            StrokeWidth: 1.5f))
+                                            Color: "var(--entity-department)",
+                                            Fill: "var(--entity-department-soft)",
+                                            StrokeWidth: 1.6f))
                                     }
                                 </span>
 
@@ -89,7 +88,6 @@
                     }
                 </div>
             }
-        </div>
 
 @code {
     [Parameter, EditorRequired] public DepartmentViewModel VM { get; set; } = default!;

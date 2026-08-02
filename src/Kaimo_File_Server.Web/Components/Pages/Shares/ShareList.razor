@@ -10,7 +10,7 @@
 
 <PageTitle>@Resources.Web_Nav_Shares - Kaimo Files</PageTitle>
 
-<div class="page-header">
+<div class="page-header share-page-header">
     <div>
         <h1>@Resources.Web_Nav_Shares</h1>
         <p class="subtitle">@string.Format(Resources.Web_ShareList_Welcome, VM.CurrentUserName)</p>
@@ -32,8 +32,9 @@
         }
         @if (VM.CanCreateShare)
         {
-            <button class="btn-icon" title="@Resources.Web_ShareList_CreateShare" @onclick="ToggleCreate">
-                @Assets.SVG("plus.svg", new SvgOptions(Width: 20, Height: 20, StrokeWidth: 2))
+            <button class="btn-primary share-create-button" type="button" @onclick="ToggleCreate">
+                @Assets.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                <span>@Resources.Web_ShareList_CreateShare</span>
             </button>
         }
     </div>
@@ -64,18 +65,16 @@ else if (!VM.Shares.Any())
 }
 else
 {
-    <div class="admin-content">
-        <div class="admin-list">
-            <ShareCardList Shares="VM.Shares"
-                           SelectedShare="VM.SelectedShare"
-                           ShowExtendedInfo="_showExtendedShareInfo"
-                           StorageAvailable="VM.IsShareStorageAvailable"
-                           StoragePoolName="VM.GetStoragePoolDisplayNameForShare"
-                           OnSelected="HandleCardClick"
-                           OnOpened="OpenShare"/>
-        </div>
+    <div class="admin-content share-workspace">
+        <ShareCardList Shares="VM.Shares"
+                       SelectedShare="VM.SelectedShare"
+                       ShowExtendedInfo="_showExtendedShareInfo"
+                       StorageAvailable="VM.IsShareStorageAvailable"
+                       StoragePoolName="VM.GetStoragePoolDisplayNameForShare"
+                       OnSelected="HandleCardClick"
+                       OnOpened="OpenShare"/>
 
-        <div class="admin-detail">
+        <aside class="admin-detail share-detail-pane" aria-label="@Resources.Web_ShareList_DetailSubtitle">
             @if (VM.SelectedShare is not null && VM.CanManageShare(VM.SelectedShare.Id))
             {
                 <div class="detail-header">
@@ -90,16 +89,16 @@ else
                     </div>
                 }
 
-                <div class="detail-tabs">
-                    <button class="detail-tab @(_activeTab == ShareDetailTab.Settings ? "detail-tab--active" : "")"
+                <div class="detail-tabs" role="tablist">
+                    <button class="detail-tab @(_activeTab == ShareDetailTab.Settings ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == ShareDetailTab.Settings)"
                             @onclick="() => SwitchTab(ShareDetailTab.Settings)"> @Assets.SVG("settings.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @Resources.Web_ShareList_Tab_General </button>
-                    <button class="detail-tab @(_activeTab == ShareDetailTab.Access ? "detail-tab--active" : "")"
+                    <button class="detail-tab @(_activeTab == ShareDetailTab.Access ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == ShareDetailTab.Access)"
                             disabled="@VM.IsSelectedShareReadOnly"
                             @onclick="() => SwitchTab(ShareDetailTab.Access)"> @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @Resources.Web_ShareList_Tab_Visibility </button>
-                    <button class="detail-tab @(_activeTab == ShareDetailTab.Acl ? "detail-tab--active" : "")"
+                    <button class="detail-tab @(_activeTab == ShareDetailTab.Acl ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == ShareDetailTab.Acl)"
                             disabled="@VM.IsSelectedShareReadOnly"
                             @onclick="() => SwitchTab(ShareDetailTab.Acl)"> @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @Resources.Web_ShareList_Tab_ACL </button>
-                    <button class="detail-tab @(_activeTab == ShareDetailTab.Cloud ? "detail-tab--active" : "")"
+                    <button class="detail-tab @(_activeTab == ShareDetailTab.Cloud ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == ShareDetailTab.Cloud)"
                             disabled="@VM.IsSelectedShareReadOnly"
                             @onclick="() => SwitchTab(ShareDetailTab.Cloud)"> @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Cloud </button>
                 </div>
@@ -134,9 +133,9 @@ else
                         Height: 48,
                         Color: "var(--text-tertiary)"))
 
-                    <p>Select a share to modify it</p>
+                    <p>Freigabe auswählen, um Details und Einstellungen anzuzeigen.</p>
                 </div>
             }
-        </div>
+        </aside>
     </div>
 }

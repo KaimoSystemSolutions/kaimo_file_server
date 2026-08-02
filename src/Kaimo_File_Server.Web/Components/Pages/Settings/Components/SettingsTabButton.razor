@@ -2,7 +2,7 @@
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject AssetProvider Icons
 
-<button class="detail-tab @(Active ? "detail-tab--active" : "")" @onclick="OnClick">
+<button class="detail-tab @(Active ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@Active" @onclick="OnClick">
     @Icons.SVG(Icon, new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
     @Label
 </button>

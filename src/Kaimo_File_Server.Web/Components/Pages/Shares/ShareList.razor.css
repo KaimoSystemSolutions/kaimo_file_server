@@ -1,47 +1,220 @@
-/* ══════════════════════════════════════════════════════════
-   ShareList.razor.css – Scoped styles for the share detail panel
-   ══════════════════════════════════════════════════════════ */
+.share-page-header {
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+}
 
-/* Read-only "textbox" look for the share parameters (Path, Status,
-   Papierkorb, Sichtbarkeit). Scoped to this component so the shared
-   .detail-* classes on the Settings / ACL pages stay untouched. */
+.share-page-header h1 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
 
-.detail-section { margin-bottom: 18px; }
-.share-help-text { margin-bottom: 12px; color: var(--text-tertiary); font-size: 12px; }
+.share-page-header .subtitle {
+    margin-top: 1px;
+    color: var(--text-secondary);
+    font-size: 12.5px;
+}
+
+.page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.share-info-toggle,
+.share-create-button {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    white-space: nowrap;
+}
+
+.share-info-toggle {
+    padding: 0 11px;
+    background: var(--bg-secondary);
+}
+
+.share-info-toggle--active {
+    border-color: var(--accent-border);
+    background: var(--accent-subtle);
+    color: var(--accent-strong);
+}
+
+.share-create-button {
+    padding: 0 13px;
+}
+
+.share-create-button svg {
+    stroke: currentColor;
+}
+
+.share-workspace {
+    display: grid;
+    grid-template-columns: minmax(360px, 1fr) minmax(360px, 430px);
+    gap: 0;
+    min-height: min(640px, calc(100vh - 180px));
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg-secondary);
+}
+
+.share-workspace ::deep .share-table {
+    min-width: 0;
+    align-self: stretch;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+}
+
+.share-detail-pane {
+    width: auto;
+    min-width: 0;
+    align-self: stretch;
+    position: static;
+    padding: 17px 18px 20px;
+    border: 0;
+    border-left: 1px solid var(--border);
+    border-radius: 0;
+    background: var(--bg-tertiary);
+    box-shadow: none;
+}
+
+.share-detail-pane .detail-header {
+    margin-bottom: 13px;
+}
+
+.share-detail-pane .detail-header h3 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.35;
+}
+
+.share-detail-pane .detail-subtitle {
+    margin-top: 1px;
+    color: var(--text-tertiary);
+    font-size: 12px;
+}
+
+.share-detail-pane .detail-tabs {
+    margin: 0 -18px 17px;
+    padding: 0 10px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+}
+
+.share-detail-pane .detail-tab {
+    min-height: 39px;
+    padding: 8px 9px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 620;
+}
+
+.share-detail-pane .detail-tab:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.share-detail-pane .detail-tab--active {
+    background: transparent;
+    color: var(--accent-strong);
+    border-bottom-color: var(--accent);
+}
+
+.detail-section {
+    margin-bottom: 18px;
+}
+
+.share-help-text {
+    margin-bottom: 12px;
+    color: var(--text-tertiary);
+    font-size: 12px;
+}
 
 .storage-unavailable-banner {
     margin: 0 0 12px;
     padding: 9px 11px;
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: 5px;
     color: var(--text-secondary);
-    background: color-mix(in srgb, var(--bg-tertiary) 78%, var(--bg-secondary));
+    background: var(--bg-sunken);
     font-size: 12px;
     line-height: 1.45;
 }
 
 .detail-tab:disabled {
     cursor: not-allowed;
-    opacity: 0.42;
+    opacity: 0.48;
 }
 
-.page-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.detail-empty {
+    min-height: 420px;
+    height: 100%;
+    gap: 9px;
+    padding: 24px;
+    color: var(--text-tertiary);
 }
 
-.share-info-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    height: 34px;
-    padding: 0 11px;
-    white-space: nowrap;
+.detail-empty p {
+    max-width: 260px;
+    font-size: 12.5px;
+    line-height: 1.5;
 }
 
-.share-info-toggle--active {
-    color: var(--accent);
-    border-color: var(--accent);
-    background: var(--accent-subtle);
+@media (max-width: 920px) {
+    .share-workspace {
+        grid-template-columns: 1fr;
+        overflow: visible;
+    }
+
+    .share-detail-pane {
+        min-height: 360px;
+        border-top: 1px solid var(--border);
+        border-left: 0;
+    }
+}
+
+@media (max-width: 620px) {
+    .share-page-header {
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .page-header-actions {
+        width: 100%;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+
+    .share-info-toggle,
+    .share-create-button {
+        min-height: 40px;
+    }
+
+    .share-workspace {
+        margin-inline: -16px;
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+    }
+
+    .share-detail-pane {
+        padding-inline: 14px;
+    }
+
+    .share-detail-pane .detail-tabs {
+        margin-inline: -14px;
+    }
 }

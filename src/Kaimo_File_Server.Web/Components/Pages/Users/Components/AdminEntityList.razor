@@ -1,17 +1,13 @@
 
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.ViewModels
-@using Kaimo_File_Server.Web.DynamicHelpers
-@inject AssetProvider Icons
-
 @* ════════════════════ LIST ════════════════════ *@
-            <div class="admin-list">
                 @switch (VM.ActiveTab)
                 {
                     case AdminTab.Users:
                         @if (!VM.Users.Any())
                         {
-                            <div class="empty-state"><p>@Resources.Web_Common_NoUsers</p></div>
+                            <div class="user-list-container empty-state"><p>@Resources.Web_Common_NoUsers</p></div>
                         }
                         else
                         {
@@ -24,14 +20,9 @@
                                 @foreach (var user in VM.Users)
                                 {
                                     var isSelected = VM.SelectedUser?.Id == user.Id;
-                                    <div class="user-list-row user-list-selectable @(isSelected ? "user-list-selected" : "")"
-                                         @onclick="() => SelectUser(user)">
+                                    <button class="user-list-row user-list-selectable @(isSelected ? "user-list-selected" : "")" type="button"
+                                        @onclick="() => SelectUser(user)">
                                         <div class="user-cell-name">
-                                            @Icons.SVG("user_transparent.svg", new SvgOptions(
-                                                Width: 20,
-                                                Height: 20,
-                                                Color: isSelected ? "var(--accent)" : "var(--text-tertiary)"
-                                            ))
                                             <span>@user.Name</span>
                                         </div>
                                         <div class="user-cell-username">@user.Username</div>
@@ -49,7 +40,7 @@
                                                 </span>
                                             }
                                         </div>
-                                    </div>
+                                    </button>
                                 }
                             </div>
                         }
@@ -59,32 +50,27 @@
                     case AdminTab.Groups:
                         @if (!VM.Groups.Any())
                         {
-                            <div class="empty-state"><p>@Resources.Web_Common_NoGroups</p></div>
+                            <div class="user-list-container empty-state"><p>@Resources.Web_Common_NoGroups</p></div>
                         }
                         else
                         {
-                            <div class="file-list">
-                                <div class="file-row admin-row-header">
-                                    <div class="file-cell user-name">@Resources.Web_Admin_Label_GroupName</div>
-                                    <div class="file-cell user-size">@Resources.Web_Admin_Label_Department</div>
+                            <div class="user-list-container entity-list-container">
+                                <div class="user-list-row entity-list-row user-list-header">
+                                    <div class="user-cell-name">@Resources.Web_Admin_Label_GroupName</div>
+                                    <div class="user-cell-meta">@Resources.Web_Admin_Label_Department</div>
                                 </div>
                                 @foreach (var group in VM.Groups)
                                 {
                                     var isSelected = VM.SelectedGroup?.Id == group.Id;
-                                    <div class="file-row admin-row-selectable @(isSelected ? "admin-row-selected" : "")"
+                                    <button class="user-list-row entity-list-row user-list-selectable @(isSelected ? "user-list-selected" : "")" type="button"
                                          @onclick="() => SelectGroup(group)">
-                                        <div class="file-cell user-name">
-                                            @Icons.SVG("users_transparent.svg", new SvgOptions(
-                                                Width: 20,
-                                                Height: 20,
-                                                Color: isSelected ? "var(--accent)" : "var(--text-tertiary)"
-                                            ))
+                                        <div class="user-cell-name">
                                             <span>@group.Name</span>
                                         </div>
-                                        <div class="file-cell user-size" style="color: var(--text-tertiary); font-size: 12px;">
+                                        <div class="user-cell-meta">
                                             @VM.GetDepartmentName(group.DepartmentId)
                                         </div>
-                                    </div>
+                                    </button>
                                 }
                             </div>
                         }
@@ -93,38 +79,32 @@
                     case AdminTab.Roles:
                         @if (!VM.Roles.Any())
                         {
-                            <div class="empty-state"><p>@Resources.Web_Common_NoRoles</p></div>
+                            <div class="user-list-container empty-state"><p>@Resources.Web_Common_NoRoles</p></div>
                         }
                         else
                         {
-                            <div class="file-list">
-                                <div class="file-row admin-row-header">
-                                    <div class="file-cell user-name">@Resources.Web_Admin_Label_RoleName</div>
-                                    <div class="file-cell user-size">@Resources.Web_Admin_Label_Type</div>
+                            <div class="user-list-container entity-list-container">
+                                <div class="user-list-row entity-list-row user-list-header">
+                                    <div class="user-cell-name">@Resources.Web_Admin_Label_RoleName</div>
+                                    <div class="user-cell-meta">@Resources.Web_Admin_Label_Type</div>
                                 </div>
                                 @foreach (var role in VM.Roles)
                                 {
                                     var isSelected = VM.SelectedRole?.Id == role.Id;
-                                    <div class="file-row admin-row-selectable @(isSelected ? "admin-row-selected" : "")"
+                                    <button class="user-list-row entity-list-row user-list-selectable @(isSelected ? "user-list-selected" : "")" type="button"
                                          @onclick="() => SelectRole(role)">
-                                        <div class="file-cell user-name">
-                                            @Icons.SVG("shield_transparent.svg", new SvgOptions(
-                                                Width: 20,
-                                                Height: 20,
-                                                Color: isSelected ? "var(--accent)" : "var(--text-tertiary)"
-                                            ))
+                                        <div class="user-cell-name">
                                             <span>@role.Name</span>
                                         </div>
-                                        <div class="file-cell user-size" style="color: var(--text-tertiary); font-size: 12px;">
+                                        <div class="user-cell-meta">
                                             @(role.IsSystemRole ? Resources.Web_Common_System : Resources.Web_Common_Custom)
                                         </div>
-                                    </div>
+                                    </button>
                                 }
                             </div>
                         }
                         break;
                 }
-            </div>
 
 @code {
     [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;

@@ -1,0 +1,75 @@
+.share-browser-header {
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.share-browser-header h1 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+
+.share-browser-actions {
+    display: flex;
+    align-items: center;
+}
+
+.share-manage-link {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 11px;
+    background: var(--bg-secondary);
+    text-decoration: none;
+}
+
+.file-list {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg-secondary);
+}
+
+.file-list-header,
+.share-browser-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(220px, 1fr);
+}
+
+.file-list-header {
+    min-height: 36px;
+    background: var(--bg-tertiary);
+}
+
+.share-browser-row {
+    width: 100%;
+    min-height: 52px;
+    border: 0;
+    border-bottom: 1px solid var(--border-light);
+    border-radius: 0;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.share-browser-row:last-child { border-bottom: 0; }
+.share-browser-row:hover { background: var(--bg-hover); }
+
+.share-browser-row .file-cell,
+.file-list-header .file-cell {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+}
+
+@media (max-width: 620px) {
+    .file-share-path { display: none; }
+    .file-list-header,
+    .share-browser-row { grid-template-columns: 1fr; }
+}

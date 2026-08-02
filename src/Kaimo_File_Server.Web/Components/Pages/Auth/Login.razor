@@ -3,19 +3,17 @@
 @layout EmptyLayout
 @inject LoginViewModel VM
 @inject NavigationManager Nav
+@inject AssetProvider BrandAssets
 
 <PageTitle>Kaimo Files – Anmelden</PageTitle>
 
 <div class="login-page">
     <div class="login-card">
-        <div class="sidebar-brand" style="justify-content: center; margin-bottom: 8px;">
-            <svg width="36" height="36" viewBox="0 0 48 48" fill="none">
-                <rect width="48" height="48" rx="10" fill="var(--accent)" />
-                <path d="M14 20h20v2H14zM14 26h20v2H14zM14 32h14v2H14z" fill="#fff" />
-            </svg>
+        <div class="login-brand">
+            @BrandAssets.RawSVG("icon_kaimo_default.svg", 42, 42)
         </div>
-        <h2 style="text-align: center;">Kaimo Files</h2>
-        <p class="subtitle" style="text-align: center;">Melde dich an, um fortzufahren</p>
+        <h1>Kaimo Files</h1>
+        <p class="subtitle">Melde dich an, um fortzufahren</p>
 
         @if (VM.ErrorMessage is not null)
         {
@@ -43,7 +41,7 @@
                        disabled="@VM.IsLoading" />
             </div>
 
-            <button class="btn-primary" @onclick="HandleLogin" disabled="@VM.IsLoading">
+            <button class="btn-primary" type="button" @onclick="HandleLogin" disabled="@VM.IsLoading">
                 @(VM.IsLoading ? "Wird angemeldet…" : "Anmelden")
             </button>
         </div>
