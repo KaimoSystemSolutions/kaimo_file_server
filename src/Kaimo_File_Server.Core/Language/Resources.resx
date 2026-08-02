@@ -1260,6 +1260,21 @@
   <data name="Web_Settings_LogViewer_SearchPlaceholder" xml:space="preserve">
     <value>Message, category, exception…</value>
   </data>
+  <data name="Web_Settings_LogViewer_ExcludePrefixes" xml:space="preserve">
+    <value>Temporarily exclude message prefixes</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ExcludePlaceholder" xml:space="preserve">
+    <value>Message starts with…</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ExcludeHint" xml:space="preserve">
+    <value>Messages beginning with one of these texts are hidden for this session. You can add up to {0} entries.</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ExcludeAdd" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ExcludeRemove" xml:space="preserve">
+    <value>Remove exclusion</value>
+  </data>
   <data name="Web_Settings_LogViewer_ResultCount" xml:space="preserve">
     <value>Matches: {0}</value>
   </data>

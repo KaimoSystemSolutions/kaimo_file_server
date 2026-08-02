@@ -1260,6 +1260,21 @@
   <data name="Web_Settings_LogViewer_SearchPlaceholder" xml:space="preserve">
     <value>Nachricht, Kategorie, Ausnahme…</value>
   </data>
+  <data name="Web_Settings_LogViewer_ExcludePrefixes" xml:space="preserve">
+    <value>Nachrichtenanfänge temporär ausschließen</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ExcludePlaceholder" xml:space="preserve">
+    <value>Nachricht beginnt mit…</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ExcludeHint" xml:space="preserve">
+    <value>Nachrichten, die mit einem dieser Texte beginnen, werden für diese Sitzung ausgeblendet. Es sind bis zu {0} Einträge möglich.</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ExcludeAdd" xml:space="preserve">
+    <value>Hinzufügen</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ExcludeRemove" xml:space="preserve">
+    <value>Ausschluss entfernen</value>
+  </data>
   <data name="Web_Settings_LogViewer_ResultCount" xml:space="preserve">
     <value>Treffer: {0}</value>
   </data>

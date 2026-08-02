@@ -17,13 +17,18 @@ public sealed class LogViewerViewModel(
     IManagementAuthService managementAuth,
     ILogger<LogViewerViewModel> logger)
 {
+    public const int MaxExcludedMessagePrefixes = LogArchiveQueryLimits.MaxExcludedMessagePrefixes;
+    public const int MaxExcludedMessagePrefixLength = LogArchiveQueryLimits.MaxExcludedMessagePrefixLength;
+
     private readonly SemaphoreSlim _queryGate = new(1, 1);
+    private readonly List<string> _excludedMessagePrefixes = [];
 
     public IReadOnlyList<string> Sources { get; private set; } = [];
     public HashSet<string> SelectedSources { get; } = new(StringComparer.OrdinalIgnoreCase);
     public ICollection<LogArchiveEntry> Entries { get; private set; } = [];
     public LogLevel MinimumLevel { get; set; } = LogLevel.Information;
     public string SearchText { get; set; } = "";
+    public IReadOnlyList<string> ExcludedMessagePrefixes => _excludedMessagePrefixes;
     public DateOnly DownloadDateUtc { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);
     public bool IsLivePaused { get; set; }
     public bool HasMore { get; private set; }
@@ -51,6 +56,30 @@ public sealed class LogViewerViewModel(
             SelectedSources.Add(source);
         else
             SelectedSources.Remove(source);
+    }
+
+    public bool TryAddExcludedMessagePrefix(string? value)
+    {
+        var prefix = value?.Trim();
+        if (string.IsNullOrEmpty(prefix) || _excludedMessagePrefixes.Count >= MaxExcludedMessagePrefixes)
+            return false;
+
+        prefix = prefix[..Math.Min(prefix.Length, MaxExcludedMessagePrefixLength)];
+        if (_excludedMessagePrefixes.Contains(prefix, StringComparer.OrdinalIgnoreCase))
+            return false;
+
+        _excludedMessagePrefixes.Add(prefix);
+        return true;
+    }
+
+    public bool RemoveExcludedMessagePrefix(string prefix)
+    {
+        var index = _excludedMessagePrefixes.FindIndex(
+            candidate => string.Equals(candidate, prefix, StringComparison.OrdinalIgnoreCase));
+        if (index < 0)
+            return false;
+        _excludedMessagePrefixes.RemoveAt(index);
+        return true;
     }
 
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
@@ -89,7 +118,13 @@ public sealed class LogViewerViewModel(
     }
 
     private LogArchiveQuery CreateQuery(DateOnly? utcDate = null)
-        => new(SelectedSources.ToArray(), MinimumLevel, SearchText, 1000, utcDate);
+        => new(
+            SelectedSources.ToArray(),
+            MinimumLevel,
+            SearchText,
+            1000,
+            utcDate,
+            _excludedMessagePrefixes.ToArray());
 
     private async Task<bool> AuthorizeAsync()
     {

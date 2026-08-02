@@ -2,6 +2,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Core.Logging;
 
+public static class LogArchiveQueryLimits
+{
+    public const int MaxExcludedMessagePrefixes = 5;
+    public const int MaxExcludedMessagePrefixLength = 200;
+}
+
 /// <summary>A structured entry persisted as one line in the log archive.</summary>
 public sealed class LogArchiveEntry
 {
@@ -27,7 +33,8 @@ public sealed record LogArchiveQuery(
     LogLevel MinimumLevel = LogLevel.Information,
     string? SearchText = null,
     int Limit = 1000,
-    DateOnly? UtcDate = null);
+    DateOnly? UtcDate = null,
+    IReadOnlyCollection<string>? ExcludedMessagePrefixes = null);
 
 public sealed record LogArchiveQueryResult(
     IReadOnlyList<LogArchiveEntry> Entries,

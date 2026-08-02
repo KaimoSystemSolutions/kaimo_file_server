@@ -52,6 +52,7 @@ public sealed class FileLogArchiveReader : ILogArchiveReader
         LogArchiveQuery query,
         CancellationToken cancellationToken = default)
     {
+        query = Normalize(query);
         var limit = Math.Clamp(query.Limit, 1, MaxViewerRows);
         var sources = await ResolveSourcesAsync(query.Sources, cancellationToken);
         var entries = new List<LogArchiveEntry>(Math.Min((limit + 1) * Math.Max(sources.Count, 1), 8192));
@@ -100,6 +101,7 @@ public sealed class FileLogArchiveReader : ILogArchiveReader
         Stream destination,
         CancellationToken cancellationToken = default)
     {
+        query = Normalize(query);
         var sources = await ResolveSourcesAsync(query.Sources, cancellationToken);
         await using var writer = new StreamWriter(
             destination,
@@ -291,7 +293,11 @@ public sealed class FileLogArchiveReader : ILogArchiveReader
         if (entry.Level < query.MinimumLevel || entry.Level == LogLevel.None)
             return false;
 
-        var search = query.SearchText?.Trim();
+        if (query.ExcludedMessagePrefixes?
+            .Any(prefix => entry.Message.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) == true)
+            return false;
+
+        var search = query.SearchText;
         if (string.IsNullOrEmpty(search))
             return true;
 
@@ -305,6 +311,22 @@ public sealed class FileLogArchiveReader : ILogArchiveReader
 
     private static bool Contains(string? value, string search)
         => value?.Contains(search, StringComparison.OrdinalIgnoreCase) == true;
+
+    private static LogArchiveQuery Normalize(LogArchiveQuery query)
+    {
+        var prefixes = (query.ExcludedMessagePrefixes ?? [])
+            .Select(prefix => prefix.Trim())
+            .Where(prefix => prefix.Length > 0)
+            .Select(prefix => prefix[..Math.Min(prefix.Length, LogArchiveQueryLimits.MaxExcludedMessagePrefixLength)])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(LogArchiveQueryLimits.MaxExcludedMessagePrefixes)
+            .ToArray();
+        return query with
+        {
+            SearchText = query.SearchText?.Trim(),
+            ExcludedMessagePrefixes = prefixes
+        };
+    }
 
     private static bool IsUnavailable(Exception exception)
         => exception is IOException or UnauthorizedAccessException;

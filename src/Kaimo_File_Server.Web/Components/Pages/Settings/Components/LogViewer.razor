@@ -73,6 +73,40 @@
                        placeholder="@Resources.Web_Settings_LogViewer_SearchPlaceholder"
                        @oninput="SearchChangedAsync" />
             </label>
+
+            <div class="log-filter-block log-exclude-filter">
+                <span class="log-filter-label">@Resources.Web_Settings_LogViewer_ExcludePrefixes</span>
+                <div class="log-exclude-controls">
+                    <input class="edit-input log-exclude-input"
+                           value="@_excludedPrefixDraft"
+                           maxlength="@LogViewerViewModel.MaxExcludedMessagePrefixLength"
+                           placeholder="@Resources.Web_Settings_LogViewer_ExcludePlaceholder"
+                           @oninput="args => _excludedPrefixDraft = args.Value?.ToString() ?? string.Empty" />
+                    <button class="btn-secondary"
+                            type="button"
+                            disabled="@(Viewer.ExcludedMessagePrefixes.Count >= LogViewerViewModel.MaxExcludedMessagePrefixes || string.IsNullOrWhiteSpace(_excludedPrefixDraft))"
+                            @onclick="AddExcludedPrefixAsync">
+                        @Resources.Web_Settings_LogViewer_ExcludeAdd
+                    </button>
+                </div>
+                <span class="settings-hint">
+                    @string.Format(Resources.Web_Settings_LogViewer_ExcludeHint, LogViewerViewModel.MaxExcludedMessagePrefixes)
+                </span>
+                @if (Viewer.ExcludedMessagePrefixes.Count > 0)
+                {
+                    <div class="log-exclude-list">
+                        @foreach (var prefix in Viewer.ExcludedMessagePrefixes)
+                        {
+                            <span class="log-exclude-chip">
+                                <span title="@prefix">@prefix</span>
+                                <button type="button"
+                                        title="@Resources.Web_Settings_LogViewer_ExcludeRemove"
+                                        @onclick="() => RemoveExcludedPrefixAsync(prefix)">×</button>
+                            </span>
+                        }
+                    </div>
+                }
+            </div>
         </div>
 
         @if (Viewer.ErrorMessage is not null)
@@ -153,6 +187,7 @@
     private readonly CancellationTokenSource _lifetime = new();
     private CancellationTokenSource? _searchDelay;
     private Task? _refreshLoop;
+    private string _excludedPrefixDraft = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -215,6 +250,20 @@
         catch (OperationCanceledException) when (delay.IsCancellationRequested)
         {
         }
+    }
+
+    private async Task AddExcludedPrefixAsync()
+    {
+        if (!Viewer.TryAddExcludedMessagePrefix(_excludedPrefixDraft))
+            return;
+        _excludedPrefixDraft = "";
+        await RefreshAsync();
+    }
+
+    private async Task RemoveExcludedPrefixAsync(string prefix)
+    {
+        if (Viewer.RemoveExcludedMessagePrefix(prefix))
+            await RefreshAsync();
     }
 
     private void Download()

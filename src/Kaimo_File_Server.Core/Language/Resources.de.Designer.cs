@@ -2271,6 +2271,36 @@ namespace Kaimo_File_Server.Core.Language {
             }
         }
 
+        internal static string Web_Settings_LogViewer_ExcludeAdd {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_ExcludeAdd", resourceCulture);
+            }
+        }
+
+        internal static string Web_Settings_LogViewer_ExcludeHint {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_ExcludeHint", resourceCulture);
+            }
+        }
+
+        internal static string Web_Settings_LogViewer_ExcludePlaceholder {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_ExcludePlaceholder", resourceCulture);
+            }
+        }
+
+        internal static string Web_Settings_LogViewer_ExcludePrefixes {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_ExcludePrefixes", resourceCulture);
+            }
+        }
+
+        internal static string Web_Settings_LogViewer_ExcludeRemove {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_ExcludeRemove", resourceCulture);
+            }
+        }
+
         internal static string Web_Settings_LogViewer_HasMore {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_HasMore", resourceCulture);

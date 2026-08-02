@@ -154,6 +154,40 @@ public sealed class LogArchiveTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Reader_excludes_message_prefixes_from_query_and_download()
+    {
+        var sourceDirectory = Path.Combine(_root, "web", "2026", "08", "02");
+        Directory.CreateDirectory(sourceDirectory);
+        var path = Path.Combine(sourceDirectory, "web-test-20260802T000000Z-000.ndjson");
+        var lines = new[]
+        {
+            "{\"timestampUtc\":\"2026-08-02T00:00:00Z\",\"sequence\":1,\"level\":\"Information\",\"service\":\"web\",\"instance\":\"a\",\"category\":\"Health\",\"eventId\":0,\"message\":\"Health check completed\"}",
+            "{\"timestampUtc\":\"2026-08-02T00:00:01Z\",\"sequence\":2,\"level\":\"Warning\",\"service\":\"web\",\"instance\":\"a\",\"category\":\"Health\",\"eventId\":0,\"message\":\"health check failed\"}",
+            "{\"timestampUtc\":\"2026-08-02T00:00:02Z\",\"sequence\":3,\"level\":\"Information\",\"service\":\"web\",\"instance\":\"a\",\"category\":\"Worker\",\"eventId\":0,\"message\":\"Worker health check completed\"}",
+            "{\"timestampUtc\":\"2026-08-02T00:00:03Z\",\"sequence\":4,\"level\":\"Information\",\"service\":\"web\",\"instance\":\"a\",\"category\":\"Worker\",\"eventId\":0,\"message\":\"normal operation\"}"
+        };
+        await File.WriteAllLinesAsync(path, lines);
+        var reader = new FileLogArchiveReader(Options.Create(new LogArchiveOptions { RootPath = _root }));
+        var query = new LogArchiveQuery(["web"], ExcludedMessagePrefixes: ["  HEALTH CHECK  "]);
+
+        var result = await reader.QueryAsync(query);
+        Assert.Equal([4L, 3L], result.Entries.Select(entry => entry.Sequence));
+
+        await using var download = new MemoryStream();
+        await reader.WriteDownloadAsync(query, download);
+        var text = Encoding.UTF8.GetString(download.ToArray());
+        Assert.DoesNotContain("Health check completed", text);
+        Assert.DoesNotContain("health check failed", text);
+        Assert.Contains("Worker health check completed", text);
+        Assert.Contains("normal operation", text);
+
+        var boundedResult = await reader.QueryAsync(new LogArchiveQuery(
+            ["web"],
+            ExcludedMessagePrefixes: ["unused-1", "unused-2", "unused-3", "unused-4", "unused-5", "normal"]));
+        Assert.Contains(boundedResult.Entries, entry => entry.Message == "normal operation");
+    }
+
+    [Fact]
     public void Log_viewer_resources_exist_in_default_and_german_cultures()
     {
         var keys = new[]
@@ -166,6 +200,11 @@ public sealed class LogArchiveTests : IAsyncLifetime
             "Web_Settings_LogViewer_DownloadDateUtc",
             "Web_Settings_LogViewer_Empty",
             "Web_Settings_LogViewer_Event",
+            "Web_Settings_LogViewer_ExcludeAdd",
+            "Web_Settings_LogViewer_ExcludeHint",
+            "Web_Settings_LogViewer_ExcludePlaceholder",
+            "Web_Settings_LogViewer_ExcludePrefixes",
+            "Web_Settings_LogViewer_ExcludeRemove",
             "Web_Settings_LogViewer_HasMore",
             "Web_Settings_LogViewer_Instance",
             "Web_Settings_LogViewer_LevelCritical",

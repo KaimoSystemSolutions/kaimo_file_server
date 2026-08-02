@@ -22,12 +22,20 @@ public sealed class LogDownloadTokenService
         var search = query.SearchText?.Trim();
         if (search is { Length: > 200 })
             search = search[..200];
+        var excludedPrefixes = (query.ExcludedMessagePrefixes ?? [])
+            .Select(prefix => prefix.Trim())
+            .Where(prefix => prefix.Length > 0)
+            .Select(prefix => prefix[..Math.Min(prefix.Length, LogArchiveQueryLimits.MaxExcludedMessagePrefixLength)])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(LogArchiveQueryLimits.MaxExcludedMessagePrefixes)
+            .ToArray();
         var safeQuery = new LogArchiveQuery(
             query.Sources.Take(20).ToArray(),
             query.MinimumLevel,
             search,
             1000,
-            query.UtcDate);
+            query.UtcDate,
+            excludedPrefixes);
         return _protector.Protect(JsonSerializer.Serialize(safeQuery, JsonOptions), TimeSpan.FromMinutes(2));
     }
 
