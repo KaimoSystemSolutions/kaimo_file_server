@@ -45,6 +45,7 @@
         ManageSystemSettings = 1L << 40,  // global settings, e.g. application language
         ManageDataServices = 1L << 41,  // start/stop data services (SMB, future NFS/FTP)
         ManageCertificates = 1L << 42,  // view/download/replace the HTTPS server certificate
+        ViewSystemLogs = 1L << 43,  // view and download retained service logs
 
         // -- Sync --
         CreateSyncs = 1L << 48, // sync a folder with an external cloud
@@ -65,7 +66,7 @@
                         | ManageShareAccess | ManageShareAcls
                         | EditDepartment | ViewDepartment,
 
-        SystemAdmin = ManageSystemSettings | ManageDataServices | ManageCertificates,
+        SystemAdmin = ManageSystemSettings | ManageDataServices | ManageCertificates | ViewSystemLogs,
 
         FullAdmin = UserAdmin | GroupAdmin | ShareAdmin
                   | AssignGroups | AssignRoles | AssignDepartments

@@ -262,6 +262,7 @@ COPY revoke-samba-sessions.sh /usr/local/bin/revoke-samba-sessions.sh
 COPY validate-sync-interval.sh /usr/local/bin/validate-sync-interval.sh
 COPY sync-health.sh           /usr/local/bin/sync-health.sh
 COPY supervise-samba.sh       /usr/local/bin/supervise-samba.sh
+COPY kaimo-samba-log-forwarder.py /usr/local/bin/kaimo-samba-log-forwarder.py
 COPY authd-health.sh          /usr/local/bin/authd-health.sh
 COPY smbd-health.sh           /usr/local/bin/smbd-health.sh
 COPY verify-samba-build.sh    /tmp/verify-samba-build.sh
@@ -285,6 +286,7 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
                        /usr/local/bin/validate-sync-interval.sh \
                        /usr/local/bin/sync-health.sh \
                        /usr/local/bin/supervise-samba.sh \
+                       /usr/local/bin/kaimo-samba-log-forwarder.py \
                        /usr/local/bin/authd-health.sh \
                        /usr/local/bin/smbd-health.sh \
                        /tmp/verify-samba-build.sh \
@@ -306,6 +308,7 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/selftest.sh \
              /usr/local/bin/validate-sync-interval.sh \
              /usr/local/bin/sync-health.sh \
              /usr/local/bin/supervise-samba.sh \
+             /usr/local/bin/kaimo-samba-log-forwarder.py \
              /usr/local/bin/authd-health.sh \
              /usr/local/bin/smbd-health.sh \
              /tmp/verify-samba-build.sh \
@@ -367,7 +370,7 @@ RUN set -eux; \
       | xargs -r -n1 readlink -f \
       | sort -u > /tmp/runtime-libraries.txt; \
     { \
-        printf '%s\n' acl ca-certificates jq login passwd procps sysvinit-utils util-linux wsdd; \
+        printf '%s\n' acl ca-certificates jq login passwd procps python3 sysvinit-utils util-linux wsdd; \
         while IFS= read -r library_path; do \
             owner="$(dpkg-query -S "$library_path" | head -n1)"; \
             printf '%s\n' "${owner%%:*}"; \

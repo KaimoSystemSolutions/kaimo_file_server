@@ -68,8 +68,11 @@ public class SettingsViewModel
     /// <summary>May view/download/replace the HTTPS server certificate.</summary>
     public bool CanManageCertificates { get; private set; }
 
+    /// <summary>May view and download retained service logs.</summary>
+    public bool CanViewLogs { get; private set; }
+
     /// <summary>True if the user may access the settings page at all.</summary>
-    public bool CanAccessPage => CanManageSettings || CanManageDataServices || CanManageCertificates;
+    public bool CanAccessPage => CanManageSettings || CanManageDataServices || CanManageCertificates || CanViewLogs;
 
     // ── Language ──
 
@@ -273,6 +276,7 @@ public class SettingsViewModel
             CanManageSettings = false;
             CanManageDataServices = false;
             CanManageCertificates = false;
+            CanViewLogs = false;
             return;
         }
 
@@ -283,6 +287,7 @@ public class SettingsViewModel
         CanManageSettings = permissions.HasFlag(ManagementPermission.ManageSystemSettings);
         CanManageDataServices = permissions.HasFlag(ManagementPermission.ManageDataServices);
         CanManageCertificates = permissions.HasFlag(ManagementPermission.ManageCertificates);
+        CanViewLogs = permissions.HasFlag(ManagementPermission.ViewSystemLogs);
     }
 
     private async Task<UserContext?> BuildActorContextAsync()

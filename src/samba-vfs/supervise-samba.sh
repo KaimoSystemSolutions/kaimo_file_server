@@ -35,7 +35,7 @@ validate_bounded_integer KAIMO_SUPERVISOR_STOP_GRACE_SECONDS \
     "$STOP_GRACE_SECONDS" 1 30 || exit 1
 
 remove_runtime_state() {
-    rm -f -- "$AUTHD_PID_FILE" "$SMBD_PID_FILE"
+    rm -f -- "$AUTHD_PID_FILE" "$SMBD_PID_FILE" "${KAIMO_SMBD_LOG_PIPE:-/var/run/kaimo/smbd-log.pipe}"
     [ -S "$AUTHD_SOCKET" ] && rm -f -- "$AUTHD_SOCKET"
 }
 
@@ -43,17 +43,20 @@ terminate_children() {
     trap - TERM INT HUP QUIT
     [ -n "$AUTHD_PID" ] && kill -TERM "$AUTHD_PID" 2>/dev/null || true
     [ -n "$SMBD_PID" ] && kill -TERM "$SMBD_PID" 2>/dev/null || true
+    [ -n "${LOG_FORWARDER_PID:-}" ] && kill -TERM "$LOG_FORWARDER_PID" 2>/dev/null || true
 
     # Bound shutdown even if a child ignores SIGTERM.
     (
         sleep "$STOP_GRACE_SECONDS"
         [ -n "$AUTHD_PID" ] && kill -KILL "$AUTHD_PID" 2>/dev/null || true
         [ -n "$SMBD_PID" ] && kill -KILL "$SMBD_PID" 2>/dev/null || true
+        [ -n "${LOG_FORWARDER_PID:-}" ] && kill -KILL "$LOG_FORWARDER_PID" 2>/dev/null || true
     ) &
     WATCHDOG_PID=$!
 
     [ -n "$AUTHD_PID" ] && wait "$AUTHD_PID" 2>/dev/null || true
     [ -n "$SMBD_PID" ] && wait "$SMBD_PID" 2>/dev/null || true
+    [ -n "${LOG_FORWARDER_PID:-}" ] && wait "$LOG_FORWARDER_PID" 2>/dev/null || true
     kill "$WATCHDOG_PID" 2>/dev/null || true
     wait "$WATCHDOG_PID" 2>/dev/null || true
     remove_runtime_state
@@ -127,7 +130,13 @@ if ! publish_pid_file "$AUTHD_PID" "$AUTHD_PID_FILE" authd; then
 fi
 
 echo "[supervisor] kaimo_authd ready (pid=$AUTHD_PID); starting smbd ..."
-smbd --foreground --no-process-group --debug-stdout &
+SMBD_LOG_PIPE="${KAIMO_SMBD_LOG_PIPE:-/var/run/kaimo/smbd-log.pipe}"
+LOG_FORWARDER="${KAIMO_SAMBA_LOG_FORWARDER:-/usr/local/bin/kaimo-samba-log-forwarder.py}"
+rm -f -- "$SMBD_LOG_PIPE"
+mkfifo -m 0600 "$SMBD_LOG_PIPE"
+"$LOG_FORWARDER" <"$SMBD_LOG_PIPE" &
+LOG_FORWARDER_PID=$!
+smbd --foreground --no-process-group --debug-stdout >"$SMBD_LOG_PIPE" 2>&1 &
 SMBD_PID=$!
 if ! kill -0 "$SMBD_PID" 2>/dev/null \
     || ! publish_pid_file "$SMBD_PID" "$SMBD_PID_FILE" smbd; then
@@ -136,13 +145,15 @@ if ! kill -0 "$SMBD_PID" 2>/dev/null \
 fi
 
 exited_pid=""
-wait -n -p exited_pid "$AUTHD_PID" "$SMBD_PID"
+wait -n -p exited_pid "$AUTHD_PID" "$SMBD_PID" "$LOG_FORWARDER_PID"
 exit_status=$?
 
 if [ "$exited_pid" = "$AUTHD_PID" ]; then
     echo "[supervisor] kaimo_authd exited unexpectedly (status=$exit_status); stopping smbd." >&2
 elif [ "$exited_pid" = "$SMBD_PID" ]; then
     echo "[supervisor] smbd exited (status=$exit_status); stopping kaimo_authd." >&2
+elif [ "$exited_pid" = "$LOG_FORWARDER_PID" ]; then
+    echo "[supervisor] Samba log forwarder exited (status=$exit_status); stopping the Samba unit." >&2
 else
     echo "[supervisor] A supervised process exited without an identifiable PID (status=$exit_status)." >&2
 fi

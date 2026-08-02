@@ -1,0 +1,267 @@
+@using Kaimo_File_Server.Core.Logging
+@using Microsoft.Extensions.Logging
+@implements IAsyncDisposable
+@inject LogViewerViewModel Viewer
+@inject NavigationManager Navigation
+
+<div class="detail-section log-viewer-section">
+    <div class="log-viewer-heading">
+        <div>
+            <span class="detail-label">Gespeicherte Systemprotokolle</span>
+            <p class="settings-description">
+                Das Archiv enthält Information bis Critical, unabhängig von der Ausgabestufe oben.
+                Angezeigt werden höchstens die neuesten 1.000 Treffer.
+            </p>
+        </div>
+        <div class="log-viewer-actions">
+            <label class="log-live-toggle" title="Automatische Aktualisierung alle drei Sekunden">
+                <input type="checkbox" checked="@(!Viewer.IsLivePaused)" @onchange="LiveChangedAsync" />
+                <span>Live</span>
+            </label>
+            <button class="btn-icon" title="Aktualisieren" @onclick="RefreshAsync" disabled="@Viewer.IsLoading">↻</button>
+            <label class="log-download-date">
+                <span>Download-Tag (UTC)</span>
+                <input class="edit-input"
+                       type="date"
+                       value="@Viewer.DownloadDateUtc.ToString("yyyy-MM-dd")"
+                       @onchange="DownloadDateChanged" />
+            </label>
+            <button class="btn-primary" @onclick="Download" disabled="@(Viewer.SelectedSources.Count == 0)">Herunterladen</button>
+        </div>
+    </div>
+
+    @if (!Viewer.IsAuthorized)
+    {
+        <div class="error-banner">Keine Berechtigung zum Anzeigen der Systemprotokolle.</div>
+    }
+    else
+    {
+        <div class="log-viewer-filters">
+            <div class="log-filter-block log-source-filter">
+                <span class="log-filter-label">Dienste</span>
+                <div class="log-source-list">
+                    @if (Viewer.Sources.Count == 0)
+                    {
+                        <span class="settings-hint">Noch keine Protokollquellen vorhanden.</span>
+                    }
+                    @foreach (var source in Viewer.Sources)
+                    {
+                        <label class="log-source-chip">
+                            <input type="checkbox"
+                                   checked="@Viewer.SelectedSources.Contains(source)"
+                                   @onchange="args => SourceChangedAsync(source, args)" />
+                            <span>@source</span>
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <label class="log-filter-block">
+                <span class="log-filter-label">Mindeststufe</span>
+                <select class="edit-input log-level-select" value="@Viewer.MinimumLevel" @onchange="LevelChangedAsync">
+                    <option value="Information">Information</option>
+                    <option value="Warning">Warning</option>
+                    <option value="Error">Error</option>
+                    <option value="Critical">Critical</option>
+                </select>
+            </label>
+
+            <label class="log-filter-block log-search-filter">
+                <span class="log-filter-label">Suche</span>
+                <input class="edit-input"
+                       type="search"
+                       value="@Viewer.SearchText"
+                       maxlength="200"
+                       placeholder="Nachricht, Kategorie, Exception …"
+                       @oninput="SearchChangedAsync" />
+            </label>
+        </div>
+
+        @if (Viewer.ErrorMessage is not null)
+        {
+            <div class="error-banner">@Viewer.ErrorMessage</div>
+        }
+
+        <div class="log-result-summary">
+            <span>@Viewer.Entries.Count Treffer</span>
+            @if (Viewer.HasMore)
+            {
+                <span>Es gibt weitere Treffer – der Download enthält alle.</span>
+            }
+            @if (Viewer.IsLoading)
+            {
+                <span>Aktualisiere …</span>
+            }
+            else if (Viewer.IsLivePaused)
+            {
+                <span>Live-Aktualisierung pausiert</span>
+            }
+        </div>
+
+        <div class="log-list" role="log" aria-live="polite">
+            @if (Viewer.Entries.Count == 0 && !Viewer.IsLoading)
+            {
+                <div class="log-empty">Keine passenden Protokolleinträge.</div>
+            }
+            else
+            {
+                <Virtualize TItem="LogArchiveEntry" Items="Viewer.Entries" Context="entry" ItemSize="52">
+                    <div class="log-row">
+                        <div class="log-row-summary">
+                            <time title="@entry.TimestampUtc.ToString("O")">@entry.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff")</time>
+                            <span class="log-level log-level-@entry.Level.ToString().ToLowerInvariant()">@entry.Level</span>
+                            <span class="log-source" title="@entry.Instance">@entry.Service</span>
+                            <span class="log-category" title="@entry.Category">@ShortCategory(entry.Category)</span>
+                            <span class="log-message">@entry.Message</span>
+                        </div>
+                        @if (HasDetails(entry))
+                        {
+                            <details class="log-details">
+                                <summary>Details</summary>
+                                @if (!string.IsNullOrEmpty(entry.Exception))
+                                {
+                                    <pre>@entry.Exception</pre>
+                                }
+                                <dl>
+                                    <dt>UTC</dt><dd>@entry.TimestampUtc.ToString("O")</dd>
+                                    <dt>Instanz</dt><dd>@entry.Instance</dd>
+                                    <dt>Kategorie</dt><dd>@entry.Category</dd>
+                                    @if (entry.EventId != 0 || entry.EventName is not null)
+                                    {
+                                        <dt>Event</dt><dd>@entry.EventId @entry.EventName</dd>
+                                    }
+                                    @if (entry.TraceId is not null)
+                                    {
+                                        <dt>Trace</dt><dd>@entry.TraceId</dd>
+                                    }
+                                    @if (entry.Properties is not null)
+                                    {
+                                        @foreach (var property in entry.Properties)
+                                        {
+                                            <dt>@property.Key</dt><dd>@property.Value</dd>
+                                        }
+                                    }
+                                </dl>
+                            </details>
+                        }
+                    </div>
+                </Virtualize>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private readonly CancellationTokenSource _lifetime = new();
+    private CancellationTokenSource? _searchDelay;
+    private Task? _refreshLoop;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Viewer.InitializeAsync(_lifetime.Token);
+        if (Viewer.IsAuthorized)
+            _refreshLoop = RunRefreshLoopAsync(_lifetime.Token);
+    }
+
+    private async Task RefreshAsync()
+    {
+        await Viewer.RefreshAsync(_lifetime.Token);
+        StateHasChanged();
+    }
+
+    private async Task SourceChangedAsync(string source, ChangeEventArgs args)
+    {
+        var selected = args.Value is bool value
+            ? value
+            : bool.TryParse(args.Value?.ToString(), out var parsed) && parsed;
+        Viewer.SetSourceSelected(source, selected);
+        await RefreshAsync();
+    }
+
+    private async Task LevelChangedAsync(ChangeEventArgs args)
+    {
+        if (Enum.TryParse<LogLevel>(args.Value?.ToString(), out var level))
+            Viewer.MinimumLevel = level;
+        await RefreshAsync();
+    }
+
+    private async Task LiveChangedAsync(ChangeEventArgs args)
+    {
+        var enabled = args.Value is bool value
+            ? value
+            : bool.TryParse(args.Value?.ToString(), out var parsed) && parsed;
+        Viewer.IsLivePaused = !enabled;
+        if (enabled)
+            await RefreshAsync();
+    }
+
+    private void DownloadDateChanged(ChangeEventArgs args)
+    {
+        if (DateOnly.TryParse(args.Value?.ToString(), out var date))
+            Viewer.DownloadDateUtc = date;
+    }
+
+    private async Task SearchChangedAsync(ChangeEventArgs args)
+    {
+        Viewer.SearchText = args.Value?.ToString() ?? "";
+        var previousDelay = _searchDelay;
+        var delay = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _searchDelay = delay;
+        previousDelay?.Cancel();
+        previousDelay?.Dispose();
+        try
+        {
+            await Task.Delay(400, delay.Token);
+            await RefreshAsync();
+        }
+        catch (OperationCanceledException) when (delay.IsCancellationRequested)
+        {
+        }
+    }
+
+    private void Download()
+    {
+        var url = Viewer.CreateDownloadUrl(Navigation.BaseUri);
+        if (!string.IsNullOrEmpty(url))
+            Navigation.NavigateTo(url, forceLoad: true);
+    }
+
+    private async Task RunRefreshLoopAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                // A search may scan the complete retention window. Do not repeat
+                // that work every few seconds; live polling resumes when it is cleared.
+                if (!Viewer.IsLivePaused && string.IsNullOrWhiteSpace(Viewer.SearchText))
+                {
+                    await Viewer.RefreshAsync(cancellationToken);
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private static string ShortCategory(string category)
+        => category[(category.LastIndexOf('.') + 1)..];
+
+    private static bool HasDetails(LogArchiveEntry entry)
+        => entry.Exception is not null || entry.Properties is not null || entry.EventId != 0 || entry.TraceId is not null;
+
+    public async ValueTask DisposeAsync()
+    {
+        _searchDelay?.Cancel();
+        _searchDelay?.Dispose();
+        _lifetime.Cancel();
+        if (_refreshLoop is not null)
+        {
+            try { await _refreshLoop; } catch (OperationCanceledException) { }
+        }
+        _lifetime.Dispose();
+    }
+}

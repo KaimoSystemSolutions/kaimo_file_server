@@ -12,6 +12,7 @@ export CONFIG_RESPONSE="$WORK/response"
 export NET_FAIL_PARAMETER=""
 export NET_IGNORE_PARAMETER=""
 export KAIMO_SAMBA_PATH_PREFIX=""
+export KAIMO_LOG_CONSOLE_LEVEL_FILE="$WORK/console-log-level"
 mkdir -p "$WORK/bin"
 printf '%s\n' '{"version":1,"config":{"min_protocol":"SMB2_02","max_protocol":"SMB3_11","require_signing":true,"require_encryption":true,"enabled":true,"enable_ws_discovery":false,"enable_audit_log":false,"log_level":"Warning"}}' >"$CONFIG_RESPONSE"
 : >"$CONFIG_STATE"
@@ -61,12 +62,13 @@ EOF
 chmod +x "$WORK/bin"/*
 export PATH="$WORK/bin:$PATH"
 
-if ! bash "$SUT" >/dev/null 2>&1; then
+if ! first_output="$(bash "$SUT" 2>&1)"; then
     echo "FAIL: valid configuration did not converge."
+    printf '%s\n' "$first_output" >&2
     exit 1
 fi
-if ! grep -q $'^log level\t1$' "$CONFIG_STATE"; then
-    echo "FAIL: Settings Warning level was not mapped to Samba log level 1."
+if ! grep -q $'^log level\t5$' "$CONFIG_STATE"; then
+    echo "FAIL: Settings Warning level did not keep Samba at the archive Information level."
     exit 1
 fi
 if ! grep -q $'^server smb encrypt\trequired$' "$CONFIG_STATE" \

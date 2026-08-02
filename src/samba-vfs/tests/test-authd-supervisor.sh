@@ -85,6 +85,8 @@ export KAIMO_AUTHD_EXPECTED_EXECUTABLE="$(readlink -f /usr/bin/python3)"
 export KAIMO_SMBD_EXPECTED_EXECUTABLE="$(readlink -f /usr/bin/bash)"
 export KAIMO_SMBCONTROL_COMMAND="$WORK/bin/smbcontrol"
 export FAKE_SMBD_STARTED_FILE="$WORK/run/smbd.started"
+export KAIMO_SAMBA_LOG_FORWARDER="$(command -v cat)"
+export KAIMO_SMBD_LOG_PIPE="$WORK/run/smbd-log.pipe"
 
 reset_case() {
     unset FAKE_AUTHD_FAIL_BEFORE_READY FAKE_AUTHD_EXIT_AFTER \

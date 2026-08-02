@@ -137,15 +137,23 @@ effective_log_level="${KAIMO_LOG_LEVEL:-$app_log_level}"
 case "${effective_log_level,,}" in
     # Samba's DBG_* severities use these numeric values (util/debug.h):
     # ERR=0, WARNING=1, NOTICE=3, INFO=5, DEBUG=10.
-    debug)       samba_log_level="10" ;;
-    information) samba_log_level="5" ;;
-    warning)     samba_log_level="1" ;;
-    error)       samba_log_level="0" ;;
+    debug)       samba_log_level="10"; console_log_level="Debug" ;;
+    information) samba_log_level="5";  console_log_level="Information" ;;
+    # Samba must produce Information for the archive. The forwarder applies the
+    # lower-volume Settings threshold only to container stdout.
+    warning)     samba_log_level="5";  console_log_level="Warning" ;;
+    error)       samba_log_level="5";  console_log_level="Error" ;;
     *)
         echo "[sync-config] Invalid KAIMO_LOG_LEVEL/log level '$effective_log_level'." >&2
         exit 1
         ;;
 esac
+
+console_level_file="${KAIMO_LOG_CONSOLE_LEVEL_FILE:-/var/run/kaimo/console-log-level}"
+console_level_tmp="${console_level_file}.tmp.$$"
+printf '%s\n' "$console_log_level" >"$console_level_tmp"
+chmod 0644 "$console_level_tmp"
+mv -f -- "$console_level_tmp" "$console_level_file"
 
 changed=0
 # apply <set-param> <value> [read-param]: sets a global registry parameter only

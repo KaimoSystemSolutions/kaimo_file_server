@@ -17,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 // NtHashProtector). Needs the same NtHash:EncryptionKey as Host/Web.
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.AddDynamicLogLevel();
+builder.AddLogArchive("smb-bridge");
 
 // Real Elasticsearch search service — MUST come before AddCoreServices so it wins
 // the NoOp fallback (Phase 3: SMB writes are indexed like web uploads).

@@ -14,6 +14,9 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // -- Global, live-reloadable log level (shared with the Web UI via the DB) --
 builder.AddDynamicLogLevel();
 
+// -- Structured Information+ archive on the dedicated bind mount --
+builder.AddLogArchive("host");
+
 // -- Elastic Search --
 //    Must be registered BEFORE AddCoreServices so the real search service wins
 //    over the NoOp fallback (AddCoreServices uses TryAddSingleton). Without this

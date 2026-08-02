@@ -257,6 +257,7 @@ public class UserListViewModel
             new(ManagementPermission.ManageSystemSettings, Resources.Web_Perm_ManageSystemSettings),
             new(ManagementPermission.ManageDataServices, Resources.Web_Perm_ManageDataServices),
             new(ManagementPermission.ManageCertificates, Resources.Web_Perm_ManageCertificates),
+            new(ManagementPermission.ViewSystemLogs, "Systemprotokolle anzeigen und herunterladen"),
         ]),
     ];
 

@@ -1,5 +1,7 @@
 @using Kaimo_File_Server.Core.Language
 
+@if (VM.CanManageSettings)
+{
 <div class="detail-section">
     <span class="detail-label">@Resources.Web_Settings_Logging_Detail</span>
     <p class="settings-description">@Resources.Web_Settings_Logging_Desc</p>
@@ -17,6 +19,12 @@
         <button class="btn-primary" @onclick="Save">@Resources.Web_Settings_Button_Save</button>
     </div>
 </div>
+}
+
+@if (VM.CanViewLogs)
+{
+    <LogViewer />
+}
 
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;

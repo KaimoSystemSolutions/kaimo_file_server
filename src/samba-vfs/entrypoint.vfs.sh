@@ -34,6 +34,7 @@ export KAIMO_AUTHD_GROUP="${KAIMO_AUTHD_GROUP:-kaimo-authd}"
 if ! getent group "$KAIMO_AUTHD_GROUP" >/dev/null 2>&1; then
     groupadd --system "$KAIMO_AUTHD_GROUP"
 fi
+install -d -m 0755 -o root -g root /var/run/kaimo
 find "$STORAGE" -mindepth 1 -maxdepth 1 -type d -not -name '.*' -print0 2>/dev/null |
     while IFS= read -r -d '' d; do
         chgrp -R "$STORAGE_GID" "$d" 2>/dev/null || true

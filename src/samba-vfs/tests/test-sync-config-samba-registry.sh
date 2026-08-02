@@ -50,6 +50,7 @@ chmod +x "$WORK/bin"/*
 export SAMBA_NET_BIN="$REAL_NET"
 export SAMBA_REGISTRY_TEST_CONFIG="$CONFIG"
 export KAIMO_SAMBA_PATH_PREFIX=""
+export KAIMO_LOG_CONSOLE_LEVEL_FILE="$WORK/console-log-level"
 export PATH="$WORK/bin:$PATH"
 
 first_output="$(bash "$SUT")"

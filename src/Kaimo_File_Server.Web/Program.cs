@@ -49,6 +49,9 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // -- Global, live-reloadable log level (shared with the SMB host via the DB) --
 builder.AddDynamicLogLevel();
 
+// -- Structured Information+ archive on the dedicated bind mount --
+builder.AddLogArchive("web");
+
 
 
 // ══════════════════════════════════════════
@@ -93,6 +96,7 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
 
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<ToastService>();
+builder.Services.AddSingleton<LogDownloadTokenService>();
 builder.Services.AddScoped<FileUploadCoordinator>();
 builder.Services.AddScoped<FileSelectionCoordinator>();
 builder.Services.AddSingleton<AssetProvider>();
@@ -108,6 +112,7 @@ builder.Services.AddSingleton<AssetProvider>();
 // ══════════════════════════════════════════
 
 builder.Services.AddScoped<SettingsViewModel>();
+builder.Services.AddScoped<LogViewerViewModel>();
 builder.Services.AddScoped<LoginViewModel>();
 builder.Services.AddScoped<ShareBrowserViewModel>();
 builder.Services.AddScoped<FileBrowserViewModel>();

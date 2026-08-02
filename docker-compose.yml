@@ -1,6 +1,7 @@
 x-vol-storage-pool-01: &vol-storage-pool-01 ${LOCATION_STORAGE_01:-./tests/data/storage/pool01}:/data/storage/pool01
 x-vol-storage-pool-02: &vol-storage-pool-02 ${LOCATION_STORAGE_02:-./tests/data/storage/pool02}:/data/storage/pool02
 x-vol-app-data: &vol-app-data               ${LOCATION_APP_DATA:-./tests/data/kaimo-system}:/data/kaimo-system
+x-vol-logs: &vol-logs                       ${LOCATION_LOGS:-./tests/data/logs}:/data/kaimo-logs
 x-bounded-logging: &bounded-logging
   driver: json-file
   options:
@@ -35,6 +36,10 @@ services:
       - *vol-storage-pool-01
       #- *vol-storage-pool-02
       - *vol-app-data
+      - *vol-logs
+    environment:
+      KAIMO_LOG_SOURCE: host
+      LogArchive__RootPath: /data/kaimo-logs
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
@@ -62,6 +67,8 @@ services:
       kaimo_smb_pki_init:
         condition: service_completed_successfully
     environment:
+      KAIMO_LOG_SOURCE: smb-bridge
+      LogArchive__RootPath: /data/kaimo-logs
       #KAIMO_LOG_LEVEL: ${#KAIMO_LOG_LEVEL:-}
       # Global internal cache, outside every configured share path.
       # Must match KAIMO_SNAPSHOT_CACHE_ROOT in the Samba container.
@@ -83,6 +90,7 @@ services:
       - *vol-storage-pool-01
       #- *vol-storage-pool-02
       - *vol-app-data
+      - *vol-logs
       # Mount only the server identity and public client CA. Client private
       # keys are available exclusively in the Samba container.
       - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/bridge:/run/secrets/kaimo-control-plane:ro
@@ -118,6 +126,7 @@ services:
       - *vol-storage-pool-01
       #- *vol-storage-pool-02
       - *vol-app-data
+      - *vol-logs
       # P1-11: survives Samba container recreation, not only process restarts.
       - kaimo_samba_event_spool:/var/lib/kaimo/event-spool
       # Mount the single Samba workload identity and public control-plane CA.
@@ -133,6 +142,11 @@ services:
     depends_on:
       - kaimo_smb_bridge
     environment:
+      KAIMO_LOG_SOURCE: samba
+      KAIMO_LOG_ARCHIVE_ROOT: /data/kaimo-logs
+      KAIMO_LOG_ARCHIVE_MAX_FILE_BYTES: ${KAIMO_LOG_ARCHIVE_MAX_FILE_BYTES:-10485760}
+      KAIMO_LOG_ARCHIVE_RETENTION_DAYS: ${KAIMO_LOG_ARCHIVE_RETENTION_DAYS:-14}
+      KAIMO_LOG_ARCHIVE_MAX_SOURCE_BYTES: ${KAIMO_LOG_ARCHIVE_MAX_SOURCE_BYTES:-262144000}
       # Highest-priority manual override for .NET, Samba and native stack logging.
       # Allowed: Debug, Information, Warning, Error. Empty = Settings page controls it.
       #KAIMO_LOG_LEVEL: ${#KAIMO_LOG_LEVEL:-}
@@ -203,6 +217,8 @@ services:
       - 8443:8443
     environment:
       TZ: Europe/Berlin
+      KAIMO_LOG_SOURCE: web
+      LogArchive__RootPath: /data/kaimo-logs
       #KAIMO_LOG_LEVEL: ${#KAIMO_LOG_LEVEL:-}
       GOOGLE_APPLICATION_CREDENTIALS: /tests/data/logins/google-service-account.json
         
@@ -215,6 +231,7 @@ services:
       - *vol-storage-pool-01
       #- *vol-storage-pool-02
       - *vol-app-data
+      - *vol-logs
       - ${LOCATION_GDRIVE_CREDENTIALS:-./tests/data/logins/google-service-account.json}:/data/logins/google-service-account.json:ro
       
     depends_on:

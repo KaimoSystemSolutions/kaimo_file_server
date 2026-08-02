@@ -14,7 +14,9 @@ public partial class Settings
 
         if (!VM.CanManageSettings)
         {
-            if (VM.CanManageDataServices)
+            if (VM.CanViewLogs)
+                _activeTab = SettingsTab.Logging;
+            else if (VM.CanManageDataServices)
                 _activeTab = SettingsTab.DataServices;
             else if (VM.CanManageCertificates)
                 _activeTab = SettingsTab.Certificate;
