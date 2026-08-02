@@ -452,3 +452,569 @@
         overflow-x: auto;
     }
 }
+
+/* User details: view mode reads like a compact profile, while edit mode
+   is intentionally framed as an active form. */
+
+.entity-detail ::deep .user-detail-shell {
+    min-width: 0;
+}
+
+.entity-detail ::deep .user-detail-shell--editing {
+    margin: -7px;
+    padding: 7px;
+    border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--border));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--accent-subtle) 28%, var(--bg-tertiary));
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.entity-detail ::deep .user-edit-mode-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 16px;
+    padding: 10px 11px;
+    border-radius: 6px;
+    background: var(--accent-subtle);
+    color: var(--accent);
+}
+
+.entity-detail ::deep .user-edit-mode-icon {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+}
+
+.entity-detail ::deep .user-edit-mode-icon svg,
+.entity-detail ::deep .user-edit-button svg {
+    stroke: currentColor;
+}
+
+.entity-detail ::deep .user-edit-mode-banner > span:last-child {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.entity-detail ::deep .user-edit-mode-banner strong {
+    font-size: 13px;
+    line-height: 1.3;
+}
+
+.entity-detail ::deep .user-edit-mode-banner small {
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.entity-detail ::deep .user-edit-form {
+    gap: 13px;
+    padding: 0 5px;
+}
+
+.entity-detail ::deep .user-detail-shell--editing .edit-input,
+.entity-detail ::deep .user-detail-shell--editing .multi-select-display {
+    min-height: 34px;
+    background: var(--bg-secondary);
+}
+
+.entity-detail ::deep .user-edit-toggles {
+    margin: 2px 0;
+    background: var(--bg-secondary);
+}
+
+.entity-detail ::deep .user-edit-error {
+    margin: 12px 5px 0;
+}
+
+.entity-detail ::deep .user-edit-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 16px 5px 0;
+}
+
+.entity-detail ::deep .user-profile-header {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 11px;
+    padding: 1px 0 17px;
+    border-bottom: 1px solid var(--border);
+}
+
+.entity-detail ::deep .user-profile-avatar {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--accent-subtle);
+    color: var(--accent);
+    font-size: 14px;
+    font-weight: 750;
+    letter-spacing: 0.02em;
+}
+
+.entity-detail ::deep .user-profile-identity {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.entity-detail ::deep .user-profile-identity strong {
+    overflow: hidden;
+    color: var(--text-primary);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.entity-detail ::deep .user-profile-identity small {
+    overflow: hidden;
+    color: var(--text-tertiary);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.entity-detail ::deep .user-overview-list {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.entity-detail ::deep .user-overview-row {
+    display: grid;
+    grid-template-columns: minmax(105px, 0.42fr) minmax(0, 1fr);
+    gap: 14px;
+    padding: 8px 0;
+}
+
+.entity-detail ::deep .user-overview-label,
+.entity-detail ::deep .user-membership-label {
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+}
+
+.entity-detail ::deep .user-overview-value {
+    min-width: 0;
+    color: var(--text-primary);
+    font-size: 12.5px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.entity-detail ::deep .user-overview-value--empty,
+.entity-detail ::deep .user-membership-empty {
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+.entity-detail ::deep .user-role-access {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.entity-detail ::deep .user-role-access-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.entity-detail ::deep .user-role-scope-help {
+    position: relative;
+    display: grid;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: help;
+}
+
+.entity-detail ::deep .user-role-scope-help:hover,
+.entity-detail ::deep .user-role-scope-help:focus-visible {
+    background: var(--accent-subtle);
+    color: var(--accent);
+    outline: none;
+}
+
+.entity-detail ::deep .user-role-scope-help svg {
+    stroke: currentColor;
+}
+
+.entity-detail ::deep .user-role-scope-tooltip {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 7px);
+    right: 0;
+    width: min(300px, calc(100vw - 54px));
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 7px;
+    background: var(--bg-secondary);
+    box-shadow: var(--shadow);
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 1.5;
+    text-align: left;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-3px);
+    transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+}
+
+.entity-detail ::deep .user-role-scope-help:hover .user-role-scope-tooltip,
+.entity-detail ::deep .user-role-scope-help:focus-visible .user-role-scope-tooltip {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.entity-detail ::deep .user-role-scope-card {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg-secondary);
+}
+
+.entity-detail ::deep .user-role-scope-card--global {
+    border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+}
+
+.entity-detail ::deep .user-role-scope-card--delegated {
+    border-color: color-mix(in srgb, var(--info) 34%, var(--border));
+}
+
+.entity-detail ::deep .user-role-scope-header {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 10px;
+}
+
+.entity-detail ::deep .user-role-scope-card--global .user-role-scope-header {
+    background: color-mix(in srgb, var(--accent-subtle) 68%, var(--bg-secondary));
+}
+
+.entity-detail ::deep .user-role-scope-card--delegated .user-role-scope-header {
+    background: color-mix(in srgb, var(--info) 8%, var(--bg-secondary));
+}
+
+.entity-detail ::deep .user-role-scope-icon {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border-radius: 6px;
+}
+
+.entity-detail ::deep .user-role-scope-card--global .user-role-scope-icon {
+    background: var(--accent-subtle);
+    color: var(--accent);
+}
+
+.entity-detail ::deep .user-role-scope-card--delegated .user-role-scope-icon {
+    background: color-mix(in srgb, var(--info) 13%, transparent);
+    color: var(--info);
+}
+
+.entity-detail ::deep .user-role-scope-icon svg {
+    stroke: currentColor;
+}
+
+.entity-detail ::deep .user-role-scope-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.entity-detail ::deep .user-role-scope-copy strong {
+    color: var(--text-primary);
+    font-size: 12px;
+    line-height: 1.3;
+}
+
+.entity-detail ::deep .user-role-scope-copy small {
+    overflow: hidden;
+    color: var(--text-tertiary);
+    font-size: 10.5px;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.entity-detail ::deep .user-role-scope-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 9.5px;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.entity-detail ::deep .user-role-scope-badge--global {
+    background: var(--accent-subtle);
+    color: var(--accent);
+}
+
+.entity-detail ::deep .user-role-scope-badge--delegated {
+    background: color-mix(in srgb, var(--info) 13%, transparent);
+    color: var(--info);
+}
+
+.entity-detail ::deep .user-role-chip-list {
+    padding: 9px 10px 10px;
+}
+
+.entity-detail ::deep .user-chip--global-role {
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+    background: var(--accent-subtle);
+    color: var(--accent);
+}
+
+.entity-detail ::deep .user-delegated-role-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.entity-detail ::deep .user-delegated-role-row {
+    display: grid;
+    grid-template-columns: minmax(90px, 0.8fr) minmax(0, 1.2fr) auto;
+    align-items: center;
+    gap: 9px;
+    min-height: 44px;
+    padding: 7px 9px 7px 10px;
+    border-top: 1px solid var(--border);
+}
+
+.entity-detail ::deep .user-delegated-role-name {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.entity-detail ::deep .user-delegated-role-scope {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.entity-detail ::deep .user-delegated-scope-type {
+    color: var(--info);
+    font-size: 9.5px;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.entity-detail ::deep .user-delegated-scope-name {
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.entity-detail ::deep .user-delegated-role-remove {
+    opacity: 0.72;
+}
+
+.entity-detail ::deep .user-delegated-role-remove:hover,
+.entity-detail ::deep .user-delegated-role-remove:focus-visible {
+    opacity: 1;
+}
+
+.entity-detail ::deep .user-role-scope-empty {
+    display: block;
+    padding: 10px;
+    border-top: 1px solid var(--border);
+}
+
+.entity-detail ::deep .user-memberships {
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.entity-detail ::deep .user-membership-section {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.entity-detail ::deep .user-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.entity-detail ::deep .user-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 3px 8px;
+    border: 1px solid var(--border-light);
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    line-height: 1.2;
+}
+
+.entity-detail ::deep .user-chip--accent {
+    border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+    background: var(--accent-subtle);
+    color: var(--accent);
+}
+
+.entity-detail ::deep .user-chip--more {
+    border-style: dashed;
+    color: var(--text-tertiary);
+}
+
+.entity-detail ::deep .user-membership-empty {
+    font-size: 12px;
+}
+
+.entity-detail ::deep .user-scoped-section {
+    margin: 0;
+    padding: 15px 0 0;
+}
+
+.entity-detail ::deep .user-scoped-section .detail-label {
+    margin: 0 0 8px;
+}
+
+.entity-detail ::deep .user-technical-id {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    margin-top: 14px;
+    color: var(--text-tertiary);
+    font-size: 10px;
+}
+
+.entity-detail ::deep .user-technical-id span {
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.entity-detail ::deep .user-technical-id code {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.entity-detail ::deep .user-view-actions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: stretch;
+}
+
+.entity-detail ::deep .user-edit-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+}
+
+.entity-detail ::deep .user-delete-confirm-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.entity-detail ::deep .user-view-actions .confirm-delete {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 430px) {
+    .entity-detail ::deep .user-profile-header {
+        grid-template-columns: 40px minmax(0, 1fr);
+    }
+
+    .entity-detail ::deep .user-profile-avatar {
+        width: 40px;
+        height: 40px;
+    }
+
+    .entity-detail ::deep .user-profile-header > .status-badge {
+        grid-column: 2;
+        justify-self: start;
+    }
+
+    .entity-detail ::deep .user-overview-row {
+        grid-template-columns: 1fr;
+        gap: 3px;
+    }
+
+    .entity-detail ::deep .user-role-scope-header {
+        grid-template-columns: 28px minmax(0, 1fr);
+    }
+
+    .entity-detail ::deep .user-role-scope-badge {
+        grid-column: 2;
+        justify-self: start;
+    }
+
+    .entity-detail ::deep .user-delegated-role-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .entity-detail ::deep .user-delegated-role-scope {
+        grid-column: 1;
+        grid-row: 2;
+    }
+
+    .entity-detail ::deep .user-delegated-role-remove {
+        grid-column: 2;
+        grid-row: 1 / 3;
+    }
+
+    .entity-detail ::deep .user-view-actions,
+    .entity-detail ::deep .user-edit-actions {
+        grid-template-columns: 1fr;
+    }
+}

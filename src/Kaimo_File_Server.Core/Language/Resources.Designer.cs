@@ -1364,6 +1364,69 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Admin_ScopedAssignments", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Global roles ähnelt.
+        /// </summary>
+        public static string Web_Admin_GlobalRoles {
+            get {
+                return ResourceManager.GetString("Web_Admin_GlobalRoles", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Applies throughout the system ähnelt.
+        /// </summary>
+        public static string Web_Admin_GlobalRoles_Hint {
+            get {
+                return ResourceManager.GetString("Web_Admin_GlobalRoles_Hint", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Limited to a department or share ähnelt.
+        /// </summary>
+        public static string Web_Admin_DelegatedRoles_Hint {
+            get {
+                return ResourceManager.GetString("Web_Admin_DelegatedRoles_Hint", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Delegated ähnelt.
+        /// </summary>
+        public static string Web_Admin_Delegated {
+            get {
+                return ResourceManager.GetString("Web_Admin_Delegated", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No delegated roles ähnelt.
+        /// </summary>
+        public static string Web_Admin_NoDelegatedRoles {
+            get {
+                return ResourceManager.GetString("Web_Admin_NoDelegatedRoles", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die About global and delegated roles ähnelt.
+        /// </summary>
+        public static string Web_Admin_RoleScopes_InfoLabel {
+            get {
+                return ResourceManager.GetString("Web_Admin_RoleScopes_InfoLabel", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht die Erklärung für globale und delegierte Rollen.
+        /// </summary>
+        public static string Web_Admin_RoleScopes_Info {
+            get {
+                return ResourceManager.GetString("Web_Admin_RoleScopes_Info", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Department ähnelt.
@@ -2644,7 +2707,7 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die No permission. ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die You don&apos;t have permissions for the global settings. ähnelt.
         /// </summary>
         public static string Web_Error_NoPermission {
             get {
