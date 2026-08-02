@@ -47,9 +47,11 @@
                 <span class="share-table-cell">
                     <span class="share-availability @(isUsable ? "share-availability--usable" : "share-availability--unusable")">
                         <span class="share-status-dot" aria-hidden="true"></span>
-                        <span>@(isUsable
-                            ? Resources.Web_ShareList_Card_Available
-                            : Resources.Web_ShareList_Card_Unavailable)</span>
+                        <span>@(isStorageUnavailable
+                            ? Resources.Web_ShareList_Card_Unavailable
+                            : share.IsEnabled
+                                ? Resources.Web_ShareList_Card_Available
+                                : Resources.Web_ShareList_Card_Disabled)</span>
                     </span>
                 </span>
 

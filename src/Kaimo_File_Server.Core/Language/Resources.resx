@@ -1747,99 +1747,102 @@
     <value>Item ID</value>
   </data>
   <data name="Web_Upload_BatchProgress" xml:space="preserve">
-  <value>Uploading file {0} of {1}: {2}</value>
-</data>
+    <value>Uploading file {0} of {1}: {2}</value>
+  </data>
   <data name="Web_Upload_BatchSuccess" xml:space="preserve">
-  <value>{0} files uploaded successfully</value>
-</data>
+    <value>{0} files uploaded successfully</value>
+  </data>
   <data name="Web_Upload_BatchPartialFailure" xml:space="preserve">
-  <value>{0} of {1} files uploaded — some failed</value>
-</data>
+    <value>{0} of {1} files uploaded — some failed</value>
+  </data>
   <data name="Web_Upload_BatchCancelled" xml:space="preserve">
-  <value>Upload cancelled</value>
-</data>
+    <value>Upload cancelled</value>
+  </data>
   <data name="Web_Delete_BatchSuccess" xml:space="preserve">
-  <value>{0} items deleted successfully</value>
-</data>
+    <value>{0} items deleted successfully</value>
+  </data>
   <data name="Web_Upload_ProgressWithSpeed" xml:space="preserve">
-  <value>Uploading {0} ({1})</value>
-</data>
+    <value>Uploading {0} ({1})</value>
+  </data>
   <data name="Web_Upload_BatchProgressWithSpeed" xml:space="preserve">
-  <value>Uploading file {0} of {1}: {2} ({3})</value>
-</data>
+    <value>Uploading file {0} of {1}: {2} ({3})</value>
+  </data>
   <data name="Web_Upload_Processing" xml:space="preserve">
-  <value>Processing {0}…</value>
-</data>
+    <value>Processing {0}…</value>
+  </data>
   <data name="Web_Upload_BatchProcessing" xml:space="preserve">
-  <value>Processing file {0} of {1}: {2}</value>
-</data>
+    <value>Processing file {0} of {1}: {2}</value>
+  </data>
   <data name="Web_Error_MoveFailed" xml:space="preserve">
-  <value>Failed to move the item.</value>
-</data>
+    <value>Failed to move the item.</value>
+  </data>
   <data name="Web_Move_Progress" xml:space="preserve">
-  <value>Moving {0}…</value>
-</data>
+    <value>Moving {0}…</value>
+  </data>
   <data name="Web_Move_BatchProgress" xml:space="preserve">
-  <value>Moving {0} items…</value>
-</data>
+    <value>Moving {0} items…</value>
+  </data>
   <data name="Web_Move_Success" xml:space="preserve">
-  <value>{0} moved successfully.</value>
-</data>
+    <value>{0} moved successfully.</value>
+  </data>
   <data name="Web_Move_BatchSuccess" xml:space="preserve">
-  <value>{0} items moved successfully.</value>
-</data>
+    <value>{0} items moved successfully.</value>
+  </data>
   <data name="Web_Move_BatchPartialFailure" xml:space="preserve">
-  <value>{0} of {1} items moved. Some items failed.</value>
-</data>
+    <value>{0} of {1} items moved. Some items failed.</value>
+  </data>
   <data name="Web_ShareList_Label_StoragePool" xml:space="preserve">
-  <value>Storage pool</value>
-</data>
+    <value>Storage pool</value>
+  </data>
   <data name="Web_ShareList_Action_MovePool" xml:space="preserve">
-  <value>Move</value>
-</data>
+    <value>Move</value>
+  </data>
   <data name="Web_ShareList_StoragePoolUnconfigured" xml:space="preserve">
-  <value>Current path (pool not configured)</value>
-</data>
+    <value>Current path (pool not configured)</value>
+  </data>
   <data name="Web_Error_ShareStorageUnavailableReadOnly" xml:space="preserve">
-  <value>The share's storage pool is currently unavailable. Its configuration is read-only until the storage is available again.</value>
-</data>
+    <value>The share's storage pool is currently unavailable. Its configuration is read-only until the storage is available again.</value>
+  </data>
   <data name="Web_ShareList_Card_ShowDetails" xml:space="preserve">
-  <value>Show details</value>
-</data>
+    <value>Show details</value>
+  </data>
   <data name="Web_ShareList_Card_HideDetails" xml:space="preserve">
-  <value>Hide details</value>
-</data>
+    <value>Hide details</value>
+  </data>
   <data name="Web_ShareList_Card_Available" xml:space="preserve">
-  <value>Available</value>
-</data>
+    <value>Available</value>
+  </data>
   <data name="Web_ShareList_Card_Unavailable" xml:space="preserve">
-  <value>Not available</value>
-</data>
+    <value>Not available</value>
+  </data>
   <data name="Web_ShareList_Card_Hidden" xml:space="preserve">
-  <value>Hidden</value>
-</data>
+    <value>Hidden</value>
+  </data>
   <data name="Web_ShareList_Card_Yes" xml:space="preserve">
-  <value>Yes</value>
-</data>
+    <value>Yes</value>
+  </data>
   <data name="Web_ShareList_Card_No" xml:space="preserve">
-  <value>No</value>
-</data>
+    <value>No</value>
+  </data>
   <data name="Web_Share_StoragePoolChanged" xml:space="preserve">
-  <value>Share moved to storage pool “{0}”.</value>
-</data>
+    <value>Share moved to storage pool “{0}”.</value>
+  </data>
   <data name="Web_Share_StoragePoolUnchanged" xml:space="preserve">
-  <value>The share already uses this storage pool.</value>
-</data>
+    <value>The share already uses this storage pool.</value>
+  </data>
   <data name="Web_Error_StoragePoolRequired" xml:space="preserve">
-  <value>Select a valid storage pool.</value>
-</data>
+    <value>Select a valid storage pool.</value>
+  </data>
   <data name="Web_Error_StoragePoolDestinationExists" xml:space="preserve">
-  <value>A file or directory with this share name already exists in the selected storage pool.</value>
-</data>
+    <value>A file or directory with this share name already exists in the selected storage pool.</value>
+  </data>
   <data name="Web_Error_StoragePoolMoveFailed" xml:space="preserve">
-  <value>The share could not be moved to the selected storage pool. Check the server log.</value>
-</data>
+    <value>The share could not be moved to the selected storage pool. Check the server log.</value>
+  </data>
   <data name="Web_Error_SharePathMissing" xml:space="preserve">
-  <value>The path stored for this share does not exist.</value>
-</data>
+    <value>The path stored for this share does not exist.</value>
+  </data>
+  <data name="Web_ShareList_Card_Disabled" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
 </root>

@@ -1747,99 +1747,102 @@
     <value>Objekt-ID</value>
   </data>
   <data name="Web_Upload_BatchProgress" xml:space="preserve">
-  <value>Lade Datei {0} von {1} hoch: {2}</value>
-</data>
+    <value>Lade Datei {0} von {1} hoch: {2}</value>
+  </data>
   <data name="Web_Upload_BatchSuccess" xml:space="preserve">
-  <value>{0} Dateien erfolgreich hochgeladen</value>
-</data>
+    <value>{0} Dateien erfolgreich hochgeladen</value>
+  </data>
   <data name="Web_Upload_BatchPartialFailure" xml:space="preserve">
-  <value>{0} von {1} Dateien hochgeladen — einige fehlgeschlagen</value>
-</data>
+    <value>{0} von {1} Dateien hochgeladen — einige fehlgeschlagen</value>
+  </data>
   <data name="Web_Upload_BatchCancelled" xml:space="preserve">
-  <value>Upload abgebrochen</value>
-</data>
+    <value>Upload abgebrochen</value>
+  </data>
   <data name="Web_Delete_BatchSuccess" xml:space="preserve">
-  <value>{0} Elemente erfolgreich gelöscht</value>
-</data>
+    <value>{0} Elemente erfolgreich gelöscht</value>
+  </data>
   <data name="Web_Upload_ProgressWithSpeed" xml:space="preserve">
-  <value>Lade {0} hoch ({1})</value>
-</data>
+    <value>Lade {0} hoch ({1})</value>
+  </data>
   <data name="Web_Upload_BatchProgressWithSpeed" xml:space="preserve">
-  <value>Lade Datei {0} von {1} hoch: {2} ({3})</value>
-</data>
+    <value>Lade Datei {0} von {1} hoch: {2} ({3})</value>
+  </data>
   <data name="Web_Upload_Processing" xml:space="preserve">
-  <value>{0} wird verarbeitet…</value>
-</data>
+    <value>{0} wird verarbeitet…</value>
+  </data>
   <data name="Web_Upload_BatchProcessing" xml:space="preserve">
-  <value>Datei {0} von {1} wird verarbeitet: {2}</value>
-</data>
+    <value>Datei {0} von {1} wird verarbeitet: {2}</value>
+  </data>
   <data name="Web_Error_MoveFailed" xml:space="preserve">
-  <value>Verschieben des Elements fehlgeschlagen.</value>
-</data>
+    <value>Verschieben des Elements fehlgeschlagen.</value>
+  </data>
   <data name="Web_Move_Progress" xml:space="preserve">
-  <value>{0} wird verschoben…</value>
-</data>
+    <value>{0} wird verschoben…</value>
+  </data>
   <data name="Web_Move_BatchProgress" xml:space="preserve">
-  <value>{0} Elemente werden verschoben…</value>
-</data>
+    <value>{0} Elemente werden verschoben…</value>
+  </data>
   <data name="Web_Move_Success" xml:space="preserve">
-  <value>{0} wurde erfolgreich verschoben.</value>
-</data>
+    <value>{0} wurde erfolgreich verschoben.</value>
+  </data>
   <data name="Web_Move_BatchSuccess" xml:space="preserve">
-  <value>{0} Elemente wurden erfolgreich verschoben.</value>
-</data>
+    <value>{0} Elemente wurden erfolgreich verschoben.</value>
+  </data>
   <data name="Web_Move_BatchPartialFailure" xml:space="preserve">
-  <value>{0} von {1} Elementen verschoben. Bei einigen Elementen ist ein Fehler aufgetreten.</value>
-</data>
+    <value>{0} von {1} Elementen verschoben. Bei einigen Elementen ist ein Fehler aufgetreten.</value>
+  </data>
   <data name="Web_ShareList_Label_StoragePool" xml:space="preserve">
-  <value>Speicherpool</value>
-</data>
+    <value>Speicherpool</value>
+  </data>
   <data name="Web_ShareList_Action_MovePool" xml:space="preserve">
-  <value>Verschieben</value>
-</data>
+    <value>Verschieben</value>
+  </data>
   <data name="Web_ShareList_StoragePoolUnconfigured" xml:space="preserve">
-  <value>Aktueller Pfad (Pool nicht konfiguriert)</value>
-</data>
+    <value>Aktueller Pfad (Pool nicht konfiguriert)</value>
+  </data>
   <data name="Web_Error_ShareStorageUnavailableReadOnly" xml:space="preserve">
-  <value>Der Speicherpool des Shares ist derzeit nicht verfügbar. Seine Konfiguration bleibt schreibgeschützt, bis der Speicher wieder verfügbar ist.</value>
-</data>
+    <value>Der Speicherpool des Shares ist derzeit nicht verfügbar. Seine Konfiguration bleibt schreibgeschützt, bis der Speicher wieder verfügbar ist.</value>
+  </data>
   <data name="Web_ShareList_Card_ShowDetails" xml:space="preserve">
-  <value>Details anzeigen</value>
-</data>
+    <value>Details anzeigen</value>
+  </data>
   <data name="Web_ShareList_Card_HideDetails" xml:space="preserve">
-  <value>Details ausblenden</value>
-</data>
+    <value>Details ausblenden</value>
+  </data>
   <data name="Web_ShareList_Card_Available" xml:space="preserve">
-  <value>Nutzbar</value>
-</data>
+    <value>Nutzbar</value>
+  </data>
   <data name="Web_ShareList_Card_Unavailable" xml:space="preserve">
-  <value>Nicht nutzbar</value>
-</data>
+    <value>Nicht nutzbar</value>
+  </data>
   <data name="Web_ShareList_Card_Hidden" xml:space="preserve">
-  <value>Versteckt</value>
-</data>
+    <value>Versteckt</value>
+  </data>
   <data name="Web_ShareList_Card_Yes" xml:space="preserve">
-  <value>Ja</value>
-</data>
+    <value>Ja</value>
+  </data>
   <data name="Web_ShareList_Card_No" xml:space="preserve">
-  <value>Nein</value>
-</data>
+    <value>Nein</value>
+  </data>
   <data name="Web_Share_StoragePoolChanged" xml:space="preserve">
-  <value>Share wurde in den Speicherpool „{0}“ verschoben.</value>
-</data>
+    <value>Share wurde in den Speicherpool „{0}“ verschoben.</value>
+  </data>
   <data name="Web_Share_StoragePoolUnchanged" xml:space="preserve">
-  <value>Der Share verwendet bereits diesen Speicherpool.</value>
-</data>
+    <value>Der Share verwendet bereits diesen Speicherpool.</value>
+  </data>
   <data name="Web_Error_StoragePoolRequired" xml:space="preserve">
-  <value>Bitte einen gültigen Speicherpool auswählen.</value>
-</data>
+    <value>Bitte einen gültigen Speicherpool auswählen.</value>
+  </data>
   <data name="Web_Error_StoragePoolDestinationExists" xml:space="preserve">
-  <value>Im ausgewählten Speicherpool existiert bereits eine Datei oder ein Ordner mit diesem Share-Namen.</value>
-</data>
+    <value>Im ausgewählten Speicherpool existiert bereits eine Datei oder ein Ordner mit diesem Share-Namen.</value>
+  </data>
   <data name="Web_Error_StoragePoolMoveFailed" xml:space="preserve">
-  <value>Der Share konnte nicht in den ausgewählten Speicherpool verschoben werden. Bitte das Serverprotokoll prüfen.</value>
-</data>
+    <value>Der Share konnte nicht in den ausgewählten Speicherpool verschoben werden. Bitte das Serverprotokoll prüfen.</value>
+  </data>
   <data name="Web_Error_SharePathMissing" xml:space="preserve">
-  <value>Der für diesen Share gespeicherte Pfad existiert nicht.</value>
-</data>
+    <value>Der für diesen Share gespeicherte Pfad existiert nicht.</value>
+  </data>
+  <data name="Web_ShareList_Card_Disabled" xml:space="preserve">
+    <value>Deaktiviert</value>
+  </data>
 </root>
