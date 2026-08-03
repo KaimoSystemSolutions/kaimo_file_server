@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.SmbBridge.Grpc;
 
@@ -23,19 +24,22 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
     private readonly IAuthenticationLookup _auth;
     private readonly ISambaLifecycleEventRepository _events;
     private readonly ILogger<FileEventGrpcService> _logger;
+    private readonly ICloudSyncOperationCoordinator? _cloudSyncOperations;
 
     public FileEventGrpcService(
         IFileServiceFactory factory,
         IShareRepository shares,
         IAuthenticationLookup auth,
         ISambaLifecycleEventRepository events,
-        ILogger<FileEventGrpcService> logger)
+        ILogger<FileEventGrpcService> logger,
+        ICloudSyncOperationCoordinator? cloudSyncOperations = null)
     {
         _factory = factory;
         _shares = shares;
         _auth = auth;
         _events = events;
         _logger = logger;
+        _cloudSyncOperations = cloudSyncOperations;
     }
 
     public override async Task<NotifyReply> NotifyClose(NotifyCloseRequest request, ServerCallContext context)
@@ -120,18 +124,32 @@ public sealed class FileEventGrpcService : EventService.EventServiceBase
         if (!TryEventPath(request.OldPath, out string oldPath) ||
             !TryEventPath(request.NewPath, out string newPath))
             return Fail();
-        var svc = await ResolveServiceAsync(
-            request.Share,
-            context?.CancellationToken ?? CancellationToken.None);
-        if (svc is null) return Fail();
+        CancellationToken cancellationToken =
+            context?.CancellationToken ?? CancellationToken.None;
+        var share = await _shares.ResolveEnabledShareAsync(
+            request.Share, cancellationToken);
+        if (share is null) return Fail();
+        var svc = _factory.CreateForShare(share.Id, share.Path);
 
-        if (!await ProcessOnceAsync(
-                eventId, "rename",
-                () => svc.NotifyExternalRenameAsync(
-                    oldPath, newPath, request.IsDirectory,
-                    eventId),
-                context?.CancellationToken ?? CancellationToken.None))
+        if (_cloudSyncOperations is not null &&
+            !await _cloudSyncOperations.TryReserveExternalPathMutationAsync(
+                share.Id, oldPath, newPath, TimeSpan.FromMinutes(2),
+                cancellationToken))
             return Fail();
+
+        bool processed = await ProcessOnceAsync(
+            eventId, "rename",
+            () => svc.NotifyExternalRenameAsync(
+                oldPath, newPath, request.IsDirectory,
+                eventId),
+            cancellationToken);
+        if (processed)
+        {
+            if (_cloudSyncOperations is not null)
+                await _cloudSyncOperations.CompleteExternalPathMutationAsync(
+                    share.Id, oldPath, newPath, CancellationToken.None);
+        }
+        if (!processed) return Fail();
         _logger.LogInformation("NotifyRename: share={Share} [{Old}] -> [{New}] dir={Dir}",
             request.Share, request.OldPath, request.NewPath, request.IsDirectory);
         return Ok();

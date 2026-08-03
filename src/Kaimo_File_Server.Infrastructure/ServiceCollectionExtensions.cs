@@ -59,6 +59,9 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IAclService, AclService>();
             services.AddScoped<IAuthenticationLookup, AuthenticationLookup>();
             services.AddScoped<IManagementAuthService, ManagementAuthService>();
+            services.AddSingleton<ICloudSyncPathUpdater, CloudSyncPathUpdater>();
+            services.AddSingleton<ICloudSyncOperationCoordinator, DatabaseCloudSyncOperationCoordinator>();
+            services.AddScoped<ICloudSyncExecutionService, CloudSyncExecutionService>();
 
             // -- Login: brute-force throttle (singleton, in-memory counters) +
             //    credential authentication with enumeration resistance --

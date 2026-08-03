@@ -142,7 +142,9 @@ builder.Services.AddScoped<ShareListViewModel>(sp =>
         sp.GetRequiredService<AuthenticationStateProvider>(),
         sp.GetRequiredService<ILogger<ShareListViewModel>>(),
         poolStoragePaths,
-        sp.GetRequiredService<IFileVersionService>()));
+        sp.GetRequiredService<IFileVersionService>(),
+        cloudSyncOperations:
+            sp.GetRequiredService<ICloudSyncOperationCoordinator>()));
 
 // ══════════════════════════════════════════
 //  DataProtection

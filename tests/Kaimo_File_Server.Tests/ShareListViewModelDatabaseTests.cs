@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
+using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
@@ -72,7 +73,9 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     /// Builds the SUT for an actor who is an unrestricted (Global) share admin — the
     /// common case for exercising the management mutations.
     /// </summary>
-    private ShareListViewModel BuildAdminSut(User actor)
+    private ShareListViewModel BuildAdminSut(
+        User actor,
+        ICloudSyncOperationCoordinator? cloudSyncOperations = null)
     {
         var ctx = ContextFor(actor);
 
@@ -95,13 +98,16 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
             AuthStateFor(actor.Username),
             NullLogger<ShareListViewModel>.Instance,
             _storagePools,
-            _versions.Object);
+            _versions.Object,
+            cloudSyncOperations: cloudSyncOperations);
     }
 
     private async Task<(ShareListViewModel Sut, ShareDefinition Share)> LoadAndSelectAsync(
-        ShareDefinition seeded, User actor)
+        ShareDefinition seeded,
+        User actor,
+        ICloudSyncOperationCoordinator? cloudSyncOperations = null)
     {
-        var sut = BuildAdminSut(actor);
+        var sut = BuildAdminSut(actor, cloudSyncOperations);
         await sut.LoadAsync();
         var share = sut.Shares.Single(s => s.Id == seeded.Id);
         sut.SelectShare(share);
@@ -254,6 +260,79 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         var row = await db.ShareDefinitions.FindAsync(seeded.Id);
         Assert.Equal("newname", row!.Name);
         Assert.Equal("newname", Path.GetFileName(row.Path)); // only final component changed
+    }
+
+    [Fact]
+    public async Task RenameShareAsync_KeepsCloudSyncAttachedToNewShareRoot()
+    {
+        var actor = SeedUser("admin");
+        var seeded = SeedPoolShare("oldname");
+        seeded.CloudSettings.Folders["team/docs"] = new SyncedFolder(
+            "google", new Dictionary<string, string>());
+        await ShareRepo().UpdateAsync(seeded);
+        var (sut, _) = await LoadAndSelectAsync(seeded, actor);
+
+        sut.EditShareName = "newname";
+        var ok = await sut.RenameShareAsync();
+
+        Assert.True(ok);
+        await using var db = NewContext();
+        var row = await db.ShareDefinitions.FindAsync(seeded.Id);
+        Assert.NotNull(row);
+        Assert.True(row.CloudSettings.Folders.ContainsKey("team/docs"));
+        Assert.Equal(
+            Path.Combine(_storagePath, "newname", "team", "docs"),
+            Path.Combine(row.Path, "team", "docs"));
+    }
+
+    [Fact]
+    public async Task RenameShareAsync_PreservesCloudPathChangedAfterUiLoaded()
+    {
+        var actor = SeedUser("admin");
+        var seeded = SeedPoolShare("oldname");
+        seeded.CloudSettings.Folders["team/old"] = new SyncedFolder(
+            "google", new Dictionary<string, string>());
+        await ShareRepo().UpdateAsync(seeded);
+        var (sut, _) = await LoadAndSelectAsync(seeded, actor);
+
+        // Simulate a folder rename after the management page loaded its copy.
+        var latest = await ShareRepo().GetByIdAsync(seeded.Id);
+        var folder = latest!.CloudSettings.Folders["team/old"];
+        latest.CloudSettings.Folders.Remove("team/old");
+        latest.CloudSettings.Folders["team/new"] = folder;
+        await ShareRepo().UpdateAsync(latest);
+
+        sut.EditShareName = "newname";
+        Assert.True(await sut.RenameShareAsync());
+
+        await using var db = NewContext();
+        var row = await db.ShareDefinitions.FindAsync(seeded.Id);
+        Assert.NotNull(row);
+        Assert.False(row.CloudSettings.Folders.ContainsKey("team/old"));
+        Assert.True(row.CloudSettings.Folders.ContainsKey("team/new"));
+    }
+
+    [Fact]
+    public async Task RenameShareAsync_ActiveCloudSync_IsRejectedWithoutChangingDatabase()
+    {
+        var actor = SeedUser("admin");
+        var seeded = SeedPoolShare("oldname");
+        var operations = new InMemoryCloudSyncOperationCoordinator(TimeProvider.System);
+        var syncLease = await operations.TryBeginSyncAsync(
+            seeded.Id, "team/docs");
+        Assert.NotNull(syncLease);
+        await using var activeSync = syncLease;
+        var (sut, _) = await LoadAndSelectAsync(seeded, actor, operations);
+
+        sut.EditShareName = "newname";
+        var ok = await sut.RenameShareAsync();
+
+        Assert.False(ok);
+        Assert.Equal(Resources.Web_Error_ShareInUse, sut.EditErrorMessage);
+        await using var db = NewContext();
+        var row = await db.ShareDefinitions.FindAsync(seeded.Id);
+        Assert.Equal("oldname", row!.Name);
+        Assert.Equal("oldname", Path.GetFileName(row.Path));
     }
 
     [Fact]

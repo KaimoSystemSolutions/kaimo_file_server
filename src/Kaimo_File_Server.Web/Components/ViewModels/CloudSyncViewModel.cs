@@ -22,6 +22,8 @@ public sealed class CloudSyncViewModel
     private readonly IShareRepository _shareRepository;
     private readonly ICloudProviderFactory _providerFactory;
     private readonly IFileServiceFactory _fileServiceFactory;
+    private readonly ICloudSyncExecutionService _syncExecution;
+    private readonly ICloudSyncOperationCoordinator _syncOperations;
     private readonly IManagementAuthService _managementAuth;
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authenticationState;
@@ -35,6 +37,8 @@ public sealed class CloudSyncViewModel
         IShareRepository shareRepository,
         ICloudProviderFactory providerFactory,
         IFileServiceFactory fileServiceFactory,
+        ICloudSyncExecutionService syncExecution,
+        ICloudSyncOperationCoordinator syncOperations,
         IManagementAuthService managementAuth,
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authenticationState,
@@ -44,6 +48,8 @@ public sealed class CloudSyncViewModel
         _shareRepository = shareRepository;
         _providerFactory = providerFactory;
         _fileServiceFactory = fileServiceFactory;
+        _syncExecution = syncExecution;
+        _syncOperations = syncOperations;
         _managementAuth = managementAuth;
         _userContextFactory = userContextFactory;
         _authenticationState = authenticationState;
@@ -266,17 +272,31 @@ public sealed class CloudSyncViewModel
             return false;
         }
 
-        var share = await _shareRepository.GetByIdAsync(SelectedSync.ShareId);
+        var selected = SelectedSync;
+        var newLocalPath = CloudSyncPaths.Normalize(EditLocalPath);
+        var operationLease = await _syncOperations.TryBeginPathMutationAsync(
+            selected.ShareId, selected.LocalPath, newLocalPath);
+        if (operationLease is null)
+        {
+            ErrorMessage = Text(
+                "Web_CloudSync_Error_Busy",
+                "This folder is already being synchronized or modified.");
+            return false;
+        }
+        await using var operation = operationLease;
+
+        // Load only after the lease was acquired. Otherwise a sync that finishes
+        // between loading and saving could have its LastSync/token update reverted.
+        var share = await _shareRepository.GetByIdAsync(selected.ShareId);
         if (share is null || !share.CloudSettings.Folders.TryGetValue(
-                SelectedSync.LocalPath, out var folder))
+                selected.LocalPath, out var folder))
         {
             ErrorMessage = Text("Web_CloudSync_Error_Missing", "This cloud sync no longer exists.");
             return false;
         }
 
-        var newLocalPath = CloudSyncPaths.Normalize(EditLocalPath);
         var conflict = share.CloudSettings.Folders.Keys.FirstOrDefault(existing =>
-            !string.Equals(existing, SelectedSync.LocalPath, StringComparison.OrdinalIgnoreCase)
+            !string.Equals(existing, selected.LocalPath, StringComparison.OrdinalIgnoreCase)
             && (CloudSyncPaths.IsSameOrAncestor(existing, newLocalPath)
                 || CloudSyncPaths.IsSameOrAncestor(newLocalPath, existing)));
         if (conflict is not null)
@@ -287,7 +307,7 @@ public sealed class CloudSyncViewModel
 
         await ValidateLocalDirectoryAsync(share, newLocalPath);
 
-        share.CloudSettings.Folders.Remove(SelectedSync.LocalPath);
+        share.CloudSettings.Folders.Remove(selected.LocalPath);
         folder.RemotePath = NormalizeRemotePath(EditRemotePath);
         folder.Mode = EditMode;
         share.CloudSettings.Folders[newLocalPath] = folder;
@@ -313,6 +333,17 @@ public sealed class CloudSyncViewModel
             ErrorMessage = Text("Web_CloudSync_Error_NotAuthorized", "You are not authorized for this action.");
             return false;
         }
+
+        var operationLease = await _syncOperations.TryBeginPathMutationAsync(
+            selected.ShareId, selected.LocalPath, selected.LocalPath);
+        if (operationLease is null)
+        {
+            ErrorMessage = Text(
+                "Web_CloudSync_Error_Busy",
+                "This folder is already being synchronized or modified.");
+            return false;
+        }
+        await using var operation = operationLease;
 
         var share = await _shareRepository.GetByIdAsync(selected.ShareId);
         if (share is null || !share.CloudSettings.Folders.Remove(selected.LocalPath, out var folder))
@@ -360,28 +391,28 @@ public sealed class CloudSyncViewModel
         ErrorMessage = null;
         try
         {
-            var share = await _shareRepository.GetByIdAsync(selected.ShareId);
-            if (share is null || !share.CloudSettings.Folders.TryGetValue(
-                    selected.LocalPath, out var folder))
-                return false;
-
-            var connection = _providerFactory.CreateOrLoad(share.Id, folder);
-            var fileService = _fileServiceFactory.CreateForShare(share.Id, share.Path);
-            await connection.SyncAsync(
-                fileService,
-                _actor,
-                NormalizeRemotePath(folder.RemotePath),
+            var result = await _syncExecution.RunAsync(
+                selected.ShareId,
                 selected.LocalPath,
-                folder.Mode,
+                _actor,
                 reportProgress,
                 cancellationToken);
+            if (result == CloudSyncExecutionResult.Busy)
+            {
+                ErrorMessage = Text(
+                    "Web_CloudSync_Error_Busy",
+                    "This folder is already being synchronized or modified.");
+                return false;
+            }
+            if (result == CloudSyncExecutionResult.Missing)
+            {
+                ErrorMessage = Text(
+                    "Web_CloudSync_Error_Missing",
+                    "This cloud sync no longer exists.");
+                return false;
+            }
 
-            cancellationToken.ThrowIfCancellationRequested();
-            ApplyPendingCredentials(folder, connection);
-            folder.LastSync = DateTime.UtcNow;
-            await _shareRepository.UpdateAsync(share);
-            connection.AcknowledgeCredentialChanges();
-            await LoadAsync(share.Id, selected.LocalPath);
+            await LoadAsync(selected.ShareId, selected.LocalPath);
             return true;
         }
         // Cancellation is a normal user action. Do not log it as a failure and do
@@ -483,22 +514,13 @@ public sealed class CloudSyncViewModel
         if (!connection.HasPendingCredentialChanges)
             return;
 
-        var share = await _shareRepository.GetByIdAsync(shareId);
-        if (share is null || !share.CloudSettings.Folders.TryGetValue(localPath, out var folder))
-            return;
-
-        ApplyPendingCredentials(folder, connection);
-        await _shareRepository.UpdateAsync(share);
-        connection.AcknowledgeCredentialChanges();
-    }
-
-    /// <summary>Applies only fields explicitly reported as rotated by the provider.</summary>
-    private static void ApplyPendingCredentials(
-        SyncedFolder folder,
-        ICloudConnection connection)
-    {
-        foreach (var (key, value) in connection.GetPendingCredentialChanges())
-            folder.Data[key] = value;
+        bool persisted = await _shareRepository.UpdateCloudSyncRuntimeStateAsync(
+            shareId,
+            localPath,
+            lastSync: null,
+            connection.GetPendingCredentialChanges());
+        if (persisted)
+            connection.AcknowledgeCredentialChanges();
     }
 
     /// <summary>Ensures a mapping targets an existing directory visible to the actor.</summary>

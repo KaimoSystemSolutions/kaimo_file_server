@@ -61,6 +61,8 @@ public class FileService : IFileService
                 return;
 
             EnsureUserWriteTargetAllowed(newRel);
+            await using var operationLease =
+                await _owner.BeginPathMutationOrThrowAsync(oldRel, newRel, ct);
 
             bool isDir = _handle.IsDirectory;
 
@@ -199,6 +201,8 @@ public class FileService : IFileService
     private readonly ISearchService? _searchService;
     private readonly IFileVersionService? _versionService;
     private readonly IFileOwnershipService? _ownershipService;
+    private readonly ICloudSyncPathUpdater? _cloudSyncPathUpdater;
+    private readonly ICloudSyncOperationCoordinator? _cloudSyncOperations;
     private readonly ILogger<FileService> _logger;
     private readonly Guid _shareId;
     private readonly SemaphoreSlim _searchSideEffectLock = new(1, 1);
@@ -210,7 +214,9 @@ public class FileService : IFileService
     Guid shareId,
     IFileVersionService? versionService = null,
     IFileOwnershipService? ownershipService = null,
-    ILogger<FileService>? logger = null)
+    ILogger<FileService>? logger = null,
+    ICloudSyncPathUpdater? cloudSyncPathUpdater = null,
+    ICloudSyncOperationCoordinator? cloudSyncOperations = null)
     {
         _storage = storage;
         _acl = acl;
@@ -218,6 +224,8 @@ public class FileService : IFileService
         _shareId = shareId;
         _versionService = versionService;
         _ownershipService = ownershipService;
+        _cloudSyncPathUpdater = cloudSyncPathUpdater;
+        _cloudSyncOperations = cloudSyncOperations;
         _logger = logger ?? NullLogger<FileService>.Instance;
     }
 
@@ -280,7 +288,8 @@ public class FileService : IFileService
     private async Task ApplyRenameSideEffectsAsync(
         string oldRelativePath, string newRelativePath, bool isDirectory,
         string oldAbsolutePath, string newAbsolutePath, bool bestEffort,
-        Guid? sambaLifecycleEventId = null, bool includeSearch = true)
+        Guid? sambaLifecycleEventId = null, bool includeSearch = true,
+        bool updateCloudSyncPaths = true)
     {
         var failures = new List<Exception>();
 
@@ -294,6 +303,17 @@ public class FileService : IFileService
                 await _versionService.RenamePathAsync(
                     _shareId, oldRelativePath, newRelativePath,
                     sambaLifecycleEventId);
+            }
+            catch (Exception ex) { failures.Add(ex); }
+        }
+
+        if (isDirectory && updateCloudSyncPaths &&
+            _cloudSyncPathUpdater != null)
+        {
+            try
+            {
+                await _cloudSyncPathUpdater.RenamePathAsync(
+                    _shareId, oldRelativePath, newRelativePath);
             }
             catch (Exception ex) { failures.Add(ex); }
         }
@@ -315,6 +335,23 @@ public class FileService : IFileService
         if (!bestEffort) throw aggregate;
         _logger.LogWarning(aggregate, "Rename lifecycle cleanup failed for {OldPath} -> {NewPath}",
             oldRelativePath, newRelativePath);
+    }
+
+    private async Task<ICloudSyncOperationLease?> BeginPathMutationOrThrowAsync(
+        string oldRelativePath,
+        string newRelativePath,
+        CancellationToken cancellationToken = default)
+    {
+        if (_cloudSyncOperations is null)
+            return null;
+        var lease = await _cloudSyncOperations.TryBeginPathMutationAsync(
+            _shareId, oldRelativePath, newRelativePath, cancellationToken);
+        if (lease is not null)
+            return lease;
+
+        throw new CloudSyncOperationConflictException(
+            $"Cannot rename '{oldRelativePath}' to '{newRelativePath}' " +
+            "while an overlapping cloud sync is running.");
     }
 
     /// <summary>
@@ -817,7 +854,7 @@ public class FileService : IFileService
             await ApplyRenameSideEffectsAsync(
                 normalized, actualRecyclePath, isDir,
                 absolutePath, actualRecycleAbsolutePath, bestEffort: false,
-                includeSearch: false);
+                includeSearch: false, updateCloudSyncPaths: false);
             StartSearchSideEffect(
                 () => isDir
                     ? _searchService!.onDirectoryRenamed(absolutePath, actualRecycleAbsolutePath)
@@ -854,6 +891,8 @@ public class FileService : IFileService
     {
         var oldNormalized = ShareRelativePath.Normalize(oldPath);
         var newNormalized = ShareRelativePath.Normalize(newPath);
+        await using var operationLease =
+            await BeginPathMutationOrThrowAsync(oldNormalized, newNormalized);
         var isDir = await _storage.IsDirectoryAsync(oldNormalized);
 
         // A rename is a delete at the source plus a create at the destination.

@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Search;
@@ -563,6 +564,24 @@ public class FileServiceTests
     }
 
     [Fact]
+    public async Task DeleteFileAsync_RecycleMove_DoesNotMoveCloudSyncMapping()
+    {
+        var cloudSyncPaths = new Mock<ICloudSyncPathUpdater>();
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, null, _shareId,
+            cloudSyncPathUpdater: cloudSyncPaths.Object);
+        _storageMock.Setup(s => s.IsDirectoryAsync("folder")).ReturnsAsync(true);
+        _storageMock.Setup(s => s.MoveAsync("folder", ".RECYCLE_BIN/folder"))
+            .ReturnsAsync(".RECYCLE_BIN/folder");
+        AllowAccess(FilePermission.Delete);
+
+        await sut.DeleteFileAsync("folder", CreateContext(), isRecycleEnabled: true);
+
+        cloudSyncPaths.Verify(updater => updater.RenamePathAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
     public async Task DeleteFileAsync_RecycleBinEntry_IsDeletedPermanently()
     {
         var sut = new FileService(
@@ -666,6 +685,43 @@ public class FileServiceTests
             _shareId, "old", "new", null), Times.Once);
     }
 
+    [Fact]
+    public async Task RenameAsync_Directory_UpdatesCloudSyncLocalPath()
+    {
+        var cloudSyncPaths = new Mock<ICloudSyncPathUpdater>();
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, null, _shareId,
+            cloudSyncPathUpdater: cloudSyncPaths.Object);
+        _storageMock.Setup(s => s.IsDirectoryAsync("old")).ReturnsAsync(true);
+        AllowAccess(FilePermission.Delete);
+        AllowAccess(FilePermission.CreateWriteData);
+
+        await sut.RenameAsync("old", "new", CreateContext());
+
+        cloudSyncPaths.Verify(updater => updater.RenamePathAsync(
+            _shareId, "old", "new"), Times.Once);
+    }
+
+    [Fact]
+    public async Task RenameAsync_OverlappingActiveSync_IsRejectedBeforeStorageMutation()
+    {
+        var operations = new InMemoryCloudSyncOperationCoordinator(TimeProvider.System);
+        var syncLease = await operations.TryBeginSyncAsync(_shareId, "old");
+        Assert.NotNull(syncLease);
+        await using var activeSync = syncLease;
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, null, _shareId,
+            cloudSyncOperations: operations);
+
+        await Assert.ThrowsAsync<CloudSyncOperationConflictException>(
+            () => sut.RenameAsync("old/sub", "new/sub", CreateContext()));
+
+        _storageMock.Verify(s => s.RenameDirectoryAsync(
+            It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        _storageMock.Verify(s => s.RenameFileAsync(
+            It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
     [Theory]
     [InlineData(".RECYCLE_BIN/old.txt")]
     [InlineData(".kaimo-renamed")]
@@ -694,12 +750,14 @@ public class FileServiceTests
     public async Task ExternalDirectoryRename_UsesDirectorySearchLifecycle()
     {
         var search = new Mock<ISearchService>();
+        var cloudSyncPaths = new Mock<ICloudSyncPathUpdater>();
         _storageMock.Setup(s => s.ToAbsolutePath("old"))
             .Returns("/storage/old");
         _storageMock.Setup(s => s.ToAbsolutePath("new"))
             .Returns("/storage/new");
         var sut = new FileService(
-            _storageMock.Object, _aclMock.Object, search.Object, _shareId);
+            _storageMock.Object, _aclMock.Object, search.Object, _shareId,
+            cloudSyncPathUpdater: cloudSyncPaths.Object);
 
         await sut.NotifyExternalRenameAsync(
             "old", "new", isDirectory: true, Guid.NewGuid());
@@ -708,6 +766,8 @@ public class FileServiceTests
             "/storage/old", "/storage/new"), Times.Once);
         search.Verify(s => s.onFileRenamed(
             It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        cloudSyncPaths.Verify(updater => updater.RenamePathAsync(
+            _shareId, "old", "new"), Times.Once);
     }
 
     [Fact]

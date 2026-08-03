@@ -42,6 +42,23 @@ namespace Kaimo_File_Server.Core.Repositories
         Task UpdateAsync(ShareDefinition share);
 
         /// <summary>
+        /// Updates only the share name and storage path against the latest row,
+        /// preserving cloud-sync mappings and other concurrently changed fields.
+        /// </summary>
+        Task UpdateLocationAsync(Guid shareId, string name, string path);
+
+        /// <summary>
+        /// Merges runtime-only cloud-sync state into the latest persisted share
+        /// aggregate without overwriting concurrent share or mapping edits.
+        /// </summary>
+        /// <returns>False when the share or local mapping no longer exists.</returns>
+        Task<bool> UpdateCloudSyncRuntimeStateAsync(
+            Guid shareId,
+            string localPath,
+            DateTime? lastSync,
+            IReadOnlyDictionary<string, string> credentialChanges);
+
+        /// <summary>
         /// Deletes a share definition by its identifier.
         /// Implementations should cascade-delete related access entries and ACLs.
         /// </summary>

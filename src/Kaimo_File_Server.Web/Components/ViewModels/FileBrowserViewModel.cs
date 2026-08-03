@@ -312,6 +312,10 @@ public class FileBrowserViewModel
         {
             return OperationResult.Fail(Resources.Web_Error_AccessDenied);
         }
+        catch (CloudSyncOperationConflictException)
+        {
+            return OperationResult.Fail(Resources.Web_Error_ShareInUse);
+        }
         catch (IOException ex) when (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
         {
             return OperationResult.Fail(Resources.Web_Error_ItemExists);

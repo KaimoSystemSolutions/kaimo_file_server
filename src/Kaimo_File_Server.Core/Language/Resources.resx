@@ -2013,6 +2013,7 @@
   <data name="Web_CloudSync_Error_Missing" xml:space="preserve"><value>This cloud sync no longer exists.</value></data>
   <data name="Web_CloudSync_Error_Save" xml:space="preserve"><value>The cloud sync settings could not be saved.</value></data>
   <data name="Web_CloudSync_Error_Run" xml:space="preserve"><value>The cloud sync failed. Check the server log.</value></data>
+  <data name="Web_CloudSync_Error_Busy" xml:space="preserve"><value>This folder is already being synchronized or modified. Please try again later.</value></data>
   <data name="Web_CloudSync_Error_LocalFolder" xml:space="preserve"><value>Select an existing local folder.</value></data>
   <data name="Web_CloudSync_SharePanel_Help" xml:space="preserve"><value>Manage this share's local and remote folder mappings in the central cloud-sync workspace.</value></data>
   <data name="Web_CloudSync_SharePanel_Count" xml:space="preserve"><value>Configured syncs: {0}</value></data>

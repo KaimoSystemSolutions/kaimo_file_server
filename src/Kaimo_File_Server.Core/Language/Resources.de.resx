@@ -2013,6 +2013,7 @@
   <data name="Web_CloudSync_Error_Missing" xml:space="preserve"><value>Diese Cloud-Synchronisierung existiert nicht mehr.</value></data>
   <data name="Web_CloudSync_Error_Save" xml:space="preserve"><value>Die Cloud-Synchronisierungseinstellungen konnten nicht gespeichert werden.</value></data>
   <data name="Web_CloudSync_Error_Run" xml:space="preserve"><value>Die Cloud-Synchronisierung ist fehlgeschlagen. Bitte das Serverprotokoll prüfen.</value></data>
+  <data name="Web_CloudSync_Error_Busy" xml:space="preserve"><value>Dieser Ordner wird bereits synchronisiert oder geändert. Bitte später erneut versuchen.</value></data>
   <data name="Web_CloudSync_Error_LocalFolder" xml:space="preserve"><value>Bitte einen vorhandenen lokalen Ordner auswählen.</value></data>
   <data name="Web_CloudSync_SharePanel_Help" xml:space="preserve"><value>Die lokalen und entfernten Ordnerzuordnungen dieses Shares zentral in der Cloud-Synchronisierung verwalten.</value></data>
   <data name="Web_CloudSync_SharePanel_Count" xml:space="preserve"><value>Eingerichtete Synchronisierungen: {0}</value></data>

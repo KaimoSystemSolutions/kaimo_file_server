@@ -2,6 +2,7 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.SmbBridge.Grpc;
 using Kaimo_File_Server.SmbBridge.Services;
@@ -22,6 +23,8 @@ public sealed class AuthzGrpcServiceRenameTests : IDisposable
     private readonly ShareDefinition _share;
     private readonly UserContext _user;
     private readonly AuthzGrpcService _sut;
+    private readonly InMemoryCloudSyncOperationCoordinator _operations =
+        new(TimeProvider.System);
 
     public AuthzGrpcServiceRenameTests()
     {
@@ -47,7 +50,8 @@ public sealed class AuthzGrpcServiceRenameTests : IDisposable
             _auth.Object,
             _acl.Object,
             _config.Object,
-            NullLogger<AuthzGrpcService>.Instance);
+            NullLogger<AuthzGrpcService>.Instance,
+            _operations);
     }
 
     public void Dispose()
@@ -238,6 +242,23 @@ public sealed class AuthzGrpcServiceRenameTests : IDisposable
 
         Assert.False(reply.Allow);
         _acl.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task AuthorizeRename_OverlappingCloudSync_IsDeniedBeforeNativeRename()
+    {
+        Allow("docs/report.txt", false, FilePermission.Delete);
+        Allow("archive", true, FilePermission.CreateWriteData);
+        var syncLease = await _operations.TryBeginSyncAsync(
+            _share.Id, "docs");
+        Assert.NotNull(syncLease);
+        await using var activeSync = syncLease;
+
+        var reply = await AuthorizeAsync(
+            "docs/report.txt", "archive/report.txt", sourceIsDirectory: false);
+
+        Assert.False(reply.Allow);
+        Assert.Contains("cloud sync", reply.Reason);
     }
 
     [Fact]

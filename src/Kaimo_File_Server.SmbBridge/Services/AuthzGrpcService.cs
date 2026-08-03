@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.SmbBridge.Grpc;
 
@@ -80,6 +81,7 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
     private readonly IAclService _acl;
     private readonly ISmbConfigStore _config;
     private readonly ILogger<AuthzGrpcService> _logger;
+    private readonly ICloudSyncOperationCoordinator? _cloudSyncOperations;
 
     public AuthzGrpcService(
         IUserRepository users,
@@ -87,7 +89,8 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         IAuthenticationLookup auth,
         IAclService acl,
         ISmbConfigStore config,
-        ILogger<AuthzGrpcService> logger)
+        ILogger<AuthzGrpcService> logger,
+        ICloudSyncOperationCoordinator? cloudSyncOperations = null)
     {
         _users = users;
         _shares = shares;
@@ -95,6 +98,7 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
         _acl = acl;
         _config = config;
         _logger = logger;
+        _cloudSyncOperations = cloudSyncOperations;
     }
 
     public override async Task<AuthorizeReply> AuthorizeConnect(
@@ -515,6 +519,13 @@ public sealed class AuthzGrpcService : AuthzService.AuthzServiceBase
                 return Deny(replacementDelete.Reason);
             replacementSource = replacementDelete.Source;
         }
+
+        if (_cloudSyncOperations is not null &&
+            !await _cloudSyncOperations.TryReserveExternalPathMutationAsync(
+                share.Id, source, destination, TimeSpan.FromMinutes(2),
+                cancellationToken))
+            return Deny(
+                "rename denied: an overlapping cloud sync is currently running");
 
         _logger.LogDebug(
             "AuthorizeRename ALLOW: user={User} share={Share} source=[{Source}] destination=[{Destination}] dir={Directory} replace={Replace} sourceDelete={SourceDelete} replacementDelete={ReplacementDelete}",

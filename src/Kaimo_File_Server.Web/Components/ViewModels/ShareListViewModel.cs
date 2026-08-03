@@ -34,6 +34,7 @@ public partial class ShareListViewModel
     private readonly IReadOnlyList<string> _storagePools;
     private readonly IFileVersionService? _versionService;
     private readonly ISearchService? _searchService;
+    private readonly ICloudSyncOperationCoordinator? _cloudSyncOperations;
 
     public ShareListViewModel(
         IShareRepository shareRepo,
@@ -49,7 +50,8 @@ public partial class ShareListViewModel
         ILogger<ShareListViewModel> logger,
         IReadOnlyList<string> storagePools,
         IFileVersionService? versionService = null,
-        ISearchService? searchService = null)
+        ISearchService? searchService = null,
+        ICloudSyncOperationCoordinator? cloudSyncOperations = null)
     {
         _shareRepo = shareRepo;
         _userRepo = userRepo;
@@ -69,6 +71,7 @@ public partial class ShareListViewModel
         NewSharePoolPath = storagePools.FirstOrDefault() ?? string.Empty;
         _versionService = versionService;
         _searchService = searchService;
+        _cloudSyncOperations = cloudSyncOperations;
     }
 
     // -- State --
@@ -531,6 +534,14 @@ public partial class ShareListViewModel
 
             try
             {
+                var cloudOperation = await TryBeginCloudSafeShareMutationAsync(
+                    SelectedShare.Id);
+                if (!cloudOperation.Acquired)
+                {
+                    EditErrorMessage = Resources.Web_Error_ShareInUse;
+                    return false;
+                }
+                await using var cloudOperationLease = cloudOperation.Lease;
                 // The persisted share path is the source of truth. Keep the
                 // current pool and only replace the final directory component.
                 var oldFullPath = Path.GetFullPath(SelectedShare.Path);
@@ -551,9 +562,10 @@ public partial class ShareListViewModel
                 // the directory back so the old persisted path remains valid.
                 try
                 {
+                    await _shareRepo.UpdateLocationAsync(
+                        SelectedShare.Id, newName, newFullPath);
                     SelectedShare.Name = newName;
                     SelectedShare.Path = newFullPath;
-                    await _shareRepo.UpdateAsync(SelectedShare);
                 }
                 catch
                 {
@@ -677,13 +689,22 @@ public partial class ShareListViewModel
 
             try
             {
+                var cloudOperation = await TryBeginCloudSafeShareMutationAsync(
+                    SelectedShare.Id);
+                if (!cloudOperation.Acquired)
+                {
+                    EditErrorMessage = Resources.Web_Error_ShareInUse;
+                    return false;
+                }
+                await using var cloudOperationLease = cloudOperation.Lease;
                 var sourceWasCopied = await MoveDirectoryAcrossPoolsAsync(
                     sourcePath, destinationPath);
 
                 try
                 {
+                    await _shareRepo.UpdateLocationAsync(
+                        SelectedShare.Id, SelectedShare.Name, destinationPath);
                     SelectedShare.Path = destinationPath;
-                    await _shareRepo.UpdateAsync(SelectedShare);
                 }
                 catch
                 {
@@ -990,6 +1011,14 @@ public partial class ShareListViewModel
 
         try
         {
+            var cloudOperation = await TryBeginCloudSafeShareMutationAsync(
+                SelectedShare.Id);
+            if (!cloudOperation.Acquired)
+            {
+                EditErrorMessage = Resources.Web_Error_ShareInUse;
+                return false;
+            }
+            await using var cloudOperationLease = cloudOperation.Lease;
             var name = SelectedShare.Name;
             // Delete share-scoped lifecycle data before dropping the definition;
             // version cleanup also reclaims blobs that are no longer referenced.
@@ -1022,10 +1051,30 @@ public partial class ShareListViewModel
         if (!EnsureSelectedShareWritable())
             return;
 
+        var cloudOperation = await TryBeginCloudSafeShareMutationAsync(
+            SelectedShare.Id);
+        if (!cloudOperation.Acquired)
+        {
+            EditErrorMessage = Resources.Web_Error_ShareInUse;
+            return;
+        }
+        await using var cloudOperationLease = cloudOperation.Lease;
+
         SelectedShare.CloudConnection?.Dispose();
         SelectedShare.CloudSettings = null;
         SelectedShare.CloudConnection = null;
         await _shareRepo.UpdateAsync(SelectedShare);
+    }
+
+    private async Task<(bool Acquired, ICloudSyncOperationLease? Lease)>
+        TryBeginCloudSafeShareMutationAsync(Guid shareId)
+    {
+        if (_cloudSyncOperations is null)
+            return (true, null);
+
+        var lease = await _cloudSyncOperations.TryBeginShareMutationAsync(
+            shareId);
+        return (lease is not null, lease);
     }
     
     // -- Access Management --

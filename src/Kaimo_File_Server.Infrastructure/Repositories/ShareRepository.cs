@@ -75,6 +75,54 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
             await db.SaveChangesAsync();
         }
 
+        public async Task UpdateLocationAsync(
+            Guid shareId,
+            string name,
+            string path)
+        {
+            SambaName.EnsureValidShareName(name, nameof(name));
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            var share = await db.ShareDefinitions.FindAsync(shareId)
+                ?? throw new InvalidOperationException(
+                    $"Share '{shareId}' no longer exists.");
+            share.Name = name;
+            share.Path = path;
+            await db.SaveChangesAsync();
+        }
+
+        public async Task<bool> UpdateCloudSyncRuntimeStateAsync(
+            Guid shareId,
+            string localPath,
+            DateTime? lastSync,
+            IReadOnlyDictionary<string, string> credentialChanges)
+        {
+            string normalizedPath = CloudSyncPaths.Normalize(localPath);
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            var share = await db.ShareDefinitions.FindAsync(shareId);
+            if (share?.CloudSettings?.Folders is not { } folders)
+                return false;
+
+            string? persistedKey = folders.Keys.FirstOrDefault(key =>
+                string.Equals(
+                    CloudSyncPaths.Normalize(key), normalizedPath,
+                    StringComparison.OrdinalIgnoreCase));
+            if (persistedKey is null ||
+                !folders.TryGetValue(persistedKey, out var folder))
+                return false;
+
+            foreach (var (key, value) in credentialChanges)
+                folder.Data[key] = value;
+            if (lastSync.HasValue)
+                folder.LastSync = lastSync.Value;
+
+            // Force EF change detection for the JSON-converted aggregate while
+            // preserving every field freshly loaded in this context.
+            share.CloudSettings = new CloudSettings(
+                new Dictionary<string, SyncedFolder>(folders));
+            await db.SaveChangesAsync();
+            return true;
+        }
+
         public async Task DeleteAsync(Guid id)
         {
             await using var db = await _dbFactory.CreateDbContextAsync();
