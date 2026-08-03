@@ -1,0 +1,160 @@
+x-storage-pool-01: &storage-pool-01
+  ${LOCATION_STORAGE_01:-./data/storage/pool01}:/data/storage/pool01
+x-app-data: &app-data
+  ${LOCATION_APP_DATA:-./data/kaimo-system}:/data/kaimo-system
+x-logs: &logs
+  ${LOCATION_LOGS:-./data/logs}:/data/kaimo-logs
+
+x-bounded-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-dotnet-environment: &dotnet-environment
+  TZ: ${TZ:-Europe/Berlin}
+  KAIMO_LOG_LEVEL: ${KAIMO_LOG_LEVEL:-}
+  ConnectionStrings__Default: >-
+    Host=db;Database=${POSTGRES_DB:-kaimo_file_server};Username=${POSTGRES_USER:-kaimo};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+  LogArchive__RootPath: /data/kaimo-logs
+  NtHash__EncryptionKey: ${NT_HASH_ENCRYPTION_KEY:?Set NT_HASH_ENCRYPTION_KEY in .env}
+
+services:
+  pki-init:
+    image: kaimosystem/kaimo_file_server.samba_pki:${KAIMO_IMAGE_TAG:-latest}
+    volumes:
+      - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}:/pki
+    restart: "no"
+
+  db:
+    image: postgres:${POSTGRES_VERSION:-17-alpine}
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      POSTGRES_DB: ${POSTGRES_DB:-kaimo_file_server}
+      POSTGRES_USER: ${POSTGRES_USER:-kaimo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - ${LOCATION_DB:-./data/postgres}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    networks:
+      - database
+      - bridge-database
+
+  host:
+    image: kaimosystem/kaimo_file_server:${KAIMO_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Host.dll"]
+    environment:
+      <<: *dotnet-environment
+      KAIMO_LOG_SOURCE: host
+    volumes:
+      - *storage-pool-01
+      - *app-data
+      - *logs
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - default
+      - database
+
+  smb-bridge:
+    image: kaimosystem/kaimo_file_server.samba_bridge:${KAIMO_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    logging: *bounded-logging
+    environment:
+      <<: *dotnet-environment
+      KAIMO_LOG_SOURCE: smb-bridge
+      Snapshots__Cache__RootPath: /data/kaimo-system/.kaimo-snapshots
+    volumes:
+      - *storage-pool-01
+      - *app-data
+      - *logs
+      - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}/bridge:/run/secrets/kaimo-control-plane:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      pki-init:
+        condition: service_completed_successfully
+    networks:
+      bridge-database:
+      smb-control:
+        aliases:
+          - kaimo_smb_bridge
+
+  samba:
+    image: kaimosystem/kaimo_file_server.samba:${KAIMO_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    logging: *bounded-logging
+    dns_search:
+      - "."
+    ports:
+      - "${SAMBA_PORT:-445}:445"
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      KAIMO_LOG_SOURCE: samba
+      KAIMO_LOG_LEVEL: ${KAIMO_LOG_LEVEL:-}
+      KAIMO_LOG_ARCHIVE_ROOT: /data/kaimo-logs
+      KAIMO_BRIDGE_ADDR: kaimo_smb_bridge:5080
+      KAIMO_EVENT_SPOOL_PATH: /var/lib/kaimo/event-spool
+      KAIMO_SNAPSHOT_CACHE_ROOT: /data/kaimo-system/.kaimo-snapshots
+    volumes:
+      - *storage-pool-01
+      - *app-data
+      - *logs
+      - samba-event-spool:/var/lib/kaimo/event-spool
+      - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
+    tmpfs:
+      - /run/kaimo-user-sync:rw,noexec,nosuid,nodev,mode=0700,uid=0,gid=0
+    depends_on:
+      smb-bridge:
+        condition: service_started
+    networks:
+      - default
+      - smb-control
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/local/bin/authd-health.sh && /usr/local/bin/smbd-health.sh && /usr/local/bin/sync-health.sh || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 6
+      start_period: 20s
+
+  web:
+    image: kaimosystem/kaimo_file_server.web:${KAIMO_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Web.dll"]
+    ports:
+      - "${WEB_HTTP_PORT:-8081}:8080"
+      - "${WEB_HTTPS_PORT:-8443}:8443"
+    environment:
+      <<: *dotnet-environment
+      KAIMO_LOG_SOURCE: web
+      Jwt__Secret: ${JWT_SECRET:?Set JWT_SECRET in .env}
+    volumes:
+      - *storage-pool-01
+      - *app-data
+      - *logs
+    depends_on:
+      db:
+        condition: service_healthy
+      host:
+        condition: service_started
+    networks:
+      - default
+      - database
+
+networks:
+  smb-control:
+    internal: true
+  database:
+    internal: true
+  bridge-database:
+    internal: true
+
+volumes:
+  samba-event-spool:

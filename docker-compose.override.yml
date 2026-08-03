@@ -1,32 +1,22 @@
 services:
   kaimo_file_server.host:
     environment:
-      - DOTNET_ENVIRONMENT=Development
-      # Dev-only key. MUST match the web service (host reads, web writes). Set a real, random
-      # NtHash__EncryptionKey via env in production.
-      - NtHash__EncryptionKey=DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey
+      DOTNET_ENVIRONMENT: Development
+      NtHash__EncryptionKey: ${NT_HASH_ENCRYPTION_KEY:-DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey}
     volumes:
-      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-      - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+      - ${APPDATA:-./tests/data/user-secrets}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+      - ${APPDATA:-./tests/data/user-secrets}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
 
   kaimo_smb_bridge:
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      # MUST match Host/Web, otherwise encrypted
-      # NT hashes cannot be decrypted.
-      - NtHash__EncryptionKey=DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey
+      ASPNETCORE_ENVIRONMENT: Development
+      NtHash__EncryptionKey: ${NT_HASH_ENCRYPTION_KEY:-DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey}
 
   kaimo_file_server.web:
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      # Dev-only key. MUST match the host service (host reads, web writes). Set a real, random
-      # NtHash__EncryptionKey via env in production.
-      - NtHash__EncryptionKey=DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey
+      ASPNETCORE_ENVIRONMENT: Development
+      Jwt__Secret: ${JWT_SECRET:-DevOnly-LocalDevelopment-DoNotUseInProduction-JwtSecret}
+      NtHash__EncryptionKey: ${NT_HASH_ENCRYPTION_KEY:-DevOnly-LocalDevelopment-DoNotUseInProduction-NtHashKey}
     volumes:
-      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
-      - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
-
-  kaimo_samba:
-    dns_search:
-      - "."
- 
+      - ${APPDATA:-./tests/data/user-secrets}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+      - ${APPDATA:-./tests/data/user-secrets}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro

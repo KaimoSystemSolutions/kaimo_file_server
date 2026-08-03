@@ -1,20 +1,32 @@
-x-vol-storage-pool-01: &vol-storage-pool-01 ${LOCATION_STORAGE_01:-./tests/data/storage/pool01}:/data/storage/pool01
-x-vol-storage-pool-02: &vol-storage-pool-02 ${LOCATION_STORAGE_02:-./tests/data/storage/pool02}:/data/storage/pool02
-x-vol-app-data: &vol-app-data               ${LOCATION_APP_DATA:-./tests/data/kaimo-system}:/data/kaimo-system
-x-vol-logs: &vol-logs                       ${LOCATION_LOGS:-./tests/data/logs}:/data/kaimo-logs
+x-storage-pool-01: &storage-pool-01
+  ${LOCATION_STORAGE_01:-./tests/data/storage/pool01}:/data/storage/pool01
+x-app-data: &app-data
+  ${LOCATION_APP_DATA:-./tests/data/kaimo-system}:/data/kaimo-system
+x-logs: &logs
+  ${LOCATION_LOGS:-./tests/data/logs}:/data/kaimo-logs
+
 x-bounded-logging: &bounded-logging
   driver: json-file
   options:
     max-size: "10m"
     max-file: "3"
 
+x-dotnet-environment: &dotnet-environment
+  TZ: ${TZ:-Europe/Berlin}
+  KAIMO_LOG_LEVEL: ${KAIMO_LOG_LEVEL:-}
+  ConnectionStrings__Default: >-
+    Host=kaimo_file_server_db;Database=${POSTGRES_DB:-kaimo_file_server};Username=${POSTGRES_USER:-kaimo_test_user};Password=${POSTGRES_PASSWORD:-change_me}
+  LogArchive__RootPath: /data/kaimo-logs
+  LogArchive__MaxFileBytes: ${KAIMO_LOG_ARCHIVE_MAX_FILE_BYTES:-10485760}
+  LogArchive__RetentionDays: ${KAIMO_LOG_ARCHIVE_RETENTION_DAYS:-14}
+  LogArchive__MaxBytesPerSource: ${KAIMO_LOG_ARCHIVE_MAX_SOURCE_BYTES:-262144000}
+  NtHash__EncryptionKey: ${NT_HASH_ENCRYPTION_KEY:-}
 
 services:
-  # One-shot bootstrap for local development. It creates the complete mTLS PKI
-  # on the first Compose start and becomes a no-op when all files already exist.
-  # Externally managed production PKI can use the same directory layout.
+  # Generates the local mTLS control-plane PKI once. Externally managed
+  # production certificates can use the same directory layout.
   kaimo_smb_pki_init:
-    image: ${DOCKER_REGISTRY-}kaimosmbpki
+    image: ${KAIMO_PKI_IMAGE:-kaimosmbpki}
     build:
       context: ./src/samba-vfs
       dockerfile: Dockerfile.pki
@@ -23,182 +35,118 @@ services:
     restart: "no"
 
   kaimo_file_server.host:
-    image: ${DOCKER_REGISTRY-}kaimofileserver
+    image: ${KAIMO_HOST_IMAGE:-kaimofileserver}
     container_name: kaimo_file_server
-    # umask 002 -> newly created files become 0664 (group-writable) so that the
-    # Samba side (group kaimo) can overwrite them. Fallback for filesystems without ACL
-    # support (drvfs/9p on Windows dev machine); on ext4 the default ACLs from the
-    # Samba entrypoint handle this. See src/samba-vfs/README.md (Storage Ownership).
-    entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Host.dll"]
-    #environment:
-      #KAIMO_LOG_LEVEL: ${#KAIMO_LOG_LEVEL:-}
-    volumes:
-      - *vol-storage-pool-01
-      #- *vol-storage-pool-02
-      - *vol-app-data
-      - *vol-logs
-    environment:
-      KAIMO_LOG_SOURCE: host
-      LogArchive__RootPath: /data/kaimo-logs
-    depends_on:
-      kaimo_file_server_db:
-        condition: service_healthy
-      #elasticsearch:
-      #  condition: service_healthy
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.Host/Dockerfile
+    entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Host.dll"]
+    environment:
+      <<: *dotnet-environment
+      KAIMO_LOG_SOURCE: host
+    volumes:
+      - *storage-pool-01
+      - *app-data
+      - *logs
+    depends_on:
+      kaimo_file_server_db:
+        condition: service_healthy
     networks:
       - default
       - kaimo_database
 
-  # Samba gRPC control plane. It is reachable only from Samba through the
-  # dedicated internal control network and requires mutually authenticated TLS.
+  # Internal, mutually authenticated gRPC control plane for Samba.
   kaimo_smb_bridge:
-    image: ${DOCKER_REGISTRY-}kaimosmbbridge
+    image: ${KAIMO_SMB_BRIDGE_IMAGE:-kaimosmbbridge}
     container_name: kaimo_smb_bridge
-    logging: *bounded-logging
     build:
       context: .
       dockerfile: src/Kaimo_File_Server.SmbBridge/Dockerfile
+    logging: *bounded-logging
+    environment:
+      <<: *dotnet-environment
+      KAIMO_LOG_SOURCE: smb-bridge
+      Snapshots__Cache__RootPath: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}
+      Snapshots__Cache__TtlHours: ${KAIMO_SNAPSHOT_CACHE_TTL_HOURS:-24}
+      Snapshots__Cache__MaxBytesPerShare: ${KAIMO_SNAPSHOT_CACHE_MAX_BYTES_PER_SHARE:-5368709120}
+      Snapshots__Cache__SweepMinutes: ${KAIMO_SNAPSHOT_CACHE_SWEEP_MINUTES:-30}
+      Snapshots__Materialization__MaxFilesPerRequest: ${KAIMO_SNAPSHOT_MAX_FILES:-10000}
+      Snapshots__Materialization__MaxBytesPerRequest: ${KAIMO_SNAPSHOT_MAX_REQUEST_BYTES:-1073741824}
+      Snapshots__Materialization__MaxConcurrentRequests: ${KAIMO_SNAPSHOT_MAX_CONCURRENT_REQUESTS:-2}
+      Snapshots__Materialization__MaxDurationSeconds: ${KAIMO_SNAPSHOT_MAX_DURATION_SECONDS:-25}
+      LifecycleEvents__ReceiptRetentionDays: ${KAIMO_EVENT_RECEIPT_RETENTION_DAYS:-30}
+    volumes:
+      - *storage-pool-01
+      - *app-data
+      - *logs
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/bridge:/run/secrets/kaimo-control-plane:ro
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
       kaimo_smb_pki_init:
         condition: service_completed_successfully
-    environment:
-      KAIMO_LOG_SOURCE: smb-bridge
-      LogArchive__RootPath: /data/kaimo-logs
-      #KAIMO_LOG_LEVEL: ${#KAIMO_LOG_LEVEL:-}
-      # Global internal cache, outside every configured share path.
-      # Must match KAIMO_SNAPSHOT_CACHE_ROOT in the Samba container.
-      Snapshots__Cache__RootPath: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}
-      # P2-08: startup-validated cache retention and sweep bounds.
-      Snapshots__Cache__TtlHours: ${KAIMO_SNAPSHOT_CACHE_TTL_HOURS:-24}
-      Snapshots__Cache__MaxBytesPerShare: ${KAIMO_SNAPSHOT_CACHE_MAX_BYTES_PER_SHARE:-5368709120}
-      Snapshots__Cache__SweepMinutes: ${KAIMO_SNAPSHOT_CACHE_SWEEP_MINUTES:-30}
-      # P1-09: preflight and runtime bounds for eager folder projections.
-      # Keep the duration below KAIMO_VFS_SNAPSHOT_TIMEOUT_MS.
-      Snapshots__Materialization__MaxFilesPerRequest: ${KAIMO_SNAPSHOT_MAX_FILES:-10000}
-      Snapshots__Materialization__MaxBytesPerRequest: ${KAIMO_SNAPSHOT_MAX_REQUEST_BYTES:-1073741824}
-      Snapshots__Materialization__MaxConcurrentRequests: ${KAIMO_SNAPSHOT_MAX_CONCURRENT_REQUESTS:-2}
-      Snapshots__Materialization__MaxDurationSeconds: ${KAIMO_SNAPSHOT_MAX_DURATION_SECONDS:-25}
-      # P1-11: completed event IDs remain long enough to deduplicate delayed
-      # sidecar retries across bridge/database restarts.
-      LifecycleEvents__ReceiptRetentionDays: ${KAIMO_EVENT_RECEIPT_RETENTION_DAYS:-30}
-    volumes:
-      - *vol-storage-pool-01
-      #- *vol-storage-pool-02
-      - *vol-app-data
-      - *vol-logs
-      # Mount only the server identity and public client CA. Client private
-      # keys are available exclusively in the Samba container.
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/bridge:/run/secrets/kaimo-control-plane:ro
     networks:
       - kaimo_bridge_database
       - kaimo_smb_control
 
-  # Real Samba (smbd) + custom VFS module (kaimo_bridge) — the SMB protocol layer
-  # since the Phase 5 cutover. It fully replaces the former in-process .NET SMB
-  # server (removed with the Kaimo_File_Server.Smb project); Samba owns port 445.
-  # Auth/ACLs/versioning/shares/protocol settings and @GMT "Previous Versions" run
-  # through the gRPC control plane (kaimo_smb_bridge); the data path stays native.
-  # Details: src/samba-vfs/README.md and docu/smb-samba-vfs-migration.md
+  # Samba owns the native SMB data path; authorization and configuration are
+  # supplied by the bridge over the isolated mTLS network.
   kaimo_samba:
-    image: ${DOCKER_REGISTRY-}kaimosamba
+    image: ${KAIMO_SAMBA_IMAGE:-kaimosamba}
     container_name: kaimo_samba
-    # authd and smbd are one supervised security unit. Any unexpected exit
-    # fails the container; restart the complete unit instead of leaving Samba
-    # alive indefinitely without its authorization sidecar.
-    restart: unless-stopped
-    logging: *bounded-logging
-    # Neutralize search domain inherited from host (e.g., home.lab). Otherwise the
-    # gRPC C++ client (c-ares, NOT glibc/NSS) appends it to the bridge service name
-    # -> asks "kaimo_smb_bridge.home.lab" -> Docker forwards to LAN DNS,
-    # which resolves unknown names via wildcard to wrong LAN IP ->
-    # "Connection refused". "." = empty search domain, so only the bare
-    # service name remains, which the embedded Docker DNS (127.0.0.11) resolves correctly.
-    dns_search:
-      - "."
-    ports:
-      - 445:445
-    volumes:
-      - *vol-storage-pool-01
-      #- *vol-storage-pool-02
-      - *vol-app-data
-      - *vol-logs
-      # P1-11: survives Samba container recreation, not only process restarts.
-      - kaimo_samba_event_spool:/var/lib/kaimo/event-spool
-      # Mount the single Samba workload identity and public control-plane CA.
-      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
-    # P2-11: decrypted NT hashes exist only in short-lived mode-0600 staging
-    # files during validation/import. Keep those files off the writable image
-    # layer and discard the complete runtime directory on container stop.
-    tmpfs:
-      - /run/kaimo-user-sync:rw,noexec,nosuid,nodev,mode=0700,uid=0,gid=0
     build:
       context: ./src/samba-vfs
       dockerfile: Dockerfile.vfs
-    depends_on:
-      - kaimo_smb_bridge
+    restart: unless-stopped
+    logging: *bounded-logging
+    dns_search:
+      - "."
+    ports:
+      - "${SAMBA_PORT:-445}:445"
     environment:
+      TZ: ${TZ:-Europe/Berlin}
       KAIMO_LOG_SOURCE: samba
+      KAIMO_LOG_LEVEL: ${KAIMO_LOG_LEVEL:-}
       KAIMO_LOG_ARCHIVE_ROOT: /data/kaimo-logs
       KAIMO_LOG_ARCHIVE_MAX_FILE_BYTES: ${KAIMO_LOG_ARCHIVE_MAX_FILE_BYTES:-10485760}
       KAIMO_LOG_ARCHIVE_RETENTION_DAYS: ${KAIMO_LOG_ARCHIVE_RETENTION_DAYS:-14}
       KAIMO_LOG_ARCHIVE_MAX_SOURCE_BYTES: ${KAIMO_LOG_ARCHIVE_MAX_SOURCE_BYTES:-262144000}
-      # Highest-priority manual override for .NET, Samba and native stack logging.
-      # Allowed: Debug, Information, Warning, Error. Empty = Settings page controls it.
-      #KAIMO_LOG_LEVEL: ${#KAIMO_LOG_LEVEL:-}
-      # Address of gRPC bridge for NT hash sync (kaimo_authsync).
       KAIMO_BRIDGE_ADDR: kaimo_smb_bridge:5080
-      # Authz fail mode when the bridge/authd is unreachable. Default is fail-CLOSED
-      # (deny) so a bridge outage cannot silently grant access. Set to "1" to fail
-      # OPEN (allow on error) only if availability must trump security in a given env.
-      KAIMO_AUTHZ_FAILOPEN: "0"
-      # P1-01: fixed authd concurrency and bounded accepted-client queue.
-      # Silent local clients lose their worker after the I/O deadline.
+      KAIMO_AUTHZ_FAILOPEN: ${KAIMO_AUTHZ_FAILOPEN:-0}
       KAIMO_AUTHD_WORKERS: ${KAIMO_AUTHD_WORKERS:-16}
       KAIMO_AUTHD_QUEUE_CAPACITY: ${KAIMO_AUTHD_QUEUE_CAPACITY:-64}
       KAIMO_AUTHD_IO_TIMEOUT_MS: ${KAIMO_AUTHD_IO_TIMEOUT_MS:-2000}
-      # P1-05: absolute VFS-side budgets cover local connect + complete frame
-      # send + complete response read. Events use a separate short enqueue budget.
       KAIMO_VFS_AUTH_TIMEOUT_MS: ${KAIMO_VFS_AUTH_TIMEOUT_MS:-6000}
       KAIMO_VFS_SNAPSHOT_TIMEOUT_MS: ${KAIMO_VFS_SNAPSHOT_TIMEOUT_MS:-32000}
       KAIMO_VFS_EVENT_TIMEOUT_MS: ${KAIMO_VFS_EVENT_TIMEOUT_MS:-250}
-      # P1-04: private local control socket. Synced Samba users receive this as
-      # a secondary group; authd additionally verifies SO_PEERCRED + smbd inode.
       KAIMO_AUTHD_GROUP: kaimo-authd
       KAIMO_AUTHD_PEER_EXECUTABLE: /opt/samba/sbin/smbd
-      # P1-02: bounded LRU authorization cache. TTL is also the documented
-      # maximum ACL-revocation delay for an already cached open decision.
       KAIMO_AUTHD_CACHE_MAX_ENTRIES: ${KAIMO_AUTHD_CACHE_MAX_ENTRIES:-10000}
       KAIMO_AUTHD_CACHE_MAX_BYTES: ${KAIMO_AUTHD_CACHE_MAX_BYTES:-8388608}
       KAIMO_AUTHD_CACHE_TTL_MS: ${KAIMO_AUTHD_CACHE_TTL_MS:-3000}
-      # P1-11: durable lifecycle queue. A VFS event is acknowledged locally only
-      # after its fsync+rename publication. Failed gRPC deliveries back off and
-      # eventually move to the bounded dead-letter directory.
       KAIMO_EVENT_SPOOL_PATH: /var/lib/kaimo/event-spool
       KAIMO_EVENT_MAX_PENDING: ${KAIMO_EVENT_MAX_PENDING:-100000}
       KAIMO_EVENT_MAX_DEAD: ${KAIMO_EVENT_MAX_DEAD:-10000}
       KAIMO_EVENT_MAX_ATTEMPTS: ${KAIMO_EVENT_MAX_ATTEMPTS:-20}
       KAIMO_EVENT_RETRY_BASE_MS: ${KAIMO_EVENT_RETRY_BASE_MS:-1000}
       KAIMO_EVENT_RETRY_MAX_MS: ${KAIMO_EVENT_RETRY_MAX_MS:-60000}
-      # P2-13: normal-operation polling bounds. The hash-bearing user export
-      # remains fixed at 60s; share/service state uses the tighter 1-5s contract.
       KAIMO_USER_SYNC_INTERVAL_SECONDS: ${KAIMO_USER_SYNC_INTERVAL_SECONDS:-60}
       KAIMO_SHARE_SYNC_INTERVAL_SECONDS: ${KAIMO_SHARE_SYNC_INTERVAL_SECONDS:-2}
       KAIMO_CONFIG_SYNC_INTERVAL_SECONDS: ${KAIMO_CONFIG_SYNC_INTERVAL_SECONDS:-2}
-      # Health fails after any sync failure or when users/shares/config have not
-      # all converged within this window.
       KAIMO_SYNC_HEALTH_MAX_AGE_SECONDS: ${KAIMO_SYNC_HEALTH_MAX_AGE_SECONDS:-180}
-      # @GMT "Previous Versions" data-path redirect (openat hook). "1" = on (serve the
-      # materialized version copy). Set to "0" to disable the redirect at runtime
-      # (no rebuild) if it ever misbehaves; timewarp opens then fail closed.
-      KAIMO_SNAPSHOT_OPENAT: "1"
-      # Must match Snapshots__Cache__RootPath in kaimo_smb_bridge. This internal
-      # directory is outside all share pools and is never published by Samba.
+      KAIMO_SNAPSHOT_OPENAT: ${KAIMO_SNAPSHOT_OPENAT:-1}
       KAIMO_SNAPSHOT_CACHE_ROOT: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}
+    volumes:
+      - *storage-pool-01
+      - *app-data
+      - *logs
+      - kaimo_samba_event_spool:/var/lib/kaimo/event-spool
+      - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
+    tmpfs:
+      - /run/kaimo-user-sync:rw,noexec,nosuid,nodev,mode=0700,uid=0,gid=0
+    depends_on:
+      kaimo_smb_bridge:
+        condition: service_started
     networks:
       - default
       - kaimo_smb_control
@@ -210,115 +158,69 @@ services:
       start_period: 20s
 
   kaimo_file_server.web:
-    image: ${DOCKER_REGISTRY-}kaimofileserverweb
+    image: ${KAIMO_WEB_IMAGE:-kaimofileserverweb}
     container_name: kaimo_file_server_web
-    ports:
-      - 8081:8080
-      - 8443:8443
-    environment:
-      TZ: Europe/Berlin
-      KAIMO_LOG_SOURCE: web
-      LogArchive__RootPath: /data/kaimo-logs
-      #KAIMO_LOG_LEVEL: ${#KAIMO_LOG_LEVEL:-}
-      GOOGLE_APPLICATION_CREDENTIALS: /tests/data/logins/google-service-account.json
-        
-    # umask 002 -> new files 0664 (group-writable) so that Samba side
-    # (group kaimo) can overwrite them. Fallback for filesystems without ACL support
-    # (drvfs/9p, Windows dev); on ext4 the default ACLs from the
-    # Samba entrypoint handle this. See src/samba-vfs/README.md (Storage Ownership).
+    build:
+      context: .
+      dockerfile: src/Kaimo_File_Server.Web/Dockerfile
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Web.dll"]
+    ports:
+      - "${WEB_HTTP_PORT:-8081}:8080"
+      - "${WEB_HTTPS_PORT:-8443}:8443"
+    environment:
+      <<: *dotnet-environment
+      KAIMO_LOG_SOURCE: web
+      Jwt__Secret: ${JWT_SECRET:-}
+      GOOGLE_APPLICATION_CREDENTIALS: /data/logins/google-service-account.json
     volumes:
-      - *vol-storage-pool-01
-      #- *vol-storage-pool-02
-      - *vol-app-data
-      - *vol-logs
+      - *storage-pool-01
+      - *app-data
+      - *logs
       - ${LOCATION_GDRIVE_CREDENTIALS:-./tests/data/logins/google-service-account.json}:/data/logins/google-service-account.json:ro
-      
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
       kaimo_file_server.host:
         condition: service_started
-      #elasticsearch:
-      #  condition: service_healthy
-    build:
-      context: .
-      dockerfile: src/Kaimo_File_Server.Web/Dockerfile
     networks:
       - default
       - kaimo_database
 
   kaimo_file_server_db:
+    image: postgres:${POSTGRES_VERSION:-17-alpine}
     container_name: kaimo_file_server_db
-    image: postgres:17-alpine
     environment:
-      TZ: Europe/Berlin
-      POSTGRES_DB: kaimo_file_server
-      POSTGRES_USER: kaimo_test_user
-      POSTGRES_PASSWORD: change_me
+      TZ: ${TZ:-Europe/Berlin}
+      POSTGRES_DB: ${POSTGRES_DB:-kaimo_file_server}
+      POSTGRES_USER: ${POSTGRES_USER:-kaimo_test_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
     volumes:
       - ${LOCATION_DB:-./tests/data/postgres}:/var/lib/postgresql/data
     ports:
-      - 5432:5432
+      - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kaimo_test_user -d kaimo_file_server"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 2s
       timeout: 5s
       retries: 10
     networks:
       - kaimo_database
       - kaimo_bridge_database
-      
-  #elasticsearch:
-  #  container_name: kaimo_elasticsearch
-  #  image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
-  #  environment:
-  #    TZ: Europe/Berlin
-  #    discovery.type: single-node
-  #    xpack.security.enabled: "false"
-  #    ES_JAVA_OPTS: "-Xms2g -Xmx2g"
-  #    # Dev machine: disk can fill more before ES blocks shard allocation.
-  #    # Default is 85/90/95% -> on a nearly full C:
-  #    # otherwise every shard remains "unassigned" and the cluster turns red.
-  #    cluster.routing.allocation.disk.watermark.low: "95%"
-  #    cluster.routing.allocation.disk.watermark.high: "97%"
-  #    cluster.routing.allocation.disk.watermark.flood_st  age: "98%"
-  #  volumes:
-  #    - ${LOCATION_ES:-./tests/data/elastic_search}:/usr/share/elasticsearch/data
-  #  ports:
-  #    - "9200:9200"
-  #  healthcheck:
-  #    test: ["CMD-SHELL", "curl -fsSL 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s' || exit 1"]
-  #    interval: 5s
-  #    timeout: 5s
-  #    retries: 30
-  #    start_period: 30s
 
-      # Reserve Memory Addresses for files straight away. Elastic search loads up files on demand later on 
-      # sudo sysctl -w vm.max_map_count=262144
-      # echo "vm.max_map_count=262144" | sudo tee -a /etc/sysctl.conf
-      #  
-      # give permissions to folder:
-      # sudo chown -R 1000:1000 ./tests/data/elasticsearch-9.4
-  
-  
   adminer:
-    image: adminer
+    image: adminer:${ADMINER_VERSION:-latest}
     restart: always
     ports:
-      - 8080:8080
+      - "${ADMINER_PORT:-8080}:8080"
     networks:
       - default
       - kaimo_database
+
 networks:
-  # No unrelated application service is attached to the gRPC control plane.
   kaimo_smb_control:
     internal: true
-  # The bridge reaches PostgreSQL without joining the general application net.
   kaimo_database:
     internal: true
-  # Point-to-point trust segment: only PostgreSQL and the SMB bridge join it.
-  # Web/Adminer cannot route to the bridge through their DB segment.
   kaimo_bridge_database:
     internal: true
 

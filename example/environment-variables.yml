@@ -1,7 +1,0 @@
-# All environment variables for all of the images
-
-KAIMO_LOG_LEVEL=
-            #  =Debug
-            #  =Information
-            #  =Warning
-            #  =Error
