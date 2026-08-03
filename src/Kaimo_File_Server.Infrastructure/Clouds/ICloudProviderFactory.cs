@@ -5,7 +5,7 @@ namespace Kaimo_File_Server.Infrastructure.Clouds;
 
 public interface ICloudProviderFactory
 {
+    IReadOnlyCollection<ICloudProvider> Providers { get; }
     ICloudConnection CreateOrLoad(Guid shareId, SyncedFolder folder);
-    public void DisposeConnection(SyncedFolder folder);
-    
+    Task DisposeConnectionAsync(Guid shareId, SyncedFolder folder);
 }

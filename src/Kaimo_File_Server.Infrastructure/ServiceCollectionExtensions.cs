@@ -79,6 +79,7 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<DatabaseSeeder>();
             
             // -- Cloud --
+            services.AddSingleton<ICloudProvider, GoogleDriveProvider>();
             services.AddSingleton<ICloudProviderFactory, CloudProviderFactory>();
             
             return services;

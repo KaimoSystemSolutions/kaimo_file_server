@@ -1,0 +1,94 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AssetProvider Assets
+
+@if (IsOpen)
+{
+    <div class="modal-backdrop" @onclick="CloseAsync">
+        <div class="modal-dialog directory-picker" role="dialog" aria-modal="true"
+             aria-label="@Title" @onclick:stopPropagation="true">
+            <h3 class="modal-title">@Title</h3>
+
+            <div class="directory-picker-path" title="@DisplayPath">@DisplayPath</div>
+
+            <div class="directory-picker-toolbar">
+                <button class="btn-secondary" type="button" disabled="@IsAtRoot" @onclick="NavigateToParentAsync">
+                    @Assets.SVG("chevron_left.svg", new SvgOptions(Width: 15, Height: 15, StrokeWidth: 2))
+                    <span>@Text("Web_CloudSync_Directory_Parent", "Parent folder")</span>
+                </button>
+            </div>
+
+            <div class="directory-picker-list" role="listbox">
+                @if (IsLoading)
+                {
+                    <div class="directory-picker-state">
+                        <div class="spinner"></div>
+                        <span>@Text("Web_CloudSync_Directory_Loading", "Loading folders…")</span>
+                    </div>
+                }
+                else if (Items.Count == 0)
+                {
+                    <div class="directory-picker-state">
+                        <span>@Text("Web_CloudSync_Directory_Empty", "This folder contains no subfolders.")</span>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var item in Items)
+                    {
+                        <button class="directory-picker-item" type="button"
+                                @onclick="() => OnNavigate.InvokeAsync(item.Path)">
+                            @Assets.SVG("folder.svg", new SvgOptions(Width: 22, Height: 22))
+                            <span>@item.Name</span>
+                        </button>
+                    }
+                }
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+            {
+                <div class="modal-error">@ErrorMessage</div>
+            }
+
+            <div class="modal-actions">
+                <button class="btn-secondary" type="button" @onclick="CloseAsync">@Resources.Web_Button_Cancel</button>
+                <button class="btn-primary" type="button" disabled="@IsLoading"
+                        @onclick="() => OnSelected.InvokeAsync(CurrentPath)">
+                    @Text("Web_CloudSync_Directory_Select", "Select this folder")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public bool IsRemote { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string CurrentPath { get; set; } = "";
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public IReadOnlyList<CloudDirectoryItem> Items { get; set; } = [];
+    [Parameter] public EventCallback<string> OnNavigate { get; set; }
+    [Parameter] public EventCallback<string> OnSelected { get; set; }
+    [Parameter] public EventCallback OnClosed { get; set; }
+
+    private string RootPath => IsRemote ? "/" : "";
+    private string DisplayPath => string.IsNullOrEmpty(CurrentPath) ? "/" : CurrentPath;
+    private bool IsAtRoot => string.Equals(CurrentPath, RootPath, StringComparison.Ordinal);
+
+    private Task CloseAsync() => OnClosed.InvokeAsync();
+
+    private Task NavigateToParentAsync()
+    {
+        var normalized = CurrentPath.Replace('\\', '/').Trim('/');
+        var separator = normalized.LastIndexOf('/');
+        var parent = separator < 0 ? "" : normalized[..separator];
+        if (IsRemote)
+            parent = parent.Length == 0 ? "/" : $"/{parent}";
+        return OnNavigate.InvokeAsync(parent);
+    }
+
+    private static string Text(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
+}

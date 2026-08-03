@@ -1968,4 +1968,53 @@
   <data name="Web_ShareList_Card_Disabled" xml:space="preserve">
     <value>Deaktiviert</value>
   </data>
+  <data name="Web_Nav_CloudSync" xml:space="preserve"><value>Cloud-Synchronisierung</value></data>
+  <data name="Web_CloudSync_Title" xml:space="preserve"><value>Cloud-Synchronisierung</value></data>
+  <data name="Web_CloudSync_Subtitle" xml:space="preserve"><value>Lokale und entfernte Ordnersynchronisierungen für alle Cloud-Anbieter verwalten.</value></data>
+  <data name="Web_CloudSync_Create" xml:space="preserve"><value>Cloud-Synchronisierung hinzufügen</value></data>
+  <data name="Web_CloudSync_Create_Title" xml:space="preserve"><value>Ordner verbinden</value></data>
+  <data name="Web_CloudSync_Create_Help" xml:space="preserve"><value>Lokalen Ordner und Anbieter auswählen. Der entfernte Ordner kann nach der Autorisierung gewählt werden.</value></data>
+  <data name="Web_CloudSync_Loading" xml:space="preserve"><value>Cloud-Synchronisierungen werden geladen…</value></data>
+  <data name="Web_CloudSync_Empty" xml:space="preserve"><value>Es wurden noch keine Cloud-Synchronisierungen eingerichtet.</value></data>
+  <data name="Web_CloudSync_Select" xml:space="preserve"><value>Eine Cloud-Synchronisierung auswählen, um ihre Einstellungen anzuzeigen.</value></data>
+  <data name="Web_CloudSync_Share" xml:space="preserve"><value>Share</value></data>
+  <data name="Web_CloudSync_Provider" xml:space="preserve"><value>Cloud-Anbieter</value></data>
+  <data name="Web_CloudSync_LocalFolder" xml:space="preserve"><value>Lokaler Ordner</value></data>
+  <data name="Web_CloudSync_RemoteFolder" xml:space="preserve"><value>Entfernter Ordner</value></data>
+  <data name="Web_CloudSync_Browse" xml:space="preserve"><value>Durchsuchen…</value></data>
+  <data name="Web_CloudSync_Connect" xml:space="preserve"><value>Autorisieren und verbinden</value></data>
+  <data name="Web_CloudSync_Mode" xml:space="preserve"><value>Synchronisierungsmodus</value></data>
+  <data name="Web_CloudSync_Mode_TwoWay" xml:space="preserve"><value>Beidseitig</value></data>
+  <data name="Web_CloudSync_Mode_Pull" xml:space="preserve"><value>Abrufen (Cloud → lokal)</value></data>
+  <data name="Web_CloudSync_Mode_Push" xml:space="preserve"><value>Hochladen (lokal → Cloud)</value></data>
+  <data name="Web_CloudSync_LastSync" xml:space="preserve"><value>Letzte Synchronisierung</value></data>
+  <data name="Web_CloudSync_Never" xml:space="preserve"><value>Nie</value></data>
+  <data name="Web_CloudSync_Save" xml:space="preserve"><value>Einstellungen speichern</value></data>
+  <data name="Web_CloudSync_Run" xml:space="preserve"><value>Jetzt synchronisieren</value></data>
+  <data name="Web_CloudSync_Unsync" xml:space="preserve"><value>Cloud-Synchronisierung entfernen</value></data>
+  <data name="Web_CloudSync_Unsync_Confirm" xml:space="preserve"><value>Diese Konfiguration entfernen und ihre Cloud-Verbindung widerrufen?</value></data>
+  <data name="Web_CloudSync_Connected" xml:space="preserve"><value>Der Cloud-Anbieter wurde erfolgreich verbunden.</value></data>
+  <data name="Web_CloudSync_Saved" xml:space="preserve"><value>Cloud-Synchronisierungseinstellungen wurden gespeichert.</value></data>
+  <data name="Web_CloudSync_Removed" xml:space="preserve"><value>Cloud-Synchronisierung wurde entfernt.</value></data>
+  <data name="Web_CloudSync_Progress" xml:space="preserve"><value>Synchronisierung läuft…</value></data>
+  <data name="Web_CloudSync_Complete" xml:space="preserve"><value>Synchronisierung abgeschlossen.</value></data>
+  <data name="Web_CloudSync_Directory_LocalTitle" xml:space="preserve"><value>Lokalen Ordner auswählen</value></data>
+  <data name="Web_CloudSync_Directory_RemoteTitle" xml:space="preserve"><value>Entfernten Ordner auswählen</value></data>
+  <data name="Web_CloudSync_Directory_Parent" xml:space="preserve"><value>Übergeordneter Ordner</value></data>
+  <data name="Web_CloudSync_Directory_Select" xml:space="preserve"><value>Diesen Ordner auswählen</value></data>
+  <data name="Web_CloudSync_Directory_Loading" xml:space="preserve"><value>Ordner werden geladen…</value></data>
+  <data name="Web_CloudSync_Directory_Empty" xml:space="preserve"><value>Dieser Ordner enthält keine Unterordner.</value></data>
+  <data name="Web_CloudSync_Directory_Error" xml:space="preserve"><value>Dieser Ordner konnte nicht geöffnet werden.</value></data>
+  <data name="Web_CloudSync_Error_Load" xml:space="preserve"><value>Die Cloud-Synchronisierungen konnten nicht geladen werden.</value></data>
+  <data name="Web_CloudSync_Error_ShareRequired" xml:space="preserve"><value>Bitte einen verwaltbaren Share auswählen.</value></data>
+  <data name="Web_CloudSync_Error_ProviderRequired" xml:space="preserve"><value>Bitte einen verfügbaren Cloud-Anbieter auswählen.</value></data>
+  <data name="Web_CloudSync_Error_Conflict" xml:space="preserve"><value>Dieser Ordner überschneidet sich mit einer bestehenden Cloud-Synchronisierung.</value></data>
+  <data name="Web_CloudSync_Error_NotAuthorized" xml:space="preserve"><value>Für diese Aktion besteht keine Berechtigung.</value></data>
+  <data name="Web_CloudSync_Error_Missing" xml:space="preserve"><value>Diese Cloud-Synchronisierung existiert nicht mehr.</value></data>
+  <data name="Web_CloudSync_Error_Save" xml:space="preserve"><value>Die Cloud-Synchronisierungseinstellungen konnten nicht gespeichert werden.</value></data>
+  <data name="Web_CloudSync_Error_Run" xml:space="preserve"><value>Die Cloud-Synchronisierung ist fehlgeschlagen. Bitte das Serverprotokoll prüfen.</value></data>
+  <data name="Web_CloudSync_Error_LocalFolder" xml:space="preserve"><value>Bitte einen vorhandenen lokalen Ordner auswählen.</value></data>
+  <data name="Web_CloudSync_SharePanel_Help" xml:space="preserve"><value>Die lokalen und entfernten Ordnerzuordnungen dieses Shares zentral in der Cloud-Synchronisierung verwalten.</value></data>
+  <data name="Web_CloudSync_SharePanel_Count" xml:space="preserve"><value>Eingerichtete Synchronisierungen: {0}</value></data>
+  <data name="Web_CloudSync_SharePanel_Open" xml:space="preserve"><value>Cloud-Synchronisierung öffnen</value></data>
 </root>

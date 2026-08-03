@@ -79,7 +79,21 @@ public class GoogleDriveConnection : ICloudConnection
         Service.Dispose();
     }
 
-    public string getServiceName() => "Google";
+    public string ServiceName => "Google";
+
+    public async Task<CloudAccountInfo?> GetAccountInfoAsync()
+    {
+        var request = _service.About.Get();
+        request.Fields = "user(displayName,emailAddress,photoLink)";
+        var about = await request.ExecuteAsync();
+
+        return about.User is null
+            ? null
+            : new CloudAccountInfo(
+                about.User.DisplayName,
+                about.User.EmailAddress,
+                about.User.PhotoLink);
+    }
 
     public async Task<string> GetAccountEmailAsync()
     {

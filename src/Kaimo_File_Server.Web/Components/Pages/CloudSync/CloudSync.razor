@@ -1,0 +1,230 @@
+@page "/sync"
+@page "/sync/{ShareName}"
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Services.DataServices
+@using Kaimo_File_Server.Web.Components.Pages.CloudSync.Components
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject CloudSyncViewModel VM
+@inject NavigationManager Navigation
+@inject AssetProvider Assets
+@inject ToastService Toasts
+
+<PageTitle>@Text("Web_Nav_CloudSync", "Cloud Sync") - Kaimo Files</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>@Text("Web_CloudSync_Title", "Cloud Sync")</h1>
+        <p class="subtitle">@Text("Web_CloudSync_Subtitle", "Manage local and remote folder synchronization across all cloud providers.")</p>
+    </div>
+    @if (VM.CanCreateSync)
+    {
+        <button class="btn-primary" type="button" @onclick="ToggleCreate">
+            @Assets.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+            <span>@Text("Web_CloudSync_Create", "Add cloud sync")</span>
+        </button>
+    }
+</div>
+
+@if (VM.IsCreating && VM.CanCreateSync)
+{
+    <section class="create-form-card cloud-sync-create" aria-label="@Text("Web_CloudSync_Create", "Add cloud sync")">
+        <div class="detail-header">
+            <h3>@Text("Web_CloudSync_Create_Title", "Connect a folder")</h3>
+            <span class="detail-subtitle">@Text("Web_CloudSync_Create_Help", "Choose a local folder and provider. You can select the remote folder after authorization.")</span>
+        </div>
+        <div class="cloud-sync-create-grid">
+            <label class="form-group">
+                <span>@Text("Web_CloudSync_Share", "Share")</span>
+                <select @bind="VM.NewShareId" @bind:after="ResetNewLocalPath">
+                    @foreach (var share in VM.Shares.Where(share => VM.CanCreateOnShare(share.Id)))
+                    {
+                        <option value="@share.Id">@share.Name</option>
+                    }
+                </select>
+            </label>
+            <label class="form-group">
+                <span>@Text("Web_CloudSync_Provider", "Cloud provider")</span>
+                <select @bind="VM.NewProviderId">
+                    @foreach (var provider in VM.Providers)
+                    {
+                        <option value="@provider.Id">@provider.DisplayName</option>
+                    }
+                </select>
+            </label>
+            <div class="form-group cloud-path-field">
+                <span>@Text("Web_CloudSync_LocalFolder", "Local folder")</span>
+                <div class="cloud-path-input-row">
+                    <input value="@DisplayLocalPath(VM.NewLocalPath)" readonly />
+                    <button class="btn-secondary" type="button" @onclick="OpenNewLocalPicker">
+                        @Text("Web_CloudSync_Browse", "Browse…")
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="create-form-actions">
+            <button class="btn-secondary" type="button" @onclick="ToggleCreate">@Resources.Web_Button_Cancel</button>
+            <button class="btn-primary" type="button" @onclick="ConnectAsync">
+                @Text("Web_CloudSync_Connect", "Authorize and connect")
+            </button>
+        </div>
+    </section>
+}
+
+@if (!string.IsNullOrWhiteSpace(VM.ErrorMessage))
+{
+    <div class="error-banner">@VM.ErrorMessage</div>
+}
+
+@if (VM.IsLoading)
+{
+    <div class="loading-state">
+        <div class="spinner"></div>
+        <p>@Text("Web_CloudSync_Loading", "Loading cloud syncs…")</p>
+    </div>
+}
+else if (VM.Syncs.Count == 0)
+{
+    <div class="empty-state">
+        @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 64, Height: 64, Color: "var(--text-tertiary)"))
+        <p>@Text("Web_CloudSync_Empty", "No cloud syncs have been configured yet.")</p>
+    </div>
+}
+else
+{
+    <div class="admin-content cloud-sync-workspace">
+        <div class="cloud-sync-table" role="listbox" aria-label="@Text("Web_CloudSync_Title", "Cloud Sync")">
+            <div class="cloud-sync-table-header" aria-hidden="true">
+                <span>@Text("Web_CloudSync_LocalFolder", "Local folder")</span>
+                <span>@Text("Web_CloudSync_Provider", "Cloud provider")</span>
+                <span>@Text("Web_CloudSync_Mode", "Sync mode")</span>
+                <span>@Text("Web_CloudSync_LastSync", "Last sync")</span>
+            </div>
+            @foreach (var sync in VM.Syncs)
+            {
+                var selected = ReferenceEquals(VM.SelectedSync, sync);
+                <button class="cloud-sync-table-row @(selected ? "cloud-sync-table-row--selected" : "")"
+                        type="button" role="option" aria-selected="@selected"
+                        @onclick="() => SelectAsync(sync)">
+                    <span class="cloud-sync-local">
+                        @Assets.SVG("folder.svg", new SvgOptions(Width: 23, Height: 23))
+                        <span>
+                            <strong>@sync.ShareName</strong>
+                            <small>@DisplayLocalPath(sync.LocalPath)</small>
+                        </span>
+                    </span>
+                    <span>@sync.ProviderDisplayName</span>
+                    <span>@ModeLabel(sync.Configuration.Mode)</span>
+                    <span>@FormatLastSync(sync.Configuration.LastSync)</span>
+                </button>
+            }
+        </div>
+
+        <aside class="admin-detail cloud-sync-detail">
+            @if (VM.SelectedSync is null)
+            {
+                <div class="detail-empty">
+                    @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 48, Height: 48, Color: "var(--text-tertiary)"))
+                    <p>@Text("Web_CloudSync_Select", "Select a cloud sync to view its settings.")</p>
+                </div>
+            }
+            else
+            {
+                <div class="detail-header">
+                    <h3>@VM.SelectedSync.ShareName</h3>
+                    <span class="detail-subtitle">@VM.SelectedSync.ProviderDisplayName</span>
+                </div>
+
+                @if (VM.SelectedAccount is not null)
+                {
+                    <div class="cloud-account cloud-sync-account">
+                        @if (!string.IsNullOrWhiteSpace(VM.SelectedAccount.PictureUrl))
+                        {
+                            <img class="cloud-avatar" src="@VM.SelectedAccount.PictureUrl" alt="" referrerpolicy="no-referrer" />
+                        }
+                        <div>
+                            @if (!string.IsNullOrWhiteSpace(VM.SelectedAccount.DisplayName))
+                            {
+                                <strong>@VM.SelectedAccount.DisplayName</strong>
+                            }
+                            <span class="detail-value">@VM.SelectedAccount.Email</span>
+                        </div>
+                    </div>
+                }
+
+                <div class="detail-section cloud-path-field">
+                    <span class="detail-label">@Text("Web_CloudSync_LocalFolder", "Local folder")</span>
+                    <div class="cloud-path-input-row">
+                        <input class="edit-input" value="@DisplayLocalPath(VM.EditLocalPath)" readonly />
+                        <button class="btn-secondary" type="button" disabled="@(!VM.CanConfigureSelected)"
+                                @onclick="OpenEditLocalPicker">@Text("Web_CloudSync_Browse", "Browse…")</button>
+                    </div>
+                </div>
+
+                <div class="detail-section cloud-path-field">
+                    <span class="detail-label">@Text("Web_CloudSync_RemoteFolder", "Remote folder")</span>
+                    <div class="cloud-path-input-row">
+                        <input class="edit-input" value="@VM.EditRemotePath" readonly />
+                        <button class="btn-secondary" type="button" disabled="@(!VM.CanConfigureSelected)"
+                                @onclick="OpenRemotePicker">@Text("Web_CloudSync_Browse", "Browse…")</button>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <span class="detail-label">@Text("Web_CloudSync_Mode", "Sync mode")</span>
+                    <select class="edit-input" @bind="VM.EditMode" disabled="@(!VM.CanConfigureSelected)">
+                        <option value="@SyncMode.TwoWay">@ModeLabel(SyncMode.TwoWay)</option>
+                        <option value="@SyncMode.Pull">@ModeLabel(SyncMode.Pull)</option>
+                        <option value="@SyncMode.Push">@ModeLabel(SyncMode.Push)</option>
+                    </select>
+                </div>
+
+                <div class="detail-section">
+                    <span class="detail-label">@Text("Web_CloudSync_LastSync", "Last sync")</span>
+                    <span class="detail-value">@FormatLastSync(VM.SelectedSync.Configuration.LastSync)</span>
+                </div>
+
+                <div class="detail-actions">
+                    @if (VM.CanConfigureSelected)
+                    {
+                        <button class="btn-secondary" type="button" disabled="@VM.IsBusy" @onclick="SaveAsync">
+                            @Text("Web_CloudSync_Save", "Save settings")
+                        </button>
+                    }
+                    @if (VM.CanRunSelected)
+                    {
+                        <button class="btn-primary" type="button" disabled="@VM.IsBusy" @onclick="RunSyncAsync">
+                            @Text("Web_CloudSync_Run", "Sync now")
+                        </button>
+                    }
+                    @if (VM.CanDeleteSelected)
+                    {
+                        <button class="btn-danger" type="button" disabled="@VM.IsBusy" @onclick="() => _showDeleteConfirm = true">
+                            @Text("Web_CloudSync_Unsync", "Remove cloud sync")
+                        </button>
+                    }
+                    @if (_showDeleteConfirm)
+                    {
+                        <div class="confirm-delete">
+                            <p>@Text("Web_CloudSync_Unsync_Confirm", "Remove this configuration and revoke its cloud connection?")</p>
+                            <div class="modal-actions">
+                                <button class="btn-secondary" type="button" @onclick="() => _showDeleteConfirm = false">@Resources.Web_Button_Cancel</button>
+                                <button class="btn-danger" type="button" @onclick="DeleteAsync">@Text("Web_CloudSync_Unsync", "Remove cloud sync")</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </aside>
+    </div>
+}
+
+<DirectoryPickerDialog IsOpen="_pickerOpen"
+                       IsRemote="_pickerRemote"
+                       IsLoading="_pickerLoading"
+                       Title="@_pickerTitle"
+                       CurrentPath="@_pickerPath"
+                       Items="@_pickerItems"
+                       ErrorMessage="@_pickerError"
+                       OnNavigate="NavigatePickerAsync"
+                       OnSelected="SelectPickerPathAsync"
+                       OnClosed="ClosePicker" />

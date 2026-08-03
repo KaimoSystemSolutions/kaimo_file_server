@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Infrastructure.Clouds;
+using Kaimo_File_Server.Web.Services;
 
 namespace Kaimo_File_Server.Web.Controllers;
 
@@ -13,23 +14,26 @@ public class GoogleOAuthController : ControllerBase
 {
     private readonly IConfiguration _configuration;
     private readonly IShareRepository _shareRepository;
-    private readonly ICloudProviderFactory _cloudFactory;
+    private readonly ICloudAuthorizationTicketStore _authorizationTickets;
 
     public GoogleOAuthController(
         IConfiguration configuration,
         IShareRepository shareRepository,
-        ICloudProviderFactory cloudFactory)
+        ICloudAuthorizationTicketStore authorizationTickets)
     {
         _configuration = configuration;
         _shareRepository = shareRepository;
-        _cloudFactory = cloudFactory;
+        _authorizationTickets = authorizationTickets;
     }
 
 
     [HttpGet("connect")]
-    public async Task<IActionResult> Connect(Guid shareId, string? path)
+    public async Task<IActionResult> Connect(Guid shareId, string? path, string ticket)
     {
         var normalizedPath = CloudSyncPaths.Normalize(path);
+
+        if (!_authorizationTickets.IsValid(ticket, shareId, normalizedPath, "google"))
+            return BadRequest("The cloud authorization request is invalid or has expired.");
 
         var share = await _shareRepository.GetByIdAsync(shareId);
         if (share is null)
@@ -55,7 +59,7 @@ public class GoogleOAuthController : ControllerBase
                 null,
                 Request.Scheme)!;
 
-        var state = CloudSyncPaths.EncodeState(shareId, normalizedPath);
+        var state = CloudSyncPaths.EncodeState(shareId, normalizedPath, ticket);
 
         var authUrl =
             "https://accounts.google.com/o/oauth2/v2/auth" +
@@ -80,7 +84,10 @@ public class GoogleOAuthController : ControllerBase
         if (decodedState is null)
             return BadRequest("Invalid state");
 
-        var (shareId, path) = decodedState.Value;
+        var (shareId, path, ticket) = decodedState.Value;
+        if (ticket is null
+            || !_authorizationTickets.TryConsume(ticket, shareId, path, "google"))
+            return BadRequest("The cloud authorization request is invalid or has expired.");
 
         var clientId = _configuration["GoogleOAuth:ClientId"]!;
         var clientSecret = _configuration["GoogleOAuth:ClientSecret"]!;
@@ -133,7 +140,7 @@ public class GoogleOAuthController : ControllerBase
             var msg = Uri.EscapeDataString(
                 $"'{path}' now conflicts with the already-synced folder '{conflict}'. " +
                 "Nothing was connected.");
-            return Redirect($"/?syncError={msg}");
+            return Redirect($"/sync?syncError={msg}");
         }
 
         // Append/overwrite this folder's entry; leaves every other synced
@@ -149,32 +156,13 @@ public class GoogleOAuthController : ControllerBase
         share.CloudSettings = settings;
         await _shareRepository.UpdateAsync(share);
 
-        var encoded = Uri.EscapeDataString(share.Name);
-        string parentPath = GetParentPath(path);
-        string syncedFolderName = Uri.EscapeDataString(GetFileOrFolderName(path));
-        return Redirect($"/files/{encoded}{parentPath}?just_synced={syncedFolderName}");
+        // Return to the provider-neutral management page. The query values let
+        // it select the newly created entry without knowing anything about Google.
+        return Redirect(
+            $"/sync?connectedShare={share.Id}" +
+            $"&connectedPath={Uri.EscapeDataString(path)}");
     }
 
-    private static string GetParentPath(string path)
-    {
-        if (string.IsNullOrEmpty(path))
-            return "";
-
-        int lastSlash = path.LastIndexOf('/');
-
-        return lastSlash < 0 ? "" : "/" + path[..lastSlash];
-    }
-    
-    private static string GetFileOrFolderName(string path)
-    {
-        if (string.IsNullOrEmpty(path))
-            return "";
-
-        int lastSlash = path.LastIndexOf('/');
-
-        return lastSlash < 0 ? path : path[(lastSlash + 1)..];
-    }
-    
     [HttpPost("disconnect")]
     public async Task<IActionResult> Disconnect(Guid shareId, [FromQuery] string? path)
     {

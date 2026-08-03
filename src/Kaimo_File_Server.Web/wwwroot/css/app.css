@@ -3800,3 +3800,226 @@ input[type="radio"] {
         max-width: none;
     }
 }
+
+/* ============================================================================
+   Cloud sync administration
+   ============================================================================ */
+
+.cloud-sync-create {
+    padding: 18px;
+}
+
+.cloud-sync-create-grid {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(260px, 1.5fr);
+    gap: 14px;
+}
+
+.cloud-sync-create-grid .form-group {
+    margin: 0;
+}
+
+.cloud-sync-create-grid .form-group > span,
+.cloud-path-field > span {
+    display: block;
+    margin-bottom: 6px;
+}
+
+.cloud-path-input-row {
+    display: flex;
+    gap: 7px;
+}
+
+.cloud-path-input-row input {
+    min-width: 0;
+    flex: 1;
+}
+
+.cloud-path-input-row button {
+    flex-shrink: 0;
+}
+
+.cloud-sync-workspace {
+    align-items: flex-start;
+}
+
+.cloud-sync-table {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg-secondary);
+}
+
+.cloud-sync-table-header,
+.cloud-sync-table-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.6fr) minmax(130px, .9fr) minmax(130px, .9fr) minmax(130px, .9fr);
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+    padding: 11px 14px;
+}
+
+.cloud-sync-table-header {
+    background: var(--bg-tertiary);
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.cloud-sync-table-row {
+    border: 0;
+    border-top: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cloud-sync-table-row:hover {
+    background: var(--bg-hover);
+}
+
+.cloud-sync-table-row--selected {
+    background: var(--accent-selected);
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.cloud-sync-local {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.cloud-sync-local > span {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+
+.cloud-sync-local strong,
+.cloud-sync-local small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cloud-sync-local strong {
+    color: var(--text-primary);
+}
+
+.cloud-sync-local small {
+    color: var(--text-tertiary);
+}
+
+.cloud-sync-detail {
+    width: 410px;
+}
+
+.cloud-sync-detail .edit-input {
+    width: 100%;
+}
+
+.cloud-sync-account {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-tertiary);
+}
+
+.cloud-sync-account > div {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+}
+
+.directory-picker {
+    width: min(520px, calc(100vw - 24px));
+    max-width: 520px;
+}
+
+.directory-picker-path {
+    overflow: hidden;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg-sunken);
+    color: var(--text-secondary);
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.directory-picker-toolbar {
+    margin: 8px 0;
+}
+
+.directory-picker-list {
+    min-height: 210px;
+    max-height: 340px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg-sunken);
+}
+
+.directory-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 11px;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.directory-picker-item:hover {
+    background: var(--bg-hover);
+}
+
+.directory-picker-state {
+    display: flex;
+    min-height: 210px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--text-tertiary);
+    font-size: 13px;
+}
+
+@media (max-width: 1000px) {
+    .cloud-sync-create-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cloud-sync-table-header {
+        display: none;
+    }
+
+    .cloud-sync-table-row {
+        grid-template-columns: minmax(190px, 1.4fr) minmax(120px, 1fr);
+    }
+
+    .cloud-sync-table-row > span:nth-child(3),
+    .cloud-sync-table-row > span:nth-child(4) {
+        display: none;
+    }
+}

@@ -44,11 +44,11 @@ public static class CloudSyncPaths
         return null;
     }
 
-    private sealed record StatePayload(Guid ShareId, string Path);
+    private sealed record StatePayload(Guid ShareId, string Path, string? AuthorizationTicket);
 
-    public static string EncodeState(Guid shareId, string path)
+    public static string EncodeState(Guid shareId, string path, string? authorizationTicket = null)
     {
-        var json = JsonSerializer.Serialize(new StatePayload(shareId, path));
+        var json = JsonSerializer.Serialize(new StatePayload(shareId, path, authorizationTicket));
         var bytes = Encoding.UTF8.GetBytes(json);
         return Convert.ToBase64String(bytes)
             .TrimEnd('=')
@@ -56,7 +56,7 @@ public static class CloudSyncPaths
             .Replace('/', '_');
     }
 
-    public static (Guid ShareId, string Path)? DecodeState(string state)
+    public static (Guid ShareId, string Path, string? AuthorizationTicket)? DecodeState(string state)
     {
         try
         {
@@ -66,7 +66,9 @@ public static class CloudSyncPaths
             var json = Encoding.UTF8.GetString(Convert.FromBase64String(padded));
             var payload = JsonSerializer.Deserialize<StatePayload>(json);
 
-            return payload is null ? null : (payload.ShareId, payload.Path);
+            return payload is null
+                ? null
+                : (payload.ShareId, payload.Path, payload.AuthorizationTicket);
         }
         catch
         {

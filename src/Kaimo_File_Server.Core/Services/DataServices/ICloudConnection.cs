@@ -7,7 +7,14 @@ namespace Kaimo_File_Server.Core.Services.DataServices;
 public interface ICloudConnection
 {
     Task Dispose();
-    string getServiceName();
+    string ServiceName { get; }
+
+    /// <summary>
+    /// Returns optional account metadata without exposing a provider-specific SDK type.
+    /// The default keeps providers that do not offer account profiles lightweight.
+    /// </summary>
+    Task<CloudAccountInfo?> GetAccountInfoAsync() => Task.FromResult<CloudAccountInfo?>(null);
+
     Task UploadAsync(string path, Stream data, DateTime modifiedTime);
     Task DownloadAsync(string path, Stream target);
     Task CreateDirectoryAsync(string path);

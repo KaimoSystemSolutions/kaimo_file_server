@@ -47,13 +47,12 @@
                 <span class="nav-label">@Resources.Web_Nav_BrowseFiles</span>
             </NavLink>
             
-            @if (hasShareSelected() && canManageSyncs())
+            @if (canManageSyncs())
             {
-                <NavLink class="nav-item" href="@($"/sync/{getSelectedShare()}")" Match="NavLinkMatch.All">
-                    @Assets.SVG("sync.svg", new SvgOptions())
-                    <span class="nav-label">Cloud Sync</span>
+                <NavLink class="nav-item" href="/sync" Match="NavLinkMatch.Prefix">
+                    @Assets.SVG("cloud-download.svg", new SvgOptions())
+                    <span class="nav-label">@Text("Web_Nav_CloudSync", "Cloud Sync")</span>
                 </NavLink>
-            
             }
             
         </div>
@@ -358,13 +357,10 @@
         return name[..Math.Min(2, name.Length)].ToUpperInvariant();
     }
 
-    private bool hasShareSelected()
-        => Nav.ToBaseRelativePath(Nav.Uri).StartsWith("files");
-
-    private string getSelectedShare()
-        => Nav.ToBaseRelativePath(Nav.Uri).Split("/")[1];
-
     private bool canManageSyncs()
         => _canManageSyncs;
+
+    private static string Text(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
 
 }

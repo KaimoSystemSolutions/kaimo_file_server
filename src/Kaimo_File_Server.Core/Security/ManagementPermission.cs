@@ -71,7 +71,7 @@
         FullAdmin = UserAdmin | GroupAdmin | ShareAdmin
                   | AssignGroups | AssignRoles | AssignDepartments
                   | EditDepartment | ViewDepartment
-                  | SystemAdmin,
+                  | SystemAdmin | SyncAdmin,
         
         SyncAdmin = CreateSyncs | DeleteSyncs | ConfigureSyncs | SyncManually,
     }

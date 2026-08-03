@@ -1968,4 +1968,53 @@
   <data name="Web_ShareList_Card_Disabled" xml:space="preserve">
     <value>Disabled</value>
   </data>
+  <data name="Web_Nav_CloudSync" xml:space="preserve"><value>Cloud Sync</value></data>
+  <data name="Web_CloudSync_Title" xml:space="preserve"><value>Cloud Sync</value></data>
+  <data name="Web_CloudSync_Subtitle" xml:space="preserve"><value>Manage local and remote folder synchronization across all cloud providers.</value></data>
+  <data name="Web_CloudSync_Create" xml:space="preserve"><value>Add cloud sync</value></data>
+  <data name="Web_CloudSync_Create_Title" xml:space="preserve"><value>Connect a folder</value></data>
+  <data name="Web_CloudSync_Create_Help" xml:space="preserve"><value>Choose a local folder and provider. You can select the remote folder after authorization.</value></data>
+  <data name="Web_CloudSync_Loading" xml:space="preserve"><value>Loading cloud syncs…</value></data>
+  <data name="Web_CloudSync_Empty" xml:space="preserve"><value>No cloud syncs have been configured yet.</value></data>
+  <data name="Web_CloudSync_Select" xml:space="preserve"><value>Select a cloud sync to view its settings.</value></data>
+  <data name="Web_CloudSync_Share" xml:space="preserve"><value>Share</value></data>
+  <data name="Web_CloudSync_Provider" xml:space="preserve"><value>Cloud provider</value></data>
+  <data name="Web_CloudSync_LocalFolder" xml:space="preserve"><value>Local folder</value></data>
+  <data name="Web_CloudSync_RemoteFolder" xml:space="preserve"><value>Remote folder</value></data>
+  <data name="Web_CloudSync_Browse" xml:space="preserve"><value>Browse…</value></data>
+  <data name="Web_CloudSync_Connect" xml:space="preserve"><value>Authorize and connect</value></data>
+  <data name="Web_CloudSync_Mode" xml:space="preserve"><value>Sync mode</value></data>
+  <data name="Web_CloudSync_Mode_TwoWay" xml:space="preserve"><value>Two-way</value></data>
+  <data name="Web_CloudSync_Mode_Pull" xml:space="preserve"><value>Pull (cloud → local)</value></data>
+  <data name="Web_CloudSync_Mode_Push" xml:space="preserve"><value>Push (local → cloud)</value></data>
+  <data name="Web_CloudSync_LastSync" xml:space="preserve"><value>Last sync</value></data>
+  <data name="Web_CloudSync_Never" xml:space="preserve"><value>Never</value></data>
+  <data name="Web_CloudSync_Save" xml:space="preserve"><value>Save settings</value></data>
+  <data name="Web_CloudSync_Run" xml:space="preserve"><value>Sync now</value></data>
+  <data name="Web_CloudSync_Unsync" xml:space="preserve"><value>Remove cloud sync</value></data>
+  <data name="Web_CloudSync_Unsync_Confirm" xml:space="preserve"><value>Remove this configuration and revoke its cloud connection?</value></data>
+  <data name="Web_CloudSync_Connected" xml:space="preserve"><value>The cloud provider was connected successfully.</value></data>
+  <data name="Web_CloudSync_Saved" xml:space="preserve"><value>Cloud sync settings saved.</value></data>
+  <data name="Web_CloudSync_Removed" xml:space="preserve"><value>Cloud sync removed.</value></data>
+  <data name="Web_CloudSync_Progress" xml:space="preserve"><value>Synchronizing…</value></data>
+  <data name="Web_CloudSync_Complete" xml:space="preserve"><value>Synchronization completed.</value></data>
+  <data name="Web_CloudSync_Directory_LocalTitle" xml:space="preserve"><value>Select local folder</value></data>
+  <data name="Web_CloudSync_Directory_RemoteTitle" xml:space="preserve"><value>Select remote folder</value></data>
+  <data name="Web_CloudSync_Directory_Parent" xml:space="preserve"><value>Parent folder</value></data>
+  <data name="Web_CloudSync_Directory_Select" xml:space="preserve"><value>Select this folder</value></data>
+  <data name="Web_CloudSync_Directory_Loading" xml:space="preserve"><value>Loading folders…</value></data>
+  <data name="Web_CloudSync_Directory_Empty" xml:space="preserve"><value>This folder contains no subfolders.</value></data>
+  <data name="Web_CloudSync_Directory_Error" xml:space="preserve"><value>This folder could not be opened.</value></data>
+  <data name="Web_CloudSync_Error_Load" xml:space="preserve"><value>The cloud syncs could not be loaded.</value></data>
+  <data name="Web_CloudSync_Error_ShareRequired" xml:space="preserve"><value>Select a share you may manage.</value></data>
+  <data name="Web_CloudSync_Error_ProviderRequired" xml:space="preserve"><value>Select an available cloud provider.</value></data>
+  <data name="Web_CloudSync_Error_Conflict" xml:space="preserve"><value>This folder overlaps an existing cloud sync.</value></data>
+  <data name="Web_CloudSync_Error_NotAuthorized" xml:space="preserve"><value>You are not authorized for this action.</value></data>
+  <data name="Web_CloudSync_Error_Missing" xml:space="preserve"><value>This cloud sync no longer exists.</value></data>
+  <data name="Web_CloudSync_Error_Save" xml:space="preserve"><value>The cloud sync settings could not be saved.</value></data>
+  <data name="Web_CloudSync_Error_Run" xml:space="preserve"><value>The cloud sync failed. Check the server log.</value></data>
+  <data name="Web_CloudSync_Error_LocalFolder" xml:space="preserve"><value>Select an existing local folder.</value></data>
+  <data name="Web_CloudSync_SharePanel_Help" xml:space="preserve"><value>Manage this share's local and remote folder mappings in the central cloud-sync workspace.</value></data>
+  <data name="Web_CloudSync_SharePanel_Count" xml:space="preserve"><value>Configured syncs: {0}</value></data>
+  <data name="Web_CloudSync_SharePanel_Open" xml:space="preserve"><value>Open cloud-sync management</value></data>
 </root>

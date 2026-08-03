@@ -100,6 +100,7 @@ builder.Services.AddSingleton<LogDownloadTokenService>();
 builder.Services.AddScoped<FileUploadCoordinator>();
 builder.Services.AddScoped<FileSelectionCoordinator>();
 builder.Services.AddSingleton<AssetProvider>();
+builder.Services.AddSingleton<ICloudAuthorizationTicketStore, CloudAuthorizationTicketStore>();
 
 
 
@@ -119,6 +120,7 @@ builder.Services.AddScoped<FileBrowserViewModel>();
 builder.Services.AddScoped<UserListViewModel>();
 builder.Services.AddScoped<AclEditorViewModel>();
 builder.Services.AddScoped<DepartmentViewModel>();
+builder.Services.AddScoped<CloudSyncViewModel>();
 
 // ShareListViewModel receives configured pool destinations. File I/O itself
 // always uses the absolute path persisted on the selected share.
