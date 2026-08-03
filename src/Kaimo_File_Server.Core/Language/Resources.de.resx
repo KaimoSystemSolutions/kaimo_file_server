@@ -2017,4 +2017,18 @@
   <data name="Web_CloudSync_SharePanel_Help" xml:space="preserve"><value>Die lokalen und entfernten Ordnerzuordnungen dieses Shares zentral in der Cloud-Synchronisierung verwalten.</value></data>
   <data name="Web_CloudSync_SharePanel_Count" xml:space="preserve"><value>Eingerichtete Synchronisierungen: {0}</value></data>
   <data name="Web_CloudSync_SharePanel_Open" xml:space="preserve"><value>Cloud-Synchronisierung öffnen</value></data>
+  <data name="Web_CloudSync_Device_Title" xml:space="preserve"><value>Microsoft OneDrive verbinden</value></data>
+  <data name="Web_CloudSync_Device_Instructions" xml:space="preserve"><value>Öffne die Microsoft-Anmeldeseite, gib diesen Code ein und erlaube den Zugriff auf dein OneDrive.</value></data>
+  <data name="Web_CloudSync_Device_OpenMicrosoft" xml:space="preserve"><value>Microsoft-Anmeldung öffnen</value></data>
+  <data name="Web_CloudSync_Device_Waiting" xml:space="preserve"><value>Microsoft-Autorisierung wird abgewartet…</value></data>
+  <data name="Web_CloudSync_Device_Expired" xml:space="preserve"><value>Die Cloud-Autorisierungsanfrage ist abgelaufen. Bitte erneut starten.</value></data>
+  <data name="Web_CloudSync_Device_Failed" xml:space="preserve"><value>Die Microsoft-Autorisierung ist fehlgeschlagen. Bitte zur Cloud-Synchronisierung zurückkehren und erneut versuchen.</value></data>
+  <data name="Web_CloudSync_Cancelled" xml:space="preserve"><value>Die Synchronisierung wurde abgebrochen.</value></data>
+  <data name="Web_Jobs_Title" xml:space="preserve"><value>Laufende Jobs</value></data>
+  <data name="Web_Jobs_Count" xml:space="preserve"><value>{0} aktiv</value></data>
+  <data name="Web_Jobs_Empty" xml:space="preserve"><value>Aktuell laufen keine Jobs.</value></data>
+  <data name="Web_Jobs_Cancel" xml:space="preserve"><value>Job abbrechen</value></data>
+  <data name="Web_Jobs_Cancelling" xml:space="preserve"><value>Wird abgebrochen…</value></data>
+  <data name="Web_Jobs_CloudSync_Title" xml:space="preserve"><value>Cloud-Synchronisierung: {0}</value></data>
+  <data name="Web_Jobs_Upload_Title" xml:space="preserve"><value>Upload: {0}</value></data>
 </root>

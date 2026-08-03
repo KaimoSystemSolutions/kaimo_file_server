@@ -8,9 +8,13 @@ namespace Kaimo_File_Server.Web.Services;
 /// </summary>
 public sealed class CloudAuthorizationTicketStore : ICloudAuthorizationTicketStore
 {
-    private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(10);
+    // Microsoft device codes currently live for roughly 15 minutes. Keep the
+    // local authorization proof slightly longer so a valid device flow cannot
+    // fail during its final token exchange.
+    private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(20);
     private readonly ConcurrentDictionary<string, Ticket> _tickets = new(StringComparer.Ordinal);
 
+    /// <inheritdoc />
     public string Issue(Guid shareId, string localPath, string providerId)
     {
         RemoveExpired();
@@ -23,14 +27,17 @@ public sealed class CloudAuthorizationTicketStore : ICloudAuthorizationTicketSto
         return token;
     }
 
+    /// <inheritdoc />
     public bool IsValid(string token, Guid shareId, string localPath, string providerId)
         => _tickets.TryGetValue(token, out var ticket)
            && Matches(ticket, shareId, localPath, providerId);
 
+    /// <inheritdoc />
     public bool TryConsume(string token, Guid shareId, string localPath, string providerId)
         => _tickets.TryRemove(token, out var ticket)
            && Matches(ticket, shareId, localPath, providerId);
 
+    /// <summary>Opportunistically removes expired tickets when new work begins.</summary>
     private void RemoveExpired()
     {
         var now = DateTimeOffset.UtcNow;
@@ -41,6 +48,10 @@ public sealed class CloudAuthorizationTicketStore : ICloudAuthorizationTicketSto
         }
     }
 
+    /// <summary>
+    /// Verifies expiry and the complete authorization context, preventing a
+    /// ticket issued for one folder or provider from being replayed elsewhere.
+    /// </summary>
     private static bool Matches(Ticket ticket, Guid shareId, string localPath, string providerId)
         => ticket.ExpiresAt > DateTimeOffset.UtcNow
            && ticket.ShareId == shareId

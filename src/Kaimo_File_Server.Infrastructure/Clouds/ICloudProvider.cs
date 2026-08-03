@@ -19,5 +19,9 @@ public interface ICloudProvider
     /// <summary>Application endpoint that starts this provider's authorization flow.</summary>
     string AuthorizationEndpoint { get; }
 
+    /// <summary>
+    /// Creates an authenticated provider connection from persisted folder data.
+    /// Provider-specific credentials remain behind the neutral connection contract.
+    /// </summary>
     ICloudConnection CreateConnection(Guid shareId, SyncedFolder folder);
 }

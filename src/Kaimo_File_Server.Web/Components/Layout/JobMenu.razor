@@ -1,0 +1,95 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.DynamicHelpers
+@implements IDisposable
+@inject JobService JobService
+@inject AssetProvider Assets
+
+<div class="job-menu">
+    <button class="job-menu-toggle @(_isOpen ? "job-menu-toggle--open" : "")"
+            type="button"
+            title="@Text("Web_Jobs_Title", "Running jobs")"
+            aria-label="@Text("Web_Jobs_Title", "Running jobs")"
+            aria-expanded="@_isOpen"
+            @onclick="Toggle">
+        @Assets.SVG("upload.svg", new SvgOptions(Width: 18, Height: 18, StrokeWidth: 2))
+        <span>@Text("Web_Jobs_Title", "Running jobs")</span>
+        @if (JobService.Jobs.Count > 0)
+        {
+            <span class="job-menu-count">@JobService.Jobs.Count</span>
+        }
+    </button>
+
+    @if (_isOpen)
+    {
+        <section class="job-menu-panel" aria-live="polite">
+            <header class="job-menu-header">
+                <strong>@Text("Web_Jobs_Title", "Running jobs")</strong>
+                <span>@string.Format(Text("Web_Jobs_Count", "{0} active"), JobService.Jobs.Count)</span>
+            </header>
+
+            @if (JobService.Jobs.Count == 0)
+            {
+                <div class="job-menu-empty">@Text("Web_Jobs_Empty", "No jobs are currently running.")</div>
+            }
+            else
+            {
+                <div class="job-menu-list">
+                    @foreach (var job in JobService.Jobs)
+                    {
+                        <article class="job-menu-item">
+                            <div class="job-menu-item-heading">
+                                <div>
+                                    <strong>@job.Title</strong>
+                                    <small>@job.Detail</small>
+                                </div>
+                                <button class="job-cancel"
+                                        type="button"
+                                        disabled="@job.IsCancellationRequested"
+                                        title="@Text("Web_Jobs_Cancel", "Cancel job")"
+                                        aria-label="@Text("Web_Jobs_Cancel", "Cancel job")"
+                                        @onclick="() => Cancel(job.Id)">
+                                    @Assets.SVG("close.svg", new SvgOptions(Width: 13, Height: 13, StrokeWidth: 2))
+                                </button>
+                            </div>
+                            <div class="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@job.Progress">
+                                <div class="job-progress-fill" style="width: @(job.Progress)%"></div>
+                            </div>
+                            <div class="job-menu-meta">
+                                <span>@(job.IsCancellationRequested
+                                    ? Text("Web_Jobs_Cancelling", "Cancelling…")
+                                    : $"{job.Progress}%")</span>
+                                <span>@job.StartedAt.ToLocalTime().ToString("t")</span>
+                            </div>
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private bool _isOpen;
+
+    // Keep the global menu synchronized with progress reports that may arrive
+    // from provider HTTP callbacks rather than the Blazor renderer thread.
+    protected override void OnInitialized() => JobService.OnChanged += HandleChanged;
+
+    // Opening an empty menu is intentional: it gives the user an explicit view
+    // that no work is running instead of making the control disappear.
+    private void Toggle() => _isOpen = !_isOpen;
+
+    // Menu and toast cancellation both target the same registered job id.
+    private void Cancel(string id) => JobService.Cancel(id);
+
+    // Job notifications are thread-agnostic; InvokeAsync safely returns rendering
+    // to the component's synchronization context.
+    private void HandleChanged() => _ = InvokeAsync(StateHasChanged);
+
+    // A scoped job service can outlive this layout instance during navigation,
+    // therefore event handlers must always be detached explicitly.
+    public void Dispose() => JobService.OnChanged -= HandleChanged;
+
+    private static string Text(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
+}

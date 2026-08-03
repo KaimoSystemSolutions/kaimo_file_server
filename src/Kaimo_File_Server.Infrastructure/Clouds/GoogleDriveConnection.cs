@@ -121,7 +121,12 @@ public class GoogleDriveConnection : ICloudConnection
         return about.User.PhotoLink;
     }
 
-    public async Task UploadAsync(string path, Stream data, DateTime modifiedTime)
+    /// <inheritdoc />
+    public async Task UploadAsync(
+        string path,
+        Stream data,
+        DateTime modifiedTime,
+        CancellationToken cancellationToken = default)
     {
         path = path.Replace('\\', '/').Trim('/');
 
@@ -137,13 +142,14 @@ public class GoogleDriveConnection : ICloudConnection
         // Create/find all parent folders
         for (int i = 0; i < parts.Length - 1; i++)
         {
-            parentId = await GetOrCreateFolderAsync(parts[i], parentId);
+            parentId = await GetOrCreateFolderAsync(parts[i], parentId, cancellationToken);
         }
 
         // Check if file already exists
         string? existingFileId = await FindFileIdAsync(
             fileName,
-            parentId);
+            parentId,
+            cancellationToken);
 
         var file = new Google.Apis.Drive.v3.Data.File
         {
@@ -163,7 +169,7 @@ public class GoogleDriveConnection : ICloudConnection
 
             request.Fields = "id";
 
-            await request.UploadAsync();
+            await request.UploadAsync(cancellationToken);
         }
         else
         {
@@ -177,25 +183,32 @@ public class GoogleDriveConnection : ICloudConnection
 
             request.Fields = "id";
 
-            await request.UploadAsync();
+            await request.UploadAsync(cancellationToken);
         }
     }
 
-    public async Task DownloadAsync(string path, Stream target)
+    /// <inheritdoc />
+    public async Task DownloadAsync(
+        string path,
+        Stream target,
+        CancellationToken cancellationToken = default)
     {
-        var fileId = await FindFileByPathAsync(path);
+        var fileId = await FindFileByPathAsync(path, cancellationToken);
 
         if (fileId == null)
             throw new FileNotFoundException(path);
 
         var request = _service.Files.Get(fileId);
 
-        await request.DownloadAsync(target);
+        await request.DownloadAsync(target, cancellationToken);
     }
     
-    public async Task<IReadOnlyList<CloudItemMeta>> ListAsync(string path)
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<CloudItemMeta>> ListAsync(
+        string path,
+        CancellationToken cancellationToken = default)
     {
-        string? parentId = await FindFolderByPathAsync(path);
+        string? parentId = await FindFolderByPathAsync(path, cancellationToken);
 
         if (parentId == null)
             return [];
@@ -204,7 +217,7 @@ public class GoogleDriveConnection : ICloudConnection
         request.Q = $"'{parentId}' in parents and trashed = false";
         request.Fields = "files(id,name,mimeType,modifiedTime,size)";
 
-        var result = await request.ExecuteAsync();
+        var result = await request.ExecuteAsync(cancellationToken);
 
         return result.Files.Select(f => new CloudItemMeta(
             IsDirectory: f.MimeType == "application/vnd.google-apps.folder",
@@ -215,20 +228,30 @@ public class GoogleDriveConnection : ICloudConnection
         )).ToList();
     }
 
-    public async Task<long> GetDirectorySizeAsync(string path)
+    /// <inheritdoc />
+    public async Task<long> GetDirectorySizeAsync(
+        string path,
+        CancellationToken cancellationToken = default)
     {
         long totalSize = 0;
 
-        foreach (var item in await ListAsync(path))
+        foreach (var item in await ListAsync(path, cancellationToken))
             if (item.IsDirectory)
-                totalSize += await GetDirectorySizeAsync(item.Path);
+                totalSize += await GetDirectorySizeAsync(item.Path, cancellationToken);
             else
                 totalSize += item.Size;
         
         return totalSize;
     }
     
-    private async Task<string> GetOrCreateFolderAsync(string name, string parentId)
+    /// <summary>
+    /// Resolves an existing child folder or creates it under the supplied
+    /// parent. Every Google API request receives the active job token.
+    /// </summary>
+    private async Task<string> GetOrCreateFolderAsync(
+        string name,
+        string parentId,
+        CancellationToken cancellationToken)
     {
         var list = _service.Files.List();
         list.Q =
@@ -238,7 +261,7 @@ public class GoogleDriveConnection : ICloudConnection
 
         list.Fields = "files(id)";
 
-        var existing = await list.ExecuteAsync();
+        var existing = await list.ExecuteAsync(cancellationToken);
 
         if (existing.Files.Count > 0)
             return existing.Files[0].Id;
@@ -253,12 +276,15 @@ public class GoogleDriveConnection : ICloudConnection
         var create = _service.Files.Create(folder);
         create.Fields = "id";
 
-        var created = await create.ExecuteAsync();
+        var created = await create.ExecuteAsync(cancellationToken);
 
         return created.Id;
     }
     
-    public async Task CreateDirectoryAsync(string path)
+    /// <inheritdoc />
+    public async Task CreateDirectoryAsync(
+        string path,
+        CancellationToken cancellationToken = default)
     {
         path = path.Replace('\\', '/').Trim('/');
 
@@ -269,12 +295,15 @@ public class GoogleDriveConnection : ICloudConnection
 
         foreach (var part in path.Split('/', StringSplitOptions.RemoveEmptyEntries))
         {
-            parentId = await GetOrCreateFolderAsync(part, parentId);
+            parentId = await GetOrCreateFolderAsync(part, parentId, cancellationToken);
         }
     }
     
 
-    private async Task<string?> FindFolderByPathAsync(string path)
+    /// <summary>Walks a provider path segment by segment and returns its folder id.</summary>
+    private async Task<string?> FindFolderByPathAsync(
+        string path,
+        CancellationToken cancellationToken)
     {
         path = path.Replace('\\', '/').Trim('/');
 
@@ -285,6 +314,7 @@ public class GoogleDriveConnection : ICloudConnection
 
         foreach (var part in path.Split('/'))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var list = _service.Files.List();
 
             list.Q =
@@ -294,7 +324,7 @@ public class GoogleDriveConnection : ICloudConnection
 
             list.Fields = "files(id)";
 
-            var result = await list.ExecuteAsync();
+            var result = await list.ExecuteAsync(cancellationToken);
 
             if (result.Files.Count == 0)
                 return null;
@@ -305,7 +335,10 @@ public class GoogleDriveConnection : ICloudConnection
         return parent;
     }
 
-    private async Task<string?> FindFileByPathAsync(string path)
+    /// <summary>Resolves a file id after locating each parent folder in order.</summary>
+    private async Task<string?> FindFileByPathAsync(
+        string path,
+        CancellationToken cancellationToken)
     {
         path = path.Replace('\\', '/').Trim('/');
 
@@ -318,7 +351,9 @@ public class GoogleDriveConnection : ICloudConnection
 
         for (int i = 0; i < parts.Length - 1; i++)
         {
-            var folder = await FindFolderByPathAsync(string.Join("/", parts.Take(i + 1)));
+            var folder = await FindFolderByPathAsync(
+                string.Join("/", parts.Take(i + 1)),
+                cancellationToken);
 
             if (folder == null)
                 return null;
@@ -334,14 +369,16 @@ public class GoogleDriveConnection : ICloudConnection
 
         request.Fields = "files(id)";
 
-        var result = await request.ExecuteAsync();
+        var result = await request.ExecuteAsync(cancellationToken);
 
         return result.Files.FirstOrDefault()?.Id;
     }
     
+    /// <summary>Finds a named, non-trashed file directly below a known parent.</summary>
     private async Task<string?> FindFileIdAsync(
         string fileName,
-        string parentId)
+        string parentId,
+        CancellationToken cancellationToken)
     {
         var request = _service.Files.List();
 
@@ -352,7 +389,7 @@ public class GoogleDriveConnection : ICloudConnection
 
         request.Fields = "files(id, name)";
 
-        var result = await request.ExecuteAsync();
+        var result = await request.ExecuteAsync(cancellationToken);
 
         return result.Files.FirstOrDefault()?.Id;
     }

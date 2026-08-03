@@ -83,6 +83,8 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorizationCore();
 
 builder.Services.AddControllers();
+builder.Services.AddHttpClient(nameof(OneDriveDeviceAuthorizationService), client =>
+    client.Timeout = TimeSpan.FromSeconds(30));
 
 // -- JWT --
 builder.Services.AddSingleton<JwtTokenService>();
@@ -96,11 +98,13 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
 
 builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<ToastService>();
+builder.Services.AddScoped<JobService>();
 builder.Services.AddSingleton<LogDownloadTokenService>();
 builder.Services.AddScoped<FileUploadCoordinator>();
 builder.Services.AddScoped<FileSelectionCoordinator>();
 builder.Services.AddSingleton<AssetProvider>();
 builder.Services.AddSingleton<ICloudAuthorizationTicketStore, CloudAuthorizationTicketStore>();
+builder.Services.AddSingleton<IOneDriveDeviceAuthorizationService, OneDriveDeviceAuthorizationService>();
 
 
 

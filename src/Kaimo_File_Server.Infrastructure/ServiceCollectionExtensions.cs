@@ -80,6 +80,7 @@ namespace Kaimo_File_Server.Infrastructure
             
             // -- Cloud --
             services.AddSingleton<ICloudProvider, GoogleDriveProvider>();
+            services.AddSingleton<ICloudProvider, OneDriveProvider>();
             services.AddSingleton<ICloudProviderFactory, CloudProviderFactory>();
             
             return services;

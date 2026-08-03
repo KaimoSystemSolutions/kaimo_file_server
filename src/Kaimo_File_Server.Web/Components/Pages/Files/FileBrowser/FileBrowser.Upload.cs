@@ -31,12 +31,16 @@ public partial class FileBrowser
         StateHasChanged();
     }
 
+    /// <summary>
+    /// Uploads the selected browser files as one tracked, cancellable job. The
+    /// job token is shared by the global job menu, toast dismissal callback, and
+    /// underlying upload API so cancellation stops the actual transfer.
+    /// </summary>
     private async Task OnFileUploaded(InputFileChangeEventArgs e)
     {
         var files = e.GetMultipleFiles(int.MaxValue);
         if (files.Count == 0) return;
 
-        var cts = new CancellationTokenSource();
         long totalBytes = files.Sum(f => f.Size);
         long totalUploadedBytes = 0;
         int completedCount = 0;
@@ -47,14 +51,22 @@ public partial class FileBrowser
         TimeSpan lastSampleTime = TimeSpan.Zero;
         double currentSpeedBytesPerSec = 0;
 
+        // A single batch is represented as one job so cancelling it prevents the
+        // current upload and every remaining file from starting.
+        using var job = Jobs.Start(
+            string.Format(
+                Resources.ResourceManager.GetString("Web_Jobs_Upload_Title") ?? "Upload: {0}",
+                files.Count == 1 ? files[0].Name : $"{files.Count} files"),
+            BuildProgressText(files[0].Name, 0, files.Count, currentSpeedBytesPerSec),
+            "upload");
+
         string toastId = null!;
         toastId = Toast.Show(
             BuildProgressText(files[0].Name, 0, files.Count, currentSpeedBytesPerSec),
             ToastType.Progress,
             onDismiss: () =>
             {
-                cts.Cancel();
-                Toast.Update(toastId, Resources.Web_Upload_BatchCancelled, type: ToastType.Error);
+                job.Cancel();
                 return Task.CompletedTask;
             });
         // Give the renderer a turn before opening/consuming the browser stream.
@@ -65,7 +77,7 @@ public partial class FileBrowser
 
         foreach (var file in files)
         {
-            if (cts.IsCancellationRequested)
+            if (job.CancellationToken.IsCancellationRequested)
                 break;
 
             long fileBytesUploaded = 0;
@@ -105,6 +117,9 @@ public partial class FileBrowser
                                     BuildProcessingText(
                                         file.Name, completedCount, files.Count),
                                     progress: 100);
+                                job.Update(
+                                    BuildProcessingText(file.Name, completedCount, files.Count),
+                                    100);
                                 StateHasChanged();
                             });
                             return;
@@ -126,12 +141,18 @@ public partial class FileBrowser
                                 Toast.Update(toastId,
                                     BuildProgressText(file.Name, completedCount, files.Count, currentSpeedBytesPerSec),
                                     progress: percent);
+                                job.Update(
+                                    BuildProgressText(file.Name, completedCount, files.Count, currentSpeedBytesPerSec),
+                                    percent);
                                 StateHasChanged();
                             });
                         }
                     });
 
-                    var result = await VM.UploadFileAsync(file.Name, progressStream, cts.Token);
+                    var result = await VM.UploadFileAsync(
+                        file.Name,
+                        progressStream,
+                        job.CancellationToken);
 
                     if (!result.Success)
                         failedFiles.Add(file.Name);
@@ -144,7 +165,6 @@ public partial class FileBrowser
             catch (JSException)
             {
                 Toast.Update(toastId, Resources.Web_Upload_PageLeft, type: ToastType.Error);
-                cts.Dispose();
                 return;
             }
             finally
@@ -155,7 +175,11 @@ public partial class FileBrowser
 
         stopwatch.Stop();
 
-        if (!cts.IsCancellationRequested)
+        if (job.CancellationToken.IsCancellationRequested)
+        {
+            Toast.Update(toastId, Resources.Web_Upload_BatchCancelled, type: ToastType.Error);
+        }
+        else
         {
             if (failedFiles.Count == 0)
             {
@@ -173,8 +197,6 @@ public partial class FileBrowser
                     type: ToastType.Error);
             }
         }
-
-        cts.Dispose();
 
         await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
         StateHasChanged();

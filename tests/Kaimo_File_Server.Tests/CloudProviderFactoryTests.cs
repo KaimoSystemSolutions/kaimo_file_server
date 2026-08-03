@@ -40,6 +40,26 @@ public sealed class CloudProviderFactoryTests
     }
 
     [Fact]
+    public void CreateOrLoad_ReusesConnectionWhenProviderRotatesCredential()
+    {
+        var provider = new FakeProvider();
+        var factory = new CloudProviderFactory([provider]);
+        var shareId = Guid.NewGuid();
+        var folder = new SyncedFolder("fake", new Dictionary<string, string>
+        {
+            ["connectionId"] = Guid.NewGuid().ToString("N"),
+            ["refreshToken"] = "old-token"
+        });
+        var first = factory.CreateOrLoad(shareId, folder);
+
+        folder.Data["refreshToken"] = "rotated-token";
+        var second = factory.CreateOrLoad(shareId, folder);
+
+        Assert.Same(first, second);
+        Assert.Equal(1, provider.CreatedConnections);
+    }
+
+    [Fact]
     public async Task DisposeConnectionAsync_AwaitsProviderCleanupAndEvictsCacheEntry()
     {
         var provider = new FakeProvider();
@@ -93,11 +113,11 @@ public sealed class CloudProviderFactoryTests
             return Task.CompletedTask;
         }
 
-        public Task UploadAsync(string path, Stream data, DateTime modifiedTime) => Task.CompletedTask;
-        public Task DownloadAsync(string path, Stream target) => Task.CompletedTask;
-        public Task CreateDirectoryAsync(string path) => Task.CompletedTask;
-        public Task<long> GetDirectorySizeAsync(string path) => Task.FromResult(0L);
-        public Task<IReadOnlyList<CloudItemMeta>> ListAsync(string path)
+        public Task UploadAsync(string path, Stream data, DateTime modifiedTime, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task DownloadAsync(string path, Stream target, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task CreateDirectoryAsync(string path, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<long> GetDirectorySizeAsync(string path, CancellationToken cancellationToken = default) => Task.FromResult(0L);
+        public Task<IReadOnlyList<CloudItemMeta>> ListAsync(string path, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<CloudItemMeta>>([]);
     }
 }

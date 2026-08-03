@@ -6,6 +6,10 @@ using Kaimo_File_Server.Core.Services.DataServices;
 
 namespace Kaimo_File_Server.Infrastructure.Clouds;
 
+/// <summary>
+/// Thread-safe provider registry and authenticated-connection cache shared by
+/// cloud-sync consumers.
+/// </summary>
 public class CloudProviderFactory : ICloudProviderFactory
 {
     private readonly ConcurrentDictionary<ConnectionKey, ICloudConnection> _connections;
@@ -17,8 +21,10 @@ public class CloudProviderFactory : ICloudProviderFactory
         _providers = providers.ToDictionary(provider => provider.Id, StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <inheritdoc />
     public IReadOnlyCollection<ICloudProvider> Providers => _providers.Values.ToArray();
 
+    /// <inheritdoc />
     public ICloudConnection CreateOrLoad(Guid shareId, SyncedFolder folder)
     {
         var key = CreateKey(shareId, folder);
@@ -33,6 +39,7 @@ public class CloudProviderFactory : ICloudProviderFactory
         return _connections.GetOrAdd(key, connection);
     }
 
+    /// <inheritdoc />
     public async Task DisposeConnectionAsync(Guid shareId, SyncedFolder folder)
     {
         if (!_connections.TryRemove(CreateKey(shareId, folder), out var existingConnection))
@@ -48,9 +55,14 @@ public class CloudProviderFactory : ICloudProviderFactory
     /// </summary>
     private static ConnectionKey CreateKey(Guid shareId, SyncedFolder folder)
     {
-        var credentials = string.Join('\n', folder.Data
-            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
-            .Select(entry => $"{entry.Key}={entry.Value}"));
+        // Providers with rotating credentials can supply an immutable connection
+        // id. This keeps the same live connection cached when a refresh token is
+        // replaced and avoids retaining an unreachable cache entry.
+        var credentials = folder.Data.TryGetValue("connectionId", out var connectionId)
+            ? $"connectionId={connectionId}"
+            : string.Join('\n', folder.Data
+                .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+                .Select(entry => $"{entry.Key}={entry.Value}"));
         var fingerprint = Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(credentials)));
         return new ConnectionKey(shareId, folder.Provider.ToLowerInvariant(), fingerprint);

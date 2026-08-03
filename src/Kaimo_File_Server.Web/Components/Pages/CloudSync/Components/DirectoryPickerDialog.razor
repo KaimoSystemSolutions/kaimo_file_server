@@ -77,8 +77,11 @@
     private string DisplayPath => string.IsNullOrEmpty(CurrentPath) ? "/" : CurrentPath;
     private bool IsAtRoot => string.Equals(CurrentPath, RootPath, StringComparison.Ordinal);
 
+    // The parent owns picker state; the dialog only reports user intent.
     private Task CloseAsync() => OnClosed.InvokeAsync();
 
+    // Local paths use an empty root while remote paths use "/". Normalize both
+    // representations before notifying the parent to keep providers abstract.
     private Task NavigateToParentAsync()
     {
         var normalized = CurrentPath.Replace('\\', '/').Trim('/');
@@ -89,6 +92,8 @@
         return OnNavigate.InvokeAsync(parent);
     }
 
+    // Razor components use a fallback so missing satellite resources never make
+    // an administration control unusable.
     private static string Text(string key, string fallback)
         => Resources.ResourceManager.GetString(key) ?? fallback;
 }

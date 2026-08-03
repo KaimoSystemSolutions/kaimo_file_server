@@ -6,6 +6,10 @@ using Microsoft.AspNetCore.Components;
 
 namespace Kaimo_File_Server.Web.Components.Pages.CloudSync;
 
+/// <summary>
+/// UI orchestration for the provider-neutral cloud-sync workspace. Business
+/// authorization and persistence remain in <see cref="CloudSyncViewModel"/>.
+/// </summary>
 public partial class CloudSync
 {
     [Parameter] public string? ShareName { get; set; }
@@ -31,6 +35,10 @@ public partial class CloudSync
     private string? _pickerError;
     private IReadOnlyList<CloudDirectoryItem> _pickerItems = [];
 
+    /// <summary>
+    /// Performs the initial authenticated load after interactive rendering and
+    /// restores selection or create state supplied through navigation parameters.
+    /// </summary>
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender || _initialized)
@@ -83,6 +91,7 @@ public partial class CloudSync
         await VM.SelectAsync(sync);
     }
 
+    /// <summary>Starts the selected provider's authorization flow after validation.</summary>
     private async Task ConnectAsync()
     {
         var uri = await VM.BuildAuthorizationUriAsync();
@@ -90,6 +99,7 @@ public partial class CloudSync
             Navigation.NavigateTo(uri, forceLoad: true);
     }
 
+    /// <summary>Saves the selected mapping and translates failures into a user notification.</summary>
     private async Task SaveAsync()
     {
         try
@@ -103,21 +113,55 @@ public partial class CloudSync
         }
     }
 
+    /// <summary>
+    /// Starts the selected sync as a tracked UI job. The job handle owns the
+    /// cancellation token shared by the global menu and progress toast, while the
+    /// view model performs authorization, persistence, and provider interaction.
+    /// </summary>
     private async Task RunSyncAsync()
     {
-        var toastId = Toasts.Show(Text("Web_CloudSync_Progress", "Synchronizing…"), ToastType.Progress);
+        if (VM.SelectedSync is null)
+            return;
+
+        var selected = VM.SelectedSync;
+        var initialMessage = Text("Web_CloudSync_Progress", "Synchronizing…");
+        using var job = Jobs.Start(
+            string.Format(
+                Text("Web_Jobs_CloudSync_Title", "Cloud sync: {0}"),
+                selected.ShareName),
+            $"{DisplayLocalPath(selected.LocalPath)} ↔ {VM.EditRemotePath}",
+            "cloud-sync");
+
+        // Closing this progress toast is an explicit cancellation action. The
+        // toast container removes the visual only after invoking this callback.
+        var toastId = Toasts.Show(
+            initialMessage,
+            ToastType.Progress,
+            onDismiss: () =>
+            {
+                job.Cancel();
+                return Task.CompletedTask;
+            });
+        // Keep both progress surfaces consistent without coupling the provider
+        // abstraction to Razor or the toast implementation.
         var success = await VM.SyncNowAsync((message, progress) =>
         {
+            job.Update(message ?? initialMessage, progress);
             _ = InvokeAsync(() => Toasts.Update(toastId, message, progress, ToastType.Progress));
-        });
+        }, job.CancellationToken);
+
+        job.Complete();
         Toasts.Remove(toastId);
         Toasts.Show(
             success
                 ? Text("Web_CloudSync_Complete", "Synchronization completed.")
                 : VM.ErrorMessage ?? Text("Web_CloudSync_Error_Run", "The cloud sync failed. Check the server log."),
-            success ? ToastType.Success : ToastType.Error);
+            success
+                ? ToastType.Success
+                : VM.LastSyncWasCancelled ? ToastType.Info : ToastType.Error);
     }
 
+    /// <summary>Confirms removal through the view model and reports successful completion.</summary>
     private async Task DeleteAsync()
     {
         _showDeleteConfirm = false;
@@ -149,12 +193,17 @@ public partial class CloudSync
         return OpenPickerAsync(VM.EditRemotePath);
     }
 
+    /// <summary>Opens the shared directory dialog and loads its initial path.</summary>
     private async Task OpenPickerAsync(string path)
     {
         _pickerOpen = true;
         await NavigatePickerAsync(path);
     }
 
+    /// <summary>
+    /// Normalizes and loads one picker level from either the local file service
+    /// or the selected cloud provider while maintaining explicit error state.
+    /// </summary>
     private async Task NavigatePickerAsync(string path)
     {
         _pickerPath = _pickerRemote
@@ -190,6 +239,7 @@ public partial class CloudSync
         }
     }
 
+    /// <summary>Writes the chosen path to the correct create/edit field and closes the dialog.</summary>
     private Task SelectPickerPathAsync(string path)
     {
         if (_pickerRemote)
@@ -203,6 +253,7 @@ public partial class CloudSync
         return Task.CompletedTask;
     }
 
+    /// <summary>Clears transient picker state so stale results are never rendered on reopen.</summary>
     private void ClosePicker()
     {
         _pickerOpen = false;

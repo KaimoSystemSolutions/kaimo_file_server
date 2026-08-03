@@ -30,6 +30,7 @@ public sealed class CloudSyncViewModel
     private readonly Dictionary<Guid, ManagementPermission> _permissions = [];
     private UserContext? _actor;
 
+    /// <summary>Creates the provider-neutral administration model and its security dependencies.</summary>
     public CloudSyncViewModel(
         IShareRepository shareRepository,
         ICloudProviderFactory providerFactory,
@@ -58,6 +59,12 @@ public sealed class CloudSyncViewModel
 
     public bool IsLoading { get; private set; }
     public bool IsBusy { get; private set; }
+
+    /// <summary>
+    /// Distinguishes an expected user cancellation from a provider failure so
+    /// the page can show a neutral result instead of an error notification.
+    /// </summary>
+    public bool LastSyncWasCancelled { get; private set; }
     public bool IsCreating { get; set; }
     public string? ErrorMessage { get; private set; }
 
@@ -77,9 +84,14 @@ public sealed class CloudSyncViewModel
     public bool CanRunSelected => SelectedSync is not null
         && HasPermission(SelectedSync.ShareId, ManagementPermission.SyncManually);
 
+    /// <summary>Checks the already-loaded effective permission for one share.</summary>
     public bool CanCreateOnShare(Guid shareId)
         => HasPermission(shareId, ManagementPermission.CreateSyncs);
 
+    /// <summary>
+    /// Loads only shares visible to the current actor, computes per-share
+    /// permissions, and rebuilds the provider-neutral sync inventory.
+    /// </summary>
     public async Task LoadAsync(Guid? preferredShareId = null, string? preferredLocalPath = null)
     {
         IsLoading = true;
@@ -154,6 +166,10 @@ public sealed class CloudSyncViewModel
         }
     }
 
+    /// <summary>
+    /// Selects a mapping for editing and loads optional account metadata without
+    /// allowing a stale cloud credential to hide the rest of the inventory.
+    /// </summary>
     public async Task SelectAsync(CloudSyncListItem item)
     {
         SelectedSync = item;
@@ -167,6 +183,7 @@ public sealed class CloudSyncViewModel
         {
             var connection = _providerFactory.CreateOrLoad(item.ShareId, item.Configuration);
             SelectedAccount = await connection.GetAccountInfoAsync();
+            await PersistPendingCredentialsAsync(item.ShareId, item.LocalPath, connection);
         }
         catch (Exception ex)
         {
@@ -175,6 +192,7 @@ public sealed class CloudSyncViewModel
         }
     }
 
+    /// <summary>Clears editing state and provider account metadata.</summary>
     public void Deselect()
     {
         SelectedSync = null;
@@ -182,6 +200,10 @@ public sealed class CloudSyncViewModel
         ErrorMessage = null;
     }
 
+    /// <summary>
+    /// Validates permission, provider, folder existence, and path conflicts,
+    /// then issues a context-bound ticket for the provider authorization endpoint.
+    /// </summary>
     public async Task<string?> BuildAuthorizationUriAsync()
     {
         ErrorMessage = null;
@@ -227,6 +249,10 @@ public sealed class CloudSyncViewModel
                $"&ticket={Uri.EscapeDataString(ticket)}";
     }
 
+    /// <summary>
+    /// Revalidates configure permission and atomically replaces the selected
+    /// local-path key while preserving its provider credentials.
+    /// </summary>
     public async Task<bool> SaveSelectedAsync()
     {
         if (SelectedSync is null || _actor is null)
@@ -271,6 +297,10 @@ public sealed class CloudSyncViewModel
         return true;
     }
 
+    /// <summary>
+    /// Removes the selected mapping after permission validation. Provider cleanup
+    /// is best-effort so an unavailable cloud service cannot trap local settings.
+    /// </summary>
     public async Task<bool> DeleteSelectedAsync()
     {
         if (SelectedSync is null || _actor is null)
@@ -305,7 +335,14 @@ public sealed class CloudSyncViewModel
         return true;
     }
 
-    public async Task<bool> SyncNowAsync(Action<string?, int> reportProgress)
+    /// <summary>
+    /// Revalidates manual-sync permission, loads the latest persisted mapping,
+    /// and executes the provider-neutral sync with cooperative cancellation.
+    /// LastSync is written only after the operation completes successfully.
+    /// </summary>
+    public async Task<bool> SyncNowAsync(
+        Action<string?, int> reportProgress,
+        CancellationToken cancellationToken = default)
     {
         if (SelectedSync is null || _actor is null)
             return false;
@@ -319,6 +356,7 @@ public sealed class CloudSyncViewModel
         }
 
         IsBusy = true;
+        LastSyncWasCancelled = false;
         ErrorMessage = null;
         try
         {
@@ -335,12 +373,28 @@ public sealed class CloudSyncViewModel
                 NormalizeRemotePath(folder.RemotePath),
                 selected.LocalPath,
                 folder.Mode,
-                reportProgress);
+                reportProgress,
+                cancellationToken);
 
+            cancellationToken.ThrowIfCancellationRequested();
+            ApplyPendingCredentials(folder, connection);
             folder.LastSync = DateTime.UtcNow;
             await _shareRepository.UpdateAsync(share);
+            connection.AcknowledgeCredentialChanges();
             await LoadAsync(share.Id, selected.LocalPath);
             return true;
+        }
+        // Cancellation is a normal user action. Do not log it as a failure and do
+        // not update LastSync, because the directory pair may be only partially processed.
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            LastSyncWasCancelled = true;
+            ErrorMessage = Text("Web_CloudSync_Cancelled", "Synchronization was cancelled.");
+            _logger.LogInformation(
+                "Manual cloud sync was cancelled for share {ShareId} and path {Path}",
+                selected.ShareId,
+                selected.LocalPath);
+            return false;
         }
         catch (Exception ex)
         {
@@ -355,6 +409,10 @@ public sealed class CloudSyncViewModel
         }
     }
 
+    /// <summary>
+    /// Lists local child directories through the share-scoped file service so
+    /// normal ACL and path-containment rules remain enforced in the picker.
+    /// </summary>
     public async Task<IReadOnlyList<CloudDirectoryItem>> LoadLocalDirectoriesAsync(Guid shareId, string path)
     {
         if (_actor is null)
@@ -375,23 +433,75 @@ public sealed class CloudSyncViewModel
             .ToArray();
     }
 
+    /// <summary>
+    /// Lists remote child directories through the selected provider abstraction
+    /// and persists a refresh token if the provider rotated it during the call.
+    /// </summary>
     public async Task<IReadOnlyList<CloudDirectoryItem>> LoadRemoteDirectoriesAsync(string path)
     {
         if (SelectedSync is null)
             return [];
 
-        var connection = _providerFactory.CreateOrLoad(
-            SelectedSync.ShareId, SelectedSync.Configuration);
+        var selected = SelectedSync;
         var normalized = NormalizeRemotePath(path);
-        var items = await connection.ListAsync(normalized);
+        try
+        {
+            var connection = _providerFactory.CreateOrLoad(
+                selected.ShareId, selected.Configuration);
+            var items = await connection.ListAsync(normalized);
+            await PersistPendingCredentialsAsync(
+                selected.ShareId,
+                selected.LocalPath,
+                connection);
 
-        return items
-            .Where(item => item.IsDirectory)
-            .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
-            .Select(item => new CloudDirectoryItem(item.Name, NormalizeRemotePath(item.Path)))
-            .ToArray();
+            return items
+                .Where(item => item.IsDirectory)
+                .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+                .Select(item => new CloudDirectoryItem(item.Name, NormalizeRemotePath(item.Path)))
+                .ToArray();
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Unable to list remote cloud directory {RemotePath} for share {ShareId}",
+                normalized,
+                selected.ShareId);
+            throw;
+        }
     }
 
+    /// <summary>
+    /// Merges provider-rotated credentials into a freshly loaded share and only
+    /// acknowledges them after repository persistence succeeds.
+    /// </summary>
+    private async Task PersistPendingCredentialsAsync(
+        Guid shareId,
+        string localPath,
+        ICloudConnection connection)
+    {
+        if (!connection.HasPendingCredentialChanges)
+            return;
+
+        var share = await _shareRepository.GetByIdAsync(shareId);
+        if (share is null || !share.CloudSettings.Folders.TryGetValue(localPath, out var folder))
+            return;
+
+        ApplyPendingCredentials(folder, connection);
+        await _shareRepository.UpdateAsync(share);
+        connection.AcknowledgeCredentialChanges();
+    }
+
+    /// <summary>Applies only fields explicitly reported as rotated by the provider.</summary>
+    private static void ApplyPendingCredentials(
+        SyncedFolder folder,
+        ICloudConnection connection)
+    {
+        foreach (var (key, value) in connection.GetPendingCredentialChanges())
+            folder.Data[key] = value;
+    }
+
+    /// <summary>Ensures a mapping targets an existing directory visible to the actor.</summary>
     private async Task ValidateLocalDirectoryAsync(ShareDefinition share, string localPath)
     {
         if (_actor is null)
@@ -404,6 +514,7 @@ public sealed class CloudSyncViewModel
             throw new InvalidOperationException("A cloud sync must target a local directory.");
     }
 
+    /// <summary>Restores selection after a list reload using stable share/path identity.</summary>
     private async Task SelectMatchingAsync(Guid shareId, string localPath)
     {
         var match = Syncs.FirstOrDefault(item => item.ShareId == shareId
@@ -414,6 +525,7 @@ public sealed class CloudSyncViewModel
             Deselect();
     }
 
+    /// <summary>Flattens per-share mappings into the sorted list rendered by Razor.</summary>
     private void RebuildSyncList()
     {
         Syncs = Shares
@@ -437,6 +549,7 @@ public sealed class CloudSyncViewModel
     private static string CombineLocalPath(string parent, string child)
         => parent.Length == 0 ? child : $"{parent}/{child}";
 
+    /// <summary>Normalizes remote paths to exactly one leading slash and no trailing slash.</summary>
     public static string NormalizeRemotePath(string? path)
     {
         var normalized = string.IsNullOrWhiteSpace(path)
@@ -449,6 +562,7 @@ public sealed class CloudSyncViewModel
         => Resources.ResourceManager.GetString(key) ?? fallback;
 }
 
+/// <summary>Provider-neutral row displayed in the cloud-sync inventory.</summary>
 public sealed record CloudSyncListItem(
     Guid ShareId,
     string ShareName,
@@ -456,4 +570,5 @@ public sealed record CloudSyncListItem(
     SyncedFolder Configuration,
     string ProviderDisplayName);
 
+/// <summary>Minimal directory-picker item shared by local and remote sources.</summary>
 public sealed record CloudDirectoryItem(string Name, string Path);

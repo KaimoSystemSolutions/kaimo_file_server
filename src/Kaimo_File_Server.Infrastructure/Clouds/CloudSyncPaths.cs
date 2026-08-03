@@ -4,6 +4,10 @@ using Kaimo_File_Server.Core.Domain;
 
 namespace Kaimo_File_Server.Infrastructure.Clouds;
 
+/// <summary>
+/// Canonical path and OAuth-state helpers shared by every cloud provider.
+/// Keeping these rules central avoids provider-specific path-key behavior.
+/// </summary>
 public static class CloudSyncPaths
 {
     /// <summary>
@@ -15,6 +19,7 @@ public static class CloudSyncPaths
             ? ""
             : path.Replace('\\', '/').Trim('/');
 
+    /// <summary>Returns empty settings for missing persistence data or deserializes existing data.</summary>
     public static CloudSettings ParseSettings(string? json)
         => string.IsNullOrWhiteSpace(json)
             ? new CloudSettings(new Dictionary<string, SyncedFolder>())
@@ -46,6 +51,10 @@ public static class CloudSyncPaths
 
     private sealed record StatePayload(Guid ShareId, string Path, string? AuthorizationTicket);
 
+    /// <summary>
+    /// Encodes the authorization context as URL-safe Base64. Authenticity is
+    /// provided separately by the short-lived ticket store, not by this payload.
+    /// </summary>
     public static string EncodeState(Guid shareId, string path, string? authorizationTicket = null)
     {
         var json = JsonSerializer.Serialize(new StatePayload(shareId, path, authorizationTicket));
@@ -56,6 +65,10 @@ public static class CloudSyncPaths
             .Replace('/', '_');
     }
 
+    /// <summary>
+    /// Decodes a provider callback state without leaking malformed-input
+    /// exceptions into controller endpoints.
+    /// </summary>
     public static (Guid ShareId, string Path, string? AuthorizationTicket)? DecodeState(string state)
     {
         try
