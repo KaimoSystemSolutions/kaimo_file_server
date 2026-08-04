@@ -4093,7 +4093,8 @@ input[type="radio"] {
 }
 
 .cloud-sync-detail {
-    width: 410px;
+    width: min(620px, 48vw);
+    min-width: 540px;
 }
 
 .cloud-sync-detail .edit-input {
@@ -4115,6 +4116,147 @@ input[type="radio"] {
     display: flex;
     min-width: 0;
     flex-direction: column;
+}
+
+.cloud-schedule-section {
+    margin-top: 20px;
+    padding-top: 2px;
+}
+
+.cloud-schedule-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.cloud-schedule-heading .detail-label {
+    margin-top: 0;
+}
+
+.cloud-schedule-interval {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.cloud-schedule-interval-input {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--text-tertiary);
+}
+
+.cloud-schedule-interval input {
+    width: 92px;
+    padding: 6px 8px;
+}
+
+.cloud-schedule-scroll {
+    overflow-x: auto;
+    padding-bottom: 4px;
+    transition: opacity .15s ease;
+}
+
+.cloud-schedule-scroll--disabled {
+    opacity: .55;
+}
+
+.cloud-schedule-grid {
+    display: grid;
+    grid-template-columns: 46px repeat(24, minmax(17px, 1fr));
+    min-width: 500px;
+    gap: 3px;
+    align-items: center;
+}
+
+.cloud-schedule-corner {
+    height: 20px;
+}
+
+.cloud-schedule-hour,
+.cloud-schedule-day,
+.cloud-schedule-slot {
+    border: 0;
+    color: var(--text-tertiary);
+    font: inherit;
+}
+
+.cloud-schedule-hour {
+    overflow: visible;
+    padding: 0;
+    background: transparent;
+    font-size: 8px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.cloud-schedule-day {
+    overflow: hidden;
+    padding: 3px 5px;
+    background: transparent;
+    font-size: 10px;
+    font-weight: 650;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.cloud-schedule-slot {
+    aspect-ratio: 1;
+    min-height: 17px;
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+    background: var(--bg-sunken);
+    cursor: pointer;
+    transition: border-color .12s ease, background .12s ease, transform .12s ease;
+}
+
+.cloud-schedule-slot:hover:not(:disabled) {
+    border-color: var(--accent);
+    transform: scale(1.08);
+}
+
+.cloud-schedule-slot--active {
+    border-color: var(--accent);
+    background: var(--accent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, white 20%, transparent);
+}
+
+.cloud-schedule-hour:disabled,
+.cloud-schedule-day:disabled,
+.cloud-schedule-slot:disabled {
+    cursor: default;
+}
+
+.cloud-schedule-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 8px;
+    color: var(--text-tertiary);
+    font-size: 11px;
+}
+
+.cloud-schedule-clear {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+}
+
+.cloud-schedule-clear:hover {
+    text-decoration: underline;
 }
 
 .directory-picker {
@@ -4194,5 +4336,21 @@ input[type="radio"] {
     .cloud-sync-table-row > span:nth-child(3),
     .cloud-sync-table-row > span:nth-child(4) {
         display: none;
+    }
+}
+
+@media (max-width: 1280px) {
+    .cloud-sync-workspace {
+        flex-direction: column;
+    }
+
+    .cloud-sync-table,
+    .cloud-sync-detail {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .cloud-sync-detail {
+        position: static;
     }
 }

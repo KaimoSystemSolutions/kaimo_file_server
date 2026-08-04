@@ -134,6 +134,93 @@ namespace Kaimo_File_Server.Core.Domain
     }
 
     /// <summary>
+    /// Hourly weekly schedule for one cloud-sync mapping. Slots are encoded as
+    /// <c>(int)DayOfWeek * 24 + hour</c>, keeping the persisted JSON compact while
+    /// still allowing the UI to render a full 7 x 24 grid.
+    /// </summary>
+    public sealed class CloudSyncSchedule : IEquatable<CloudSyncSchedule>
+    {
+        public const int HoursPerDay = 24;
+        public const int SlotCount = 7 * HoursPerDay;
+        public const int DefaultIntervalSeconds = 60;
+        public const int MinIntervalSeconds = 1;
+        public const int MaxIntervalSeconds = 86_400;
+
+        public bool IsEnabled { get; set; }
+
+        public HashSet<int> ActiveSlots { get; set; } = [];
+
+        /// <summary>How often this individual mapping is evaluated.</summary>
+        public int IntervalSeconds { get; set; } = DefaultIntervalSeconds;
+
+        /// <summary>
+        /// User whose ACL context is used by unattended runs. The value is set
+        /// whenever an enabled schedule is saved by an authorized administrator.
+        /// </summary>
+        public string? RunAsUsername { get; set; }
+
+        public bool IsActive(DayOfWeek day, int hour)
+            => ActiveSlots?.Contains(ToSlot(day, hour)) == true;
+
+        public void SetActive(DayOfWeek day, int hour, bool active)
+        {
+            ActiveSlots ??= [];
+            int slot = ToSlot(day, hour);
+            if (active)
+                ActiveSlots.Add(slot);
+            else
+                ActiveSlots.Remove(slot);
+        }
+
+        public CloudSyncSchedule Clone()
+            => new()
+            {
+                IsEnabled = IsEnabled,
+                ActiveSlots = ActiveSlots is null
+                    ? []
+                    : new HashSet<int>(ActiveSlots.Where(IsValidSlot)),
+                IntervalSeconds = GetEffectiveIntervalSeconds(),
+                RunAsUsername = RunAsUsername
+            };
+
+        public bool HasValidInterval
+            => IntervalSeconds is >= MinIntervalSeconds and <= MaxIntervalSeconds;
+
+        public int GetEffectiveIntervalSeconds()
+            => HasValidInterval ? IntervalSeconds : DefaultIntervalSeconds;
+
+        public static int ToSlot(DayOfWeek day, int hour)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(hour);
+            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(hour, HoursPerDay);
+            return (int)day * HoursPerDay + hour;
+        }
+
+        public static bool IsValidSlot(int slot)
+            => slot >= 0 && slot < SlotCount;
+
+        public bool Equals(CloudSyncSchedule? other)
+            => other is not null
+               && IsEnabled == other.IsEnabled
+               && IntervalSeconds == other.IntervalSeconds
+               && string.Equals(RunAsUsername, other.RunAsUsername, StringComparison.Ordinal)
+               && (ActiveSlots ?? []).SetEquals(other.ActiveSlots ?? []);
+
+        public override bool Equals(object? obj) => Equals(obj as CloudSyncSchedule);
+
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+            hash.Add(IsEnabled);
+            hash.Add(IntervalSeconds);
+            hash.Add(RunAsUsername, StringComparer.Ordinal);
+            foreach (int slot in (ActiveSlots ?? []).Order())
+                hash.Add(slot);
+            return hash.ToHashCode();
+        }
+    }
+
+    /// <summary>
     /// A single folder's cloud-sync config. Provider/Data are the persisted part
     /// (round-tripped through CloudSettings' JSON). Connection is a live,
     /// in-memory handle built on demand by ICloudProviderFactory — it is never
@@ -157,6 +244,9 @@ namespace Kaimo_File_Server.Core.Domain
         public DateTime? LastSync { get; set; }
 
         public SyncMode Mode { get; set; } = SyncMode.TwoWay;
+
+        /// <summary>Optional hourly weekly timer. Disabled for legacy mappings.</summary>
+        public CloudSyncSchedule Schedule { get; set; } = new();
         
         public SyncedFolder(
             string provider,
@@ -178,6 +268,8 @@ namespace Kaimo_File_Server.Core.Domain
             if (Provider != other.Provider) return false;
             if (RemotePath != other.RemotePath) return false;
             if (LastSync != other.LastSync) return false;
+            if (Mode != other.Mode) return false;
+            if (!Equals(Schedule, other.Schedule)) return false;
             if (Data.Count != other.Data.Count) return false;
 
             foreach (var kvp in Data)
@@ -201,6 +293,8 @@ namespace Kaimo_File_Server.Core.Domain
             hash.Add(Provider);
             hash.Add(RemotePath);
             hash.Add(LastSync);
+            hash.Add(Mode);
+            hash.Add(Schedule);
 
             // Order-independent dictionary hash
             int dataHash = 0;

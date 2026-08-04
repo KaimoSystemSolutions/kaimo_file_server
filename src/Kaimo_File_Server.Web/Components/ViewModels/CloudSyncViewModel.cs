@@ -28,6 +28,7 @@ public sealed class CloudSyncViewModel
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authenticationState;
     private readonly ICloudAuthorizationTicketStore _authorizationTickets;
+    private readonly CloudSyncSchedulerSignal _schedulerSignal;
     private readonly ILogger<CloudSyncViewModel> _logger;
     private readonly Dictionary<Guid, ManagementPermission> _permissions = [];
     private UserContext? _actor;
@@ -43,6 +44,7 @@ public sealed class CloudSyncViewModel
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authenticationState,
         ICloudAuthorizationTicketStore authorizationTickets,
+        CloudSyncSchedulerSignal schedulerSignal,
         ILogger<CloudSyncViewModel> logger)
     {
         _shareRepository = shareRepository;
@@ -54,6 +56,7 @@ public sealed class CloudSyncViewModel
         _userContextFactory = userContextFactory;
         _authenticationState = authenticationState;
         _authorizationTickets = authorizationTickets;
+        _schedulerSignal = schedulerSignal;
         _logger = logger;
     }
 
@@ -81,6 +84,11 @@ public sealed class CloudSyncViewModel
     public string EditLocalPath { get; set; } = "";
     public string EditRemotePath { get; set; } = "/";
     public SyncMode EditMode { get; set; } = SyncMode.TwoWay;
+    public bool EditScheduleEnabled { get; set; }
+    public int EditScheduleIntervalSeconds { get; set; } = CloudSyncSchedule.DefaultIntervalSeconds;
+    public HashSet<int> EditScheduleSlots { get; private set; } = [];
+
+    public int ActiveScheduleSlotCount => EditScheduleSlots.Count;
 
     public bool CanCreateSync => Shares.Any(share => HasPermission(share.Id, ManagementPermission.CreateSyncs));
     public bool CanConfigureSelected => SelectedSync is not null
@@ -182,6 +190,12 @@ public sealed class CloudSyncViewModel
         EditLocalPath = item.LocalPath;
         EditRemotePath = NormalizeRemotePath(item.Configuration.RemotePath);
         EditMode = item.Configuration.Mode;
+        EditScheduleEnabled = item.Configuration.Schedule?.IsEnabled == true;
+        EditScheduleIntervalSeconds = item.Configuration.Schedule?.GetEffectiveIntervalSeconds()
+            ?? CloudSyncSchedule.DefaultIntervalSeconds;
+        EditScheduleSlots = item.Configuration.Schedule?.ActiveSlots is { } slots
+            ? new HashSet<int>(slots.Where(CloudSyncSchedule.IsValidSlot))
+            : [];
         SelectedAccount = null;
         ErrorMessage = null;
 
@@ -203,7 +217,47 @@ public sealed class CloudSyncViewModel
     {
         SelectedSync = null;
         SelectedAccount = null;
+        EditScheduleEnabled = false;
+        EditScheduleIntervalSeconds = CloudSyncSchedule.DefaultIntervalSeconds;
+        EditScheduleSlots = [];
         ErrorMessage = null;
+    }
+
+    public bool IsScheduleSlotActive(DayOfWeek day, int hour)
+        => EditScheduleSlots.Contains(CloudSyncSchedule.ToSlot(day, hour));
+
+    public void ToggleScheduleSlot(DayOfWeek day, int hour)
+    {
+        int slot = CloudSyncSchedule.ToSlot(day, hour);
+        if (!EditScheduleSlots.Add(slot))
+            EditScheduleSlots.Remove(slot);
+    }
+
+    public void ToggleScheduleDay(DayOfWeek day)
+    {
+        bool activate = Enumerable.Range(0, CloudSyncSchedule.HoursPerDay)
+            .Any(hour => !IsScheduleSlotActive(day, hour));
+        foreach (int hour in Enumerable.Range(0, CloudSyncSchedule.HoursPerDay))
+            SetScheduleSlot(day, hour, activate);
+    }
+
+    public void ToggleScheduleHour(int hour)
+    {
+        DayOfWeek[] days = Enum.GetValues<DayOfWeek>();
+        bool activate = days.Any(day => !IsScheduleSlotActive(day, hour));
+        foreach (DayOfWeek day in days)
+            SetScheduleSlot(day, hour, activate);
+    }
+
+    public void ClearSchedule() => EditScheduleSlots.Clear();
+
+    private void SetScheduleSlot(DayOfWeek day, int hour, bool active)
+    {
+        int slot = CloudSyncSchedule.ToSlot(day, hour);
+        if (active)
+            EditScheduleSlots.Add(slot);
+        else
+            EditScheduleSlots.Remove(slot);
     }
 
     /// <summary>
@@ -272,6 +326,22 @@ public sealed class CloudSyncViewModel
             return false;
         }
 
+        if (EditScheduleEnabled && EditScheduleSlots.Count == 0)
+        {
+            ErrorMessage = Text(
+                "Web_CloudSync_Schedule_Error_Empty",
+                "Select at least one hour before enabling the timer.");
+            return false;
+        }
+        if (EditScheduleIntervalSeconds is < CloudSyncSchedule.MinIntervalSeconds
+            or > CloudSyncSchedule.MaxIntervalSeconds)
+        {
+            ErrorMessage = Text(
+                "Web_CloudSync_Schedule_Error_Interval",
+                "Enter an interval between 1 and 86400 seconds.");
+            return false;
+        }
+
         var selected = SelectedSync;
         var newLocalPath = CloudSyncPaths.Normalize(EditLocalPath);
         var operationLease = await _syncOperations.TryBeginPathMutationAsync(
@@ -310,8 +380,19 @@ public sealed class CloudSyncViewModel
         share.CloudSettings.Folders.Remove(selected.LocalPath);
         folder.RemotePath = NormalizeRemotePath(EditRemotePath);
         folder.Mode = EditMode;
+        var previousSchedule = folder.Schedule ?? new CloudSyncSchedule();
+        folder.Schedule = new CloudSyncSchedule
+        {
+            IsEnabled = EditScheduleEnabled,
+            IntervalSeconds = EditScheduleIntervalSeconds,
+            ActiveSlots = new HashSet<int>(EditScheduleSlots.Where(CloudSyncSchedule.IsValidSlot)),
+            RunAsUsername = EditScheduleEnabled
+                ? _actor.User.Username
+                : previousSchedule.RunAsUsername
+        };
         share.CloudSettings.Folders[newLocalPath] = folder;
         await _shareRepository.UpdateAsync(share);
+        _schedulerSignal.Wake();
 
         await LoadAsync(share.Id, newLocalPath);
         return true;
@@ -360,6 +441,7 @@ public sealed class CloudSyncViewModel
             _logger.LogWarning(ex, "Cloud connection revocation failed for share {ShareId}", share.Id);
         }
         await _shareRepository.UpdateAsync(share);
+        _schedulerSignal.Wake();
         SelectedSync = null;
         SelectedAccount = null;
         await LoadAsync();

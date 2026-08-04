@@ -1,8 +1,10 @@
 using Kaimo_File_Server.Core.Language;
+using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components;
+using System.Globalization;
 
 namespace Kaimo_File_Server.Web.Components.Pages.CloudSync;
 
@@ -12,6 +14,17 @@ namespace Kaimo_File_Server.Web.Components.Pages.CloudSync;
 /// </summary>
 public partial class CloudSync
 {
+    private static readonly DayOfWeek[] ScheduleDays =
+    [
+        DayOfWeek.Monday,
+        DayOfWeek.Tuesday,
+        DayOfWeek.Wednesday,
+        DayOfWeek.Thursday,
+        DayOfWeek.Friday,
+        DayOfWeek.Saturday,
+        DayOfWeek.Sunday
+    ];
+
     [Parameter] public string? ShareName { get; set; }
     [SupplyParameterFromQuery(Name = "connectedShare")]
     public Guid? ConnectedShareId { get; set; }
@@ -275,6 +288,22 @@ public partial class CloudSync
         SyncMode.Push => Text("Web_CloudSync_Mode_Push", "Push (local → cloud)"),
         _ => Text("Web_CloudSync_Mode_TwoWay", "Two-way")
     };
+
+    private static string ScheduleDayName(DayOfWeek day)
+        => CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(day);
+
+    private static string ScheduleSlotLabel(DayOfWeek day, int hour, bool active)
+        => string.Format(
+            Text(
+                active
+                    ? "Web_CloudSync_Schedule_Slot_On"
+                    : "Web_CloudSync_Schedule_Slot_Off",
+                active
+                    ? "{0}, {1}:00–{2}:00: active"
+                    : "{0}, {1}:00–{2}:00: inactive"),
+            ScheduleDayName(day),
+            hour.ToString("00"),
+            ((hour + 1) % CloudSyncSchedule.HoursPerDay).ToString("00"));
 
     private static string Text(string key, string fallback)
         => Resources.ResourceManager.GetString(key) ?? fallback;

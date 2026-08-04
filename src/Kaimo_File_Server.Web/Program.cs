@@ -4,6 +4,7 @@ using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure;
+using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Infrastructure.Logging;
 using Kaimo_File_Server.Infrastructure.Services;
@@ -170,7 +171,9 @@ builder.Services.AddSingleton<HttpsCertificateProvider>(sp =>
 builder.Services.AddSingleton<IHttpsCertificateProvider>(
     sp => sp.GetRequiredService<HttpsCertificateProvider>());
 
+builder.Services.AddSingleton<CloudSyncSchedulerSignal>();
 builder.Services.AddHostedService<CertificateRenewalService>();
+builder.Services.AddHostedService<CloudSyncSchedulerService>();
 
 
 // ══════════════════════════════════════════

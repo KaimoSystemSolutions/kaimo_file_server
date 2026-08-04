@@ -1989,6 +1989,20 @@
   <data name="Web_CloudSync_Mode_Push" xml:space="preserve"><value>Push (local → cloud)</value></data>
   <data name="Web_CloudSync_LastSync" xml:space="preserve"><value>Last sync</value></data>
   <data name="Web_CloudSync_Never" xml:space="preserve"><value>Never</value></data>
+  <data name="Web_CloudSync_Schedule" xml:space="preserve"><value>Automatic sync</value></data>
+  <data name="Web_CloudSync_Schedule_Help" xml:space="preserve"><value>Select the hourly windows in which this folder should synchronize.</value></data>
+  <data name="Web_CloudSync_Schedule_Toggle" xml:space="preserve"><value>Enable or disable automatic sync</value></data>
+  <data name="Web_CloudSync_Schedule_Interval" xml:space="preserve"><value>Check interval</value></data>
+  <data name="Web_CloudSync_Schedule_Seconds" xml:space="preserve"><value>seconds</value></data>
+  <data name="Web_CloudSync_Schedule_Grid" xml:space="preserve"><value>Weekly hourly sync schedule</value></data>
+  <data name="Web_CloudSync_Schedule_Hour_Toggle" xml:space="preserve"><value>Toggle {0}:00 for every day</value></data>
+  <data name="Web_CloudSync_Schedule_Day_Toggle" xml:space="preserve"><value>Toggle every hour on {0}</value></data>
+  <data name="Web_CloudSync_Schedule_Slot_On" xml:space="preserve"><value>{0}, {1}:00–{2}:00: active</value></data>
+  <data name="Web_CloudSync_Schedule_Slot_Off" xml:space="preserve"><value>{0}, {1}:00–{2}:00: inactive</value></data>
+  <data name="Web_CloudSync_Schedule_Selected" xml:space="preserve"><value>{0} hourly windows selected · server local time</value></data>
+  <data name="Web_CloudSync_Schedule_Clear" xml:space="preserve"><value>Clear</value></data>
+  <data name="Web_CloudSync_Schedule_Error_Empty" xml:space="preserve"><value>Select at least one hour before enabling the timer.</value></data>
+  <data name="Web_CloudSync_Schedule_Error_Interval" xml:space="preserve"><value>Enter an interval between 1 and 86400 seconds.</value></data>
   <data name="Web_CloudSync_Save" xml:space="preserve"><value>Save settings</value></data>
   <data name="Web_CloudSync_Run" xml:space="preserve"><value>Sync now</value></data>
   <data name="Web_CloudSync_Unsync" xml:space="preserve"><value>Remove cloud sync</value></data>

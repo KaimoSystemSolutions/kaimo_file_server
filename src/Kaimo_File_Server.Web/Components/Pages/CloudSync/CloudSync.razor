@@ -179,6 +179,91 @@ else
                     </select>
                 </div>
 
+                <div class="detail-section cloud-schedule-section">
+                    <div class="cloud-schedule-heading">
+                        <div>
+                            <span class="detail-label">@Text("Web_CloudSync_Schedule", "Automatic sync")</span>
+                            <span class="detail-subtitle">
+                                @Text("Web_CloudSync_Schedule_Help", "Select the hourly windows in which this folder should synchronize.")
+                            </span>
+                        </div>
+                        <label class="toggle-switch" title="@Text("Web_CloudSync_Schedule_Toggle", "Enable or disable automatic sync")">
+                            <input type="checkbox"
+                                   @bind="VM.EditScheduleEnabled"
+                                   disabled="@(!VM.CanConfigureSelected)"
+                                   aria-label="@Text("Web_CloudSync_Schedule_Toggle", "Enable or disable automatic sync")" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <label class="cloud-schedule-interval">
+                        <span>@Text("Web_CloudSync_Schedule_Interval", "Check interval")</span>
+                        <span class="cloud-schedule-interval-input">
+                            <input type="number"
+                                   min="@CloudSyncSchedule.MinIntervalSeconds"
+                                   max="@CloudSyncSchedule.MaxIntervalSeconds"
+                                   step="1"
+                                   @bind="VM.EditScheduleIntervalSeconds"
+                                   disabled="@(!VM.CanConfigureSelected)" />
+                            <span>@Text("Web_CloudSync_Schedule_Seconds", "seconds")</span>
+                        </span>
+                    </label>
+
+                    <div class="cloud-schedule-scroll @(VM.EditScheduleEnabled ? "" : "cloud-schedule-scroll--disabled")">
+                        <div class="cloud-schedule-grid" role="grid" aria-label="@Text("Web_CloudSync_Schedule_Grid", "Weekly hourly sync schedule")">
+                            <span class="cloud-schedule-corner" aria-hidden="true"></span>
+                            @foreach (var hour in Enumerable.Range(0, CloudSyncSchedule.HoursPerDay))
+                            {
+                                <button class="cloud-schedule-hour"
+                                        type="button"
+                                        title="@string.Format(Text("Web_CloudSync_Schedule_Hour_Toggle", "Toggle {0}:00 for every day"), hour.ToString("00"))"
+                                        disabled="@(!VM.CanConfigureSelected || !VM.EditScheduleEnabled)"
+                                        @onclick="() => VM.ToggleScheduleHour(hour)">
+                                    @hour.ToString("00")
+                                </button>
+                            }
+                            @foreach (var day in ScheduleDays)
+                            {
+                                <button class="cloud-schedule-day"
+                                        type="button"
+                                        title="@string.Format(Text("Web_CloudSync_Schedule_Day_Toggle", "Toggle every hour on {0}"), ScheduleDayName(day))"
+                                        disabled="@(!VM.CanConfigureSelected || !VM.EditScheduleEnabled)"
+                                        @onclick="() => VM.ToggleScheduleDay(day)">
+                                    @ScheduleDayName(day)
+                                </button>
+                                @foreach (var hour in Enumerable.Range(0, CloudSyncSchedule.HoursPerDay))
+                                {
+                                    var active = VM.IsScheduleSlotActive(day, hour);
+                                    <button class="cloud-schedule-slot @(active ? "cloud-schedule-slot--active" : "")"
+                                            type="button"
+                                            role="gridcell"
+                                            aria-pressed="@active"
+                                            aria-label="@ScheduleSlotLabel(day, hour, active)"
+                                            title="@ScheduleSlotLabel(day, hour, active)"
+                                            disabled="@(!VM.CanConfigureSelected || !VM.EditScheduleEnabled)"
+                                            @onclick="() => VM.ToggleScheduleSlot(day, hour)">
+                                        <span class="visually-hidden">@ScheduleSlotLabel(day, hour, active)</span>
+                                    </button>
+                                }
+                            }
+                        </div>
+                    </div>
+
+                    <div class="cloud-schedule-footer">
+                        <span>
+                            @string.Format(
+                                Text("Web_CloudSync_Schedule_Selected", "{0} hourly windows selected · server local time"),
+                                VM.ActiveScheduleSlotCount)
+                        </span>
+                        @if (VM.CanConfigureSelected && VM.ActiveScheduleSlotCount > 0)
+                        {
+                            <button type="button" class="cloud-schedule-clear" @onclick="VM.ClearSchedule">
+                                @Text("Web_CloudSync_Schedule_Clear", "Clear")
+                            </button>
+                        }
+                    </div>
+                </div>
+
                 <div class="detail-section">
                     <span class="detail-label">@Text("Web_CloudSync_LastSync", "Last sync")</span>
                     <span class="detail-value">@FormatLastSync(VM.SelectedSync.Configuration.LastSync)</span>

@@ -1989,6 +1989,20 @@
   <data name="Web_CloudSync_Mode_Push" xml:space="preserve"><value>Hochladen (lokal → Cloud)</value></data>
   <data name="Web_CloudSync_LastSync" xml:space="preserve"><value>Letzte Synchronisierung</value></data>
   <data name="Web_CloudSync_Never" xml:space="preserve"><value>Nie</value></data>
+  <data name="Web_CloudSync_Schedule" xml:space="preserve"><value>Automatische Synchronisierung</value></data>
+  <data name="Web_CloudSync_Schedule_Help" xml:space="preserve"><value>Wähle die stündlichen Zeitfenster aus, in denen dieser Ordner synchronisiert werden soll.</value></data>
+  <data name="Web_CloudSync_Schedule_Toggle" xml:space="preserve"><value>Automatische Synchronisierung ein- oder ausschalten</value></data>
+  <data name="Web_CloudSync_Schedule_Interval" xml:space="preserve"><value>Prüfintervall</value></data>
+  <data name="Web_CloudSync_Schedule_Seconds" xml:space="preserve"><value>Sekunden</value></data>
+  <data name="Web_CloudSync_Schedule_Grid" xml:space="preserve"><value>Wöchentlicher stündlicher Synchronisierungsplan</value></data>
+  <data name="Web_CloudSync_Schedule_Hour_Toggle" xml:space="preserve"><value>{0}:00 für alle Tage umschalten</value></data>
+  <data name="Web_CloudSync_Schedule_Day_Toggle" xml:space="preserve"><value>Alle Stunden am {0} umschalten</value></data>
+  <data name="Web_CloudSync_Schedule_Slot_On" xml:space="preserve"><value>{0}, {1}:00–{2}:00: aktiv</value></data>
+  <data name="Web_CloudSync_Schedule_Slot_Off" xml:space="preserve"><value>{0}, {1}:00–{2}:00: inaktiv</value></data>
+  <data name="Web_CloudSync_Schedule_Selected" xml:space="preserve"><value>{0} Stundenblöcke ausgewählt · lokale Serverzeit</value></data>
+  <data name="Web_CloudSync_Schedule_Clear" xml:space="preserve"><value>Leeren</value></data>
+  <data name="Web_CloudSync_Schedule_Error_Empty" xml:space="preserve"><value>Bitte mindestens einen Stundenblock auswählen, bevor der Timer aktiviert wird.</value></data>
+  <data name="Web_CloudSync_Schedule_Error_Interval" xml:space="preserve"><value>Bitte ein Intervall zwischen 1 und 86400 Sekunden eingeben.</value></data>
   <data name="Web_CloudSync_Save" xml:space="preserve"><value>Einstellungen speichern</value></data>
   <data name="Web_CloudSync_Run" xml:space="preserve"><value>Jetzt synchronisieren</value></data>
   <data name="Web_CloudSync_Unsync" xml:space="preserve"><value>Cloud-Synchronisierung entfernen</value></data>
