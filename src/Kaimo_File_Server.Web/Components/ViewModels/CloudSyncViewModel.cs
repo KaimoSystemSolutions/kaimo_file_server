@@ -233,12 +233,27 @@ public sealed class CloudSyncViewModel
             EditScheduleSlots.Remove(slot);
     }
 
+    public void SetScheduleSlot(DayOfWeek day, int hour, bool active)
+        => SetScheduleSlotCore(day, hour, active);
+
+    public void SetScheduleDay(DayOfWeek day, bool active)
+    {
+        foreach (int hour in Enumerable.Range(0, CloudSyncSchedule.HoursPerDay))
+            SetScheduleSlotCore(day, hour, active);
+    }
+
+    public void SetScheduleHour(int hour, bool active)
+    {
+        foreach (DayOfWeek day in Enum.GetValues<DayOfWeek>())
+            SetScheduleSlotCore(day, hour, active);
+    }
+
     public void ToggleScheduleDay(DayOfWeek day)
     {
         bool activate = Enumerable.Range(0, CloudSyncSchedule.HoursPerDay)
             .Any(hour => !IsScheduleSlotActive(day, hour));
         foreach (int hour in Enumerable.Range(0, CloudSyncSchedule.HoursPerDay))
-            SetScheduleSlot(day, hour, activate);
+            SetScheduleSlotCore(day, hour, activate);
     }
 
     public void ToggleScheduleHour(int hour)
@@ -246,12 +261,12 @@ public sealed class CloudSyncViewModel
         DayOfWeek[] days = Enum.GetValues<DayOfWeek>();
         bool activate = days.Any(day => !IsScheduleSlotActive(day, hour));
         foreach (DayOfWeek day in days)
-            SetScheduleSlot(day, hour, activate);
+            SetScheduleSlotCore(day, hour, activate);
     }
 
     public void ClearSchedule() => EditScheduleSlots.Clear();
 
-    private void SetScheduleSlot(DayOfWeek day, int hour, bool active)
+    private void SetScheduleSlotCore(DayOfWeek day, int hour, bool active)
     {
         int slot = CloudSyncSchedule.ToSlot(day, hour);
         if (active)

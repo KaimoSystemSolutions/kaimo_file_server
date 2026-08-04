@@ -4,6 +4,7 @@ using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using System.Globalization;
 
 namespace Kaimo_File_Server.Web.Components.Pages.CloudSync;
@@ -12,8 +13,14 @@ namespace Kaimo_File_Server.Web.Components.Pages.CloudSync;
 /// UI orchestration for the provider-neutral cloud-sync workspace. Business
 /// authorization and persistence remain in <see cref="CloudSyncViewModel"/>.
 /// </summary>
-public partial class CloudSync
+public partial class CloudSync : IAsyncDisposable
 {
+    private enum SchedulePaintMode
+    {
+        Select,
+        Deselect
+    }
+
     private static readonly DayOfWeek[] ScheduleDays =
     [
         DayOfWeek.Monday,
@@ -47,6 +54,11 @@ public partial class CloudSync
     private string _pickerPath = "";
     private string? _pickerError;
     private IReadOnlyList<CloudDirectoryItem> _pickerItems = [];
+    private SchedulePaintMode _schedulePaintMode = SchedulePaintMode.Select;
+    private ElementReference _scheduleGrid;
+    private DotNetObjectReference<CloudSync>? _schedulePaintReference;
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
 
     /// <summary>
     /// Performs the initial authenticated load after interactive rendering and
@@ -54,39 +66,45 @@ public partial class CloudSync
     /// </summary>
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || _initialized)
-            return;
-
-        _initialized = true;
-        var preferredShareId = ConnectedShareId ?? TargetShareId;
-        var preferredPath = ConnectedShareId is not null ? ConnectedPath : TargetPath;
-        await VM.LoadAsync(preferredShareId, preferredPath);
-
-        if (ConnectedShareId is not null)
-            Toasts.Show(Text("Web_CloudSync_Connected", "The cloud provider was connected successfully."), ToastType.Success);
-        if (!string.IsNullOrWhiteSpace(SyncError))
-            Toasts.Show(SyncError, ToastType.Error);
-
-        if (ConnectedShareId is null
-            && TargetShareId is not null
-            && VM.SelectedSync is null
-            && VM.CanCreateOnShare(TargetShareId.Value))
+        if (firstRender && !_initialized)
         {
-            VM.NewShareId = TargetShareId.Value;
-            VM.NewLocalPath = Infrastructure.Clouds.CloudSyncPaths.Normalize(TargetPath);
-            VM.IsCreating = true;
+            _initialized = true;
+            var preferredShareId = ConnectedShareId ?? TargetShareId;
+            var preferredPath = ConnectedShareId is not null ? ConnectedPath : TargetPath;
+            await VM.LoadAsync(preferredShareId, preferredPath);
+
+            if (ConnectedShareId is not null)
+                Toasts.Show(Text("Web_CloudSync_Connected", "The cloud provider was connected successfully."), ToastType.Success);
+            if (!string.IsNullOrWhiteSpace(SyncError))
+                Toasts.Show(SyncError, ToastType.Error);
+
+            if (ConnectedShareId is null
+                && TargetShareId is not null
+                && VM.SelectedSync is null
+                && VM.CanCreateOnShare(TargetShareId.Value))
+            {
+                VM.NewShareId = TargetShareId.Value;
+                VM.NewLocalPath = Infrastructure.Clouds.CloudSyncPaths.Normalize(TargetPath);
+                VM.IsCreating = true;
+            }
+
+            if (ConnectedShareId is null && !string.IsNullOrWhiteSpace(ShareName))
+            {
+                var share = VM.Shares.FirstOrDefault(candidate => string.Equals(
+                    candidate.Name, ShareName, StringComparison.OrdinalIgnoreCase));
+                var first = share is null ? null : VM.Syncs.FirstOrDefault(item => item.ShareId == share.Id);
+                if (first is not null)
+                    await VM.SelectAsync(first);
+            }
+
+            StateHasChanged();
         }
 
-        if (ConnectedShareId is null && !string.IsNullOrWhiteSpace(ShareName))
+        if (_scheduleGrid.Context is not null)
         {
-            var share = VM.Shares.FirstOrDefault(candidate => string.Equals(
-                candidate.Name, ShareName, StringComparison.OrdinalIgnoreCase));
-            var first = share is null ? null : VM.Syncs.FirstOrDefault(item => item.ShareId == share.Id);
-            if (first is not null)
-                await VM.SelectAsync(first);
+            _schedulePaintReference ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("schedulePaint.initialize", _scheduleGrid, _schedulePaintReference);
         }
-
-        StateHasChanged();
     }
 
     private void ToggleCreate()
@@ -292,6 +310,65 @@ public partial class CloudSync
     private static string ScheduleDayName(DayOfWeek day)
         => CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(day);
 
+    private string SchedulePaintModeClass => _schedulePaintMode == SchedulePaintMode.Select
+        ? "cloud-schedule-scroll--paint-select"
+        : "cloud-schedule-scroll--paint-deselect";
+
+    private bool SchedulePaintValue => _schedulePaintMode == SchedulePaintMode.Select;
+
+    private string SchedulePaintModeLabel()
+        => _schedulePaintMode == SchedulePaintMode.Select
+            ? Text("Web_CloudSync_Schedule_Paint_Select", "Select")
+            : Text("Web_CloudSync_Schedule_Paint_Deselect", "Deselect");
+
+    private void PaintScheduleSlot(DayOfWeek day, int hour)
+        => VM.SetScheduleSlot(day, hour, SchedulePaintValue);
+
+    [JSInvokable]
+    public Task PaintScheduleRectangleFromJs(int startRow, int startHour, int endRow, int endHour)
+    {
+        if (!VM.CanConfigureSelected
+            || !VM.EditScheduleEnabled
+            || startRow < 0
+            || endRow < 0
+            || startRow >= ScheduleDays.Length
+            || endRow >= ScheduleDays.Length
+            || startHour is < 0 or >= CloudSyncSchedule.HoursPerDay
+            || endHour is < 0 or >= CloudSyncSchedule.HoursPerDay)
+            return Task.CompletedTask;
+
+        int firstRow = Math.Min(startRow, endRow);
+        int lastRow = Math.Max(startRow, endRow);
+        int firstHour = Math.Min(startHour, endHour);
+        int lastHour = Math.Max(startHour, endHour);
+
+        for (int row = firstRow; row <= lastRow; row++)
+        {
+            for (int hour = firstHour; hour <= lastHour; hour++)
+                VM.SetScheduleSlot(ScheduleDays[row], hour, SchedulePaintValue);
+        }
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void PaintScheduleDay(DayOfWeek day)
+        => VM.SetScheduleDay(day, SchedulePaintValue);
+
+    private void PaintScheduleHour(int hour)
+        => VM.SetScheduleHour(hour, SchedulePaintValue);
+
+    private string ScheduleDayActionLabel(DayOfWeek day)
+        => string.Format(
+            Text("Web_CloudSync_Schedule_Day_Paint", "Every hour on {0}: {1}"),
+            ScheduleDayName(day),
+            SchedulePaintModeLabel());
+
+    private string ScheduleHourActionLabel(int hour)
+        => string.Format(
+            Text("Web_CloudSync_Schedule_Hour_Paint", "{0}:00 on every day: {1}"),
+            hour.ToString("00"),
+            SchedulePaintModeLabel());
+
     private static string ScheduleSlotLabel(DayOfWeek day, int hour, bool active)
         => string.Format(
             Text(
@@ -307,4 +384,21 @@ public partial class CloudSync
 
     private static string Text(string key, string fallback)
         => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_scheduleGrid.Context is not null)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("schedulePaint.dispose", _scheduleGrid);
+            }
+            catch (JSDisconnectedException)
+            {
+                // The circuit is already gone; browser-side listeners disappear with it.
+            }
+        }
+
+        _schedulePaintReference?.Dispose();
+    }
 }

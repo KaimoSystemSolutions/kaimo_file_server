@@ -4125,14 +4125,51 @@ input[type="radio"] {
 
 .cloud-schedule-heading {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 16px;
     margin-bottom: 12px;
 }
 
+.cloud-schedule-title-row,
+.cloud-schedule-field-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
 .cloud-schedule-heading .detail-label {
     margin-top: 0;
+}
+
+.cloud-schedule-toggle {
+    flex: 0 0 auto;
+    align-self: center;
+}
+
+.cloud-schedule-info {
+    display: inline-grid;
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    place-items: center;
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    background: var(--bg-sunken);
+    color: var(--text-tertiary);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 1;
+    cursor: help;
+}
+
+.cloud-schedule-info:hover,
+.cloud-schedule-info:focus-visible {
+    border-color: var(--accent);
+    color: var(--accent);
+    outline: none;
+    box-shadow: 0 0 0 2px var(--accent-subtle);
 }
 
 .cloud-schedule-interval {
@@ -4140,6 +4177,7 @@ input[type="radio"] {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    padding-right: clamp(28px, 6vw, 72px);
     margin-bottom: 12px;
     color: var(--text-secondary);
     font-size: 12px;
@@ -4152,9 +4190,88 @@ input[type="radio"] {
     color: var(--text-tertiary);
 }
 
-.cloud-schedule-interval input {
+.cloud-schedule-interval .cloud-schedule-interval-field {
     width: 92px;
     padding: 6px 8px;
+}
+
+.cloud-schedule-paint-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.cloud-schedule-paint-label {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.cloud-schedule-paint-modes {
+    display: inline-flex;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-sunken);
+}
+
+.cloud-schedule-paint-mode {
+    display: inline-flex;
+    min-height: 27px;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 9px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-tertiary);
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    transition: border-color .12s ease, background .12s ease, color .12s ease, box-shadow .12s ease;
+}
+
+.cloud-schedule-paint-mode > span {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.cloud-schedule-paint-mode--select:not(.cloud-schedule-paint-mode--active) {
+    border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+    background: color-mix(in srgb, var(--accent) 7%, transparent);
+    color: var(--accent-strong);
+}
+
+.cloud-schedule-paint-mode--select.cloud-schedule-paint-mode--active {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #07120d;
+    font-weight: 700;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+[data-theme="light"] .cloud-schedule-paint-mode--select.cloud-schedule-paint-mode--active {
+    color: #fff;
+}
+
+.cloud-schedule-paint-mode--deselect.cloud-schedule-paint-mode--active {
+    border-color: var(--danger);
+    background: var(--danger);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 22%, transparent);
+}
+
+.cloud-schedule-paint-mode:disabled {
+    cursor: default;
+    opacity: .55;
+}
+
+.cloud-schedule-paint-help {
+    color: var(--text-tertiary);
+    font-size: 11px;
 }
 
 .cloud-schedule-scroll {
@@ -4173,6 +4290,7 @@ input[type="radio"] {
     min-width: 500px;
     gap: 3px;
     align-items: center;
+    user-select: none;
 }
 
 .cloud-schedule-corner {
@@ -4216,18 +4334,67 @@ input[type="radio"] {
     border-radius: 3px;
     background: var(--bg-sunken);
     cursor: pointer;
-    transition: border-color .12s ease, background .12s ease, transform .12s ease;
+    touch-action: none;
+    transition: border-color .12s ease, background .12s ease, box-shadow .12s ease, transform .12s ease;
 }
 
-.cloud-schedule-slot:hover:not(:disabled) {
+.cloud-schedule-scroll--paint-select .cloud-schedule-slot:hover:not(:disabled) {
     border-color: var(--accent);
-    transform: scale(1.08);
+    background: color-mix(in srgb, var(--accent) 24%, var(--bg-sunken));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
+    transform: scale(1.12);
+}
+
+.cloud-schedule-scroll--paint-deselect .cloud-schedule-slot:hover:not(:disabled) {
+    border-color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 24%, var(--bg-sunken));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 25%, transparent);
+    transform: scale(1.12);
 }
 
 .cloud-schedule-slot--active {
     border-color: var(--accent);
     background: var(--accent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, white 20%, transparent);
+}
+
+.cloud-schedule-scroll--range-active .cloud-schedule-slot {
+    cursor: crosshair;
+}
+
+.cloud-schedule-scroll--paint-select .cloud-schedule-slot--range-preview {
+    border-color: var(--accent);
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--accent) 48%, var(--bg-sunken));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, white 22%, transparent);
+    transform: none;
+}
+
+.cloud-schedule-scroll--paint-deselect .cloud-schedule-slot--range-preview {
+    border-color: var(--danger);
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--danger) 42%, var(--bg-sunken));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, white 18%, transparent);
+    transform: none;
+}
+
+.cloud-schedule-slot--range-origin {
+    outline: 2px solid currentColor;
+    outline-offset: 1px;
+}
+
+.cloud-schedule-scroll--paint-select .cloud-schedule-slot--range-origin,
+.cloud-schedule-scroll--paint-select .cloud-schedule-slot--range-end {
+    color: var(--accent);
+}
+
+.cloud-schedule-scroll--paint-deselect .cloud-schedule-slot--range-origin,
+.cloud-schedule-scroll--paint-deselect .cloud-schedule-slot--range-end {
+    color: var(--danger);
+}
+
+.cloud-schedule-slot--range-end {
+    box-shadow: inset 0 0 0 2px currentColor !important;
 }
 
 .cloud-schedule-hour:disabled,
@@ -4257,6 +4424,17 @@ input[type="radio"] {
 
 .cloud-schedule-clear:hover {
     text-decoration: underline;
+}
+
+@media (max-width: 700px) {
+    .cloud-schedule-interval {
+        padding-right: 0;
+    }
+
+    .cloud-schedule-paint-toolbar {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
 }
 
 .directory-picker {

@@ -1993,7 +1993,14 @@
   <data name="Web_CloudSync_Schedule_Help" xml:space="preserve"><value>Wähle die stündlichen Zeitfenster aus, in denen dieser Ordner synchronisiert werden soll.</value></data>
   <data name="Web_CloudSync_Schedule_Toggle" xml:space="preserve"><value>Automatische Synchronisierung ein- oder ausschalten</value></data>
   <data name="Web_CloudSync_Schedule_Interval" xml:space="preserve"><value>Prüfintervall</value></data>
+  <data name="Web_CloudSync_Schedule_Interval_Help" xml:space="preserve"><value>Legt fest, wie oft der Server prüft, ob ein ausgewähltes Synchronisierungsfenster aktiv ist.</value></data>
   <data name="Web_CloudSync_Schedule_Seconds" xml:space="preserve"><value>Sekunden</value></data>
+  <data name="Web_CloudSync_Schedule_Paint_Mode" xml:space="preserve"><value>Bearbeitungsmodus</value></data>
+  <data name="Web_CloudSync_Schedule_Paint_Select" xml:space="preserve"><value>Auswählen</value></data>
+  <data name="Web_CloudSync_Schedule_Paint_Deselect" xml:space="preserve"><value>Abwählen</value></data>
+  <data name="Web_CloudSync_Schedule_Paint_Help" xml:space="preserve"><value>Klicken oder mit gedrückter Maustaste vom Startfeld aus ein Rechteck über mehrere Zeitfenster aufziehen.</value></data>
+  <data name="Web_CloudSync_Schedule_Day_Paint" xml:space="preserve"><value>Alle Stunden am {0}: {1}</value></data>
+  <data name="Web_CloudSync_Schedule_Hour_Paint" xml:space="preserve"><value>{0}:00 an allen Tagen: {1}</value></data>
   <data name="Web_CloudSync_Schedule_Grid" xml:space="preserve"><value>Wöchentlicher stündlicher Synchronisierungsplan</value></data>
   <data name="Web_CloudSync_Schedule_Hour_Toggle" xml:space="preserve"><value>{0}:00 für alle Tage umschalten</value></data>
   <data name="Web_CloudSync_Schedule_Day_Toggle" xml:space="preserve"><value>Alle Stunden am {0} umschalten</value></data>
