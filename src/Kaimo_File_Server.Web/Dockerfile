@@ -39,12 +39,6 @@ RUN dotnet publish "./Kaimo_File_Server.Web.csproj" \
     -o /app/publish \
     /p:UseAppHost=false
 
-# Some Linux SDK publishes do not generate the MapStaticAssets endpoint
-# manifest. Program.cs falls back to physical static files in that case. The
-# Blazor loader itself is nevertheless mandatory; without it the page cannot
-# become interactive, so guard exactly that condition here.
-RUN test -s /app/publish/wwwroot/_framework/blazor.web.js
-
 #RUN dotnet publish "./Kaimo_File_Server.Web.csproj" \
 #    -c $BUILD_CONFIGURATION \
 #    -a $TARGETARCH \
