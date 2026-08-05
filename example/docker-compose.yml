@@ -17,6 +17,7 @@ x-dotnet-environment: &dotnet-environment
     Host=db;Database=${POSTGRES_DB:-kaimo_file_server};Username=${POSTGRES_USER:-kaimo};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
   LogArchive__RootPath: /data/kaimo-logs
   NtHash__EncryptionKey: ${NT_HASH_ENCRYPTION_KEY:?Set NT_HASH_ENCRYPTION_KEY in .env}
+  Seed_AdminPassword: ${SEED_ADMIN_PASSWORD:?Set SEED_ADMIN_PASSWORD in .env}
 
 services:
   pki-init:
