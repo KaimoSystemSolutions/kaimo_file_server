@@ -34,11 +34,18 @@ COPY src/ src/
 WORKDIR "/src/src/Kaimo_File_Server.Web"
 RUN dotnet publish "./Kaimo_File_Server.Web.csproj" \
     -c $BUILD_CONFIGURATION \
-    -a $TARGETARCH \
     --no-restore \
     --no-self-contained \
     -o /app/publish \
     /p:UseAppHost=false
+
+#RUN dotnet publish "./Kaimo_File_Server.Web.csproj" \
+#    -c $BUILD_CONFIGURATION \
+#    -a $TARGETARCH \
+#    --no-restore \
+#    --no-self-contained \
+#    -o /app/publish \
+#    /p:UseAppHost=false
 
 # This stage is used in production or when run by VS in regular mode (default if debug configuration is not used).
 FROM base AS final
