@@ -1,9 +1,9 @@
 x-storage-pool-01: &storage-pool-01
-  ${LOCATION_STORAGE_01:-./data/storage/pool01}:/data/storage/pool01
+  ./data/storage/pool01:/data/storage/pool01
 x-app-data: &app-data
-  ${LOCATION_APP_DATA:-./data/kaimo-system}:/data/kaimo-system
+  ./data/kaimo-system:/data/kaimo-system
 x-logs: &logs
-  ${LOCATION_LOGS:-./data/logs}:/data/kaimo-logs
+  ./data/logs:/data/kaimo-logs
 
 x-bounded-logging: &bounded-logging
   driver: json-file
@@ -13,7 +13,6 @@ x-bounded-logging: &bounded-logging
 
 x-dotnet-environment: &dotnet-environment
   TZ: ${TZ:-Europe/Berlin}
-  KAIMO_LOG_LEVEL: ${KAIMO_LOG_LEVEL:-}
   ConnectionStrings__Default: >-
     Host=db;Database=${POSTGRES_DB:-kaimo_file_server};Username=${POSTGRES_USER:-kaimo};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
   LogArchive__RootPath: /data/kaimo-logs
@@ -94,11 +93,10 @@ services:
     dns_search:
       - "."
     ports:
-      - "${SAMBA_PORT:-445}:445"
+      - "445:445"
     environment:
       TZ: ${TZ:-Europe/Berlin}
       KAIMO_LOG_SOURCE: samba
-      KAIMO_LOG_LEVEL: ${KAIMO_LOG_LEVEL:-}
       KAIMO_LOG_ARCHIVE_ROOT: /data/kaimo-logs
       KAIMO_BRIDGE_ADDR: kaimo_smb_bridge:5080
       KAIMO_EVENT_SPOOL_PATH: /var/lib/kaimo/event-spool
@@ -107,7 +105,6 @@ services:
       - *storage-pool-01
       - *app-data
       - *logs
-      - samba-event-spool:/var/lib/kaimo/event-spool
       - ${KAIMO_SMB_CONTROL_PKI:-./data/smb-control-plane}/samba:/run/secrets/kaimo-control-plane:ro
     tmpfs:
       - /run/kaimo-user-sync:rw,noexec,nosuid,nodev,mode=0700,uid=0,gid=0
@@ -129,8 +126,8 @@ services:
     restart: unless-stopped
     entrypoint: ["/bin/sh", "-c", "umask 0002 && exec dotnet Kaimo_File_Server.Web.dll"]
     ports:
-      - "${WEB_HTTP_PORT:-8081}:8080"
-      - "${WEB_HTTPS_PORT:-8443}:8443"
+      - "8081:8080"
+      - "8443:8443"
     environment:
       <<: *dotnet-environment
       KAIMO_LOG_SOURCE: web
@@ -155,6 +152,3 @@ networks:
     internal: true
   bridge-database:
     internal: true
-
-volumes:
-  samba-event-spool:
