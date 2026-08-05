@@ -34,6 +34,7 @@ COPY src/ src/
 WORKDIR "/src/src/Kaimo_File_Server.Web"
 RUN dotnet publish "./Kaimo_File_Server.Web.csproj" \
     -c $BUILD_CONFIGURATION \
+    -a $TARGETARCH \
     --no-restore \
     --no-self-contained \
     -o /app/publish \
