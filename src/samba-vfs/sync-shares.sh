@@ -65,7 +65,13 @@ if ! SHARE_RECORDS="$(printf '%s' "$OUT" | jq -s -e -r '
        or (([.shares[].name | ascii_downcase] | length)
            != ([.shares[].name | ascii_downcase] | unique | length))
     then error("invalid share sync schema")
-    else .shares[] | [.name, .path, (if .hidden then "1" else "0" end)] | @tsv
+    # Always emit one JSON result so `jq -e` also succeeds for the valid
+    # empty desired state. `join("\n")` becomes an empty string for zero
+    # shares and a newline-separated TSV document otherwise.
+    else ([.shares[]
+           | [.name, .path, (if .hidden then "1" else "0" end)]
+           | @tsv]
+          | join("\n"))
     end
 ')"; then
     echo "[sync-shares] Invalid structured share response." >&2

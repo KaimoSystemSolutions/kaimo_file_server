@@ -166,6 +166,21 @@ if ! grep -q '^new-share'$'\t' "$SHARE_STATE"; then
     fail=1
 fi
 
+# An empty desired state is valid and must remove every registry share. This
+# also guards against `jq -e` treating a filter with no output as a failure.
+printf '%s\n' '{"version":1,"shares":[]}' >"$DESIRED_SHARES"
+if ! empty_output="$(bash "$SUT" 2>&1)"; then
+    printf '%s\n' "$empty_output"
+    echo "FAIL: empty share response was rejected."
+    fail=1
+elif [ -s "$SHARE_STATE" ]; then
+    echo "FAIL: empty desired state left registry shares behind."
+    fail=1
+elif ! grep -q 'done: 0 desired shares' <<<"$empty_output"; then
+    echo "FAIL: empty desired state did not report successful reconciliation."
+    fail=1
+fi
+
 # Mutation failures must fail the run rather than producing a misleading
 # success summary.
 jq -n --arg path "$WORK/pool02/failing" \

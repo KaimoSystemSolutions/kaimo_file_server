@@ -152,6 +152,48 @@ public sealed class AuthGrpcServiceUserExportTests
     }
 
     [Fact]
+    public async Task ListUsers_ReportsRateLimitWithoutThrowingServerException()
+    {
+        var auth = new Mock<IAuthenticationLookup>();
+        auth.Setup(lookup => lookup.GetSambaCredentialBatchAsync(
+                0,
+                1,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SambaCredentialBatch(
+                [],
+                [],
+                SourceCount: 0,
+                HasMore: false));
+        var limiter = new HashExportRateLimiter(
+            Options.Create(new HashExportRateLimitOptions
+            {
+                PermitLimit = 1,
+                WindowSeconds = 60,
+            }));
+        var sut = BuildSut(auth, limiter);
+
+        await sut.ListUsers(
+            new ListUsersRequest { PageSize = 1 },
+            new UnitServerCallContext());
+        var limitedContext = new UnitServerCallContext();
+
+        ListUsersReply reply = await sut.ListUsers(
+            new ListUsersRequest { PageSize = 1 },
+            limitedContext);
+
+        Assert.Empty(reply.Users);
+        Assert.Equal(StatusCode.ResourceExhausted, limitedContext.Status.StatusCode);
+        Metadata.Entry retryAfter = Assert.Single(
+            limitedContext.ResponseTrailers,
+            entry => entry.Key == "retry-after-ms");
+        Assert.True(long.Parse(retryAfter.Value) > 0);
+        auth.Verify(lookup => lookup.GetSambaCredentialBatchAsync(
+            0,
+            1,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task ListUsers_FailsClosedWhenAnotherPageWouldExceedTotalLimit()
     {
         var auth = new Mock<IAuthenticationLookup>();

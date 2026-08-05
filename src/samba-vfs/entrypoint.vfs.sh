@@ -8,10 +8,10 @@ export PATH=/opt/samba/sbin:/opt/samba/bin:$PATH
 STORAGE="${KAIMO_STORAGE:-/data/storage}"
 
 mkdir -p "$STORAGE"
-# P1-11 durable outbox. Owner-only permissions are reasserted on every start;
-# authd independently verifies ownership, mode, and non-symlink directory type.
-install -d -m 0700 -o root -g root \
-    "${KAIMO_EVENT_SPOOL_PATH:-/var/lib/kaimo/event-spool}"
+# P1-11 durable outbox. Repair the root and authd-managed child directories on
+# every start; bind mounts may preserve permissive host-created directories.
+# The preparer rejects symlinks, and authd independently verifies the result.
+/usr/local/bin/prepare-event-spool.sh
 
 # --- Storage write permissions via a shared group (risk: storage ownership) ---
 # Each Kaimo user has their OWN UID (per-user identity/SID), but share

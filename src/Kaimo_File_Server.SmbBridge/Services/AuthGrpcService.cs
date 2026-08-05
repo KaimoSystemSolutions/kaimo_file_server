@@ -105,9 +105,14 @@ public sealed class AuthGrpcService : AuthService.AuthServiceBase
                             (long)Math.Ceiling(
                                 retryAfter.TotalMilliseconds))
                         .ToString());
-                throw new RpcException(new Status(
+                // Expected admission-control outcomes are represented through
+                // the server context instead of throwing. The wire status is
+                // identical, while debuggers no longer suspend the complete
+                // bridge process on a first-chance RpcException.
+                context.Status = new Status(
                     StatusCode.ResourceExhausted,
-                    "NT-hash export rate limit exceeded."));
+                    "NT-hash export rate limit exceeded.");
+                return new ListUsersReply();
             }
         }
         else if (!_rateLimiter.IsValidContinuationToken(

@@ -8,12 +8,14 @@
 // (last toolchain risk from Phase 0).
 #include <algorithm>
 #include <array>
+#include <cerrno>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -83,6 +85,28 @@ static void clear_reply_hashes(ListUsersReply& reply) {
     }
 }
 
+static bool read_retry_after(const grpc::ClientContext& context,
+                             std::chrono::milliseconds& delay) {
+    const auto& trailers = context.GetServerTrailingMetadata();
+    auto value = trailers.find("retry-after-ms");
+    if (value == trailers.end()) return false;
+
+    std::string encoded(value->second.data(), value->second.length());
+    if (encoded.empty()) return false;
+    errno = 0;
+    char* end = nullptr;
+    unsigned long parsed = std::strtoul(encoded.c_str(), &end, 10);
+    if (errno != 0 || end == encoded.c_str() || *end != '\0'
+        || parsed > 300000UL) {
+        return false;
+    }
+
+    // Cross the fixed-window boundary rather than retrying on its last
+    // millisecond and being rejected again due to clock/scheduling jitter.
+    delay = std::chrono::milliseconds(parsed + 250UL);
+    return true;
+}
+
 int main() {
     const char* addr_env = std::getenv("KAIMO_BRIDGE_ADDR");
     std::string addr = addr_env ? addr_env : "kaimo_smb_bridge:5080";
@@ -109,6 +133,7 @@ int main() {
     std::size_t estimated_json_bytes = 32;
     std::vector<credential> users;
     users.reserve(page_size);
+    bool rate_limit_retry_used = false;
 
     for (;;) {
         grpc::ClientContext ctx;
@@ -121,6 +146,20 @@ int main() {
         ListUsersReply reply;
         grpc::Status status = stub->ListUsers(&ctx, req, &reply);
         if (!status.ok()) {
+            std::chrono::milliseconds retry_delay;
+            if (offset == 0
+                && !rate_limit_retry_used
+                && status.error_code()
+                    == grpc::StatusCode::RESOURCE_EXHAUSTED
+                && read_retry_after(ctx, retry_delay)) {
+                clear_reply_hashes(reply);
+                rate_limit_retry_used = true;
+                std::cerr << "kaimo_authsync: NT-hash export rate limited; "
+                          << "retrying after " << retry_delay.count()
+                          << " ms." << std::endl;
+                std::this_thread::sleep_for(retry_delay);
+                continue;
+            }
             std::cerr << "kaimo_authsync: ListUsers RPC failed: "
                       << status.error_code() << " " << status.error_message()
                       << " (addr=" << addr << ", offset=" << offset << ")"

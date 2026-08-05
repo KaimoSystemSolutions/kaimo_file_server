@@ -2,6 +2,11 @@
 
 # This stage is used when run by VS in quick mode (default for debug configuration).
 FROM mcr.microsoft.com/dotnet/runtime:10.0 AS base
+USER root
+# Npgsql probes GSSAPI during startup. Keep the runtime dependency available so
+# password-authenticated deployments do not emit a native-library load error.
+RUN apt-get update && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+    && rm -rf /var/lib/apt/lists/*
 USER $APP_UID
 WORKDIR /app
 
