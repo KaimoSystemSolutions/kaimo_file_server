@@ -39,6 +39,13 @@ RUN dotnet publish "./Kaimo_File_Server.Web.csproj" \
     -o /app/publish \
     /p:UseAppHost=false
 
+# MapStaticAssets() depends on this manifest, and the Blazor server cannot
+# become interactive without the framework loader. Fail the image build rather
+# than publishing a web image that would render a blank page in production.
+RUN test -s /app/publish/Kaimo_File_Server.Web.staticwebassets.endpoints.json \
+    && test -s /app/publish/wwwroot/_framework/blazor.web.js \
+    && grep -q 'blazor.web.js' /app/publish/Kaimo_File_Server.Web.staticwebassets.endpoints.json
+
 #RUN dotnet publish "./Kaimo_File_Server.Web.csproj" \
 #    -c $BUILD_CONFIGURATION \
 #    -a $TARGETARCH \

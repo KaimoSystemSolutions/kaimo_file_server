@@ -203,7 +203,25 @@ else
 {
     app.UseExceptionHandler("/Error");
     app.UseHsts();
-    app.MapStaticAssets();
+
+    var staticWebAssetsManifest = Path.Combine(
+        AppContext.BaseDirectory,
+        $"{app.Environment.ApplicationName}.staticwebassets.endpoints.json");
+
+    if (File.Exists(staticWebAssetsManifest))
+    {
+        app.MapStaticAssets();
+    }
+    else
+    {
+        // Keep deployments of older/incomplete images operational. Their
+        // wwwroot assets can still be served physically even though the
+        // MapStaticAssets() manifest is unavailable.
+        app.Logger.LogWarning(
+            "Static-web-assets manifest {ManifestPath} is missing; using the physical static-file provider.",
+            staticWebAssetsManifest);
+        app.UseStaticFiles();
+    }
 }
 
 app.UseAntiforgery();
