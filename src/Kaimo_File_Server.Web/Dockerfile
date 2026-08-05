@@ -40,6 +40,11 @@ RUN dotnet publish "./Kaimo_File_Server.Web.csproj" \
     -o /app/publish \
     /p:UseAppHost=false
 
+# The Blazor loader is a framework static asset in .NET 10. Keep a broken
+# restore layer from reaching Docker Hub as a seemingly healthy web image.
+RUN grep -q '"Route":"_framework/blazor.web.js"' \
+    /app/publish/Kaimo_File_Server.Web.staticwebassets.endpoints.json
+
 #RUN dotnet publish "./Kaimo_File_Server.Web.csproj" \
 #    -c $BUILD_CONFIGURATION \
 #    -a $TARGETARCH \

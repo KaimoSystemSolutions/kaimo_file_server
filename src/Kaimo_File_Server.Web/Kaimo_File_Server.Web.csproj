@@ -8,16 +8,15 @@
 		<UserSecretsId>9573d0b4-8b32-4bb5-a949-9934a4f80f0d</UserSecretsId>
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 		<DockerfileContext>..\..</DockerfileContext>
+		<!-- Docker restores before it copies the .razor files. Explicitly opt in
+		     so the .NET 10 restore adds the Blazor framework web assets. -->
+		<RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\Kaimo_File_Server.Core\Kaimo_File_Server.Core.csproj" />
 		<ProjectReference Include="..\Kaimo_File_Server.Infrastructure\Kaimo_File_Server.Infrastructure.csproj" />
 		<ProjectReference Include="..\Kaimo_File_Server.Search\Kaimo_File_Server.Search.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
 
 	<ItemGroup>
