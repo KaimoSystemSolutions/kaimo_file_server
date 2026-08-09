@@ -1989,6 +1989,20 @@
   <data name="Web_CloudSync_Mode_Push" xml:space="preserve"><value>Push (local → cloud)</value></data>
   <data name="Web_CloudSync_LastSync" xml:space="preserve"><value>Last sync</value></data>
   <data name="Web_CloudSync_Never" xml:space="preserve"><value>Never</value></data>
+  <data name="Web_CloudSync_Name" xml:space="preserve"><value>Name</value></data>
+  <data name="Web_CloudSync_Tab_General" xml:space="preserve"><value>General</value></data>
+  <data name="Web_CloudSync_Tab_Schedule" xml:space="preserve"><value>Timing</value></data>
+  <data name="Web_CloudSync_Tab_Advanced" xml:space="preserve"><value>Advanced</value></data>
+  <data name="Web_CloudSync_Description" xml:space="preserve"><value>Description</value></data>
+  <data name="Web_CloudSync_Advanced" xml:space="preserve"><value>Advanced settings</value></data>
+  <data name="Web_CloudSync_Advanced_Help" xml:space="preserve"><value>Optional file filters and bandwidth limits for this sync.</value></data>
+  <data name="Web_CloudSync_Advanced_MaxFileSize" xml:space="preserve"><value>Maximum file size (MB)</value></data>
+  <data name="Web_CloudSync_Advanced_ExcludedExtensions" xml:space="preserve"><value>Excluded file extensions</value></data>
+  <data name="Web_CloudSync_Advanced_ExcludedExtensions_Help" xml:space="preserve"><value>Separate extensions with commas, spaces, or new lines.</value></data>
+  <data name="Web_CloudSync_Advanced_MaxUpload" xml:space="preserve"><value>Maximum upload rate (KB/s)</value></data>
+  <data name="Web_CloudSync_Advanced_MaxDownload" xml:space="preserve"><value>Maximum download rate (KB/s)</value></data>
+  <data name="Web_CloudSync_Advanced_Error_Negative" xml:space="preserve"><value>Advanced limits cannot be negative.</value></data>
+  <data name="Web_CloudSync_Advanced_Unlimited_Help" xml:space="preserve"><value>Enter 0 or leave empty for no limit.</value></data>
   <data name="Web_CloudSync_Schedule" xml:space="preserve"><value>Automatic sync</value></data>
   <data name="Web_CloudSync_Schedule_Help" xml:space="preserve"><value>Select the hourly windows in which this folder should synchronize.</value></data>
   <data name="Web_CloudSync_Schedule_Toggle" xml:space="preserve"><value>Enable or disable automatic sync</value></data>

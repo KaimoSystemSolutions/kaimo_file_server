@@ -228,6 +228,11 @@ namespace Kaimo_File_Server.Core.Domain
     /// </summary>
     public class SyncedFolder : IEquatable<SyncedFolder>
     {
+        /// <summary>User-facing label for this mapping; it does not affect its paths or behavior.</summary>
+        public string DisplayName { get; set; } = "";
+
+        /// <summary>Optional user-facing notes for this mapping.</summary>
+        public string Description { get; set; } = "";
         public string Provider { get; set; } = "";
 
         public Dictionary<string, string> Data { get; set; } = new();
@@ -254,6 +259,9 @@ namespace Kaimo_File_Server.Core.Domain
 
         /// <summary>Optional hourly weekly timer. Disabled for legacy mappings.</summary>
         public CloudSyncSchedule Schedule { get; set; } = new();
+
+        /// <summary>Optional filters and bandwidth limits for advanced users.</summary>
+        public CloudSyncAdvancedSettings AdvancedSettings { get; set; } = new();
         
         public SyncedFolder(
             string provider,
@@ -278,6 +286,9 @@ namespace Kaimo_File_Server.Core.Domain
             if (LastSync != other.LastSync) return false;
             if (Mode != other.Mode) return false;
             if (!Equals(Schedule, other.Schedule)) return false;
+            if (!string.Equals(DisplayName, other.DisplayName, StringComparison.Ordinal)) return false;
+            if (!string.Equals(Description, other.Description, StringComparison.Ordinal)) return false;
+            if (!Equals(AdvancedSettings, other.AdvancedSettings)) return false;
             if (Data.Count != other.Data.Count) return false;
 
             foreach (var kvp in Data)
@@ -304,6 +315,9 @@ namespace Kaimo_File_Server.Core.Domain
             hash.Add(LastSync);
             hash.Add(Mode);
             hash.Add(Schedule);
+            hash.Add(DisplayName, StringComparer.Ordinal);
+            hash.Add(Description, StringComparer.Ordinal);
+            hash.Add(AdvancedSettings);
 
             // Order-independent dictionary hash
             int dataHash = 0;
@@ -322,5 +336,49 @@ namespace Kaimo_File_Server.Core.Domain
 
         public static bool operator !=(SyncedFolder? left, SyncedFolder? right)
             => !(left == right);
+    }
+
+    /// <summary>Optional transfer constraints persisted with a cloud-sync mapping.</summary>
+    public sealed class CloudSyncAdvancedSettings : IEquatable<CloudSyncAdvancedSettings>
+    {
+        /// <summary>Maximum size of an individual synced file in bytes; null means unlimited.</summary>
+        public long? MaxFileSizeBytes { get; set; }
+
+        /// <summary>File extensions to skip, stored normalized with a leading dot.</summary>
+        public HashSet<string> ExcludedExtensions { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Maximum upload throughput in bytes/second; null means unlimited.</summary>
+        public long? MaxUploadBytesPerSecond { get; set; }
+
+        /// <summary>Maximum download throughput in bytes/second; null means unlimited.</summary>
+        public long? MaxDownloadBytesPerSecond { get; set; }
+
+        public CloudSyncAdvancedSettings Clone() => new()
+        {
+            MaxFileSizeBytes = MaxFileSizeBytes,
+            ExcludedExtensions = new HashSet<string>(ExcludedExtensions ?? [], StringComparer.OrdinalIgnoreCase),
+            MaxUploadBytesPerSecond = MaxUploadBytesPerSecond,
+            MaxDownloadBytesPerSecond = MaxDownloadBytesPerSecond
+        };
+
+        public bool Equals(CloudSyncAdvancedSettings? other)
+            => other is not null
+               && MaxFileSizeBytes == other.MaxFileSizeBytes
+               && MaxUploadBytesPerSecond == other.MaxUploadBytesPerSecond
+               && MaxDownloadBytesPerSecond == other.MaxDownloadBytesPerSecond
+               && (ExcludedExtensions ?? []).SetEquals(other.ExcludedExtensions ?? []);
+
+        public override bool Equals(object? obj) => Equals(obj as CloudSyncAdvancedSettings);
+
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+            hash.Add(MaxFileSizeBytes);
+            hash.Add(MaxUploadBytesPerSecond);
+            hash.Add(MaxDownloadBytesPerSecond);
+            foreach (var extension in (ExcludedExtensions ?? []).Order(StringComparer.OrdinalIgnoreCase))
+                hash.Add(extension, StringComparer.OrdinalIgnoreCase);
+            return hash.ToHashCode();
+        }
     }
 }

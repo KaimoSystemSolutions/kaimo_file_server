@@ -21,6 +21,13 @@ public partial class CloudSync : IAsyncDisposable
         Deselect
     }
 
+    private enum CloudSyncSettingsTab
+    {
+        General,
+        Schedule,
+        Advanced
+    }
+
     private static readonly DayOfWeek[] ScheduleDays =
     [
         DayOfWeek.Monday,
@@ -57,6 +64,7 @@ public partial class CloudSync : IAsyncDisposable
     private string? _pickerError;
     private IReadOnlyList<CloudDirectoryItem> _pickerItems = [];
     private SchedulePaintMode _schedulePaintMode = SchedulePaintMode.Select;
+    private CloudSyncSettingsTab _activeSettingsTab = CloudSyncSettingsTab.General;
     private ElementReference _scheduleGrid;
     private DotNetObjectReference<CloudSync>? _schedulePaintReference;
 
@@ -329,6 +337,9 @@ public partial class CloudSync : IAsyncDisposable
         : "cloud-schedule-scroll--paint-deselect";
 
     private bool SchedulePaintValue => _schedulePaintMode == SchedulePaintMode.Select;
+
+    private string SettingsTabClass(CloudSyncSettingsTab tab)
+        => _activeSettingsTab == tab ? "detail-tab detail-tab--active" : "detail-tab";
 
     private string SchedulePaintModeLabel()
         => _schedulePaintMode == SchedulePaintMode.Select

@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Services.File;
 
 namespace Kaimo_File_Server.Infrastructure.Clouds;
@@ -63,6 +64,7 @@ public sealed class CloudSyncExecutionService(
                 NormalizeRemotePath(folder.RemotePath),
                 normalizedPath,
                 folder.Mode,
+                new CloudSyncTransferOptions(folder.AdvancedSettings),
                 reportProgress,
                 cancellationToken);
 

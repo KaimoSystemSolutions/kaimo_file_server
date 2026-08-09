@@ -43,6 +43,7 @@ public sealed class CloudSyncExecutionServiceTests
                 "/remote",
                 "projects",
                 SyncMode.TwoWay,
+                It.IsAny<CloudSyncTransferOptions?>(),
                 It.IsAny<Action<string?, int>?>(),
                 It.IsAny<CancellationToken>()))
             .Returns(async () =>

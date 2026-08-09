@@ -53,7 +53,7 @@
                 </select>
             </label>
             <div class="form-group cloud-path-field">
-                <span>@Text("Web_CloudSync_LocalFolder", "Local folder")</span>
+                <span>@Text("Web_CloudSync_Name", "Name")</span>
                 <div class="cloud-path-input-row">
                     <input value="@DisplayLocalPath(VM.NewLocalPath)" readonly />
                     <button class="btn-secondary" type="button" @onclick="OpenNewLocalPicker">
@@ -109,8 +109,8 @@ else
                     <span class="cloud-sync-local">
                         @Assets.SVG("folder.svg", new SvgOptions(Width: 23, Height: 23))
                         <span>
-                            <strong>@sync.ShareName</strong>
-                            <small>@DisplayLocalPath(sync.LocalPath)</small>
+                            <strong>@(string.IsNullOrWhiteSpace(sync.Configuration.DisplayName) ? sync.ShareName : sync.Configuration.DisplayName)</strong>
+                            <small>@sync.ShareName · @DisplayLocalPath(sync.LocalPath)</small>
                         </span>
                     </span>
                     <span>@sync.ProviderDisplayName</span>
@@ -131,7 +131,7 @@ else
             else
             {
                 <div class="detail-header">
-                    <h3>@VM.SelectedSync.ShareName</h3>
+                    <h3>@(string.IsNullOrWhiteSpace(VM.SelectedSync.Configuration.DisplayName) ? VM.SelectedSync.ShareName : VM.SelectedSync.Configuration.DisplayName)</h3>
                     <span class="detail-subtitle">@VM.SelectedSync.ProviderDisplayName</span>
                 </div>
 
@@ -151,6 +151,39 @@ else
                         </div>
                     </div>
                 }
+
+                <div class="detail-tabs cloud-sync-tabs" role="tablist" aria-label="@Text("Web_CloudSync_Title", "Cloud Sync")">
+                    <button class="@SettingsTabClass(CloudSyncSettingsTab.General)" type="button"
+                            role="tab" aria-selected="@(_activeSettingsTab == CloudSyncSettingsTab.General)"
+                            @onclick="() => _activeSettingsTab = CloudSyncSettingsTab.General">
+                        @Assets.SVG("refresh.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        @Text("Web_CloudSync_Tab_General", "General")
+                    </button>
+                    <button class="@SettingsTabClass(CloudSyncSettingsTab.Schedule)" type="button"
+                            role="tab" aria-selected="@(_activeSettingsTab == CloudSyncSettingsTab.Schedule)"
+                            @onclick="() => _activeSettingsTab = CloudSyncSettingsTab.Schedule">
+                        @Assets.SVG("history.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        @Text("Web_CloudSync_Tab_Schedule", "Timing")
+                    </button>
+                    <button class="@SettingsTabClass(CloudSyncSettingsTab.Advanced)" type="button"
+                            role="tab" aria-selected="@(_activeSettingsTab == CloudSyncSettingsTab.Advanced)"
+                            @onclick="() => _activeSettingsTab = CloudSyncSettingsTab.Advanced">
+                        @Assets.SVG("edit_box.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        @Text("Web_CloudSync_Tab_Advanced", "Advanced")
+                    </button>
+                </div>
+
+                @if (_activeSettingsTab == CloudSyncSettingsTab.General)
+                {
+                <div class="detail-section cloud-path-field">
+                    <span class="detail-label">@Text("Web_CloudSync_Name", "Name")</span>
+                    <input class="edit-input" @bind="VM.EditDisplayName" disabled="@(!VM.CanConfigureSelected)" />
+                </div>
+
+                <div class="detail-section cloud-path-field">
+                    <span class="detail-label">@Text("Web_CloudSync_Description", "Description")</span>
+                    <textarea class="edit-input cloud-sync-description" @bind="VM.EditDescription" disabled="@(!VM.CanConfigureSelected)"></textarea>
+                </div>
 
                 <div class="detail-section cloud-path-field">
                     <span class="detail-label">@Text("Web_CloudSync_LocalFolder", "Local folder")</span>
@@ -184,7 +217,10 @@ else
                         <option value="@SyncMode.Push">@ModeLabel(SyncMode.Push)</option>
                     </select>
                 </div>
+                }
 
+                @if (_activeSettingsTab == CloudSyncSettingsTab.Schedule)
+                {
                 <div class="detail-section cloud-schedule-section">
                     <div class="cloud-schedule-heading">
                         <div class="cloud-schedule-title-row">
@@ -319,11 +355,46 @@ else
                         }
                     </div>
                 </div>
+                }
 
+                @if (_activeSettingsTab == CloudSyncSettingsTab.Advanced)
+                {
+                <div class="detail-section cloud-sync-advanced">
+                    <h4>@Text("Web_CloudSync_Advanced", "Advanced settings")</h4>
+                    <p>@Text("Web_CloudSync_Advanced_Help", "Optional file filters and bandwidth limits for this sync.")</p>
+                    <label class="form-group">
+                        <span>@Text("Web_CloudSync_Advanced_MaxFileSize", "Maximum file size (MB)")</span>
+                        <input class="edit-input" type="number" min="0" step="1" @bind="VM.EditMaxFileSizeMb" disabled="@(!VM.CanConfigureSelected)" />
+                        <small>@Text("Web_CloudSync_Advanced_Unlimited_Help", "Enter 0 or leave empty for no limit.")</small>
+                    </label>
+                    <label class="form-group">
+                        <span>@Text("Web_CloudSync_Advanced_ExcludedExtensions", "Excluded file extensions")</span>
+                        <textarea class="edit-input cloud-sync-extension-list" @bind="VM.EditExcludedExtensions" disabled="@(!VM.CanConfigureSelected)"
+                                  placeholder=".tmp, .iso, .bak"></textarea>
+                        <small>@Text("Web_CloudSync_Advanced_ExcludedExtensions_Help", "Separate extensions with commas, spaces, or new lines.")</small>
+                    </label>
+                    <div class="cloud-sync-advanced-rates">
+                        <label class="form-group">
+                            <span>@Text("Web_CloudSync_Advanced_MaxUpload", "Maximum upload rate (KB/s)")</span>
+                            <input class="edit-input" type="number" min="0" step="1" @bind="VM.EditMaxUploadRateKbps" disabled="@(!VM.CanConfigureSelected)" />
+                            <small>@Text("Web_CloudSync_Advanced_Unlimited_Help", "Enter 0 or leave empty for no limit.")</small>
+                        </label>
+                        <label class="form-group">
+                            <span>@Text("Web_CloudSync_Advanced_MaxDownload", "Maximum download rate (KB/s)")</span>
+                            <input class="edit-input" type="number" min="0" step="1" @bind="VM.EditMaxDownloadRateKbps" disabled="@(!VM.CanConfigureSelected)" />
+                            <small>@Text("Web_CloudSync_Advanced_Unlimited_Help", "Enter 0 or leave empty for no limit.")</small>
+                        </label>
+                    </div>
+                </div>
+                }
+
+                @if (_activeSettingsTab == CloudSyncSettingsTab.General)
+                {
                 <div class="detail-section">
                     <span class="detail-label">@Text("Web_CloudSync_LastSync", "Last sync")</span>
                     <span class="detail-value">@FormatLastSync(VM.SelectedSync.Configuration.LastSync)</span>
                 </div>
+                }
 
                 <div class="detail-actions">
                     @if (VM.CanConfigureSelected)

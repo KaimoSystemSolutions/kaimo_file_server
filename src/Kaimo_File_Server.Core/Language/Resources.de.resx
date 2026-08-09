@@ -1989,6 +1989,20 @@
   <data name="Web_CloudSync_Mode_Push" xml:space="preserve"><value>Hochladen (lokal → Cloud)</value></data>
   <data name="Web_CloudSync_LastSync" xml:space="preserve"><value>Letzte Synchronisierung</value></data>
   <data name="Web_CloudSync_Never" xml:space="preserve"><value>Nie</value></data>
+  <data name="Web_CloudSync_Name" xml:space="preserve"><value>Name</value></data>
+  <data name="Web_CloudSync_Tab_General" xml:space="preserve"><value>Allgemein</value></data>
+  <data name="Web_CloudSync_Tab_Schedule" xml:space="preserve"><value>Zeiteinstellungen</value></data>
+  <data name="Web_CloudSync_Tab_Advanced" xml:space="preserve"><value>Erweitert</value></data>
+  <data name="Web_CloudSync_Description" xml:space="preserve"><value>Beschreibung</value></data>
+  <data name="Web_CloudSync_Advanced" xml:space="preserve"><value>Erweiterte Einstellungen</value></data>
+  <data name="Web_CloudSync_Advanced_Help" xml:space="preserve"><value>Optionale Dateifilter und Bandbreitenlimits für diese Synchronisierung.</value></data>
+  <data name="Web_CloudSync_Advanced_MaxFileSize" xml:space="preserve"><value>Maximale Dateigröße (MB)</value></data>
+  <data name="Web_CloudSync_Advanced_ExcludedExtensions" xml:space="preserve"><value>Ausgeschlossene Dateiendungen</value></data>
+  <data name="Web_CloudSync_Advanced_ExcludedExtensions_Help" xml:space="preserve"><value>Dateiendungen mit Kommas, Leerzeichen oder Zeilenumbrüchen trennen.</value></data>
+  <data name="Web_CloudSync_Advanced_MaxUpload" xml:space="preserve"><value>Maximale Uploadrate (KB/s)</value></data>
+  <data name="Web_CloudSync_Advanced_MaxDownload" xml:space="preserve"><value>Maximale Downloadrate (KB/s)</value></data>
+  <data name="Web_CloudSync_Advanced_Error_Negative" xml:space="preserve"><value>Erweiterte Limits dürfen nicht negativ sein.</value></data>
+  <data name="Web_CloudSync_Advanced_Unlimited_Help" xml:space="preserve"><value>0 eingeben oder leer lassen für kein Limit.</value></data>
   <data name="Web_CloudSync_Schedule" xml:space="preserve"><value>Automatische Synchronisierung</value></data>
   <data name="Web_CloudSync_Schedule_Help" xml:space="preserve"><value>Wähle die stündlichen Zeitfenster aus, in denen dieser Ordner synchronisiert werden soll.</value></data>
   <data name="Web_CloudSync_Schedule_Toggle" xml:space="preserve"><value>Automatische Synchronisierung ein- oder ausschalten</value></data>

@@ -84,7 +84,13 @@ public sealed class CloudSyncViewModel
 
     public string EditLocalPath { get; set; } = "";
     public string EditRemotePath { get; set; } = "/";
+    public string EditDisplayName { get; set; } = "";
+    public string EditDescription { get; set; } = "";
     public SyncMode EditMode { get; set; } = SyncMode.TwoWay;
+    public long? EditMaxFileSizeMb { get; set; }
+    public string EditExcludedExtensions { get; set; } = "";
+    public long? EditMaxUploadRateKbps { get; set; }
+    public long? EditMaxDownloadRateKbps { get; set; }
     public bool EditScheduleEnabled { get; set; }
     public int EditScheduleIntervalSeconds { get; set; } = CloudSyncSchedule.DefaultIntervalSeconds;
     public HashSet<int> EditScheduleSlots { get; private set; } = [];
@@ -122,6 +128,12 @@ public sealed class CloudSyncViewModel
                        NormalizeRemotePath(configuration.RemotePath),
                        StringComparison.Ordinal)
                    || EditMode != configuration.Mode
+                   || !string.Equals(EditDisplayName, configuration.DisplayName, StringComparison.Ordinal)
+                   || !string.Equals(EditDescription, configuration.Description, StringComparison.Ordinal)
+                   || EditMaxFileSizeMb != ToMegabytes(configuration.AdvancedSettings?.MaxFileSizeBytes)
+                   || EditMaxUploadRateKbps != ToKilobytes(configuration.AdvancedSettings?.MaxUploadBytesPerSecond)
+                   || EditMaxDownloadRateKbps != ToKilobytes(configuration.AdvancedSettings?.MaxDownloadBytesPerSecond)
+                   || !ParseExtensions(EditExcludedExtensions).SetEquals(configuration.AdvancedSettings?.ExcludedExtensions ?? [])
                    || EditScheduleEnabled != schedule.IsEnabled
                    || EditScheduleIntervalSeconds != schedule.GetEffectiveIntervalSeconds()
                    || !EditScheduleSlots.SetEquals(schedule.ActiveSlots.Where(CloudSyncSchedule.IsValidSlot));
@@ -227,7 +239,13 @@ public sealed class CloudSyncViewModel
         SelectedSync = item;
         EditLocalPath = item.LocalPath;
         EditRemotePath = NormalizeRemotePath(item.Configuration.RemotePath);
+        EditDisplayName = item.Configuration.DisplayName;
+        EditDescription = item.Configuration.Description;
         EditMode = item.Configuration.Mode;
+        EditMaxFileSizeMb = ToMegabytes(item.Configuration.AdvancedSettings?.MaxFileSizeBytes);
+        EditExcludedExtensions = string.Join(", ", item.Configuration.AdvancedSettings?.ExcludedExtensions?.Order(StringComparer.OrdinalIgnoreCase) ?? Enumerable.Empty<string>());
+        EditMaxUploadRateKbps = ToKilobytes(item.Configuration.AdvancedSettings?.MaxUploadBytesPerSecond);
+        EditMaxDownloadRateKbps = ToKilobytes(item.Configuration.AdvancedSettings?.MaxDownloadBytesPerSecond);
         EditScheduleEnabled = item.Configuration.Schedule?.IsEnabled == true;
         EditScheduleIntervalSeconds = item.Configuration.Schedule?.GetEffectiveIntervalSeconds()
             ?? CloudSyncSchedule.DefaultIntervalSeconds;
@@ -259,6 +277,12 @@ public sealed class CloudSyncViewModel
         EditScheduleEnabled = false;
         EditScheduleIntervalSeconds = CloudSyncSchedule.DefaultIntervalSeconds;
         EditScheduleSlots = [];
+        EditDisplayName = "";
+        EditDescription = "";
+        EditMaxFileSizeMb = null;
+        EditExcludedExtensions = "";
+        EditMaxUploadRateKbps = null;
+        EditMaxDownloadRateKbps = null;
         _remoteFolderSelectedExplicitly = false;
         ErrorMessage = null;
     }
@@ -402,6 +426,11 @@ public sealed class CloudSyncViewModel
                 "Enter an interval between 1 and 86400 seconds.");
             return false;
         }
+        if (EditMaxFileSizeMb is < 0 || EditMaxUploadRateKbps is < 0 || EditMaxDownloadRateKbps is < 0)
+        {
+            ErrorMessage = Text("Web_CloudSync_Advanced_Error_Negative", "Advanced limits cannot be negative.");
+            return false;
+        }
         if (RequiresRemoteFolderSelection && !_remoteFolderSelectedExplicitly)
         {
             ErrorMessage = Text(
@@ -447,8 +476,17 @@ public sealed class CloudSyncViewModel
 
         share.CloudSettings.Folders.Remove(selected.LocalPath);
         folder.RemotePath = NormalizeRemotePath(EditRemotePath);
+        folder.DisplayName = EditDisplayName.Trim();
+        folder.Description = EditDescription.Trim();
         folder.RequiresRemoteFolderSelection = false;
         folder.Mode = EditMode;
+        folder.AdvancedSettings = new CloudSyncAdvancedSettings
+        {
+            MaxFileSizeBytes = ToBytes(EditMaxFileSizeMb, 1024L * 1024),
+            ExcludedExtensions = ParseExtensions(EditExcludedExtensions),
+            MaxUploadBytesPerSecond = ToBytes(EditMaxUploadRateKbps, 1024L),
+            MaxDownloadBytesPerSecond = ToBytes(EditMaxDownloadRateKbps, 1024L)
+        };
         var previousSchedule = folder.Schedule ?? new CloudSyncSchedule();
         folder.Schedule = new CloudSyncSchedule
         {
@@ -730,6 +768,21 @@ public sealed class CloudSyncViewModel
             : path.Replace('\\', '/').Trim('/');
         return normalized.Length == 0 ? "/" : $"/{normalized}";
     }
+
+    private static HashSet<string> ParseExtensions(string? value)
+        => (value ?? "").Split([',', ';', '\n', '\r', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(extension => extension.StartsWith('.') ? extension : $".{extension}")
+            .Where(extension => extension.Length > 1)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static long? ToBytes(long? value, long multiplier)
+        => value is > 0 ? checked(value.Value * multiplier) : null;
+
+    private static long? ToMegabytes(long? bytes)
+        => bytes is > 0 ? (long)Math.Ceiling(bytes.Value / (1024d * 1024d)) : null;
+
+    private static long? ToKilobytes(long? bytes)
+        => bytes is > 0 ? (long)Math.Ceiling(bytes.Value / 1024d) : null;
 
     private static string Text(string key, string fallback)
         => Resources.ResourceManager.GetString(key) ?? fallback;

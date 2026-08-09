@@ -73,6 +73,7 @@ public interface ICloudConnection
         string remotePath,
         string localPath,
         SyncMode mode,
+        CloudSyncTransferOptions? transferOptions = null,
         Action<string?, int>? reportProgress = null,
         CancellationToken cancellationToken = default)
     {
@@ -97,12 +98,14 @@ public interface ICloudConnection
 
         progress.Update("Scanning...");
 
+        var options = transferOptions ?? new CloudSyncTransferOptions(null);
         await SyncDirectory(
             fileService,
             user,
             remotePath.TrimEnd('/'),
             localPath.TrimEnd('/'),
             mode,
+            options,
             progress,
             cancellationToken
             );
@@ -133,6 +136,7 @@ public interface ICloudConnection
         string remoteDir,
         string localDir,
         SyncMode mode,
+        CloudSyncTransferOptions options,
         SyncProgress syncProgress,
         CancellationToken cancellationToken
         )
@@ -158,6 +162,10 @@ public interface ICloudConnection
             bool remoteExists = remote != null;
             bool localExists = local != null;
 
+            if ((localExists && !local!.IsDirectory && options.ShouldSkip(local.Name, local.Size))
+                || (remoteExists && !remote!.IsDirectory && options.ShouldSkip(remote.Name, remote.Size)))
+                continue;
+
             string remoteChild = $"{remoteDir}/{name}";
             string localChild = $"{localDir}/{name}";
 
@@ -179,13 +187,14 @@ public interface ICloudConnection
                         localChild,
                         remoteChild,
                         syncProgress,
+                        options,
                         cancellationToken);
                 }
                 else
                 {
                     syncProgress.Update($"Pushing {local.Name}...");
 
-                    await using var stream = await fileService.ReadFileAsync(localChild, user);
+                    await using var stream = options.LimitUpload(await fileService.ReadFileAsync(localChild, user));
                     await UploadAsync(remoteChild, stream, local.ModifiedAt, cancellationToken);
 
                     syncProgress.TransferredBytes += local.Size;
@@ -214,6 +223,7 @@ public interface ICloudConnection
                         remoteChild,
                         localChild,
                         mode,
+                        options,
                         syncProgress,
                         cancellationToken);
                 }
@@ -221,7 +231,8 @@ public interface ICloudConnection
                 {
                     syncProgress.Update($"Pulling {remote.Name}...");
 
-                    await using var ms = new MemoryStream();
+                    await using var raw = new MemoryStream();
+                    await using var ms = options.LimitDownload(raw);
                     await DownloadAsync(remoteChild, ms, cancellationToken);
 
                     ms.Position = 0;
@@ -248,6 +259,7 @@ public interface ICloudConnection
                     remoteChild,
                     localChild,
                     mode,
+                    options,
                     syncProgress,
                     cancellationToken);
 
@@ -266,7 +278,8 @@ public interface ICloudConnection
                 {
                     syncProgress.Update($"Pulling {remote.Name}...");
 
-                    await using var ms = new MemoryStream();
+                    await using var raw = new MemoryStream();
+                    await using var ms = options.LimitDownload(raw);
                     await DownloadAsync(remoteChild, ms, cancellationToken);
 
                     ms.Position = 0;
@@ -291,7 +304,7 @@ public interface ICloudConnection
                 {
                     syncProgress.Update($"Pushing {local.Name}...");
 
-                    await using var stream = await fileService.ReadFileAsync(localChild, user);
+                    await using var stream = options.LimitUpload(await fileService.ReadFileAsync(localChild, user));
                     await UploadAsync(remoteChild, stream, local.ModifiedAt, cancellationToken);
 
                     syncProgress.TransferredBytes += local.Size;
@@ -308,7 +321,7 @@ public interface ICloudConnection
             {
                 syncProgress.Update($"Pushing {local.Name}...");
 
-                await using var stream = await fileService.ReadFileAsync(localChild, user);
+                await using var stream = options.LimitUpload(await fileService.ReadFileAsync(localChild, user));
                 await UploadAsync(remoteChild, stream, local.ModifiedAt, cancellationToken);
 
                 syncProgress.TransferredBytes += local.Size;
@@ -318,7 +331,8 @@ public interface ICloudConnection
             {
                 syncProgress.Update($"Pulling {remote.Name}...");
 
-                await using var ms = new MemoryStream();
+                await using var raw = new MemoryStream();
+                await using var ms = options.LimitDownload(raw);
                 await DownloadAsync(remoteChild, ms, cancellationToken);
 
                 ms.Position = 0;
@@ -343,6 +357,7 @@ public interface ICloudConnection
         string localDir,
         string remoteDir,
         SyncProgress syncProgress,
+        CloudSyncTransferOptions options,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -362,13 +377,16 @@ public interface ICloudConnection
                     localChild,
                     remoteChild,
                     syncProgress,
+                    options,
                     cancellationToken);
             }
             else
             {
                 syncProgress.Update($"Pushing {item.Name}");
 
-                await using var stream = await fileService.ReadFileAsync(localChild, user);
+                if (options.ShouldSkip(item.Name, item.Size))
+                    continue;
+                await using var stream = options.LimitUpload(await fileService.ReadFileAsync(localChild, user));
                 await UploadAsync(remoteChild, stream, item.ModifiedAt, cancellationToken);
 
                 syncProgress.TransferredBytes += item.Size;

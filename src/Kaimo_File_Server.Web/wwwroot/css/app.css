@@ -4152,6 +4152,52 @@ input[type="radio"] {
     width: 100%;
 }
 
+.cloud-sync-description,
+.cloud-sync-extension-list {
+    min-height: 68px;
+    resize: vertical;
+}
+
+.cloud-sync-advanced h4 {
+    margin: 0;
+    color: var(--text-primary);
+    font-weight: 650;
+}
+
+.cloud-sync-advanced > p,
+.cloud-sync-advanced small {
+    display: block;
+    margin: 8px 0;
+    color: var(--text-tertiary);
+    font-size: 12px;
+}
+
+.cloud-sync-advanced .form-group {
+    margin: 20px 0 0;
+}
+
+.cloud-sync-advanced .form-group > span {
+    display: block;
+    margin-bottom: 8px;
+}
+
+.cloud-sync-advanced input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.cloud-sync-advanced input[type="number"]::-webkit-inner-spin-button,
+.cloud-sync-advanced input[type="number"]::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+}
+
+.cloud-sync-advanced-rates {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+}
+
 .cloud-sync-account {
     display: flex;
     align-items: center;
