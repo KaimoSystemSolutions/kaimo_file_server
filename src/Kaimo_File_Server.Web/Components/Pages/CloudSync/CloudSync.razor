@@ -168,6 +168,12 @@ else
                         <button class="btn-secondary" type="button" disabled="@(!VM.CanConfigureSelected)"
                                 @onclick="OpenRemotePicker">@Text("Web_CloudSync_Browse", "Browse…")</button>
                     </div>
+                    @if (VM.RequiresRemoteFolderSelection)
+                    {
+                        <span class="cloud-path-required">
+                            @Text("Web_CloudSync_RemoteFolder_Required", "Select a remote folder before saving this cloud sync. The root folder is allowed.")
+                        </span>
+                    }
                 </div>
 
                 <div class="detail-section">
@@ -322,13 +328,16 @@ else
                 <div class="detail-actions">
                     @if (VM.CanConfigureSelected)
                     {
-                        <button class="btn-secondary" type="button" disabled="@VM.IsBusy" @onclick="SaveAsync">
+                        <button class="@(VM.HasUnsavedChanges ? "btn-primary cloud-sync-save--changed" : "btn-secondary")"
+                                type="button"
+                                disabled="@(!VM.HasUnsavedChanges || VM.IsBusy)"
+                                @onclick="SaveAsync">
                             @Text("Web_CloudSync_Save", "Save settings")
                         </button>
                     }
                     @if (VM.CanRunSelected)
                     {
-                        <button class="btn-primary" type="button" disabled="@VM.IsBusy" @onclick="RunSyncAsync">
+                        <button class="btn-primary" type="button" disabled="@(VM.IsBusy || VM.RequiresRemoteFolderSelection)" @onclick="RunSyncAsync">
                             @Text("Web_CloudSync_Run", "Sync now")
                         </button>
                     }

@@ -151,7 +151,10 @@ public class GoogleOAuthController : ControllerBase
             {
                 ["refreshToken"] = token.RefreshToken,
                 ["scope"] = token.Scope,
-            });
+            })
+        {
+            RequiresRemoteFolderSelection = true
+        };
 
         share.CloudSettings = settings;
         await _shareRepository.UpdateAsync(share);
@@ -160,7 +163,7 @@ public class GoogleOAuthController : ControllerBase
         // it select the newly created entry without knowing anything about Google.
         return Redirect(
             $"/sync?connectedShare={share.Id}" +
-            $"&connectedPath={Uri.EscapeDataString(path)}");
+            $"&connectedPath={Uri.EscapeDataString(path)}&remoteFolderRequired=true");
     }
 
     [HttpPost("disconnect")]

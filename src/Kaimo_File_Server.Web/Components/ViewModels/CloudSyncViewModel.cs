@@ -32,6 +32,7 @@ public sealed class CloudSyncViewModel
     private readonly ILogger<CloudSyncViewModel> _logger;
     private readonly Dictionary<Guid, ManagementPermission> _permissions = [];
     private UserContext? _actor;
+    private bool _remoteFolderSelectedExplicitly;
 
     /// <summary>Creates the provider-neutral administration model and its security dependencies.</summary>
     public CloudSyncViewModel(
@@ -89,6 +90,43 @@ public sealed class CloudSyncViewModel
     public HashSet<int> EditScheduleSlots { get; private set; } = [];
 
     public int ActiveScheduleSlotCount => EditScheduleSlots.Count;
+
+    /// <summary>
+    /// Gets whether a newly authorized mapping still requires the administrator
+    /// to explicitly confirm its remote folder. The remote root is valid, but
+    /// must be selected intentionally rather than accepted as an implicit default.
+    /// </summary>
+    public bool RequiresRemoteFolderSelection
+        => SelectedSync?.Configuration.RequiresRemoteFolderSelection == true;
+
+    /// <summary>
+    /// Gets whether the selected mapping has edits that differ from its persisted
+    /// configuration, including a pending explicit remote-folder confirmation.
+    /// </summary>
+    public bool HasUnsavedChanges
+    {
+        get
+        {
+            if (SelectedSync is null)
+                return false;
+
+            var configuration = SelectedSync.Configuration;
+            var schedule = configuration.Schedule ?? new CloudSyncSchedule();
+            return (RequiresRemoteFolderSelection && _remoteFolderSelectedExplicitly)
+                   || !string.Equals(
+                       CloudSyncPaths.Normalize(EditLocalPath),
+                       SelectedSync.LocalPath,
+                       StringComparison.OrdinalIgnoreCase)
+                   || !string.Equals(
+                       NormalizeRemotePath(EditRemotePath),
+                       NormalizeRemotePath(configuration.RemotePath),
+                       StringComparison.Ordinal)
+                   || EditMode != configuration.Mode
+                   || EditScheduleEnabled != schedule.IsEnabled
+                   || EditScheduleIntervalSeconds != schedule.GetEffectiveIntervalSeconds()
+                   || !EditScheduleSlots.SetEquals(schedule.ActiveSlots.Where(CloudSyncSchedule.IsValidSlot));
+        }
+    }
 
     public bool CanCreateSync => Shares.Any(share => HasPermission(share.Id, ManagementPermission.CreateSyncs));
     public bool CanConfigureSelected => SelectedSync is not null
@@ -196,6 +234,7 @@ public sealed class CloudSyncViewModel
         EditScheduleSlots = item.Configuration.Schedule?.ActiveSlots is { } slots
             ? new HashSet<int>(slots.Where(CloudSyncSchedule.IsValidSlot))
             : [];
+        _remoteFolderSelectedExplicitly = false;
         SelectedAccount = null;
         ErrorMessage = null;
 
@@ -220,6 +259,7 @@ public sealed class CloudSyncViewModel
         EditScheduleEnabled = false;
         EditScheduleIntervalSeconds = CloudSyncSchedule.DefaultIntervalSeconds;
         EditScheduleSlots = [];
+        _remoteFolderSelectedExplicitly = false;
         ErrorMessage = null;
     }
 
@@ -265,6 +305,12 @@ public sealed class CloudSyncViewModel
     }
 
     public void ClearSchedule() => EditScheduleSlots.Clear();
+
+    /// <summary>
+    /// Records an intentional choice in the remote-folder picker. This also
+    /// allows an administrator to explicitly keep the provider root.
+    /// </summary>
+    public void ConfirmRemoteFolderSelection() => _remoteFolderSelectedExplicitly = true;
 
     private void SetScheduleSlotCore(DayOfWeek day, int hour, bool active)
     {
@@ -356,6 +402,13 @@ public sealed class CloudSyncViewModel
                 "Enter an interval between 1 and 86400 seconds.");
             return false;
         }
+        if (RequiresRemoteFolderSelection && !_remoteFolderSelectedExplicitly)
+        {
+            ErrorMessage = Text(
+                "Web_CloudSync_RemoteFolder_Required",
+                "Select a remote folder before saving this cloud sync. The root folder is allowed.");
+            return false;
+        }
 
         var selected = SelectedSync;
         var newLocalPath = CloudSyncPaths.Normalize(EditLocalPath);
@@ -394,6 +447,7 @@ public sealed class CloudSyncViewModel
 
         share.CloudSettings.Folders.Remove(selected.LocalPath);
         folder.RemotePath = NormalizeRemotePath(EditRemotePath);
+        folder.RequiresRemoteFolderSelection = false;
         folder.Mode = EditMode;
         var previousSchedule = folder.Schedule ?? new CloudSyncSchedule();
         folder.Schedule = new CloudSyncSchedule

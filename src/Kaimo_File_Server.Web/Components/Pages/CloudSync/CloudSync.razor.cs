@@ -39,6 +39,8 @@ public partial class CloudSync : IAsyncDisposable
     public string? ConnectedPath { get; set; }
     [SupplyParameterFromQuery(Name = "syncError")]
     public string? SyncError { get; set; }
+    [SupplyParameterFromQuery(Name = "remoteFolderRequired")]
+    public bool RemoteFolderRequired { get; set; }
     [SupplyParameterFromQuery(Name = "targetShare")]
     public Guid? TargetShareId { get; set; }
     [SupplyParameterFromQuery(Name = "targetPath")]
@@ -74,7 +76,16 @@ public partial class CloudSync : IAsyncDisposable
             await VM.LoadAsync(preferredShareId, preferredPath);
 
             if (ConnectedShareId is not null)
+            {
                 Toasts.Show(Text("Web_CloudSync_Connected", "The cloud provider was connected successfully."), ToastType.Success);
+                if (RemoteFolderRequired && VM.RequiresRemoteFolderSelection)
+                {
+                    Toasts.Show(
+                        Text("Web_CloudSync_RemoteFolder_Required", "Select a remote folder before saving this cloud sync. The root folder is allowed."),
+                        ToastType.Info);
+                    await OpenRemotePicker();
+                }
+            }
             if (!string.IsNullOrWhiteSpace(SyncError))
                 Toasts.Show(SyncError, ToastType.Error);
 
@@ -274,7 +285,10 @@ public partial class CloudSync : IAsyncDisposable
     private Task SelectPickerPathAsync(string path)
     {
         if (_pickerRemote)
+        {
             VM.EditRemotePath = CloudSyncViewModel.NormalizeRemotePath(path);
+            VM.ConfirmRemoteFolderSelection();
+        }
         else if (_pickerForNewSync)
             VM.NewLocalPath = Infrastructure.Clouds.CloudSyncPaths.Normalize(path);
         else

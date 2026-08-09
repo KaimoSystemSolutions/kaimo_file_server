@@ -32,11 +32,12 @@ public sealed class CloudSyncSchedulerServiceTests
     }
 
     [Fact]
-    public void IsDue_RequiresEnabledCurrentSlotAndNoSuccessfulRunInCurrentHour()
+    public void IsDue_RequiresEnabledCurrentSlotAndConfiguredIntervalSinceLastSuccessfulRun()
     {
         var schedule = new CloudSyncSchedule
         {
             IsEnabled = true,
+            IntervalSeconds = 15 * 60,
             ActiveSlots = [CloudSyncSchedule.ToSlot(DayOfWeek.Monday, 10)]
         };
         var now = new DateTimeOffset(2026, 8, 3, 10, 42, 0, TimeSpan.Zero);
@@ -44,7 +45,9 @@ public sealed class CloudSyncSchedulerServiceTests
         Assert.True(CloudSyncSchedulerService.IsDue(
             schedule, new DateTime(2026, 8, 3, 9, 59, 0, DateTimeKind.Utc), now, TimeZoneInfo.Utc));
         Assert.False(CloudSyncSchedulerService.IsDue(
-            schedule, new DateTime(2026, 8, 3, 10, 5, 0, DateTimeKind.Utc), now, TimeZoneInfo.Utc));
+            schedule, new DateTime(2026, 8, 3, 10, 30, 0, DateTimeKind.Utc), now, TimeZoneInfo.Utc));
+        Assert.True(CloudSyncSchedulerService.IsDue(
+            schedule, new DateTime(2026, 8, 3, 10, 20, 0, DateTimeKind.Utc), now, TimeZoneInfo.Utc));
 
         schedule.IsEnabled = false;
         Assert.False(CloudSyncSchedulerService.IsDue(

@@ -134,11 +134,14 @@ public sealed class OneDriveOAuthController : ControllerBase
                 ["connectionId"] = Guid.NewGuid().ToString("N"),
                 ["refreshToken"] = result.RefreshToken,
                 ["scope"] = result.Scope
-            });
+            })
+        {
+            RequiresRemoteFolderSelection = true
+        };
         await _shareRepository.UpdateAsync(share);
 
         var redirect = $"/sync?connectedShare={share.Id}" +
-                       $"&connectedPath={Uri.EscapeDataString(result.LocalPath)}";
+                       $"&connectedPath={Uri.EscapeDataString(result.LocalPath)}&remoteFolderRequired=true";
         return Ok(new { state = "complete", redirect });
     }
 

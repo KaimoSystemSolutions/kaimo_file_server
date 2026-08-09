@@ -238,6 +238,13 @@ namespace Kaimo_File_Server.Core.Domain
         public string RemotePath { get; set; } = "/";
 
         /// <summary>
+        /// Newly authorized mappings require an explicit remote-folder selection
+        /// before they can be used. Root is a valid selection when it is chosen
+        /// deliberately; legacy mappings retain their existing configuration.
+        /// </summary>
+        public bool RequiresRemoteFolderSelection { get; set; }
+
+        /// <summary>
         /// Timestamp of the last successful sync.
         /// Null means the folder has never been synced.
         /// </summary>
@@ -267,6 +274,7 @@ namespace Kaimo_File_Server.Core.Domain
 
             if (Provider != other.Provider) return false;
             if (RemotePath != other.RemotePath) return false;
+            if (RequiresRemoteFolderSelection != other.RequiresRemoteFolderSelection) return false;
             if (LastSync != other.LastSync) return false;
             if (Mode != other.Mode) return false;
             if (!Equals(Schedule, other.Schedule)) return false;
@@ -292,6 +300,7 @@ namespace Kaimo_File_Server.Core.Domain
 
             hash.Add(Provider);
             hash.Add(RemotePath);
+            hash.Add(RequiresRemoteFolderSelection);
             hash.Add(LastSync);
             hash.Add(Mode);
             hash.Add(Schedule);

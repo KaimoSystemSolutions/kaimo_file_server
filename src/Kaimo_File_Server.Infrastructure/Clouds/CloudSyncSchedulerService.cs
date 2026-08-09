@@ -50,7 +50,7 @@ public sealed class CloudSyncSchedulerSignal
 /// <summary>
 /// Evaluates enabled cloud-sync schedules at the configured interval and starts
 /// mappings selected for the current local server hour. A successful manual or
-/// scheduled run in the same hour suppresses a duplicate execution.
+/// scheduled run is eligible again after its configured interval has elapsed.
 /// </summary>
 public sealed class CloudSyncSchedulerService(
     IServiceScopeFactory scopeFactory,
@@ -197,10 +197,9 @@ public sealed class CloudSyncSchedulerService(
             DateTimeKind.Local => lastSyncUtc.Value.ToUniversalTime(),
             _ => DateTime.SpecifyKind(lastSyncUtc.Value, DateTimeKind.Utc)
         };
-        DateTimeOffset lastLocal = TimeZoneInfo.ConvertTime(new DateTimeOffset(utc), localTimeZone);
-        return lastLocal.Year != localNow.Year
-               || lastLocal.DayOfYear != localNow.DayOfYear
-               || lastLocal.Hour != localNow.Hour;
+        DateTimeOffset lastSync = new(utc);
+        return localNow.ToUniversalTime() - lastSync
+               >= TimeSpan.FromSeconds(schedule.GetEffectiveIntervalSeconds());
     }
 
     private async Task<TimeSpan> CheckNowSafelyAsync(

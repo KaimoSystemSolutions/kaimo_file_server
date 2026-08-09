@@ -966,6 +966,17 @@ html, body, #app {
     border-top: 1px solid var(--border);
 }
 
+.cloud-path-required {
+    display: block;
+    margin-top: 6px;
+    color: var(--danger);
+    font-size: 12px;
+}
+
+.cloud-sync-save--changed {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
 .detail-info {
     display: flex;
     align-items: flex-start;
