@@ -149,6 +149,46 @@ html, body, #app {
     -webkit-font-smoothing: antialiased;
 }
 
+/* Blazor creates this reconnect dialog when an Interactive Server circuit loses
+   its server connection. It is framework-owned, so theme it globally here. */
+#components-reconnect-modal {
+    background: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-strong) !important;
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+}
+
+#components-reconnect-modal button {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 5px;
+}
+
+/* .components-reconnect-dialog is the visible child created by blazor.web.js. */
+#components-reconnect-modal .components-reconnect-dialog {
+    background: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-strong) !important;
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+}
+
+#components-reconnect-modal .components-reconnect-dialog p {
+    color: var(--text-primary) !important;
+}
+
+#components-reconnect-modal .components-reconnect-dialog button {
+    background: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border) !important;
+}
+
+#components-reconnect-modal .components-rejoining-animation > div {
+    background: var(--accent) !important;
+}
+
 :where(button, a, input, select, textarea):focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
