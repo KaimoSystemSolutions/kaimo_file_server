@@ -228,13 +228,14 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
     volumes:
       - ${LOCATION_DB:-./tests/data/postgres}:/var/lib/postgresql/data
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    #ports:
+    #  - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} -h 127.0.0.1"]
       interval: 2s
       timeout: 5s
       retries: 10
+      start_period: 15s
     networks:
       - kaimo_database
       - kaimo_bridge_database
