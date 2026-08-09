@@ -198,7 +198,10 @@ namespace Kaimo_File_Server.Infrastructure
 
                     return;
                 }
-                catch (Exception ex)
+                // Only retry failures that Npgsql classifies as transient (for
+                // example while PostgreSQL is still starting). Migration and
+                // seeding errors must surface immediately with their true cause.
+                catch (Npgsql.NpgsqlException ex) when (ex.IsTransient)
                 {
                     if (attempt == maxRetries)
                         throw new InvalidOperationException(

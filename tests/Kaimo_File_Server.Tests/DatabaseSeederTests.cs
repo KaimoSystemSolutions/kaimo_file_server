@@ -133,6 +133,8 @@ public class DatabaseSeederTests : IDisposable
 
         var admin = await _db.Users.SingleAsync(u => u.Username == "admin");
         Assert.True(_passwords.VerifyPassword("admin1234", admin.PasswordHash));
+        Assert.Contains(await _db.Departments.Select(d => d.Name).ToListAsync(),
+            name => name == "Entwicklung");
     }
 
     [Fact]

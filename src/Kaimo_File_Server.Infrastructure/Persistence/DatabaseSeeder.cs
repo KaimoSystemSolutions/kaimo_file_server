@@ -1,3 +1,4 @@
+using Elastic.Clients.Elasticsearch;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
@@ -65,14 +66,19 @@ public class DatabaseSeeder
     {
         await CleanupDuplicatesAsync();
         await SeedGlobalDepartmentAsync();
-        await SeedRolesAsync();
-        await SeedGroupsAsync();
-        await SeedDepartmentsAsync();
+        await SeedSystemGroupsAsync();
+        await SeedSystemRolesAsync();
 
         if (SeedDemoData)
+        {
+            await SeedDepartmentsAsync();
+            await SeedGroupsAsync();
             await SeedTestUsersAsync();
+        }
         else
+        {
             await SeedBootstrapAdminAsync();
+        }
 
         await SeedConfigAsync();
     }
@@ -106,7 +112,8 @@ public class DatabaseSeeder
             return;
         }
 
-        var configuredPassword = _configuration["Seed:AdminPassword"];
+        string configuredPassword = _configuration["Seed_AdminPassword"];
+
         var generated = string.IsNullOrWhiteSpace(configuredPassword);
         var password = generated ? GenerateStrongPassword() : configuredPassword!;
 
@@ -195,7 +202,7 @@ public class DatabaseSeeder
         ("User",              ManagementPermission.None,                                           true, WellKnownGUIDs.ROLE_USER),
     ];
 
-    private async Task SeedRolesAsync()
+    private async Task SeedSystemRolesAsync()
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
 
@@ -231,10 +238,13 @@ public class DatabaseSeeder
     //  2. Default Groups (DepartmentId = Global)
     // ══════════════════════════════════════════
 
-    private static readonly string[] DefaultGroups =
+    private static readonly string[] DemoGroups =
     [
-        "Admins", "Developers", "Everyone",
-        "Backend-Team", "Frontend-Team", "Marketing-Team"
+        "Developers", "Backend-Team", "Frontend-Team", "Marketing-Team"
+    ];
+
+    private static readonly string[] SystemGroups = [
+        "Admins", "Everyone"
     ];
 
     private async Task SeedGroupsAsync()
@@ -246,12 +256,35 @@ public class DatabaseSeeder
 
         var changed = false;
 
-        foreach (var name in DefaultGroups)
+        foreach (var name in DemoGroups)
         {
             if (existingNames.Add(name))
             {
                 // All default groups start in Global department.
                 // Department-specific groups get reassigned in SeedTestUsersAsync.
+                db.Groups.Add(new Group(Guid.NewGuid(), name));
+                _logger.LogDebug(LogEvents.SeedGroupCreated, LogMessages.SeedGroupCreated, name);
+                changed = true;
+            }
+        }
+
+        if (changed)
+            await db.SaveChangesAsync();
+    }
+
+    private async Task SeedSystemGroupsAsync()
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var existingNames = (await db.Groups.Select(g => g.Name).ToListAsync())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var changed = false;
+
+        foreach (var name in SystemGroups)
+        {
+            if (existingNames.Add(name))
+            {
                 db.Groups.Add(new Group(Guid.NewGuid(), name));
                 _logger.LogDebug(LogEvents.SeedGroupCreated, LogMessages.SeedGroupCreated, name);
                 changed = true;
