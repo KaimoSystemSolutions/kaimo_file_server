@@ -13,6 +13,12 @@ public sealed record BrowserCapabilities
     public bool CanDelete { get; init; }
     public bool CanMove { get; init; }
     public bool CanCopy { get; init; }
+    /// <summary>
+    /// Indicates whether items from this browser may be removed after a paste.
+    /// Remote shares intentionally never expose this capability: a cross-share
+    /// transfer from a virtual provider is always a copy.
+    /// </summary>
+    public bool CanCut { get; init; }
     public bool CanCopyToLocal { get; init; }
     public bool CanArchive { get; init; }
     public bool CanExtract { get; init; }
@@ -32,6 +38,7 @@ public sealed record BrowserCapabilities
         CanDelete = true,
         CanMove = true,
         CanCopy = true,
+        CanCut = true,
         CanArchive = true,
         CanExtract = true,
         HasFileAcls = true,

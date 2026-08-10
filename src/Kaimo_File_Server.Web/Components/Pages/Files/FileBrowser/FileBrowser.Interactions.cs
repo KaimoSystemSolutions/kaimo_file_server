@@ -168,7 +168,7 @@ public partial class FileBrowser
 
     internal async Task PutIntoClipboard(bool deleteOnPaste)
     {
-        if (!VM.Capabilities.CanCopy || _selectedItems.Count < 1)
+        if (!VM.Capabilities.CanCopy || !VM.Capabilities.CanCut && deleteOnPaste || _selectedItems.Count < 1)
             return;
 
         if(_clipboardToastID != null)

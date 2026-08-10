@@ -14,6 +14,7 @@ public sealed class FileBrowserViewModelContractTests
 
         Assert.True(capabilities.CanUpload);
         Assert.True(capabilities.CanMove);
+        Assert.True(capabilities.CanCut);
         Assert.True(capabilities.CanArchive);
         Assert.True(capabilities.HasFileAcls);
         Assert.True(capabilities.HasVersions);
@@ -36,6 +37,7 @@ public sealed class FileBrowserViewModelContractTests
             ["projects", "active"],
             browser.Breadcrumbs.Select(part => part.Name).ToArray());
         Assert.False(browser.Capabilities.HasFileAcls);
+        Assert.False(browser.Capabilities.CanCut);
         Assert.False(browser.Capabilities.HasVersions);
         Assert.Null(browser.GetDirectorySize(browser.Items[0]));
         Assert.Empty(await browser.GetFileVersionsAsync(browser.Items[0]));

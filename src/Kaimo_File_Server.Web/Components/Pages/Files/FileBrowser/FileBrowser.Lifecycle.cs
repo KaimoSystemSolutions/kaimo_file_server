@@ -175,7 +175,10 @@ public partial class FileBrowser
             if (e.Key == "c" && VM.Capabilities.CanCopy)
                 await PutIntoClipboard(false);
         
-            if (e.Key == "x" && VM.Capabilities.CanCopy && VM.Capabilities.CanDelete)
+            // A virtual share can be writable for provider-native operations, but
+            // it is never a cut source. Cross-share transfers must preserve the
+            // remote original and therefore start as copies.
+            if (e.Key == "x" && VM.Capabilities.CanCopy && VM.Capabilities.CanCut)
                 await PutIntoClipboard(true);
 
             if (e.Key == "v" && VM.Capabilities.CanCopy)
