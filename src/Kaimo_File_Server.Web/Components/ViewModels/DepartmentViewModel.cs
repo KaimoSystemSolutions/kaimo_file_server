@@ -352,8 +352,23 @@ public class DepartmentViewModel
 
             foreach (var userId in desiredUserIds.Except(currentUserIds))
                 await _departmentRepo.AddUserAsync(Selected.Id, userId);
+            var removedGroupMemberships = 0;
             foreach (var userId in currentUserIds.Except(desiredUserIds))
+            {
                 await _departmentRepo.RemoveUserAsync(Selected.Id, userId);
+
+                var userGroups = await _userRepo.GetGroupsForUserAsync(userId);
+                var remainingGroupIds = userGroups
+                    .Where(group => group.DepartmentId != Selected.Id)
+                    .Select(group => group.Id)
+                    .ToList();
+
+                if (remainingGroupIds.Count != userGroups.Count)
+                {
+                    await _userRepo.SetGroupsForUserAsync(userId, remainingGroupIds);
+                    removedGroupMemberships += userGroups.Count - remainingGroupIds.Count;
+                }
+            }
 
             // -- Groups diff (direct FK: Group.DepartmentId) --
             foreach (var item in EditGroups)
@@ -401,7 +416,9 @@ public class DepartmentViewModel
             await LoadDepartmentsAsync();
 
             IsEditing = false;
-            SuccessMessage = Resources.Web_Dept_Saved;
+            SuccessMessage = removedGroupMemberships == 0
+                ? Resources.Web_Dept_Saved
+                : $"{Resources.Web_Dept_Saved} {removedGroupMemberships} Gruppenzuordnung(en) wurden entfernt, weil der Benutzer nicht mehr Mitglied dieser Abteilung ist.";
         }
         catch (Exception ex)
         {

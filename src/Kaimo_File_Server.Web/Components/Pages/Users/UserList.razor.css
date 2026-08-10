@@ -526,6 +526,13 @@
     background: var(--bg-secondary);
 }
 
+/* The group picker sits near the bottom of the edit form. Open it upward so
+   the workspace boundary never clips the final options. */
+.entity-detail ::deep .user-group-select .multi-select-dropdown {
+    top: auto;
+    bottom: calc(100% + 4px);
+}
+
 .entity-detail ::deep .user-edit-toggles {
     margin: 2px 0;
     background: var(--bg-secondary);

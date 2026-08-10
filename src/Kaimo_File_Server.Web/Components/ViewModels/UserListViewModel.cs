@@ -528,7 +528,12 @@ public class UserListViewModel
         EditUserIsEnabled = SelectedUser.IsEnabled;
         EditUserCanChangePassword = SelectedUser.CanChangePassword;
 
-        var allGroups = (await _groupRepo.GetAllAsync()).OrderBy(g => g.Name).ToList();
+        var departmentIds = UserDepartments.Select(department => department.Id).ToHashSet();
+        var allGroups = (await _groupRepo.GetAllAsync())
+            .Where(group => group.DepartmentId == WellKnownGUIDs.DEPARTMENT_GLOBAL
+                         || departmentIds.Contains(group.DepartmentId))
+            .OrderBy(group => group.Name)
+            .ToList();
         var userGroups = await _userRepo.GetGroupsForUserAsync(SelectedUser.Id);
         var userGroupIds = userGroups.Select(g => g.Id).ToHashSet();
         EditUserGroups = allGroups.Select(g => new CheckboxItem<Group>(g, userGroupIds.Contains(g.Id))).ToList();

@@ -70,7 +70,7 @@
 
                 <div class="form-group">
                     <label>@Resources.Web_Admin_Label_Groups</label>
-                    <div class="multi-select @(groupsOpen ? "open" : "")">
+                    <div class="multi-select user-group-select @(groupsOpen ? "open" : "")">
                         <div class="multi-select-display" @onclick="() => groupsOpen = !groupsOpen">
                             <span class="multi-select-text">
                                 @Checked(VM.EditUserGroups.Where(g => g.IsChecked).Select(g => g.Item.Name), Resources.Web_Common_NoGroupsAssigned)
