@@ -6,7 +6,8 @@
 <div class="toast-container">
     @foreach (var toast in Toasts.Toasts)
     {
-        <div class="toast toast--@toast.Type.ToString().ToLower() @(_removing.Contains(toast.Id) ? "toast--removing" : "")">
+        <div class="toast toast--@toast.Type.ToString().ToLower() @(_removing.Contains(toast.Id) ? "toast--removing" : "")"
+             title="@toast.Tooltip">
             @(toast.Type switch
             {
                 ToastType.Success  => Assets.SVG("check.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2, CssClass: "toast-icon")),

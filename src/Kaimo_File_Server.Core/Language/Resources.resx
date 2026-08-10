@@ -2155,6 +2155,29 @@
   <data name="Web_CloudAccess_Error_RemoteCopy" xml:space="preserve"><value>The item could not be copied.</value></data>
   <data name="Web_CloudAccess_Error_Upload" xml:space="preserve"><value>The file could not be uploaded.</value></data>
   <data name="Web_CloudAccess_Error_ReadOnly" xml:space="preserve"><value>This virtual share is read only.</value></data>
+  <data name="Web_Transfer_Error_NoSelection" xml:space="preserve"><value>Select at least one item.</value></data>
+  <data name="Web_Transfer_Error_RemoteCut" xml:space="preserve"><value>Items from a virtual share can only be copied.</value></data>
+  <data name="Web_Transfer_Error_InvalidPath" xml:space="preserve"><value>The target folder is invalid.</value></data>
+  <data name="Web_Transfer_Error_SignInRequired" xml:space="preserve"><value>Sign-in is required.</value></data>
+  <data name="Web_Transfer_Error_AccessDenied" xml:space="preserve"><value>You do not have permission to transfer these items.</value></data>
+  <data name="Web_Transfer_Error_Cancelled" xml:space="preserve"><value>The transfer was cancelled.</value></data>
+  <data name="Web_Transfer_Error_Failed" xml:space="preserve"><value>The items could not be transferred.</value></data>
+  <data name="Web_Transfer_CopySuccess" xml:space="preserve"><value>Items copied successfully.</value></data>
+  <data name="Web_Transfer_CutSuccess" xml:space="preserve"><value>Items moved successfully.</value></data>
+  <data name="Web_Transfer_Copy" xml:space="preserve"><value>Copy</value></data>
+  <data name="Web_Transfer_Cut" xml:space="preserve"><value>Cut</value></data>
+  <data name="Web_Transfer_Paste" xml:space="preserve"><value>Paste</value></data>
+  <data name="Web_Transfer_CopyingOne" xml:space="preserve"><value>Copying: {0}</value></data>
+  <data name="Web_Transfer_CopyingMany" xml:space="preserve"><value>Copying {0} items</value></data>
+  <data name="Web_Transfer_CuttingOne" xml:space="preserve"><value>Cutting: {0}</value></data>
+  <data name="Web_Transfer_CuttingMany" xml:space="preserve"><value>Cutting {0} items</value></data>
+  <data name="Web_Jobs_FileTransfer_Title" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="Web_Transfer_JobCopy" xml:space="preserve"><value>Copy</value></data>
+  <data name="Web_Transfer_JobCut" xml:space="preserve"><value>Move</value></data>
+  <data name="Web_Transfer_Items" xml:space="preserve"><value>{0} items</value></data>
+  <data name="Web_Transfer_Progress" xml:space="preserve"><value>Preparing transfer…</value></data>
+  <data name="Web_Transfer_ProgressItem" xml:space="preserve"><value>Transferring: {0}</value></data>
+  <data name="Web_Properties_SizeUnavailable" xml:space="preserve"><value>Unavailable</value></data>
   <data name="Web_Settings_Tab_CloudAccess" xml:space="preserve"><value>Cloud Access</value></data>
   <data name="Web_Settings_CloudAccess_CacheTitle" xml:space="preserve"><value>Directory metadata cache</value></data>
   <data name="Web_Settings_CloudAccess_CacheDescription" xml:space="preserve"><value>Controls how long remote directory listings are reused. File contents, credentials, and access decisions are never cached. Changes apply immediately.</value></data>

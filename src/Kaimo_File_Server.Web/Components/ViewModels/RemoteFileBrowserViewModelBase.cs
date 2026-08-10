@@ -73,6 +73,9 @@ public abstract class RemoteFileBrowserViewModelBase : IFileBrowserViewModel
 
     public virtual long GetMaxPreviewSizeBytes() => 25L * 1024 * 1024;
     public virtual long GetMaxUploadSizeBytes() => 1100L * 1024 * 1024;
+    public virtual Task<long?> CalculateDirectorySizeAsync(
+        FileMetadata directory, CancellationToken cancellationToken = default)
+        => Task.FromResult<long?>(null);
 
     public virtual string ShareRelativeOf(FileMetadata item)
         => ShareRelativePath.Normalize(item.Path);

@@ -176,6 +176,33 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
         return (memory.ToArray(), FileHelper.GetContentType(file.Name), FileHelper.GetPreviewKind(file.Name));
     }
 
+    /// <summary>
+    /// OneDrive directory listings do not carry an aggregate size. Walk the selected
+    /// subtree on demand for Properties, keeping normal browsing metadata-only.
+    /// </summary>
+    public override async Task<long?> CalculateDirectorySizeAsync(
+        FileMetadata directory, CancellationToken cancellationToken = default)
+    {
+        if (!directory.IsDirectory || _connection is null || _share is null)
+            return null;
+
+        try
+        {
+            var total = await CalculateDirectorySizeCoreAsync(ShareRelativeOf(directory), cancellationToken);
+            await PersistRotatedCredentialsAsync();
+            return total;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "Unable to calculate size for Cloud Access directory {Path}", directory.Path);
+            return null;
+        }
+    }
+
     public override async Task<OperationResult> UploadFileAsync(
         string fileName, Stream fileStream, CancellationToken cancellationToken = default)
         => await RunWriteAsync(connection => connection.UploadAsync(
@@ -216,6 +243,19 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
                 ModifiedAt = item.ModifiedAtUtc
             }).ToList();
         });
+    }
+
+    private async Task<long> CalculateDirectorySizeCoreAsync(string relativePath, CancellationToken cancellationToken)
+    {
+        long total = 0;
+        foreach (var item in await _connection!.ListDetailedAsync(RemotePath(relativePath), cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            total = checked(total + (item.IsDirectory
+                ? await CalculateDirectorySizeCoreAsync(StripRoot(item.Path), cancellationToken)
+                : item.Size));
+        }
+        return total;
     }
 
     private async Task<OperationResult> RunWriteAsync(Func<OneDriveConnection, Task> action, string userError)

@@ -5,6 +5,8 @@ public record ToastMessage(string Id, string Text, ToastType Type, DateTime Crea
     public int Progress { get; set; }
     public DateTime CreatedAt { get; set; } = CreatedAt;
     public Func<Task>? OnDismiss { get; set; }
+    /// <summary>Optional native-browser tooltip shown for additional toast details.</summary>
+    public string? Tooltip { get; init; }
 }
 
 public class ToastService
@@ -13,10 +15,15 @@ public class ToastService
     public IReadOnlyList<ToastMessage> Toasts => _toasts;
     public event Action? OnChanged;
 
-    public string Show(string text, ToastType type = ToastType.Info, Func<Task>? onDismiss = null)
+    public string Show(string text, ToastType type = ToastType.Info, Func<Task>? onDismiss = null,
+        string? tooltip = null)
     {
         var id = Guid.NewGuid().ToString();
-        _toasts.Add(new ToastMessage(id, text, type, DateTime.Now) { OnDismiss = onDismiss });
+        _toasts.Add(new ToastMessage(id, text, type, DateTime.Now)
+        {
+            OnDismiss = onDismiss,
+            Tooltip = tooltip
+        });
         OnChanged?.Invoke();
         return id;
     }

@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Helpers;
+using Kaimo_File_Server.Web.Services;
 using Xunit;
 
 namespace Kaimo_File_Server.Tests;
@@ -41,7 +42,47 @@ public sealed class FileBrowserViewModelContractTests
         Assert.False(browser.Capabilities.HasVersions);
         Assert.Null(browser.GetDirectorySize(browser.Items[0]));
         Assert.Empty(await browser.GetFileVersionsAsync(browser.Items[0]));
+        Assert.Null(await browser.CalculateDirectorySizeAsync(browser.Items[0]));
         Assert.Equal(0, browser.GetAclCount("projects/active"));
+    }
+
+    [Fact]
+    public void Clipboard_PreservesSourceAcrossBrowserRoutes_AndCanBeCleared()
+    {
+        var clipboard = new FileBrowserClipboardService();
+        var source = new BrowserShareInfo(Guid.NewGuid(), "Local", BrowserShareKind.Local);
+        var item = new FileMetadata { Name = "report.txt", Path = "report.txt" };
+
+        clipboard.Set(source, [item], deleteOnPaste: true);
+        clipboard.SetToastId("clipboard-toast");
+
+        Assert.Equal(source, clipboard.Source);
+        Assert.Single(clipboard.Items);
+        Assert.True(clipboard.DeleteOnPaste);
+        Assert.Equal("clipboard-toast", clipboard.ToastId);
+
+        clipboard.Clear();
+
+        Assert.Null(clipboard.Source);
+        Assert.Empty(clipboard.Items);
+        Assert.False(clipboard.DeleteOnPaste);
+        Assert.Null(clipboard.ToastId);
+    }
+
+    [Fact]
+    public async Task CrossShareTransfer_RejectsCutFromVirtualSourceBeforeAnyBackendAccess()
+    {
+        // Dependencies are intentionally null: this policy is evaluated before
+        // authentication or storage is touched, preventing a virtual cut outright.
+        var transfer = new CrossShareTransferService(null!, null!, null!, null!, null!, null!, null!, null!, null!);
+        var remote = new BrowserShareInfo(Guid.NewGuid(), "Virtual", BrowserShareKind.Remote, "onedrive");
+        var local = new BrowserShareInfo(Guid.NewGuid(), "Local", BrowserShareKind.Local);
+
+        var result = await transfer.TransferAsync(remote,
+            [new FileMetadata { Name = "document.txt", Path = "document.txt" }], local, "", cut: true);
+
+        Assert.False(result.Success);
+        Assert.Equal("Items from a virtual share can only be copied.", result.Error);
     }
 
     private sealed class TestRemoteFileBrowserViewModel : RemoteFileBrowserViewModelBase

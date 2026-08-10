@@ -114,6 +114,8 @@ builder.Services.AddSingleton<ICloudAccessSettingsStore, CloudAccessSettingsStor
 builder.Services.AddSingleton<CloudAccessDirectoryCache>();
 builder.Services.AddScoped<CloudAccessAuthorizationService>();
 builder.Services.AddScoped<CloudToLocalTransferService>();
+builder.Services.AddScoped<CrossShareTransferService>();
+builder.Services.AddScoped<FileBrowserClipboardService>();
 
 
 

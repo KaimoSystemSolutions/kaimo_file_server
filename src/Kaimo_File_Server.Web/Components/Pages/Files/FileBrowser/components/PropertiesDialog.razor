@@ -128,6 +128,8 @@
     private string? _ownerName;
     private Guid? _itemId;
     private bool _showSecurityTab;
+    private long? _directorySize;
+    private bool _directorySizeResolved;
 
     /// <summary>Opens the properties dialog for a single file or directory.</summary>
     public async Task Open(FileMetadata target)
@@ -139,6 +141,8 @@
         _ownerName = null;
         _itemId = null;
         _show = true;
+        _directorySize = target.IsDirectory ? VM.GetDirectorySize(target) : target.Size;
+        _directorySizeResolved = !target.IsDirectory || _directorySize.HasValue;
 
         // Location = share name + share-relative parent folder (empty at the root).
         var parent = Kaimo_File_Server.Core.Helpers.ShareRelativePath.GetParent(_relativePath);
@@ -146,6 +150,14 @@
         _location = string.IsNullOrEmpty(parent) ? shareName : $"{shareName}/{parent}";
 
         StateHasChanged();
+
+        if (target.IsDirectory && !_directorySizeResolved)
+        {
+            _directorySize = await VM.CalculateDirectorySizeAsync(target);
+            _directorySizeResolved = true;
+            if (_target == target && _show)
+                StateHasChanged();
+        }
 
         // Identity/owner live in the database, not in the filesystem listing (whose
         // Id/OwnerId are always empty). Resolve the persisted record after the first
@@ -180,8 +192,9 @@
     {
         if (_target is null) return "";
 
-        long? bytes = _target.IsDirectory ? VM.GetDirectorySize(_target) : _target.Size;
-        if (bytes is null) return Resources.Web_Properties_Calculating;
+        long? bytes = _target.IsDirectory ? _directorySize : _target.Size;
+        if (bytes is null)
+            return _directorySizeResolved ? T("Web_Properties_SizeUnavailable") : Resources.Web_Properties_Calculating;
 
         return $"{FormatHelper.FormatFileSize(bytes.Value)} " +
                string.Format(Resources.Web_Properties_Bytes, bytes.Value.ToString("N0"));
@@ -195,4 +208,6 @@
 
     private static string FormatTs(DateTime utc)
         => utc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss");
+
+    private static string T(string key) => Resources.ResourceManager.GetString(key) ?? key;
 }

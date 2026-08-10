@@ -55,6 +55,12 @@ public interface IFileBrowserViewModel
     Task LoadAclCountsAsync() => Task.CompletedTask;
     int GetAclCount(string path) => 0;
     long? GetDirectorySize(FileMetadata directory) => null;
+    /// <summary>
+    /// Calculates a directory's complete size when the backend cannot provide it
+    /// from its listing metadata (for example a virtual provider).
+    /// </summary>
+    Task<long?> CalculateDirectorySizeAsync(FileMetadata directory, CancellationToken cancellationToken = default)
+        => Task.FromResult(GetDirectorySize(directory));
 
     Task<List<FileVersion>> GetFileVersionsAsync(FileMetadata file)
         => Task.FromResult(new List<FileVersion>());
