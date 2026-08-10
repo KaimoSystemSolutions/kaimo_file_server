@@ -36,15 +36,12 @@ public interface IOneDriveDeviceAuthorizationService
 public sealed class OneDriveDeviceAuthorizationService : IOneDriveDeviceAuthorizationService
 {
     private readonly ConcurrentDictionary<string, DeviceSession> _sessions = new(StringComparer.Ordinal);
-    private readonly IConfiguration _configuration;
     private readonly IHttpClientFactory _httpClientFactory;
 
     /// <summary>Creates the coordinator with application configuration and managed HTTP clients.</summary>
     public OneDriveDeviceAuthorizationService(
-        IConfiguration configuration,
         IHttpClientFactory httpClientFactory)
     {
-        _configuration = configuration;
         _httpClientFactory = httpClientFactory;
     }
 
@@ -55,15 +52,12 @@ public sealed class OneDriveDeviceAuthorizationService : IOneDriveDeviceAuthoriz
         string authorizationTicket)
     {
         RemoveExpiredSessions();
-        var clientId = RequireClientId();
-        var tenant = OneDriveConnection.ValidateTenant(
-            _configuration["OneDriveOAuth:Tenant"] ?? "common");
         var client = _httpClientFactory.CreateClient(nameof(OneDriveDeviceAuthorizationService));
         using var response = await client.PostAsync(
-            OneDriveOAuthDefaults.DeviceCodeEndpoint(tenant),
+            OneDriveOAuthDefaults.DeviceCodeEndpoint,
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                ["client_id"] = clientId,
+                ["client_id"] = OneDriveOAuthDefaults.ClientId,
                 ["scope"] = OneDriveOAuthDefaults.Scope
             }));
         using var json = await ParseSuccessAsync(response);
@@ -137,16 +131,13 @@ public sealed class OneDriveDeviceAuthorizationService : IOneDriveDeviceAuthoriz
 
         try
         {
-            var clientId = RequireClientId();
-            var tenant = OneDriveConnection.ValidateTenant(
-                _configuration["OneDriveOAuth:Tenant"] ?? "common");
             var client = _httpClientFactory.CreateClient(nameof(OneDriveDeviceAuthorizationService));
             using var response = await client.PostAsync(
-                OneDriveOAuthDefaults.TokenEndpoint(tenant),
+                OneDriveOAuthDefaults.TokenEndpoint,
                 new FormUrlEncodedContent(new Dictionary<string, string>
                 {
                     ["grant_type"] = "urn:ietf:params:oauth:grant-type:device_code",
-                    ["client_id"] = clientId,
+                    ["client_id"] = OneDriveOAuthDefaults.ClientId,
                     ["device_code"] = session.DeviceCode
                 }));
             using var json = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
@@ -198,23 +189,6 @@ public sealed class OneDriveDeviceAuthorizationService : IOneDriveDeviceAuthoriz
             lock (session.SyncRoot)
                 session.IsPolling = false;
         }
-    }
-
-    /// <summary>
-    /// Reads and validates the public Entra application id. A client secret is
-    /// deliberately neither required nor accepted by this public-client flow.
-    /// </summary>
-    private string RequireClientId()
-    {
-        var clientId = _configuration["OneDriveOAuth:ClientId"];
-        if (string.IsNullOrWhiteSpace(clientId)
-            || string.Equals(clientId, "PASTE_APPLICATION_CLIENT_ID_HERE", StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                "OneDriveOAuth:ClientId must contain the Microsoft Entra Application (client) ID.");
-        }
-
-        return clientId;
     }
 
     /// <summary>Opportunistically removes expired device sessions before issuing a new one.</summary>

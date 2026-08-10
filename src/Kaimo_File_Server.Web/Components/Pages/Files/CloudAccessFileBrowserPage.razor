@@ -1,0 +1,15 @@
+@page "/files/access/{ShareId:guid}"
+@page "/files/access/{ShareId:guid}/{*SubPath}"
+@using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser
+@inject OneDriveCloudAccessFileBrowserViewModel RemoteViewModel
+
+<FileBrowser VM="RemoteViewModel"
+             ShareName="@ShareId.ToString()"
+             SubPath="@SubPath"
+             OverviewRoute="/files"
+             ShareRoute="@($"/files/access/{ShareId}")" />
+
+@code {
+    [Parameter] public Guid ShareId { get; set; }
+    [Parameter] public string? SubPath { get; set; }
+}

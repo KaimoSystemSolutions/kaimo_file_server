@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.DynamicHelpers;
+using Kaimo_File_Server.Web.Services;
 using Kaimo_File_Server.Web.Services.Https;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
@@ -25,6 +26,7 @@ public class SettingsViewModel
     private readonly IHttpsCertificateProvider _certProvider;
     private readonly ILoggingConfigStore _loggingStore;
     private readonly LoggingLevelConfigurationSource _loggingSource;
+    private readonly ICloudAccessSettingsStore _cloudAccessSettingsStore;
     private readonly ILogger<SettingsViewModel> _logger;
 
     public SettingsViewModel(
@@ -37,6 +39,7 @@ public class SettingsViewModel
         IHttpsCertificateProvider certProvider,
         ILoggingConfigStore loggingStore,
         LoggingLevelConfigurationSource loggingSource,
+        ICloudAccessSettingsStore cloudAccessSettingsStore,
         ILogger<SettingsViewModel> logger)
     {
         _config = config;
@@ -48,6 +51,7 @@ public class SettingsViewModel
         _certProvider = certProvider;
         _loggingStore = loggingStore;
         _loggingSource = loggingSource;
+        _cloudAccessSettingsStore = cloudAccessSettingsStore;
         _logger = logger;
     }
 
@@ -188,6 +192,10 @@ public class SettingsViewModel
     /// </summary>
     public int SessionRevalidationSeconds { get; set; } = SessionSecuritySettings.DefaultRevalidationSeconds;
 
+    /// <summary>Global Cloud Access runtime settings edited in the Settings UI.</summary>
+    public CloudAccessRuntimeSettings CloudAccessSettings { get; private set; }
+        = CloudAccessRuntimeSettings.Default();
+
     public static int MinSessionRevalidationSeconds => SessionSecuritySettings.MinRevalidationSeconds;
     public static int MaxSessionRevalidationSeconds => SessionSecuritySettings.MaxRevalidationSeconds;
 
@@ -226,19 +234,22 @@ public class SettingsViewModel
                     SessionSecuritySettings.RevalidationSecondsKey,
                     SessionSecuritySettings.DefaultRevalidationSeconds);
                 var loggingTask = _loggingStore.GetLevelAsync();
+                var cloudAccessSettingsTask = _cloudAccessSettingsStore.GetAsync();
 
                 await Task.WhenAll(
                     languageTask,
                     contextMenuTask,
                     passwordPolicyTask,
                     sessionSecurityTask,
-                    loggingTask);
+                    loggingTask,
+                    cloudAccessSettingsTask);
 
                 SelectedLanguage = await languageTask;
                 CtxConfig = await contextMenuTask;
                 PwPolicy = await passwordPolicyTask;
                 SessionRevalidationSeconds = await sessionSecurityTask;
                 LogLevel = await loggingTask;
+                CloudAccessSettings = await cloudAccessSettingsTask;
                 RefreshSystemInfo();
             }
 
@@ -507,6 +518,35 @@ public class SettingsViewModel
         {
             _logger.LogError(ex, "Failed to save session security setting");
             ErrorMessage = "Sitzungs-Einstellung konnte nicht gespeichert werden.";
+            return false;
+        }
+    }
+
+    public async Task<bool> SaveCloudAccessSettingsAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!CanManageSettings)
+        {
+            ErrorMessage = Resources.Web_Settings_NoPermissionChange;
+            return false;
+        }
+
+        CloudAccessSettings.Normalize();
+        try
+        {
+            await _cloudAccessSettingsStore.SetAsync(CloudAccessSettings);
+            _logger.LogInformation(
+                "Cloud Access directory cache TTL set to {Seconds}s",
+                CloudAccessSettings.DirectoryCacheSeconds);
+            SuccessMessage = R("Web_Settings_CloudAccess_CacheSaved");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save Cloud Access settings");
+            ErrorMessage = R("Web_Settings_CloudAccess_CacheSaveFailed");
             return false;
         }
     }
@@ -975,4 +1015,6 @@ public class SettingsViewModel
         ErrorMessage = null;
         SuccessMessage = null;
     }
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 }

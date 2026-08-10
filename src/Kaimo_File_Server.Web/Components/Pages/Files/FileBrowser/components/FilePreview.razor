@@ -150,11 +150,13 @@
         _previewLoading = true;
         StateHasChanged();
 
-
+        var providerDownloadUrl = await VM.GetDownloadUrlAsync(file);
         var result = await VM.ReadFileForPreviewAsync(file);
         if (result is null)
         {
-            _showFilePreview = false;
+            _previewTooLarge = file.Size > VM.GetMaxPreviewSizeBytes();
+            _downloadUrl = providerDownloadUrl ?? "";
+            _previewKind = PreviewKind.Unsupported;
             _previewLoading = false;
             StateHasChanged();
             return;
@@ -168,7 +170,7 @@
             "filePreview.preparePreview", data, contentType, kind.ToString());
         sw.Stop();
 
-        _downloadUrl = urls.DownloadUrl ?? "";
+        _downloadUrl = providerDownloadUrl ?? urls.DownloadUrl ?? "";
         _displayUrl = urls.DisplayUrl ?? "";
 
         // No inline content produced (e.g. docx conversion failed) -> download fallback.

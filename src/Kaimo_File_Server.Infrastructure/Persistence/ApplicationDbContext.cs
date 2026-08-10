@@ -24,6 +24,9 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<ShareDefinition> ShareDefinitions { get; set; }
         public DbSet<FileVersion> FileVersions { get; set; }
         public DbSet<SambaLifecycleEventReceipt> SambaLifecycleEventReceipts { get; set; }
+        public DbSet<CloudAccessConnection> CloudAccessConnections { get; set; }
+        public DbSet<CloudAccessShare> CloudAccessShares { get; set; }
+        public DbSet<CloudAccessGrant> CloudAccessGrants { get; set; }
 
         // -- Departments & Scoped Roles --
         public DbSet<Department> Departments { get; set; }
@@ -172,6 +175,45 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.LastError).HasMaxLength(1000);
                 entity.HasIndex(e => e.CompletedAtUtc);
                 entity.HasIndex(e => e.LeaseUntilUtc);
+            });
+
+            modelBuilder.Entity<CloudAccessConnection>(entity =>
+            {
+                entity.ToTable("cloud_access_connections");
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Provider).IsRequired().HasMaxLength(50);
+                entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+                entity.Property(x => x.AccountDisplayName).HasMaxLength(300);
+                entity.Property(x => x.AccountEmail).HasMaxLength(320);
+                entity.Property(x => x.ProtectedCredentials).HasColumnType("text");
+                entity.Property(x => x.State).HasConversion<int>();
+                entity.Property(x => x.LastError).HasMaxLength(2000);
+                entity.HasIndex(x => x.Name).IsUnique();
+                entity.HasIndex(x => x.DepartmentId);
+            });
+
+            modelBuilder.Entity<CloudAccessShare>(entity =>
+            {
+                entity.ToTable("cloud_access_shares");
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+                entity.Property(x => x.Description).HasMaxLength(1000);
+                entity.Property(x => x.RemoteRootPath).IsRequired().HasMaxLength(2000);
+                entity.Property(x => x.RemoteRootItemId).HasMaxLength(500);
+                entity.HasIndex(x => x.Name).IsUnique();
+                entity.HasIndex(x => x.DepartmentId);
+                entity.HasIndex(x => x.ConnectionId);
+                entity.HasOne<CloudAccessConnection>().WithMany().HasForeignKey(x => x.ConnectionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<CloudAccessGrant>(entity =>
+            {
+                entity.ToTable("cloud_access_grants");
+                entity.HasKey(x => new { x.ShareId, x.PrincipalId });
+                entity.HasIndex(x => x.PrincipalId);
+                entity.HasOne<CloudAccessShare>().WithMany().HasForeignKey(x => x.ShareId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             // -- Departments --

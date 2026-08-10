@@ -2,6 +2,9 @@ namespace Kaimo_File_Server.Web.Components.Pages.Settings;
 
 public partial class Settings
 {
+    private static string R(string key)
+        => Kaimo_File_Server.Core.Language.Resources.ResourceManager.GetString(key) ?? key;
+
     private SettingsTab _activeTab = SettingsTab.Language;
     private bool _initialLoadComplete;
 
@@ -56,6 +59,7 @@ internal enum SettingsTab
     Memory,
     DataServices,
     Search,
+    CloudAccess,
     Logging,
     Certificate
 }

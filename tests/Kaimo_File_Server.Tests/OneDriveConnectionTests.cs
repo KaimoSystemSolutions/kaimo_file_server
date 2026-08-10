@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text;
 using Kaimo_File_Server.Infrastructure.Clouds;
-using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace Kaimo_File_Server.Tests;
@@ -28,7 +27,7 @@ public sealed class OneDriveConnectionTests
         });
         var data = CreateData();
         using var http = new HttpClient(handler);
-        var connection = new OneDriveConnection(data, CreateConfiguration(), http);
+        var connection = new OneDriveConnection(data, http);
 
         var account = await connection.GetAccountInfoAsync();
 
@@ -71,7 +70,7 @@ public sealed class OneDriveConnectionTests
                 """));
         });
         using var http = new HttpClient(handler);
-        var connection = new OneDriveConnection(CreateData(), CreateConfiguration(), http);
+        var connection = new OneDriveConnection(CreateData(), http);
 
         var items = await connection.ListAsync("/Team Files/#Current");
 
@@ -99,7 +98,7 @@ public sealed class OneDriveConnectionTests
         var handler = new StubHttpMessageHandler(_ =>
             throw new InvalidOperationException("A cancelled request must not reach HTTP."));
         using var http = new HttpClient(handler);
-        var connection = new OneDriveConnection(CreateData(), CreateConfiguration(), http);
+        var connection = new OneDriveConnection(CreateData(), http);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
@@ -144,7 +143,7 @@ public sealed class OneDriveConnectionTests
             return Json(HttpStatusCode.OK, "{}");
         });
         using var http = new HttpClient(handler);
-        var connection = new OneDriveConnection(CreateData(), CreateConfiguration(), http);
+        var connection = new OneDriveConnection(CreateData(), http);
         await using var data = new MemoryStream(new byte[10 * 1024 * 1024 + 1]);
 
         await connection.UploadAsync("large.bin", data, new DateTime(2026, 8, 3, 12, 0, 0, DateTimeKind.Utc));
@@ -155,27 +154,85 @@ public sealed class OneDriveConnectionTests
         await connection.Dispose();
     }
 
-    [Theory]
-    [InlineData("common")]
-    [InlineData("organizations")]
-    [InlineData("consumers")]
-    [InlineData("d917bd9f-c0f1-4e26-a9d5-94aa5c43b218")]
-    public void ValidateTenant_AcceptsSupportedMicrosoftAuthorities(string tenant)
-        => Assert.Equal(tenant, OneDriveConnection.ValidateTenant(tenant));
+    [Fact]
+    public async Task ResolveFolderByIdAsync_TracksFolderAfterExternalRename()
+    {
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            if (request.RequestUri!.Host == "login.microsoftonline.com")
+                return Task.FromResult(Json(HttpStatusCode.OK, """{"access_token":"token","expires_in":3600}"""));
+            Assert.EndsWith("/items/folder-id", request.RequestUri.AbsolutePath);
+            return Task.FromResult(Json(HttpStatusCode.OK,
+                """{"id":"folder-id","name":"Renamed","folder":{},"parentReference":{"path":"/drive/root:/Teams/Alpha"}}"""));
+        });
+        using var http = new HttpClient(handler);
+        await using var connection = new OneDriveConnection(CreateData(), http);
+
+        var folder = await connection.ResolveFolderByIdAsync("folder-id");
+
+        Assert.Equal("folder-id", folder.ProviderId);
+        Assert.Equal("Teams/Alpha/Renamed", folder.Path);
+    }
 
     [Fact]
-    public void ValidateTenant_RejectsArbitraryAuthorityPath()
-        => Assert.Throws<InvalidOperationException>(() =>
-            OneDriveConnection.ValidateTenant("common/oauth2/evil"));
+    public async Task MoveItemAsync_UsesProviderSidePatch()
+    {
+        var graphRequests = new List<(HttpMethod Method, string Path, string? Body)>();
+        var handler = new StubHttpMessageHandler(async request =>
+        {
+            if (request.RequestUri!.Host == "login.microsoftonline.com")
+                return Json(HttpStatusCode.OK, """{"access_token":"token","expires_in":3600}""");
+            var body = request.Content is null ? null : await request.Content.ReadAsStringAsync();
+            graphRequests.Add((request.Method, request.RequestUri.AbsolutePath, body));
+            if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath.Contains("root:/docs/a.txt"))
+                return Json(HttpStatusCode.OK, """{"id":"source-id"}""");
+            if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath.EndsWith("/drive/root"))
+                return Json(HttpStatusCode.OK, """{"id":"root-id"}""");
+            return Json(HttpStatusCode.OK, "{}");
+        });
+        using var http = new HttpClient(handler);
+        await using var connection = new OneDriveConnection(CreateData(), http);
 
-    private static IConfiguration CreateConfiguration()
-        => new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
+        await connection.MoveItemAsync("docs/a.txt", "a-renamed.txt");
+
+        var patchRequest = Assert.Single(graphRequests, x => x.Method == HttpMethod.Patch);
+        Assert.EndsWith("/items/source-id", patchRequest.Path);
+        Assert.Contains("a-renamed.txt", patchRequest.Body);
+        Assert.Contains("root-id", patchRequest.Body);
+    }
+
+    [Fact]
+    public async Task CopyItemAsync_WaitsForProviderSideMonitorCompletion()
+    {
+        var monitorCalls = 0;
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            if (request.RequestUri!.Host == "login.microsoftonline.com")
+                return Task.FromResult(Json(HttpStatusCode.OK, """{"access_token":"token","expires_in":3600}"""));
+            if (request.RequestUri.Host == "tenant.sharepoint.com")
             {
-                ["OneDriveOAuth:ClientId"] = "client-id",
-                ["OneDriveOAuth:Tenant"] = "common"
-            })
-            .Build();
+                monitorCalls++;
+                return Task.FromResult(Json(HttpStatusCode.OK, """{"percentageComplete":100}"""));
+            }
+            if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath.Contains("root:/docs/a.txt"))
+                return Task.FromResult(Json(HttpStatusCode.OK, """{"id":"source-id"}"""));
+            if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath.EndsWith("/drive/root"))
+                return Task.FromResult(Json(HttpStatusCode.OK, """{"id":"root-id"}"""));
+            if (request.Method == HttpMethod.Post && request.RequestUri.AbsolutePath.EndsWith("/copy"))
+            {
+                var accepted = Json(HttpStatusCode.Accepted, "{}");
+                accepted.Headers.Location = new Uri("https://tenant.sharepoint.com/_api/v2.0/monitor/id");
+                return Task.FromResult(accepted);
+            }
+            throw new InvalidOperationException($"Unexpected request {request.Method} {request.RequestUri}");
+        });
+        using var http = new HttpClient(handler);
+        await using var connection = new OneDriveConnection(CreateData(), http);
+
+        await connection.CopyItemAsync("docs/a.txt", "a-copy.txt");
+
+        Assert.Equal(1, monitorCalls);
+    }
 
     private static Dictionary<string, string> CreateData()
         => new()

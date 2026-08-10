@@ -1,0 +1,508 @@
+@page "/cloud-access"
+@using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Domain.Identity
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.Pages.CloudSync.Components
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject CloudAccessViewModel VM
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject AssetProvider Assets
+
+<PageTitle>@R("Web_CloudAccess_Title") - Kaimo Files</PageTitle>
+
+<div class="page-header cloud-access-header">
+    <div>
+        <h1>@R("Web_CloudAccess_Title")</h1>
+        <p class="subtitle">@R("Web_CloudAccess_Subtitle")</p>
+    </div>
+    @if (VM.CanManage)
+    {
+        <div class="page-header-actions">
+            <button class="btn-secondary" type="button" @onclick="ToggleConnectionForm">
+                @Assets.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                <span>@R("Web_CloudAccess_AddConnection")</span>
+            </button>
+            <button class="btn-primary" type="button" disabled="@(!VM.Connections.Any(IsReady))" @onclick="ToggleShareForm">
+                @Assets.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                <span>@R("Web_CloudAccess_AddShare")</span>
+            </button>
+        </div>
+    }
+</div>
+
+@if (VM.IsLoading)
+{
+    <div class="loading-state"><div class="spinner"></div><p>@R("Web_CloudAccess_Loading")</p></div>
+}
+else if (!VM.CanManage)
+{
+    <div class="error-banner">@R("Web_CloudAccess_NoPermission")</div>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(_error ?? VM.ErrorMessage))
+    {
+        <div class="error-banner">@(_error ?? VM.ErrorMessage)</div>
+    }
+
+    @if (_showConnectionForm)
+    {
+        <section class="create-form-card cloud-access-create-card">
+            <div class="detail-header">
+                <h3>@R("Web_CloudAccess_AddConnection")</h3>
+                <span class="detail-subtitle">@R("Web_CloudAccess_ConnectionHelp")</span>
+            </div>
+            <div class="cloud-access-form">
+                <label>
+                    <span class="detail-label">@R("Web_CloudAccess_Provider")</span>
+                    <select class="edit-input" @bind="_connectionProvider">
+                        <option value="">@R("Web_CloudAccess_Provider_Select")</option>
+                        <option value="onedrive">Microsoft OneDrive</option>
+                    </select>
+                </label>
+                <label>
+                    <span class="detail-label">@R("Web_CloudAccess_ConnectionName")</span>
+                    <input class="edit-input" @bind="_connectionName" @bind:event="oninput" maxlength="200" />
+                </label>
+                <label>
+                    <span class="detail-label">@R("Web_CloudAccess_Department")</span>
+                    <select class="edit-input" @bind="_connectionDepartmentId">
+                        <option value="@Guid.Empty">@R("Web_CloudAccess_Select")</option>
+                        @foreach (var department in VM.ManageableDepartments)
+                        {
+                            <option value="@department.Id">@department.Name</option>
+                        }
+                    </select>
+                </label>
+            </div>
+            <div class="detail-actions cloud-access-form-actions">
+                <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CloseConnectionForm">@Resources.Web_Button_Cancel</button>
+                <button class="btn-primary" type="button" disabled="@(_busy || !CanConnect)" @onclick="ConnectAsync">@R("Web_CloudAccess_Connect")</button>
+            </div>
+        </section>
+    }
+
+    @if (_showShareForm)
+    {
+        <section class="create-form-card cloud-access-create-card">
+            <div class="detail-header">
+                <h3>@R("Web_CloudAccess_AddShare")</h3>
+                <span class="detail-subtitle">@R("Web_CloudAccess_CreateShareHelp")</span>
+            </div>
+            <div class="cloud-access-form">
+                <label>
+                    <span class="detail-label">@R("Web_CloudAccess_Connection")</span>
+                    <select class="edit-input" value="@_shareConnectionId" @onchange="ConnectionChangedAsync">
+                        <option value="@Guid.Empty">@R("Web_CloudAccess_Select")</option>
+                        @foreach (var connection in VM.Connections.Where(IsReady))
+                        {
+                            <option value="@connection.Id">@ConnectionDisplay(connection)</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    <span class="detail-label">@R("Web_CloudAccess_ShareName")</span>
+                    <input class="edit-input" @bind="_shareName" @bind:event="oninput" maxlength="200" />
+                </label>
+                <label>
+                    <span class="detail-label">@R("Web_CloudAccess_AccessMode")</span>
+                    <select class="edit-input" @bind="_readOnly">
+                        <option value="false">@R("Web_CloudAccess_ReadWrite")</option>
+                        <option value="true">@R("Web_CloudAccess_ReadOnly")</option>
+                    </select>
+                </label>
+                <label class="cloud-access-folder-field">
+                    <span class="detail-label">@R("Web_CloudAccess_RemoteFolder")</span>
+                    <div class="cloud-access-path">
+                        <input class="edit-input" value="@_remoteRoot" readonly />
+                        <button class="btn-secondary" type="button" disabled="@(_shareConnectionId == Guid.Empty)" @onclick="OpenPickerAsync">@R("Web_CloudAccess_Browse")</button>
+                    </div>
+                </label>
+            </div>
+
+            @if (_shareConnectionId != Guid.Empty)
+            {
+                <div class="detail-section cloud-access-principal-editor">
+                    <span class="detail-label">@R("Web_CloudAccess_Access")</span>
+                    <p class="share-help-text">@R("Web_CloudAccess_AccessHelp")</p>
+                    <select class="edit-input"
+                            aria-label="@R("Web_CloudAccess_Access")"
+                            value="@Guid.Empty"
+                            @onchange="AddCreatePrincipal">
+                        <option value="@Guid.Empty">@R("Web_CloudAccess_PrincipalPlaceholder")</option>
+                        @foreach (var principal in AvailableUnselectedPrincipals(_principalIds))
+                        {
+                            <option value="@principal.Id">@PrincipalDisplay(principal)</option>
+                        }
+                    </select>
+                    @PrincipalList(_principalIds, RemoveCreatePrincipal)
+                </div>
+            }
+
+            <div class="detail-actions cloud-access-form-actions">
+                <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CloseShareForm">@Resources.Web_Button_Cancel</button>
+                <button class="btn-primary" type="button" disabled="@(_busy || !CanCreateShare)" @onclick="CreateShareAsync">@Resources.Web_Button_Create</button>
+            </div>
+        </section>
+    }
+
+    <div class="admin-content cloud-access-workspace">
+        <section class="cloud-access-share-list" aria-label="@R("Web_CloudAccess_Shares")">
+            <div class="cloud-access-list-header">@R("Web_CloudAccess_Shares")</div>
+            @if (VM.Shares.Count == 0)
+            {
+                <div class="detail-empty"><p>@R("Web_CloudAccess_NoShares")</p></div>
+            }
+            else
+            {
+                @foreach (var share in VM.Shares)
+                {
+                    <button class="cloud-access-share-row @(_selectedShare?.Id == share.Id ? "cloud-access-share-row--selected" : "")"
+                            type="button" @onclick="() => SelectShareAsync(share)" @ondblclick="() => OpenShare(share)">
+                        @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 22, Height: 22))
+                        <span><strong>@share.Name</strong><small>@share.RemoteRootPath</small></span>
+                        <span class="share-state">@(share.IsReadOnly ? R("Web_CloudAccess_ReadOnly") : R("Web_CloudAccess_ReadWrite"))</span>
+                    </button>
+                }
+            }
+        </section>
+
+        <aside class="admin-detail cloud-access-detail-pane">
+            @if (_selectedShare is not null)
+            {
+                <div class="detail-header">
+                    <h3>@_selectedShare.Name</h3>
+                    <span class="detail-subtitle">@R("Web_CloudAccess_Title")</span>
+                </div>
+                <div class="detail-tabs" role="tablist">
+                    <button class="detail-tab @(_activeTab == CloudAccessTab.General ? "detail-tab--active" : "")" type="button" role="tab"
+                            aria-selected="@(_activeTab == CloudAccessTab.General)" @onclick="() => SwitchTabAsync(CloudAccessTab.General)">
+                        @Assets.SVG("settings.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @R("Web_CloudAccess_TabGeneral")
+                    </button>
+                    <button class="detail-tab @(_activeTab == CloudAccessTab.Access ? "detail-tab--active" : "")" type="button" role="tab"
+                            aria-selected="@(_activeTab == CloudAccessTab.Access)" @onclick="() => SwitchTabAsync(CloudAccessTab.Access)">
+                        @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @R("Web_CloudAccess_TabAccess")
+                    </button>
+                </div>
+
+                @if (_activeTab == CloudAccessTab.General)
+                {
+                    var connection = VM.Connections.FirstOrDefault(x => x.Id == _selectedShare.ConnectionId);
+                    <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_Connection")</span><span class="detail-value">@(connection?.Name ?? "—")</span></div>
+                    <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_Account")</span><span class="detail-value">@(connection?.AccountEmail ?? connection?.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</span></div>
+                    <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_RemoteFolder")</span><span class="detail-value">@_selectedShare.RemoteRootPath</span></div>
+                    <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_AccessMode")</span><span class="detail-value">@(_selectedShare.IsReadOnly ? R("Web_CloudAccess_ReadOnly") : R("Web_CloudAccess_ReadWrite"))</span></div>
+                    <div class="detail-actions">
+                        <button class="btn-primary" type="button" @onclick="() => OpenShare(_selectedShare)">@R("Web_CloudAccess_Open")</button>
+                        <button class="btn-danger-outline" type="button" @onclick="() => DeleteShareAsync(_selectedShare)">@Resources.Web_Action_Delete</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="detail-section cloud-access-principal-editor">
+                        <p class="share-help-text">@R("Web_CloudAccess_AccessHelp")</p>
+                        <select class="edit-input"
+                                aria-label="@R("Web_CloudAccess_Access")"
+                                value="@Guid.Empty"
+                                @onchange="AddGrantPrincipal">
+                            <option value="@Guid.Empty">@R("Web_CloudAccess_PrincipalPlaceholder")</option>
+                            @foreach (var principal in AvailableUnselectedPrincipals(_grantPrincipalIds))
+                            {
+                                <option value="@principal.Id">@PrincipalDisplay(principal)</option>
+                            }
+                        </select>
+                        @PrincipalList(_grantPrincipalIds, RemoveGrantPrincipal)
+                        <div class="detail-actions">
+                            <button class="btn-primary" type="button" disabled="@_busy" @onclick="SaveGrantsAsync">@R("Web_CloudAccess_SaveAccess")</button>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="detail-empty">
+                    @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 48, Height: 48, Color: "var(--text-tertiary)"))
+                    <p>@R("Web_CloudAccess_DetailHint")</p>
+                </div>
+            }
+        </aside>
+    </div>
+
+    <section class="cloud-access-connections">
+        <h3>@R("Web_CloudAccess_Connections")</h3>
+        @if (VM.Connections.Count == 0)
+        {
+            <p class="detail-subtitle">@R("Web_CloudAccess_NoConnections")</p>
+        }
+        else
+        {
+            <div class="cloud-access-connection-grid">
+                @foreach (var connection in VM.Connections)
+                {
+                    <article class="cloud-access-connection-card">
+                        <div>
+                            <strong>@connection.Name</strong>
+                            <small>Microsoft OneDrive · @ConnectionState(connection)</small>
+                            <small>@(connection.AccountEmail ?? connection.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</small>
+                        </div>
+                        <div class="cloud-access-connection-actions">
+                            <button class="btn-secondary" type="button" @onclick="() => AuthorizeConnectionAsync(connection)">@(IsReady(connection) ? R("Web_CloudAccess_Reauthorize") : R("Web_CloudAccess_Authorize"))</button>
+                            <button class="btn-danger-outline" type="button" @onclick="() => DeleteConnectionAsync(connection)">@Resources.Web_Action_Delete</button>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+}
+
+<DirectoryPickerDialog IsOpen="@_pickerOpen"
+                       IsRemote="true"
+                       IsLoading="@_pickerLoading"
+                       Title="@R("Web_CloudAccess_FolderPickerTitle")"
+                       CurrentPath="@_pickerPath"
+                       Items="@_pickerItems"
+                       ErrorMessage="@_pickerError"
+                       OnNavigate="NavigatePickerAsync"
+                       OnSelected="SelectPickerAsync"
+                       OnClosed="ClosePicker" />
+
+@code {
+    private bool _showConnectionForm;
+    private bool _showShareForm;
+    private string _connectionProvider = "";
+    private string _connectionName = "";
+    private Guid _connectionDepartmentId;
+    private Guid _shareConnectionId;
+    private string _shareName = "";
+    private string _remoteRoot = "";
+    private bool _readOnly;
+    private readonly HashSet<Guid> _principalIds = [];
+    private bool _busy;
+    private string? _error;
+    private bool _pickerOpen;
+    private bool _pickerLoading;
+    private string _pickerPath = "/";
+    private string? _pickerError;
+    private IReadOnlyList<CloudDirectoryItem> _pickerItems = [];
+    private CloudAccessShare? _selectedShare;
+    private CloudAccessTab _activeTab = CloudAccessTab.General;
+    private HashSet<Guid> _grantPrincipalIds = [];
+
+    private bool CanConnect => _connectionProvider == "onedrive"
+                               && !string.IsNullOrWhiteSpace(_connectionName)
+                               && _connectionDepartmentId != Guid.Empty;
+    private bool CanCreateShare => _shareConnectionId != Guid.Empty
+                                   && !string.IsNullOrWhiteSpace(_shareName)
+                                   && !string.IsNullOrWhiteSpace(_remoteRoot);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await VM.LoadAsync();
+        StateHasChanged();
+    }
+
+    private void ToggleConnectionForm()
+    {
+        _showConnectionForm = !_showConnectionForm;
+        _showShareForm = false;
+        _error = null;
+    }
+
+    private void CloseConnectionForm() => _showConnectionForm = false;
+
+    private void ToggleShareForm()
+    {
+        _showShareForm = !_showShareForm;
+        _showConnectionForm = false;
+        _error = null;
+    }
+
+    private void CloseShareForm() => _showShareForm = false;
+
+    private async Task ConnectAsync() => await RunAsync(async () =>
+    {
+        if (_connectionProvider != "onedrive")
+            throw new ArgumentException(R("Web_CloudAccess_Provider_Select"));
+        var url = await VM.CreateOneDriveConnectionAsync(_connectionName, _connectionDepartmentId);
+        Nav.NavigateTo(url, forceLoad: true);
+    });
+
+    private async Task ConnectionChangedAsync(ChangeEventArgs e)
+    {
+        _shareConnectionId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : Guid.Empty;
+        _remoteRoot = "";
+        _principalIds.Clear();
+        var connection = VM.Connections.FirstOrDefault(x => x.Id == _shareConnectionId);
+        if (connection is not null)
+            await RunAsync(() => VM.LoadPrincipalsAsync(connection.DepartmentId));
+    }
+
+    private async Task CreateShareAsync() => await RunAsync(async () =>
+    {
+        await VM.CreateShareAsync(_shareConnectionId, _shareName, _remoteRoot, _readOnly, _principalIds);
+        _shareName = "";
+        _remoteRoot = "";
+        _principalIds.Clear();
+        _showShareForm = false;
+    });
+
+    private async Task OpenPickerAsync()
+    {
+        _pickerOpen = true;
+        _pickerPath = "/";
+        await LoadPickerAsync();
+    }
+
+    private async Task NavigatePickerAsync(string path)
+    {
+        _pickerPath = path;
+        await LoadPickerAsync();
+    }
+
+    private Task SelectPickerAsync(string path)
+    {
+        _remoteRoot = path;
+        _pickerOpen = false;
+        return Task.CompletedTask;
+    }
+
+    private Task ClosePicker()
+    {
+        _pickerOpen = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task LoadPickerAsync()
+    {
+        _pickerLoading = true;
+        _pickerError = null;
+        try
+        {
+            _pickerItems = await VM.ListOneDriveFoldersAsync(_shareConnectionId, _pickerPath);
+        }
+        catch (Exception exception)
+        {
+            _pickerError = exception.Message;
+            _pickerItems = [];
+        }
+        finally
+        {
+            _pickerLoading = false;
+        }
+    }
+
+    private async Task SelectShareAsync(CloudAccessShare share)
+    {
+        _selectedShare = share;
+        _activeTab = CloudAccessTab.General;
+        var connection = VM.Connections.FirstOrDefault(x => x.Id == share.ConnectionId);
+        if (connection is not null)
+            await VM.LoadPrincipalsAsync(connection.DepartmentId);
+    }
+
+    private async Task SwitchTabAsync(CloudAccessTab tab)
+    {
+        _activeTab = tab;
+        if (tab == CloudAccessTab.Access && _selectedShare is not null)
+            _grantPrincipalIds = await VM.LoadShareGrantsAsync(_selectedShare.Id);
+    }
+
+    private void AddCreatePrincipal(ChangeEventArgs e) => AddPrincipal(e, _principalIds);
+    private void AddGrantPrincipal(ChangeEventArgs e) => AddPrincipal(e, _grantPrincipalIds);
+    private static void AddPrincipal(ChangeEventArgs e, HashSet<Guid> target)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id) && id != Guid.Empty)
+            target.Add(id);
+    }
+
+    private void RemoveCreatePrincipal(Guid id) => _principalIds.Remove(id);
+    private void RemoveGrantPrincipal(Guid id) => _grantPrincipalIds.Remove(id);
+
+    private async Task SaveGrantsAsync()
+    {
+        if (_selectedShare is null) return;
+        await RunAsync(() => VM.UpdateShareGrantsAsync(_selectedShare.Id, _grantPrincipalIds));
+    }
+
+    private async Task DeleteShareAsync(CloudAccessShare share)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", string.Format(R("Web_CloudAccess_DeleteShareConfirm"), share.Name))) return;
+        await RunAsync(() => VM.DeleteShareAsync(share.Id));
+        if (_selectedShare?.Id == share.Id) _selectedShare = null;
+    }
+
+    private async Task DeleteConnectionAsync(CloudAccessConnection connection)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", string.Format(R("Web_CloudAccess_DeleteConnectionConfirm"), connection.Name))) return;
+        await RunAsync(() => VM.DeleteConnectionAsync(connection.Id));
+        if (_selectedShare is not null && _selectedShare.ConnectionId == connection.Id) _selectedShare = null;
+    }
+
+    private async Task AuthorizeConnectionAsync(CloudAccessConnection connection) => await RunAsync(async () =>
+    {
+        var url = await VM.AuthorizeConnectionAsync(connection.Id);
+        Nav.NavigateTo(url, forceLoad: true);
+    });
+
+    private RenderFragment PrincipalList(HashSet<Guid> selected, Action<Guid> remove) => builder =>
+    {
+        var sequence = 0;
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "cloud-access-principal-list");
+        foreach (var principal in VM.AvailablePrincipals.Where(x => selected.Contains(x.Id)))
+        {
+            builder.OpenElement(sequence++, "div");
+            builder.AddAttribute(sequence++, "class", "cloud-access-principal-row");
+            builder.OpenElement(sequence++, "span");
+            builder.AddContent(sequence++, PrincipalDisplay(principal));
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "button");
+            builder.AddAttribute(sequence++, "type", "button");
+            builder.AddAttribute(sequence++, "class", "btn-secondary compact-button");
+            builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => remove(principal.Id)));
+            builder.AddContent(sequence++, R("Web_CloudAccess_RemovePrincipal"));
+            builder.CloseElement();
+            builder.CloseElement();
+        }
+        builder.CloseElement();
+    };
+
+    private IEnumerable<Identity> AvailableUnselectedPrincipals(HashSet<Guid> selected)
+        => VM.AvailablePrincipals.Where(x => !selected.Contains(x.Id));
+
+    private string PrincipalDisplay(Identity principal)
+        => $"{(principal is Group ? R("Web_CloudAccess_Group") : R("Web_CloudAccess_User"))}: {principal.Name}";
+
+    private static bool IsReady(CloudAccessConnection connection)
+        => connection.State == CloudAccessConnectionState.Ready;
+
+    private string ConnectionDisplay(CloudAccessConnection connection)
+        => $"{connection.Name} ({connection.AccountEmail ?? connection.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized")})";
+
+    private string ConnectionState(CloudAccessConnection connection) => connection.State switch
+    {
+        CloudAccessConnectionState.Ready => R("Web_CloudAccess_StatusReady"),
+        CloudAccessConnectionState.PendingAuthorization => R("Web_CloudAccess_StatusPending"),
+        CloudAccessConnectionState.Disabled => R("Web_CloudAccess_StatusDisabled"),
+        _ => R("Web_CloudAccess_StatusError")
+    };
+
+    private void OpenShare(CloudAccessShare share) => Nav.NavigateTo($"/files/access/{share.Id}");
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        _error = null;
+        try { await action(); }
+        catch (Exception exception) { _error = exception.Message; }
+        finally { _busy = false; StateHasChanged(); }
+    }
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+
+    private enum CloudAccessTab { General, Access }
+}

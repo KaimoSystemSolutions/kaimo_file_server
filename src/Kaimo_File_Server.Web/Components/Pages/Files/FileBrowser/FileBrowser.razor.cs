@@ -18,6 +18,8 @@ namespace Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser;
 
 public partial class FileBrowser
 {
+    private static string T(string key) => Resources.ResourceManager.GetString(key) ?? key;
+
     [Parameter, EditorRequired] public IFileBrowserViewModel VM { get; set; } = default!;
     [Parameter] public string ShareName { get; set; } = "";
     [Parameter] public string? SubPath { get; set; }

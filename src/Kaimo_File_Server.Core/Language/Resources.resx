@@ -2067,4 +2067,99 @@
   <data name="Web_Jobs_Cancelling" xml:space="preserve"><value>Cancelling…</value></data>
   <data name="Web_Jobs_CloudSync_Title" xml:space="preserve"><value>Cloud sync: {0}</value></data>
   <data name="Web_Jobs_Upload_Title" xml:space="preserve"><value>Upload: {0}</value></data>
+  <data name="Web_CloudAccess_Title" xml:space="preserve"><value>Cloud Access</value></data>
+  <data name="Web_CloudAccess_Subtitle" xml:space="preserve"><value>Expose remote folders as virtual shares available only in the web file browser.</value></data>
+  <data name="Web_CloudAccess_Loading" xml:space="preserve"><value>Loading Cloud Access…</value></data>
+  <data name="Web_CloudAccess_NoPermission" xml:space="preserve"><value>You are not permitted to manage Cloud Access.</value></data>
+  <data name="Web_CloudAccess_AddConnection" xml:space="preserve"><value>Add connection</value></data>
+  <data name="Web_CloudAccess_AddShare" xml:space="preserve"><value>Create virtual share</value></data>
+  <data name="Web_CloudAccess_Provider" xml:space="preserve"><value>Cloud provider</value></data>
+  <data name="Web_CloudAccess_Provider_Select" xml:space="preserve"><value>Select a provider</value></data>
+  <data name="Web_CloudAccess_ConnectionName" xml:space="preserve"><value>Connection name</value></data>
+  <data name="Web_CloudAccess_Department" xml:space="preserve"><value>Department</value></data>
+  <data name="Web_CloudAccess_Select" xml:space="preserve"><value>Please select</value></data>
+  <data name="Web_CloudAccess_Connect" xml:space="preserve"><value>Connect</value></data>
+  <data name="Web_CloudAccess_ConnectionHelp" xml:space="preserve"><value>Select a provider and assign the connection to a department. Credentials remain encrypted on the server.</value></data>
+  <data name="Web_CloudAccess_Connections" xml:space="preserve"><value>Connections</value></data>
+  <data name="Web_CloudAccess_NoConnections" xml:space="preserve"><value>No cloud connections have been configured.</value></data>
+  <data name="Web_CloudAccess_Authorize" xml:space="preserve"><value>Authorize</value></data>
+  <data name="Web_CloudAccess_Reauthorize" xml:space="preserve"><value>Authorize again</value></data>
+  <data name="Web_CloudAccess_DeleteConnectionConfirm" xml:space="preserve"><value>Delete connection '{0}' and all of its virtual shares?</value></data>
+  <data name="Web_CloudAccess_Shares" xml:space="preserve"><value>Virtual shares</value></data>
+  <data name="Web_CloudAccess_NoShares" xml:space="preserve"><value>No virtual shares have been created.</value></data>
+  <data name="Web_CloudAccess_CreateShareHelp" xml:space="preserve"><value>Select a connected account and expose one of its remote folders in the web file browser.</value></data>
+  <data name="Web_CloudAccess_Connection" xml:space="preserve"><value>Connection</value></data>
+  <data name="Web_CloudAccess_ShareName" xml:space="preserve"><value>Share name</value></data>
+  <data name="Web_CloudAccess_RemoteFolder" xml:space="preserve"><value>Remote folder</value></data>
+  <data name="Web_CloudAccess_Browse" xml:space="preserve"><value>Browse…</value></data>
+  <data name="Web_CloudAccess_AccessMode" xml:space="preserve"><value>Access mode</value></data>
+  <data name="Web_CloudAccess_ReadOnly" xml:space="preserve"><value>Read only</value></data>
+  <data name="Web_CloudAccess_ReadWrite" xml:space="preserve"><value>Read and write</value></data>
+  <data name="Web_CloudAccess_Access" xml:space="preserve"><value>Access</value></data>
+  <data name="Web_CloudAccess_AccessHelp" xml:space="preserve"><value>Selected users and groups can access the complete virtual share.</value></data>
+  <data name="Web_CloudAccess_Principal" xml:space="preserve"><value>User or group</value></data>
+  <data name="Web_CloudAccess_PrincipalPlaceholder" xml:space="preserve"><value>Select a user or group</value></data>
+  <data name="Web_CloudAccess_AddPrincipal" xml:space="preserve"><value>Add</value></data>
+  <data name="Web_CloudAccess_RemovePrincipal" xml:space="preserve"><value>Remove</value></data>
+  <data name="Web_CloudAccess_Open" xml:space="preserve"><value>Open share</value></data>
+  <data name="Web_CloudAccess_DeleteShareConfirm" xml:space="preserve"><value>Delete virtual share '{0}'? Remote files remain unchanged.</value></data>
+  <data name="Web_CloudAccess_TabGeneral" xml:space="preserve"><value>General</value></data>
+  <data name="Web_CloudAccess_TabAccess" xml:space="preserve"><value>Access</value></data>
+  <data name="Web_CloudAccess_DetailHint" xml:space="preserve"><value>Select a virtual share to view its settings.</value></data>
+  <data name="Web_CloudAccess_Account" xml:space="preserve"><value>Account</value></data>
+  <data name="Web_CloudAccess_SaveAccess" xml:space="preserve"><value>Save access</value></data>
+  <data name="Web_CloudAccess_ShareNameExists" xml:space="preserve"><value>A local or virtual share with this name already exists.</value></data>
+  <data name="Web_CloudAccess_InvalidConnectionName" xml:space="preserve"><value>Enter a valid connection name.</value></data>
+  <data name="Web_CloudAccess_InvalidShareName" xml:space="preserve"><value>Enter a valid share name.</value></data>
+  <data name="Web_CloudAccess_ConnectionRequired" xml:space="preserve"><value>Select a ready connection.</value></data>
+  <data name="Web_CloudAccess_FolderRequired" xml:space="preserve"><value>Select a remote folder.</value></data>
+  <data name="Web_CloudAccess_ConnectionNotReady" xml:space="preserve"><value>The OneDrive connection is not ready.</value></data>
+  <data name="Web_CloudAccess_InvalidRemotePath" xml:space="preserve"><value>The remote path is invalid.</value></data>
+  <data name="Web_CloudAccess_ShareMissing" xml:space="preserve"><value>The virtual share no longer exists.</value></data>
+  <data name="Web_CloudAccess_ConnectionMissing" xml:space="preserve"><value>The connection no longer exists.</value></data>
+  <data name="Web_CloudAccess_DepartmentDenied" xml:space="preserve"><value>You are not permitted to manage Cloud Access in this department.</value></data>
+  <data name="Web_CloudAccess_LoadFailed" xml:space="preserve"><value>Cloud Access could not be loaded.</value></data>
+  <data name="Web_CloudAccess_FolderPickerTitle" xml:space="preserve"><value>Select OneDrive folder</value></data>
+  <data name="Web_CloudAccess_User" xml:space="preserve"><value>User</value></data>
+  <data name="Web_CloudAccess_Group" xml:space="preserve"><value>Group</value></data>
+  <data name="Web_CloudAccess_NotAuthorized" xml:space="preserve"><value>Not authorized</value></data>
+  <data name="Web_CloudAccess_CopyToLocal" xml:space="preserve"><value>Copy to local share</value></data>
+  <data name="Web_CloudAccess_CopyDescription" xml:space="preserve"><value>The selected remote items are streamed directly to the local share.</value></data>
+  <data name="Web_CloudAccess_TargetShare" xml:space="preserve"><value>Target share</value></data>
+  <data name="Web_CloudAccess_TargetFolder" xml:space="preserve"><value>Target folder (optional)</value></data>
+  <data name="Web_CloudAccess_TargetFolderPlaceholder" xml:space="preserve"><value>e.g. Import/OneDrive</value></data>
+  <data name="Web_CloudAccess_Copy" xml:space="preserve"><value>Copy</value></data>
+  <data name="Web_CloudAccess_CopyProgress" xml:space="preserve"><value>Copying…</value></data>
+  <data name="Web_CloudAccess_Remote" xml:space="preserve"><value>Remote</value></data>
+  <data name="Web_CloudAccess_StatusReady" xml:space="preserve"><value>Ready</value></data>
+  <data name="Web_CloudAccess_StatusPending" xml:space="preserve"><value>Authorization pending</value></data>
+  <data name="Web_CloudAccess_StatusError" xml:space="preserve"><value>Error</value></data>
+  <data name="Web_CloudAccess_StatusDisabled" xml:space="preserve"><value>Disabled</value></data>
+  <data name="Web_CloudAccess_Error_NoSelection" xml:space="preserve"><value>Select at least one item.</value></data>
+  <data name="Web_CloudAccess_Error_SignInRequired" xml:space="preserve"><value>Sign-in is required.</value></data>
+  <data name="Web_CloudAccess_Error_AccessDenied" xml:space="preserve"><value>Access to the virtual share was denied.</value></data>
+  <data name="Web_CloudAccess_Error_InvalidLocalPath" xml:space="preserve"><value>The local target path is invalid.</value></data>
+  <data name="Web_CloudAccess_Error_LocalUnavailable" xml:space="preserve"><value>The local target share is unavailable.</value></data>
+  <data name="Web_CloudAccess_Error_LocalWriteDenied" xml:space="preserve"><value>You do not have write access to the local target.</value></data>
+  <data name="Web_CloudAccess_Error_CopyCancelled" xml:space="preserve"><value>The copy operation was cancelled.</value></data>
+  <data name="Web_CloudAccess_Error_CopyFailed" xml:space="preserve"><value>The remote files could not be copied to the local share.</value></data>
+  <data name="Web_CloudAccess_Error_NoLocalTarget" xml:space="preserve"><value>No writable local share is available.</value></data>
+  <data name="Web_CloudAccess_CopySuccess" xml:space="preserve"><value>The remote items were copied to the local share.</value></data>
+  <data name="Web_CloudAccess_Error_InvalidShare" xml:space="preserve"><value>The virtual share is invalid.</value></data>
+  <data name="Web_CloudAccess_Error_InvalidPath" xml:space="preserve"><value>The requested path is invalid.</value></data>
+  <data name="Web_CloudAccess_Error_LoadShare" xml:space="preserve"><value>The OneDrive share could not be loaded.</value></data>
+  <data name="Web_CloudAccess_Error_CreateFolder" xml:space="preserve"><value>The folder could not be created.</value></data>
+  <data name="Web_CloudAccess_Error_Delete" xml:space="preserve"><value>The item could not be deleted.</value></data>
+  <data name="Web_CloudAccess_Error_Rename" xml:space="preserve"><value>The item could not be renamed.</value></data>
+  <data name="Web_CloudAccess_Error_Move" xml:space="preserve"><value>The item could not be moved.</value></data>
+  <data name="Web_CloudAccess_Error_RemoteCopy" xml:space="preserve"><value>The item could not be copied.</value></data>
+  <data name="Web_CloudAccess_Error_Upload" xml:space="preserve"><value>The file could not be uploaded.</value></data>
+  <data name="Web_CloudAccess_Error_ReadOnly" xml:space="preserve"><value>This virtual share is read only.</value></data>
+  <data name="Web_Settings_Tab_CloudAccess" xml:space="preserve"><value>Cloud Access</value></data>
+  <data name="Web_Settings_CloudAccess_CacheTitle" xml:space="preserve"><value>Directory metadata cache</value></data>
+  <data name="Web_Settings_CloudAccess_CacheDescription" xml:space="preserve"><value>Controls how long remote directory listings are reused. File contents, credentials, and access decisions are never cached. Changes apply immediately.</value></data>
+  <data name="Web_Settings_CloudAccess_CacheSeconds" xml:space="preserve"><value>Cache duration (seconds)</value></data>
+  <data name="Web_Settings_CloudAccess_CacheRange" xml:space="preserve"><value>Allowed range: {0}–{1} seconds. The default is 20 seconds.</value></data>
+  <data name="Web_Settings_CloudAccess_CacheSaved" xml:space="preserve"><value>Cloud Access cache settings saved.</value></data>
+  <data name="Web_Settings_CloudAccess_CacheSaveFailed" xml:space="preserve"><value>Cloud Access cache settings could not be saved.</value></data>
 </root>

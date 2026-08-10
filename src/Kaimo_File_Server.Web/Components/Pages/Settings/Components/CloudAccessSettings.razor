@@ -1,0 +1,30 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Services
+
+<div class="detail-section">
+    <span class="detail-label">@R("Web_Settings_CloudAccess_CacheTitle")</span>
+    <p class="settings-description">@R("Web_Settings_CloudAccess_CacheDescription")</p>
+    <div class="settings-row settings-row-spaced">
+        <label class="settings-field-label" for="cloud-access-cache-seconds">@R("Web_Settings_CloudAccess_CacheSeconds")</label>
+        <input id="cloud-access-cache-seconds"
+               type="number"
+               min="@CloudAccessRuntimeSettings.MinDirectoryCacheSeconds"
+               max="@CloudAccessRuntimeSettings.MaxDirectoryCacheSeconds"
+               class="edit-input settings-number"
+               @bind="VM.CloudAccessSettings.DirectoryCacheSeconds"
+               @bind:event="oninput" />
+    </div>
+    <p class="settings-description">@string.Format(
+        R("Web_Settings_CloudAccess_CacheRange"),
+        CloudAccessRuntimeSettings.MinDirectoryCacheSeconds,
+        CloudAccessRuntimeSettings.MaxDirectoryCacheSeconds)</p>
+    <div class="settings-actions">
+        <button class="btn-primary" @onclick="Save">@Resources.Web_Settings_Button_Save</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+    private async Task Save() { await VM.SaveCloudAccessSettingsAsync(); StateHasChanged(); }
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+}

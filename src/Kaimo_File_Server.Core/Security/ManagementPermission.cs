@@ -52,6 +52,9 @@
         DeleteSyncs = 1L << 49, // delete a sync folder
         ConfigureSyncs = 1L << 50, // edit the frequency of syncing
         SyncManually = 1L << 51, // manually cause a sync to occour
+
+        // -- Web-only remote shares --
+        ManageCloudAccess = 1L << 52,
         
         // -- Shortcuts --
         UserAdmin = CreateUsers | DeleteUsers | EditUserProfiles
@@ -71,8 +74,10 @@
         FullAdmin = UserAdmin | GroupAdmin | ShareAdmin
                   | AssignGroups | AssignRoles | AssignDepartments
                   | EditDepartment | ViewDepartment
-                  | SystemAdmin | SyncAdmin,
+                  | SystemAdmin | SyncAdmin | CloudAccessAdmin,
         
         SyncAdmin = CreateSyncs | DeleteSyncs | ConfigureSyncs | SyncManually,
+
+        CloudAccessAdmin = ManageCloudAccess,
     }
 }

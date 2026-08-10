@@ -86,6 +86,8 @@ builder.Services.AddAuthorizationCore();
 builder.Services.AddControllers();
 builder.Services.AddHttpClient(nameof(OneDriveDeviceAuthorizationService), client =>
     client.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddHttpClient("CloudAccessOneDrive", client =>
+    client.Timeout = Timeout.InfiniteTimeSpan);
 
 // -- JWT --
 builder.Services.AddSingleton<JwtTokenService>();
@@ -106,6 +108,12 @@ builder.Services.AddScoped<FileSelectionCoordinator>();
 builder.Services.AddSingleton<AssetProvider>();
 builder.Services.AddSingleton<ICloudAuthorizationTicketStore, CloudAuthorizationTicketStore>();
 builder.Services.AddSingleton<IOneDriveDeviceAuthorizationService, OneDriveDeviceAuthorizationService>();
+builder.Services.AddSingleton<ICloudAccessCredentialProtector, CloudAccessCredentialProtector>();
+builder.Services.AddSingleton<CloudAccessDownloadTicketStore>();
+builder.Services.AddSingleton<ICloudAccessSettingsStore, CloudAccessSettingsStore>();
+builder.Services.AddSingleton<CloudAccessDirectoryCache>();
+builder.Services.AddScoped<CloudAccessAuthorizationService>();
+builder.Services.AddScoped<CloudToLocalTransferService>();
 
 
 
@@ -126,6 +134,9 @@ builder.Services.AddScoped<UserListViewModel>();
 builder.Services.AddScoped<AclEditorViewModel>();
 builder.Services.AddScoped<DepartmentViewModel>();
 builder.Services.AddScoped<CloudSyncViewModel>();
+builder.Services.AddScoped<CloudAccessViewModel>();
+builder.Services.AddScoped<CloudAccessShareBrowserViewModel>();
+builder.Services.AddScoped<OneDriveCloudAccessFileBrowserViewModel>();
 
 // ShareListViewModel receives configured pool destinations. File I/O itself
 // always uses the absolute path persisted on the selected share.
@@ -151,9 +162,12 @@ builder.Services.AddScoped<ShareListViewModel>(sp =>
 //  DataProtection
 // ══════════════════════════════════════════
 
-builder.Services.AddDataProtection()
+var dataProtection = builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(applicationDataPath, ".dp-keys")))
     .SetApplicationName("KaimoFiles");
+var dataProtectionCertificate =
+    DataProtectionKeyEncryptionCertificate.LoadOrCreate(applicationDataPath);
+dataProtection.ProtectKeysWithCertificate(dataProtectionCertificate);
 
 
 // ══════════════════════════════════════════

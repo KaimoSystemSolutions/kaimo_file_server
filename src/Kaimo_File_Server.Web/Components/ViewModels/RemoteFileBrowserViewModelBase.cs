@@ -18,7 +18,7 @@ public abstract class RemoteFileBrowserViewModelBase : IFileBrowserViewModel
 
     public event Action? OnStateChanged;
 
-    public BrowserCapabilities Capabilities { get; }
+    public BrowserCapabilities Capabilities { get; protected set; }
     public BrowserShareInfo? CurrentBrowserShare { get; protected set; }
     public List<FileMetadata> Items { get; protected set; } = [];
     public string CurrentPath { get; protected set; } = "";
@@ -107,4 +107,3 @@ public abstract class RemoteFileBrowserViewModelBase : IFileBrowserViewModel
 
     protected void NotifyStateChanged() => OnStateChanged?.Invoke();
 }
-

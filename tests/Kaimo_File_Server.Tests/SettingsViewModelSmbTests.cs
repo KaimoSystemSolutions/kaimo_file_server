@@ -7,6 +7,7 @@ using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components.ViewModels;
+using Kaimo_File_Server.Web.Services;
 using Kaimo_File_Server.Web.Services.Https;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -22,6 +23,22 @@ namespace Kaimo_File_Server.Tests;
 /// </summary>
 public class SettingsViewModelSmbTests
 {
+    [Fact]
+    public async Task SaveCloudAccessSettingsAsync_ClampsAndPersistsGlobalTtl()
+    {
+        var h = new Harness(canManageDataServices: false, canManageSettings: true);
+        await h.Vm.LoadAsync();
+        h.Vm.CloudAccessSettings.DirectoryCacheSeconds = 999;
+
+        var ok = await h.Vm.SaveCloudAccessSettingsAsync();
+
+        Assert.True(ok);
+        Assert.Equal(CloudAccessRuntimeSettings.MaxDirectoryCacheSeconds,
+            h.Vm.CloudAccessSettings.DirectoryCacheSeconds);
+        h.CloudAccessSettings.Verify(s => s.SetAsync(It.Is<CloudAccessRuntimeSettings>(value =>
+            value.DirectoryCacheSeconds == CloudAccessRuntimeSettings.MaxDirectoryCacheSeconds)), Times.Once);
+    }
+
     // ─────────────────────────── SmbProtocolSettings model ───────────────────────────
 
     [Fact]
@@ -295,6 +312,7 @@ public class SettingsViewModelSmbTests
     {
         public Mock<IConfigRepository> Config { get; } = new();
         public Mock<ISearchAdminService> SearchAdmin { get; } = new();
+        public Mock<ICloudAccessSettingsStore> CloudAccessSettings { get; } = new();
         public SettingsViewModel Vm { get; }
 
         /// <summary>The <see cref="SmbProtocolSettings"/> captured on the last SetAsync write.</summary>
@@ -339,6 +357,10 @@ public class SettingsViewModelSmbTests
 
             var loggingStore = new Mock<Kaimo_File_Server.Core.Logging.ILoggingConfigStore>();
             loggingStore.Setup(s => s.GetLevelAsync()).ReturnsAsync("Warning");
+            CloudAccessSettings.Setup(s => s.GetAsync())
+                .ReturnsAsync(CloudAccessRuntimeSettings.Default());
+            CloudAccessSettings.Setup(s => s.SetAsync(It.IsAny<CloudAccessRuntimeSettings>()))
+                .Returns(Task.CompletedTask);
 
             Vm = new SettingsViewModel(
                 Config.Object,
@@ -350,6 +372,7 @@ public class SettingsViewModelSmbTests
                 Mock.Of<IHttpsCertificateProvider>(),
                 loggingStore.Object,
                 new Kaimo_File_Server.Infrastructure.Logging.LoggingLevelConfigurationSource(),
+                CloudAccessSettings.Object,
                 NullLogger<SettingsViewModel>.Instance);
         }
 

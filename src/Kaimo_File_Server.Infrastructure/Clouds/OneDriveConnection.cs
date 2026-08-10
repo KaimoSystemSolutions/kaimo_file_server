@@ -5,7 +5,6 @@ using System.Text;
 using System.Text.Json;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Services.File;
-using Microsoft.Extensions.Configuration;
 
 namespace Kaimo_File_Server.Infrastructure.Clouds;
 
@@ -13,7 +12,7 @@ namespace Kaimo_File_Server.Infrastructure.Clouds;
 /// Provider-neutral OneDrive connection backed by Microsoft Graph. No Graph SDK
 /// type crosses the cloud abstraction, so the UI and sync engine remain reusable.
 /// </summary>
-public sealed class OneDriveConnection : ICloudConnection
+public sealed class OneDriveConnection : ICloudConnection, IAsyncDisposable
 {
     private const long SimpleUploadThreshold = 10L * 1024 * 1024;
     private const int UploadChunkSize = 10 * 1024 * 1024; // 32 * Graph's 320 KiB fragment unit.
@@ -23,8 +22,6 @@ public sealed class OneDriveConnection : ICloudConnection
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
     private readonly SemaphoreSlim _tokenLock = new(1, 1);
-    private readonly string _clientId;
-    private readonly string _tenant;
     private string? _accessToken;
     private DateTimeOffset _accessTokenExpiresAt;
     private bool _hasPendingCredentialChanges;
@@ -35,12 +32,9 @@ public sealed class OneDriveConnection : ICloudConnection
     /// </summary>
     public OneDriveConnection(
         Dictionary<string, string> data,
-        IConfiguration configuration,
         HttpClient? httpClient = null)
     {
         _data = data;
-        _clientId = RequireConfiguration(configuration, "OneDriveOAuth:ClientId");
-        _tenant = ValidateTenant(configuration["OneDriveOAuth:Tenant"] ?? "common");
         _httpClient = httpClient ?? new HttpClient();
         _ownsHttpClient = httpClient is null;
 
@@ -144,6 +138,205 @@ public sealed class OneDriveConnection : ICloudConnection
         }
 
         return result;
+    }
+
+    /// <summary>Lists browser metadata including stable Graph ids.</summary>
+    public async Task<IReadOnlyList<OneDriveItemMeta>> ListDetailedAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedPath = NormalizePath(path);
+        var requestUrl = normalizedPath.Length == 0
+            ? "/me/drive/root/children?$select=id,name,size,createdDateTime,lastModifiedDateTime,folder,file,package,specialFolder,eTag"
+            : $"/me/drive/root:/{EncodePath(normalizedPath)}:/children" +
+              "?$select=id,name,size,createdDateTime,lastModifiedDateTime,folder,file,package,specialFolder,eTag";
+        var result = new List<OneDriveItemMeta>();
+
+        while (!string.IsNullOrEmpty(requestUrl))
+        {
+            using var response = await SendGraphAsync(HttpMethod.Get, requestUrl, cancellationToken: cancellationToken);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+                return [];
+            using var json = await ParseSuccessAsync(response, cancellationToken);
+            foreach (var item in json.RootElement.GetProperty("value").EnumerateArray())
+            {
+                if (IsPersonalVault(item)) continue;
+                var name = GetOptionalString(item, "name") ?? string.Empty;
+                var isDirectory = item.TryGetProperty("folder", out _)
+                                  || item.TryGetProperty("package", out _)
+                                  || item.TryGetProperty("specialFolder", out _);
+                result.Add(new OneDriveItemMeta(
+                    GetOptionalString(item, "id") ?? throw new InvalidOperationException("Microsoft Graph did not return an item id."),
+                    name,
+                    CombinePath(normalizedPath, name).TrimStart('/'),
+                    isDirectory,
+                    item.TryGetProperty("size", out var size) ? size.GetInt64() : 0,
+                    ParseGraphDate(item, "createdDateTime"),
+                    ParseGraphDate(item, "lastModifiedDateTime"),
+                    GetOptionalString(item, "eTag")));
+            }
+            requestUrl = GetOptionalString(json.RootElement, "@odata.nextLink") ?? string.Empty;
+        }
+        return result;
+    }
+
+    public async Task DeleteItemAsync(string path, CancellationToken cancellationToken = default)
+    {
+        var normalizedPath = RequireFilePath(path);
+        using var response = await SendGraphAsync(
+            HttpMethod.Delete,
+            $"/me/drive/root:/{EncodePath(normalizedPath)}",
+            cancellationToken: cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound) return;
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<OneDriveFolderReference> ResolveFolderAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        var normalized = NormalizePath(path);
+        if (normalized.Length == 0)
+            return new OneDriveFolderReference(await GetRootIdAsync(cancellationToken), string.Empty);
+        var item = await GetItemByPathAsync(normalized, cancellationToken)
+                   ?? throw new DirectoryNotFoundException("The OneDrive folder was not found.");
+        if (!item.IsDirectory)
+            throw new IOException("The selected OneDrive item is not a folder.");
+        return new OneDriveFolderReference(item.Id, normalized);
+    }
+
+    public async Task<OneDriveFolderReference> ResolveFolderByIdAsync(
+        string providerId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(providerId))
+            throw new ArgumentException("A OneDrive folder id is required.", nameof(providerId));
+        using var response = await SendGraphAsync(
+            HttpMethod.Get,
+            $"/me/drive/items/{Uri.EscapeDataString(providerId)}?$select=id,name,parentReference,folder,root",
+            cancellationToken: cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            throw new DirectoryNotFoundException("The configured OneDrive root folder no longer exists.");
+        using var json = await ParseSuccessAsync(response, cancellationToken);
+        var item = json.RootElement;
+        if (!item.TryGetProperty("folder", out _) && !item.TryGetProperty("root", out _))
+            throw new IOException("The configured OneDrive root item is no longer a folder.");
+        if (item.TryGetProperty("root", out _))
+            return new OneDriveFolderReference(providerId, string.Empty);
+        var name = GetOptionalString(item, "name")
+                   ?? throw new InvalidOperationException("Microsoft Graph did not return the folder name.");
+        var parentPath = item.TryGetProperty("parentReference", out var parent)
+            ? GetOptionalString(parent, "path") ?? string.Empty
+            : string.Empty;
+        const string rootMarker = "/root:";
+        var markerIndex = parentPath.IndexOf(rootMarker, StringComparison.OrdinalIgnoreCase);
+        var relativeParent = markerIndex >= 0
+            ? parentPath[(markerIndex + rootMarker.Length)..].Trim('/')
+            : string.Empty;
+        return new OneDriveFolderReference(providerId, ShareRelativePathForGraph(relativeParent, name));
+    }
+
+    public async Task MoveItemAsync(
+        string sourcePath,
+        string destinationPath,
+        CancellationToken cancellationToken = default)
+    {
+        var source = await GetItemByPathAsync(RequireFilePath(sourcePath), cancellationToken)
+                     ?? throw new FileNotFoundException("The OneDrive item was not found.", sourcePath);
+        var destination = RequireFilePath(destinationPath);
+        var separator = destination.LastIndexOf('/');
+        var parentPath = separator < 0 ? string.Empty : destination[..separator];
+        var name = separator < 0 ? destination : destination[(separator + 1)..];
+        var parentId = parentPath.Length == 0
+            ? await GetRootIdAsync(cancellationToken)
+            : await EnsureDirectoryAsync(parentPath, cancellationToken);
+        var body = JsonSerializer.Serialize(new { name, parentReference = new { id = parentId } });
+        using var response = await SendGraphAsync(
+            HttpMethod.Patch,
+            $"/me/drive/items/{Uri.EscapeDataString(source.Id)}",
+            new StringContent(body, Encoding.UTF8, "application/json"),
+            cancellationToken: cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    /// <summary>Starts a provider-side copy; file bytes do not traverse this server.</summary>
+    public async Task CopyItemAsync(
+        string sourcePath,
+        string destinationPath,
+        CancellationToken cancellationToken = default)
+    {
+        var source = await GetItemByPathAsync(RequireFilePath(sourcePath), cancellationToken)
+                     ?? throw new FileNotFoundException("The OneDrive item was not found.", sourcePath);
+        var destination = RequireFilePath(destinationPath);
+        var separator = destination.LastIndexOf('/');
+        var parentPath = separator < 0 ? string.Empty : destination[..separator];
+        var name = separator < 0 ? destination : destination[(separator + 1)..];
+        var parentId = parentPath.Length == 0
+            ? await GetRootIdAsync(cancellationToken)
+            : await EnsureDirectoryAsync(parentPath, cancellationToken);
+        var body = JsonSerializer.Serialize(new { name, parentReference = new { id = parentId } });
+        using var response = await SendGraphAsync(
+            HttpMethod.Post,
+            $"/me/drive/items/{Uri.EscapeDataString(source.Id)}/copy",
+            new StringContent(body, Encoding.UTF8, "application/json"),
+            cancellationToken: cancellationToken);
+        if (response.StatusCode != HttpStatusCode.Accepted)
+        {
+            await EnsureSuccessAsync(response, cancellationToken);
+            return;
+        }
+
+        var monitor = response.Headers.Location
+                      ?? throw new InvalidOperationException("Microsoft Graph did not return a copy monitor URL.");
+        ValidateCopyMonitorUri(monitor);
+        await WaitForCopyCompletionAsync(monitor, cancellationToken);
+    }
+
+    private async Task WaitForCopyCompletionAsync(Uri monitor, CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddMinutes(15);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, monitor);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            if (response.RequestMessage?.RequestUri is { } finalUri)
+                ValidateCopyMonitorUri(finalUri);
+            await EnsureSuccessAsync(response, cancellationToken);
+            if (response.Content.Headers.ContentLength == 0)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+                continue;
+            }
+            using var json = await JsonDocument.ParseAsync(
+                await response.Content.ReadAsStreamAsync(cancellationToken),
+                cancellationToken: cancellationToken);
+            var root = json.RootElement;
+            var percentage = root.TryGetProperty("percentageComplete", out var firstPercentage)
+                ? firstPercentage.GetDouble()
+                : root.TryGetProperty("percentComplete", out var secondPercentage)
+                    ? secondPercentage.GetDouble()
+                    : -1;
+            if (percentage >= 100) return;
+            var status = GetOptionalString(root, "status");
+            if (string.Equals(status, "completed", StringComparison.OrdinalIgnoreCase)) return;
+            if (status is not null
+                && !string.Equals(status, "inProgress", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(status, "notStarted", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(status, "running", StringComparison.OrdinalIgnoreCase))
+                throw new IOException($"The OneDrive copy operation ended with status '{status}'.");
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+        }
+        throw new TimeoutException("The OneDrive copy operation did not complete within 15 minutes.");
+    }
+
+    private static void ValidateCopyMonitorUri(Uri uri)
+    {
+        if (!uri.IsAbsoluteUri || uri.Scheme != Uri.UriSchemeHttps
+            || !string.IsNullOrEmpty(uri.UserInfo)
+            || !uri.IsDefaultPort
+            || string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase)
+            || IPAddress.TryParse(uri.Host, out _))
+            throw new InvalidOperationException("Microsoft Graph returned an untrusted copy monitor URL.");
     }
 
     /// <summary>
@@ -259,6 +452,8 @@ public sealed class OneDriveConnection : ICloudConnection
             _httpClient.Dispose();
         return Task.CompletedTask;
     }
+
+    public async ValueTask DisposeAsync() => await Dispose();
 
     /// <summary>
     /// Resolves or creates every segment of a remote directory path. Conflict
@@ -495,10 +690,10 @@ public sealed class OneDriveConnection : ICloudConnection
                 return _accessToken;
 
             using var response = await _httpClient.PostAsync(
-                OneDriveOAuthDefaults.TokenEndpoint(_tenant),
+                OneDriveOAuthDefaults.TokenEndpoint,
                 new FormUrlEncodedContent(new Dictionary<string, string>
                 {
-                    ["client_id"] = _clientId,
+                    ["client_id"] = OneDriveOAuthDefaults.ClientId,
                     ["grant_type"] = "refresh_token",
                     ["refresh_token"] = _data["refreshToken"],
                     ["scope"] = _data["scope"]
@@ -558,27 +753,6 @@ public sealed class OneDriveConnection : ICloudConnection
             response.StatusCode);
     }
 
-    /// <summary>Reads a mandatory provider setting with a deployment-friendly error.</summary>
-    private static string RequireConfiguration(IConfiguration configuration, string key)
-        => string.IsNullOrWhiteSpace(configuration[key])
-            ? throw new InvalidOperationException($"Configuration value '{key}' is required for OneDrive.")
-            : configuration[key]!;
-
-    /// <summary>
-    /// Restricts authority selection to Microsoft's supported aliases or a GUID,
-    /// preventing configuration values from injecting arbitrary authority paths.
-    /// </summary>
-    public static string ValidateTenant(string tenant)
-    {
-        var normalized = tenant.Trim();
-        if (normalized is "common" or "organizations" or "consumers"
-            || Guid.TryParse(normalized, out _))
-            return normalized;
-
-        throw new InvalidOperationException(
-            "OneDriveOAuth:Tenant must be common, organizations, consumers, or a tenant GUID.");
-    }
-
     /// <summary>Normalizes provider paths to slash-separated, root-relative form.</summary>
     private static string NormalizePath(string? path)
         => string.IsNullOrWhiteSpace(path) ? "" : path.Replace('\\', '/').Trim('/');
@@ -604,6 +778,11 @@ public sealed class OneDriveConnection : ICloudConnection
             ? $"/{normalizedParent}/{child}"
             : $"/{child}";
 
+    private static string ShareRelativePathForGraph(string parent, string child)
+        => NormalizePath(parent) is { Length: > 0 } normalizedParent
+            ? $"{normalizedParent}/{child}"
+            : child;
+
     /// <summary>Reads an optional JSON string without accepting non-string values.</summary>
     private static string? GetOptionalString(JsonElement element, string propertyName)
         => element.TryGetProperty(propertyName, out var property)
@@ -611,20 +790,37 @@ public sealed class OneDriveConnection : ICloudConnection
                 ? property.GetString()
                 : null;
 
+    private static DateTime ParseGraphDate(JsonElement element, string propertyName)
+        => DateTimeOffset.TryParse(
+            GetOptionalString(element, propertyName),
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal,
+            out var value)
+            ? value.UtcDateTime
+            : DateTime.MinValue;
+
     private readonly record struct DriveItemReference(string Id, bool IsDirectory);
 }
 
-/// <summary>Shared Microsoft identity-platform values used by auth and runtime refresh.</summary>
+public sealed record OneDriveItemMeta(
+    string ProviderId,
+    string Name,
+    string Path,
+    bool IsDirectory,
+    long Size,
+    DateTime CreatedAtUtc,
+    DateTime ModifiedAtUtc,
+    string? ETag);
+
+public sealed record OneDriveFolderReference(string ProviderId, string Path);
+
 /// <summary>Shared Microsoft identity endpoints and least-privilege runtime scopes.</summary>
 public static class OneDriveOAuthDefaults
 {
+    public const string ClientId = "e966f5be-e8a1-4c67-b322-aac34c1ab642";
     public const string Scope = "offline_access Files.ReadWrite User.Read";
-
-    /// <summary>Builds the device-code endpoint for the validated tenant authority.</summary>
-    public static string DeviceCodeEndpoint(string tenant)
-        => $"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/devicecode";
-
-    /// <summary>Builds the OAuth token endpoint for polling and refresh.</summary>
-    public static string TokenEndpoint(string tenant)
-        => $"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token";
+    public const string DeviceCodeEndpoint =
+        "https://login.microsoftonline.com/common/oauth2/v2.0/devicecode";
+    public const string TokenEndpoint =
+        "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 }

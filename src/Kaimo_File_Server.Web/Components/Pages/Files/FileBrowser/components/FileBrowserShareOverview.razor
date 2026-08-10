@@ -2,6 +2,7 @@
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject ShareBrowserViewModel VM
+@inject CloudAccessShareBrowserViewModel RemoteVM
 @inject NavigationManager Nav
 @inject AssetProvider Assets
 @implements IDisposable
@@ -34,7 +35,7 @@ else if (VM.ErrorMessage is not null)
 {
     <div class="error-banner">@VM.ErrorMessage</div>
 }
-else if (!VM.Shares.Any())
+else if (!VM.Shares.Any() && !RemoteVM.Shares.Any())
 {
     <div class="empty-state">
         @Assets.SVG("folder.svg", new SvgOptions(Width: 64, Height: 64, Color: "var(--text-tertiary)"))
@@ -60,6 +61,17 @@ else
                 <div class="col-size">@(VM.GetShareSize(share) is { } size ? FormatHelper.FormatFileSize(size) : "…")</div>
             </button>
         }
+        @foreach (var share in RemoteVM.Shares)
+        {
+            <button class="file-grid-row file-row-dir share-overview-row" type="button" @onclick="() => OpenRemoteShare(share.Id)">
+                <div class="col-name">
+                    @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--folder-stroke)", CssClass: "file-icon"))
+                    <span>@share.Name</span>
+                </div>
+                <div class="col-share-path">Microsoft OneDrive · @share.RemotePath</div>
+                <div class="col-size">@(share.IsReadOnly ? Text("Web_CloudAccess_ReadOnly") : Text("Web_CloudAccess_Remote"))</div>
+            </button>
+        }
     </div>
 }
 
@@ -71,13 +83,17 @@ else
         if (firstRender)
         {
             await VM.LoadAsync();
+            await RemoteVM.LoadAsync();
             StateHasChanged();
         }
     }
 
     private void OpenShare(string name) => Nav.NavigateTo($"/files/{name}");
+    private void OpenRemoteShare(Guid id) => Nav.NavigateTo($"/files/access/{id}");
 
     private void OnVmStateChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private static string Text(string key) => Resources.ResourceManager.GetString(key) ?? key;
 
     public void Dispose() => VM.OnStateChanged -= OnVmStateChanged;
 }

@@ -13,6 +13,7 @@ public sealed record BrowserCapabilities
     public bool CanDelete { get; init; }
     public bool CanMove { get; init; }
     public bool CanCopy { get; init; }
+    public bool CanCopyToLocal { get; init; }
     public bool CanArchive { get; init; }
     public bool CanExtract { get; init; }
     public bool HasFileAcls { get; init; }

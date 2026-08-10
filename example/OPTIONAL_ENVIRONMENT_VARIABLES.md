@@ -43,8 +43,6 @@ Add these variables to `web`.
 | `Jwt__ExpirationHours` | `24` | Login-token lifetime in hours. |
 | `GoogleOAuth__ClientId` | Image default | Overrides the Google OAuth client ID. |
 | `GoogleOAuth__ClientSecret` | Image default | Overrides the Google OAuth client secret. |
-| `OneDriveOAuth__ClientId` | Image default | Overrides the Microsoft Entra application/client ID. |
-| `OneDriveOAuth__Tenant` | `common` | Restricts OneDrive sign-in to a tenant or keeps multi-tenant sign-in. |
 
 ## SMB bridge only
 

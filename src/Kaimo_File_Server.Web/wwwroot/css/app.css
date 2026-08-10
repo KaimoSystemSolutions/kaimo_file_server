@@ -168,7 +168,7 @@ html, body, #app {
 
 /* .components-reconnect-dialog is the visible child created by blazor.web.js. */
 #components-reconnect-modal .components-reconnect-dialog {
-    background: var(--bg-secondary) !important;
+    background-color: var(--bg-secondary) !important;
     color: var(--text-primary) !important;
     border: 1px solid var(--border-strong) !important;
     border-radius: 8px;

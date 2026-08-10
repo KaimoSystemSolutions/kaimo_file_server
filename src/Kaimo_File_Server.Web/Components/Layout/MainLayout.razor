@@ -54,6 +54,13 @@
                     <span class="nav-label">@Text("Web_Nav_CloudSync", "Cloud Sync")</span>
                 </NavLink>
             }
+            @if (_canManageCloudAccess)
+            {
+                <NavLink class="nav-item" href="/cloud-access" Match="NavLinkMatch.Prefix">
+                    @Assets.SVG("cloud-download.svg", new SvgOptions())
+                    <span class="nav-label">@Text("Web_CloudAccess_Title", "Cloud Access")</span>
+                </NavLink>
+            }
             
         </div>
 
@@ -167,6 +174,7 @@
     private CancellationTokenSource? _searchCts;
 
     private bool _canManageSyncs;
+    private bool _canManageCloudAccess;
     private UserContext? _currentUser;
     
     [Inject] private IJSRuntime JS { get; set; } = default!;
@@ -325,6 +333,8 @@
             _currentUser = await UserContextFactory.CreateByUsernameAsync(username);
             _canManageSyncs = _currentUser != null
                               && await ManagementAuthService.HasAnyPermissionAsync(_currentUser, ManagementPermission.SyncAdmin);
+            _canManageCloudAccess = _currentUser != null
+                                    && await ManagementAuthService.HasAnyPermissionAsync(_currentUser, ManagementPermission.ManageCloudAccess);
         }
     }
 

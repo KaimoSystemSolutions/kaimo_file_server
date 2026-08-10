@@ -49,6 +49,9 @@ public interface IFileBrowserViewModel
     long GetMaxUploadSizeBytes();
     string ShareRelativeOf(FileMetadata item);
 
+    Task<string?> GetDownloadUrlAsync(FileMetadata file)
+        => Task.FromResult<string?>(null);
+
     Task LoadAclCountsAsync() => Task.CompletedTask;
     int GetAclCount(string path) => 0;
     long? GetDirectorySize(FileMetadata directory) => null;
@@ -87,4 +90,3 @@ public interface IFileBrowserViewModel
     Task<OperationResult> UnzipAsync(FileMetadata file)
         => Task.FromResult(OperationResult.Fail("Extracting archives is not supported by this backend."));
 }
-

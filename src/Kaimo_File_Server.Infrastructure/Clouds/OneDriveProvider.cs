@@ -1,11 +1,10 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Services.DataServices;
-using Microsoft.Extensions.Configuration;
 
 namespace Kaimo_File_Server.Infrastructure.Clouds;
 
 /// <summary>Microsoft OneDrive registration for the provider-neutral cloud subsystem.</summary>
-public sealed class OneDriveProvider(IConfiguration configuration) : ICloudProvider
+public sealed class OneDriveProvider : ICloudProvider
 {
     public string Id => "onedrive";
     public string DisplayName => "Microsoft OneDrive";
@@ -17,5 +16,5 @@ public sealed class OneDriveProvider(IConfiguration configuration) : ICloudProvi
     /// or provider-specific object is exposed to UI consumers.
     /// </remarks>
     public ICloudConnection CreateConnection(Guid shareId, SyncedFolder folder)
-        => new OneDriveConnection(folder.Data, configuration);
+        => new OneDriveConnection(folder.Data);
 }

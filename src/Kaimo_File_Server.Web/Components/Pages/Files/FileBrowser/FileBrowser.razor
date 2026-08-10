@@ -14,6 +14,7 @@
 @inject FileUploadCoordinator UploadCoordinator
 @inject FileSelectionCoordinator FileSelectionCoordinator
 @inject AssetProvider Assets
+@inject CloudToLocalTransferService CloudTransfer
 
 <PageTitle>@(VM.CurrentBrowserShare?.Name ?? Resources.Web_Files) - Kaimo Files</PageTitle>
 
@@ -96,6 +97,14 @@
                 <span>@Resources.Web_Action_Permissions</span>
             </button>
         }
+        @if (VM.Capabilities.CanCopyToLocal)
+        {
+            <button class="toolbar-btn" title="@T("Web_CloudAccess_CopyToLocal")"
+                    disabled="@(_selectedItems.Count == 0)" @onclick="ShowCloudToLocalDialogAsync">
+                @Assets.SVG("download.svg", new SvgOptions(Width: 16, Height: 16))
+                <span>@T("Web_CloudAccess_CopyToLocal")</span>
+            </button>
+        }
     </div>
 </div>
 
@@ -160,6 +169,36 @@
             <div class="modal-actions">
                 <button class="btn btn-secondary" @onclick="CancelDelete">@Resources.Web_Button_Cancel</button>
                 <button class="btn btn-danger" @onclick="ConfirmDelete">@Resources.Web_Action_Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_showCloudToLocal)
+{
+    <div class="modal-backdrop" @onclick="CancelCloudToLocal">
+        <div class="modal-dialog" @onclick:stopPropagation="true">
+            <h3 class="modal-title">@T("Web_CloudAccess_CopyToLocal")</h3>
+            <p class="modal-text">@T("Web_CloudAccess_CopyDescription")</p>
+            <label class="detail-field"><span class="detail-label">@T("Web_CloudAccess_TargetShare")</span>
+                <select class="modal-input" @bind="_cloudToLocalTargetId">
+                    <option value="@Guid.Empty">@T("Web_CloudAccess_Select")</option>
+                    @foreach (var target in _cloudToLocalTargets)
+                    { <option value="@target.Id">@target.Name</option> }
+                </select>
+            </label>
+            <label class="detail-field"><span class="detail-label">@T("Web_CloudAccess_TargetFolder")</span>
+                <input class="modal-input" @bind="_cloudToLocalPath" placeholder="@T("Web_CloudAccess_TargetFolderPlaceholder")" />
+            </label>
+            @if (_cloudToLocalError is not null)
+            {
+                <div class="modal-error">@_cloudToLocalError</div>
+            }
+            <div class="modal-actions">
+                <button class="btn-secondary" type="button" disabled="@_cloudToLocalBusy" @onclick="CancelCloudToLocal">@Resources.Web_Button_Cancel</button>
+                <button class="btn-primary" type="button" disabled="@(_cloudToLocalBusy || _cloudToLocalTargetId == Guid.Empty)" @onclick="ConfirmCloudToLocalAsync">
+                    @(_cloudToLocalBusy ? T("Web_CloudAccess_CopyProgress") : T("Web_CloudAccess_Copy"))
+                </button>
             </div>
         </div>
     </div>

@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
+using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Web.Services;
-using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace Kaimo_File_Server.Tests;
@@ -12,9 +12,11 @@ public sealed class OneDriveDeviceAuthorizationServiceTests
     public async Task DeviceFlow_UsesPublicClientWithoutSecretOrRedirectUri()
     {
         var requestBodies = new List<string>();
+        var requestUris = new List<Uri>();
         var handler = new StubHttpMessageHandler(async request =>
         {
             requestBodies.Add(await request.Content!.ReadAsStringAsync());
+            requestUris.Add(request.RequestUri!);
             if (request.RequestUri!.AbsolutePath.EndsWith("/devicecode", StringComparison.Ordinal))
             {
                 return Json(HttpStatusCode.OK,
@@ -42,7 +44,6 @@ public sealed class OneDriveDeviceAuthorizationServiceTests
         });
         using var http = new HttpClient(handler);
         var service = new OneDriveDeviceAuthorizationService(
-            CreateConfiguration("public-client-id"),
             new StubHttpClientFactory(http));
         var shareId = Guid.NewGuid();
 
@@ -54,7 +55,9 @@ public sealed class OneDriveDeviceAuthorizationServiceTests
         Assert.Equal(OneDriveDevicePollState.Complete, result.State);
         Assert.Equal(shareId, result.ShareId);
         Assert.Equal("refresh-token", result.RefreshToken);
-        Assert.Contains("client_id=public-client-id", requestBodies[0]);
+        Assert.All(requestBodies, body =>
+            Assert.Contains($"client_id={OneDriveOAuthDefaults.ClientId}", body));
+        Assert.All(requestUris, uri => Assert.Contains("/common/oauth2/v2.0/", uri.AbsolutePath));
         Assert.Contains("scope=offline_access+Files.ReadWrite+User.Read", requestBodies[0]);
         Assert.Contains("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code", requestBodies[1]);
         Assert.All(requestBodies, body =>
@@ -79,7 +82,6 @@ public sealed class OneDriveDeviceAuthorizationServiceTests
         });
         using var http = new HttpClient(handler);
         var service = new OneDriveDeviceAuthorizationService(
-            CreateConfiguration("public-client-id"),
             new StubHttpClientFactory(http));
         var authorization = await service.StartAsync(Guid.NewGuid(), "", "ticket");
 
@@ -88,28 +90,6 @@ public sealed class OneDriveDeviceAuthorizationServiceTests
         Assert.Equal(OneDriveDevicePollState.Pending, result.State);
         Assert.Equal(5, result.RetryAfterSeconds);
     }
-
-    [Fact]
-    public async Task StartAsync_RejectsUnchangedClientIdPlaceholder()
-    {
-        using var http = new HttpClient(new StubHttpMessageHandler(_ =>
-            throw new InvalidOperationException("No HTTP request was expected.")));
-        var service = new OneDriveDeviceAuthorizationService(
-            CreateConfiguration("PASTE_APPLICATION_CLIENT_ID_HERE"),
-            new StubHttpClientFactory(http));
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.StartAsync(Guid.NewGuid(), "", "ticket"));
-    }
-
-    private static IConfiguration CreateConfiguration(string clientId)
-        => new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["OneDriveOAuth:ClientId"] = clientId,
-                ["OneDriveOAuth:Tenant"] = "common"
-            })
-            .Build();
 
     private static HttpResponseMessage Json(HttpStatusCode statusCode, string json)
         => new(statusCode)

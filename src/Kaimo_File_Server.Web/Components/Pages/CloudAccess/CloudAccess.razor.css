@@ -1,0 +1,185 @@
+.cloud-access-header {
+    align-items: flex-start;
+}
+
+.cloud-access-create-card,
+.cloud-access-connections {
+    margin: 1rem 0;
+    padding: 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+}
+
+.cloud-access-form {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.cloud-access-form label {
+    display: grid;
+    gap: .4rem;
+}
+
+.cloud-access-folder-field {
+    grid-column: 1 / -1;
+}
+
+.cloud-access-path {
+    display: flex;
+    gap: .5rem;
+}
+
+.cloud-access-path input {
+    flex: 1;
+}
+
+.cloud-access-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .5rem;
+    margin-top: 1rem;
+}
+
+.cloud-access-workspace {
+    display: grid;
+    grid-template-columns: minmax(320px, .95fr) minmax(380px, 1.25fr);
+    gap: 1rem;
+    min-height: 440px;
+}
+
+.cloud-access-share-list,
+.cloud-access-detail-pane {
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    overflow: hidden;
+}
+
+.cloud-access-list-header {
+    padding: .85rem 1rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.cloud-access-share-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .75rem;
+    padding: .8rem 1rem;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cloud-access-share-row:hover,
+.cloud-access-share-row--selected {
+    background: var(--bg-hover);
+}
+
+.cloud-access-share-row--selected {
+    box-shadow: inset 3px 0 var(--accent);
+}
+
+.cloud-access-share-row > span:nth-child(2) {
+    display: grid;
+    min-width: 0;
+    gap: .15rem;
+}
+
+.cloud-access-share-row small {
+    overflow: hidden;
+    color: var(--text-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cloud-access-share-row .share-state {
+    font-size: .75rem;
+    color: var(--text-secondary);
+}
+
+.cloud-access-detail-pane {
+    padding: 1rem;
+}
+
+.cloud-access-principal-editor {
+    display: grid;
+    gap: .75rem;
+}
+
+.cloud-access-principal-list {
+    display: grid;
+    gap: .4rem;
+}
+
+.cloud-access-principal-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .55rem .65rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.cloud-access-connection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: .75rem;
+    margin-top: .75rem;
+}
+
+.cloud-access-connection-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .85rem;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+}
+
+.cloud-access-connection-card > div:first-child {
+    display: grid;
+    min-width: 0;
+    gap: .15rem;
+}
+
+.cloud-access-connection-card small {
+    overflow: hidden;
+    color: var(--text-secondary);
+    text-overflow: ellipsis;
+}
+
+.cloud-access-connection-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: .4rem;
+}
+
+@media (max-width: 900px) {
+    .cloud-access-form,
+    .cloud-access-workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .cloud-access-connection-card,
+    .cloud-access-path {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
