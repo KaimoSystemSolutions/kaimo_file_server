@@ -2079,6 +2079,11 @@
   <data name="Web_CloudAccess_Department" xml:space="preserve"><value>Abteilung</value></data>
   <data name="Web_CloudAccess_Select" xml:space="preserve"><value>Bitte auswählen</value></data>
   <data name="Web_CloudAccess_Connect" xml:space="preserve"><value>Verbinden</value></data>
+  <data name="Web_CloudAccess_Edit" xml:space="preserve"><value>Bearbeiten</value></data>
+  <data name="Web_CloudAccess_Save" xml:space="preserve"><value>Änderungen speichern</value></data>
+  <data name="Web_CloudAccess_Cancel" xml:space="preserve"><value>Abbrechen</value></data>
+  <data name="Web_CloudAccess_EditConnection" xml:space="preserve"><value>Verbindung bearbeiten</value></data>
+  <data name="Web_CloudAccess_EditShare" xml:space="preserve"><value>Virtuellen Share bearbeiten</value></data>
   <data name="Web_CloudAccess_ConnectionHelp" xml:space="preserve"><value>Anbieter auswählen und die Verbindung einer Abteilung zuweisen. Zugangsdaten bleiben verschlüsselt auf dem Server.</value></data>
   <data name="Web_CloudAccess_Connections" xml:space="preserve"><value>Verbindungen</value></data>
   <data name="Web_CloudAccess_NoConnections" xml:space="preserve"><value>Noch keine Cloud-Verbindung eingerichtet.</value></data>
@@ -2097,6 +2102,7 @@
   <data name="Web_CloudAccess_ReadWrite" xml:space="preserve"><value>Lesen und Schreiben</value></data>
   <data name="Web_CloudAccess_Access" xml:space="preserve"><value>Zugriff</value></data>
   <data name="Web_CloudAccess_AccessHelp" xml:space="preserve"><value>Ausgewählte Benutzer und Gruppen können auf den gesamten virtuellen Share zugreifen.</value></data>
+  <data name="Web_CloudAccess_AccessEditHelp" xml:space="preserve"><value>Benutzer und Gruppen hinzufügen oder entfernen und anschließend die Zugriffsliste speichern.</value></data>
   <data name="Web_CloudAccess_Principal" xml:space="preserve"><value>Benutzer oder Gruppe</value></data>
   <data name="Web_CloudAccess_PrincipalPlaceholder" xml:space="preserve"><value>Benutzer oder Gruppe auswählen</value></data>
   <data name="Web_CloudAccess_AddPrincipal" xml:space="preserve"><value>Hinzufügen</value></data>

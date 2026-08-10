@@ -16,6 +16,68 @@ namespace Kaimo_File_Server.Tests;
 
 public sealed class CloudAccessViewModelTests
 {
+    [Fact]
+    public async Task UpdateConnectionAsync_TrimsAndPersistsManagedConnectionName()
+    {
+        var departmentId = Guid.NewGuid();
+        var user = new User(Guid.NewGuid(), "Alice", "alice", "hash", "nt");
+        var actor = new UserContext(user, [], [], []);
+        var connection = new CloudAccessConnection { DepartmentId = departmentId, Name = "Old name" };
+        var cloudRepository = new Mock<ICloudAccessRepository>();
+        cloudRepository.Setup(x => x.GetConnectionAsync(connection.Id, default)).ReturnsAsync(connection);
+        cloudRepository.Setup(x => x.GetConnectionsAsync(default)).ReturnsAsync([connection]);
+        cloudRepository.Setup(x => x.GetSharesAsync(default)).ReturnsAsync([]);
+        var management = new Mock<IManagementAuthService>();
+        management.Setup(x => x.CanManageDepartmentAsync(actor, departmentId, ManagementPermission.ManageCloudAccess))
+            .ReturnsAsync(true);
+        management.Setup(x => x.GetAuthorizedDepartmentIdsAsync(actor, ManagementPermission.ManageCloudAccess))
+            .ReturnsAsync(AuthorizedScopeResult.Unrestricted());
+        var userContexts = new Mock<IUserContextFactory>();
+        userContexts.Setup(x => x.CreateByUsernameAsync("alice")).ReturnsAsync(actor);
+        var authentication = new Mock<AuthenticationStateProvider>();
+        authentication.Setup(x => x.GetAuthenticationStateAsync()).ReturnsAsync(new AuthenticationState(
+            new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "alice")], "test"))));
+        var departments = new Mock<IDepartmentRepository>();
+        departments.Setup(x => x.GetAllAsync()).ReturnsAsync([]);
+        var viewModel = new CloudAccessViewModel(
+            cloudRepository.Object, Mock.Of<ICloudAccessCredentialProtector>(), Mock.Of<ICloudAuthorizationTicketStore>(),
+            management.Object, userContexts.Object, authentication.Object, departments.Object,
+            Mock.Of<IUserRepository>(), Mock.Of<IGroupRepository>(), Mock.Of<IShareRepository>(),
+            Mock.Of<IHttpClientFactory>(), NullLogger<CloudAccessViewModel>.Instance);
+
+        await viewModel.UpdateConnectionAsync(connection.Id, "  Finance OneDrive  ");
+
+        Assert.Equal("Finance OneDrive", connection.Name);
+        cloudRepository.Verify(x => x.UpsertConnectionAsync(connection, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateConnectionAsync_RejectsBlankNames()
+    {
+        var connection = new CloudAccessConnection { DepartmentId = Guid.NewGuid(), Name = "Current" };
+        var cloudRepository = new Mock<ICloudAccessRepository>();
+        cloudRepository.Setup(x => x.GetConnectionAsync(connection.Id, default)).ReturnsAsync(connection);
+        var management = new Mock<IManagementAuthService>();
+        management.Setup(x => x.CanManageDepartmentAsync(It.IsAny<UserContext>(), connection.DepartmentId,
+                ManagementPermission.ManageCloudAccess)).ReturnsAsync(true);
+        var user = new User(Guid.NewGuid(), "Alice", "alice", "hash", "nt");
+        var contexts = new Mock<IUserContextFactory>();
+        contexts.Setup(x => x.CreateByUsernameAsync("alice")).ReturnsAsync(new UserContext(user, [], [], []));
+        var authentication = new Mock<AuthenticationStateProvider>();
+        authentication.Setup(x => x.GetAuthenticationStateAsync()).ReturnsAsync(new AuthenticationState(
+            new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "alice")], "test"))));
+        var viewModel = new CloudAccessViewModel(
+            cloudRepository.Object, Mock.Of<ICloudAccessCredentialProtector>(), Mock.Of<ICloudAuthorizationTicketStore>(),
+            management.Object, contexts.Object, authentication.Object, Mock.Of<IDepartmentRepository>(),
+            Mock.Of<IUserRepository>(), Mock.Of<IGroupRepository>(), Mock.Of<IShareRepository>(),
+            Mock.Of<IHttpClientFactory>(), NullLogger<CloudAccessViewModel>.Instance);
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() => viewModel.UpdateConnectionAsync(connection.Id, " "));
+
+        Assert.Equal(Resources.ResourceManager.GetString("Web_CloudAccess_InvalidConnectionName"), exception.Message);
+        cloudRepository.Verify(x => x.UpsertConnectionAsync(It.IsAny<CloudAccessConnection>(), default), Times.Never);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

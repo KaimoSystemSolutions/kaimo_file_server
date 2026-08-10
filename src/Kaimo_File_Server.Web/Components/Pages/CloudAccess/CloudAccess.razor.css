@@ -23,6 +23,10 @@
     gap: .4rem;
 }
 
+.cloud-access-edit-form {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+}
+
 .cloud-access-folder-field {
     grid-column: 1 / -1;
 }
@@ -169,6 +173,10 @@
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: .4rem;
+}
+
+.cloud-access-connection-name {
+    min-width: 160px;
 }
 
 @media (max-width: 900px) {

@@ -118,6 +118,19 @@ public sealed class CloudAccessViewModel
         return $"/api/cloud-access/onedrive/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
     }
 
+    /// <summary>Updates the display name of a managed provider connection.</summary>
+    public async Task UpdateConnectionAsync(Guid connectionId, string name)
+    {
+        var connection = await GetManagedConnectionAsync(connectionId);
+        var normalizedName = name.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedName) || normalizedName.Length > 200)
+            throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
+
+        connection.Name = normalizedName;
+        await _repository.UpsertConnectionAsync(connection);
+        await LoadAsync();
+    }
+
     public async Task<List<CloudDirectoryItem>> ListOneDriveFoldersAsync(Guid connectionId, string path)
     {
         var connectionRecord = await GetManagedConnectionAsync(connectionId);
@@ -201,6 +214,49 @@ public sealed class CloudAccessViewModel
         await LoadAsync();
     }
 
+    /// <summary>
+    /// Updates a virtual share while preserving its identity and existing grants.
+    /// The selected remote folder is resolved again to keep the persisted provider item ID current.
+    /// </summary>
+    public async Task UpdateShareAsync(
+        Guid shareId,
+        string name,
+        string remoteRootPath,
+        bool isReadOnly)
+    {
+        var share = await _repository.GetShareAsync(shareId)
+                    ?? throw new InvalidOperationException(R("Web_CloudAccess_ShareMissing"));
+        await EnsureCanManageDepartmentAsync(share.DepartmentId);
+
+        var normalizedName = name.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedName)
+            || normalizedName.Length > 200
+            || !SambaName.IsValidShareName(normalizedName))
+            throw new ArgumentException(R("Web_CloudAccess_InvalidShareName"));
+        if (!await IsShareNameAvailableAsync(normalizedName, share.Id))
+            throw new InvalidOperationException(R("Web_CloudAccess_ShareNameExists"));
+        if (!ShareRelativePath.TryNormalizeStrict(remoteRootPath.Trim('/'), out var root))
+            throw new UnauthorizedAccessException(R("Web_CloudAccess_InvalidRemotePath"));
+
+        var connectionRecord = await GetManagedConnectionAsync(share.ConnectionId);
+        if (connectionRecord.State != CloudAccessConnectionState.Ready
+            || string.IsNullOrWhiteSpace(connectionRecord.ProtectedCredentials))
+            throw new InvalidOperationException(R("Web_CloudAccess_ConnectionNotReady"));
+
+        var credentials = _protector.Unprotect(connectionRecord.ProtectedCredentials);
+        await using var connection = new OneDriveConnection(
+            credentials, _httpClientFactory.CreateClient("CloudAccessOneDrive"));
+        var folder = await connection.ResolveFolderAsync(root);
+        await PersistCredentialsIfRotatedAsync(connectionRecord, connection, credentials);
+
+        share.Name = normalizedName;
+        share.RemoteRootPath = folder.Path;
+        share.RemoteRootItemId = folder.ProviderId;
+        share.IsReadOnly = isReadOnly;
+        await _repository.UpsertShareAsync(share);
+        await LoadAsync();
+    }
+
     public async Task DeleteShareAsync(Guid shareId)
     {
         var share = await _repository.GetShareAsync(shareId)
@@ -261,10 +317,10 @@ public sealed class CloudAccessViewModel
             throw new UnauthorizedAccessException(R("Web_CloudAccess_DepartmentDenied"));
     }
 
-    private async Task<bool> IsShareNameAvailableAsync(string name)
+    private async Task<bool> IsShareNameAvailableAsync(string name, Guid? excludedShareId = null)
     {
         var comparer = StringComparer.OrdinalIgnoreCase;
-        if ((await _repository.GetSharesAsync()).Any(x => comparer.Equals(x.Name, name)))
+        if ((await _repository.GetSharesAsync()).Any(x => x.Id != excludedShareId && comparer.Equals(x.Name, name)))
             return false;
 
         return !(await _localShares.GetAllAsync()).Any(x => comparer.Equals(x.Name, name));

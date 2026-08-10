@@ -194,7 +194,24 @@ else
                     <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_Account")</span><span class="detail-value">@(connection?.AccountEmail ?? connection?.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</span></div>
                     <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_RemoteFolder")</span><span class="detail-value">@_selectedShare.RemoteRootPath</span></div>
                     <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_AccessMode")</span><span class="detail-value">@(_selectedShare.IsReadOnly ? R("Web_CloudAccess_ReadOnly") : R("Web_CloudAccess_ReadWrite"))</span></div>
+                    @if (_editingShare)
+                    {
+                        <div class="cloud-access-form cloud-access-edit-form">
+                            <label><span class="detail-label">@R("Web_CloudAccess_ShareName")</span><input class="edit-input" @bind="_editShareName" @bind:event="oninput" maxlength="200" /></label>
+                            <label><span class="detail-label">@R("Web_CloudAccess_AccessMode")</span><select class="edit-input" @bind="_editShareReadOnly"><option value="false">@R("Web_CloudAccess_ReadWrite")</option><option value="true">@R("Web_CloudAccess_ReadOnly")</option></select></label>
+                            <label class="cloud-access-folder-field"><span class="detail-label">@R("Web_CloudAccess_RemoteFolder")</span><div class="cloud-access-path"><input class="edit-input" value="@_editShareRoot" readonly /><button class="btn-secondary" type="button" disabled="@_busy" @onclick="OpenEditPickerAsync">@R("Web_CloudAccess_Browse")</button></div></label>
+                        </div>
+                    }
                     <div class="detail-actions">
+                        @if (_editingShare)
+                        {
+                            <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelEditShare">@R("Web_CloudAccess_Cancel")</button>
+                            <button class="btn-primary" type="button" disabled="@(_busy || string.IsNullOrWhiteSpace(_editShareName) || string.IsNullOrWhiteSpace(_editShareRoot))" @onclick="SaveShareAsync">@R("Web_CloudAccess_Save")</button>
+                        }
+                        else
+                        {
+                            <button class="btn-secondary" type="button" @onclick="StartEditShare">@R("Web_CloudAccess_Edit")</button>
+                        }
                         <button class="btn-primary" type="button" @onclick="() => OpenShare(_selectedShare)">@R("Web_CloudAccess_Open")</button>
                         <button class="btn-danger-outline" type="button" @onclick="() => DeleteShareAsync(_selectedShare)">@Resources.Web_Action_Delete</button>
                     </div>
@@ -202,7 +219,7 @@ else
                 else
                 {
                     <div class="detail-section cloud-access-principal-editor">
-                        <p class="share-help-text">@R("Web_CloudAccess_AccessHelp")</p>
+                        <p class="share-help-text">@R("Web_CloudAccess_AccessEditHelp")</p>
                         <select class="edit-input"
                                 aria-label="@R("Web_CloudAccess_Access")"
                                 value="@Guid.Empty"
@@ -248,6 +265,16 @@ else
                             <small>@(connection.AccountEmail ?? connection.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</small>
                         </div>
                         <div class="cloud-access-connection-actions">
+                            @if (_editingConnectionId == connection.Id)
+                            {
+                                <input class="edit-input cloud-access-connection-name" aria-label="@R("Web_CloudAccess_ConnectionName")" @bind="_editConnectionName" @bind:event="oninput" maxlength="200" />
+                                <button class="btn-primary" type="button" disabled="@(_busy || string.IsNullOrWhiteSpace(_editConnectionName))" @onclick="SaveConnectionAsync">@R("Web_CloudAccess_Save")</button>
+                                <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelEditConnection">@R("Web_CloudAccess_Cancel")</button>
+                            }
+                            else
+                            {
+                                <button class="btn-secondary" type="button" @onclick="() => StartEditConnection(connection)">@R("Web_CloudAccess_Edit")</button>
+                            }
                             <button class="btn-secondary" type="button" @onclick="() => AuthorizeConnectionAsync(connection)">@(IsReady(connection) ? R("Web_CloudAccess_Reauthorize") : R("Web_CloudAccess_Authorize"))</button>
                             <button class="btn-danger-outline" type="button" @onclick="() => DeleteConnectionAsync(connection)">@Resources.Web_Action_Delete</button>
                         </div>
@@ -287,9 +314,17 @@ else
     private string _pickerPath = "/";
     private string? _pickerError;
     private IReadOnlyList<CloudDirectoryItem> _pickerItems = [];
+    private Guid _pickerConnectionId;
+    private bool _pickingEditedShare;
     private CloudAccessShare? _selectedShare;
     private CloudAccessTab _activeTab = CloudAccessTab.General;
     private HashSet<Guid> _grantPrincipalIds = [];
+    private bool _editingShare;
+    private string _editShareName = "";
+    private string _editShareRoot = "";
+    private bool _editShareReadOnly;
+    private Guid? _editingConnectionId;
+    private string _editConnectionName = "";
 
     private bool CanConnect => _connectionProvider == "onedrive"
                                && !string.IsNullOrWhiteSpace(_connectionName)
@@ -353,7 +388,19 @@ else
     private async Task OpenPickerAsync()
     {
         _pickerOpen = true;
+        _pickerConnectionId = _shareConnectionId;
+        _pickingEditedShare = false;
         _pickerPath = "/";
+        await LoadPickerAsync();
+    }
+
+    private async Task OpenEditPickerAsync()
+    {
+        if (_selectedShare is null) return;
+        _pickerOpen = true;
+        _pickerConnectionId = _selectedShare.ConnectionId;
+        _pickingEditedShare = true;
+        _pickerPath = _editShareRoot;
         await LoadPickerAsync();
     }
 
@@ -365,7 +412,8 @@ else
 
     private Task SelectPickerAsync(string path)
     {
-        _remoteRoot = path;
+        if (_pickingEditedShare) _editShareRoot = path;
+        else _remoteRoot = path;
         _pickerOpen = false;
         return Task.CompletedTask;
     }
@@ -382,7 +430,7 @@ else
         _pickerError = null;
         try
         {
-            _pickerItems = await VM.ListOneDriveFoldersAsync(_shareConnectionId, _pickerPath);
+            _pickerItems = await VM.ListOneDriveFoldersAsync(_pickerConnectionId, _pickerPath);
         }
         catch (Exception exception)
         {
@@ -398,6 +446,7 @@ else
     private async Task SelectShareAsync(CloudAccessShare share)
     {
         _selectedShare = share;
+        _editingShare = false;
         _activeTab = CloudAccessTab.General;
         var connection = VM.Connections.FirstOrDefault(x => x.Id == share.ConnectionId);
         if (connection is not null)
@@ -426,6 +475,47 @@ else
     {
         if (_selectedShare is null) return;
         await RunAsync(() => VM.UpdateShareGrantsAsync(_selectedShare.Id, _grantPrincipalIds));
+    }
+
+    private void StartEditShare()
+    {
+        if (_selectedShare is null) return;
+        _editShareName = _selectedShare.Name;
+        _editShareRoot = _selectedShare.RemoteRootPath;
+        _editShareReadOnly = _selectedShare.IsReadOnly;
+        _editingShare = true;
+    }
+
+    private void CancelEditShare() => _editingShare = false;
+
+    private async Task SaveShareAsync()
+    {
+        if (_selectedShare is null) return;
+        var shareId = _selectedShare.Id;
+        await RunAsync(async () =>
+        {
+            await VM.UpdateShareAsync(shareId, _editShareName, _editShareRoot, _editShareReadOnly);
+            _selectedShare = VM.Shares.SingleOrDefault(x => x.Id == shareId);
+            _editingShare = false;
+        });
+    }
+
+    private void StartEditConnection(CloudAccessConnection connection)
+    {
+        _editingConnectionId = connection.Id;
+        _editConnectionName = connection.Name;
+    }
+
+    private void CancelEditConnection() => _editingConnectionId = null;
+
+    private async Task SaveConnectionAsync()
+    {
+        if (_editingConnectionId is not { } connectionId) return;
+        await RunAsync(async () =>
+        {
+            await VM.UpdateConnectionAsync(connectionId, _editConnectionName);
+            _editingConnectionId = null;
+        });
     }
 
     private async Task DeleteShareAsync(CloudAccessShare share)
