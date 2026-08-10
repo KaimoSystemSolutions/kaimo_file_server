@@ -60,9 +60,9 @@ public partial class FileBrowser
 
     // ========== Toolbar Computed ==========
     
-    private bool CanOpenSelection => _selectedItems.Count == 1;
-    private bool CanRenameSelection => _selectedItems.Count == 1;
-    private bool CanDeleteSelection => _selectedItems.Count > 0;
+    private bool CanOpenSelection => VM.Capabilities.CanOpen && _selectedItems.Count == 1;
+    private bool CanRenameSelection => VM.Capabilities.CanRename && _selectedItems.Count == 1;
+    private bool CanDeleteSelection => VM.Capabilities.CanDelete && _selectedItems.Count > 0;
     private bool CanAclSelection => CanManageAcls() && _selectedItems.Count == 1;
     
     // ========== Syncing ==========
@@ -154,7 +154,7 @@ public partial class FileBrowser
 
     internal async Task RenameSelected()
     {
-        if (_selectedItems.Count != 1) return;
+        if (!VM.Capabilities.CanRename || _selectedItems.Count != 1) return;
         var item = _selectedItems.First();
         _renameTarget = item;
         _renameNewName = item.Name;
@@ -168,7 +168,7 @@ public partial class FileBrowser
 
     internal async Task PutIntoClipboard(bool deleteOnPaste)
     {
-        if(_selectedItems.Count < 1)
+        if (!VM.Capabilities.CanCopy || _selectedItems.Count < 1)
             return;
 
         if(_clipboardToastID != null)
@@ -190,7 +190,7 @@ public partial class FileBrowser
 
     private async Task PasteClipboard()
     {
-        if(_clipboard.Count < 1)
+        if (!VM.Capabilities.CanCopy || _clipboard.Count < 1)
             return;
 
         CancellationToken cancellationToken = new CancellationToken();
@@ -282,6 +282,9 @@ public partial class FileBrowser
 
     private void OnDragStart(FileMetadata entry)
     {
+        if (!VM.Capabilities.CanMove)
+            return;
+
         // If the dragged item is part of the current selection, the entire
         // selection is dragged, otherwise only the single item.
         if (!_selectedItems.Contains(entry))
@@ -303,6 +306,7 @@ public partial class FileBrowser
 
     private bool CanDropOn(FileMetadata target)
     {
+        if (!VM.Capabilities.CanMove) return false;
         if (_draggedItems.Count == 0) return false;
         if (!target.IsDirectory) return false;
         if (_draggedItems.Contains(target)) return false;
@@ -320,7 +324,8 @@ public partial class FileBrowser
         return true;
     }
 
-    private bool CanDropOnParent() => _draggedItems.Count > 0 && VM.HasParent;
+    private bool CanDropOnParent()
+        => VM.Capabilities.CanMove && _draggedItems.Count > 0 && VM.HasParent;
 
 // ---- Hover-Feedback ----
 
@@ -368,7 +373,7 @@ public partial class FileBrowser
         _draggedItems.Clear();
         _dragOverPath = null;
 
-        if (items.Count == 0) return;
+        if (!VM.Capabilities.CanMove || items.Count == 0) return;
 
         var toastId = Toast.Show(
             items.Count == 1

@@ -18,10 +18,15 @@ namespace Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser;
 
 public partial class FileBrowser
 {
+    [Parameter, EditorRequired] public IFileBrowserViewModel VM { get; set; } = default!;
     [Parameter] public string ShareName { get; set; } = "";
     [Parameter] public string? SubPath { get; set; }
+    [Parameter] public string OverviewRoute { get; set; } = "/files";
+    [Parameter] public string? ShareRoute { get; set; }
 
-    private bool IsShareOverview => string.IsNullOrWhiteSpace(ShareName);
+    private string CurrentShareRoute => string.IsNullOrWhiteSpace(ShareRoute)
+        ? $"{OverviewRoute.TrimEnd('/')}/{Uri.EscapeDataString(ShareName)}"
+        : ShareRoute.TrimEnd('/');
 
     // ========== Column Resize (5 Spalten, ohne Actions) ==========
 

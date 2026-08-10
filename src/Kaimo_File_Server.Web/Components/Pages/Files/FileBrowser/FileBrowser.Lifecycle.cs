@@ -24,9 +24,6 @@ public partial class FileBrowser
 
     protected override async Task OnParametersSetAsync()
     {
-        if (IsShareOverview)
-            return;
-
         _showFolderAcl = false;
         _aclFolderPath = "";
         _selectedItems.Clear();
@@ -50,7 +47,7 @@ public partial class FileBrowser
 
     private async Task CheckForJustSynced()
     {
-        if (string.IsNullOrEmpty(JustSynced))
+        if (!VM.Capabilities.HasCloudSync || string.IsNullOrEmpty(JustSynced))
             return;
         
         var match = VM.Items.FirstOrDefault(i => i.IsDirectory && i.Name == JustSynced);
@@ -67,6 +64,9 @@ public partial class FileBrowser
 
     private bool TryApplyPendingFileSelection()
     {
+        if (!VM.Capabilities.HasSearchIntegration)
+            return false;
+
         if (!FileSelectionCoordinator.TryConsume(ShareName, SubPath ?? "", out var itemName))
             return false;
 
@@ -90,15 +90,14 @@ public partial class FileBrowser
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (IsShareOverview)
-            return;
-
         if (!_jsInitialized && _fileDropZone.Id is not null)
         {
             _jsInitialized = true;
             _dotNetRef = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("initFileUpload", "#file-drop-zone");
-            await JS.InvokeVoidAsync("initInternalDragDrop");
+            if (VM.Capabilities.CanUpload)
+                await JS.InvokeVoidAsync("initFileUpload", "#file-drop-zone");
+            if (VM.Capabilities.CanMove)
+                await JS.InvokeVoidAsync("initInternalDragDrop");
         }
         
         
@@ -164,22 +163,22 @@ public partial class FileBrowser
     
     private async Task OnKeyDownItemList(KeyboardEventArgs e)
     {
-        if (e.Key == "Delete" && _selectedItems.Count > 0)
+        if (e.Key == "Delete" && VM.Capabilities.CanDelete && _selectedItems.Count > 0)
             await DeleteSelected();
 
-        if (e.Key == "F2" && _selectedItems.Count == 1)
+        if (e.Key == "F2" && VM.Capabilities.CanRename && _selectedItems.Count == 1)
             await RenameSelected();
         
         // copy/cut/paste
         if (e.CtrlKey)
         {
-            if (e.Key == "c")
+            if (e.Key == "c" && VM.Capabilities.CanCopy)
                 await PutIntoClipboard(false);
         
-            if (e.Key == "x")
+            if (e.Key == "x" && VM.Capabilities.CanCopy && VM.Capabilities.CanDelete)
                 await PutIntoClipboard(true);
 
-            if (e.Key == "v")
+            if (e.Key == "v" && VM.Capabilities.CanCopy)
                 await PasteClipboard();
         }
         
@@ -340,20 +339,10 @@ public partial class FileBrowser
     private async Task LoadAclCounts() => await VM.LoadAclCountsAsync();
 
     private string GetDirAclPath(FileMetadata dir)
-    {
-        var relativePath = dir.Path;
-        if (VM.CurrentShare is not null && relativePath.StartsWith(VM.CurrentShare.Path))
-            relativePath = relativePath[VM.CurrentShare.Path.Length..].TrimStart('/');
-        return relativePath;
-    }
+        => VM.ShareRelativeOf(dir);
 
     private string GetFileAclPath(FileMetadata file)
-    {
-        var relativePath = file.Path;
-        if (VM.CurrentShare is not null && relativePath.StartsWith(VM.CurrentShare.Path))
-            relativePath = relativePath[VM.CurrentShare.Path.Length..].TrimStart('/');
-        return relativePath;
-    }
+        => VM.ShareRelativeOf(file);
 
     internal void OpenFolderAcl(FileMetadata dir)
     {
@@ -413,18 +402,16 @@ public partial class FileBrowser
 
     internal void NavigateTo(FileMetadata dir)
     {
-        var relativePath = dir.Path;
-        if (VM.CurrentShare is not null && relativePath.StartsWith(VM.CurrentShare.Path))
-            relativePath = relativePath[VM.CurrentShare.Path.Length..].TrimStart('/');
-        Nav.NavigateTo($"/files/{ShareName}/{relativePath}");
+        var relativePath = VM.ShareRelativeOf(dir);
+        Nav.NavigateTo($"{CurrentShareRoute}/{relativePath}");
     }
 
     private void NavigateUp()
     {
         if (string.IsNullOrEmpty(VM.ParentPath))
-            Nav.NavigateTo($"/files/{ShareName}");
+            Nav.NavigateTo(CurrentShareRoute);
         else
-            Nav.NavigateTo($"/files/{ShareName}/{VM.ParentPath}");
+            Nav.NavigateTo($"{CurrentShareRoute}/{VM.ParentPath}");
     }
 
     /// <summary>
@@ -433,10 +420,16 @@ public partial class FileBrowser
     /// ACL panel, badges and permission actions — and the context-menu entry.
     /// </summary>
     public bool CanManageAcls()
-        => !VM.IsLoading && VM.ErrorMessage is null && VM.CanManageAcls;
+        => VM.Capabilities.HasFileAcls
+           && !VM.IsLoading
+           && VM.ErrorMessage is null
+           && VM.CanManageAcls;
     
     public bool CanManageSyncs()
-        => !VM.IsLoading && VM.ErrorMessage is null && VM.CanManageSyncs;
+        => VM.Capabilities.HasCloudSync
+           && !VM.IsLoading
+           && VM.ErrorMessage is null
+           && VM.CanManageSyncs;
     
     
     

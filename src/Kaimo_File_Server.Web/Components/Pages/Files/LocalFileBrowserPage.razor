@@ -1,0 +1,20 @@
+@page "/files/{ShareName}/{*SubPath}"
+@page "/files/{ShareName}"
+@page "/files"
+@using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser
+@using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser.components
+@inject FileBrowserViewModel LocalViewModel
+
+@if (string.IsNullOrWhiteSpace(ShareName))
+{
+    <FileBrowserShareOverview />
+}
+else
+{
+    <FileBrowser VM="LocalViewModel" ShareName="ShareName" SubPath="SubPath" />
+}
+
+@code {
+    [Parameter] public string ShareName { get; set; } = "";
+    [Parameter] public string? SubPath { get; set; }
+}

@@ -3,7 +3,6 @@
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Kaimo_File_Server.Web.Helpers
 @inject AssetProvider Assets
-@inject FileBrowserViewModel VM
 @inject IJSRuntime JS
 
 
@@ -88,6 +87,8 @@
 
 
 @code {
+
+    [Parameter, EditorRequired] public IFileBrowserViewModel VM { get; set; } = default!;
 
     private string _displayUrl = "";
     private string _downloadUrl = "";

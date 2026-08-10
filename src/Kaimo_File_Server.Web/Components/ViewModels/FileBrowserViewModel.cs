@@ -25,7 +25,7 @@ public record OperationResult(bool Success, string? Error = null)
     public static OperationResult Fail(string error) => new(false, error);
 }
 
-public class FileBrowserViewModel
+public class FileBrowserViewModel : IFileBrowserViewModel
 {
     private long MaxUploadSizeBytes => 1100L * 1024 * 1024; // 1.1 GB
 
@@ -71,6 +71,12 @@ public class FileBrowserViewModel
     // -- State --
 
     public event Action? OnStateChanged;
+
+    public BrowserCapabilities Capabilities => BrowserCapabilities.Local;
+
+    public BrowserShareInfo? CurrentBrowserShare => CurrentShare is null
+        ? null
+        : new BrowserShareInfo(CurrentShare.Id, CurrentShare.Name, BrowserShareKind.Local);
 
     // Written from a background task (bounded parallelism) while the render thread
     // reads it — hence concurrent, not a plain Dictionary, to avoid torn reads.

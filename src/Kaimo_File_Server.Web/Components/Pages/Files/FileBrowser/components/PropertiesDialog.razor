@@ -1,7 +1,6 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Pages.Acl
 @using Kaimo_File_Server.Web.DynamicHelpers
-@inject FileBrowserViewModel VM
 @inject AssetProvider Assets
 
 @*
@@ -91,7 +90,7 @@
                         <dd>@(_ownerName ?? "–")</dd>
 
                         <dt>@Resources.Web_Properties_Share</dt>
-                        <dd>@(VM.CurrentShare?.Name ?? "–")</dd>
+                        <dd>@(VM.CurrentBrowserShare?.Name ?? "–")</dd>
 
                         @* Only persisted items carry a stable id; hide the row otherwise
                            instead of showing a meaningless all-zero GUID. *@
@@ -115,6 +114,8 @@
 }
 
 @code {
+    [Parameter, EditorRequired] public IFileBrowserViewModel VM { get; set; } = default!;
+
     private enum Tab { General, Security }
 
     private bool _show;
@@ -141,7 +142,7 @@
 
         // Location = share name + share-relative parent folder (empty at the root).
         var parent = Kaimo_File_Server.Core.Helpers.ShareRelativePath.GetParent(_relativePath);
-        var shareName = VM.CurrentShare?.Name ?? "";
+        var shareName = VM.CurrentBrowserShare?.Name ?? "";
         _location = string.IsNullOrEmpty(parent) ? shareName : $"{shareName}/{parent}";
 
         StateHasChanged();

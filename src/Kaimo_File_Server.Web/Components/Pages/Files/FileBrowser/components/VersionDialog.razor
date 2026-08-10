@@ -1,6 +1,5 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
-@inject FileBrowserViewModel VM
 @inject AssetProvider Assets
 @inject IJSRuntime JS
 @inject ToastService Toast
@@ -69,8 +68,8 @@
                                 var name = EntryName(entry.FilePath);
                                 <div class="version-row">
                                     @Assets.SVG(FileHelper.GetIcon(name), new SvgOptions(Width: 16, Height: 16, Color: "var(--text-tertiary)"))
-                                    <span class="version-row-main" title="@FileBrowserViewModel.RelativeName(entry.FilePath, _folderRel)">
-                                        @FileBrowserViewModel.RelativeName(entry.FilePath, _folderRel)
+                                    <span class="version-row-main" title="@RelativeName(entry.FilePath, _folderRel)">
+                                        @RelativeName(entry.FilePath, _folderRel)
                                     </span>
                                     <span class="version-row-size">@FormatHelper.FormatFileSize(entry.Size)</span>
                                     <div class="version-row-actions">
@@ -148,6 +147,7 @@
 }
 
 @code {
+    [Parameter, EditorRequired] public IFileBrowserViewModel VM { get; set; } = default!;
     [Parameter] public FilePreview FilePreviewComponent { get; set; } = default!;
     [Parameter] public EventCallback OnRestored { get; set; }
 
@@ -298,6 +298,17 @@
     {
         var slash = path.LastIndexOf('/');
         return slash >= 0 ? path[(slash + 1)..] : path;
+    }
+
+    private static string RelativeName(string shareRelativeFilePath, string folderShareRelativePath)
+    {
+        if (!string.IsNullOrEmpty(folderShareRelativePath)
+            && shareRelativeFilePath.StartsWith(folderShareRelativePath + "/", StringComparison.Ordinal))
+        {
+            return shareRelativeFilePath[(folderShareRelativePath.Length + 1)..];
+        }
+
+        return shareRelativeFilePath;
     }
 
     private static string FormatTs(DateTime utc)

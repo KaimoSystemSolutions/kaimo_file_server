@@ -6,11 +6,7 @@
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Kaimo_File_Server.Web.Helpers
 
-@page "/files/{ShareName}/{*SubPath}"
-@page "/files/{ShareName}"
-@page "/files"
 @implements IDisposable
-@inject FileBrowserViewModel VM
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ToastService Toast
@@ -19,33 +15,30 @@
 @inject FileSelectionCoordinator FileSelectionCoordinator
 @inject AssetProvider Assets
 
-@if (IsShareOverview)
-{
-    <FileBrowserShareOverview />
-}
-else
-{
-<PageTitle>@(VM.CurrentShare?.Name ?? Resources.Web_Files) - Kaimo Files</PageTitle>
+<PageTitle>@(VM.CurrentBrowserShare?.Name ?? Resources.Web_Files) - Kaimo Files</PageTitle>
 
 <div class="page-header file-page-header">
     <div class="breadcrumb-bar">
-        <a class="breadcrumb-link" href="/files">@Resources.Web_Breadcrumb_Shares</a>
+        <a class="breadcrumb-link" href="@OverviewRoute">@Resources.Web_Breadcrumb_Shares</a>
         <span class="breadcrumb-sep">/</span>
-        <a class="breadcrumb-link" href="/files/@ShareName">@ShareName</a>
+        <a class="breadcrumb-link" href="@CurrentShareRoute">@(VM.CurrentBrowserShare?.Name ?? ShareName)</a>
         @foreach (var (name, fullPath) in VM.Breadcrumbs)
         {
             <span class="breadcrumb-sep">/</span>
-            <a class="breadcrumb-link" href="/files/@ShareName/@fullPath">@name</a>
+            <a class="breadcrumb-link" href="@($"{CurrentShareRoute}/{fullPath}")">@name</a>
         }
     </div>
     <div class="file-page-actions">
-        <button class="btn-secondary page-command" title="@Resources.Web_CreateFolder_Title"
-                @onclick="ShowCreateFolderDialog"
-                @onkeydown="OnCreateFolderKeyDown"
-                disabled="@(VM.IsLoading || VM.ErrorMessage is not null)">
-            @Assets.SVG("folder.svg", new SvgOptions(Width: 16, Height: 16, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)"))
-            <span>@Resources.Web_CreateFolder_Title</span>
-        </button>
+        @if (VM.Capabilities.CanCreateDirectory)
+        {
+            <button class="btn-secondary page-command" title="@Resources.Web_CreateFolder_Title"
+                    @onclick="ShowCreateFolderDialog"
+                    @onkeydown="OnCreateFolderKeyDown"
+                    disabled="@(VM.IsLoading || VM.ErrorMessage is not null)">
+                @Assets.SVG("folder.svg", new SvgOptions(Width: 16, Height: 16, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)"))
+                <span>@Resources.Web_CreateFolder_Title</span>
+            </button>
+        }
         @if (CanManageAcls())
         {
             <button class="btn-secondary page-command @(_showAclPanel ? "page-command--active" : "")" title="@Resources.Web_ManagePermissions"
@@ -79,23 +72,30 @@ else
             @Assets.SVG("arrow_right.svg", new SvgOptions(Width: 16, Height: 16))
             <span>@Resources.Web_Action_Open</span>
         </button>
-        <button class="toolbar-btn" title="@Resources.Web_Action_Rename"
-                disabled="@(!CanRenameSelection)" @onclick="RenameSelected">
-            @Assets.SVG("edit.svg", new SvgOptions(Width: 16, Height: 16))
-            <span>@Resources.Web_Action_Rename</span>
-        </button>
-        <button class="toolbar-btn toolbar-btn--danger" title="@Resources.Web_Action_Delete"
-                disabled="@(!CanDeleteSelection)" @onclick="DeleteSelected">
-
-            @Assets.SVG("trash.svg", new SvgOptions(Width: 16, Height: 16))
-            <span>@Resources.Web_Action_Delete</span>
-        </button>
-        <button class="toolbar-btn" title="@Resources.Web_Action_Permissions"
-                disabled="@(!CanAclSelection)" @onclick="AclSelected">
-
-            @Assets.SVG("shield.svg", new SvgOptions(Width: 16, Height: 16, Style: "vertical-align: -2px; margin-right: 6px;"))
-            <span>@Resources.Web_Action_Permissions</span>
-        </button>
+        @if (VM.Capabilities.CanRename)
+        {
+            <button class="toolbar-btn" title="@Resources.Web_Action_Rename"
+                    disabled="@(!CanRenameSelection)" @onclick="RenameSelected">
+                @Assets.SVG("edit.svg", new SvgOptions(Width: 16, Height: 16))
+                <span>@Resources.Web_Action_Rename</span>
+            </button>
+        }
+        @if (VM.Capabilities.CanDelete)
+        {
+            <button class="toolbar-btn toolbar-btn--danger" title="@Resources.Web_Action_Delete"
+                    disabled="@(!CanDeleteSelection)" @onclick="DeleteSelected">
+                @Assets.SVG("trash.svg", new SvgOptions(Width: 16, Height: 16))
+                <span>@Resources.Web_Action_Delete</span>
+            </button>
+        }
+        @if (VM.Capabilities.HasFileAcls)
+        {
+            <button class="toolbar-btn" title="@Resources.Web_Action_Permissions"
+                    disabled="@(!CanAclSelection)" @onclick="AclSelected">
+                @Assets.SVG("shield.svg", new SvgOptions(Width: 16, Height: 16, Style: "vertical-align: -2px; margin-right: 6px;"))
+                <span>@Resources.Web_Action_Permissions</span>
+            </button>
+        }
     </div>
 </div>
 
@@ -299,7 +299,7 @@ else
                 @oncontextmenu:stopPropagation="true">
 
                 <div class="col-name"
-                     draggable="true"
+                     draggable="@VM.Capabilities.CanMove"
                      data-path="@entry.Path"
                      @ondragstart="() => OnDragStart(entry)"
                      @ondragend="OnDragEnd">
@@ -329,7 +329,7 @@ else
                 </div>
 
                 <div class="col-size">
-                    @if (entry.IsDirectory)
+                    @if (entry.IsDirectory && VM.Capabilities.ShowDirectorySizes)
                     {
                         var dirSize = VM.GetDirectorySize(entry);
                         if (dirSize.HasValue)
@@ -341,9 +341,13 @@ else
                             <span class="size-loading">…</span>
                         }
                     }
-                    else
+                    else if (!entry.IsDirectory)
                     {
                         @FormatHelper.FormatFileSize(entry.Size)
+                    }
+                    else
+                    {
+                        <span>–</span>
                     }
                 </div>
 
@@ -384,7 +388,6 @@ else
 
 @* -- Context menu (right-click) -- *@
 <ContextMenu @ref="_contextMenuComponent" FileBrowser="this" FilePreviewComponent="_filePreviewComponent"/>
-}
 
 @* -- Dialog: Rename -- *@
 @if (_showRenameDialog)
@@ -412,14 +415,15 @@ else
 }
 
 
-<FilePreview @ref="_filePreviewComponent"/>
+<FilePreview @ref="_filePreviewComponent" VM="VM"/>
 
 @* -- Version history / point-in-time dialog -- *@
 <VersionDialog @ref="_versionDialogComponent"
+               VM="VM"
                FilePreviewComponent="_filePreviewComponent"
                OnRestored="OnVersionRestored"/>
 
 @* -- Properties dialog (size / metadata / ACL) -- *@
-<PropertiesDialog @ref="_propertiesDialogComponent"/>
+<PropertiesDialog @ref="_propertiesDialogComponent" VM="VM"/>
 
 <SyncDialog @ref="_syncDialogComponent" />

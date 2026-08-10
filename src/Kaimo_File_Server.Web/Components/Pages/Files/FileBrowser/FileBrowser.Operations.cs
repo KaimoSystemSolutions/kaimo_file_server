@@ -33,7 +33,7 @@ public partial class FileBrowser
         if (result.Success)
         {
             Toast.Update(toastId, string.Format(Resources.Web_Archive_Success, archiveName), type: ToastType.Success);
-            await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
+            await VM.LoadShareAsync(ShareName, VM.CurrentPath);
             StateHasChanged();
         }
         else
@@ -53,7 +53,7 @@ public partial class FileBrowser
         if (result.Success)
         {
             Toast.Update(toastId, string.Format(Resources.Web_Unzip_Success, file.Name), type: ToastType.Success);
-            await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
+            await VM.LoadShareAsync(ShareName, VM.CurrentPath);
             StateHasChanged();
         }
         else

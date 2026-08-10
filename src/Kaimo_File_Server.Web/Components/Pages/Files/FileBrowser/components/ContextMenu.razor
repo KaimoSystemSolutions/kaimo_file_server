@@ -103,11 +103,20 @@
     private bool PassesRuntimeGuard(string id, ContextMenuScope scope, HashSet<FileMetadata> selected)
         => id switch
         {
+            "open" => FileBrowser.VM.Capabilities.CanOpen,
+            "rename" => FileBrowser.VM.Capabilities.CanRename,
+            "delete" => FileBrowser.VM.Capabilities.CanDelete,
+            "compress.zip" or "compress.targz" => FileBrowser.VM.Capabilities.CanArchive,
+            "versions" => FileBrowser.VM.Capabilities.HasVersions,
+            "properties" => FileBrowser.VM.Capabilities.HasProperties,
+            "newfolder" => FileBrowser.VM.Capabilities.CanCreateDirectory,
             // Permissions stay manager-only regardless of configuration.
             "permissions" => FileBrowser.CanManageAcls(),
             // Bulk extract only makes sense when every selected item is an archive.
             "extract" when scope == ContextMenuScope.MultiSelection
-                => selected.All(f => !f.IsDirectory && FileHelper.IsArchive(f.Name)),
+                => FileBrowser.VM.Capabilities.CanExtract
+                   && selected.All(f => !f.IsDirectory && FileHelper.IsArchive(f.Name)),
+            "extract" => FileBrowser.VM.Capabilities.CanExtract,
                 
             "sync" when scope == ContextMenuScope.Folder => FileBrowser.CanManageSyncs(),
             

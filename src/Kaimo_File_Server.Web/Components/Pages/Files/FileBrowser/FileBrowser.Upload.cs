@@ -21,8 +21,10 @@ public partial class FileBrowser
 
     protected override void OnInitialized()
     {
-        UploadCoordinator.OnFilesSelected += OnFileUploaded;
-        FileSelectionCoordinator.SelectionRequested += OnFileSelectionRequested;
+        if (VM.Capabilities.CanUpload)
+            UploadCoordinator.OnFilesSelected += OnFileUploaded;
+        if (VM.Capabilities.HasSearchIntegration)
+            FileSelectionCoordinator.SelectionRequested += OnFileSelectionRequested;
     }
 
     [JSInvokable]
@@ -198,7 +200,7 @@ public partial class FileBrowser
             }
         }
 
-        await VM.LoadShareAsync(VM.CurrentShare!.Name, VM.CurrentPath);
+        await VM.LoadShareAsync(ShareName, VM.CurrentPath);
         StateHasChanged();
     }
 
