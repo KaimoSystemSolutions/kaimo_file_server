@@ -21,6 +21,8 @@ public partial class FileBrowser
     [Parameter] public string ShareName { get; set; } = "";
     [Parameter] public string? SubPath { get; set; }
 
+    private bool IsShareOverview => string.IsNullOrWhiteSpace(ShareName);
+
     // ========== Column Resize (5 Spalten, ohne Actions) ==========
 
     private Dictionary<string, double> _colWidths = new()

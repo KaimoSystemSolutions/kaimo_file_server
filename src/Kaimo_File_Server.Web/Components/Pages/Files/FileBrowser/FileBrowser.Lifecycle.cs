@@ -24,6 +24,9 @@ public partial class FileBrowser
 
     protected override async Task OnParametersSetAsync()
     {
+        if (IsShareOverview)
+            return;
+
         _showFolderAcl = false;
         _aclFolderPath = "";
         _selectedItems.Clear();
@@ -87,6 +90,9 @@ public partial class FileBrowser
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (IsShareOverview)
+            return;
+
         if (!_jsInitialized && _fileDropZone.Id is not null)
         {
             _jsInitialized = true;

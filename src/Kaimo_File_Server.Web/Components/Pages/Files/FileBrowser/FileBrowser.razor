@@ -8,6 +8,7 @@
 
 @page "/files/{ShareName}/{*SubPath}"
 @page "/files/{ShareName}"
+@page "/files"
 @implements IDisposable
 @inject FileBrowserViewModel VM
 @inject NavigationManager Nav
@@ -18,6 +19,12 @@
 @inject FileSelectionCoordinator FileSelectionCoordinator
 @inject AssetProvider Assets
 
+@if (IsShareOverview)
+{
+    <FileBrowserShareOverview />
+}
+else
+{
 <PageTitle>@(VM.CurrentShare?.Name ?? Resources.Web_Files) - Kaimo Files</PageTitle>
 
 <div class="page-header file-page-header">
@@ -377,6 +384,7 @@ else
 
 @* -- Context menu (right-click) -- *@
 <ContextMenu @ref="_contextMenuComponent" FileBrowser="this" FilePreviewComponent="_filePreviewComponent"/>
+}
 
 @* -- Dialog: Rename -- *@
 @if (_showRenameDialog)

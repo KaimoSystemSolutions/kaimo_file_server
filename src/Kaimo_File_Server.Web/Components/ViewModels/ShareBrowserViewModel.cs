@@ -1,8 +1,11 @@
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.File;
 using Microsoft.AspNetCore.Components.Authorization;
+using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Kaimo_File_Server.Core.Language;
@@ -17,6 +20,7 @@ public partial class ShareBrowserViewModel
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<ShareBrowserViewModel> _logger;
+    private readonly IFileServiceFactory _fileServiceFactory;
 
     public ShareBrowserViewModel(
         IShareRepository shareRepo,
@@ -24,7 +28,8 @@ public partial class ShareBrowserViewModel
         IManagementAuthService mgmtAuth,
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authState,
-        ILogger<ShareBrowserViewModel> logger)
+        ILogger<ShareBrowserViewModel> logger,
+        IFileServiceFactory fileServiceFactory)
     {
         _shareRepo = shareRepo;
         _aclService = aclService;
@@ -32,6 +37,7 @@ public partial class ShareBrowserViewModel
         _userContextFactory = userContextFactory;
         _authState = authState;
         _logger = logger;
+        _fileServiceFactory = fileServiceFactory;
     }
 
     // -- State --
@@ -39,6 +45,8 @@ public partial class ShareBrowserViewModel
     public List<ShareDefinition> Shares { get; private set; } = [];
     public bool IsLoading { get; private set; }
     public string? ErrorMessage { get; private set; }
+    public ConcurrentDictionary<Guid, long> ShareSizes { get; } = new();
+    public event Action? OnStateChanged;
 
     // -- Create Share State --
 
@@ -50,6 +58,9 @@ public partial class ShareBrowserViewModel
 
     // -- Computed --
     public string CurrentUserName { get; private set; } = "";
+
+    public long? GetShareSize(ShareDefinition share) =>
+        ShareSizes.TryGetValue(share.Id, out var size) ? size : null;
 
     // Regex: nur Buchstaben, Zahlen, Bindestriche, Unterstriche, Punkte
     [GeneratedRegex(@"^[a-zA-Z0-9\-_.]+$")]
@@ -63,6 +74,7 @@ public partial class ShareBrowserViewModel
         {
             IsLoading = true;
             ErrorMessage = null;
+            ShareSizes.Clear();
 
             var state = await _authState.GetAuthenticationStateAsync();
             CurrentUserName = state.User.FindFirst("display_name")?.Value
@@ -119,6 +131,7 @@ public partial class ShareBrowserViewModel
             }
 
             Shares = visible;
+            _ = LoadShareSizesInBackgroundAsync(visible, actor);
         }
         catch (Exception ex)
         {
@@ -130,6 +143,27 @@ public partial class ShareBrowserViewModel
         {
             IsLoading = false;
         }
+    }
+
+    private async Task LoadShareSizesInBackgroundAsync(
+        IReadOnlyCollection<ShareDefinition> shares,
+        UserContext actor)
+    {
+        await Parallel.ForEachAsync(shares, new ParallelOptions { MaxDegreeOfParallelism = 4 },
+            async (share, _) =>
+            {
+                try
+                {
+                    var service = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+                    ShareSizes[share.Id] = await service.GetDirectorySizeAsync("", actor);
+                    OnStateChanged?.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    // A failed calculation must never hide a share or block browsing it.
+                    _logger.LogDebug(ex, "Could not calculate total size for share '{ShareName}'", share.Name);
+                }
+            });
     }
 
 }

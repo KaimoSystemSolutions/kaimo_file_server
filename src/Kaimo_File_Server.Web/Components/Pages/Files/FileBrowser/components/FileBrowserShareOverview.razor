@@ -1,0 +1,83 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject ShareBrowserViewModel VM
+@inject NavigationManager Nav
+@inject AssetProvider Assets
+@implements IDisposable
+
+<PageTitle>Kaimo Files – @Resources.Web_ShareBrowser_PageTitle</PageTitle>
+
+<div class="page-header file-page-header share-overview-header">
+    <div class="breadcrumb-bar">
+        <a class="breadcrumb-link" href="/files">@Resources.Web_Breadcrumb_Shares</a>
+    </div>
+    @if (VM.CanManageShares)
+    {
+        <div class="file-page-actions">
+            <a class="btn-secondary page-command" href="/" title="@Resources.Web_ShareBrowser_ManageShares">
+                @Assets.SVG("folder.svg", new SvgOptions(Width: 16, Height: 16, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)"))
+                <span>@Resources.Web_ShareBrowser_ManageShares</span>
+            </a>
+        </div>
+    }
+</div>
+
+@if (VM.IsLoading)
+{
+    <div class="loading-state">
+        <div class="spinner"></div>
+        <p>@Resources.Web_ShareBrowser_Loading</p>
+    </div>
+}
+else if (VM.ErrorMessage is not null)
+{
+    <div class="error-banner">@VM.ErrorMessage</div>
+}
+else if (!VM.Shares.Any())
+{
+    <div class="empty-state">
+        @Assets.SVG("folder.svg", new SvgOptions(Width: 64, Height: 64, Color: "var(--text-tertiary)"))
+        <p>@Resources.Web_ShareBrowser_Empty</p>
+    </div>
+}
+else
+{
+    <div class="file-table-wrap share-overview-table">
+        <div class="file-grid-header">
+            <div class="col-name">@Resources.Web_Folder_Name</div>
+            <div class="col-share-path">@Resources.Web_ShareList_Label_Path</div>
+            <div class="col-size">@Resources.Web_Folder_Size</div>
+        </div>
+        @foreach (var share in VM.Shares)
+        {
+            <button class="file-grid-row file-row-dir share-overview-row" type="button" @onclick="() => OpenShare(share.Name)">
+                <div class="col-name">
+                    @Assets.SVG("folder.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)", CssClass: "file-icon"))
+                    <span>@share.Name</span>
+                </div>
+                <div class="col-share-path">@share.Path</div>
+                <div class="col-size">@(VM.GetShareSize(share) is { } size ? FormatHelper.FormatFileSize(size) : "…")</div>
+            </button>
+        }
+    </div>
+}
+
+@code {
+    protected override void OnInitialized() => VM.OnStateChanged += OnVmStateChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await VM.LoadAsync();
+            StateHasChanged();
+        }
+    }
+
+    private void OpenShare(string name) => Nav.NavigateTo($"/files/{name}");
+
+    private void OnVmStateChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => VM.OnStateChanged -= OnVmStateChanged;
+}
