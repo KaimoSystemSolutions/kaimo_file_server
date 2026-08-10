@@ -283,6 +283,33 @@ select.edit-input {
     letter-spacing: -0.015em;
 }
 
+.department-detail .detail-tabs {
+    display: flex;
+    gap: 4px;
+    margin: 16px -18px 18px;
+    padding: 0 18px 10px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--border);
+}
+
+.department-detail .detail-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex: 0 0 auto;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 5px;
+    color: var(--text-secondary);
+    background: transparent;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.department-detail .detail-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
+.department-detail .detail-tab--active { background: var(--accent-selected); color: var(--accent); }
+
 .department-detail .detail-field-value {
     min-height: 32px;
     padding: 6px 9px;

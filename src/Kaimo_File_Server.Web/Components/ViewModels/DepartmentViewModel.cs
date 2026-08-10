@@ -578,7 +578,8 @@ public class DepartmentViewModel
         var roots = Departments
             .Where(d => !d.ParentDepartmentId.HasValue
                         || !deptIds.Contains(d.ParentDepartmentId.Value))
-            .OrderBy(d => d.Name)
+            .OrderBy(d => IsGlobalDepartment(d) ? 0 : 1)
+            .ThenBy(d => d.Name)
             .ToList();
 
         for (var i = 0; i < roots.Count; i++)

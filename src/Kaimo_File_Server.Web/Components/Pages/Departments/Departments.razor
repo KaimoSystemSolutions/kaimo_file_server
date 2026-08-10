@@ -113,6 +113,20 @@ else
                         <span class="detail-subtitle">@VM.Selected.Name</span>
                     </div>
 
+                    <div class="detail-tabs" role="tablist" aria-label="Abteilungseinstellungen">
+                        <button class="detail-tab @(_activeTab == DepartmentDetailTab.General ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == DepartmentDetailTab.General)" @onclick="() => SwitchTab(DepartmentDetailTab.General)">
+                            @Assets.SVG("settings.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Allgemein
+                        </button>
+                        <button class="detail-tab @(_activeTab == DepartmentDetailTab.Permissions ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == DepartmentDetailTab.Permissions)" @onclick="() => SwitchTab(DepartmentDetailTab.Permissions)">
+                            @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Berechtigungen
+                        </button>
+                        <button class="detail-tab @(_activeTab == DepartmentDetailTab.Assignments ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == DepartmentDetailTab.Assignments)" @onclick="() => SwitchTab(DepartmentDetailTab.Assignments)">
+                            @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Zuordnungen
+                        </button>
+                    </div>
+
+                    @if (_activeTab == DepartmentDetailTab.General)
+                    {
                     <div class="detail-field-grid">
                         <div class="form-group">
                             <label>@Resources.Web_Common_Name</label>
@@ -135,8 +149,11 @@ else
                             <span class="form-hint">@Resources.Web_Dept_InheritHint</span>
                         </div>
                     </div>
+                    }
 
                     @* -- Default File Permission -- *@
+                    @if (_activeTab == DepartmentDetailTab.Permissions)
+                    {
                     <div class="detail-section" style="margin-top: 16px;">
                         <span class="detail-label">@Resources.Web_Dept_DefaultFilePerm</span>
                         <p class="form-hint" style="margin-bottom: 8px;">
@@ -173,8 +190,11 @@ else
 <span class="detail-field-value detail-field-value--empty">@Resources.Web_Dept_NoParentNoPerm</span>
                         }
                     </div>
+                    }
 
                     @* -- Members (M:N) -- *@
+                    @if (_activeTab == DepartmentDetailTab.Assignments)
+                    {
                     <div class="detail-section" style="margin-top: 16px;">
 <span class="detail-label">@Resources.Web_Dept_Label_Members</span>
                         <div class="multi-select @(membersOpen ? "open" : "")">
@@ -203,8 +223,11 @@ else
                             }
                         </div>
                     </div>
+                    }
 
                     @* -- Groups (direct FK) -- *@
+                    @if (_activeTab == DepartmentDetailTab.Assignments)
+                    {
                     <div class="detail-section" style="margin-top: 16px;">
 <span class="detail-label">@Resources.Web_Dept_Label_AssignedGroups</span>
                         <p class="form-hint" style="margin-bottom: 4px;">
@@ -236,8 +259,11 @@ else
                             }
                         </div>
                     </div>
+                    }
 
                     @* -- Shares (direct FK) -- *@
+                    @if (_activeTab == DepartmentDetailTab.Assignments)
+                    {
                     <div class="detail-section" style="margin-top: 16px;">
 <span class="detail-label">@Resources.Web_Dept_Label_AssignedShares</span>
                         <p class="form-hint" style="margin-bottom: 4px;">
@@ -273,6 +299,7 @@ else
                             }
                         </div>
                     </div>
+                    }
 
                     @if (VM.ErrorMessage is not null)
                     {
@@ -295,7 +322,21 @@ else
                         </span>
                     </div>
 
+                    <div class="detail-tabs" role="tablist" aria-label="Abteilungsdetails">
+                        <button class="detail-tab @(_activeTab == DepartmentDetailTab.General ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == DepartmentDetailTab.General)" @onclick="() => SwitchTab(DepartmentDetailTab.General)">
+                            @Assets.SVG("settings.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Allgemein
+                        </button>
+                        <button class="detail-tab @(_activeTab == DepartmentDetailTab.Permissions ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == DepartmentDetailTab.Permissions)" @onclick="() => SwitchTab(DepartmentDetailTab.Permissions)">
+                            @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Berechtigungen
+                        </button>
+                        <button class="detail-tab @(_activeTab == DepartmentDetailTab.Assignments ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == DepartmentDetailTab.Assignments)" @onclick="() => SwitchTab(DepartmentDetailTab.Assignments)">
+                            @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Zuordnungen
+                        </button>
+                    </div>
+
                     <div class="detail-field-grid">
+                        @if (_activeTab == DepartmentDetailTab.General)
+                        {
                         @if (!string.IsNullOrWhiteSpace(VM.Selected.Description))
                         {
                             <div class="detail-field">
@@ -311,9 +352,16 @@ else
                             }
                             else
                             {
-<span class="detail-field-value detail-field-value--empty">@Resources.Web_Dept_NoParentTopLevel</span>
+                                <span class="detail-field-value detail-field-value--empty">@Resources.Web_Dept_NoParentTopLevel</span>
                             }
                         </div>
+                        <div class="detail-field">
+                            <span class="detail-field-label">ID</span>
+                            <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">@VM.Selected.Id</span>
+                        </div>
+                        }
+                        @if (_activeTab == DepartmentDetailTab.Assignments)
+                        {
                         <div class="detail-field">
 <span class="detail-field-label">@string.Format(Resources.Web_Dept_Label_MembersCount, VM.Members.Count)</span>
                             <span class="detail-field-value">
@@ -332,8 +380,11 @@ else
 @(VM.Shares.Any() ? Format(VM.Shares.Select(s => s.Name), 5) : Resources.Web_Dept_NoSharesAssigned)
                             </span>
                         </div>
+                        }
 
                         @* -- Effective Permission -- *@
+                        @if (_activeTab == DepartmentDetailTab.Permissions)
+                        {
                         <div class="detail-field">
 <span class="detail-field-label">@Resources.Web_Dept_DefaultFilePerm</span>
                             <span class="detail-field-value">
@@ -371,11 +422,7 @@ else
                                 }
                             </span>
                         </div>
-
-                        <div class="detail-field">
-                            <span class="detail-field-label">ID</span>
-                            <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">@VM.Selected.Id</span>
-                        </div>
+                        }
                     </div>
 
                     <div class="detail-actions">
