@@ -12,6 +12,7 @@ public sealed class StorageAuthorizationTransaction
     public string ProviderId { get; set; } = string.Empty;
     public Guid? InitiatingUserId { get; set; }
     public Guid? DepartmentId { get; set; }
+    public string? ProtectedContext { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime ExpiresAtUtc { get; set; }
     public DateTime? ConsumedAtUtc { get; set; }

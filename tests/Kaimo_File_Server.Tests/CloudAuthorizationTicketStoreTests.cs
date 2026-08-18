@@ -48,4 +48,59 @@ public sealed class CloudAuthorizationTicketStoreTests : DatabaseTestBase
         Assert.False(await issuer.TryConsumeAsync(token, resourceId, "", "google"));
         Assert.False(await consumer.IsValidAsync(token, resourceId, "", "google"));
     }
+
+    [Fact]
+    public async Task CallbackContext_IsAttachedAndConsumedAtomically()
+    {
+        var firstInstance = new CloudAuthorizationTicketStore(DbFactory, TimeProvider.System);
+        var secondInstance = new CloudAuthorizationTicketStore(DbFactory, TimeProvider.System);
+        var resourceId = Guid.NewGuid();
+        var actorId = Guid.NewGuid();
+        var departmentId = Guid.NewGuid();
+        var token = await firstInstance.IssueAsync(
+            resourceId, "documents", "google", actorId, departmentId);
+
+        Assert.True(await firstInstance.TryAttachProtectedContextAsync(
+            token,
+            resourceId,
+            "documents",
+            "google",
+            actorId,
+            departmentId,
+            "protected-pkce-context"));
+        Assert.False(await firstInstance.TryAttachProtectedContextAsync(
+            token,
+            resourceId,
+            "documents",
+            "google",
+            actorId,
+            departmentId,
+            "replacement"));
+
+        var callback = await secondInstance.TryConsumeCallbackAsync(
+            token, "google", actorId);
+        Assert.NotNull(callback);
+        Assert.Equal(resourceId, callback.ResourceId);
+        Assert.Equal("documents", callback.ResourcePath);
+        Assert.Equal(departmentId, callback.DepartmentId);
+        Assert.Equal("protected-pkce-context", callback.ProtectedContext);
+        Assert.Null(await firstInstance.TryConsumeCallbackAsync(token, "google", actorId));
+    }
+
+    [Fact]
+    public async Task CallbackContext_IsBoundToActorAndProvider()
+    {
+        var store = new CloudAuthorizationTicketStore(DbFactory, TimeProvider.System);
+        var resourceId = Guid.NewGuid();
+        var actorId = Guid.NewGuid();
+        var departmentId = Guid.NewGuid();
+        var token = await store.IssueAsync(
+            resourceId, "", "google", actorId, departmentId);
+        Assert.True(await store.TryAttachProtectedContextAsync(
+            token, resourceId, "", "google", actorId, departmentId, "protected"));
+
+        Assert.Null(await store.TryConsumeCallbackAsync(token, "onedrive", actorId));
+        Assert.Null(await store.TryConsumeCallbackAsync(token, "google", Guid.NewGuid()));
+        Assert.NotNull(await store.TryConsumeCallbackAsync(token, "google", actorId));
+    }
 }

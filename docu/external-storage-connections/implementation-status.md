@@ -89,9 +89,9 @@ No new UI copy was required. Authorization failures continue to resolve through 
 resource keys. Provider response bodies are converted into allow-listed error codes before they can reach UI,
 health state, exceptions, or logs.
 
-## Current focus
+## Provider consolidation packages
 
-### Package 3: Microsoft provider consolidation — planned
+### Package 3: Microsoft provider consolidation — implemented foundation
 
 - [x] Preserve device authorization as the zero-configuration default.
 - [x] Add validated tenant-owned public-client ID and authority overrides for Cloud Access and legacy Cloud Sync token requests.
@@ -105,11 +105,30 @@ client ID as a GUID and restricts the authority to a tenant identifier, domain, 
 invalid configuration fails startup rather than sending tokens to an arbitrary endpoint. The default remains
 the shipped public client and `common` authority, so a normal installation requires no Microsoft OAuth settings.
 
-### Package 4: Google provider consolidation — planned
+### Package 4: Google provider consolidation — implemented
 
-- Replace manual token exchange with the maintained Google client library.
-- Load customer-owned OAuth credentials through protected deployment configuration.
-- Add scope profiles, secure callback transactions, and Workspace service identities.
+- [x] Replace the manual controller token exchange with Google's maintained PKCE-capable .NET client.
+- [x] Load customer-owned OAuth and Workspace credentials from absolute, protected secret-file paths.
+- [x] Use the configured external base URL instead of request headers to construct the exact callback URI.
+- [x] Add selected-item, read-only, and read/write Drive scope profiles.
+- [x] Store the PKCE verifier, callback URI, and scopes in a Data-Protection-protected database transaction.
+- [x] Use the opaque single-use transaction token directly as OAuth state and bind it to the actor, department, share, and path.
+- [x] Add an explicit Workspace service-account mode with optional impersonated subject.
+- [x] Add English and German authorization responses plus operator documentation.
+
+Migration `GoogleOAuthProtectedContext` adds a nullable protected-context column to the existing shared
+authorization transaction table. This is additive and does not rewrite active connection or sync records.
+The Google callback atomically consumes this row before exchanging the authorization code, so replay and
+cross-instance completion use the same database guarantee as the earlier shared runtime.
+
+New delegated sync grants record their selected scope profile and authorization mode. The legacy Cloud Sync
+shape still owns the refresh token until Package 5 can create the corresponding encrypted `StorageConnection`
+and `SyncDefinition` in one restart-safe migration. Workspace credential files are supported by a dedicated
+runtime factory that cannot be selected through legacy share JSON. Activation and its department-scoped
+authorization checks depend on Package 5's first-class connection workflow rather than copying key material
+or deployment identity selection into legacy settings.
+
+## Current focus
 
 ### Package 5: first-class sync definitions — planned
 
@@ -137,3 +156,5 @@ the shipped public client and `common` authority, so a normal installation requi
 | 2026-08-18 | Package 2 full `Kaimo_File_Server.Tests` suite | 780 passed, 0 failed, 0 skipped. |
 | 2026-08-18 | Package 3 Microsoft identity tests | 16 passed, 0 failed, 0 skipped. |
 | 2026-08-18 | Package 3 full `Kaimo_File_Server.Tests` suite | 784 passed, 0 failed, 0 skipped. |
+| 2026-08-18 | Package 4 Google identity and authorization transaction tests | 15 passed, 0 failed, 0 skipped. |
+| 2026-08-18 | Package 4 full `Kaimo_File_Server.Tests` suite | 797 passed, 0 failed, 0 skipped. |

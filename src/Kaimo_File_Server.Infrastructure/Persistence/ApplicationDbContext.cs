@@ -255,6 +255,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(x => x.TokenHash).HasMaxLength(64);
                 entity.Property(x => x.ResourcePath).IsRequired().HasMaxLength(2000);
                 entity.Property(x => x.ProviderId).IsRequired().HasMaxLength(100);
+                entity.Property(x => x.ProtectedContext).HasColumnType("text");
                 entity.HasIndex(x => x.ExpiresAtUtc);
                 entity.HasIndex(x => new { x.ResourceId, x.ProviderId });
             });

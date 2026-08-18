@@ -101,6 +101,82 @@ public sealed class CloudAuthorizationTicketStore(
         return affected == 1;
     }
 
+    /// <inheritdoc />
+    public async Task<bool> TryAttachProtectedContextAsync(
+        string token,
+        Guid resourceId,
+        string localPath,
+        string providerId,
+        Guid initiatingUserId,
+        Guid departmentId,
+        string protectedContext,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(protectedContext))
+            return false;
+
+        var hash = Hash(token);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var affected = await db.StorageAuthorizationTransactions
+            .Where(transaction => transaction.TokenHash == hash
+                                  && transaction.ConsumedAtUtc == null
+                                  && transaction.ExpiresAtUtc > now
+                                  && transaction.ResourceId == resourceId
+                                  && transaction.ResourcePath.ToLower() == (localPath ?? string.Empty).ToLower()
+                                  && transaction.ProviderId.ToLower() == providerId.ToLower()
+                                  && transaction.InitiatingUserId == initiatingUserId
+                                  && transaction.DepartmentId == departmentId
+                                  && transaction.ProtectedContext == null)
+            .ExecuteUpdateAsync(
+                update => update.SetProperty(
+                    transaction => transaction.ProtectedContext,
+                    protectedContext),
+                cancellationToken);
+        return affected == 1;
+    }
+
+    /// <inheritdoc />
+    public async Task<CloudAuthorizationTransaction?> TryConsumeCallbackAsync(
+        string token,
+        string providerId,
+        Guid initiatingUserId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return null;
+
+        var hash = Hash(token);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var transaction = await db.StorageAuthorizationTransactions.AsNoTracking()
+            .SingleOrDefaultAsync(
+                item => item.TokenHash == hash
+                        && item.ConsumedAtUtc == null
+                        && item.ExpiresAtUtc > now
+                        && item.ProviderId.ToLower() == providerId.ToLower()
+                        && item.InitiatingUserId == initiatingUserId
+                        && item.ProtectedContext != null,
+                cancellationToken);
+        if (transaction is null)
+            return null;
+
+        var affected = await db.StorageAuthorizationTransactions
+            .Where(item => item.TokenHash == hash
+                           && item.ConsumedAtUtc == null
+                           && item.ExpiresAtUtc > now)
+            .ExecuteUpdateAsync(
+                update => update.SetProperty(item => item.ConsumedAtUtc, now),
+                cancellationToken);
+        return affected == 1
+            ? new CloudAuthorizationTransaction(
+                transaction.ResourceId,
+                transaction.ResourcePath,
+                transaction.DepartmentId,
+                transaction.ProtectedContext!)
+            : null;
+    }
+
     private static string Hash(string token)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 

@@ -2186,4 +2186,14 @@
   <data name="Web_Settings_CloudAccess_CacheRange" xml:space="preserve"><value>Erlaubter Bereich: {0}–{1} Sekunden. Der Standardwert beträgt 20 Sekunden.</value></data>
   <data name="Web_Settings_CloudAccess_CacheSaved" xml:space="preserve"><value>Cloud-Zugriff-Cache-Einstellungen gespeichert.</value></data>
   <data name="Web_Settings_CloudAccess_CacheSaveFailed" xml:space="preserve"><value>Cloud-Zugriff-Cache-Einstellungen konnten nicht gespeichert werden.</value></data>
+  <data name="Web_GoogleOAuth_ShareNotFound" xml:space="preserve"><value>Der Share existiert nicht mehr.</value></data>
+  <data name="Web_GoogleOAuth_InvalidTransaction" xml:space="preserve"><value>Die Google-Autorisierungsanfrage ist ungültig oder abgelaufen.</value></data>
+  <data name="Web_GoogleOAuth_FolderAlreadySynced" xml:space="preserve"><value>Dieser Ordner wird bereits synchronisiert.</value></data>
+  <data name="Web_GoogleOAuth_FolderConflict" xml:space="preserve"><value>Dieser Ordner überschneidet sich mit dem synchronisierten Ordner „{0}“.</value></data>
+  <data name="Web_GoogleOAuth_NotConfigured" xml:space="preserve"><value>Die Google-Autorisierung ist für diese Installation nicht konfiguriert.</value></data>
+  <data name="Web_GoogleOAuth_InvalidScopeProfile" xml:space="preserve"><value>Das ausgewählte Google-Drive-Zugriffsprofil ist ungültig.</value></data>
+  <data name="Web_GoogleOAuth_ConsentDenied" xml:space="preserve"><value>Die Google-Autorisierung wurde abgebrochen oder abgelehnt.</value></data>
+  <data name="Web_GoogleOAuth_InvalidCallback" xml:space="preserve"><value>Google hat einen ungültigen Autorisierungsrückruf gesendet.</value></data>
+  <data name="Web_GoogleOAuth_ExchangeFailed" xml:space="preserve"><value>Die Google-Autorisierung konnte nicht abgeschlossen werden. Es wurden keine Zugangsdaten gespeichert.</value></data>
+  <data name="Web_GoogleOAuth_CallbackConflict" xml:space="preserve"><value>„{0}“ überschneidet sich jetzt mit dem synchronisierten Ordner „{1}“. Es wurde keine Verbindung hergestellt.</value></data>
 </root>

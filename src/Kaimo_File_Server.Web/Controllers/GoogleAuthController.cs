@@ -1,8 +1,11 @@
-using System.Text;
-using System.Text.Json;
+using System.Security.Cryptography;
+using Google.Apis.Auth.OAuth2.Responses;
 using Microsoft.AspNetCore.Mvc;
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Web.Services;
 
@@ -12,38 +15,52 @@ namespace Kaimo_File_Server.Web.Controllers;
 [Route("api/google")]
 public class GoogleOAuthController : ControllerBase
 {
-    private readonly IConfiguration _configuration;
     private readonly IShareRepository _shareRepository;
     private readonly ICloudAuthorizationTicketStore _authorizationTickets;
     private readonly IUserContextFactory _userContextFactory;
+    private readonly IManagementAuthService _managementAuth;
+    private readonly GoogleOAuthService _googleOAuth;
+    private readonly GoogleIdentityConfiguration _identity;
 
     public GoogleOAuthController(
-        IConfiguration configuration,
         IShareRepository shareRepository,
         ICloudAuthorizationTicketStore authorizationTickets,
-        IUserContextFactory userContextFactory)
+        IUserContextFactory userContextFactory,
+        IManagementAuthService managementAuth,
+        GoogleOAuthService googleOAuth,
+        GoogleIdentityConfiguration identity)
     {
-        _configuration = configuration;
         _shareRepository = shareRepository;
         _authorizationTickets = authorizationTickets;
         _userContextFactory = userContextFactory;
+        _managementAuth = managementAuth;
+        _googleOAuth = googleOAuth;
+        _identity = identity;
     }
 
 
     [HttpGet("connect")]
-    public async Task<IActionResult> Connect(Guid shareId, string? path, string ticket)
+    public async Task<IActionResult> Connect(
+        Guid shareId,
+        string? path,
+        string ticket,
+        string? scopeProfile = null,
+        CancellationToken cancellationToken = default)
     {
         var normalizedPath = CloudSyncPaths.Normalize(path);
 
         var share = await _shareRepository.GetByIdAsync(shareId);
         if (share is null)
-            return NotFound("Share not found");
-        var actorId = await GetActorIdAsync();
-        if (actorId is null)
+            return NotFound(R("Web_GoogleOAuth_ShareNotFound"));
+        var actor = await GetActorAsync();
+        if (actor is null)
             return Unauthorized();
+        if (!await _managementAuth.CanManageShareAsync(
+                actor, shareId, ManagementPermission.CreateSyncs))
+            return Forbid();
         if (!await _authorizationTickets.IsValidAsync(
-                ticket, shareId, normalizedPath, "google", actorId, share.DepartmentId))
-            return BadRequest("The cloud authorization request is invalid or has expired.");
+                ticket, shareId, normalizedPath, "google", actor.User.Id, share.DepartmentId))
+            return BadRequest(R("Web_GoogleOAuth_InvalidTransaction"));
 
         var settings = share.CloudSettings;
 
@@ -52,113 +69,114 @@ public class GoogleOAuthController : ControllerBase
         {
             return BadRequest(
                 conflict == normalizedPath
-                    ? "This folder is already synced."
-                    : $"This conflicts with the already-synced folder '{conflict}'.");
+                    ? R("Web_GoogleOAuth_FolderAlreadySynced")
+                    : string.Format(R("Web_GoogleOAuth_FolderConflict"), conflict));
         }
 
-        var clientId = _configuration["GoogleOAuth:ClientId"]!;
+        if (!_identity.DelegatedOAuthEnabled)
+            return StatusCode(503, R("Web_GoogleOAuth_NotConfigured"));
 
-        var redirectUri =
-            Url.Action(
-                "Callback",
-                "GoogleOAuth",
-                null,
-                Request.Scheme)!;
+        GoogleDriveScopeProfile selectedProfile;
+        try
+        {
+            selectedProfile = scopeProfile is null
+                ? _identity.DefaultScopeProfile
+                : GoogleIdentityConfiguration.ParseScopeProfile(scopeProfile);
+        }
+        catch (InvalidOperationException)
+        {
+            return BadRequest(R("Web_GoogleOAuth_InvalidScopeProfile"));
+        }
 
-        var state = CloudSyncPaths.EncodeState(shareId, normalizedPath, ticket);
+        var start = _googleOAuth.BeginAuthorization(ticket, selectedProfile);
+        if (!await _authorizationTickets.TryAttachProtectedContextAsync(
+                ticket,
+                shareId,
+                normalizedPath,
+                "google",
+                actor.User.Id,
+                share.DepartmentId,
+                start.ProtectedContext,
+                cancellationToken))
+            return BadRequest(R("Web_GoogleOAuth_InvalidTransaction"));
 
-        var authUrl =
-            "https://accounts.google.com/o/oauth2/v2/auth" +
-            "?access_type=offline" +
-            "&prompt=consent" +
-            $"&client_id={clientId}" +
-            $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
-            "&response_type=code" +
-            $"&state={Uri.EscapeDataString(state)}" +
-            "&scope=" +
-            Uri.EscapeDataString(
-                "https://www.googleapis.com/auth/drive");
-
-        return Redirect(authUrl);
+        return Redirect(start.AuthorizationUri);
     }
 
 
     [HttpGet("callback")]
-    public async Task<IActionResult> Callback(string code, string state)
+    public async Task<IActionResult> Callback(
+        string state,
+        string? code = null,
+        string? error = null,
+        CancellationToken cancellationToken = default)
     {
-        var decodedState = CloudSyncPaths.DecodeState(state);
-        if (decodedState is null)
-            return BadRequest("Invalid state");
-
-        var (shareId, path, ticket) = decodedState.Value;
-        var share = await _shareRepository.GetByIdAsync(shareId);
-        var actorId = await GetActorIdAsync();
-        if (share is null || actorId is null)
+        var actor = await GetActorAsync();
+        if (actor is null)
             return Unauthorized();
-        if (ticket is null
-            || !await _authorizationTickets.TryConsumeAsync(
-                ticket, shareId, path, "google", actorId, share.DepartmentId))
-            return BadRequest("The cloud authorization request is invalid or has expired.");
+        var transaction = await _authorizationTickets.TryConsumeCallbackAsync(
+            state,
+            "google",
+            actor.User.Id,
+            cancellationToken);
+        if (transaction is null)
+            return BadRequest(R("Web_GoogleOAuth_InvalidTransaction"));
 
-        var clientId = _configuration["GoogleOAuth:ClientId"]!;
-        var clientSecret = _configuration["GoogleOAuth:ClientSecret"]!;
+        var share = await _shareRepository.GetByIdAsync(transaction.ResourceId);
+        if (share is null || transaction.DepartmentId != share.DepartmentId)
+            return BadRequest(R("Web_GoogleOAuth_InvalidTransaction"));
+        if (!await _managementAuth.CanManageShareAsync(
+                actor, share.Id, ManagementPermission.CreateSyncs))
+            return Forbid();
+        if (!string.IsNullOrWhiteSpace(error))
+            return RedirectWithSyncError(R("Web_GoogleOAuth_ConsentDenied"));
+        if (string.IsNullOrWhiteSpace(code))
+            return BadRequest(R("Web_GoogleOAuth_InvalidCallback"));
 
-        var redirectUri =
-            Url.Action(
-                "Callback",
-                "GoogleOAuth",
-                null,
-                Request.Scheme)!;
-
-
-        using var http = new HttpClient();
-
-        var response = await http.PostAsync(
-            "https://oauth2.googleapis.com/token",
-            new FormUrlEncodedContent(
-                new Dictionary<string, string>
-                {
-                    ["client_id"] = clientId,
-                    ["client_secret"] = clientSecret,
-                    ["code"] = code,
-                    ["grant_type"] = "authorization_code",
-                    ["redirect_uri"] = redirectUri
-                }));
-
-
-        if (!response.IsSuccessStatusCode)
+        GoogleAuthorizationGrant grant;
+        try
         {
-            var errorBody = await response.Content.ReadAsStringAsync();
-            var providerError = Kaimo_File_Server.Core.Services.ProviderErrorSanitizer.FromResponse(
-                response.StatusCode, errorBody);
-            return BadRequest(new { error = providerError.Code });
+            grant = await _googleOAuth.CompleteAuthorizationAsync(
+                $"share-{share.Id:N}",
+                code,
+                transaction.ProtectedContext,
+                cancellationToken);
         }
-
-
-        var token = await GoogleTokenResponse
-            .FromHttpResponse(response.Content);
+        catch (Exception exception) when (
+            exception is TokenResponseException
+                or CryptographicException
+                or InvalidOperationException)
+        {
+            return BadRequest(new
+            {
+                error = "google_oauth_failed",
+                message = R("Web_GoogleOAuth_ExchangeFailed")
+            });
+        }
 
         var settings = share.CloudSettings;
         // Re-check for conflicts: the share may have changed while the user
         // was over on Google's consent screen (e.g. an ancestor folder got
         // synced by someone else in the meantime).
-        var conflict = CloudSyncPaths.FindConflict(settings, path);
-        if (conflict is not null && conflict != path)
+        var conflict = CloudSyncPaths.FindConflict(settings, transaction.ResourcePath);
+        if (conflict is not null)
         {
-            var msg = Uri.EscapeDataString(
-                $"'{path}' now conflicts with the already-synced folder '{conflict}'. " +
-                "Nothing was connected.");
-            return Redirect($"/sync?syncError={msg}");
+            return RedirectWithSyncError(string.Format(
+                R("Web_GoogleOAuth_CallbackConflict"),
+                transaction.ResourcePath,
+                conflict));
         }
 
         // Append/overwrite this folder's entry; leaves every other synced
         // folder on the share untouched.
-        settings.Folders[path] = new SyncedFolder(
+        settings.Folders[transaction.ResourcePath] = new SyncedFolder(
             "google",
             new Dictionary<string, string>
             {
-                ["refreshToken"] = token.RefreshToken,
-                ["scope"] = token.Scope,
+                ["refreshToken"] = grant.RefreshToken,
+                ["scope"] = grant.GrantedScopes,
+                ["scopeProfile"] = grant.ScopeProfile.ToString(),
+                ["authorizationMode"] = "delegated"
             })
         {
             RequiresRemoteFolderSelection = true
@@ -171,7 +189,7 @@ public class GoogleOAuthController : ControllerBase
         // it select the newly created entry without knowing anything about Google.
         return Redirect(
             $"/sync?connectedShare={share.Id}" +
-            $"&connectedPath={Uri.EscapeDataString(path)}&remoteFolderRequired=true");
+            $"&connectedPath={Uri.EscapeDataString(transaction.ResourcePath)}&remoteFolderRequired=true");
     }
 
     [HttpPost("disconnect")]
@@ -229,35 +247,15 @@ public class GoogleOAuthController : ControllerBase
     }
 
 
-    internal sealed class GoogleTokenResponse
-    {
-        public string AccessToken { get; init; } = null!;
-        public string RefreshToken { get; init; } = null!;
-        public int ExpiresIn { get; init; }
-        public string TokenType { get; init; } = null!;
-        public string Scope { get; init; } = null!;
-
-        public static async Task<GoogleTokenResponse> FromHttpResponse(HttpContent content)
-        {
-            using var stream = await content.ReadAsStreamAsync();
-
-            var json = await JsonSerializer.DeserializeAsync<JsonElement>(stream);
-
-            return new GoogleTokenResponse
-            {
-                AccessToken = json.GetProperty("access_token").GetString()!,
-                RefreshToken = json.GetProperty("refresh_token").GetString()!,
-                ExpiresIn = json.GetProperty("expires_in").GetInt32(),
-                TokenType = json.GetProperty("token_type").GetString()!,
-                Scope = json.GetProperty("scope").GetString()!
-            };
-        }
-    }
-
-    private async Task<Guid?> GetActorIdAsync()
+    private async Task<Kaimo_File_Server.Core.Domain.Identity.UserContext?> GetActorAsync()
     {
         var username = User.Identity?.Name;
         if (string.IsNullOrWhiteSpace(username)) return null;
-        return (await _userContextFactory.CreateByUsernameAsync(username))?.User.Id;
+        return await _userContextFactory.CreateByUsernameAsync(username);
     }
+
+    private static RedirectResult RedirectWithSyncError(string message)
+        => new($"/sync?syncError={Uri.EscapeDataString(message)}");
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 }

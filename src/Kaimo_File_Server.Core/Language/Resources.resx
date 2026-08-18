@@ -2209,4 +2209,14 @@
   <data name="Web_Settings_CloudAccess_CacheRange" xml:space="preserve"><value>Allowed range: {0}–{1} seconds. The default is 20 seconds.</value></data>
   <data name="Web_Settings_CloudAccess_CacheSaved" xml:space="preserve"><value>Cloud Access cache settings saved.</value></data>
   <data name="Web_Settings_CloudAccess_CacheSaveFailed" xml:space="preserve"><value>Cloud Access cache settings could not be saved.</value></data>
+  <data name="Web_GoogleOAuth_ShareNotFound" xml:space="preserve"><value>The share no longer exists.</value></data>
+  <data name="Web_GoogleOAuth_InvalidTransaction" xml:space="preserve"><value>The Google authorization request is invalid or has expired.</value></data>
+  <data name="Web_GoogleOAuth_FolderAlreadySynced" xml:space="preserve"><value>This folder is already synchronized.</value></data>
+  <data name="Web_GoogleOAuth_FolderConflict" xml:space="preserve"><value>This folder conflicts with the synchronized folder “{0}”.</value></data>
+  <data name="Web_GoogleOAuth_NotConfigured" xml:space="preserve"><value>Google authorization is not configured for this installation.</value></data>
+  <data name="Web_GoogleOAuth_InvalidScopeProfile" xml:space="preserve"><value>The selected Google Drive access profile is invalid.</value></data>
+  <data name="Web_GoogleOAuth_ConsentDenied" xml:space="preserve"><value>Google authorization was cancelled or denied.</value></data>
+  <data name="Web_GoogleOAuth_InvalidCallback" xml:space="preserve"><value>Google returned an invalid authorization callback.</value></data>
+  <data name="Web_GoogleOAuth_ExchangeFailed" xml:space="preserve"><value>Google authorization could not be completed. No credentials were stored.</value></data>
+  <data name="Web_GoogleOAuth_CallbackConflict" xml:space="preserve"><value>“{0}” now conflicts with the synchronized folder “{1}”. Nothing was connected.</value></data>
 </root>

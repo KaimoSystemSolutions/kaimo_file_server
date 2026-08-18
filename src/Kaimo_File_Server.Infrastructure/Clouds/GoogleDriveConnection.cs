@@ -2,54 +2,57 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Drive.v3;
+using Google.Apis.Http;
 using Google.Apis.Services;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Services.File;
-using Microsoft.Extensions.Configuration;
 
 namespace Kaimo_File_Server.Infrastructure.Clouds;
 
 public class GoogleDriveConnection : ICloudConnection
 {
     private readonly DriveService _service;
-    private readonly string _refreshToken;
+    private readonly string? _refreshToken;
+    private readonly GoogleDriveScopeProfile _scopeProfile;
 
     public DriveService Service => _service;
 
-    public GoogleDriveConnection(Guid shareId, Dictionary<string, string> data, IConfiguration configuration)
+    public GoogleDriveConnection(
+        Guid shareId,
+        Dictionary<string, string> data,
+        GoogleIdentityConfiguration identity)
     {
-        if (!data.TryGetValue("refreshToken", out var refreshToken))
-            throw new InvalidOperationException("Google Drive refresh token is missing");
+        var scopeProfile = data.TryGetValue("scopeProfile", out var profileValue)
+            ? GoogleIdentityConfiguration.ParseScopeProfile(profileValue)
+            : identity.DefaultScopeProfile;
+        _scopeProfile = scopeProfile;
+        var scopes = data.TryGetValue("scope", out var scopeString)
+            ? scopeString.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            : GoogleIdentityConfiguration.GetScopes(scopeProfile).ToArray();
 
-        if (!data.TryGetValue("scope", out var scopeString))
-            throw new InvalidOperationException("Google Drive scope is missing");
+        if (!identity.DelegatedOAuthEnabled)
+            throw new InvalidOperationException("Google delegated OAuth is not configured.");
+        if (!data.TryGetValue("refreshToken", out var refreshToken)
+            || string.IsNullOrWhiteSpace(refreshToken))
+            throw new InvalidOperationException("Google Drive refresh token is missing.");
 
         _refreshToken = refreshToken;
-
-        var scopes = scopeString.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-        var credential = new UserCredential(
+        IConfigurableHttpClientInitializer credential = new UserCredential(
             new GoogleAuthorizationCodeFlow(
                 new GoogleAuthorizationCodeFlow.Initializer
                 {
                     ClientSecrets = new ClientSecrets
                     {
-                        ClientId = configuration["GoogleOAuth:ClientId"]!,
-                        ClientSecret = configuration["GoogleOAuth:ClientSecret"]!
+                        ClientId = identity.ClientId,
+                        ClientSecret = identity.ClientSecret
                     },
                     Scopes = scopes
                 }),
-            // Token store key now identifies share + this specific credential,
-            // since a share can hold several independent Google connections
-            // is no longer possible for the *same* provider on one share
-            // (see note below), but keeping shareId here is still correct
-            // and avoids collisions across shares.
+            // Package 5 replaces this legacy share key with a stable
+            // StorageConnection ID when sync definitions are migrated.
             "share-" + shareId,
-            new TokenResponse
-            {
-                RefreshToken = refreshToken
-            });
+            new TokenResponse { RefreshToken = refreshToken });
 
         _service = new DriveService(
             new BaseClientService.Initializer
@@ -75,7 +78,8 @@ public class GoogleDriveConnection : ICloudConnection
 
     public async Task Dispose()
     {
-        await RevokeTokenAsync(_refreshToken);
+        if (_refreshToken is not null)
+            await RevokeTokenAsync(_refreshToken);
         Service.Dispose();
     }
 
@@ -128,6 +132,7 @@ public class GoogleDriveConnection : ICloudConnection
         DateTime modifiedTime,
         CancellationToken cancellationToken = default)
     {
+        EnsureWritable();
         path = path.Replace('\\', '/').Trim('/');
 
         var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
@@ -286,6 +291,7 @@ public class GoogleDriveConnection : ICloudConnection
         string path,
         CancellationToken cancellationToken = default)
     {
+        EnsureWritable();
         path = path.Replace('\\', '/').Trim('/');
 
         if (string.IsNullOrEmpty(path))
@@ -392,5 +398,12 @@ public class GoogleDriveConnection : ICloudConnection
         var result = await request.ExecuteAsync(cancellationToken);
 
         return result.Files.FirstOrDefault()?.Id;
+    }
+
+    private void EnsureWritable()
+    {
+        if (_scopeProfile == GoogleDriveScopeProfile.ReadOnly)
+            throw new InvalidOperationException(
+                "The Google Drive connection uses a read-only scope profile.");
     }
 }
