@@ -32,7 +32,10 @@ else
     @if (_creating)
     {
         <section class="connection-editor">
-            <h3>@R("Web_CloudAccess_AddConnection")</h3>
+            <div class="connection-editor-heading">
+                <h3>@R("Web_CloudAccess_AddConnection")</h3>
+                <p>@R("Web_ExternalStorage_ConnectionsHelp")</p>
+            </div>
             <div class="connection-form">
                 <label><span>@R("Web_CloudAccess_Provider")</span><select class="edit-input" @bind="_provider">@foreach (var provider in CreatableProviders) { <option value="@provider.Id">@provider.DisplayName</option> }</select></label>
                 <label><span>@R("Web_CloudAccess_ConnectionName")</span><input class="edit-input" maxlength="200" @bind="_name" /></label>
@@ -56,17 +59,18 @@ else
             <div class="connection-list">
                 <div class="connection-list-header" aria-hidden="true">
                     <span>@R("Web_ExternalStorage_Name")</span>
-                    <span>@R("Web_CloudAccess_Provider")</span>
                     <span>@R("Web_ExternalStorage_State")</span>
                     <span>@R("Web_ExternalStorage_Usage")</span>
                 </div>
                 @foreach (var connection in VM.Connections)
                 {
                     <button class="connection-row @(_selected?.Id == connection.Id ? "connection-row--selected" : "")" type="button" @onclick="() => _selected = connection">
-                        <span class="connection-name"><strong>@connection.Name</strong><small>@(connection.AccountEmail ?? connection.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</small></span>
-                        <span>@ProviderName(connection.ProviderId)</span>
-                        <span class="connection-state"><span class="connection-health connection-health--@StateClass(connection.State)"></span>@StateName(connection.State)</span>
-                        <span>@UsageSummary(connection.Id)</span>
+                        <span class="connection-name">
+                            <strong>@connection.Name</strong>
+                            <small>@ProviderName(connection.ProviderId) · @(connection.AccountEmail ?? connection.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</small>
+                        </span>
+                        <span class="connection-state connection-state--@StateClass(connection.State)"><span class="connection-health connection-health--@StateClass(connection.State)"></span>@StateName(connection.State)</span>
+                        <span class="connection-usage">@UsageSummary(connection.Id)</span>
                     </button>
                 }
             </div>
@@ -78,7 +82,10 @@ else
                 else
                 {
                     var usage = Usage(_selected.Id);
-                    <div class="detail-header"><h3>@_selected.Name</h3><span class="detail-subtitle">@ProviderName(_selected.ProviderId)</span></div>
+                    <div class="detail-header connection-detail-header">
+                        <div><h3>@_selected.Name</h3><span class="detail-subtitle">@ProviderName(_selected.ProviderId)</span></div>
+                        <span class="connection-state connection-state--@StateClass(_selected.State)"><span class="connection-health connection-health--@StateClass(_selected.State)"></span>@StateName(_selected.State)</span>
+                    </div>
                     <div class="connection-detail-grid">
                         <section class="connection-detail-group">
                             <h4>@R("Web_ExternalStorage_Identity")</h4>

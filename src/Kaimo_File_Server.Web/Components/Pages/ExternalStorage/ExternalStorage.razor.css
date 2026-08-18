@@ -1,22 +1,40 @@
 .external-storage-tabs {
     display: flex;
-    gap: .5rem;
-    margin: 0 0 1.25rem;
-    border-bottom: 1px solid var(--border-color);
+    gap: 4px;
+    margin: -2px 0 18px;
+    padding: 4px;
+    width: fit-content;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg-tertiary);
 }
 
 .external-storage-tab {
-    padding: .8rem 1.15rem;
+    min-height: 34px;
+    padding: 6px 14px;
     border: 0;
-    border-bottom: 3px solid transparent;
+    border-radius: 5px;
     background: transparent;
     color: var(--text-secondary);
     font: inherit;
+    font-size: 12.5px;
     font-weight: 650;
     cursor: pointer;
+    transition: background 110ms ease, color 110ms ease, box-shadow 110ms ease;
+}
+
+.external-storage-tab:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
 }
 
 .external-storage-tab--active {
-    border-bottom-color: var(--accent);
-    color: var(--accent);
+    background: var(--bg-secondary);
+    color: var(--accent-strong);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+@media (max-width: 480px) {
+    .external-storage-tabs { width: 100%; }
+    .external-storage-tab { flex: 1; }
 }

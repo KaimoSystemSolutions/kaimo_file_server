@@ -51,18 +51,20 @@ else
                         <article class="sync-list-row @(_editingId == item.Definition.Id ? "sync-list-row--selected" : "")" role="row">
                             <div class="sync-primary" role="cell">
                                 <strong>@DisplayName(item)</strong>
-                                <small>@item.ShareName · @DisplayPath(item.Definition.LocalPath)</small>
-                                <small>@R("Web_ExternalStorage_RemotePath"): @item.Definition.RemotePath</small>
+                                <small class="sync-path" title="@DisplayPath(item.Definition.LocalPath)">@item.ShareName · @DisplayPath(item.Definition.LocalPath)</small>
+                                <small class="sync-path" title="@item.Definition.RemotePath">@R("Web_ExternalStorage_RemotePath"): @item.Definition.RemotePath</small>
                             </div>
-                            <div class="sync-cell" role="cell"><strong>@item.ConnectionName</strong><small>@ProviderFor(item)</small></div>
+                            <div class="sync-cell sync-connection" role="cell"><strong>@item.ConnectionName</strong><small>@ProviderFor(item)</small></div>
                             <div class="sync-cell" role="cell">
-                                <span class="storage-state @(!item.Definition.Enabled ? "storage-state--disabled" : "")">@SyncState(item)</span>
+                                <span class="storage-state storage-state--@SyncStateClass(item)">
+                                    <span class="storage-state-dot" aria-hidden="true"></span>@SyncState(item)
+                                </span>
                                 <small>@ModeName(item.Definition.Mode) · @(item.Definition.Schedule.IsEnabled ? R("Web_ExternalStorage_ScheduleEnabled") : R("Web_ExternalStorage_Disabled"))</small>
                                 <small>@R("Web_ExternalStorage_LastRun"): @FormatDate(item.Runtime?.LastRunAtUtc)</small>
                             </div>
                             <div class="sync-row-actions" role="cell">
                                 <button class="btn-secondary" type="button" disabled="@(_busy || !item.Definition.Enabled)" @onclick="() => RunAsync(item)">@R("Web_ExternalStorage_RunNow")</button>
-                                <button class="btn-secondary" type="button" disabled="@_busy" @onclick="() => StartEdit(item)">@R("Web_CloudAccess_Edit")</button>
+                                <button class="btn-secondary sync-edit-action" type="button" disabled="@_busy" @onclick="() => StartEdit(item)">@R("Web_CloudAccess_Edit")</button>
                                 <button class="btn-danger-outline" type="button" disabled="@_busy" @onclick="() => DeleteAsync(item)">@R("Web_Action_Delete")</button>
                             </div>
                         </article>
@@ -404,6 +406,8 @@ else
     private static string Health(ExternalStorageSyncListItem item) => string.IsNullOrWhiteSpace(item.Runtime?.LastErrorCode) ? R("Web_ExternalStorage_Healthy") : R("Web_ExternalStorage_AttentionRequired");
     private static string SyncState(ExternalStorageSyncListItem item)
         => item.Definition.Enabled ? Health(item) : R("Web_ExternalStorage_Disabled");
+    private static string SyncStateClass(ExternalStorageSyncListItem item)
+        => !item.Definition.Enabled ? "disabled" : string.IsNullOrWhiteSpace(item.Runtime?.LastErrorCode) ? "healthy" : "attention";
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
     public async ValueTask DisposeAsync()
     {
