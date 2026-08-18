@@ -42,7 +42,8 @@
                 @Assets.SVG("users.svg", new SvgOptions())
                 <span class="nav-label">@Resources.Web_Nav_Departments</span>
             </NavLink>
-            <NavLink class="nav-item" href="/files" Match="NavLinkMatch.All">
+            @* Keep the File Browser selected while navigating within a share. *@
+            <NavLink class="nav-item" href="/files" Match="NavLinkMatch.Prefix">
                 @Assets.SVG("compass.svg", new SvgOptions())
                 <span class="nav-label">@Resources.Web_Nav_BrowseFiles</span>
             </NavLink>
