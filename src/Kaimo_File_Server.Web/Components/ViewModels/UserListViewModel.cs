@@ -259,6 +259,12 @@ public class UserListViewModel
             new(ManagementPermission.ManageCertificates, Resources.Web_Perm_ManageCertificates),
             new(ManagementPermission.ViewSystemLogs, Resources.Web_Perm_ViewSystemLogs),
         ]),
+        new(Resources.Web_PermGroup_ExternalStorage,
+        [
+            new(ManagementPermission.ManageCloudAccess, Resources.Web_Perm_ManageCloudAccess),
+            new(ManagementPermission.ManageConnections, Resources.Web_Perm_ManageConnections),
+            new(ManagementPermission.UseConnections, Resources.Web_Perm_UseConnections),
+        ]),
     ];
 
     public static readonly List<PermissionPreset> PermissionPresets =
@@ -268,6 +274,7 @@ public class UserListViewModel
         new("ShareAdmin", ManagementPermission.ShareAdmin),
         new("DepartmentAdmin", ManagementPermission.DepartmentAdmin),
         new("SystemAdmin", ManagementPermission.SystemAdmin),
+        new("ExternalStorageAdmin", ManagementPermission.CloudAccessAdmin),
         new("FullAdmin", ManagementPermission.FullAdmin),
     ];
 

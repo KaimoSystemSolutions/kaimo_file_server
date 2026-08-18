@@ -17,17 +17,23 @@
         <h1>@R("Web_CloudAccess_Title")</h1>
         <p class="subtitle">@R("Web_CloudAccess_Subtitle")</p>
     </div>
-    @if (VM.CanManage)
+    @if (VM.CanManageConnections || (VM.CanManageVirtualShares && VM.CanUseConnections))
     {
         <div class="page-header-actions">
-            <button class="btn-secondary" type="button" @onclick="ToggleConnectionForm">
-                @Assets.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
-                <span>@R("Web_CloudAccess_AddConnection")</span>
-            </button>
-            <button class="btn-primary" type="button" disabled="@(!VM.Connections.Any(IsReady))" @onclick="ToggleShareForm">
-                @Assets.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
-                <span>@R("Web_CloudAccess_AddShare")</span>
-            </button>
+            @if (VM.CanManageConnections)
+            {
+                <button class="btn-secondary" type="button" @onclick="ToggleConnectionForm">
+                    @Assets.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                    <span>@R("Web_CloudAccess_AddConnection")</span>
+                </button>
+            }
+            @if (VM.CanManageVirtualShares && VM.CanUseConnections)
+            {
+                <button class="btn-primary" type="button" disabled="@(!VM.Connections.Any(IsReady))" @onclick="ToggleShareForm">
+                    @Assets.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                    <span>@R("Web_CloudAccess_AddShare")</span>
+                </button>
+            }
         </div>
     }
 </div>
@@ -264,6 +270,8 @@ else
                             <small>Microsoft OneDrive · @ConnectionState(connection)</small>
                             <small>@(connection.AccountEmail ?? connection.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</small>
                         </div>
+                        @if (VM.CanManageConnections)
+                        {
                         <div class="cloud-access-connection-actions">
                             @if (_editingConnectionId == connection.Id)
                             {
@@ -278,6 +286,7 @@ else
                             <button class="btn-secondary" type="button" @onclick="() => AuthorizeConnectionAsync(connection)">@(IsReady(connection) ? R("Web_CloudAccess_Reauthorize") : R("Web_CloudAccess_Authorize"))</button>
                             <button class="btn-danger-outline" type="button" @onclick="() => DeleteConnectionAsync(connection)">@Resources.Web_Action_Delete</button>
                         </div>
+                        }
                     </article>
                 }
             </div>
@@ -500,7 +509,7 @@ else
         });
     }
 
-    private void StartEditConnection(CloudAccessConnection connection)
+    private void StartEditConnection(StorageConnection connection)
     {
         _editingConnectionId = connection.Id;
         _editConnectionName = connection.Name;
@@ -525,14 +534,14 @@ else
         if (_selectedShare?.Id == share.Id) _selectedShare = null;
     }
 
-    private async Task DeleteConnectionAsync(CloudAccessConnection connection)
+    private async Task DeleteConnectionAsync(StorageConnection connection)
     {
         if (!await JS.InvokeAsync<bool>("confirm", string.Format(R("Web_CloudAccess_DeleteConnectionConfirm"), connection.Name))) return;
         await RunAsync(() => VM.DeleteConnectionAsync(connection.Id));
         if (_selectedShare is not null && _selectedShare.ConnectionId == connection.Id) _selectedShare = null;
     }
 
-    private async Task AuthorizeConnectionAsync(CloudAccessConnection connection) => await RunAsync(async () =>
+    private async Task AuthorizeConnectionAsync(StorageConnection connection) => await RunAsync(async () =>
     {
         var url = await VM.AuthorizeConnectionAsync(connection.Id);
         Nav.NavigateTo(url, forceLoad: true);
@@ -567,17 +576,20 @@ else
     private string PrincipalDisplay(Identity principal)
         => $"{(principal is Group ? R("Web_CloudAccess_Group") : R("Web_CloudAccess_User"))}: {principal.Name}";
 
-    private static bool IsReady(CloudAccessConnection connection)
-        => connection.State == CloudAccessConnectionState.Ready;
+    private static bool IsReady(StorageConnection connection)
+        => connection.State == StorageConnectionState.Ready;
 
-    private string ConnectionDisplay(CloudAccessConnection connection)
+    private string ConnectionDisplay(StorageConnection connection)
         => $"{connection.Name} ({connection.AccountEmail ?? connection.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized")})";
 
-    private string ConnectionState(CloudAccessConnection connection) => connection.State switch
+    private string ConnectionState(StorageConnection connection) => connection.State switch
     {
-        CloudAccessConnectionState.Ready => R("Web_CloudAccess_StatusReady"),
-        CloudAccessConnectionState.PendingAuthorization => R("Web_CloudAccess_StatusPending"),
-        CloudAccessConnectionState.Disabled => R("Web_CloudAccess_StatusDisabled"),
+        StorageConnectionState.Ready => R("Web_CloudAccess_StatusReady"),
+        StorageConnectionState.PendingConfiguration => R("Web_StorageConnection_StatusPendingConfiguration"),
+        StorageConnectionState.PendingAuthorization => R("Web_CloudAccess_StatusPending"),
+        StorageConnectionState.Degraded => R("Web_StorageConnection_StatusDegraded"),
+        StorageConnectionState.NeedsReauthorization => R("Web_StorageConnection_StatusNeedsReauthorization"),
+        StorageConnectionState.Disabled => R("Web_CloudAccess_StatusDisabled"),
         _ => R("Web_CloudAccess_StatusError")
     };
 

@@ -8,60 +8,6 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
 public sealed class CloudAccessRepository(IDbContextFactory<ApplicationDbContext> dbFactory)
     : ICloudAccessRepository
 {
-    public async Task<List<CloudAccessConnection>> GetConnectionsAsync(CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        return await db.CloudAccessConnections.AsNoTracking().OrderBy(x => x.Name).ToListAsync(cancellationToken);
-    }
-
-    public async Task<CloudAccessConnection?> GetConnectionAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        return await db.CloudAccessConnections.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
-    }
-
-    public async Task UpsertConnectionAsync(CloudAccessConnection connection, CancellationToken cancellationToken = default)
-    {
-        connection.UpdatedAtUtc = DateTime.UtcNow;
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        if (await db.CloudAccessConnections.AnyAsync(x => x.Id == connection.Id, cancellationToken))
-            db.CloudAccessConnections.Update(connection);
-        else
-            db.CloudAccessConnections.Add(connection);
-        await db.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task UpdateConnectionRuntimeAsync(
-        Guid id,
-        string protectedCredentials,
-        string? accountDisplayName,
-        string? accountEmail,
-        CloudAccessConnectionState state,
-        string? lastError,
-        CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var connection = await db.CloudAccessConnections.SingleOrDefaultAsync(x => x.Id == id, cancellationToken)
-                         ?? throw new InvalidOperationException("Cloud Access connection no longer exists.");
-        connection.ProtectedCredentials = protectedCredentials;
-        connection.AccountDisplayName = accountDisplayName ?? connection.AccountDisplayName;
-        connection.AccountEmail = accountEmail ?? connection.AccountEmail;
-        connection.State = state;
-        connection.LastError = lastError;
-        connection.LastVerifiedAtUtc = state == CloudAccessConnectionState.Ready ? DateTime.UtcNow : connection.LastVerifiedAtUtc;
-        connection.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task DeleteConnectionAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var connection = await db.CloudAccessConnections.FindAsync([id], cancellationToken);
-        if (connection is null) return;
-        db.CloudAccessConnections.Remove(connection);
-        await db.SaveChangesAsync(cancellationToken);
-    }
-
     public async Task<List<CloudAccessShare>> GetSharesAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);

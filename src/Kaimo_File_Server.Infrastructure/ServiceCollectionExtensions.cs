@@ -44,6 +44,7 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<IShareRepository, ShareRepository>();
             services.AddScoped<ICloudAccessRepository, CloudAccessRepository>();
+            services.AddScoped<IStorageConnectionRepository, StorageConnectionRepository>();
             services.AddScoped<IGroupRepository, GroupRepository>();
             services.AddScoped<IRoleRepository, RoleRepository>();
             services.AddScoped<IDepartmentRepository, DepartmentRepository>();

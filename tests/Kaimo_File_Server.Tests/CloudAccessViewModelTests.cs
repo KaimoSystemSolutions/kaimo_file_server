@@ -22,15 +22,16 @@ public sealed class CloudAccessViewModelTests
         var departmentId = Guid.NewGuid();
         var user = new User(Guid.NewGuid(), "Alice", "alice", "hash", "nt");
         var actor = new UserContext(user, [], [], []);
-        var connection = new CloudAccessConnection { DepartmentId = departmentId, Name = "Old name" };
+        var connection = new StorageConnection { DepartmentId = departmentId, Name = "Old name" };
         var cloudRepository = new Mock<ICloudAccessRepository>();
-        cloudRepository.Setup(x => x.GetConnectionAsync(connection.Id, default)).ReturnsAsync(connection);
-        cloudRepository.Setup(x => x.GetConnectionsAsync(default)).ReturnsAsync([connection]);
+        var connectionRepository = new Mock<IStorageConnectionRepository>();
+        connectionRepository.Setup(x => x.GetAsync(connection.Id, default)).ReturnsAsync(connection);
+        connectionRepository.Setup(x => x.GetAllAsync(default)).ReturnsAsync([connection]);
         cloudRepository.Setup(x => x.GetSharesAsync(default)).ReturnsAsync([]);
         var management = new Mock<IManagementAuthService>();
-        management.Setup(x => x.CanManageDepartmentAsync(actor, departmentId, ManagementPermission.ManageCloudAccess))
+        management.Setup(x => x.CanManageDepartmentAsync(actor, departmentId, ManagementPermission.ManageConnections))
             .ReturnsAsync(true);
-        management.Setup(x => x.GetAuthorizedDepartmentIdsAsync(actor, ManagementPermission.ManageCloudAccess))
+        management.Setup(x => x.GetAuthorizedDepartmentIdsAsync(actor, It.IsAny<ManagementPermission>()))
             .ReturnsAsync(AuthorizedScopeResult.Unrestricted());
         var userContexts = new Mock<IUserContextFactory>();
         userContexts.Setup(x => x.CreateByUsernameAsync("alice")).ReturnsAsync(actor);
@@ -40,7 +41,8 @@ public sealed class CloudAccessViewModelTests
         var departments = new Mock<IDepartmentRepository>();
         departments.Setup(x => x.GetAllAsync()).ReturnsAsync([]);
         var viewModel = new CloudAccessViewModel(
-            cloudRepository.Object, Mock.Of<ICredentialVault>(), Mock.Of<ICloudAuthorizationTicketStore>(),
+            cloudRepository.Object, connectionRepository.Object,
+            Mock.Of<ICredentialVault>(), Mock.Of<ICloudAuthorizationTicketStore>(),
             management.Object, userContexts.Object, authentication.Object, departments.Object,
             Mock.Of<IUserRepository>(), Mock.Of<IGroupRepository>(), Mock.Of<IShareRepository>(),
             Mock.Of<IHttpClientFactory>(), NullLogger<CloudAccessViewModel>.Instance);
@@ -48,18 +50,19 @@ public sealed class CloudAccessViewModelTests
         await viewModel.UpdateConnectionAsync(connection.Id, "  Finance OneDrive  ");
 
         Assert.Equal("Finance OneDrive", connection.Name);
-        cloudRepository.Verify(x => x.UpsertConnectionAsync(connection, default), Times.Once);
+        connectionRepository.Verify(x => x.SaveAsync(connection, default), Times.Once);
     }
 
     [Fact]
     public async Task UpdateConnectionAsync_RejectsBlankNames()
     {
-        var connection = new CloudAccessConnection { DepartmentId = Guid.NewGuid(), Name = "Current" };
+        var connection = new StorageConnection { DepartmentId = Guid.NewGuid(), Name = "Current" };
         var cloudRepository = new Mock<ICloudAccessRepository>();
-        cloudRepository.Setup(x => x.GetConnectionAsync(connection.Id, default)).ReturnsAsync(connection);
+        var connectionRepository = new Mock<IStorageConnectionRepository>();
+        connectionRepository.Setup(x => x.GetAsync(connection.Id, default)).ReturnsAsync(connection);
         var management = new Mock<IManagementAuthService>();
         management.Setup(x => x.CanManageDepartmentAsync(It.IsAny<UserContext>(), connection.DepartmentId,
-                ManagementPermission.ManageCloudAccess)).ReturnsAsync(true);
+                ManagementPermission.ManageConnections)).ReturnsAsync(true);
         var user = new User(Guid.NewGuid(), "Alice", "alice", "hash", "nt");
         var contexts = new Mock<IUserContextFactory>();
         contexts.Setup(x => x.CreateByUsernameAsync("alice")).ReturnsAsync(new UserContext(user, [], [], []));
@@ -67,7 +70,8 @@ public sealed class CloudAccessViewModelTests
         authentication.Setup(x => x.GetAuthenticationStateAsync()).ReturnsAsync(new AuthenticationState(
             new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "alice")], "test"))));
         var viewModel = new CloudAccessViewModel(
-            cloudRepository.Object, Mock.Of<ICredentialVault>(), Mock.Of<ICloudAuthorizationTicketStore>(),
+            cloudRepository.Object, connectionRepository.Object,
+            Mock.Of<ICredentialVault>(), Mock.Of<ICloudAuthorizationTicketStore>(),
             management.Object, contexts.Object, authentication.Object, Mock.Of<IDepartmentRepository>(),
             Mock.Of<IUserRepository>(), Mock.Of<IGroupRepository>(), Mock.Of<IShareRepository>(),
             Mock.Of<IHttpClientFactory>(), NullLogger<CloudAccessViewModel>.Instance);
@@ -75,7 +79,7 @@ public sealed class CloudAccessViewModelTests
         var exception = await Assert.ThrowsAsync<ArgumentException>(() => viewModel.UpdateConnectionAsync(connection.Id, " "));
 
         Assert.Equal(Resources.ResourceManager.GetString("Web_CloudAccess_InvalidConnectionName"), exception.Message);
-        cloudRepository.Verify(x => x.UpsertConnectionAsync(It.IsAny<CloudAccessConnection>(), default), Times.Never);
+        connectionRepository.Verify(x => x.SaveAsync(It.IsAny<StorageConnection>(), default), Times.Never);
     }
 
     [Theory]
@@ -86,14 +90,16 @@ public sealed class CloudAccessViewModelTests
         var departmentId = Guid.NewGuid();
         var user = new User(Guid.NewGuid(), "Alice", "alice", "hash", "nt");
         var actor = new UserContext(user, [], [], []);
-        var connection = new CloudAccessConnection
+        var connection = new StorageConnection
         {
             DepartmentId = departmentId,
-            State = CloudAccessConnectionState.Ready,
-            ProtectedCredentials = "protected"
+            ProviderId = "onedrive",
+            State = StorageConnectionState.Ready,
+            EncryptedCredentialPayload = "protected"
         };
         var cloudRepository = new Mock<ICloudAccessRepository>();
-        cloudRepository.Setup(x => x.GetConnectionAsync(connection.Id, default)).ReturnsAsync(connection);
+        var connectionRepository = new Mock<IStorageConnectionRepository>();
+        connectionRepository.Setup(x => x.GetAsync(connection.Id, default)).ReturnsAsync(connection);
         cloudRepository.Setup(x => x.GetSharesAsync(default)).ReturnsAsync(localCollision
             ? []
             : [new CloudAccessShare { Name = "Documents" }]);
@@ -105,6 +111,9 @@ public sealed class CloudAccessViewModelTests
         management.Setup(x => x.CanManageDepartmentAsync(
                 actor, departmentId, ManagementPermission.ManageCloudAccess))
             .ReturnsAsync(true);
+        management.Setup(x => x.CanManageDepartmentAsync(
+                actor, departmentId, ManagementPermission.UseConnections))
+            .ReturnsAsync(true);
         var userContexts = new Mock<IUserContextFactory>();
         userContexts.Setup(x => x.CreateByUsernameAsync("alice")).ReturnsAsync(actor);
         var identity = new ClaimsIdentity(
@@ -115,6 +124,7 @@ public sealed class CloudAccessViewModelTests
         var credentialVault = new Mock<ICredentialVault>();
         var viewModel = new CloudAccessViewModel(
             cloudRepository.Object,
+            connectionRepository.Object,
             credentialVault.Object,
             Mock.Of<ICloudAuthorizationTicketStore>(),
             management.Object,

@@ -24,6 +24,7 @@ public sealed record CrossShareTransferResult(bool Success, string? Error = null
 /// </summary>
 public sealed class CrossShareTransferService(
     ICloudAccessRepository cloudRepository,
+    IStorageConnectionRepository connections,
     ICredentialVault credentialVault,
     CloudAccessAuthorizationService cloudAuthorization,
     IShareRepository shareRepository,
@@ -97,8 +98,8 @@ public sealed class CrossShareTransferService(
                         sourceBackend.LocalShare!.IsRecycleEnabled);
             }
 
-            await sourceBackend.PersistCredentialsAsync(cloudRepository, credentialVault, cancellationToken);
-            await targetBackend.PersistCredentialsAsync(cloudRepository, credentialVault, cancellationToken);
+            await sourceBackend.PersistCredentialsAsync(connections, credentialVault, cancellationToken);
+            await targetBackend.PersistCredentialsAsync(connections, credentialVault, cancellationToken);
             return new(true);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -136,8 +137,8 @@ public sealed class CrossShareTransferService(
         if (!shareRemote.IsEnabled || (requireWrite && shareRemote.IsReadOnly)
             || !await cloudAuthorization.CanAccessAsync(actor, shareRemote))
             throw new UnauthorizedAccessException("The virtual share is not accessible.");
-        var record = await cloudRepository.GetConnectionAsync(shareRemote.ConnectionId, cancellationToken);
-        if (record?.State != CloudAccessConnectionState.Ready || string.IsNullOrWhiteSpace(record.ProtectedCredentials))
+        var record = await connections.GetAsync(shareRemote.ConnectionId, cancellationToken);
+        if (record?.State != StorageConnectionState.Ready || string.IsNullOrWhiteSpace(record.EncryptedCredentialPayload))
             throw new InvalidOperationException("The virtual-share connection is unavailable.");
         var credentials = credentialVault.UnprotectConnectionCredentials(record);
         return new(new OneDriveConnection(credentials, httpClientFactory.CreateClient("CloudAccessOneDrive")),
@@ -182,13 +183,13 @@ public sealed class CrossShareTransferService(
     private sealed class TransferBackend : IAsyncDisposable
     {
         public TransferBackend(IFileService local, ShareDefinition share) { Local = local; LocalShare = share; }
-        public TransferBackend(OneDriveConnection remote, CloudAccessShare share, CloudAccessConnection record, Dictionary<string, string> credentials)
+        public TransferBackend(OneDriveConnection remote, CloudAccessShare share, StorageConnection record, Dictionary<string, string> credentials)
         { Remote = remote; RemoteShare = share; ConnectionRecord = record; Credentials = credentials; }
         public IFileService? Local { get; }
         public ShareDefinition? LocalShare { get; }
         public OneDriveConnection? Remote { get; }
         public CloudAccessShare? RemoteShare { get; }
-        public CloudAccessConnection? ConnectionRecord { get; }
+        public StorageConnection? ConnectionRecord { get; }
         public Dictionary<string, string>? Credentials { get; }
 
         public async Task<List<FileMetadata>> ListAsync(string path, UserContext actor, CancellationToken cancellationToken)
@@ -220,12 +221,12 @@ public sealed class CrossShareTransferService(
             if (Local is not null) { await Local.CreateDirectoryAsync(path, actor); return; }
             await Remote!.CreateDirectoryAsync(RemotePath(path), cancellationToken);
         }
-        public async Task PersistCredentialsAsync(ICloudAccessRepository repository, ICredentialVault credentialVault, CancellationToken cancellationToken)
+        public async Task PersistCredentialsAsync(IStorageConnectionRepository repository, ICredentialVault credentialVault, CancellationToken cancellationToken)
         {
             if (Remote?.HasPendingCredentialChanges == true)
-                await repository.UpdateConnectionRuntimeAsync(ConnectionRecord!.Id,
+                await repository.UpdateRuntimeAsync(ConnectionRecord!.Id,
                     credentialVault.ProtectConnectionCredentials(ConnectionRecord, Credentials!), null, null,
-                    CloudAccessConnectionState.Ready, null, cancellationToken);
+                    StorageConnectionState.Ready, null, cancellationToken);
         }
         private string RemotePath(string path) => ShareRelativePath.Combine(RemoteShare!.RemoteRootPath, path);
         private string StripRoot(string path)

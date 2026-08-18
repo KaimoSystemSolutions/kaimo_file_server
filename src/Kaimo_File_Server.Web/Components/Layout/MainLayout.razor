@@ -337,7 +337,8 @@
             _canManageSyncs = _currentUser != null
                               && await ManagementAuthService.HasAnyPermissionAsync(_currentUser, ManagementPermission.SyncAdmin);
             _canManageCloudAccess = _currentUser != null
-                                    && await ManagementAuthService.HasAnyPermissionAsync(_currentUser, ManagementPermission.ManageCloudAccess);
+                                    && await ManagementAuthService.HasAnyPermissionAsync(
+                                        _currentUser, ManagementPermission.CloudAccessAdmin);
         }
     }
 

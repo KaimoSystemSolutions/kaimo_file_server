@@ -1095,6 +1095,9 @@
   <data name="Web_PermGroup_SystemMgmt" xml:space="preserve">
     <value>Systemverwaltung</value>
   </data>
+  <data name="Web_PermGroup_ExternalStorage" xml:space="preserve">
+    <value>Externer Speicher</value>
+  </data>
   <data name="Web_Perm_CreateUsers" xml:space="preserve">
     <value>Benutzer erstellen</value>
   </data>
@@ -1160,6 +1163,15 @@
   </data>
   <data name="Web_Perm_ViewSystemLogs" xml:space="preserve">
     <value>Systemprotokolle anzeigen und herunterladen</value>
+  </data>
+  <data name="Web_Perm_ManageCloudAccess" xml:space="preserve">
+    <value>Virtuelle Shares verwalten</value>
+  </data>
+  <data name="Web_Perm_ManageConnections" xml:space="preserve">
+    <value>Speicherverbindungen verwalten</value>
+  </data>
+  <data name="Web_Perm_UseConnections" xml:space="preserve">
+    <value>Speicherverbindungen verwenden</value>
   </data>
   <data name="Web_Settings_Tab_Certificate" xml:space="preserve">
     <value>Zertifikat</value>
@@ -2141,6 +2153,12 @@
   <data name="Web_CloudAccess_StatusPending" xml:space="preserve"><value>Autorisierung ausstehend</value></data>
   <data name="Web_CloudAccess_StatusError" xml:space="preserve"><value>Fehler</value></data>
   <data name="Web_CloudAccess_StatusDisabled" xml:space="preserve"><value>Deaktiviert</value></data>
+  <data name="Web_StorageConnection_StatusPendingConfiguration" xml:space="preserve"><value>Konfiguration ausstehend</value></data>
+  <data name="Web_StorageConnection_StatusDegraded" xml:space="preserve"><value>Eingeschränkt</value></data>
+  <data name="Web_StorageConnection_StatusNeedsReauthorization" xml:space="preserve"><value>Erneute Autorisierung erforderlich</value></data>
+  <data name="Web_StorageConnection_DeleteInUse" xml:space="preserve"><value>Die Verbindung wird noch von einer Synchronisierung oder einem virtuellen Share verwendet und kann nicht gelöscht werden.</value></data>
+  <data name="Web_StorageConnection_ManageDenied" xml:space="preserve"><value>Sie dürfen Speicherverbindungen in dieser Abteilung nicht verwalten.</value></data>
+  <data name="Web_StorageConnection_UseDenied" xml:space="preserve"><value>Sie dürfen Speicherverbindungen in dieser Abteilung nicht verwenden.</value></data>
   <data name="Web_CloudAccess_Error_NoSelection" xml:space="preserve"><value>Bitte mindestens ein Element auswählen.</value></data>
   <data name="Web_CloudAccess_Error_SignInRequired" xml:space="preserve"><value>Eine Anmeldung ist erforderlich.</value></data>
   <data name="Web_CloudAccess_Error_AccessDenied" xml:space="preserve"><value>Der Zugriff auf den virtuellen Share wurde verweigert.</value></data>

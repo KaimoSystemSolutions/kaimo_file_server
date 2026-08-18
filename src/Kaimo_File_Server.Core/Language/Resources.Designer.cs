@@ -3425,6 +3425,24 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Perm_ManageAcls", resourceCulture);
             }
         }
+
+        public static string Web_Perm_ManageCloudAccess {
+            get {
+                return ResourceManager.GetString("Web_Perm_ManageCloudAccess", resourceCulture);
+            }
+        }
+
+        public static string Web_Perm_ManageConnections {
+            get {
+                return ResourceManager.GetString("Web_Perm_ManageConnections", resourceCulture);
+            }
+        }
+
+        public static string Web_Perm_UseConnections {
+            get {
+                return ResourceManager.GetString("Web_Perm_UseConnections", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Manage HTTPS certificate ähnelt.
@@ -4131,6 +4149,12 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Settings_Logging_Saved {
             get {
                 return ResourceManager.GetString("Web_Settings_Logging_Saved", resourceCulture);
+            }
+        }
+
+        public static string Web_PermGroup_ExternalStorage {
+            get {
+                return ResourceManager.GetString("Web_PermGroup_ExternalStorage", resourceCulture);
             }
         }
 

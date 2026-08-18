@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
 public sealed class CloudAccessShareBrowserViewModel(
-    ICloudAccessRepository repository,
+    IStorageConnectionRepository connectionsRepository,
     CloudAccessAuthorizationService authorization,
     IUserContextFactory userContextFactory,
     AuthenticationStateProvider authenticationState,
@@ -25,11 +25,11 @@ public sealed class CloudAccessShareBrowserViewModel(
             var actor = string.IsNullOrWhiteSpace(username) ? null : await userContextFactory.CreateByUsernameAsync(username);
             if (actor is null) { Shares = []; return; }
             var visible = await authorization.GetVisibleSharesAsync(actor);
-            var connections = (await repository.GetConnectionsAsync()).ToDictionary(x => x.Id);
+            var connections = (await connectionsRepository.GetAllAsync()).ToDictionary(x => x.Id);
             Shares = visible.Where(x => connections.TryGetValue(x.ConnectionId, out var connection)
-                                        && connection.State == CloudAccessConnectionState.Ready)
+                                        && connection.State == StorageConnectionState.Ready)
                 .Select(x => new CloudAccessShareListItem(
-                    x.Id, x.Name, connections[x.ConnectionId].Provider, x.RemoteRootPath, x.IsReadOnly))
+                    x.Id, x.Name, connections[x.ConnectionId].ProviderId, x.RemoteRootPath, x.IsReadOnly))
                 .OrderBy(x => x.Name).ToList();
         }
         catch (Exception exception)

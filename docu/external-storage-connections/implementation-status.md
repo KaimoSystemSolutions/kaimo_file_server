@@ -14,7 +14,7 @@ Last updated: **2026-08-18**
 - Database changes remain additive and reversible until the final cleanup package.
 - The repository owner creates commits; implementation work does not create commits.
 
-## Current focus
+## Immediate containment
 
 ### Package 0A: immediate credential containment — in progress
 
@@ -32,6 +32,8 @@ During the compatibility period, an installation can provide the existing keys t
 `GoogleOAuth__ClientId` and `GoogleOAuth__ClientSecret`. Secret-file and external-vault resolution is
 scheduled for the Google provider consolidation package.
 
+## Completed foundation packages
+
 ### Package 0B: context-bound credential vault foundation — implemented
 
 - [x] Introduce the provider-neutral `ICredentialVault` contract and typed `CredentialContext`.
@@ -46,17 +48,26 @@ next time the provider returns a rotated grant. A bounded rewrap job remains par
 
 No UI copy was introduced in this package, so no resource-file keys were required.
 
-## Next work packages
+### Package 1: neutral connection domain — implemented
 
-### Package 1: neutral connection domain — next
+- [x] Add `StorageConnection`, `ProviderProfile`, connection states, and authorization modes.
+- [x] Separate connection persistence from the virtual-share repository.
+- [x] Add application-managed optimistic concurrency and stale-write rejection.
+- [x] Add usage counts and block deletion while a virtual share references the connection.
+- [x] Change the database foreign key from cascade to restrict.
+- [x] Rename the existing table and credential column without recreating, decrypting, or logging records.
+- [x] Assign existing OneDrive records to the built-in Microsoft public-client profile.
+- [x] Add `ManageConnections` and `UseConnections` authorization checks.
+- [x] Expose the new permissions and connection states through English and German resource files.
+- [x] Add database tests for persistence, concurrency, usage counts, runtime updates, and restrictive deletion.
 
-- Add `StorageConnection`, `ProviderProfile`, connection states, and authorization modes.
-- Add repository operations, optimistic concurrency, usage counts, and restrictive foreign keys.
-- Represent existing Cloud Access OneDrive records without losing encrypted credentials.
-- Add `ManageConnections` and `UseConnections` authorization checks.
-- Add database and delete-restriction tests.
+The migration keeps `ProviderProfileId` nullable during the additive rollout so future legacy provider records
+can be classified safely instead of being assigned to the wrong profile. Existing OneDrive records are linked
+to the built-in profile automatically.
 
-### Package 2: shared authorization and refresh coordination — planned
+## Current focus
+
+### Package 2: shared authorization and refresh coordination — next
 
 - Persist short-lived authorization transactions with a TTL.
 - Add distributed, per-connection refresh leases.
@@ -95,3 +106,6 @@ No UI copy was introduced in this package, so no resource-file keys were require
 | --- | --- | --- |
 | 2026-08-18 | Project compilation through the solution build | Core, Infrastructure, Host, SMB bridge, Web, and test projects compiled; the solution command itself was blocked by sandbox access to the Docker Compose project SDK lookup. |
 | 2026-08-18 | `Kaimo_File_Server.Tests` | 766 passed, 0 failed, 0 skipped. |
+| 2026-08-18 | Neutral connection domain build and tests | 771 passed, 0 failed, 0 skipped. |
+| 2026-08-18 | EF Core model check | No pending model changes after `NeutralStorageConnections`. |
+| 2026-08-18 | PostgreSQL migration script review | Existing connection table and credential column are renamed in place; no connection table drop is emitted. |

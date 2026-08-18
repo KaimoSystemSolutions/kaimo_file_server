@@ -16,6 +16,7 @@ public sealed record CloudTransferResult(bool Success, string? Error = null);
 /// <summary>Streams selected remote items into an ACL-protected local share with bounded memory.</summary>
 public sealed class CloudToLocalTransferService(
     ICloudAccessRepository cloudRepository,
+    IStorageConnectionRepository connections,
     ICredentialVault credentialVault,
     CloudAccessAuthorizationService cloudAuthorization,
     IShareRepository shareRepository,
@@ -66,9 +67,9 @@ public sealed class CloudToLocalTransferService(
         var local = fileServiceFactory.CreateForShare(localShare.Id, localShare.Path);
         if (!await local.CanCreateAsync(destination, actor)) return new(false, R("Web_CloudAccess_Error_LocalWriteDenied"));
 
-        var connectionRecord = await cloudRepository.GetConnectionAsync(remoteShare.ConnectionId);
-        if (connectionRecord?.State != CloudAccessConnectionState.Ready
-            || string.IsNullOrWhiteSpace(connectionRecord.ProtectedCredentials))
+        var connectionRecord = await connections.GetAsync(remoteShare.ConnectionId);
+        if (connectionRecord?.State != StorageConnectionState.Ready
+            || string.IsNullOrWhiteSpace(connectionRecord.EncryptedCredentialPayload))
             return new(false, R("Web_CloudAccess_ConnectionNotReady"));
         var credentials = credentialVault.UnprotectConnectionCredentials(connectionRecord);
         await using var remote = new OneDriveConnection(
@@ -84,9 +85,9 @@ public sealed class CloudToLocalTransferService(
             }
             if (remote.HasPendingCredentialChanges)
             {
-                await cloudRepository.UpdateConnectionRuntimeAsync(
+                await connections.UpdateRuntimeAsync(
                     connectionRecord.Id, credentialVault.ProtectConnectionCredentials(connectionRecord, credentials), null, null,
-                    CloudAccessConnectionState.Ready, null, cancellationToken);
+                    StorageConnectionState.Ready, null, cancellationToken);
             }
             return new(true);
         }

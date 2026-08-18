@@ -17,6 +17,7 @@ namespace Kaimo_File_Server.Web.Controllers;
 [Route("api/cloud-access/onedrive")]
 public sealed class CloudAccessOneDriveController(
     ICloudAccessRepository repository,
+    IStorageConnectionRepository connections,
     ICredentialVault credentialVault,
     ICloudAuthorizationTicketStore tickets,
     IOneDriveDeviceAuthorizationService deviceAuthorization,
@@ -35,9 +36,9 @@ public sealed class CloudAccessOneDriveController(
         var actor = await userContextFactory.CreateByUserIdAsync(download.UserId);
         if (share is null || actor is null || !await authorization.CanAccessAsync(actor, share))
             return Forbid();
-        var record = await repository.GetConnectionAsync(share.ConnectionId);
-        if (record?.State != CloudAccessConnectionState.Ready
-            || string.IsNullOrWhiteSpace(record.ProtectedCredentials))
+        var record = await connections.GetAsync(share.ConnectionId);
+        if (record?.State != StorageConnectionState.Ready
+            || string.IsNullOrWhiteSpace(record.EncryptedCredentialPayload))
             return NotFound();
         if (!ShareRelativePath.TryNormalizeStrict(download.RelativePath, out var relative, allowRoot: false))
             return BadRequest("The download path is invalid.");
@@ -58,9 +59,9 @@ public sealed class CloudAccessOneDriveController(
             HttpContext.RequestAborted);
         if (connection.HasPendingCredentialChanges)
         {
-            await repository.UpdateConnectionRuntimeAsync(
+            await connections.UpdateRuntimeAsync(
                 record.Id, credentialVault.ProtectConnectionCredentials(record, credentials), null, null,
-                CloudAccessConnectionState.Ready, null,
+                StorageConnectionState.Ready, null,
                 HttpContext.RequestAborted);
         }
         return new EmptyResult();
@@ -71,8 +72,8 @@ public sealed class CloudAccessOneDriveController(
     {
         if (!tickets.IsValid(ticket, connectionId, string.Empty, "onedrive-access"))
             return BadRequest("The Cloud Access authorization request is invalid or has expired.");
-        var connection = await repository.GetConnectionAsync(connectionId);
-        if (connection is null || !string.Equals(connection.Provider, "onedrive", StringComparison.OrdinalIgnoreCase))
+        var connection = await connections.GetAsync(connectionId);
+        if (connection is null || !string.Equals(connection.ProviderId, "onedrive", StringComparison.OrdinalIgnoreCase))
             return NotFound("Cloud Access connection not found.");
         try
         {
@@ -99,7 +100,7 @@ public sealed class CloudAccessOneDriveController(
             || !tickets.TryConsume(result.AuthorizationTicket, result.ShareId, string.Empty, "onedrive-access"))
             return Ok(new { state = "failed", message = R("Web_CloudSync_Device_Expired") });
 
-        var record = await repository.GetConnectionAsync(result.ShareId);
+        var record = await connections.GetAsync(result.ShareId);
         if (record is null)
             return Ok(new { state = "failed", message = R("Web_CloudAccess_ConnectionMissing") });
 
@@ -113,23 +114,23 @@ public sealed class CloudAccessOneDriveController(
             await using var connection = new OneDriveConnection(
                 credentials, httpClientFactory.CreateClient("CloudAccessOneDrive"));
             var account = await connection.GetAccountInfoAsync();
-            await repository.UpdateConnectionRuntimeAsync(
+            await connections.UpdateRuntimeAsync(
                 record.Id,
                 credentialVault.ProtectConnectionCredentials(record, credentials),
                 account?.DisplayName,
                 account?.Email,
-                CloudAccessConnectionState.Ready,
+                StorageConnectionState.Ready,
                 null);
             return Ok(new { state = "complete", redirect = $"/cloud-access?connected={record.Id}" });
         }
         catch (Exception exception)
         {
             logger.LogError(exception, "OneDrive verification failed for Cloud Access connection {ConnectionId}", record.Id);
-            await repository.UpdateConnectionRuntimeAsync(
+            await connections.UpdateRuntimeAsync(
                 record.Id,
                 credentialVault.ProtectConnectionCredentials(record, credentials),
                 null, null,
-                CloudAccessConnectionState.Error,
+                StorageConnectionState.Degraded,
                 R("Web_CloudSync_Device_Failed"));
             return Ok(new { state = "failed", message = R("Web_CloudSync_Device_Failed") });
         }

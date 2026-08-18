@@ -15,6 +15,7 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 public sealed class CloudAccessViewModel
 {
     private readonly ICloudAccessRepository _repository;
+    private readonly IStorageConnectionRepository _connections;
     private readonly ICredentialVault _credentialVault;
     private readonly ICloudAuthorizationTicketStore _tickets;
     private readonly IManagementAuthService _managementAuth;
@@ -30,6 +31,7 @@ public sealed class CloudAccessViewModel
 
     public CloudAccessViewModel(
         ICloudAccessRepository repository,
+        IStorageConnectionRepository connections,
         ICredentialVault credentialVault,
         ICloudAuthorizationTicketStore tickets,
         IManagementAuthService managementAuth,
@@ -43,6 +45,7 @@ public sealed class CloudAccessViewModel
         ILogger<CloudAccessViewModel> logger)
     {
         _repository = repository;
+        _connections = connections;
         _credentialVault = credentialVault;
         _tickets = tickets;
         _managementAuth = managementAuth;
@@ -56,12 +59,15 @@ public sealed class CloudAccessViewModel
         _logger = logger;
     }
 
-    public List<CloudAccessConnection> Connections { get; private set; } = [];
+    public List<StorageConnection> Connections { get; private set; } = [];
     public List<CloudAccessShare> Shares { get; private set; } = [];
     public List<Department> ManageableDepartments { get; private set; } = [];
     public List<Identity> AvailablePrincipals { get; private set; } = [];
     public bool IsLoading { get; private set; }
     public bool CanManage { get; private set; }
+    public bool CanManageConnections { get; private set; }
+    public bool CanManageVirtualShares { get; private set; }
+    public bool CanUseConnections { get; private set; }
     public string? ErrorMessage { get; private set; }
 
     public async Task LoadAsync()
@@ -72,18 +78,27 @@ public sealed class CloudAccessViewModel
         {
             _actor = await GetActorAsync();
             if (_actor is null) return;
-            var scope = await _managementAuth.GetAuthorizedDepartmentIdsAsync(
+            var connectionScope = await _managementAuth.GetAuthorizedDepartmentIdsAsync(
+                _actor, ManagementPermission.ManageConnections);
+            var usageScope = await _managementAuth.GetAuthorizedDepartmentIdsAsync(
+                _actor, ManagementPermission.UseConnections);
+            var shareScope = await _managementAuth.GetAuthorizedDepartmentIdsAsync(
                 _actor, ManagementPermission.ManageCloudAccess);
-            CanManage = scope.IsUnrestricted || scope.ScopeIds.Count > 0;
+            CanManageConnections = HasDepartments(connectionScope);
+            CanUseConnections = HasDepartments(usageScope);
+            CanManageVirtualShares = HasDepartments(shareScope);
+            CanManage = CanManageConnections || CanManageVirtualShares;
             var allDepartments = await _departments.GetAllAsync();
-            ManageableDepartments = scope.IsUnrestricted
-                ? allDepartments.OrderBy(x => x.Name).ToList()
-                : allDepartments.Where(x => scope.ScopeIds.Contains(x.Id)).OrderBy(x => x.Name).ToList();
-            var departmentIds = ManageableDepartments.Select(x => x.Id).ToHashSet();
-            Connections = (await _repository.GetConnectionsAsync())
-                .Where(x => departmentIds.Contains(x.DepartmentId)).ToList();
+            var connectionManagementIds = GetDepartmentIds(connectionScope, allDepartments);
+            var connectionUsageIds = GetDepartmentIds(usageScope, allDepartments);
+            var shareIds = GetDepartmentIds(shareScope, allDepartments);
+            ManageableDepartments = allDepartments.Where(x => connectionManagementIds.Contains(x.Id))
+                .OrderBy(x => x.Name).ToList();
+            var visibleConnectionIds = connectionManagementIds.Concat(connectionUsageIds).ToHashSet();
+            Connections = (await _connections.GetAllAsync())
+                .Where(x => visibleConnectionIds.Contains(x.DepartmentId)).ToList();
             Shares = (await _repository.GetSharesAsync())
-                .Where(x => departmentIds.Contains(x.DepartmentId)).ToList();
+                .Where(x => shareIds.Contains(x.DepartmentId)).ToList();
         }
         catch (Exception exception)
         {
@@ -95,18 +110,20 @@ public sealed class CloudAccessViewModel
 
     public async Task<string> CreateOneDriveConnectionAsync(string name, Guid departmentId)
     {
-        await EnsureCanManageDepartmentAsync(departmentId);
+        await EnsureCanManageConnectionDepartmentAsync(departmentId);
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 200)
             throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
-        var connection = new CloudAccessConnection
+        var connection = new StorageConnection
         {
             DepartmentId = departmentId,
             CreatedByUserId = _actor!.User.Id,
-            Provider = "onedrive",
+            ProviderProfileId = WellKnownProviderProfiles.MicrosoftPublicClient,
+            ProviderId = "onedrive",
             Name = name.Trim(),
-            State = CloudAccessConnectionState.PendingAuthorization
+            AuthorizationMode = StorageAuthorizationMode.DeviceCode,
+            State = StorageConnectionState.PendingAuthorization
         };
-        await _repository.UpsertConnectionAsync(connection);
+        await _connections.SaveAsync(connection);
         var ticket = _tickets.Issue(connection.Id, string.Empty, "onedrive-access");
         return $"/api/cloud-access/onedrive/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
     }
@@ -127,15 +144,15 @@ public sealed class CloudAccessViewModel
             throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
 
         connection.Name = normalizedName;
-        await _repository.UpsertConnectionAsync(connection);
+        await _connections.SaveAsync(connection);
         await LoadAsync();
     }
 
     public async Task<List<CloudDirectoryItem>> ListOneDriveFoldersAsync(Guid connectionId, string path)
     {
         var connectionRecord = await GetManagedConnectionAsync(connectionId);
-        if (connectionRecord.State != CloudAccessConnectionState.Ready
-            || string.IsNullOrWhiteSpace(connectionRecord.ProtectedCredentials))
+        if (connectionRecord.State != StorageConnectionState.Ready
+            || string.IsNullOrWhiteSpace(connectionRecord.EncryptedCredentialPayload))
             throw new InvalidOperationException(R("Web_CloudAccess_ConnectionNotReady"));
         if (!ShareRelativePath.TryNormalizeStrict(path.Trim('/'), out var normalized))
             throw new UnauthorizedAccessException(R("Web_CloudAccess_InvalidRemotePath"));
@@ -171,9 +188,9 @@ public sealed class CloudAccessViewModel
         bool isReadOnly,
         IEnumerable<Guid> principalIds)
     {
-        var connectionRecord = await GetManagedConnectionAsync(connectionId);
-        if (connectionRecord.State != CloudAccessConnectionState.Ready
-            || string.IsNullOrWhiteSpace(connectionRecord.ProtectedCredentials))
+        var connectionRecord = await GetUsableConnectionAsync(connectionId);
+        if (connectionRecord.State != StorageConnectionState.Ready
+            || string.IsNullOrWhiteSpace(connectionRecord.EncryptedCredentialPayload))
             throw new InvalidOperationException(R("Web_CloudAccess_ConnectionNotReady"));
         var normalizedName = name.Trim();
         if (string.IsNullOrWhiteSpace(normalizedName)
@@ -238,9 +255,9 @@ public sealed class CloudAccessViewModel
         if (!ShareRelativePath.TryNormalizeStrict(remoteRootPath.Trim('/'), out var root))
             throw new UnauthorizedAccessException(R("Web_CloudAccess_InvalidRemotePath"));
 
-        var connectionRecord = await GetManagedConnectionAsync(share.ConnectionId);
-        if (connectionRecord.State != CloudAccessConnectionState.Ready
-            || string.IsNullOrWhiteSpace(connectionRecord.ProtectedCredentials))
+        var connectionRecord = await GetUsableConnectionAsync(share.ConnectionId);
+        if (connectionRecord.State != StorageConnectionState.Ready
+            || string.IsNullOrWhiteSpace(connectionRecord.EncryptedCredentialPayload))
             throw new InvalidOperationException(R("Web_CloudAccess_ConnectionNotReady"));
 
         var credentials = _credentialVault.UnprotectConnectionCredentials(connectionRecord);
@@ -297,16 +314,38 @@ public sealed class CloudAccessViewModel
     public async Task DeleteConnectionAsync(Guid connectionId)
     {
         var connection = await GetManagedConnectionAsync(connectionId);
-        await _repository.DeleteConnectionAsync(connection.Id);
+        var result = await _connections.DeleteAsync(connection.Id);
+        if (result == StorageConnectionDeleteResult.InUse)
+            throw new InvalidOperationException(R("Web_StorageConnection_DeleteInUse"));
         await LoadAsync();
     }
 
-    private async Task<CloudAccessConnection> GetManagedConnectionAsync(Guid connectionId)
+    private async Task<StorageConnection> GetManagedConnectionAsync(Guid connectionId)
     {
-        var connection = await _repository.GetConnectionAsync(connectionId)
+        var connection = await _connections.GetAsync(connectionId)
+                         ?? throw new InvalidOperationException(R("Web_CloudAccess_ConnectionMissing"));
+        await EnsureCanManageConnectionDepartmentAsync(connection.DepartmentId);
+        return connection;
+    }
+
+    private async Task<StorageConnection> GetUsableConnectionAsync(Guid connectionId)
+    {
+        var connection = await _connections.GetAsync(connectionId)
                          ?? throw new InvalidOperationException(R("Web_CloudAccess_ConnectionMissing"));
         await EnsureCanManageDepartmentAsync(connection.DepartmentId);
+        _actor ??= await GetActorAsync();
+        if (_actor is null || !await _managementAuth.CanManageDepartmentAsync(
+                _actor, connection.DepartmentId, ManagementPermission.UseConnections))
+            throw new UnauthorizedAccessException(R("Web_StorageConnection_UseDenied"));
         return connection;
+    }
+
+    private async Task EnsureCanManageConnectionDepartmentAsync(Guid departmentId)
+    {
+        _actor ??= await GetActorAsync();
+        if (_actor is null || !await _managementAuth.CanManageDepartmentAsync(
+                _actor, departmentId, ManagementPermission.ManageConnections))
+            throw new UnauthorizedAccessException(R("Web_StorageConnection_ManageDenied"));
     }
 
     private async Task EnsureCanManageDepartmentAsync(Guid departmentId)
@@ -327,12 +366,12 @@ public sealed class CloudAccessViewModel
     }
 
     private async Task PersistCredentialsIfRotatedAsync(
-        CloudAccessConnection record, OneDriveConnection connection, Dictionary<string, string> credentials)
+        StorageConnection record, OneDriveConnection connection, Dictionary<string, string> credentials)
     {
         if (!connection.HasPendingCredentialChanges) return;
-        await _repository.UpdateConnectionRuntimeAsync(
+        await _connections.UpdateRuntimeAsync(
             record.Id, _credentialVault.ProtectConnectionCredentials(record, credentials), null, null,
-            CloudAccessConnectionState.Ready, null);
+            StorageConnectionState.Ready, null);
         connection.AcknowledgeCredentialChanges();
     }
 
@@ -342,6 +381,16 @@ public sealed class CloudAccessViewModel
         var username = state.User.Identity?.Name;
         return string.IsNullOrWhiteSpace(username) ? null : await _userContextFactory.CreateByUsernameAsync(username);
     }
+
+    private static bool HasDepartments(AuthorizedScopeResult scope)
+        => scope.IsUnrestricted || scope.ScopeIds.Count > 0;
+
+    private static HashSet<Guid> GetDepartmentIds(
+        AuthorizedScopeResult scope,
+        IReadOnlyCollection<Department> allDepartments)
+        => scope.IsUnrestricted
+            ? allDepartments.Select(department => department.Id).ToHashSet()
+            : scope.ScopeIds.ToHashSet();
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 }

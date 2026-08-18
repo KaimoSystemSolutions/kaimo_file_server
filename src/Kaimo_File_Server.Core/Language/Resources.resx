@@ -1095,6 +1095,9 @@
   <data name="Web_PermGroup_SystemMgmt" xml:space="preserve">
     <value>System Management</value>
   </data>
+  <data name="Web_PermGroup_ExternalStorage" xml:space="preserve">
+    <value>External Storage</value>
+  </data>
   <data name="Web_Perm_CreateUsers" xml:space="preserve">
     <value>Create users</value>
   </data>
@@ -1160,6 +1163,15 @@
   </data>
   <data name="Web_Perm_ViewSystemLogs" xml:space="preserve">
     <value>View and download system logs</value>
+  </data>
+  <data name="Web_Perm_ManageCloudAccess" xml:space="preserve">
+    <value>Manage virtual shares</value>
+  </data>
+  <data name="Web_Perm_ManageConnections" xml:space="preserve">
+    <value>Manage storage connections</value>
+  </data>
+  <data name="Web_Perm_UseConnections" xml:space="preserve">
+    <value>Use storage connections</value>
   </data>
   <data name="Web_Settings_Tab_Certificate" xml:space="preserve">
     <value>Certificate</value>
@@ -2141,6 +2153,12 @@
   <data name="Web_CloudAccess_StatusPending" xml:space="preserve"><value>Authorization pending</value></data>
   <data name="Web_CloudAccess_StatusError" xml:space="preserve"><value>Error</value></data>
   <data name="Web_CloudAccess_StatusDisabled" xml:space="preserve"><value>Disabled</value></data>
+  <data name="Web_StorageConnection_StatusPendingConfiguration" xml:space="preserve"><value>Configuration pending</value></data>
+  <data name="Web_StorageConnection_StatusDegraded" xml:space="preserve"><value>Degraded</value></data>
+  <data name="Web_StorageConnection_StatusNeedsReauthorization" xml:space="preserve"><value>Reauthorization required</value></data>
+  <data name="Web_StorageConnection_DeleteInUse" xml:space="preserve"><value>The connection is still used by a sync or virtual share and cannot be deleted.</value></data>
+  <data name="Web_StorageConnection_ManageDenied" xml:space="preserve"><value>You may not manage storage connections in this department.</value></data>
+  <data name="Web_StorageConnection_UseDenied" xml:space="preserve"><value>You may not use storage connections in this department.</value></data>
   <data name="Web_CloudAccess_Error_NoSelection" xml:space="preserve"><value>Select at least one item.</value></data>
   <data name="Web_CloudAccess_Error_SignInRequired" xml:space="preserve"><value>Sign-in is required.</value></data>
   <data name="Web_CloudAccess_Error_AccessDenied" xml:space="preserve"><value>Access to the virtual share was denied.</value></data>

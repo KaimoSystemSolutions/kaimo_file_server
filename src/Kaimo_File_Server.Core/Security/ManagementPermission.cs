@@ -55,6 +55,10 @@
 
         // -- Web-only remote shares --
         ManageCloudAccess = 1L << 52,
+
+        // -- Reusable external-storage connections --
+        ManageConnections = 1L << 53,
+        UseConnections = 1L << 54,
         
         // -- Shortcuts --
         UserAdmin = CreateUsers | DeleteUsers | EditUserProfiles
@@ -78,6 +82,6 @@
         
         SyncAdmin = CreateSyncs | DeleteSyncs | ConfigureSyncs | SyncManually,
 
-        CloudAccessAdmin = ManageCloudAccess,
+        CloudAccessAdmin = ManageCloudAccess | ManageConnections | UseConnections,
     }
 }

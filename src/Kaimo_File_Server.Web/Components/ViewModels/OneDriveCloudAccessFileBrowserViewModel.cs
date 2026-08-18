@@ -25,6 +25,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     };
 
     private readonly ICloudAccessRepository _repository;
+    private readonly IStorageConnectionRepository _connections;
     private readonly ICredentialVault _credentialVault;
     private readonly CloudAccessAuthorizationService _authorization;
     private readonly IUserContextFactory _userContextFactory;
@@ -34,13 +35,14 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     private readonly CloudAccessDownloadTicketStore _downloadTickets;
     private readonly CloudAccessDirectoryCache _directoryCache;
     private CloudAccessShare? _share;
-    private CloudAccessConnection? _connectionRecord;
+    private StorageConnection? _connectionRecord;
     private OneDriveConnection? _connection;
     private Dictionary<string, string>? _credentials;
     private DateTimeOffset _rootRevalidationAt;
 
     public OneDriveCloudAccessFileBrowserViewModel(
         ICloudAccessRepository repository,
+        IStorageConnectionRepository connections,
         ICredentialVault credentialVault,
         CloudAccessAuthorizationService authorization,
         IUserContextFactory userContextFactory,
@@ -52,6 +54,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
         : base(WritableCapabilities)
     {
         _repository = repository;
+        _connections = connections;
         _credentialVault = credentialVault;
         _authorization = authorization;
         _userContextFactory = userContextFactory;
@@ -78,11 +81,11 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
             if (!await _authorization.CanAccessAsync(actor, share))
                 throw new UnauthorizedAccessException("You may not access this virtual share.");
 
-            var connectionRecord = await _repository.GetConnectionAsync(share.ConnectionId)
+            var connectionRecord = await _connections.GetAsync(share.ConnectionId)
                                    ?? throw new InvalidOperationException("The provider connection is missing.");
-            if (connectionRecord.State != CloudAccessConnectionState.Ready
-                || !string.Equals(connectionRecord.Provider, "onedrive", StringComparison.OrdinalIgnoreCase)
-                || string.IsNullOrWhiteSpace(connectionRecord.ProtectedCredentials))
+            if (connectionRecord.State != StorageConnectionState.Ready
+                || !string.Equals(connectionRecord.ProviderId, "onedrive", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(connectionRecord.EncryptedCredentialPayload))
                 throw new InvalidOperationException("The OneDrive connection is not ready.");
 
             var connectionChanged = _connectionRecord?.Id != connectionRecord.Id;
@@ -296,7 +299,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
         return path[prefix.Length..];
     }
 
-    private async Task ReplaceConnectionAsync(CloudAccessConnection record)
+    private async Task ReplaceConnectionAsync(StorageConnection record)
     {
         if (_connectionRecord?.Id == record.Id && _connection is not null) return;
         if (_connection is not null) await _connection.Dispose();
@@ -311,11 +314,11 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     {
         if (_connection is null || _connectionRecord is null || _credentials is null
             || !_connection.HasPendingCredentialChanges) return;
-        await _repository.UpdateConnectionRuntimeAsync(
+        await _connections.UpdateRuntimeAsync(
             _connectionRecord.Id,
             _credentialVault.ProtectConnectionCredentials(_connectionRecord, _credentials),
             null, null,
-            CloudAccessConnectionState.Ready,
+            StorageConnectionState.Ready,
             null);
         _connection.AcknowledgeCredentialChanges();
     }

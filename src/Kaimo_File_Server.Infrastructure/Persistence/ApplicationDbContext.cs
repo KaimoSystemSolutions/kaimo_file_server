@@ -24,7 +24,8 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<ShareDefinition> ShareDefinitions { get; set; }
         public DbSet<FileVersion> FileVersions { get; set; }
         public DbSet<SambaLifecycleEventReceipt> SambaLifecycleEventReceipts { get; set; }
-        public DbSet<CloudAccessConnection> CloudAccessConnections { get; set; }
+        public DbSet<ProviderProfile> ProviderProfiles { get; set; }
+        public DbSet<StorageConnection> StorageConnections { get; set; }
         public DbSet<CloudAccessShare> CloudAccessShares { get; set; }
         public DbSet<CloudAccessGrant> CloudAccessGrants { get; set; }
 
@@ -177,19 +178,47 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(e => e.LeaseUntilUtc);
             });
 
-            modelBuilder.Entity<CloudAccessConnection>(entity =>
+            modelBuilder.Entity<ProviderProfile>(entity =>
             {
-                entity.ToTable("cloud_access_connections");
+                entity.ToTable("provider_profiles");
                 entity.HasKey(x => x.Id);
-                entity.Property(x => x.Provider).IsRequired().HasMaxLength(50);
+                entity.Property(x => x.ProviderId).IsRequired().HasMaxLength(50);
                 entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+                entity.Property(x => x.AuthorizationMode).HasConversion<int>();
+                entity.Property(x => x.TenantOrOrganizationId).HasMaxLength(300);
+                entity.Property(x => x.PublicClientId).HasMaxLength(500);
+                entity.Property(x => x.SecretReference).HasMaxLength(1000);
+                entity.Property(x => x.AllowedRedirectBaseUri).HasMaxLength(2000);
+                entity.Property(x => x.AllowedScopes).HasColumnType("text");
+                entity.HasIndex(x => x.Name).IsUnique();
+                entity.HasIndex(x => new { x.ProviderId, x.Enabled });
+            });
+
+            modelBuilder.Entity<StorageConnection>(entity =>
+            {
+                entity.ToTable("storage_connections");
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.ProviderId).IsRequired().HasMaxLength(50);
+                entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+                entity.Property(x => x.AuthorizationMode).HasConversion<int>();
+                entity.Property(x => x.SettingsJson).HasColumnType("text");
                 entity.Property(x => x.AccountDisplayName).HasMaxLength(300);
                 entity.Property(x => x.AccountEmail).HasMaxLength(320);
-                entity.Property(x => x.ProtectedCredentials).HasColumnType("text");
+                entity.Property(x => x.ProviderAccountId).HasMaxLength(500);
+                entity.Property(x => x.ProviderTenantId).HasMaxLength(500);
+                entity.Property(x => x.ProviderSubjectId).HasMaxLength(500);
+                entity.Property(x => x.EffectiveScopes).HasColumnType("text");
+                entity.Property(x => x.EncryptedCredentialPayload).HasColumnType("text");
                 entity.Property(x => x.State).HasConversion<int>();
-                entity.Property(x => x.LastError).HasMaxLength(2000);
+                // Kept at the legacy width during the additive migration. New
+                // writes contain only sanitized provider error codes.
+                entity.Property(x => x.LastErrorCode).HasMaxLength(2000);
+                entity.Property(x => x.ConcurrencyVersion).IsConcurrencyToken();
                 entity.HasIndex(x => x.Name).IsUnique();
                 entity.HasIndex(x => x.DepartmentId);
+                entity.HasIndex(x => x.ProviderProfileId);
+                entity.HasOne<ProviderProfile>().WithMany().HasForeignKey(x => x.ProviderProfileId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<CloudAccessShare>(entity =>
@@ -203,8 +232,8 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(x => x.Name).IsUnique();
                 entity.HasIndex(x => x.DepartmentId);
                 entity.HasIndex(x => x.ConnectionId);
-                entity.HasOne<CloudAccessConnection>().WithMany().HasForeignKey(x => x.ConnectionId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne<StorageConnection>().WithMany().HasForeignKey(x => x.ConnectionId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             modelBuilder.Entity<CloudAccessGrant>(entity =>

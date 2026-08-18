@@ -40,21 +40,21 @@ public static class CredentialVaultConnectionExtensions
 {
     public static string ProtectConnectionCredentials(
         this ICredentialVault vault,
-        CloudAccessConnection connection,
+        StorageConnection connection,
         IReadOnlyDictionary<string, string> credentials)
         => vault.Protect(
             credentials,
-            CredentialContext.ForAuthorizationGrant(connection.Id, connection.Provider));
+            CredentialContext.ForAuthorizationGrant(connection.Id, connection.ProviderId));
 
     public static Dictionary<string, string> UnprotectConnectionCredentials(
         this ICredentialVault vault,
-        CloudAccessConnection connection)
+        StorageConnection connection)
     {
-        if (string.IsNullOrWhiteSpace(connection.ProtectedCredentials))
+        if (string.IsNullOrWhiteSpace(connection.EncryptedCredentialPayload))
             throw new InvalidOperationException("The storage connection has no protected credentials.");
 
         return vault.Unprotect<Dictionary<string, string>>(
-            connection.ProtectedCredentials,
-            CredentialContext.ForAuthorizationGrant(connection.Id, connection.Provider));
+            connection.EncryptedCredentialPayload,
+            CredentialContext.ForAuthorizationGrant(connection.Id, connection.ProviderId));
     }
 }
