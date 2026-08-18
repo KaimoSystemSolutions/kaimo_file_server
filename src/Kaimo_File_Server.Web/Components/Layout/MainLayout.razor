@@ -291,6 +291,7 @@
     protected override void OnInitialized()
     {
         UploadCoordinator.OnUploadRequested += TriggerFileDialog;
+        UploadCoordinator.OnFilesProcessed += ResetFileInput;
     }
     private async void TriggerFileDialog()
     {
@@ -300,23 +301,24 @@
 
     private async Task OnFilesSelected(InputFileChangeEventArgs e)
     {
-        try
-        {
-            await UploadCoordinator.NotifyFilesSelected(e);
-        }
-        finally
+        // The browser streams belong to this InputFile. The browser page starts
+        // its upload independently and notifies us once all streams are consumed.
+        // Returning now keeps the interactive circuit responsive for large batches.
+        await UploadCoordinator.NotifyFilesSelected(e);
+    }
+
+    private void ResetFileInput()
+        => _ = InvokeAsync(() =>
         {
             // Browsers do not raise change when the same file is selected twice.
-            // Recreate the InputFile only after all BrowserFile streams were consumed.
-            // This stays entirely inside Blazor and does not depend on a cached JS file.
             _fileInputKey++;
             StateHasChanged();
-        }
-    }
+        });
 
     public void Dispose()
     {
         UploadCoordinator.OnUploadRequested -= TriggerFileDialog;
+        UploadCoordinator.OnFilesProcessed -= ResetFileInput;
     }
     
     protected override async Task OnInitializedAsync()

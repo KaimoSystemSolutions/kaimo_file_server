@@ -140,6 +140,50 @@ public partial class FileBrowser
 
     private void OnListBackgroundClick(MouseEventArgs e) => _selectedItems.Clear();
 
+    /// <summary>
+    /// Applies a completed Explorer-style marquee selection. JavaScript performs
+    /// the pointer tracking locally and calls this once per gesture, keeping a
+    /// large directory listing responsive while the pointer is moving.
+    /// </summary>
+    [JSInvokable]
+    public Task CompleteMarqueeSelection(string[] paths, bool addToSelection)
+    {
+        var selectedPaths = paths.ToHashSet(StringComparer.Ordinal);
+        var availableItems = VM.Directories.Cast<FileMetadata>().Concat(VM.Files);
+
+        if (!addToSelection)
+            _selectedItems.Clear();
+
+        foreach (var item in availableItems)
+        {
+            if (selectedPaths.Contains(item.Path))
+                _selectedItems.Add(item);
+        }
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Clears the file selection for a page-level Escape press, provided no
+    /// dialog or context menu currently owns the key.
+    /// </summary>
+    [JSInvokable]
+    public Task ClearSelectionOnEscape()
+    {
+        if (_showCreateFolder || _showDeleteConfirm || _showRenameDialog || _showCloudToLocal ||
+            _filePreviewComponent?.IsOpen == true || _versionDialogComponent?.IsOpen == true ||
+            _propertiesDialogComponent?.IsOpen == true || _contextMenuComponent?.IsOpen == true)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (_selectedItems.Count == 0)
+            return Task.CompletedTask;
+
+        _selectedItems.Clear();
+        return InvokeAsync(StateHasChanged);
+    }
+
     // ========== Toolbar Actions ==========
 
     private async Task OpenSelected()

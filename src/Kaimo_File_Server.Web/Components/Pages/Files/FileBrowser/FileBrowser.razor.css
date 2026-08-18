@@ -193,6 +193,48 @@
     background: var(--accent-selected);
 }
 
+/* Keyboard shortcuts are handled on this focusable region, but the browser's
+   default white focus ring is visually misleading beside selected rows. */
+.file-table-wrap:focus,
+.file-table-wrap:focus-visible {
+    outline: none;
+}
+
+/* Immediate browser-side feedback while the marquee is still moving. The final
+   Blazor selection replaces this preview on pointer release. */
+.file-grid-row.file-marquee-preview > div {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.file-grid-row.file-marquee-preview > div:first-child {
+    box-shadow: inset 3px 0 0 0 var(--accent);
+}
+
+/* This is deliberately separate from the bordered table. It provides the
+   Explorer-like selection surface below the column header without making the
+   table's empty area or its border grow with the viewport. */
+.file-browser-selection-area {
+    position: relative;
+    min-height: calc(100vh - 280px);
+    margin-inline: -28px;
+    padding-inline: 28px;
+}
+
+@media (max-width: 768px) {
+    .file-browser-selection-area {
+        margin-inline: -16px;
+        padding-inline: 16px;
+    }
+}
+
+/* The selection rectangle is viewport-relative because pointer coordinates are
+   viewport-relative. It never captures input, so scrolling remains available. */
+.file-marquee-active,
+.file-marquee-active * {
+    cursor: crosshair;
+    user-select: none;
+}
+
 /* --- ACL Expand --- */
 
 .file-row-acl-expand-wrap {

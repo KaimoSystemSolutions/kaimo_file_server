@@ -13,25 +13,21 @@ window.contextMenu = {
      */
     reposition: function (el) {
         if (!el) return;
+        // Wait until the menu has its final dimensions. This is essential for
+        // Blazor Server because the first post-render layout can still contain
+        // the scale-in animation's smaller bounding box.
+        return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => {
+            var margin = 8;
+            el.style.animation = 'none';
+            el.style.maxHeight = Math.max(0, window.innerHeight - 2 * margin) + 'px';
+            el.style.maxWidth = Math.max(0, window.innerWidth - 2 * margin) + 'px';
 
-        var margin = 8;
-        var rect = el.getBoundingClientRect();
-        var vw = window.innerWidth;
-        var vh = window.innerHeight;
-
-        var top = rect.top;
-        var left = rect.left;
-
-        // Overflowing the bottom: pull the menu up so its bottom edge fits.
-        if (rect.bottom > vh - margin) {
-            top = Math.max(margin, vh - rect.height - margin);
-        }
-        // Overflowing the right: pull the menu left so its right edge fits.
-        if (rect.right > vw - margin) {
-            left = Math.max(margin, vw - rect.width - margin);
-        }
-
-        if (top !== rect.top) el.style.top = top + 'px';
-        if (left !== rect.left) el.style.left = left + 'px';
+            var rect = el.getBoundingClientRect();
+            var top = Math.min(Math.max(margin, rect.top), Math.max(margin, window.innerHeight - rect.height - margin));
+            var left = Math.min(Math.max(margin, rect.left), Math.max(margin, window.innerWidth - rect.width - margin));
+            el.style.top = top + 'px';
+            el.style.left = left + 'px';
+            resolve();
+        })));
     }
 };

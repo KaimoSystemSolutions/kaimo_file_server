@@ -38,10 +38,22 @@ public partial class FileBrowser
     /// job token is shared by the global job menu, toast dismissal callback, and
     /// underlying upload API so cancellation stops the actual transfer.
     /// </summary>
-    private async Task OnFileUploaded(InputFileChangeEventArgs e)
+    private Task OnFileUploaded(InputFileChangeEventArgs e)
     {
-        var files = e.GetMultipleFiles(int.MaxValue);
-        if (files.Count == 0) return;
+        // Do not retain the input-change event for the entire batch. In Blazor
+        // Server that can serialize user interactions behind a long upload.
+        // BrowserFile streams remain valid because MainLayout recreates its input
+        // only after ProcessFileUploadAsync signals completion.
+        _ = ProcessFileUploadAsync(e);
+        return Task.CompletedTask;
+    }
+
+    private async Task ProcessFileUploadAsync(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var files = e.GetMultipleFiles(int.MaxValue);
+            if (files.Count == 0) return;
 
         long totalBytes = files.Sum(f => f.Size);
         long totalUploadedBytes = 0;
@@ -200,8 +212,21 @@ public partial class FileBrowser
             }
         }
 
-        await VM.LoadShareAsync(ShareName, VM.CurrentPath);
-        StateHasChanged();
+            await VM.LoadShareAsync(ShareName, VM.CurrentPath);
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            // The upload now runs independently from the input-change event, so
+            // surface unexpected failures here instead of leaving an unobserved task.
+            Toast.Show(Resources.Web_Upload_Failed, ToastType.Error);
+        }
+        finally
+        {
+            // The layout can now safely replace the input, allowing the same
+            // files to be selected again without invalidating active streams.
+            UploadCoordinator.NotifyFilesProcessed();
+        }
     }
 
 

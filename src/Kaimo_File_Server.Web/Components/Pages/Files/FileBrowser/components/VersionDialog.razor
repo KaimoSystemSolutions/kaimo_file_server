@@ -152,6 +152,7 @@
     [Parameter] public EventCallback OnRestored { get; set; }
 
     private bool _show;
+    public bool IsOpen => _show;
     private bool _loading;
     private bool _isFolder;
     private FileMetadata? _target;

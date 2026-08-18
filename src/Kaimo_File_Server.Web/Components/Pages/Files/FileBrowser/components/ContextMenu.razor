@@ -47,6 +47,7 @@
     private ElementReference _menuRef;
     // Set when the menu is (re)opened so OnAfterRenderAsync nudges it back on-screen once.
     private bool _needsReposition;
+    public bool IsOpen => _showContextMenu;
 
     // Globally configured, per-scope menu layout (Settings → Kontextmenü).
     // Reloaded on every right-click (see ReloadMenuConfig) so a saved change
@@ -194,6 +195,7 @@
         _contextMenuY = e.ClientY;
         _showContextMenu = true;
         _needsReposition = true;
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task OnBackgroundContextMenu(MouseEventArgs e)
@@ -203,6 +205,7 @@
         _contextMenuY = e.ClientY;
         _showContextMenu = true;
         _needsReposition = true;
+        await InvokeAsync(StateHasChanged);
     }
 
     // After the menu renders at the click point, ask the browser to shift it back

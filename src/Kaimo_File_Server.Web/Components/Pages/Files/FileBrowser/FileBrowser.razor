@@ -265,6 +265,9 @@ else
        Resizable Column Table – 5 Spalten (ohne Actions)
        Name-Spalte (1fr) nimmt den Rest.
        ══════════════════════════════════════════════════ *@
+    <div id="file-selection-area" class="file-browser-selection-area"
+         @oncontextmenu="(e) => _contextMenuComponent.OnItemContextMenu(e)"
+         @oncontextmenu:preventDefault="true">
     <div class="file-table-wrap" id="file-drop-zone" @ref="_fileDropZone" @onkeydown="OnKeyDownItemList" tabindex="0"
          style="--grid-cols: @GridColumns; padding-bottom: @GetTableExtraPaddingPx()px"
          @oncontextmenu="(e) => _contextMenuComponent.OnItemContextMenu(e)"
@@ -448,6 +451,7 @@ else
                 <p>@Resources.Web_Folder_Empty</p>
             </div>
         }
+    </div>
     </div>
 }
 

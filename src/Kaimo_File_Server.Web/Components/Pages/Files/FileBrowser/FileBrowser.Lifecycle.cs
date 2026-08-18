@@ -84,6 +84,7 @@ public partial class FileBrowser
     {
         VM.OnStateChanged -= OnVmStateChanged;
         FileSelectionCoordinator.SelectionRequested -= OnFileSelectionRequested;
+        _ = JS.InvokeVoidAsync("fileMarquee.dispose", "#file-selection-area");
         _dotNetRef?.Dispose();
         UploadCoordinator.OnFilesSelected -= OnFileUploaded;
     }
@@ -96,6 +97,7 @@ public partial class FileBrowser
             _dotNetRef = DotNetObjectReference.Create(this);
             if (VM.Capabilities.CanUpload)
                 await JS.InvokeVoidAsync("initFileUpload", "#file-drop-zone");
+            await JS.InvokeVoidAsync("fileMarquee.initialize", "#file-selection-area", _dotNetRef);
             if (VM.Capabilities.CanMove)
                 await JS.InvokeVoidAsync("initInternalDragDrop");
         }

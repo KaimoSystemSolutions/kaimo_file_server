@@ -119,6 +119,7 @@
     private enum Tab { General, Security }
 
     private bool _show;
+    public bool IsOpen => _show;
     private Tab _activeTab = Tab.General;
     private FileMetadata? _target;
 
