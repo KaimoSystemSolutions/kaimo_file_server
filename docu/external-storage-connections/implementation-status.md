@@ -130,12 +130,26 @@ or deployment identity selection into legacy settings.
 
 ## Current focus
 
-### Package 5: first-class sync definitions — planned
+### Package 5: first-class sync definitions — implemented additive cutover
 
-- Add `SyncDefinition` and separate runtime state.
-- Migrate schedules, paths, filters, and bandwidth settings out of share JSON.
-- Create one connection per legacy sync mapping and encrypt its grant.
-- Remove plaintext token material only after verified cutover.
+- [x] Add `SyncDefinition` and separate runtime state.
+- [x] Import schedules, paths, filters, and bandwidth settings from share JSON.
+- [x] Create one connection per legacy sync mapping and encrypt its grant.
+- [x] Switch manual execution and scheduling to the first-class definitions.
+- [x] Count sync consumers and block deletion through repository checks and restrictive foreign keys.
+- [ ] Remove plaintext fallback token material after a verified production cutover.
+
+Migration `FirstClassSyncDefinitions` adds the configuration and runtime tables without deleting or rewriting
+legacy share JSON. The restart-safe compatibility importer uses a unique share/path key and source checksum,
+creates every connection in the local share's department, and protects the complete legacy provider grant with
+the context-bound vault. Removed legacy mappings disable their imported definition while retaining the
+connection for recovery. Runtime refresh-token rotation is persisted to the protected connection before the
+provider acknowledges it. See
+[`package-5-first-class-sync-definitions.md`](package-5-first-class-sync-definitions.md) for rollout details.
+
+The final unchecked item is deliberately deferred: the legacy editor remains the compatibility writer until
+the unified Package 6 administration UI is available. Package 8 performs the irreversible JSON cleanup only
+after operational verification. No user-facing text was added in Package 5, so no new resource keys were needed.
 
 ### Packages 6–8 — planned
 
@@ -158,3 +172,6 @@ or deployment identity selection into legacy settings.
 | 2026-08-18 | Package 3 full `Kaimo_File_Server.Tests` suite | 784 passed, 0 failed, 0 skipped. |
 | 2026-08-18 | Package 4 Google identity and authorization transaction tests | 15 passed, 0 failed, 0 skipped. |
 | 2026-08-18 | Package 4 full `Kaimo_File_Server.Tests` suite | 797 passed, 0 failed, 0 skipped. |
+| 2026-08-18 | Package 5 first-class sync migration and execution tests | 16 passed, 0 failed, 0 skipped. |
+| 2026-08-18 | Package 5 full `Kaimo_File_Server.Tests` suite | 801 passed, 0 failed, 0 skipped. |
+| 2026-08-18 | Package 5 EF Core model check | No pending model changes after `FirstClassSyncDefinitions`. |

@@ -85,21 +85,24 @@ public sealed class CloudSyncSchedulerService(
         TimeSpan nextDelay = IdleInterval;
         var activeKeys = new HashSet<ScheduleKey>();
         using var scope = scopeFactory.CreateScope();
-        var shares = scope.ServiceProvider.GetRequiredService<IShareRepository>();
+        var syncDefinitions = scope.ServiceProvider.GetRequiredService<ISyncDefinitionRepository>();
+        var legacyMigration = scope.ServiceProvider.GetRequiredService<ILegacyCloudSyncMigrationService>();
         var execution = scope.ServiceProvider.GetRequiredService<ICloudSyncExecutionService>();
         var users = scope.ServiceProvider.GetRequiredService<IUserContextFactory>();
-        var actors = new Dictionary<string, UserContext?>(StringComparer.OrdinalIgnoreCase);
+        var actors = new Dictionary<Guid, UserContext?>();
 
-        foreach (ShareDefinition share in await shares.GetAllEnabledAsync())
+        await legacyMigration.EnsureMigratedAsync(cancellationToken);
+        foreach (SyncDefinitionScheduleEntry entry in
+                 await syncDefinitions.GetEnabledScheduledAsync(cancellationToken))
         {
-            foreach (var (localPath, folder) in share.CloudSettings.Folders.ToArray())
-            {
+            SyncDefinition definition = entry.Definition;
+            string localPath = definition.LocalPath;
                 cancellationToken.ThrowIfCancellationRequested();
-                CloudSyncSchedule? schedule = folder.Schedule;
+                CloudSyncSchedule? schedule = definition.Schedule;
                 if (schedule is null || !schedule.IsEnabled)
                     continue;
 
-                var key = new ScheduleKey(share.Id, localPath);
+                var key = new ScheduleKey(definition.LocalShareId, localPath);
                 activeKeys.Add(key);
                 TimeSpan interval = TimeSpan.FromSeconds(
                     schedule.GetEffectiveIntervalSeconds());
@@ -116,36 +119,36 @@ public sealed class CloudSyncSchedulerService(
 
                 _lastEvaluations[key] = utcNow;
                 nextDelay = Min(nextDelay, interval);
-                if (!IsDue(schedule, folder.LastSync, localNow, timeProvider.LocalTimeZone))
+                if (!IsDue(schedule, entry.LastSuccessfulRunAtUtc, localNow, timeProvider.LocalTimeZone))
                     continue;
 
-                string? username = schedule.RunAsUsername;
-                if (string.IsNullOrWhiteSpace(username))
+                Guid? runAsUserId = definition.RunAsUserId;
+                if (runAsUserId is null)
                 {
                     logger.LogWarning(
-                        "Scheduled cloud sync {ShareId}/{LocalPath} has no execution user and was skipped.",
-                        share.Id, localPath);
+                        "Scheduled cloud sync {SyncDefinitionId} has no execution user and was skipped.",
+                        definition.Id);
                     continue;
                 }
 
-                if (!actors.TryGetValue(username, out UserContext? actor))
+                if (!actors.TryGetValue(runAsUserId.Value, out UserContext? actor))
                 {
-                    actor = await users.CreateByUsernameAsync(username);
-                    actors[username] = actor;
+                    actor = await users.CreateByUserIdAsync(runAsUserId.Value);
+                    actors[runAsUserId.Value] = actor;
                 }
 
                 if (actor is null || !actor.User.IsEnabled)
                 {
                     logger.LogWarning(
-                        "Scheduled cloud sync {ShareId}/{LocalPath} was skipped because user {Username} is unavailable or disabled.",
-                        share.Id, localPath, username);
+                        "Scheduled cloud sync {SyncDefinitionId} was skipped because user {UserId} is unavailable or disabled.",
+                        definition.Id, runAsUserId.Value);
                     continue;
                 }
 
                 try
                 {
                     CloudSyncExecutionResult result = await execution.RunAsync(
-                        share.Id,
+                        definition.LocalShareId,
                         localPath,
                         actor,
                         cancellationToken: cancellationToken);
@@ -153,7 +156,7 @@ public sealed class CloudSyncSchedulerService(
                     {
                         logger.LogInformation(
                             "Scheduled cloud sync completed for {ShareId}/{LocalPath}.",
-                            share.Id, localPath);
+                            definition.LocalShareId, localPath);
                     }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -165,9 +168,8 @@ public sealed class CloudSyncSchedulerService(
                     logger.LogError(
                         ex,
                         "Scheduled cloud sync failed for {ShareId}/{LocalPath}.",
-                        share.Id, localPath);
+                        definition.LocalShareId, localPath);
                 }
-            }
         }
 
         foreach (ScheduleKey staleKey in _lastEvaluations.Keys

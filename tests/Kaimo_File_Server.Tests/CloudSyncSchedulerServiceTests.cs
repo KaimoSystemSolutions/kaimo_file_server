@@ -59,30 +59,32 @@ public sealed class CloudSyncSchedulerServiceTests
     {
         var now = new DateTimeOffset(2026, 8, 3, 10, 15, 0, TimeSpan.Zero);
         var time = new FixedTimeProvider(now);
-        var share = new ShareDefinition("docs", "/data/docs");
-        share.CloudSettings.Folders["projects"] = new SyncedFolder(
-            "google", new Dictionary<string, string>())
-        {
-            Schedule = new CloudSyncSchedule
-            {
-                IsEnabled = true,
-                RunAsUsername = "scheduler",
-                ActiveSlots = [CloudSyncSchedule.ToSlot(DayOfWeek.Monday, 10)]
-            }
-        };
-
+        var shareId = Guid.NewGuid();
         var actor = new UserContext(
             new User(Guid.NewGuid(), "Scheduler", "scheduler", "hash", "nt"),
             [], [], []);
-        var shares = new Mock<IShareRepository>();
-        shares.Setup(repository => repository.GetAllEnabledAsync())
-            .ReturnsAsync([share]);
+        var definition = new SyncDefinition
+        {
+            LocalShareId = shareId,
+            LocalPath = "projects",
+            RunAsUserId = actor.User.Id,
+            Schedule = new CloudSyncSchedule
+            {
+                IsEnabled = true,
+                ActiveSlots = [CloudSyncSchedule.ToSlot(DayOfWeek.Monday, 10)]
+            }
+        };
+        var definitions = new Mock<ISyncDefinitionRepository>();
+        definitions.Setup(repository => repository.GetEnabledScheduledAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new SyncDefinitionScheduleEntry(definition, null)]);
+        var migration = new Mock<ILegacyCloudSyncMigrationService>();
         var users = new Mock<IUserContextFactory>();
-        users.Setup(factory => factory.CreateByUsernameAsync("scheduler"))
+        users.Setup(factory => factory.CreateByUserIdAsync(actor.User.Id))
             .ReturnsAsync(actor);
         var execution = new Mock<ICloudSyncExecutionService>();
         execution.Setup(service => service.RunAsync(
-                share.Id,
+                shareId,
                 "projects",
                 actor,
                 null,
@@ -90,7 +92,8 @@ public sealed class CloudSyncSchedulerServiceTests
             .ReturnsAsync(CloudSyncExecutionResult.Completed);
 
         var services = new ServiceCollection();
-        services.AddSingleton(shares.Object);
+        services.AddSingleton(definitions.Object);
+        services.AddSingleton(migration.Object);
         services.AddSingleton(users.Object);
         services.AddSingleton(execution.Object);
         await using ServiceProvider provider = services.BuildServiceProvider();
@@ -103,7 +106,7 @@ public sealed class CloudSyncSchedulerServiceTests
         await sut.CheckNowAsync();
 
         execution.Verify(service => service.RunAsync(
-            share.Id,
+            shareId,
             "projects",
             actor,
             null,
@@ -115,31 +118,36 @@ public sealed class CloudSyncSchedulerServiceTests
     {
         var time = new FixedTimeProvider(
             new DateTimeOffset(2026, 8, 3, 10, 15, 0, TimeSpan.Zero));
-        var share = new ShareDefinition("docs", "/data/docs");
-        share.CloudSettings.Folders["projects"] = new SyncedFolder(
-            "google", new Dictionary<string, string>())
+        var shareId = Guid.NewGuid();
+        var actor = new UserContext(
+            new User(Guid.NewGuid(), "Scheduler", "scheduler", "hash", "nt"),
+            [], [], []);
+        var definition = new SyncDefinition
         {
+            LocalShareId = shareId,
+            LocalPath = "projects",
+            RunAsUserId = actor.User.Id,
             Schedule = new CloudSyncSchedule
             {
                 IsEnabled = true,
                 IntervalSeconds = 15,
-                RunAsUsername = "scheduler",
                 ActiveSlots = [CloudSyncSchedule.ToSlot(DayOfWeek.Monday, 10)]
             }
         };
-        var actor = new UserContext(
-            new User(Guid.NewGuid(), "Scheduler", "scheduler", "hash", "nt"),
-            [], [], []);
-        var shares = new Mock<IShareRepository>();
-        shares.Setup(repository => repository.GetAllEnabledAsync()).ReturnsAsync([share]);
+        var definitions = new Mock<ISyncDefinitionRepository>();
+        definitions.Setup(repository => repository.GetEnabledScheduledAsync(
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync([new SyncDefinitionScheduleEntry(definition, null)]);
+        var migration = new Mock<ILegacyCloudSyncMigrationService>();
         var users = new Mock<IUserContextFactory>();
-        users.Setup(factory => factory.CreateByUsernameAsync("scheduler")).ReturnsAsync(actor);
+        users.Setup(factory => factory.CreateByUserIdAsync(actor.User.Id)).ReturnsAsync(actor);
         var execution = new Mock<ICloudSyncExecutionService>();
         execution.Setup(service => service.RunAsync(
-                share.Id, "projects", actor, null, It.IsAny<CancellationToken>()))
+                shareId, "projects", actor, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(CloudSyncExecutionResult.Completed);
         var services = new ServiceCollection();
-        services.AddSingleton(shares.Object);
+        services.AddSingleton(definitions.Object);
+        services.AddSingleton(migration.Object);
         services.AddSingleton(users.Object);
         services.AddSingleton(execution.Object);
         await using ServiceProvider provider = services.BuildServiceProvider();
@@ -153,12 +161,12 @@ public sealed class CloudSyncSchedulerServiceTests
         time.Advance(TimeSpan.FromSeconds(14));
         Assert.Equal(TimeSpan.FromSeconds(1), await sut.CheckNowAsync());
         execution.Verify(service => service.RunAsync(
-            share.Id, "projects", actor, null, It.IsAny<CancellationToken>()), Times.Once);
+            shareId, "projects", actor, null, It.IsAny<CancellationToken>()), Times.Once);
 
         time.Advance(TimeSpan.FromSeconds(1));
         await sut.CheckNowAsync();
         execution.Verify(service => service.RunAsync(
-            share.Id, "projects", actor, null, It.IsAny<CancellationToken>()), Times.Exactly(2));
+            shareId, "projects", actor, null, It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
     [Fact]

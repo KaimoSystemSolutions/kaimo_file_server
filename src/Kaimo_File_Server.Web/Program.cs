@@ -110,6 +110,9 @@ builder.Services.AddSingleton<ICloudAuthorizationTicketStore, CloudAuthorization
 builder.Services.AddSingleton<IOneDriveDeviceAuthorizationService, OneDriveDeviceAuthorizationService>();
 builder.Services.AddSingleton<GoogleOAuthService>();
 builder.Services.AddSingleton<ICredentialVault, DataProtectionCredentialVault>();
+builder.Services.AddScoped<ILegacyCloudSyncMigrationService, LegacyCloudSyncMigrationService>();
+builder.Services.AddScoped<ICloudSyncExecutionService, CloudSyncExecutionService>();
+builder.Services.AddHostedService<LegacyCloudSyncMigrationHostedService>();
 builder.Services.AddScoped<OneDriveStorageConnectionFactory>();
 builder.Services.AddScoped<CredentialRewrapService>();
 builder.Services.AddSingleton<CloudAccessDownloadTicketStore>();

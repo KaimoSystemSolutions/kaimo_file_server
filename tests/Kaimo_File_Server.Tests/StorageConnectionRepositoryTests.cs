@@ -105,6 +105,34 @@ public sealed class StorageConnectionRepositoryTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task DeleteAsync_IsBlockedWhileSyncDefinitionReferencesConnection()
+    {
+        var repository = new StorageConnectionRepository(DbFactory);
+        var connection = NewConnection();
+        await repository.SaveAsync(connection);
+        var share = SeedShare("sync-source");
+        await using (var db = NewContext())
+        {
+            db.SyncDefinitions.Add(new SyncDefinition
+            {
+                ConnectionId = connection.Id,
+                LocalShareId = share.Id,
+                LocalPath = "projects",
+                RemotePath = "/projects"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var usage = await repository.GetUsageAsync(connection.Id);
+        var result = await repository.DeleteAsync(connection.Id);
+
+        Assert.Equal(1, usage.SyncCount);
+        Assert.Equal(0, usage.VirtualShareCount);
+        Assert.Equal(StorageConnectionDeleteResult.InUse, result);
+        Assert.NotNull(await repository.GetAsync(connection.Id));
+    }
+
+    [Fact]
     public async Task UpdateRuntimeAsync_RecordsCredentialAndIncrementsVersion()
     {
         var repository = new StorageConnectionRepository(DbFactory);

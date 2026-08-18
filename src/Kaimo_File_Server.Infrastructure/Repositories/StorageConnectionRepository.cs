@@ -102,10 +102,9 @@ public sealed class StorageConnectionRepository(IDbContextFactory<ApplicationDbC
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var virtualShareCount = await db.CloudAccessShares.AsNoTracking()
             .CountAsync(share => share.ConnectionId == id, cancellationToken);
-
-        // SyncDefinition is introduced in package 5. Keeping the explicit field
-        // in this contract avoids another API change when that table is added.
-        return new StorageConnectionUsage(SyncCount: 0, VirtualShareCount: virtualShareCount);
+        var syncCount = await db.SyncDefinitions.AsNoTracking()
+            .CountAsync(sync => sync.ConnectionId == id, cancellationToken);
+        return new StorageConnectionUsage(syncCount, virtualShareCount);
     }
 
     public async Task<bool> TryUpdateCredentialAsync(
@@ -141,7 +140,9 @@ public sealed class StorageConnectionRepository(IDbContextFactory<ApplicationDbC
             return StorageConnectionDeleteResult.NotFound;
 
         if (await db.CloudAccessShares.AsNoTracking()
-                .AnyAsync(share => share.ConnectionId == id, cancellationToken))
+                .AnyAsync(share => share.ConnectionId == id, cancellationToken) ||
+            await db.SyncDefinitions.AsNoTracking()
+                .AnyAsync(sync => sync.ConnectionId == id, cancellationToken))
             return StorageConnectionDeleteResult.InUse;
 
         db.StorageConnections.Remove(connection);

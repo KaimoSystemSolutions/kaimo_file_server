@@ -10,6 +10,26 @@ Create a Web application OAuth client in the installation owner's Google Cloud p
 https://files.example.com/api/google/callback
 ```
 
+### Why a client ID alone is not accepted
+
+Kaimo's callback is a server-side HTTPS endpoint. Google's web-server OAuth flow
+therefore requires a Web application client and its client secret. PKCE protects
+the authorization code but does not turn that Web client into a public client or
+replace Google's client authentication requirement.
+
+An installed/desktop client can omit a client secret, but Google restricts its
+redirect to a custom application scheme or a loopback address on the user's
+device. That redirect model cannot safely return authorization to a remote Kaimo
+server. Google's limited-input device flow is also not a replacement for full
+Drive sync: it supports only a limited scope set and its token request still uses
+the registered client authentication values.
+
+Consequently, Kaimo deliberately rejects a Google delegated configuration that
+contains only a client ID. Secretless Google deployments must use a supported
+workload identity or Workspace service identity when that first-class connection
+mode is enabled. A public identifier is never silently treated as proof of the
+application's identity.
+
 Mount the client secret as a read-only Docker or Kubernetes secret and configure:
 
 ```text

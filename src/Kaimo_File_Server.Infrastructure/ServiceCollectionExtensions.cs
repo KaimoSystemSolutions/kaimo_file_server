@@ -45,6 +45,7 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IShareRepository, ShareRepository>();
             services.AddScoped<ICloudAccessRepository, CloudAccessRepository>();
             services.AddScoped<IStorageConnectionRepository, StorageConnectionRepository>();
+            services.AddScoped<ISyncDefinitionRepository, SyncDefinitionRepository>();
             services.AddScoped<IGroupRepository, GroupRepository>();
             services.AddScoped<IRoleRepository, RoleRepository>();
             services.AddScoped<IDepartmentRepository, DepartmentRepository>();
@@ -64,7 +65,6 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddSingleton<ICloudSyncPathUpdater, CloudSyncPathUpdater>();
             services.AddSingleton<ICloudSyncOperationCoordinator, DatabaseCloudSyncOperationCoordinator>();
             services.AddSingleton<IStorageConnectionCredentialLeaseManager, DatabaseStorageConnectionCredentialLeaseManager>();
-            services.AddScoped<ICloudSyncExecutionService, CloudSyncExecutionService>();
 
             // -- Login: brute-force throttle (singleton, in-memory counters) +
             //    credential authentication with enumeration resistance --
