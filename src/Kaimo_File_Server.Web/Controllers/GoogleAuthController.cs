@@ -15,15 +15,18 @@ public class GoogleOAuthController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly IShareRepository _shareRepository;
     private readonly ICloudAuthorizationTicketStore _authorizationTickets;
+    private readonly IUserContextFactory _userContextFactory;
 
     public GoogleOAuthController(
         IConfiguration configuration,
         IShareRepository shareRepository,
-        ICloudAuthorizationTicketStore authorizationTickets)
+        ICloudAuthorizationTicketStore authorizationTickets,
+        IUserContextFactory userContextFactory)
     {
         _configuration = configuration;
         _shareRepository = shareRepository;
         _authorizationTickets = authorizationTickets;
+        _userContextFactory = userContextFactory;
     }
 
 
@@ -32,12 +35,15 @@ public class GoogleOAuthController : ControllerBase
     {
         var normalizedPath = CloudSyncPaths.Normalize(path);
 
-        if (!_authorizationTickets.IsValid(ticket, shareId, normalizedPath, "google"))
-            return BadRequest("The cloud authorization request is invalid or has expired.");
-
         var share = await _shareRepository.GetByIdAsync(shareId);
         if (share is null)
             return NotFound("Share not found");
+        var actorId = await GetActorIdAsync();
+        if (actorId is null)
+            return Unauthorized();
+        if (!await _authorizationTickets.IsValidAsync(
+                ticket, shareId, normalizedPath, "google", actorId, share.DepartmentId))
+            return BadRequest("The cloud authorization request is invalid or has expired.");
 
         var settings = share.CloudSettings;
 
@@ -85,8 +91,13 @@ public class GoogleOAuthController : ControllerBase
             return BadRequest("Invalid state");
 
         var (shareId, path, ticket) = decodedState.Value;
+        var share = await _shareRepository.GetByIdAsync(shareId);
+        var actorId = await GetActorIdAsync();
+        if (share is null || actorId is null)
+            return Unauthorized();
         if (ticket is null
-            || !_authorizationTickets.TryConsume(ticket, shareId, path, "google"))
+            || !await _authorizationTickets.TryConsumeAsync(
+                ticket, shareId, path, "google", actorId, share.DepartmentId))
             return BadRequest("The cloud authorization request is invalid or has expired.");
 
         var clientId = _configuration["GoogleOAuth:ClientId"]!;
@@ -117,18 +128,15 @@ public class GoogleOAuthController : ControllerBase
 
         if (!response.IsSuccessStatusCode)
         {
-            var error = await response.Content.ReadAsStringAsync();
-            return BadRequest(error);
+            var errorBody = await response.Content.ReadAsStringAsync();
+            var providerError = Kaimo_File_Server.Core.Services.ProviderErrorSanitizer.FromResponse(
+                response.StatusCode, errorBody);
+            return BadRequest(new { error = providerError.Code });
         }
 
 
         var token = await GoogleTokenResponse
             .FromHttpResponse(response.Content);
-
-        var share = await _shareRepository.GetByIdAsync(shareId);
-
-        if (share is null)
-            return Redirect("/");
 
         var settings = share.CloudSettings;
         // Re-check for conflicts: the share may have changed while the user
@@ -244,5 +252,12 @@ public class GoogleOAuthController : ControllerBase
                 Scope = json.GetProperty("scope").GetString()!
             };
         }
+    }
+
+    private async Task<Guid?> GetActorIdAsync()
+    {
+        var username = User.Identity?.Name;
+        if (string.IsNullOrWhiteSpace(username)) return null;
+        return (await _userContextFactory.CreateByUsernameAsync(username))?.User.Id;
     }
 }

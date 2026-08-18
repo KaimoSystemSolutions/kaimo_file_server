@@ -21,6 +21,7 @@ public sealed class CloudAccessOneDriveController(
     ICredentialVault credentialVault,
     ICloudAuthorizationTicketStore tickets,
     IOneDriveDeviceAuthorizationService deviceAuthorization,
+    OneDriveStorageConnectionFactory oneDriveConnections,
     IHttpClientFactory httpClientFactory,
     CloudAccessDownloadTicketStore downloadTickets,
     IUserContextFactory userContextFactory,
@@ -43,9 +44,7 @@ public sealed class CloudAccessOneDriveController(
         if (!ShareRelativePath.TryNormalizeStrict(download.RelativePath, out var relative, allowRoot: false))
             return BadRequest("The download path is invalid.");
 
-        var credentials = credentialVault.UnprotectConnectionCredentials(record);
-        await using var connection = new OneDriveConnection(
-            credentials, httpClientFactory.CreateClient("CloudAccessOneDrive"));
+        await using var connection = oneDriveConnections.Create(record);
         var contentDisposition = new ContentDispositionHeaderValue("attachment")
         {
             FileNameStar = download.FileName
@@ -57,24 +56,21 @@ public sealed class CloudAccessOneDriveController(
             ShareRelativePath.Combine(share.RemoteRootPath, relative),
             Response.Body,
             HttpContext.RequestAborted);
-        if (connection.HasPendingCredentialChanges)
-        {
-            await connections.UpdateRuntimeAsync(
-                record.Id, credentialVault.ProtectConnectionCredentials(record, credentials), null, null,
-                StorageConnectionState.Ready, null,
-                HttpContext.RequestAborted);
-        }
         return new EmptyResult();
     }
 
     [HttpGet("connect")]
     public async Task<IActionResult> Connect(Guid connectionId, string ticket)
     {
-        if (!tickets.IsValid(ticket, connectionId, string.Empty, "onedrive-access"))
-            return BadRequest("The Cloud Access authorization request is invalid or has expired.");
         var connection = await connections.GetAsync(connectionId);
         if (connection is null || !string.Equals(connection.ProviderId, "onedrive", StringComparison.OrdinalIgnoreCase))
             return NotFound("Cloud Access connection not found.");
+        var actorId = await GetActorIdAsync();
+        if (actorId is null)
+            return Unauthorized();
+        if (!await tickets.IsValidAsync(
+                ticket, connectionId, string.Empty, "onedrive-access", actorId, connection.DepartmentId))
+            return BadRequest("The Cloud Access authorization request is invalid or has expired.");
         try
         {
             var authorization = await deviceAuthorization.StartAsync(connectionId, string.Empty, ticket);
@@ -96,13 +92,16 @@ public sealed class CloudAccessOneDriveController(
             return Ok(new { state = "pending", retryAfterSeconds = result.RetryAfterSeconds });
         if (result.State == OneDriveDevicePollState.Failed)
             return Ok(new { state = "failed", message = result.ErrorMessage });
-        if (result.AuthorizationTicket is null || result.RefreshToken is null || result.Scope is null
-            || !tickets.TryConsume(result.AuthorizationTicket, result.ShareId, string.Empty, "onedrive-access"))
-            return Ok(new { state = "failed", message = R("Web_CloudSync_Device_Expired") });
-
         var record = await connections.GetAsync(result.ShareId);
+        var actorId = await GetActorIdAsync();
         if (record is null)
             return Ok(new { state = "failed", message = R("Web_CloudAccess_ConnectionMissing") });
+        if (result.AuthorizationTicket is null || result.RefreshToken is null || result.Scope is null
+            || actorId is null
+            || !await tickets.TryConsumeAsync(
+                result.AuthorizationTicket, result.ShareId, string.Empty, "onedrive-access",
+                actorId, record.DepartmentId))
+            return Ok(new { state = "failed", message = R("Web_CloudSync_Device_Expired") });
 
         var credentials = new Dictionary<string, string>
         {
@@ -164,4 +163,11 @@ public sealed class CloudAccessOneDriveController(
     }
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+
+    private async Task<Guid?> GetActorIdAsync()
+    {
+        var username = User.Identity?.Name;
+        if (string.IsNullOrWhiteSpace(username)) return null;
+        return (await userContextFactory.CreateByUsernameAsync(username))?.User.Id;
+    }
 }

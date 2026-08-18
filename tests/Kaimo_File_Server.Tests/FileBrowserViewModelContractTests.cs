@@ -75,7 +75,7 @@ public sealed class FileBrowserViewModelContractTests
         // Dependencies are intentionally null: this policy is evaluated before
         // authentication or storage is touched, preventing a virtual cut outright.
         var transfer = new CrossShareTransferService(
-            null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
+            null!, null!, null!, null!, null!, null!, null!, null!, null!);
         var remote = new BrowserShareInfo(Guid.NewGuid(), "Virtual", BrowserShareKind.Remote, "onedrive");
         var local = new BrowserShareInfo(Guid.NewGuid(), "Local", BrowserShareKind.Local);
 

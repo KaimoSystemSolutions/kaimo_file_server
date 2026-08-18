@@ -25,13 +25,12 @@ public sealed record CrossShareTransferResult(bool Success, string? Error = null
 public sealed class CrossShareTransferService(
     ICloudAccessRepository cloudRepository,
     IStorageConnectionRepository connections,
-    ICredentialVault credentialVault,
     CloudAccessAuthorizationService cloudAuthorization,
     IShareRepository shareRepository,
     IFileServiceFactory fileServiceFactory,
     IUserContextFactory userContextFactory,
     AuthenticationStateProvider authenticationState,
-    IHttpClientFactory httpClientFactory,
+    OneDriveStorageConnectionFactory oneDriveConnections,
     ILogger<CrossShareTransferService> logger)
 {
     public async Task<List<CrossShareTransferTarget>> GetTargetsAsync()
@@ -98,8 +97,6 @@ public sealed class CrossShareTransferService(
                         sourceBackend.LocalShare!.IsRecycleEnabled);
             }
 
-            await sourceBackend.PersistCredentialsAsync(connections, credentialVault, cancellationToken);
-            await targetBackend.PersistCredentialsAsync(connections, credentialVault, cancellationToken);
             return new(true);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -140,9 +137,8 @@ public sealed class CrossShareTransferService(
         var record = await connections.GetAsync(shareRemote.ConnectionId, cancellationToken);
         if (record?.State != StorageConnectionState.Ready || string.IsNullOrWhiteSpace(record.EncryptedCredentialPayload))
             throw new InvalidOperationException("The virtual-share connection is unavailable.");
-        var credentials = credentialVault.UnprotectConnectionCredentials(record);
-        return new(new OneDriveConnection(credentials, httpClientFactory.CreateClient("CloudAccessOneDrive")),
-            shareRemote, record, credentials);
+        return new(oneDriveConnections.Create(record),
+            shareRemote);
     }
 
     private static async Task CopyItemAsync(TransferBackend source, TransferBackend target,
@@ -183,14 +179,12 @@ public sealed class CrossShareTransferService(
     private sealed class TransferBackend : IAsyncDisposable
     {
         public TransferBackend(IFileService local, ShareDefinition share) { Local = local; LocalShare = share; }
-        public TransferBackend(OneDriveConnection remote, CloudAccessShare share, StorageConnection record, Dictionary<string, string> credentials)
-        { Remote = remote; RemoteShare = share; ConnectionRecord = record; Credentials = credentials; }
+        public TransferBackend(OneDriveConnection remote, CloudAccessShare share)
+        { Remote = remote; RemoteShare = share; }
         public IFileService? Local { get; }
         public ShareDefinition? LocalShare { get; }
         public OneDriveConnection? Remote { get; }
         public CloudAccessShare? RemoteShare { get; }
-        public StorageConnection? ConnectionRecord { get; }
-        public Dictionary<string, string>? Credentials { get; }
 
         public async Task<List<FileMetadata>> ListAsync(string path, UserContext actor, CancellationToken cancellationToken)
         {
@@ -220,13 +214,6 @@ public sealed class CrossShareTransferService(
         {
             if (Local is not null) { await Local.CreateDirectoryAsync(path, actor); return; }
             await Remote!.CreateDirectoryAsync(RemotePath(path), cancellationToken);
-        }
-        public async Task PersistCredentialsAsync(IStorageConnectionRepository repository, ICredentialVault credentialVault, CancellationToken cancellationToken)
-        {
-            if (Remote?.HasPendingCredentialChanges == true)
-                await repository.UpdateRuntimeAsync(ConnectionRecord!.Id,
-                    credentialVault.ProtectConnectionCredentials(ConnectionRecord, Credentials!), null, null,
-                    StorageConnectionState.Ready, null, cancellationToken);
         }
         private string RemotePath(string path) => ShareRelativePath.Combine(RemoteShare!.RemoteRootPath, path);
         private string StripRoot(string path)

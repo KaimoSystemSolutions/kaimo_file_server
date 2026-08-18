@@ -28,6 +28,9 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<StorageConnection> StorageConnections { get; set; }
         public DbSet<CloudAccessShare> CloudAccessShares { get; set; }
         public DbSet<CloudAccessGrant> CloudAccessGrants { get; set; }
+        public DbSet<StorageAuthorizationTransaction> StorageAuthorizationTransactions { get; set; }
+        public DbSet<StorageConnectionCredentialLease> StorageConnectionCredentialLeases { get; set; }
+        public DbSet<StorageDeviceAuthorizationSession> StorageDeviceAuthorizationSessions { get; set; }
 
         // -- Departments & Scoped Roles --
         public DbSet<Department> Departments { get; set; }
@@ -243,6 +246,37 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(x => x.PrincipalId);
                 entity.HasOne<CloudAccessShare>().WithMany().HasForeignKey(x => x.ShareId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<StorageAuthorizationTransaction>(entity =>
+            {
+                entity.ToTable("storage_authorization_transactions");
+                entity.HasKey(x => x.TokenHash);
+                entity.Property(x => x.TokenHash).HasMaxLength(64);
+                entity.Property(x => x.ResourcePath).IsRequired().HasMaxLength(2000);
+                entity.Property(x => x.ProviderId).IsRequired().HasMaxLength(100);
+                entity.HasIndex(x => x.ExpiresAtUtc);
+                entity.HasIndex(x => new { x.ResourceId, x.ProviderId });
+            });
+
+            modelBuilder.Entity<StorageConnectionCredentialLease>(entity =>
+            {
+                entity.ToTable("storage_connection_credential_leases");
+                entity.HasKey(x => x.ConnectionId);
+                entity.HasIndex(x => x.ExpiresAtUtc);
+                entity.HasOne<StorageConnection>().WithOne().HasForeignKey<StorageConnectionCredentialLease>(x => x.ConnectionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<StorageDeviceAuthorizationSession>(entity =>
+            {
+                entity.ToTable("storage_device_authorization_sessions");
+                entity.HasKey(x => x.SessionHash);
+                entity.Property(x => x.SessionHash).HasMaxLength(64);
+                entity.Property(x => x.ProviderId).IsRequired().HasMaxLength(100);
+                entity.Property(x => x.ProtectedPayload).IsRequired().HasColumnType("text");
+                entity.HasIndex(x => x.ExpiresAtUtc);
+                entity.HasIndex(x => x.PollLeaseUntilUtc);
             });
 
             // -- Departments --

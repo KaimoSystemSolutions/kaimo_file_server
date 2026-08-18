@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Services;
 
 namespace Kaimo_File_Server.Infrastructure.Clouds;
 
@@ -17,10 +18,14 @@ public sealed class OneDriveConnection : ICloudConnection, IAsyncDisposable
     private const long SimpleUploadThreshold = 10L * 1024 * 1024;
     private const int UploadChunkSize = 10 * 1024 * 1024; // 32 * Graph's 320 KiB fragment unit.
     private const string GraphBaseUrl = "https://graph.microsoft.com/v1.0";
+    private static readonly TimeSpan TokenExchangeTimeout = TimeSpan.FromSeconds(60);
 
     private readonly Dictionary<string, string> _data;
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
+    private readonly Func<CancellationToken, Task<IAsyncDisposable?>>? _acquireRefreshLease;
+    private readonly Func<CancellationToken, Task<Dictionary<string, string>>>? _reloadCredentials;
+    private readonly Func<Dictionary<string, string>, CancellationToken, Task>? _persistRotatedCredentials;
     private readonly SemaphoreSlim _tokenLock = new(1, 1);
     private string? _accessToken;
     private DateTimeOffset _accessTokenExpiresAt;
@@ -32,11 +37,17 @@ public sealed class OneDriveConnection : ICloudConnection, IAsyncDisposable
     /// </summary>
     public OneDriveConnection(
         Dictionary<string, string> data,
-        HttpClient? httpClient = null)
+        HttpClient? httpClient = null,
+        Func<CancellationToken, Task<IAsyncDisposable?>>? acquireRefreshLease = null,
+        Func<CancellationToken, Task<Dictionary<string, string>>>? reloadCredentials = null,
+        Func<Dictionary<string, string>, CancellationToken, Task>? persistRotatedCredentials = null)
     {
         _data = data;
         _httpClient = httpClient ?? new HttpClient();
         _ownsHttpClient = httpClient is null;
+        _acquireRefreshLease = acquireRefreshLease;
+        _reloadCredentials = reloadCredentials;
+        _persistRotatedCredentials = persistRotatedCredentials;
 
         if (!_data.TryGetValue("refreshToken", out var refreshToken)
             || string.IsNullOrWhiteSpace(refreshToken))
@@ -689,6 +700,34 @@ public sealed class OneDriveConnection : ICloudConnection, IAsyncDisposable
                 && _accessTokenExpiresAt > DateTimeOffset.UtcNow.AddMinutes(1))
                 return _accessToken;
 
+            await using var refreshLease = _acquireRefreshLease is null
+                ? null
+                : await _acquireRefreshLease(cancellationToken)
+                  ?? throw new InvalidOperationException(
+                      "The storage connection credential refresh is already in progress.");
+
+            // A provider may have returned a rotated refresh token immediately
+            // before a database write failed. Retry that write before reloading
+            // the database value or contacting the provider again.
+            if (_hasPendingCredentialChanges && _persistRotatedCredentials is not null)
+            {
+                await _persistRotatedCredentials(_data, cancellationToken);
+                _hasPendingCredentialChanges = false;
+            }
+
+            if (_reloadCredentials is not null)
+            {
+                var latest = await _reloadCredentials(cancellationToken);
+                if (!latest.TryGetValue("refreshToken", out var latestRefreshToken)
+                    || string.IsNullOrWhiteSpace(latestRefreshToken))
+                    throw new InvalidOperationException("The Microsoft OneDrive refresh token is missing.");
+                _data["refreshToken"] = latestRefreshToken;
+                if (latest.TryGetValue("scope", out var latestScope) && !string.IsNullOrWhiteSpace(latestScope))
+                    _data["scope"] = latestScope;
+            }
+
+            using var tokenTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            tokenTimeout.CancelAfter(TokenExchangeTimeout);
             using var response = await _httpClient.PostAsync(
                 OneDriveOAuthDefaults.TokenEndpoint,
                 new FormUrlEncodedContent(new Dictionary<string, string>
@@ -698,14 +737,14 @@ public sealed class OneDriveConnection : ICloudConnection, IAsyncDisposable
                     ["refresh_token"] = _data["refreshToken"],
                     ["scope"] = _data["scope"]
                 }),
-                cancellationToken);
-            using var json = await ParseSuccessAsync(response, cancellationToken);
-            _accessToken = json.RootElement.GetProperty("access_token").GetString()
-                           ?? throw new InvalidOperationException("Microsoft did not return an access token.");
+                tokenTimeout.Token);
+            using var json = await ParseSuccessAsync(response, tokenTimeout.Token);
+            var accessToken = json.RootElement.GetProperty("access_token").GetString()
+                              ?? throw new InvalidOperationException("Microsoft did not return an access token.");
             var expiresIn = json.RootElement.TryGetProperty("expires_in", out var expiry)
                 ? expiry.GetInt32()
                 : 3600;
-            _accessTokenExpiresAt = DateTimeOffset.UtcNow.AddSeconds(expiresIn);
+            var accessTokenExpiresAt = DateTimeOffset.UtcNow.AddSeconds(expiresIn);
 
             var rotatedRefreshToken = GetOptionalString(json.RootElement, "refresh_token");
             if (!string.IsNullOrWhiteSpace(rotatedRefreshToken)
@@ -713,9 +752,18 @@ public sealed class OneDriveConnection : ICloudConnection, IAsyncDisposable
             {
                 _data["refreshToken"] = rotatedRefreshToken;
                 _hasPendingCredentialChanges = true;
+                if (_persistRotatedCredentials is not null)
+                {
+                    await _persistRotatedCredentials(_data, cancellationToken);
+                    _hasPendingCredentialChanges = false;
+                }
             }
 
-            return _accessToken;
+            // The access token becomes visible to callers only after a rotated
+            // refresh token has been durably saved.
+            _accessToken = accessToken;
+            _accessTokenExpiresAt = accessTokenExpiresAt;
+            return accessToken;
         }
         finally
         {
@@ -736,8 +784,8 @@ public sealed class OneDriveConnection : ICloudConnection, IAsyncDisposable
     }
 
     /// <summary>
-    /// Converts unsuccessful Graph responses into exceptions that retain the
-    /// status code and response body needed for server-side diagnostics.
+    /// Converts unsuccessful Graph responses into a sanitized exception. Raw
+    /// provider bodies are deliberately discarded at this boundary.
     /// </summary>
     private static async Task EnsureSuccessAsync(
         HttpResponseMessage response,
@@ -747,10 +795,9 @@ public sealed class OneDriveConnection : ICloudConnection, IAsyncDisposable
             return;
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        throw new HttpRequestException(
-            $"Microsoft Graph returned {(int)response.StatusCode} ({response.ReasonPhrase}): {body}",
-            null,
-            response.StatusCode);
+        throw new ProviderRequestException(
+            "microsoft_graph",
+            ProviderErrorSanitizer.FromResponse(response.StatusCode, body));
     }
 
     /// <summary>Normalizes provider paths to slash-separated, root-relative form.</summary>

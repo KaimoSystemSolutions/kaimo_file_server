@@ -109,6 +109,8 @@ builder.Services.AddSingleton<AssetProvider>();
 builder.Services.AddSingleton<ICloudAuthorizationTicketStore, CloudAuthorizationTicketStore>();
 builder.Services.AddSingleton<IOneDriveDeviceAuthorizationService, OneDriveDeviceAuthorizationService>();
 builder.Services.AddSingleton<ICredentialVault, DataProtectionCredentialVault>();
+builder.Services.AddScoped<OneDriveStorageConnectionFactory>();
+builder.Services.AddScoped<CredentialRewrapService>();
 builder.Services.AddSingleton<CloudAccessDownloadTicketStore>();
 builder.Services.AddSingleton<ICloudAccessSettingsStore, CloudAccessSettingsStore>();
 builder.Services.AddSingleton<CloudAccessDirectoryCache>();
@@ -204,6 +206,28 @@ var app = builder.Build();
 // Must run BEFORE search init: the search router reads its on/off flag from the
 // config table, which only exists once migrations have run.
 await app.InitializeDatabaseAsync();
+
+// Upgrade a bounded number of legacy credential envelopes after migrations
+// have completed. Failures leave the original ciphertext untouched and do not
+// prevent unrelated providers from starting.
+try
+{
+    await using var rewrapScope = app.Services.CreateAsyncScope();
+    var rewrap = await rewrapScope.ServiceProvider
+        .GetRequiredService<CredentialRewrapService>()
+        .RewrapBatchAsync();
+    if (rewrap.Examined > 0)
+    {
+        app.Logger.LogInformation(
+            "Credential rewrap pass examined {Examined}, updated {Rewrapped}, busy {Busy}, concurrently changed {ChangedConcurrently}",
+            rewrap.Examined, rewrap.Rewrapped, rewrap.Busy, rewrap.ChangedConcurrently);
+    }
+}
+catch (Exception exception)
+{
+    app.Logger.LogWarning(exception,
+        "The bounded external-storage credential rewrap pass could not complete; existing ciphertext was retained");
+}
 
 // Load or generate the HTTPS certificate before the first TLS connection is served.
 await app.Services.GetRequiredService<HttpsCertificateProvider>().InitializeAsync();

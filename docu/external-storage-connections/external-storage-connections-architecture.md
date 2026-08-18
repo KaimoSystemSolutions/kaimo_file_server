@@ -788,12 +788,13 @@ Exit criterion: existing Cloud Access OneDrive records can be represented by the
 
 ### Phase 2: credential vault and authorization transactions
 
-- [ ] Introduce `ICredentialVault` with versioned, context-bound protection.
+- [x] Introduce `ICredentialVault` with versioned, context-bound protection.
 - [ ] Add self-contained and external-secret resolution modes.
-- [ ] Move OAuth transactions to a shared TTL-backed store.
-- [ ] Add per-connection distributed refresh leases and optimistic concurrency.
-- [ ] Add centralized secret redaction and provider-error sanitization.
-- [ ] Add backup/restore and key-rotation tests.
+- [x] Move OAuth transactions to a shared TTL-backed store.
+- [x] Add per-connection distributed refresh leases and optimistic concurrency.
+- [x] Add centralized secret redaction and provider-error sanitization.
+- [x] Add backup/restore and credential-envelope rewrap tests.
+- [ ] Add encryption-root key-rotation tests for the selected external protector.
 
 Exit criterion: two Web instances can authorize and refresh connections safely while sharing the same database and key configuration.
 

@@ -46,6 +46,106 @@ public sealed class OneDriveConnectionTests
     }
 
     [Fact]
+    public async Task Refresh_ReloadsLatestGrantAndPersistsRotationBeforeReleasingDistributedLease()
+    {
+        var tokenRequestBody = string.Empty;
+        var lease = new TrackingLease();
+        var persistedWhileOwned = false;
+        var handler = new StubHttpMessageHandler(async request =>
+        {
+            if (request.RequestUri!.Host == "login.microsoftonline.com")
+            {
+                tokenRequestBody = await request.Content!.ReadAsStringAsync();
+                return Json(HttpStatusCode.OK,
+                    """{"access_token":"access","expires_in":3600,"refresh_token":"rotated-refresh"}""");
+            }
+            return Json(HttpStatusCode.OK, """{"displayName":"Ada"}""");
+        });
+        using var http = new HttpClient(handler);
+        await using var connection = new OneDriveConnection(
+            CreateData(),
+            http,
+            _ => Task.FromResult<IAsyncDisposable?>(lease),
+            _ => Task.FromResult(new Dictionary<string, string>
+            {
+                ["refreshToken"] = "latest-refresh",
+                ["scope"] = OneDriveOAuthDefaults.Scope
+            }),
+            (credentials, _) =>
+            {
+                persistedWhileOwned = !lease.IsDisposed
+                                      && credentials["refreshToken"] == "rotated-refresh";
+                return Task.CompletedTask;
+            });
+
+        await connection.GetAccountInfoAsync();
+
+        Assert.Contains("refresh_token=latest-refresh", tokenRequestBody);
+        Assert.True(persistedWhileOwned);
+        Assert.True(lease.IsDisposed);
+        Assert.False(connection.HasPendingCredentialChanges);
+    }
+
+    [Fact]
+    public async Task ProviderFailure_DoesNotExposeRawResponseBodyOrToken()
+    {
+        const string secret = "provider-body-secret";
+        var handler = new StubHttpMessageHandler(_ => Task.FromResult(Json(
+            HttpStatusCode.BadRequest,
+            $$"""{"error":"invalid_grant","error_description":"{{secret}}"}""")));
+        using var http = new HttpClient(handler);
+        await using var connection = new OneDriveConnection(CreateData(), http);
+
+        var exception = await Assert.ThrowsAsync<Kaimo_File_Server.Core.Services.ProviderRequestException>(
+            () => connection.GetAccountInfoAsync());
+
+        Assert.Equal("invalid_grant", exception.ErrorCode);
+        Assert.DoesNotContain(secret, exception.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FailedRotationWrite_IsRetriedBeforeAnotherProviderExchange()
+    {
+        var tokenRequests = 0;
+        var persistenceAttempts = 0;
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            if (request.RequestUri!.Host != "login.microsoftonline.com")
+                return Task.FromResult(Json(HttpStatusCode.OK, """{"displayName":"Recovered"}"""));
+            tokenRequests++;
+            return Task.FromResult(Json(HttpStatusCode.OK,
+                tokenRequests == 1
+                    ? """{"access_token":"first","expires_in":3600,"refresh_token":"rotated"}"""
+                    : """{"access_token":"second","expires_in":3600}"""));
+        });
+        using var http = new HttpClient(handler);
+        await using var connection = new OneDriveConnection(
+            CreateData(),
+            http,
+            _ => Task.FromResult<IAsyncDisposable?>(new TrackingLease()),
+            _ => Task.FromResult(new Dictionary<string, string>
+            {
+                ["refreshToken"] = persistenceAttempts == 0 ? "old-refresh" : "rotated",
+                ["scope"] = OneDriveOAuthDefaults.Scope
+            }),
+            (credentials, _) =>
+            {
+                persistenceAttempts++;
+                Assert.Equal("rotated", credentials["refreshToken"]);
+                if (persistenceAttempts == 1)
+                    throw new IOException("Simulated database outage.");
+                return Task.CompletedTask;
+            });
+
+        await Assert.ThrowsAsync<IOException>(() => connection.GetAccountInfoAsync());
+        var account = await connection.GetAccountInfoAsync();
+
+        Assert.Equal("Recovered", account!.DisplayName);
+        Assert.Equal(2, persistenceAttempts);
+        Assert.Equal(2, tokenRequests);
+    }
+
+    [Fact]
     public async Task ListAsync_EncodesPathAndMapsFilesAndFolders()
     {
         var graphUris = new List<Uri>();
@@ -264,5 +364,16 @@ public sealed class OneDriveConnectionTests
             HttpRequestMessage request,
             CancellationToken cancellationToken)
             => send(request);
+    }
+
+    private sealed class TrackingLease : IAsyncDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public ValueTask DisposeAsync()
+        {
+            IsDisposed = true;
+            return ValueTask.CompletedTask;
+        }
     }
 }

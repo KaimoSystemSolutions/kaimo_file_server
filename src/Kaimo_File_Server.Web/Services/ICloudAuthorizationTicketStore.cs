@@ -7,11 +7,31 @@ namespace Kaimo_File_Server.Web.Services;
 public interface ICloudAuthorizationTicketStore
 {
     /// <summary>Issues a short-lived proof bound to one share, path, and provider.</summary>
-    string Issue(Guid shareId, string localPath, string providerId);
+    Task<string> IssueAsync(
+        Guid resourceId,
+        string localPath,
+        string providerId,
+        Guid? initiatingUserId = null,
+        Guid? departmentId = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Checks a ticket without consuming it during multi-step authorization.</summary>
-    bool IsValid(string token, Guid shareId, string localPath, string providerId);
+    Task<bool> IsValidAsync(
+        string token,
+        Guid resourceId,
+        string localPath,
+        string providerId,
+        Guid? initiatingUserId = null,
+        Guid? departmentId = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Atomically validates and consumes a ticket at the final OAuth hand-off.</summary>
-    bool TryConsume(string token, Guid shareId, string localPath, string providerId);
+    Task<bool> TryConsumeAsync(
+        string token,
+        Guid resourceId,
+        string localPath,
+        string providerId,
+        Guid? initiatingUserId = null,
+        Guid? departmentId = null,
+        CancellationToken cancellationToken = default);
 }

@@ -16,7 +16,6 @@ public sealed class CloudAccessViewModel
 {
     private readonly ICloudAccessRepository _repository;
     private readonly IStorageConnectionRepository _connections;
-    private readonly ICredentialVault _credentialVault;
     private readonly ICloudAuthorizationTicketStore _tickets;
     private readonly IManagementAuthService _managementAuth;
     private readonly IUserContextFactory _userContextFactory;
@@ -25,14 +24,13 @@ public sealed class CloudAccessViewModel
     private readonly IUserRepository _users;
     private readonly IGroupRepository _groups;
     private readonly IShareRepository _localShares;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly OneDriveStorageConnectionFactory _oneDriveConnections;
     private readonly ILogger<CloudAccessViewModel> _logger;
     private UserContext? _actor;
 
     public CloudAccessViewModel(
         ICloudAccessRepository repository,
         IStorageConnectionRepository connections,
-        ICredentialVault credentialVault,
         ICloudAuthorizationTicketStore tickets,
         IManagementAuthService managementAuth,
         IUserContextFactory userContextFactory,
@@ -41,12 +39,11 @@ public sealed class CloudAccessViewModel
         IUserRepository users,
         IGroupRepository groups,
         IShareRepository localShares,
-        IHttpClientFactory httpClientFactory,
+        OneDriveStorageConnectionFactory oneDriveConnections,
         ILogger<CloudAccessViewModel> logger)
     {
         _repository = repository;
         _connections = connections;
-        _credentialVault = credentialVault;
         _tickets = tickets;
         _managementAuth = managementAuth;
         _userContextFactory = userContextFactory;
@@ -55,7 +52,7 @@ public sealed class CloudAccessViewModel
         _users = users;
         _groups = groups;
         _localShares = localShares;
-        _httpClientFactory = httpClientFactory;
+        _oneDriveConnections = oneDriveConnections;
         _logger = logger;
     }
 
@@ -124,14 +121,16 @@ public sealed class CloudAccessViewModel
             State = StorageConnectionState.PendingAuthorization
         };
         await _connections.SaveAsync(connection);
-        var ticket = _tickets.Issue(connection.Id, string.Empty, "onedrive-access");
+        var ticket = await _tickets.IssueAsync(
+            connection.Id, string.Empty, "onedrive-access", _actor.User.Id, connection.DepartmentId);
         return $"/api/cloud-access/onedrive/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
     }
 
     public async Task<string> AuthorizeConnectionAsync(Guid connectionId)
     {
         var connection = await GetManagedConnectionAsync(connectionId);
-        var ticket = _tickets.Issue(connection.Id, string.Empty, "onedrive-access");
+        var ticket = await _tickets.IssueAsync(
+            connection.Id, string.Empty, "onedrive-access", _actor!.User.Id, connection.DepartmentId);
         return $"/api/cloud-access/onedrive/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
     }
 
@@ -156,11 +155,8 @@ public sealed class CloudAccessViewModel
             throw new InvalidOperationException(R("Web_CloudAccess_ConnectionNotReady"));
         if (!ShareRelativePath.TryNormalizeStrict(path.Trim('/'), out var normalized))
             throw new UnauthorizedAccessException(R("Web_CloudAccess_InvalidRemotePath"));
-        var credentials = _credentialVault.UnprotectConnectionCredentials(connectionRecord);
-        await using var connection = new OneDriveConnection(
-            credentials, _httpClientFactory.CreateClient("CloudAccessOneDrive"));
+        await using var connection = _oneDriveConnections.Create(connectionRecord);
         var items = await connection.ListDetailedAsync(normalized);
-        await PersistCredentialsIfRotatedAsync(connectionRecord, connection, credentials);
         return items.Where(x => x.IsDirectory)
             .Select(x => new CloudDirectoryItem(x.Name, "/" + x.Path.Trim('/')))
             .OrderBy(x => x.Name).ToList();
@@ -202,11 +198,8 @@ public sealed class CloudAccessViewModel
         if (!ShareRelativePath.TryNormalizeStrict(remoteRootPath.Trim('/'), out var root))
             throw new UnauthorizedAccessException(R("Web_CloudAccess_InvalidRemotePath"));
 
-        var credentials = _credentialVault.UnprotectConnectionCredentials(connectionRecord);
-        await using var connection = new OneDriveConnection(
-            credentials, _httpClientFactory.CreateClient("CloudAccessOneDrive"));
+        await using var connection = _oneDriveConnections.Create(connectionRecord);
         var folder = await connection.ResolveFolderAsync(root);
-        await PersistCredentialsIfRotatedAsync(connectionRecord, connection, credentials);
 
         var share = new CloudAccessShare
         {
@@ -260,11 +253,8 @@ public sealed class CloudAccessViewModel
             || string.IsNullOrWhiteSpace(connectionRecord.EncryptedCredentialPayload))
             throw new InvalidOperationException(R("Web_CloudAccess_ConnectionNotReady"));
 
-        var credentials = _credentialVault.UnprotectConnectionCredentials(connectionRecord);
-        await using var connection = new OneDriveConnection(
-            credentials, _httpClientFactory.CreateClient("CloudAccessOneDrive"));
+        await using var connection = _oneDriveConnections.Create(connectionRecord);
         var folder = await connection.ResolveFolderAsync(root);
-        await PersistCredentialsIfRotatedAsync(connectionRecord, connection, credentials);
 
         share.Name = normalizedName;
         share.RemoteRootPath = folder.Path;
@@ -363,16 +353,6 @@ public sealed class CloudAccessViewModel
             return false;
 
         return !(await _localShares.GetAllAsync()).Any(x => comparer.Equals(x.Name, name));
-    }
-
-    private async Task PersistCredentialsIfRotatedAsync(
-        StorageConnection record, OneDriveConnection connection, Dictionary<string, string> credentials)
-    {
-        if (!connection.HasPendingCredentialChanges) return;
-        await _connections.UpdateRuntimeAsync(
-            record.Id, _credentialVault.ProtectConnectionCredentials(record, credentials), null, null,
-            StorageConnectionState.Ready, null);
-        connection.AcknowledgeCredentialChanges();
     }
 
     private async Task<UserContext?> GetActorAsync()

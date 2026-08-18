@@ -1,12 +1,15 @@
 using System.Net;
 using System.Text;
 using Kaimo_File_Server.Infrastructure.Clouds;
+using Kaimo_File_Server.Tests.Infrastructure;
 using Kaimo_File_Server.Web.Services;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Kaimo_File_Server.Tests;
 
-public sealed class OneDriveDeviceAuthorizationServiceTests
+public sealed class OneDriveDeviceAuthorizationServiceTests : DatabaseTestBase
 {
     [Fact]
     public async Task DeviceFlow_UsesPublicClientWithoutSecretOrRedirectUri()
@@ -43,12 +46,13 @@ public sealed class OneDriveDeviceAuthorizationServiceTests
                 """);
         });
         using var http = new HttpClient(handler);
-        var service = new OneDriveDeviceAuthorizationService(
-            new StubHttpClientFactory(http));
+        var protection = new EphemeralDataProtectionProvider();
+        var service = CreateService(http, protection);
+        var secondInstance = CreateService(http, protection);
         var shareId = Guid.NewGuid();
 
         var authorization = await service.StartAsync(shareId, "documents", "ticket");
-        var result = await service.PollAsync(authorization.SessionId);
+        var result = await secondInstance.PollAsync(authorization.SessionId);
 
         Assert.Equal("ABCD-EFGH", authorization.UserCode);
         Assert.Equal("https://microsoft.com/devicelogin", authorization.VerificationUri);
@@ -65,6 +69,9 @@ public sealed class OneDriveDeviceAuthorizationServiceTests
             Assert.DoesNotContain("client_secret", body);
             Assert.DoesNotContain("redirect_uri", body);
         });
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        Assert.Empty(await db.StorageDeviceAuthorizationSessions.ToListAsync());
     }
 
     [Fact]
@@ -81,15 +88,28 @@ public sealed class OneDriveDeviceAuthorizationServiceTests
                     """{"error":"authorization_pending","error_description":"Waiting for the user."}"""));
         });
         using var http = new HttpClient(handler);
-        var service = new OneDriveDeviceAuthorizationService(
-            new StubHttpClientFactory(http));
+        var service = CreateService(http);
         var authorization = await service.StartAsync(Guid.NewGuid(), "", "ticket");
 
         var result = await service.PollAsync(authorization.SessionId);
 
         Assert.Equal(OneDriveDevicePollState.Pending, result.State);
         Assert.Equal(5, result.RetryAfterSeconds);
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var persisted = await db.StorageDeviceAuthorizationSessions.SingleAsync();
+        Assert.DoesNotContain("device", persisted.ProtectedPayload, StringComparison.Ordinal);
+        Assert.DoesNotContain("ticket", persisted.ProtectedPayload, StringComparison.Ordinal);
     }
+
+    private OneDriveDeviceAuthorizationService CreateService(
+        HttpClient http,
+        IDataProtectionProvider? protection = null)
+        => new(
+            new StubHttpClientFactory(http),
+            DbFactory,
+            protection ?? new EphemeralDataProtectionProvider(),
+            TimeProvider.System);
 
     private static HttpResponseMessage Json(HttpStatusCode statusCode, string json)
         => new(statusCode)

@@ -65,14 +65,31 @@ The migration keeps `ProviderProfileId` nullable during the additive rollout so 
 can be classified safely instead of being assigned to the wrong profile. Existing OneDrive records are linked
 to the built-in profile automatically.
 
+### Package 2: shared authorization and refresh coordination — implemented
+
+- [x] Persist short-lived authorization transactions with a TTL and store only hashes of browser-visible tokens.
+- [x] Persist encrypted OneDrive device-code sessions and coordinate polling across Web instances.
+- [x] Add renewable, database-backed per-connection credential leases with expired-owner recovery.
+- [x] Reload the latest grant under the lease and persist refresh-token rotation before releasing it.
+- [x] Add provider-error sanitization and centralized diagnostic secret redaction.
+- [x] Add a bounded, concurrency-safe legacy credential rewrap pass.
+- [x] Add backup/restore, rewrap, lease, replay, redaction, and multi-instance tests.
+
+Migration `SharedExternalStorageRuntime` adds three runtime tables without changing existing connection or
+consumer records. Authorization tickets and device sessions can therefore move between Web instances without
+sticky sessions. Tickets are bound to the initiating user and department and are revalidated by the HTTP
+endpoints. Device codes and hand-off context are protected with Data Protection, while ticket and session
+identifiers are persisted only as SHA-256 hashes.
+
+The bounded startup rewrap pass upgrades at most 100 legacy `dp:v1` connection grants per Web startup. It holds
+the same distributed credential lease used by refresh-token rotation and applies an optimistic concurrency
+check before writing. A busy or concurrently changed connection is retained unchanged for a later pass.
+
+No new UI copy was required. Authorization failures continue to resolve through the existing English and German
+resource keys. Provider response bodies are converted into allow-listed error codes before they can reach UI,
+health state, exceptions, or logs.
+
 ## Current focus
-
-### Package 2: shared authorization and refresh coordination — next
-
-- Persist short-lived authorization transactions with a TTL.
-- Add distributed, per-connection refresh leases.
-- Add provider-error sanitization and centralized secret redaction.
-- Add key rewrap, backup/restore, and multi-instance tests.
 
 ### Package 3: Microsoft provider consolidation — planned
 
@@ -109,3 +126,5 @@ to the built-in profile automatically.
 | 2026-08-18 | Neutral connection domain build and tests | 771 passed, 0 failed, 0 skipped. |
 | 2026-08-18 | EF Core model check | No pending model changes after `NeutralStorageConnections`. |
 | 2026-08-18 | PostgreSQL migration script review | Existing connection table and credential column are renamed in place; no connection table drop is emitted. |
+| 2026-08-18 | Package 2 focused security and coordination tests | 27 passed, 0 failed, 0 skipped. |
+| 2026-08-18 | Package 2 full `Kaimo_File_Server.Tests` suite | 780 passed, 0 failed, 0 skipped. |

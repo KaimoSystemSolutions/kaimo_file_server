@@ -26,28 +26,25 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
 
     private readonly ICloudAccessRepository _repository;
     private readonly IStorageConnectionRepository _connections;
-    private readonly ICredentialVault _credentialVault;
     private readonly CloudAccessAuthorizationService _authorization;
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authenticationState;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly OneDriveStorageConnectionFactory _oneDriveConnections;
     private readonly ILogger<OneDriveCloudAccessFileBrowserViewModel> _logger;
     private readonly CloudAccessDownloadTicketStore _downloadTickets;
     private readonly CloudAccessDirectoryCache _directoryCache;
     private CloudAccessShare? _share;
     private StorageConnection? _connectionRecord;
     private OneDriveConnection? _connection;
-    private Dictionary<string, string>? _credentials;
     private DateTimeOffset _rootRevalidationAt;
 
     public OneDriveCloudAccessFileBrowserViewModel(
         ICloudAccessRepository repository,
         IStorageConnectionRepository connections,
-        ICredentialVault credentialVault,
         CloudAccessAuthorizationService authorization,
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authenticationState,
-        IHttpClientFactory httpClientFactory,
+        OneDriveStorageConnectionFactory oneDriveConnections,
         CloudAccessDownloadTicketStore downloadTickets,
         CloudAccessDirectoryCache directoryCache,
         ILogger<OneDriveCloudAccessFileBrowserViewModel> logger)
@@ -55,11 +52,10 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     {
         _repository = repository;
         _connections = connections;
-        _credentialVault = credentialVault;
         _authorization = authorization;
         _userContextFactory = userContextFactory;
         _authenticationState = authenticationState;
-        _httpClientFactory = httpClientFactory;
+        _oneDriveConnections = oneDriveConnections;
         _downloadTickets = downloadTickets;
         _directoryCache = directoryCache;
         _logger = logger;
@@ -106,7 +102,6 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
             }
             Capabilities = share.IsReadOnly ? ReadOnlyCapabilities : WritableCapabilities;
             var items = await ListCoreAsync(relativePath);
-            await PersistRotatedCredentialsAsync();
             CompleteLoad(
                 new BrowserShareInfo(share.Id, share.Name, BrowserShareKind.Remote, "onedrive"),
                 relativePath,
@@ -175,7 +170,6 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
         if (_connection is null || file.Size > GetMaxPreviewSizeBytes()) return null;
         await using var memory = new MemoryStream(file.Size is > 0 and <= int.MaxValue ? (int)file.Size : 0);
         await _connection.DownloadAsync(RemotePath(ShareRelativeOf(file)), memory);
-        await PersistRotatedCredentialsAsync();
         return (memory.ToArray(), FileHelper.GetContentType(file.Name), FileHelper.GetPreviewKind(file.Name));
     }
 
@@ -192,7 +186,6 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
         try
         {
             var total = await CalculateDirectorySizeCoreAsync(ShareRelativeOf(directory), cancellationToken);
-            await PersistRotatedCredentialsAsync();
             return total;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -268,7 +261,6 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
         try
         {
             await action(_connection);
-            await PersistRotatedCredentialsAsync();
             _directoryCache.InvalidateShare(_share.Id);
             return OperationResult.Ok();
         }
@@ -303,24 +295,8 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     {
         if (_connectionRecord?.Id == record.Id && _connection is not null) return;
         if (_connection is not null) await _connection.Dispose();
-        _credentials = _credentialVault.UnprotectConnectionCredentials(record);
-        _connection = new OneDriveConnection(
-            _credentials,
-            _httpClientFactory.CreateClient("CloudAccessOneDrive"));
+        _connection = _oneDriveConnections.Create(record);
         _connectionRecord = record;
-    }
-
-    private async Task PersistRotatedCredentialsAsync()
-    {
-        if (_connection is null || _connectionRecord is null || _credentials is null
-            || !_connection.HasPendingCredentialChanges) return;
-        await _connections.UpdateRuntimeAsync(
-            _connectionRecord.Id,
-            _credentialVault.ProtectConnectionCredentials(_connectionRecord, _credentials),
-            null, null,
-            StorageConnectionState.Ready,
-            null);
-        _connection.AcknowledgeCredentialChanges();
     }
 
     private async Task<Kaimo_File_Server.Core.Domain.Identity.UserContext?> GetActorAsync()

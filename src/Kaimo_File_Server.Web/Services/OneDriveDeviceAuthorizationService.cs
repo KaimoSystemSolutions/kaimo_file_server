@@ -1,48 +1,52 @@
-using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Language;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Infrastructure.Clouds;
+using Kaimo_File_Server.Infrastructure.Persistence;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.EntityFrameworkCore;
 
 namespace Kaimo_File_Server.Web.Services;
 
-/// <summary>
-/// Runs Microsoft's OAuth device authorization grant without a redirect URI or
-/// client secret. Only the public application id is distributed in the image;
-/// device codes and resulting tokens remain inside the individual server.
-/// </summary>
+/// <summary>Runs Microsoft's OAuth device authorization grant using shared server-side state.</summary>
 public interface IOneDriveDeviceAuthorizationService
 {
-    /// <summary>
-    /// Requests a Microsoft device code and stores the associated local sync
-    /// context in a short-lived server-side session.
-    /// </summary>
     Task<OneDriveDeviceAuthorization> StartAsync(
         Guid shareId,
         string localPath,
         string authorizationTicket);
 
-    /// <summary>
-    /// Polls Microsoft once for the specified session and returns a neutral
-    /// pending, completed, or failed result to the controller.
-    /// </summary>
     Task<OneDriveDevicePollResult> PollAsync(string sessionId);
 }
 
 /// <summary>
-/// In-memory coordinator for Microsoft's public-client device-code flow. It
-/// serializes polling per session and follows Microsoft's retry intervals.
+/// Database-backed device authorization coordinator. Device codes and hand-off
+/// context are protected at rest, browser session IDs are stored only as hashes,
+/// and a short polling lease prevents duplicate token exchanges across instances.
 /// </summary>
 public sealed class OneDriveDeviceAuthorizationService : IOneDriveDeviceAuthorizationService
 {
-    private readonly ConcurrentDictionary<string, DeviceSession> _sessions = new(StringComparer.Ordinal);
+    private static readonly TimeSpan PollLeaseLifetime = TimeSpan.FromSeconds(45);
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
+    private readonly IDataProtector _protector;
+    private readonly TimeProvider _timeProvider;
 
-    /// <summary>Creates the coordinator with application configuration and managed HTTP clients.</summary>
     public OneDriveDeviceAuthorizationService(
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        IDbContextFactory<ApplicationDbContext> dbFactory,
+        IDataProtectionProvider dataProtectionProvider,
+        TimeProvider timeProvider)
     {
         _httpClientFactory = httpClientFactory;
+        _dbFactory = dbFactory;
+        _protector = dataProtectionProvider.CreateProtector(
+            "KaimoFiles.ExternalStorage.DeviceAuthorization", "v1");
+        _timeProvider = timeProvider;
     }
 
     /// <inheritdoc />
@@ -51,7 +55,6 @@ public sealed class OneDriveDeviceAuthorizationService : IOneDriveDeviceAuthoriz
         string localPath,
         string authorizationTicket)
     {
-        RemoveExpiredSessions();
         var client = _httpClientFactory.CreateClient(nameof(OneDriveDeviceAuthorizationService));
         using var response = await client.PostAsync(
             OneDriveOAuthDefaults.DeviceCodeEndpoint,
@@ -67,9 +70,7 @@ public sealed class OneDriveDeviceAuthorizationService : IOneDriveDeviceAuthoriz
         var verificationUri = RequiredString(root, "verification_uri");
         if (!Uri.TryCreate(verificationUri, UriKind.Absolute, out var verification)
             || verification.Scheme != Uri.UriSchemeHttps)
-        {
             throw new InvalidOperationException("Microsoft returned an invalid device verification URI.");
-        }
 
         var expiresIn = root.TryGetProperty("expires_in", out var expiryProperty)
             ? Math.Clamp(expiryProperty.GetInt32(), 60, 1800)
@@ -78,55 +79,78 @@ public sealed class OneDriveDeviceAuthorizationService : IOneDriveDeviceAuthoriz
             ? Math.Clamp(intervalProperty.GetInt32(), 5, 60)
             : 5;
         var sessionId = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        var session = new DeviceSession(
-            shareId,
-            localPath,
-            authorizationTicket,
-            deviceCode,
-            DateTimeOffset.UtcNow.AddSeconds(expiresIn),
-            interval);
-        _sessions[sessionId] = session;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var payload = new DeviceSessionPayload(
+            shareId, localPath, authorizationTicket, deviceCode);
+
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        db.StorageDeviceAuthorizationSessions.Add(new StorageDeviceAuthorizationSession
+        {
+            SessionHash = Hash(sessionId),
+            ProviderId = "onedrive",
+            ProtectedPayload = _protector.Protect(JsonSerializer.Serialize(payload)),
+            CreatedAtUtc = now,
+            ExpiresAtUtc = now.AddSeconds(expiresIn),
+            PollIntervalSeconds = interval,
+            NextPollAtUtc = now
+        });
+        await db.SaveChangesAsync();
+        _ = await db.StorageDeviceAuthorizationSessions
+            .Where(session => session.ExpiresAtUtc <= now)
+            .ExecuteDeleteAsync();
 
         return new OneDriveDeviceAuthorization(
-            sessionId,
-            userCode,
-            verification.AbsoluteUri,
-            expiresIn,
-            interval);
+            sessionId, userCode, verification.AbsoluteUri, expiresIn, interval);
     }
 
     /// <inheritdoc />
-    /// <remarks>
-    /// Concurrent or early polls are answered locally instead of producing
-    /// duplicate token requests. Microsoft's slow_down response increases the
-    /// stored interval for every following poll.
-    /// </remarks>
     public async Task<OneDriveDevicePollResult> PollAsync(string sessionId)
     {
-        if (!_sessions.TryGetValue(sessionId, out var session))
-            return OneDriveDevicePollResult.Failed("The Microsoft authorization session has expired.");
+        if (string.IsNullOrWhiteSpace(sessionId))
+            return OneDriveDevicePollResult.Failed(R("Web_CloudSync_Device_Expired"));
 
-        var now = DateTimeOffset.UtcNow;
-        int retryAfter;
-        lock (session.SyncRoot)
+        var sessionHash = Hash(sessionId);
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var pollLeaseId = Guid.NewGuid();
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var claimed = await db.StorageDeviceAuthorizationSessions
+            .Where(session => session.SessionHash == sessionHash
+                              && session.ExpiresAtUtc > now
+                              && session.NextPollAtUtc <= now
+                              && (session.PollLeaseUntilUtc == null || session.PollLeaseUntilUtc <= now))
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(session => session.PollLeaseId, pollLeaseId)
+                .SetProperty(session => session.PollLeaseUntilUtc, now.Add(PollLeaseLifetime)));
+
+        var session = await db.StorageDeviceAuthorizationSessions.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.SessionHash == sessionHash);
+        if (session is null || session.ExpiresAtUtc <= now)
         {
-            if (session.ExpiresAt <= now)
-            {
-                _sessions.TryRemove(sessionId, out _);
-                return OneDriveDevicePollResult.Failed("The Microsoft authorization code has expired.");
-            }
+            if (session is not null)
+                _ = await db.StorageDeviceAuthorizationSessions
+                    .Where(item => item.SessionHash == sessionHash)
+                    .ExecuteDeleteAsync();
+            return OneDriveDevicePollResult.Failed(R("Web_CloudSync_Device_Expired"));
+        }
 
-            if (session.IsPolling || session.NextPollAt > now)
-            {
-                retryAfter = Math.Max(
-                    1,
-                    (int)Math.Ceiling((session.NextPollAt - now).TotalSeconds));
-                return OneDriveDevicePollResult.Pending(retryAfter);
-            }
+        if (claimed != 1)
+        {
+            var retryAfter = Math.Max(1, (int)Math.Ceiling(
+                (session.NextPollAtUtc - now).TotalSeconds));
+            return OneDriveDevicePollResult.Pending(retryAfter);
+        }
 
-            session.IsPolling = true;
-            session.NextPollAt = now.AddSeconds(session.IntervalSeconds);
-            retryAfter = session.IntervalSeconds;
+        DeviceSessionPayload payload;
+        try
+        {
+            payload = JsonSerializer.Deserialize<DeviceSessionPayload>(
+                          _protector.Unprotect(session.ProtectedPayload))
+                      ?? throw new JsonException();
+        }
+        catch (Exception exception) when (exception is JsonException or CryptographicException)
+        {
+            await DeleteSessionAsync(sessionHash);
+            return OneDriveDevicePollResult.Failed(R("Web_CloudSync_Device_Failed"));
         }
 
         try
@@ -138,116 +162,117 @@ public sealed class OneDriveDeviceAuthorizationService : IOneDriveDeviceAuthoriz
                 {
                     ["grant_type"] = "urn:ietf:params:oauth:grant-type:device_code",
                     ["client_id"] = OneDriveOAuthDefaults.ClientId,
-                    ["device_code"] = session.DeviceCode
+                    ["device_code"] = payload.DeviceCode
                 }));
-            using var json = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-
-            if (response.IsSuccessStatusCode)
+            var body = await response.Content.ReadAsStringAsync();
+            JsonDocument? document = null;
+            try
             {
-                var refreshToken = RequiredString(json.RootElement, "refresh_token");
-                var scope = OptionalString(json.RootElement, "scope") ?? OneDriveOAuthDefaults.Scope;
-                _sessions.TryRemove(sessionId, out _);
-                return OneDriveDevicePollResult.Completed(
-                    session.ShareId,
-                    session.LocalPath,
-                    session.AuthorizationTicket,
-                    refreshToken,
-                    scope);
+                document = JsonDocument.Parse(body);
+            }
+            catch (JsonException)
+            {
+                await DeleteSessionAsync(sessionHash);
+                return OneDriveDevicePollResult.Failed(R("Web_CloudSync_Device_Failed"));
             }
 
-            var providerError = OptionalString(json.RootElement, "error");
-            if (string.Equals(providerError, "authorization_pending", StringComparison.Ordinal))
-                return OneDriveDevicePollResult.Pending(retryAfter);
-
-            if (string.Equals(providerError, "slow_down", StringComparison.Ordinal))
+            using (document)
             {
-                lock (session.SyncRoot)
+                if (response.IsSuccessStatusCode)
                 {
-                    session.IntervalSeconds = Math.Min(session.IntervalSeconds + 5, 60);
-                    session.NextPollAt = DateTimeOffset.UtcNow.AddSeconds(session.IntervalSeconds);
-                    retryAfter = session.IntervalSeconds;
+                    var refreshToken = RequiredString(document.RootElement, "refresh_token");
+                    var scope = OptionalString(document.RootElement, "scope") ?? OneDriveOAuthDefaults.Scope;
+                    await DeleteSessionAsync(sessionHash);
+                    return OneDriveDevicePollResult.Completed(
+                        payload.ShareId, payload.LocalPath, payload.AuthorizationTicket, refreshToken, scope);
                 }
-                return OneDriveDevicePollResult.Pending(retryAfter);
+
+                var providerError = ProviderErrorSanitizer.FromResponse(response.StatusCode, body);
+                if (providerError.Code == "authorization_pending")
+                {
+                    await ReleasePollAsync(sessionHash, pollLeaseId, session.PollIntervalSeconds);
+                    return OneDriveDevicePollResult.Pending(session.PollIntervalSeconds);
+                }
+                if (providerError.Code == "slow_down")
+                {
+                    var interval = Math.Min(session.PollIntervalSeconds + 5, 60);
+                    await ReleasePollAsync(sessionHash, pollLeaseId, interval);
+                    return OneDriveDevicePollResult.Pending(interval);
+                }
+
+                await DeleteSessionAsync(sessionHash);
+                return OneDriveDevicePollResult.Failed(providerError.Code switch
+                {
+                    "expired_token" => R("Web_CloudSync_Device_Expired"),
+                    _ => R("Web_CloudSync_Device_Failed")
+                });
             }
-
-            _sessions.TryRemove(sessionId, out _);
-            var description = OptionalString(json.RootElement, "error_description");
-            return OneDriveDevicePollResult.Failed(providerError switch
-            {
-                "authorization_declined" => "Microsoft authorization was declined.",
-                "expired_token" => "The Microsoft authorization code has expired.",
-                _ => description ?? "Microsoft authorization failed."
-            });
         }
-        catch (JsonException)
+        catch
         {
-            _sessions.TryRemove(sessionId, out _);
-            return OneDriveDevicePollResult.Failed("Microsoft returned an invalid authorization response.");
-        }
-        finally
-        {
-            lock (session.SyncRoot)
-                session.IsPolling = false;
+            await ReleasePollAsync(sessionHash, pollLeaseId, session.PollIntervalSeconds);
+            throw;
         }
     }
 
-    /// <summary>Opportunistically removes expired device sessions before issuing a new one.</summary>
-    private void RemoveExpiredSessions()
+    private async Task ReleasePollAsync(string sessionHash, Guid pollLeaseId, int intervalSeconds)
     {
-        var now = DateTimeOffset.UtcNow;
-        foreach (var (id, session) in _sessions)
-        {
-            if (session.ExpiresAt <= now)
-                _sessions.TryRemove(id, out _);
-        }
+        var nextPoll = _timeProvider.GetUtcNow().UtcDateTime.AddSeconds(intervalSeconds);
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        _ = await db.StorageDeviceAuthorizationSessions
+            .Where(session => session.SessionHash == sessionHash && session.PollLeaseId == pollLeaseId)
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(session => session.PollIntervalSeconds, intervalSeconds)
+                .SetProperty(session => session.NextPollAtUtc, nextPoll)
+                .SetProperty(session => session.PollLeaseId, (Guid?)null)
+                .SetProperty(session => session.PollLeaseUntilUtc, (DateTime?)null));
     }
 
-    /// <summary>
-    /// Parses a successful identity-platform response or raises a diagnostic
-    /// HTTP exception containing the provider response body.
-    /// </summary>
+    private async Task DeleteSessionAsync(string sessionHash)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        _ = await db.StorageDeviceAuthorizationSessions
+            .Where(session => session.SessionHash == sessionHash)
+            .ExecuteDeleteAsync();
+    }
+
     private static async Task<JsonDocument> ParseSuccessAsync(HttpResponseMessage response)
     {
-        if (response.IsSuccessStatusCode)
-            return await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-
         var body = await response.Content.ReadAsStringAsync();
-        throw new HttpRequestException(
-            $"Microsoft identity platform returned {(int)response.StatusCode} ({response.ReasonPhrase}): {body}",
-            null,
-            response.StatusCode);
+        if (!response.IsSuccessStatusCode)
+            throw new ProviderRequestException(
+                "microsoft_identity",
+                ProviderErrorSanitizer.FromResponse(response.StatusCode, body));
+        try
+        {
+            return JsonDocument.Parse(body);
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidOperationException("Microsoft returned an invalid authorization response.", exception);
+        }
     }
 
-    /// <summary>Reads a mandatory Microsoft response string with a precise error.</summary>
     private static string RequiredString(JsonElement element, string propertyName)
         => OptionalString(element, propertyName)
            ?? throw new InvalidOperationException($"Microsoft did not return '{propertyName}'.");
 
-    /// <summary>Reads an optional JSON string without throwing for missing or null fields.</summary>
     private static string? OptionalString(JsonElement element, string propertyName)
         => element.TryGetProperty(propertyName, out var property)
            && property.ValueKind == JsonValueKind.String
             ? property.GetString()
             : null;
 
-    private sealed class DeviceSession(
-        Guid shareId,
-        string localPath,
-        string authorizationTicket,
-        string deviceCode,
-        DateTimeOffset expiresAt,
-        int intervalSeconds)
-    {
-        public object SyncRoot { get; } = new();
-        public Guid ShareId { get; } = shareId;
-        public string LocalPath { get; } = localPath;
-        public string AuthorizationTicket { get; } = authorizationTicket;
-        public string DeviceCode { get; } = deviceCode;
-        public DateTimeOffset ExpiresAt { get; } = expiresAt;
-        public int IntervalSeconds { get; set; } = intervalSeconds;
-        public DateTimeOffset NextPollAt { get; set; }
-        public bool IsPolling { get; set; }
-    }
+    private static string Hash(string value)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+
+    private sealed record DeviceSessionPayload(
+        Guid ShareId,
+        string LocalPath,
+        string AuthorizationTicket,
+        string DeviceCode);
 }
 
 /// <summary>Browser-safe values required to display and poll a device authorization.</summary>
@@ -266,10 +291,7 @@ public enum OneDriveDevicePollState
     Failed
 }
 
-/// <summary>
-/// Result of polling a device session. Sensitive tokens are populated only for
-/// a completed server-side exchange and are never rendered into the HTML page.
-/// </summary>
+/// <summary>Result of polling a device session; sensitive values remain server-side.</summary>
 public sealed record OneDriveDevicePollResult(
     OneDriveDevicePollState State,
     int RetryAfterSeconds,
@@ -280,28 +302,17 @@ public sealed record OneDriveDevicePollResult(
     string? Scope,
     string? ErrorMessage)
 {
-    /// <summary>Creates a result instructing the browser when to poll again.</summary>
     public static OneDriveDevicePollResult Pending(int retryAfterSeconds)
         => new(OneDriveDevicePollState.Pending, retryAfterSeconds, Guid.Empty, null, null, null, null, null);
 
-    /// <summary>Creates the completed hand-off containing the persisted sync context.</summary>
     public static OneDriveDevicePollResult Completed(
         Guid shareId,
         string localPath,
         string authorizationTicket,
         string refreshToken,
         string scope)
-        => new(
-            OneDriveDevicePollState.Complete,
-            0,
-            shareId,
-            localPath,
-            authorizationTicket,
-            refreshToken,
-            scope,
-            null);
+        => new(OneDriveDevicePollState.Complete, 0, shareId, localPath, authorizationTicket, refreshToken, scope, null);
 
-    /// <summary>Creates a terminal failure safe to report to the authorization page.</summary>
     public static OneDriveDevicePollResult Failed(string message)
         => new(OneDriveDevicePollState.Failed, 0, Guid.Empty, null, null, null, null, message);
 }

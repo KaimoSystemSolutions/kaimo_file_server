@@ -33,6 +33,12 @@ public interface ICredentialVault
 {
     string Protect<T>(T credential, CredentialContext context);
     T Unprotect<T>(string protectedValue, CredentialContext context);
+
+    /// <summary>Returns whether a payload should be rewritten with the active protector format.</summary>
+    bool NeedsRewrap(string protectedValue);
+
+    /// <summary>Decrypts and immediately protects a payload with the active format and context.</summary>
+    string Rewrap<T>(string protectedValue, CredentialContext context);
 }
 
 /// <summary>Convenience operations for the current Cloud Access compatibility model.</summary>

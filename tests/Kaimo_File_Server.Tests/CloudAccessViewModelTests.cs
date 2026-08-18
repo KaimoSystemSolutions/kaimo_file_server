@@ -42,10 +42,11 @@ public sealed class CloudAccessViewModelTests
         departments.Setup(x => x.GetAllAsync()).ReturnsAsync([]);
         var viewModel = new CloudAccessViewModel(
             cloudRepository.Object, connectionRepository.Object,
-            Mock.Of<ICredentialVault>(), Mock.Of<ICloudAuthorizationTicketStore>(),
+            Mock.Of<ICloudAuthorizationTicketStore>(),
             management.Object, userContexts.Object, authentication.Object, departments.Object,
             Mock.Of<IUserRepository>(), Mock.Of<IGroupRepository>(), Mock.Of<IShareRepository>(),
-            Mock.Of<IHttpClientFactory>(), NullLogger<CloudAccessViewModel>.Instance);
+            ConnectionFactory(connectionRepository.Object, Mock.Of<ICredentialVault>()),
+            NullLogger<CloudAccessViewModel>.Instance);
 
         await viewModel.UpdateConnectionAsync(connection.Id, "  Finance OneDrive  ");
 
@@ -71,10 +72,11 @@ public sealed class CloudAccessViewModelTests
             new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "alice")], "test"))));
         var viewModel = new CloudAccessViewModel(
             cloudRepository.Object, connectionRepository.Object,
-            Mock.Of<ICredentialVault>(), Mock.Of<ICloudAuthorizationTicketStore>(),
+            Mock.Of<ICloudAuthorizationTicketStore>(),
             management.Object, contexts.Object, authentication.Object, Mock.Of<IDepartmentRepository>(),
             Mock.Of<IUserRepository>(), Mock.Of<IGroupRepository>(), Mock.Of<IShareRepository>(),
-            Mock.Of<IHttpClientFactory>(), NullLogger<CloudAccessViewModel>.Instance);
+            ConnectionFactory(connectionRepository.Object, Mock.Of<ICredentialVault>()),
+            NullLogger<CloudAccessViewModel>.Instance);
 
         var exception = await Assert.ThrowsAsync<ArgumentException>(() => viewModel.UpdateConnectionAsync(connection.Id, " "));
 
@@ -125,7 +127,6 @@ public sealed class CloudAccessViewModelTests
         var viewModel = new CloudAccessViewModel(
             cloudRepository.Object,
             connectionRepository.Object,
-            credentialVault.Object,
             Mock.Of<ICloudAuthorizationTicketStore>(),
             management.Object,
             userContexts.Object,
@@ -134,7 +135,7 @@ public sealed class CloudAccessViewModelTests
             Mock.Of<IUserRepository>(),
             Mock.Of<IGroupRepository>(),
             localRepository.Object,
-            Mock.Of<IHttpClientFactory>(),
+            ConnectionFactory(connectionRepository.Object, credentialVault.Object),
             NullLogger<CloudAccessViewModel>.Instance);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -148,4 +149,13 @@ public sealed class CloudAccessViewModelTests
         cloudRepository.Verify(x => x.UpsertShareAsync(
             It.IsAny<CloudAccessShare>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    private static OneDriveStorageConnectionFactory ConnectionFactory(
+        IStorageConnectionRepository repository,
+        ICredentialVault vault)
+        => new(
+            repository,
+            vault,
+            Mock.Of<IStorageConnectionCredentialLeaseManager>(),
+            Mock.Of<IHttpClientFactory>());
 }

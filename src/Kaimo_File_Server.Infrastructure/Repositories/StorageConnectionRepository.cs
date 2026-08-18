@@ -108,6 +108,29 @@ public sealed class StorageConnectionRepository(IDbContextFactory<ApplicationDbC
         return new StorageConnectionUsage(SyncCount: 0, VirtualShareCount: virtualShareCount);
     }
 
+    public async Task<bool> TryUpdateCredentialAsync(
+        Guid id,
+        long expectedConcurrencyVersion,
+        string encryptedCredentialPayload,
+        int protectorPurposeVersion,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(encryptedCredentialPayload);
+        var now = DateTime.UtcNow;
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var affected = await db.StorageConnections
+            .Where(connection => connection.Id == id
+                                 && connection.ConcurrencyVersion == expectedConcurrencyVersion)
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(connection => connection.EncryptedCredentialPayload, encryptedCredentialPayload)
+                .SetProperty(connection => connection.ProtectorPurposeVersion, protectorPurposeVersion)
+                .SetProperty(connection => connection.CredentialUpdatedAtUtc, now)
+                .SetProperty(connection => connection.UpdatedAtUtc, now)
+                .SetProperty(connection => connection.ConcurrencyVersion, expectedConcurrencyVersion + 1),
+                cancellationToken);
+        return affected == 1;
+    }
+
     public async Task<StorageConnectionDeleteResult> DeleteAsync(
         Guid id,
         CancellationToken cancellationToken = default)

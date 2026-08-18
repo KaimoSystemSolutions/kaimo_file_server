@@ -1,66 +1,114 @@
-using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
+using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Kaimo_File_Server.Web.Services;
 
 /// <summary>
-/// In-memory OAuth hand-off store. Tickets intentionally do not survive a
-/// server restart and expire quickly because they only cover one redirect.
+/// Database-backed, single-use authorization transaction store. Instances in
+/// different Web containers validate and consume the same short-lived records.
+/// Browser tokens contain 256 bits of entropy and are stored only as hashes.
 /// </summary>
-public sealed class CloudAuthorizationTicketStore : ICloudAuthorizationTicketStore
+public sealed class CloudAuthorizationTicketStore(
+    IDbContextFactory<ApplicationDbContext> dbFactory,
+    TimeProvider timeProvider) : ICloudAuthorizationTicketStore
 {
-    // Microsoft device codes currently live for roughly 15 minutes. Keep the
-    // local authorization proof slightly longer so a valid device flow cannot
-    // fail during its final token exchange.
     private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(20);
-    private readonly ConcurrentDictionary<string, Ticket> _tickets = new(StringComparer.Ordinal);
 
     /// <inheritdoc />
-    public string Issue(Guid shareId, string localPath, string providerId)
+    public async Task<string> IssueAsync(
+        Guid resourceId,
+        string localPath,
+        string providerId,
+        Guid? initiatingUserId = null,
+        Guid? departmentId = null,
+        CancellationToken cancellationToken = default)
     {
-        RemoveExpired();
-        var token = Guid.NewGuid().ToString("N");
-        _tickets[token] = new Ticket(
-            shareId,
-            localPath,
-            providerId,
-            DateTimeOffset.UtcNow.Add(Lifetime));
+        ArgumentException.ThrowIfNullOrWhiteSpace(providerId);
+        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        db.StorageAuthorizationTransactions.Add(new StorageAuthorizationTransaction
+        {
+            TokenHash = Hash(token),
+            ResourceId = resourceId,
+            ResourcePath = localPath ?? string.Empty,
+            ProviderId = providerId,
+            InitiatingUserId = initiatingUserId,
+            DepartmentId = departmentId,
+            CreatedAtUtc = now,
+            ExpiresAtUtc = now.Add(Lifetime)
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        await RemoveExpiredAsync(db, now, cancellationToken);
         return token;
     }
 
     /// <inheritdoc />
-    public bool IsValid(string token, Guid shareId, string localPath, string providerId)
-        => _tickets.TryGetValue(token, out var ticket)
-           && Matches(ticket, shareId, localPath, providerId);
-
-    /// <inheritdoc />
-    public bool TryConsume(string token, Guid shareId, string localPath, string providerId)
-        => _tickets.TryRemove(token, out var ticket)
-           && Matches(ticket, shareId, localPath, providerId);
-
-    /// <summary>Opportunistically removes expired tickets when new work begins.</summary>
-    private void RemoveExpired()
+    public async Task<bool> IsValidAsync(
+        string token,
+        Guid resourceId,
+        string localPath,
+        string providerId,
+        Guid? initiatingUserId = null,
+        Guid? departmentId = null,
+        CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.UtcNow;
-        foreach (var entry in _tickets)
-        {
-            if (entry.Value.ExpiresAt <= now)
-                _tickets.TryRemove(entry.Key, out _);
-        }
+        if (string.IsNullOrWhiteSpace(token)) return false;
+        var hash = Hash(token);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.StorageAuthorizationTransactions.AsNoTracking().AnyAsync(
+            transaction => transaction.TokenHash == hash
+                           && transaction.ConsumedAtUtc == null
+                           && transaction.ExpiresAtUtc > now
+                           && transaction.ResourceId == resourceId
+                           && transaction.ResourcePath.ToLower() == (localPath ?? string.Empty).ToLower()
+                           && transaction.ProviderId.ToLower() == providerId.ToLower()
+                           && (!initiatingUserId.HasValue || transaction.InitiatingUserId == initiatingUserId)
+                           && (!departmentId.HasValue || transaction.DepartmentId == departmentId),
+            cancellationToken);
     }
 
-    /// <summary>
-    /// Verifies expiry and the complete authorization context, preventing a
-    /// ticket issued for one folder or provider from being replayed elsewhere.
-    /// </summary>
-    private static bool Matches(Ticket ticket, Guid shareId, string localPath, string providerId)
-        => ticket.ExpiresAt > DateTimeOffset.UtcNow
-           && ticket.ShareId == shareId
-           && string.Equals(ticket.LocalPath, localPath, StringComparison.OrdinalIgnoreCase)
-           && string.Equals(ticket.ProviderId, providerId, StringComparison.OrdinalIgnoreCase);
+    /// <inheritdoc />
+    public async Task<bool> TryConsumeAsync(
+        string token,
+        Guid resourceId,
+        string localPath,
+        string providerId,
+        Guid? initiatingUserId = null,
+        Guid? departmentId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return false;
+        var hash = Hash(token);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var affected = await db.StorageAuthorizationTransactions
+            .Where(transaction => transaction.TokenHash == hash
+                                  && transaction.ConsumedAtUtc == null
+                                  && transaction.ExpiresAtUtc > now
+                                  && transaction.ResourceId == resourceId
+                                  && transaction.ResourcePath.ToLower() == (localPath ?? string.Empty).ToLower()
+                                  && transaction.ProviderId.ToLower() == providerId.ToLower()
+                                  && (!initiatingUserId.HasValue || transaction.InitiatingUserId == initiatingUserId)
+                                  && (!departmentId.HasValue || transaction.DepartmentId == departmentId))
+            .ExecuteUpdateAsync(
+                update => update.SetProperty(transaction => transaction.ConsumedAtUtc, now),
+                cancellationToken);
+        return affected == 1;
+    }
 
-    private sealed record Ticket(
-        Guid ShareId,
-        string LocalPath,
-        string ProviderId,
-        DateTimeOffset ExpiresAt);
+    private static string Hash(string token)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+
+    private static async Task RemoveExpiredAsync(
+        ApplicationDbContext db,
+        DateTime now,
+        CancellationToken cancellationToken)
+        => _ = await db.StorageAuthorizationTransactions
+            .Where(transaction => transaction.ExpiresAtUtc <= now)
+            .ExecuteDeleteAsync(cancellationToken);
 }

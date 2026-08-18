@@ -63,6 +63,7 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IManagementAuthService, ManagementAuthService>();
             services.AddSingleton<ICloudSyncPathUpdater, CloudSyncPathUpdater>();
             services.AddSingleton<ICloudSyncOperationCoordinator, DatabaseCloudSyncOperationCoordinator>();
+            services.AddSingleton<IStorageConnectionCredentialLeaseManager, DatabaseStorageConnectionCredentialLeaseManager>();
             services.AddScoped<ICloudSyncExecutionService, CloudSyncExecutionService>();
 
             // -- Login: brute-force throttle (singleton, in-memory counters) +

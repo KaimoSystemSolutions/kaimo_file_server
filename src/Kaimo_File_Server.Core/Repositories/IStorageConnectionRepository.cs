@@ -38,6 +38,18 @@ public interface IStorageConnectionRepository
         string? lastErrorCode,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Replaces only the encrypted credential when the caller still owns the
+    /// observed concurrency version. This prevents a rewrap from overwriting a
+    /// provider refresh that completed after the batch loaded its snapshot.
+    /// </summary>
+    Task<bool> TryUpdateCredentialAsync(
+        Guid id,
+        long expectedConcurrencyVersion,
+        string encryptedCredentialPayload,
+        int protectorPurposeVersion,
+        CancellationToken cancellationToken = default);
+
     Task<StorageConnectionUsage> GetUsageAsync(Guid id, CancellationToken cancellationToken = default);
     Task<StorageConnectionDeleteResult> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }

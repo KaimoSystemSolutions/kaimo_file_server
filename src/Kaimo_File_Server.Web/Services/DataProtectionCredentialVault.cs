@@ -55,6 +55,17 @@ public sealed class DataProtectionCredentialVault(IDataProtectionProvider provid
                ?? throw new InvalidOperationException("The credential payload is invalid.");
     }
 
+    /// <inheritdoc />
+    public bool NeedsRewrap(string protectedValue)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(protectedValue);
+        return !protectedValue.StartsWith(CurrentPrefix, StringComparison.Ordinal);
+    }
+
+    /// <inheritdoc />
+    public string Rewrap<T>(string protectedValue, CredentialContext context)
+        => Protect(Unprotect<T>(protectedValue, context), context);
+
     private IDataProtector CreateContextProtector(CredentialContext context)
         => _rootProtector.CreateProtector(
             context.ConnectionId.ToString("D"),

@@ -388,7 +388,8 @@ public sealed class CloudSyncViewModel
             return null;
         }
 
-        var ticket = _authorizationTickets.Issue(share.Id, localPath, provider.Id);
+        var ticket = await _authorizationTickets.IssueAsync(
+            share.Id, localPath, provider.Id, _actor!.User.Id, share.DepartmentId);
         return $"{provider.AuthorizationEndpoint}?shareId={Uri.EscapeDataString(share.Id.ToString())}" +
                $"&path={Uri.EscapeDataString(localPath)}" +
                $"&ticket={Uri.EscapeDataString(ticket)}";

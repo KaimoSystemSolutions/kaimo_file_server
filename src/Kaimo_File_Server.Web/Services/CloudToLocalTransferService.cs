@@ -17,13 +17,12 @@ public sealed record CloudTransferResult(bool Success, string? Error = null);
 public sealed class CloudToLocalTransferService(
     ICloudAccessRepository cloudRepository,
     IStorageConnectionRepository connections,
-    ICredentialVault credentialVault,
     CloudAccessAuthorizationService cloudAuthorization,
     IShareRepository shareRepository,
     IFileServiceFactory fileServiceFactory,
     IUserContextFactory userContextFactory,
     AuthenticationStateProvider authenticationState,
-    IHttpClientFactory httpClientFactory,
+    OneDriveStorageConnectionFactory oneDriveConnections,
     ILogger<CloudToLocalTransferService> logger)
 {
     public async Task<List<LocalTransferTarget>> GetTargetsAsync()
@@ -71,9 +70,7 @@ public sealed class CloudToLocalTransferService(
         if (connectionRecord?.State != StorageConnectionState.Ready
             || string.IsNullOrWhiteSpace(connectionRecord.EncryptedCredentialPayload))
             return new(false, R("Web_CloudAccess_ConnectionNotReady"));
-        var credentials = credentialVault.UnprotectConnectionCredentials(connectionRecord);
-        await using var remote = new OneDriveConnection(
-            credentials, httpClientFactory.CreateClient("CloudAccessOneDrive"));
+        await using var remote = oneDriveConnections.Create(connectionRecord);
         try
         {
             foreach (var item in selectedItems)
@@ -82,12 +79,6 @@ public sealed class CloudToLocalTransferService(
                     throw new UnauthorizedAccessException("An invalid remote item path was supplied.");
                 await CopyItemAsync(remote, remoteShare, local, actor, relative,
                     ShareRelativePath.Combine(destination, item.Name), item.IsDirectory, cancellationToken);
-            }
-            if (remote.HasPendingCredentialChanges)
-            {
-                await connections.UpdateRuntimeAsync(
-                    connectionRecord.Id, credentialVault.ProtectConnectionCredentials(connectionRecord, credentials), null, null,
-                    StorageConnectionState.Ready, null, cancellationToken);
             }
             return new(true);
         }

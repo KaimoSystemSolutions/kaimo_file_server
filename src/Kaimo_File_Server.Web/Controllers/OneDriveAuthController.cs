@@ -21,16 +21,19 @@ public sealed class OneDriveOAuthController : ControllerBase
     private readonly IShareRepository _shareRepository;
     private readonly ICloudAuthorizationTicketStore _authorizationTickets;
     private readonly IOneDriveDeviceAuthorizationService _deviceAuthorization;
+    private readonly IUserContextFactory _userContextFactory;
 
     /// <summary>Creates the endpoint using neutral persistence and authorization services.</summary>
     public OneDriveOAuthController(
         IShareRepository shareRepository,
         ICloudAuthorizationTicketStore authorizationTickets,
-        IOneDriveDeviceAuthorizationService deviceAuthorization)
+        IOneDriveDeviceAuthorizationService deviceAuthorization,
+        IUserContextFactory userContextFactory)
     {
         _shareRepository = shareRepository;
         _authorizationTickets = authorizationTickets;
         _deviceAuthorization = deviceAuthorization;
+        _userContextFactory = userContextFactory;
     }
 
     /// <summary>
@@ -41,12 +44,15 @@ public sealed class OneDriveOAuthController : ControllerBase
     public async Task<IActionResult> Connect(Guid shareId, string? path, string ticket)
     {
         var normalizedPath = CloudSyncPaths.Normalize(path);
-        if (!_authorizationTickets.IsValid(ticket, shareId, normalizedPath, "onedrive"))
-            return BadRequest("The cloud authorization request is invalid or has expired.");
-
         var share = await _shareRepository.GetByIdAsync(shareId);
         if (share is null)
             return NotFound("Share not found.");
+        var actorId = await GetActorIdAsync();
+        if (actorId is null)
+            return Unauthorized();
+        if (!await _authorizationTickets.IsValidAsync(
+                ticket, shareId, normalizedPath, "onedrive", actorId, share.DepartmentId))
+            return BadRequest("The cloud authorization request is invalid or has expired.");
 
         var conflict = CloudSyncPaths.FindConflict(share.CloudSettings, normalizedPath);
         if (conflict is not null)
@@ -91,15 +97,21 @@ public sealed class OneDriveOAuthController : ControllerBase
         if (result.State == OneDriveDevicePollState.Failed)
             return Ok(new { state = "failed", message = result.ErrorMessage });
 
+        var share = await _shareRepository.GetByIdAsync(result.ShareId);
+        var actorId = await GetActorIdAsync();
         if (result.AuthorizationTicket is null
             || result.LocalPath is null
             || result.RefreshToken is null
             || result.Scope is null
-            || !_authorizationTickets.TryConsume(
+            || share is null
+            || actorId is null
+            || !await _authorizationTickets.TryConsumeAsync(
                 result.AuthorizationTicket,
                 result.ShareId,
                 result.LocalPath,
-                "onedrive"))
+                "onedrive",
+                actorId,
+                share.DepartmentId))
         {
             return Ok(new
             {
@@ -109,10 +121,6 @@ public sealed class OneDriveOAuthController : ControllerBase
                     "The cloud authorization request has expired. Please start again.")
             });
         }
-
-        var share = await _shareRepository.GetByIdAsync(result.ShareId);
-        if (share is null)
-            return Ok(new { state = "failed", message = "Share not found." });
 
         // The share may have changed while the user was signing in at Microsoft.
         var conflict = CloudSyncPaths.FindConflict(share.CloudSettings, result.LocalPath);
@@ -233,4 +241,11 @@ public sealed class OneDriveOAuthController : ControllerBase
     /// <summary>Resolves localized UI text with a stable English fallback.</summary>
     private static string Text(string key, string fallback)
         => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    private async Task<Guid?> GetActorIdAsync()
+    {
+        var username = User.Identity?.Name;
+        if (string.IsNullOrWhiteSpace(username)) return null;
+        return (await _userContextFactory.CreateByUsernameAsync(username))?.User.Id;
+    }
 }
