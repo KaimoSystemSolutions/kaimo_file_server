@@ -40,7 +40,7 @@ public sealed class CloudAccessViewModelTests
         var departments = new Mock<IDepartmentRepository>();
         departments.Setup(x => x.GetAllAsync()).ReturnsAsync([]);
         var viewModel = new CloudAccessViewModel(
-            cloudRepository.Object, Mock.Of<ICloudAccessCredentialProtector>(), Mock.Of<ICloudAuthorizationTicketStore>(),
+            cloudRepository.Object, Mock.Of<ICredentialVault>(), Mock.Of<ICloudAuthorizationTicketStore>(),
             management.Object, userContexts.Object, authentication.Object, departments.Object,
             Mock.Of<IUserRepository>(), Mock.Of<IGroupRepository>(), Mock.Of<IShareRepository>(),
             Mock.Of<IHttpClientFactory>(), NullLogger<CloudAccessViewModel>.Instance);
@@ -67,7 +67,7 @@ public sealed class CloudAccessViewModelTests
         authentication.Setup(x => x.GetAuthenticationStateAsync()).ReturnsAsync(new AuthenticationState(
             new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "alice")], "test"))));
         var viewModel = new CloudAccessViewModel(
-            cloudRepository.Object, Mock.Of<ICloudAccessCredentialProtector>(), Mock.Of<ICloudAuthorizationTicketStore>(),
+            cloudRepository.Object, Mock.Of<ICredentialVault>(), Mock.Of<ICloudAuthorizationTicketStore>(),
             management.Object, contexts.Object, authentication.Object, Mock.Of<IDepartmentRepository>(),
             Mock.Of<IUserRepository>(), Mock.Of<IGroupRepository>(), Mock.Of<IShareRepository>(),
             Mock.Of<IHttpClientFactory>(), NullLogger<CloudAccessViewModel>.Instance);
@@ -112,10 +112,10 @@ public sealed class CloudAccessViewModelTests
         var authentication = new Mock<AuthenticationStateProvider>();
         authentication.Setup(x => x.GetAuthenticationStateAsync())
             .ReturnsAsync(new AuthenticationState(new ClaimsPrincipal(identity)));
-        var protector = new Mock<ICloudAccessCredentialProtector>();
+        var credentialVault = new Mock<ICredentialVault>();
         var viewModel = new CloudAccessViewModel(
             cloudRepository.Object,
-            protector.Object,
+            credentialVault.Object,
             Mock.Of<ICloudAuthorizationTicketStore>(),
             management.Object,
             userContexts.Object,
@@ -133,7 +133,8 @@ public sealed class CloudAccessViewModelTests
         Assert.Equal(
             Resources.ResourceManager.GetString("Web_CloudAccess_ShareNameExists"),
             exception.Message);
-        protector.Verify(x => x.Unprotect(It.IsAny<string>()), Times.Never);
+        credentialVault.Verify(x => x.Unprotect<Dictionary<string, string>>(
+            It.IsAny<string>(), It.IsAny<CredentialContext>()), Times.Never);
         cloudRepository.Verify(x => x.UpsertShareAsync(
             It.IsAny<CloudAccessShare>(), It.IsAny<CancellationToken>()), Times.Never);
     }

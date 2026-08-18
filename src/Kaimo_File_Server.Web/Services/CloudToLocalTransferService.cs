@@ -16,7 +16,7 @@ public sealed record CloudTransferResult(bool Success, string? Error = null);
 /// <summary>Streams selected remote items into an ACL-protected local share with bounded memory.</summary>
 public sealed class CloudToLocalTransferService(
     ICloudAccessRepository cloudRepository,
-    ICloudAccessCredentialProtector protector,
+    ICredentialVault credentialVault,
     CloudAccessAuthorizationService cloudAuthorization,
     IShareRepository shareRepository,
     IFileServiceFactory fileServiceFactory,
@@ -70,7 +70,7 @@ public sealed class CloudToLocalTransferService(
         if (connectionRecord?.State != CloudAccessConnectionState.Ready
             || string.IsNullOrWhiteSpace(connectionRecord.ProtectedCredentials))
             return new(false, R("Web_CloudAccess_ConnectionNotReady"));
-        var credentials = protector.Unprotect(connectionRecord.ProtectedCredentials);
+        var credentials = credentialVault.UnprotectConnectionCredentials(connectionRecord);
         await using var remote = new OneDriveConnection(
             credentials, httpClientFactory.CreateClient("CloudAccessOneDrive"));
         try
@@ -85,7 +85,7 @@ public sealed class CloudToLocalTransferService(
             if (remote.HasPendingCredentialChanges)
             {
                 await cloudRepository.UpdateConnectionRuntimeAsync(
-                    connectionRecord.Id, protector.Protect(credentials), null, null,
+                    connectionRecord.Id, credentialVault.ProtectConnectionCredentials(connectionRecord, credentials), null, null,
                     CloudAccessConnectionState.Ready, null, cancellationToken);
             }
             return new(true);

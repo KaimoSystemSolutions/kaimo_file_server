@@ -58,11 +58,11 @@ Cloud Access already provides several useful building blocks:
 
 The relevant starting points are:
 
-- [`CloudAccessConnection`](../src/Kaimo_File_Server.Core/Domain/CloudAccessConnection.cs)
-- [`CloudAccessShare`](../src/Kaimo_File_Server.Core/Domain/CloudAccessShare.cs)
-- [`CloudAccessCredentialProtector`](../src/Kaimo_File_Server.Web/Services/CloudAccessCredentialProtector.cs)
-- [`DataProtectionKeyEncryptionCertificate`](../src/Kaimo_File_Server.Web/Services/DataProtectionKeyEncryptionCertificate.cs)
-- [`BrowserCapabilities`](../src/Kaimo_File_Server.Web/Components/ViewModels/BrowserCapabilities.cs)
+- [`CloudAccessConnection`](../../src/Kaimo_File_Server.Core/Domain/CloudAccessConnection.cs)
+- [`CloudAccessShare`](../../src/Kaimo_File_Server.Core/Domain/CloudAccessShare.cs)
+- [`DataProtectionCredentialVault`](../../src/Kaimo_File_Server.Web/Services/DataProtectionCredentialVault.cs)
+- [`DataProtectionKeyEncryptionCertificate`](../../src/Kaimo_File_Server.Web/Services/DataProtectionKeyEncryptionCertificate.cs)
+- [`BrowserCapabilities`](../../src/Kaimo_File_Server.Web/Components/ViewModels/BrowserCapabilities.cs)
 
 ### 3.2 Security and architecture gaps that must be addressed
 

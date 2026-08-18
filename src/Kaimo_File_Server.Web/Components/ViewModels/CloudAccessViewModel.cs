@@ -15,7 +15,7 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 public sealed class CloudAccessViewModel
 {
     private readonly ICloudAccessRepository _repository;
-    private readonly ICloudAccessCredentialProtector _protector;
+    private readonly ICredentialVault _credentialVault;
     private readonly ICloudAuthorizationTicketStore _tickets;
     private readonly IManagementAuthService _managementAuth;
     private readonly IUserContextFactory _userContextFactory;
@@ -30,7 +30,7 @@ public sealed class CloudAccessViewModel
 
     public CloudAccessViewModel(
         ICloudAccessRepository repository,
-        ICloudAccessCredentialProtector protector,
+        ICredentialVault credentialVault,
         ICloudAuthorizationTicketStore tickets,
         IManagementAuthService managementAuth,
         IUserContextFactory userContextFactory,
@@ -43,7 +43,7 @@ public sealed class CloudAccessViewModel
         ILogger<CloudAccessViewModel> logger)
     {
         _repository = repository;
-        _protector = protector;
+        _credentialVault = credentialVault;
         _tickets = tickets;
         _managementAuth = managementAuth;
         _userContextFactory = userContextFactory;
@@ -139,7 +139,7 @@ public sealed class CloudAccessViewModel
             throw new InvalidOperationException(R("Web_CloudAccess_ConnectionNotReady"));
         if (!ShareRelativePath.TryNormalizeStrict(path.Trim('/'), out var normalized))
             throw new UnauthorizedAccessException(R("Web_CloudAccess_InvalidRemotePath"));
-        var credentials = _protector.Unprotect(connectionRecord.ProtectedCredentials);
+        var credentials = _credentialVault.UnprotectConnectionCredentials(connectionRecord);
         await using var connection = new OneDriveConnection(
             credentials, _httpClientFactory.CreateClient("CloudAccessOneDrive"));
         var items = await connection.ListDetailedAsync(normalized);
@@ -185,7 +185,7 @@ public sealed class CloudAccessViewModel
         if (!ShareRelativePath.TryNormalizeStrict(remoteRootPath.Trim('/'), out var root))
             throw new UnauthorizedAccessException(R("Web_CloudAccess_InvalidRemotePath"));
 
-        var credentials = _protector.Unprotect(connectionRecord.ProtectedCredentials);
+        var credentials = _credentialVault.UnprotectConnectionCredentials(connectionRecord);
         await using var connection = new OneDriveConnection(
             credentials, _httpClientFactory.CreateClient("CloudAccessOneDrive"));
         var folder = await connection.ResolveFolderAsync(root);
@@ -243,7 +243,7 @@ public sealed class CloudAccessViewModel
             || string.IsNullOrWhiteSpace(connectionRecord.ProtectedCredentials))
             throw new InvalidOperationException(R("Web_CloudAccess_ConnectionNotReady"));
 
-        var credentials = _protector.Unprotect(connectionRecord.ProtectedCredentials);
+        var credentials = _credentialVault.UnprotectConnectionCredentials(connectionRecord);
         await using var connection = new OneDriveConnection(
             credentials, _httpClientFactory.CreateClient("CloudAccessOneDrive"));
         var folder = await connection.ResolveFolderAsync(root);
@@ -331,7 +331,7 @@ public sealed class CloudAccessViewModel
     {
         if (!connection.HasPendingCredentialChanges) return;
         await _repository.UpdateConnectionRuntimeAsync(
-            record.Id, _protector.Protect(credentials), null, null,
+            record.Id, _credentialVault.ProtectConnectionCredentials(record, credentials), null, null,
             CloudAccessConnectionState.Ready, null);
         connection.AcknowledgeCredentialChanges();
     }

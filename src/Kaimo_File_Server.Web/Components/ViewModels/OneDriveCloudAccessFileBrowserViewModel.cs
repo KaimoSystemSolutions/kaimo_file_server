@@ -25,7 +25,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     };
 
     private readonly ICloudAccessRepository _repository;
-    private readonly ICloudAccessCredentialProtector _protector;
+    private readonly ICredentialVault _credentialVault;
     private readonly CloudAccessAuthorizationService _authorization;
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authenticationState;
@@ -41,7 +41,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
 
     public OneDriveCloudAccessFileBrowserViewModel(
         ICloudAccessRepository repository,
-        ICloudAccessCredentialProtector protector,
+        ICredentialVault credentialVault,
         CloudAccessAuthorizationService authorization,
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authenticationState,
@@ -52,7 +52,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
         : base(WritableCapabilities)
     {
         _repository = repository;
-        _protector = protector;
+        _credentialVault = credentialVault;
         _authorization = authorization;
         _userContextFactory = userContextFactory;
         _authenticationState = authenticationState;
@@ -300,7 +300,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     {
         if (_connectionRecord?.Id == record.Id && _connection is not null) return;
         if (_connection is not null) await _connection.Dispose();
-        _credentials = _protector.Unprotect(record.ProtectedCredentials!);
+        _credentials = _credentialVault.UnprotectConnectionCredentials(record);
         _connection = new OneDriveConnection(
             _credentials,
             _httpClientFactory.CreateClient("CloudAccessOneDrive"));
@@ -313,7 +313,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
             || !_connection.HasPendingCredentialChanges) return;
         await _repository.UpdateConnectionRuntimeAsync(
             _connectionRecord.Id,
-            _protector.Protect(_credentials),
+            _credentialVault.ProtectConnectionCredentials(_connectionRecord, _credentials),
             null, null,
             CloudAccessConnectionState.Ready,
             null);

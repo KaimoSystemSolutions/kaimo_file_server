@@ -108,7 +108,7 @@ builder.Services.AddScoped<FileSelectionCoordinator>();
 builder.Services.AddSingleton<AssetProvider>();
 builder.Services.AddSingleton<ICloudAuthorizationTicketStore, CloudAuthorizationTicketStore>();
 builder.Services.AddSingleton<IOneDriveDeviceAuthorizationService, OneDriveDeviceAuthorizationService>();
-builder.Services.AddSingleton<ICloudAccessCredentialProtector, CloudAccessCredentialProtector>();
+builder.Services.AddSingleton<ICredentialVault, DataProtectionCredentialVault>();
 builder.Services.AddSingleton<CloudAccessDownloadTicketStore>();
 builder.Services.AddSingleton<ICloudAccessSettingsStore, CloudAccessSettingsStore>();
 builder.Services.AddSingleton<CloudAccessDirectoryCache>();
