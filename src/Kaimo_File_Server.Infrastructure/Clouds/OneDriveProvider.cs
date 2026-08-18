@@ -4,7 +4,7 @@ using Kaimo_File_Server.Core.Services.DataServices;
 namespace Kaimo_File_Server.Infrastructure.Clouds;
 
 /// <summary>Microsoft OneDrive registration for the provider-neutral cloud subsystem.</summary>
-public sealed class OneDriveProvider : ICloudProvider
+public sealed class OneDriveProvider(MicrosoftIdentityConfiguration identity) : ICloudProvider
 {
     public string Id => "onedrive";
     public string DisplayName => "Microsoft OneDrive";
@@ -16,5 +16,5 @@ public sealed class OneDriveProvider : ICloudProvider
     /// or provider-specific object is exposed to UI consumers.
     /// </remarks>
     public ICloudConnection CreateConnection(Guid shareId, SyncedFolder folder)
-        => new OneDriveConnection(folder.Data);
+        => new OneDriveConnection(folder.Data, identity: identity);
 }

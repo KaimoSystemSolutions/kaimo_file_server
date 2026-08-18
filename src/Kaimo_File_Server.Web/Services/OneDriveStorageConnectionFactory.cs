@@ -13,7 +13,8 @@ public sealed class OneDriveStorageConnectionFactory(
     IStorageConnectionRepository connections,
     ICredentialVault credentialVault,
     IStorageConnectionCredentialLeaseManager leases,
-    IHttpClientFactory httpClientFactory)
+    IHttpClientFactory httpClientFactory,
+    MicrosoftIdentityConfiguration? identity = null)
 {
     private static readonly TimeSpan AcquisitionTimeout = TimeSpan.FromSeconds(30);
 
@@ -26,8 +27,22 @@ public sealed class OneDriveStorageConnectionFactory(
             httpClientFactory.CreateClient(clientName),
             cancellationToken => AcquireAsync(record.Id, cancellationToken),
             cancellationToken => ReloadAsync(record.Id, cancellationToken),
-            (rotated, cancellationToken) => PersistAsync(record.Id, rotated, cancellationToken));
+            (rotated, cancellationToken) => PersistAsync(record.Id, rotated, cancellationToken),
+            ResolveIdentity());
     }
+
+    /// <summary>
+    /// Opens a short-lived connection while authorization is being verified.
+    /// The grant has not been persisted yet, so refresh coordination is not
+    /// applicable until the storage connection is saved.
+    /// </summary>
+    public OneDriveConnection CreatePending(Dictionary<string, string> credentials,
+        string clientName = "CloudAccessOneDrive")
+        => new(credentials, httpClientFactory.CreateClient(clientName), identity: ResolveIdentity());
+
+    private MicrosoftIdentityConfiguration ResolveIdentity()
+        => identity ?? MicrosoftIdentityConfiguration.Create(
+            OneDriveOAuthDefaults.ClientId, OneDriveOAuthDefaults.Authority);
 
     private async Task<IAsyncDisposable?> AcquireAsync(Guid connectionId, CancellationToken cancellationToken)
     {

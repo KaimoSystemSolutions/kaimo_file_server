@@ -35,18 +35,22 @@ public sealed class OneDriveDeviceAuthorizationService : IOneDriveDeviceAuthoriz
     private readonly IDbContextFactory<ApplicationDbContext> _dbFactory;
     private readonly IDataProtector _protector;
     private readonly TimeProvider _timeProvider;
+    private readonly MicrosoftIdentityConfiguration _identity;
 
     public OneDriveDeviceAuthorizationService(
         IHttpClientFactory httpClientFactory,
         IDbContextFactory<ApplicationDbContext> dbFactory,
         IDataProtectionProvider dataProtectionProvider,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        MicrosoftIdentityConfiguration? identity = null)
     {
         _httpClientFactory = httpClientFactory;
         _dbFactory = dbFactory;
         _protector = dataProtectionProvider.CreateProtector(
             "KaimoFiles.ExternalStorage.DeviceAuthorization", "v1");
         _timeProvider = timeProvider;
+        _identity = identity ?? MicrosoftIdentityConfiguration.Create(
+            OneDriveOAuthDefaults.ClientId, OneDriveOAuthDefaults.Authority);
     }
 
     /// <inheritdoc />
@@ -57,10 +61,10 @@ public sealed class OneDriveDeviceAuthorizationService : IOneDriveDeviceAuthoriz
     {
         var client = _httpClientFactory.CreateClient(nameof(OneDriveDeviceAuthorizationService));
         using var response = await client.PostAsync(
-            OneDriveOAuthDefaults.DeviceCodeEndpoint,
+            _identity.DeviceCodeEndpoint,
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                ["client_id"] = OneDriveOAuthDefaults.ClientId,
+                ["client_id"] = _identity.PublicClientId,
                 ["scope"] = OneDriveOAuthDefaults.Scope
             }));
         using var json = await ParseSuccessAsync(response);
@@ -157,11 +161,11 @@ public sealed class OneDriveDeviceAuthorizationService : IOneDriveDeviceAuthoriz
         {
             var client = _httpClientFactory.CreateClient(nameof(OneDriveDeviceAuthorizationService));
             using var response = await client.PostAsync(
-                OneDriveOAuthDefaults.TokenEndpoint,
+                _identity.TokenEndpoint,
                 new FormUrlEncodedContent(new Dictionary<string, string>
                 {
                     ["grant_type"] = "urn:ietf:params:oauth:grant-type:device_code",
-                    ["client_id"] = OneDriveOAuthDefaults.ClientId,
+                    ["client_id"] = _identity.PublicClientId,
                     ["device_code"] = payload.DeviceCode
                 }));
             var body = await response.Content.ReadAsStringAsync();

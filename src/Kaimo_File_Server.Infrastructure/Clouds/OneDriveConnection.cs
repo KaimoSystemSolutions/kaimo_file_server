@@ -26,6 +26,7 @@ public sealed class OneDriveConnection : ICloudConnection, IAsyncDisposable
     private readonly Func<CancellationToken, Task<IAsyncDisposable?>>? _acquireRefreshLease;
     private readonly Func<CancellationToken, Task<Dictionary<string, string>>>? _reloadCredentials;
     private readonly Func<Dictionary<string, string>, CancellationToken, Task>? _persistRotatedCredentials;
+    private readonly MicrosoftIdentityConfiguration _identity;
     private readonly SemaphoreSlim _tokenLock = new(1, 1);
     private string? _accessToken;
     private DateTimeOffset _accessTokenExpiresAt;
@@ -40,7 +41,8 @@ public sealed class OneDriveConnection : ICloudConnection, IAsyncDisposable
         HttpClient? httpClient = null,
         Func<CancellationToken, Task<IAsyncDisposable?>>? acquireRefreshLease = null,
         Func<CancellationToken, Task<Dictionary<string, string>>>? reloadCredentials = null,
-        Func<Dictionary<string, string>, CancellationToken, Task>? persistRotatedCredentials = null)
+        Func<Dictionary<string, string>, CancellationToken, Task>? persistRotatedCredentials = null,
+        MicrosoftIdentityConfiguration? identity = null)
     {
         _data = data;
         _httpClient = httpClient ?? new HttpClient();
@@ -48,6 +50,8 @@ public sealed class OneDriveConnection : ICloudConnection, IAsyncDisposable
         _acquireRefreshLease = acquireRefreshLease;
         _reloadCredentials = reloadCredentials;
         _persistRotatedCredentials = persistRotatedCredentials;
+        _identity = identity ?? MicrosoftIdentityConfiguration.Create(
+            OneDriveOAuthDefaults.ClientId, OneDriveOAuthDefaults.Authority);
 
         if (!_data.TryGetValue("refreshToken", out var refreshToken)
             || string.IsNullOrWhiteSpace(refreshToken))
@@ -729,10 +733,10 @@ public sealed class OneDriveConnection : ICloudConnection, IAsyncDisposable
             using var tokenTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             tokenTimeout.CancelAfter(TokenExchangeTimeout);
             using var response = await _httpClient.PostAsync(
-                OneDriveOAuthDefaults.TokenEndpoint,
+                _identity.TokenEndpoint,
                 new FormUrlEncodedContent(new Dictionary<string, string>
                 {
-                    ["client_id"] = OneDriveOAuthDefaults.ClientId,
+                    ["client_id"] = _identity.PublicClientId,
                     ["grant_type"] = "refresh_token",
                     ["refresh_token"] = _data["refreshToken"],
                     ["scope"] = _data["scope"]
@@ -865,6 +869,7 @@ public sealed record OneDriveFolderReference(string ProviderId, string Path);
 public static class OneDriveOAuthDefaults
 {
     public const string ClientId = "e966f5be-e8a1-4c67-b322-aac34c1ab642";
+    public const string Authority = "common";
     public const string Scope = "offline_access Files.ReadWrite User.Read";
     public const string DeviceCodeEndpoint =
         "https://login.microsoftonline.com/common/oauth2/v2.0/devicecode";

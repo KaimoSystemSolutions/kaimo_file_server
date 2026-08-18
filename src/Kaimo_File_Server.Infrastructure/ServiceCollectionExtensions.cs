@@ -85,6 +85,7 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<DatabaseSeeder>();
             
             // -- Cloud --
+            services.AddSingleton(MicrosoftIdentityConfiguration.FromConfiguration(configuration));
             services.AddSingleton<ICloudProvider, GoogleDriveProvider>();
             services.AddSingleton<ICloudProvider, OneDriveProvider>();
             services.AddSingleton<ICloudProviderFactory, CloudProviderFactory>();

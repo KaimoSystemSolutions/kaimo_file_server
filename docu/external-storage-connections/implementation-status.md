@@ -93,10 +93,17 @@ health state, exceptions, or logs.
 
 ### Package 3: Microsoft provider consolidation — planned
 
-- Adapt Cloud Access OneDrive to the storage-provider contracts.
-- Move Cloud Sync OneDrive to connection references.
-- Preserve device authorization as the default path.
-- Add tenant-owned client ID and authority overrides.
+- [x] Preserve device authorization as the zero-configuration default.
+- [x] Add validated tenant-owned public-client ID and authority overrides for Cloud Access and legacy Cloud Sync token requests.
+- [x] Route Cloud Access authorization verification through the shared OneDrive connection factory.
+- [ ] Adapt Cloud Access OneDrive to the final `IStorageConnectionProvider` contracts.
+- [ ] Move Cloud Sync OneDrive to connection references. This depends on Package 5's `SyncDefinition` migration; the legacy reader now shares the same Microsoft identity configuration but still owns its legacy grant.
+
+The optional override uses `ExternalStorage__Microsoft__PublicClientId` and
+`ExternalStorage__Microsoft__Authority`. Both values are public identifiers. The application validates the
+client ID as a GUID and restricts the authority to a tenant identifier, domain, or Microsoft authority alias;
+invalid configuration fails startup rather than sending tokens to an arbitrary endpoint. The default remains
+the shipped public client and `common` authority, so a normal installation requires no Microsoft OAuth settings.
 
 ### Package 4: Google provider consolidation — planned
 
@@ -128,3 +135,5 @@ health state, exceptions, or logs.
 | 2026-08-18 | PostgreSQL migration script review | Existing connection table and credential column are renamed in place; no connection table drop is emitted. |
 | 2026-08-18 | Package 2 focused security and coordination tests | 27 passed, 0 failed, 0 skipped. |
 | 2026-08-18 | Package 2 full `Kaimo_File_Server.Tests` suite | 780 passed, 0 failed, 0 skipped. |
+| 2026-08-18 | Package 3 Microsoft identity tests | 16 passed, 0 failed, 0 skipped. |
+| 2026-08-18 | Package 3 full `Kaimo_File_Server.Tests` suite | 784 passed, 0 failed, 0 skipped. |

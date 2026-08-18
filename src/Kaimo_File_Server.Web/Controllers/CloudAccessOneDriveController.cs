@@ -22,7 +22,6 @@ public sealed class CloudAccessOneDriveController(
     ICloudAuthorizationTicketStore tickets,
     IOneDriveDeviceAuthorizationService deviceAuthorization,
     OneDriveStorageConnectionFactory oneDriveConnections,
-    IHttpClientFactory httpClientFactory,
     CloudAccessDownloadTicketStore downloadTickets,
     IUserContextFactory userContextFactory,
     CloudAccessAuthorizationService authorization,
@@ -110,8 +109,7 @@ public sealed class CloudAccessOneDriveController(
         };
         try
         {
-            await using var connection = new OneDriveConnection(
-                credentials, httpClientFactory.CreateClient("CloudAccessOneDrive"));
+            await using var connection = oneDriveConnections.CreatePending(credentials);
             var account = await connection.GetAccountInfoAsync();
             await connections.UpdateRuntimeAsync(
                 record.Id,
