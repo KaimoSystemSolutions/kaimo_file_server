@@ -133,6 +133,18 @@
     border-bottom-color: var(--accent);
 }
 
+.share-detail-pane .detail-actions {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+
+.share-detail-pane .detail-actions > button {
+    flex: 0 0 auto;
+    width: auto;
+}
+
 .detail-section {
     margin-bottom: 18px;
 }

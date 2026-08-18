@@ -15,6 +15,23 @@
     <PageTitle>@R("Web_CloudAccess_Title") - Kaimo Files</PageTitle>
 }
 
+@if (Embedded && VirtualSharesOnly)
+{
+    <div class="virtual-share-toolbar">
+        <div>
+            <h1>@R("Web_Shares_VirtualShares")</h1>
+            <p class="subtitle">@R("Web_CloudAccess_Subtitle")</p>
+        </div>
+        @if (VM.CanManageVirtualShares && VM.CanUseConnections)
+        {
+            <button class="btn-primary" type="button" disabled="@(!VM.Connections.Any(IsReady))" @onclick="ToggleShareForm">
+                @Assets.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                <span>@R("Web_CloudAccess_AddShare")</span>
+            </button>
+        }
+    </div>
+}
+
 @if (!Embedded)
 {
 <div class="page-header cloud-access-header">
@@ -214,7 +231,7 @@ else
                             <label class="cloud-access-folder-field"><span class="detail-label">@R("Web_CloudAccess_RemoteFolder")</span><div class="cloud-access-path"><input class="edit-input" value="@_editShareRoot" readonly /><button class="btn-secondary" type="button" disabled="@_busy" @onclick="OpenEditPickerAsync">@R("Web_CloudAccess_Browse")</button></div></label>
                         </div>
                     }
-                    <div class="detail-actions">
+                    <div class="detail-actions cloud-access-detail-actions">
                         @if (_editingShare)
                         {
                             <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelEditShare">@R("Web_CloudAccess_Cancel")</button>
@@ -243,7 +260,7 @@ else
                             }
                         </select>
                         @PrincipalList(_grantPrincipalIds, RemoveGrantPrincipal)
-                        <div class="detail-actions">
+                        <div class="detail-actions cloud-access-detail-actions">
                             <button class="btn-primary" type="button" disabled="@_busy" @onclick="SaveGrantsAsync">@R("Web_CloudAccess_SaveAccess")</button>
                         </div>
                     </div>

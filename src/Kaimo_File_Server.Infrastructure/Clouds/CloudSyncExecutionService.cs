@@ -4,6 +4,8 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
+using Kaimo_File_Server.Infrastructure.ExternalStorage;
 
 namespace Kaimo_File_Server.Infrastructure.Clouds;
 
@@ -37,7 +39,8 @@ public sealed class CloudSyncExecutionService(
     ILegacyCloudSyncMigrationService legacyMigration,
     ICloudProviderFactory providers,
     IFileServiceFactory fileServices,
-    ICloudSyncOperationCoordinator operations) : ICloudSyncExecutionService
+    ICloudSyncOperationCoordinator operations,
+    IStorageConnectionProviderCatalog? storageProviderCatalog = null) : ICloudSyncExecutionService
 {
     public async Task<CloudSyncExecutionResult> RunAsync(
         Guid shareId,
@@ -64,16 +67,37 @@ public sealed class CloudSyncExecutionService(
 
             var storageConnection = await storageConnections.GetAsync(
                 definition.ConnectionId, cancellationToken);
-            if (storageConnection is null ||
-                storageConnection.State is StorageConnectionState.Disabled or
-                    StorageConnectionState.NeedsReauthorization)
+            if (storageConnection is null || storageConnection.State != StorageConnectionState.Ready)
                 return CloudSyncExecutionResult.Missing;
 
-            Dictionary<string, string> credentials =
-                credentialVault.UnprotectConnectionCredentials(storageConnection);
-            // The stable ID prevents refresh-token rotation from creating a new
-            // live provider cache entry. Providers ignore this neutral key.
-            credentials["connectionId"] = storageConnection.Id.ToString("D");
+            Dictionary<string, string> credentials = [];
+            IStorageSession? providerSession = null;
+            ICloudConnection connection;
+            IStorageConnectionProvider? storageProvider = null;
+            if (storageProviderCatalog is not null)
+            {
+                storageProvider = storageProviderCatalog.GetRequired(storageConnection.ProviderId);
+                if (!storageProvider.Capabilities.HasFlag(StorageProviderCapabilities.Sync))
+                    return CloudSyncExecutionResult.Missing;
+            }
+            if (storageProvider?.Capabilities.HasFlag(StorageProviderCapabilities.RequiresHostMount) == true)
+            {
+                providerSession = await storageProvider.OpenSessionAsync(storageConnection, cancellationToken);
+                var remoteFiles = providerSession.RemoteFiles
+                                  ?? throw new NotSupportedException(
+                                      "The storage provider does not expose the remote file contract required for synchronization.");
+                connection = new RemoteFileStoreSyncAdapter(storageProvider.DisplayName, remoteFiles);
+            }
+            else
+            {
+                credentials = credentialVault.UnprotectConnectionCredentials(storageConnection);
+                // The stable ID prevents refresh-token rotation from creating a new
+                // live provider cache entry. Providers ignore this neutral key.
+                credentials["connectionId"] = storageConnection.Id.ToString("D");
+                var legacyFolder = new SyncedFolder(
+                    storageConnection.ProviderId, credentials, definition.RemotePath);
+                connection = providers.CreateOrLoad(share.Id, legacyFolder);
+            }
             var folder = new SyncedFolder(
                 storageConnection.ProviderId,
                 credentials,
@@ -87,7 +111,6 @@ public sealed class CloudSyncExecutionService(
                 AdvancedSettings = definition.AdvancedSettings
             };
 
-            var connection = providers.CreateOrLoad(share.Id, folder);
             var fileService = fileServices.CreateForShare(share.Id, share.Path);
             try
             {
@@ -116,6 +139,11 @@ public sealed class CloudSyncExecutionService(
                     errorCode,
                     cancellationToken);
                 throw;
+            }
+            finally
+            {
+                if (providerSession is not null)
+                    await providerSession.DisposeAsync();
             }
 
             cancellationToken.ThrowIfCancellationRequested();

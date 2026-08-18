@@ -2,11 +2,14 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
+using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Infrastructure.Logging;
+using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components;
@@ -110,6 +113,44 @@ builder.Services.AddSingleton<ICloudAuthorizationTicketStore, CloudAuthorization
 builder.Services.AddSingleton<IOneDriveDeviceAuthorizationService, OneDriveDeviceAuthorizationService>();
 builder.Services.AddSingleton<GoogleOAuthService>();
 builder.Services.AddSingleton<ICredentialVault, DataProtectionCredentialVault>();
+builder.Services.AddScoped<IStorageConnectionProvider>(services =>
+    new LegacyCloudStorageConnectionProvider(
+        "onedrive",
+        "Microsoft OneDrive",
+        StorageProviderCapabilities.Browse
+        | StorageProviderCapabilities.Read
+        | StorageProviderCapabilities.Write
+        | StorageProviderCapabilities.CreateDirectory
+        | StorageProviderCapabilities.Sync
+        | StorageProviderCapabilities.StableItemIds
+        | StorageProviderCapabilities.DelegatedAuthorization,
+        new HashSet<StorageAuthorizationMode>
+        {
+            StorageAuthorizationMode.DeviceCode,
+            StorageAuthorizationMode.DelegatedAuthorizationCode,
+            StorageAuthorizationMode.ApplicationCredential
+        },
+        services.GetRequiredService<ICredentialVault>(),
+        services.GetRequiredService<IStorageConnectionRepository>(),
+        services.GetRequiredService<ICloudProviderFactory>()));
+builder.Services.AddScoped<IStorageConnectionProvider>(services =>
+    new LegacyCloudStorageConnectionProvider(
+        "google",
+        "Google Drive",
+        StorageProviderCapabilities.Browse
+        | StorageProviderCapabilities.Read
+        | StorageProviderCapabilities.Write
+        | StorageProviderCapabilities.CreateDirectory
+        | StorageProviderCapabilities.Sync
+        | StorageProviderCapabilities.DelegatedAuthorization,
+        new HashSet<StorageAuthorizationMode>
+        {
+            StorageAuthorizationMode.DelegatedAuthorizationCode,
+            StorageAuthorizationMode.ServiceAccount
+        },
+        services.GetRequiredService<ICredentialVault>(),
+        services.GetRequiredService<IStorageConnectionRepository>(),
+        services.GetRequiredService<ICloudProviderFactory>()));
 builder.Services.AddScoped<ILegacyCloudSyncMigrationService, LegacyCloudSyncMigrationService>();
 builder.Services.AddScoped<ICloudSyncExecutionService, CloudSyncExecutionService>();
 builder.Services.AddHostedService<LegacyCloudSyncMigrationHostedService>();

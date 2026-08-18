@@ -2,6 +2,18 @@
     align-items: flex-start;
 }
 
+.virtual-share-toolbar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.virtual-share-toolbar h1 {
+    margin: 0;
+}
+
 .cloud-access-create-card,
 .cloud-access-connections {
     margin: 1rem 0;
@@ -42,9 +54,25 @@
 
 .cloud-access-form-actions {
     display: flex;
+    flex-direction: row;
+    align-items: center;
     justify-content: flex-end;
     gap: .5rem;
     margin-top: 1rem;
+}
+
+.cloud-access-form-actions > button,
+.cloud-access-detail-actions > button,
+.virtual-share-toolbar > button {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+.cloud-access-detail-actions {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-start;
 }
 
 .cloud-access-workspace {
@@ -188,6 +216,10 @@
     .cloud-access-connection-card,
     .cloud-access-path {
         align-items: stretch;
+        flex-direction: column;
+    }
+
+    .virtual-share-toolbar {
         flex-direction: column;
     }
 }

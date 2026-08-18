@@ -2275,4 +2275,32 @@
   <data name="Web_ShareList_Tab_Cloud" xml:space="preserve"><value>Cloud</value></data>
   <data name="Web_ShareList_SelectHint" xml:space="preserve"><value>Wählen Sie eine Freigabe aus, um Details und Einstellungen anzuzeigen.</value></data>
   <data name="Web_ShareList_CloudConnected" xml:space="preserve"><value>Die Cloud-Verbindung wurde erfolgreich hinzugefügt.</value></data>
+  <data name="Web_ExternalStorage_Capabilities" xml:space="preserve"><value>Funktionen</value></data>
+  <data name="Web_ExternalStorage_None" xml:space="preserve"><value>Keine</value></data>
+  <data name="Web_ExternalStorage_BrowseUnsupported" xml:space="preserve"><value>Dieser Anbieter unterstützt kein Durchsuchen entfernter Ordner.</value></data>
+  <data name="Web_ExternalStorage_SyncUnsupported" xml:space="preserve"><value>Dieser Anbieter unterstützt keine Synchronisierung.</value></data>
+  <data name="Web_ExternalStorage_VirtualShareUnsupported" xml:space="preserve"><value>Dieser Anbieter kann nicht für virtuelle Freigaben verwendet werden.</value></data>
+  <data name="Web_ExternalStorage_AuthorizeUnsupported" xml:space="preserve"><value>Diese Verbindung unterstützt keine interaktive Autorisierung.</value></data>
+  <data name="Web_ExternalStorage_Capability_Browse" xml:space="preserve"><value>Durchsuchen</value></data>
+  <data name="Web_ExternalStorage_Capability_Read" xml:space="preserve"><value>Lesen</value></data>
+  <data name="Web_ExternalStorage_Capability_Write" xml:space="preserve"><value>Schreiben</value></data>
+  <data name="Web_ExternalStorage_Capability_CreateDirectory" xml:space="preserve"><value>Ordner erstellen</value></data>
+  <data name="Web_ExternalStorage_Capability_Delete" xml:space="preserve"><value>Löschen</value></data>
+  <data name="Web_ExternalStorage_Capability_Rename" xml:space="preserve"><value>Umbenennen</value></data>
+  <data name="Web_ExternalStorage_Capability_Move" xml:space="preserve"><value>Verschieben</value></data>
+  <data name="Web_ExternalStorage_Capability_ServerSideCopy" xml:space="preserve"><value>Serverseitig kopieren</value></data>
+  <data name="Web_ExternalStorage_Capability_Sync" xml:space="preserve"><value>Synchronisierung</value></data>
+  <data name="Web_ExternalStorage_Capability_StableItemIds" xml:space="preserve"><value>Stabile Element-IDs</value></data>
+  <data name="Web_ExternalStorage_Capability_WatchChanges" xml:space="preserve"><value>Änderungsverfolgung</value></data>
+  <data name="Web_ExternalStorage_Capability_DelegatedAuthorization" xml:space="preserve"><value>Delegierte Autorisierung</value></data>
+  <data name="Web_ExternalStorage_Capability_ApplicationAuthorization" xml:space="preserve"><value>Anwendungsautorisierung</value></data>
+  <data name="Web_ExternalStorage_Capability_RequiresHostMount" xml:space="preserve"><value>Vom Betreiber verwaltete Einhängung</value></data>
+  <data name="Web_ExternalStorage_Capability_OptimizedSync" xml:space="preserve"><value>Optimierte Synchronisierung</value></data>
+  <data name="Web_ExternalStorage_ConnectionSettings" xml:space="preserve"><value>Protokolleinstellungen (JSON)</value></data>
+  <data name="Web_ExternalStorage_ConnectionSettingsHelp" xml:space="preserve"><value>Verwenden Sie nur vom Betreiber verwaltete Einhängenachweise oder absolute Verweise auf Secret-Dateien. Geben Sie niemals ein Kennwort oder einen privaten Schlüssel ein.</value></data>
+  <data name="Web_ExternalStorage_InvalidSettings" xml:space="preserve"><value>Geben Sie gültige Protokolleinstellungen mit höchstens 64 KiB ein.</value></data>
+  <data name="Web_ExternalStorage_ProviderUnsupported" xml:space="preserve"><value>Dieser Anbieter kann über diesen Ablauf nicht konfiguriert werden.</value></data>
+  <data name="Web_ExternalStorage_Identity" xml:space="preserve"><value>Identität und Autorisierung</value></data>
+  <data name="Web_ExternalStorage_CapabilitiesAndUsage" xml:space="preserve"><value>Funktionen und Verwendung</value></data>
+  <data name="Web_ExternalStorage_SelectSyncHint" xml:space="preserve"><value>Wählen Sie bei einer Synchronisierung „Bearbeiten“, um ihre Einstellungen zu öffnen.</value></data>
 </root>

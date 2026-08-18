@@ -6,6 +6,8 @@ using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Clouds;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
+using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Infrastructure.Repositories;
 using Kaimo_File_Server.Infrastructure.Services;
@@ -92,6 +94,13 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddSingleton<ICloudProvider, GoogleDriveProvider>();
             services.AddSingleton<ICloudProvider, OneDriveProvider>();
             services.AddSingleton<ICloudProviderFactory, CloudProviderFactory>();
+
+            // -- Capability-based external-storage providers --
+            services.AddSingleton<IRsyncProcessRunner, RsyncProcessRunner>();
+            services.AddSingleton<IStorageConnectionProvider, SmbStorageConnectionProvider>();
+            services.AddSingleton<IStorageConnectionProvider, NfsStorageConnectionProvider>();
+            services.AddSingleton<IStorageConnectionProvider, RsyncSshStorageConnectionProvider>();
+            services.AddScoped<IStorageConnectionProviderCatalog, StorageConnectionProviderCatalog>();
             
             return services;
         }

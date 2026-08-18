@@ -1,9 +1,14 @@
 @using Kaimo_File_Server.Core.Domain
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Core.Services.DataServices
+@using Kaimo_File_Server.Core.Services.ExternalStorage
 @using Kaimo_File_Server.Web.Components.Pages.CloudSync.Components
 @using Kaimo_File_Server.Web.Components.ViewModels
+@using Microsoft.JSInterop
+@using System.Globalization
+@implements IAsyncDisposable
 @inject ExternalStorageSyncViewModel VM
+@inject IJSRuntime JS
 
 @if (VM.IsLoading)
 {
@@ -26,79 +31,191 @@ else
         </button>
     </div>
 
-    @if (_editing)
-    {
-        <section class="storage-editor">
-            <h3>@(_editingId is null ? R("Web_ExternalStorage_CreateSync") : R("Web_ExternalStorage_EditSync"))</h3>
-            <div class="storage-form-grid">
-                <label><span>@R("Web_ExternalStorage_Name")</span><input class="edit-input" maxlength="200" @bind="_model.DisplayName" /></label>
-                <label><span>@R("Web_ExternalStorage_Connection")</span><select class="edit-input" @bind="_model.ConnectionId">
-                    <option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>
-                    @foreach (var connection in ReadyConnections)
+    <div class="sync-workspace">
+        <section class="sync-list-pane">
+            @if (VM.Syncs.Count == 0)
+            {
+                <div class="empty-state"><p>@R("Web_ExternalStorage_NoSyncs")</p></div>
+            }
+            else
+            {
+                <div class="sync-list" role="table" aria-label="@R("Web_ExternalStorage_Tab_Syncs")">
+                    <div class="sync-list-header" role="row">
+                        <span role="columnheader">@R("Web_ExternalStorage_Name")</span>
+                        <span role="columnheader">@R("Web_ExternalStorage_Connection")</span>
+                        <span role="columnheader">@R("Web_ExternalStorage_Health")</span>
+                        <span role="columnheader" aria-hidden="true"></span>
+                    </div>
+                    @foreach (var item in VM.Syncs)
                     {
-                        <option value="@connection.Id">@connection.Name (@ProviderName(connection.ProviderId))</option>
+                        <article class="sync-list-row @(_editingId == item.Definition.Id ? "sync-list-row--selected" : "")" role="row">
+                            <div class="sync-primary" role="cell">
+                                <strong>@DisplayName(item)</strong>
+                                <small>@item.ShareName · @DisplayPath(item.Definition.LocalPath)</small>
+                                <small>@R("Web_ExternalStorage_RemotePath"): @item.Definition.RemotePath</small>
+                            </div>
+                            <div class="sync-cell" role="cell"><strong>@item.ConnectionName</strong><small>@ProviderFor(item)</small></div>
+                            <div class="sync-cell" role="cell">
+                                <span class="storage-state @(!item.Definition.Enabled ? "storage-state--disabled" : "")">@SyncState(item)</span>
+                                <small>@ModeName(item.Definition.Mode) · @(item.Definition.Schedule.IsEnabled ? R("Web_ExternalStorage_ScheduleEnabled") : R("Web_ExternalStorage_Disabled"))</small>
+                                <small>@R("Web_ExternalStorage_LastRun"): @FormatDate(item.Runtime?.LastRunAtUtc)</small>
+                            </div>
+                            <div class="sync-row-actions" role="cell">
+                                <button class="btn-secondary" type="button" disabled="@(_busy || !item.Definition.Enabled)" @onclick="() => RunAsync(item)">@R("Web_ExternalStorage_RunNow")</button>
+                                <button class="btn-secondary" type="button" disabled="@_busy" @onclick="() => StartEdit(item)">@R("Web_CloudAccess_Edit")</button>
+                                <button class="btn-danger-outline" type="button" disabled="@_busy" @onclick="() => DeleteAsync(item)">@R("Web_Action_Delete")</button>
+                            </div>
+                        </article>
                     }
-                </select></label>
-                <label><span>@R("Web_ExternalStorage_LocalShare")</span><select class="edit-input" @bind="_model.LocalShareId">
-                    <option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>
-                    @foreach (var share in VM.Shares.Where(ShareMatchesConnection))
-                    {
-                        <option value="@share.Id">@share.Name</option>
-                    }
-                </select></label>
-                <label><span>@R("Web_ExternalStorage_LocalPath")</span><input class="edit-input" placeholder="/" @bind="_model.LocalPath" /></label>
-                <label><span>@R("Web_ExternalStorage_RemotePath")</span><span class="storage-path-field"><input class="edit-input" placeholder="/" @bind="_model.RemotePath" /><button class="btn-secondary" type="button" disabled="@(_model.ConnectionId == Guid.Empty || _model.LocalShareId == Guid.Empty)" @onclick="OpenRemotePickerAsync">@R("Web_CloudAccess_Browse")</button></span></label>
-                <label><span>@R("Web_ExternalStorage_Mode")</span><select class="edit-input" @bind="_model.Mode">
-                    <option value="@SyncMode.TwoWay">@R("Web_CloudSync_Mode_TwoWay")</option>
-                    <option value="@SyncMode.Pull">@R("Web_CloudSync_Mode_Pull")</option>
-                    <option value="@SyncMode.Push">@R("Web_CloudSync_Mode_Push")</option>
-                </select></label>
-                <label class="storage-wide"><span>@R("Web_ExternalStorage_Description")</span><textarea class="edit-input" maxlength="2000" @bind="_model.Description"></textarea></label>
-                <label class="storage-check"><input type="checkbox" @bind="_model.Enabled" /> <span>@R("Web_ExternalStorage_Enabled")</span></label>
-                <label class="storage-check"><input type="checkbox" @bind="_model.ScheduleEnabled" /> <span>@R("Web_ExternalStorage_ScheduleEnabled")</span></label>
-                <label><span>@R("Web_ExternalStorage_Interval")</span><input class="edit-input" type="number" min="1" max="86400" @bind="_model.IntervalSeconds" /></label>
-                <label><span>@R("Web_ExternalStorage_ExcludedExtensions")</span><input class="edit-input" placeholder=".tmp, .bak" @bind="_model.ExcludedExtensions" /></label>
-                <label><span>@R("Web_ExternalStorage_MaxFileSize")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxFileSizeMb" /></label>
-                <label><span>@R("Web_ExternalStorage_MaxUploadRate")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxUploadRateKbps" /></label>
-                <label><span>@R("Web_ExternalStorage_MaxDownloadRate")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxDownloadRateKbps" /></label>
+                </div>
+            }
+        </section>
+
+        <aside class="storage-editor sync-detail-pane" aria-label="@R("Web_ExternalStorage_EditSync")">
+        @if (_editing)
+        {
+            <div class="storage-editor-heading">
+                <div>
+                    <h3>@(_editingId is null ? R("Web_ExternalStorage_CreateSync") : R("Web_ExternalStorage_EditSync"))</h3>
+                    <span>@(_editingId is null ? R("Web_ExternalStorage_SyncsHelp") : _model.DisplayName)</span>
+                </div>
+                <label class="storage-enabled"><input type="checkbox" @bind="_model.Enabled" /> <span>@R("Web_ExternalStorage_Enabled")</span></label>
             </div>
+
+            <div class="detail-tabs cloud-sync-tabs" role="tablist" aria-label="@R("Web_ExternalStorage_EditSync")">
+                <button class="@SettingsTabClass(SyncSettingsTab.General)" type="button" role="tab"
+                        aria-selected="@(_activeSettingsTab == SyncSettingsTab.General)"
+                        @onclick="() => _activeSettingsTab = SyncSettingsTab.General">@R("Web_CloudSync_Tab_General")</button>
+                <button class="@SettingsTabClass(SyncSettingsTab.Schedule)" type="button" role="tab"
+                        aria-selected="@(_activeSettingsTab == SyncSettingsTab.Schedule)"
+                        @onclick="() => _activeSettingsTab = SyncSettingsTab.Schedule">@R("Web_CloudSync_Tab_Schedule")</button>
+                <button class="@SettingsTabClass(SyncSettingsTab.Advanced)" type="button" role="tab"
+                        aria-selected="@(_activeSettingsTab == SyncSettingsTab.Advanced)"
+                        @onclick="() => _activeSettingsTab = SyncSettingsTab.Advanced">@R("Web_CloudSync_Tab_Advanced")</button>
+            </div>
+
+            @if (_activeSettingsTab == SyncSettingsTab.General)
+            {
+                <div class="storage-form-grid storage-tab-panel" role="tabpanel">
+                    <label><span>@R("Web_ExternalStorage_Name")</span><input class="edit-input" maxlength="200" @bind="_model.DisplayName" /></label>
+                    <label><span>@R("Web_ExternalStorage_Connection")</span><select class="edit-input" @bind="_model.ConnectionId">
+                        <option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>
+                        @foreach (var connection in ReadyConnections)
+                        {
+                            <option value="@connection.Id">@connection.Name (@ProviderName(connection.ProviderId))</option>
+                        }
+                    </select></label>
+                    <label><span>@R("Web_ExternalStorage_LocalShare")</span><select class="edit-input" @bind="_model.LocalShareId">
+                        <option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>
+                        @foreach (var share in VM.Shares.Where(ShareMatchesConnection))
+                        {
+                            <option value="@share.Id">@share.Name</option>
+                        }
+                    </select></label>
+                    <label><span>@R("Web_ExternalStorage_Mode")</span><select class="edit-input" @bind="_model.Mode">
+                        <option value="@SyncMode.TwoWay">@R("Web_CloudSync_Mode_TwoWay")</option>
+                        <option value="@SyncMode.Pull">@R("Web_CloudSync_Mode_Pull")</option>
+                        <option value="@SyncMode.Push">@R("Web_CloudSync_Mode_Push")</option>
+                    </select></label>
+                    <label><span>@R("Web_ExternalStorage_LocalPath")</span><input class="edit-input" placeholder="/" @bind="_model.LocalPath" /></label>
+                    <label><span>@R("Web_ExternalStorage_RemotePath")</span><span class="storage-path-field"><input class="edit-input" placeholder="/" @bind="_model.RemotePath" />@if (SelectedConnectionSupports(StorageProviderCapabilities.Browse)) { <button class="btn-secondary" type="button" disabled="@(_model.LocalShareId == Guid.Empty)" @onclick="OpenRemotePickerAsync">@R("Web_CloudAccess_Browse")</button> }</span></label>
+                    <label class="storage-wide"><span>@R("Web_ExternalStorage_Description")</span><textarea class="edit-input" maxlength="2000" @bind="_model.Description"></textarea></label>
+                </div>
+            }
+            else if (_activeSettingsTab == SyncSettingsTab.Schedule)
+            {
+                <div class="storage-tab-panel cloud-schedule-section" role="tabpanel">
+                    <div class="cloud-schedule-heading">
+                        <div class="cloud-schedule-title-row">
+                            <span class="detail-label">@R("Web_CloudSync_Schedule")</span>
+                            <span class="cloud-schedule-info" tabindex="0" title="@R("Web_CloudSync_Schedule_Help")">i</span>
+                        </div>
+                        <label class="toggle-switch cloud-schedule-toggle" title="@R("Web_CloudSync_Schedule_Toggle")">
+                            <input type="checkbox" @bind="_model.ScheduleEnabled" aria-label="@R("Web_CloudSync_Schedule_Toggle")" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <label class="cloud-schedule-interval">
+                        <span class="cloud-schedule-field-label">@R("Web_CloudSync_Schedule_Interval")</span>
+                        <span class="cloud-schedule-interval-input">
+                            <input class="edit-input cloud-schedule-interval-field" type="number"
+                                   min="@CloudSyncSchedule.MinIntervalSeconds" max="@CloudSyncSchedule.MaxIntervalSeconds"
+                                   @bind="_model.IntervalSeconds" />
+                            <span>@R("Web_CloudSync_Schedule_Seconds")</span>
+                        </span>
+                    </label>
+                    <div class="cloud-schedule-paint-toolbar">
+                        <span class="cloud-schedule-paint-label cloud-schedule-field-label">@R("Web_CloudSync_Schedule_Paint_Mode")</span>
+                        <div class="cloud-schedule-paint-modes" role="group" aria-label="@R("Web_CloudSync_Schedule_Paint_Mode")">
+                            <button class="cloud-schedule-paint-mode cloud-schedule-paint-mode--select @(_schedulePaintMode == SchedulePaintMode.Select ? "cloud-schedule-paint-mode--active" : "")"
+                                    type="button" disabled="@(!_model.ScheduleEnabled)" @onclick="() => _schedulePaintMode = SchedulePaintMode.Select">
+                                <span aria-hidden="true">+</span>@R("Web_CloudSync_Schedule_Paint_Select")
+                            </button>
+                            <button class="cloud-schedule-paint-mode cloud-schedule-paint-mode--deselect @(_schedulePaintMode == SchedulePaintMode.Deselect ? "cloud-schedule-paint-mode--active" : "")"
+                                    type="button" disabled="@(!_model.ScheduleEnabled)" @onclick="() => _schedulePaintMode = SchedulePaintMode.Deselect">
+                                <span aria-hidden="true">−</span>@R("Web_CloudSync_Schedule_Paint_Deselect")
+                            </button>
+                        </div>
+                    </div>
+                    <div class="cloud-schedule-scroll @SchedulePaintModeClass @(_model.ScheduleEnabled ? "" : "cloud-schedule-scroll--disabled")" @ref="_scheduleGrid">
+                        <div class="cloud-schedule-grid" role="grid" aria-label="@R("Web_CloudSync_Schedule_Grid")">
+                            <span class="cloud-schedule-corner" aria-hidden="true"></span>
+                            @foreach (var hour in Enumerable.Range(0, CloudSyncSchedule.HoursPerDay))
+                            {
+                                <button class="cloud-schedule-hour" type="button" disabled="@(!_model.ScheduleEnabled)"
+                                        title="@ScheduleHourActionLabel(hour)" @onclick="() => PaintScheduleHour(hour)">@hour.ToString("00")</button>
+                            }
+                            @foreach (var day in ScheduleDays)
+                            {
+                                <button class="cloud-schedule-day" type="button" disabled="@(!_model.ScheduleEnabled)"
+                                        title="@ScheduleDayActionLabel(day)" @onclick="() => PaintScheduleDay(day)">@ScheduleDayName(day)</button>
+                                @foreach (var hour in Enumerable.Range(0, CloudSyncSchedule.HoursPerDay))
+                                {
+                                    var active = IsScheduleSlotActive(day, hour);
+                                    <button class="cloud-schedule-slot @(active ? "cloud-schedule-slot--active" : "")" type="button" role="gridcell"
+                                            data-schedule-row="@Array.IndexOf(ScheduleDays, day)" data-schedule-hour="@hour"
+                                            aria-pressed="@active" aria-label="@ScheduleSlotLabel(day, hour, active)"
+                                            title="@ScheduleSlotLabel(day, hour, active)" disabled="@(!_model.ScheduleEnabled)"
+                                            @onclick="() => PaintScheduleSlot(day, hour)"></button>
+                                }
+                            }
+                        </div>
+                    </div>
+                    <div class="cloud-schedule-footer">
+                        <span>@string.Format(R("Web_CloudSync_Schedule_Selected"), _model.ActiveScheduleSlots.Count)</span>
+                        @if (_model.ActiveScheduleSlots.Count > 0)
+                        {
+                            <button type="button" class="cloud-schedule-clear" @onclick="ClearSchedule">@R("Web_CloudSync_Schedule_Clear")</button>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="storage-tab-panel cloud-sync-advanced" role="tabpanel">
+                    <h4>@R("Web_CloudSync_Advanced")</h4>
+                    <p>@R("Web_CloudSync_Advanced_Help")</p>
+                    <div class="storage-form-grid">
+                        <label><span>@R("Web_CloudSync_Advanced_MaxFileSize")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxFileSizeMb" /><small>@R("Web_CloudSync_Advanced_Unlimited_Help")</small></label>
+                        <label><span>@R("Web_CloudSync_Advanced_ExcludedExtensions")</span><textarea class="edit-input" placeholder=".tmp, .iso, .bak" @bind="_model.ExcludedExtensions"></textarea><small>@R("Web_CloudSync_Advanced_ExcludedExtensions_Help")</small></label>
+                        <label><span>@R("Web_CloudSync_Advanced_MaxUpload")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxUploadRateKbps" /><small>@R("Web_CloudSync_Advanced_Unlimited_Help")</small></label>
+                        <label><span>@R("Web_CloudSync_Advanced_MaxDownload")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxDownloadRateKbps" /><small>@R("Web_CloudSync_Advanced_Unlimited_Help")</small></label>
+                    </div>
+                </div>
+            }
             <div class="detail-actions">
                 <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelEdit">@R("Web_Button_Cancel")</button>
                 <button class="btn-primary" type="button" disabled="@(_busy || !CanSave)" @onclick="SaveAsync">@R("Web_CloudAccess_Save")</button>
             </div>
-        </section>
-    }
-
-    @if (VM.Syncs.Count == 0)
-    {
-        <div class="empty-state"><p>@R("Web_ExternalStorage_NoSyncs")</p></div>
-    }
-    else
-    {
-        <div class="storage-card-grid">
-            @foreach (var item in VM.Syncs)
-            {
-                <article class="storage-card">
-                    <div class="storage-card-heading">
-                        <div><strong>@DisplayName(item)</strong><small>@item.ShareName · @DisplayPath(item.Definition.LocalPath)</small></div>
-                        <span class="storage-state @(!item.Definition.Enabled ? "storage-state--disabled" : "")">@(item.Definition.Enabled ? R("Web_ExternalStorage_Enabled") : R("Web_ExternalStorage_Disabled"))</span>
-                    </div>
-                    <dl>
-                        <dt>@R("Web_ExternalStorage_Connection")</dt><dd>@item.ConnectionName</dd>
-                        <dt>@R("Web_ExternalStorage_RemotePath")</dt><dd>@item.Definition.RemotePath</dd>
-                        <dt>@R("Web_ExternalStorage_Mode")</dt><dd>@ModeName(item.Definition.Mode)</dd>
-                        <dt>@R("Web_ExternalStorage_LastRun")</dt><dd>@FormatDate(item.Runtime?.LastRunAtUtc)</dd>
-                        <dt>@R("Web_ExternalStorage_Health")</dt><dd>@Health(item)</dd>
-                    </dl>
-                    <div class="detail-actions">
-                        <button class="btn-secondary" type="button" disabled="@(_busy || !item.Definition.Enabled)" @onclick="() => RunAsync(item)">@R("Web_ExternalStorage_RunNow")</button>
-                        <button class="btn-secondary" type="button" disabled="@_busy" @onclick="() => StartEdit(item)">@R("Web_CloudAccess_Edit")</button>
-                        <button class="btn-danger-outline" type="button" disabled="@_busy" @onclick="() => DeleteAsync(item)">@R("Web_Action_Delete")</button>
-                    </div>
-                </article>
-            }
-        </div>
-    }
+        }
+        else
+        {
+            <div class="detail-empty">
+                <p>@R("Web_ExternalStorage_SelectSyncHint")</p>
+            </div>
+        }
+        </aside>
+    </div>
 }
 
 <DirectoryPickerDialog IsOpen="@_pickerOpen"
@@ -113,6 +230,10 @@ else
                        OnClosed="CloseRemotePicker" />
 
 @code {
+    private enum SyncSettingsTab { General, Schedule, Advanced }
+    private enum SchedulePaintMode { Select, Deselect }
+    private static readonly DayOfWeek[] ScheduleDays = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
+
     [Parameter] public Guid? InitialConnectionId { get; set; }
     private bool _editing;
     private bool _busy;
@@ -124,16 +245,28 @@ else
     private string _pickerPath = "/";
     private string? _pickerError;
     private IReadOnlyList<CloudDirectoryItem> _pickerItems = [];
-    private IEnumerable<StorageConnection> ReadyConnections => VM.Connections.Where(c => c.State == StorageConnectionState.Ready);
+    private SyncSettingsTab _activeSettingsTab = SyncSettingsTab.General;
+    private SchedulePaintMode _schedulePaintMode = SchedulePaintMode.Select;
+    private ElementReference _scheduleGrid;
+    private DotNetObjectReference<SyncAdministration>? _schedulePaintReference;
+    private IEnumerable<StorageConnection> ReadyConnections => VM.Connections.Where(c =>
+        c.State == StorageConnectionState.Ready && VM.Supports(c, StorageProviderCapabilities.Sync));
     private bool CanSave => _model.ConnectionId != Guid.Empty && _model.LocalShareId != Guid.Empty && !string.IsNullOrWhiteSpace(_model.DisplayName);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
-        await VM.LoadAsync();
-        if (InitialConnectionId is Guid connectionId && ReadyConnections.Any(c => c.Id == connectionId))
-            StartCreate(connectionId);
-        StateHasChanged();
+        if (firstRender)
+        {
+            await VM.LoadAsync();
+            if (InitialConnectionId is Guid connectionId && ReadyConnections.Any(c => c.Id == connectionId))
+                StartCreate(connectionId);
+            StateHasChanged();
+        }
+        if (_scheduleGrid.Context is not null)
+        {
+            _schedulePaintReference ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("schedulePaint.initialize", _scheduleGrid, _schedulePaintReference);
+        }
     }
 
     private void StartCreate() => StartCreate(InitialConnectionId);
@@ -142,6 +275,7 @@ else
         _editing = true;
         _editingId = null;
         _error = null;
+        _activeSettingsTab = SyncSettingsTab.General;
         _model = new ExternalStorageSyncEditModel { ConnectionId = connectionId ?? Guid.Empty };
     }
 
@@ -151,6 +285,7 @@ else
         _editing = true;
         _editingId = definition.Id;
         _error = null;
+        _activeSettingsTab = SyncSettingsTab.General;
         _model = new ExternalStorageSyncEditModel
         {
             ConnectionId = definition.ConnectionId,
@@ -163,6 +298,7 @@ else
             Enabled = definition.Enabled,
             ScheduleEnabled = definition.Schedule.IsEnabled,
             IntervalSeconds = definition.Schedule.IntervalSeconds,
+            ActiveScheduleSlots = new HashSet<int>((definition.Schedule.ActiveSlots ?? []).Where(CloudSyncSchedule.IsValidSlot)),
             MaxFileSizeMb = ToUnit(definition.AdvancedSettings.MaxFileSizeBytes, 1024L * 1024),
             MaxUploadRateKbps = ToUnit(definition.AdvancedSettings.MaxUploadBytesPerSecond, 1024L),
             MaxDownloadRateKbps = ToUnit(definition.AdvancedSettings.MaxDownloadBytesPerSecond, 1024L),
@@ -175,7 +311,12 @@ else
         if (_editingId is Guid id) await VM.UpdateAsync(id, _model); else await VM.CreateAsync(_model);
         CancelEdit();
     });
-    private async Task DeleteAsync(ExternalStorageSyncListItem item) => await ActAsync(() => VM.DeleteAsync(item.Definition.Id));
+    private async Task DeleteAsync(ExternalStorageSyncListItem item)
+    {
+        await ActAsync(() => VM.DeleteAsync(item.Definition.Id));
+        if (_editingId == item.Definition.Id && VM.Syncs.All(sync => sync.Definition.Id != item.Definition.Id))
+            CancelEdit();
+    }
     private async Task RunAsync(ExternalStorageSyncListItem item) => await ActAsync(() => VM.RunAsync(item.Definition.Id));
     private async Task ActAsync(Func<Task> action)
     {
@@ -213,14 +354,64 @@ else
         return Task.CompletedTask;
     }
     private void CloseRemotePicker() { _pickerOpen = false; _pickerItems = []; _pickerError = null; }
+    private string SettingsTabClass(SyncSettingsTab tab) => _activeSettingsTab == tab ? "detail-tab detail-tab--active" : "detail-tab";
+    private string SchedulePaintModeClass => _schedulePaintMode == SchedulePaintMode.Select ? "cloud-schedule-scroll--paint-select" : "cloud-schedule-scroll--paint-deselect";
+    private bool SchedulePaintValue => _schedulePaintMode == SchedulePaintMode.Select;
+    private static string ScheduleDayName(DayOfWeek day) => CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(day);
+    private bool IsScheduleSlotActive(DayOfWeek day, int hour) => _model.ActiveScheduleSlots.Contains(CloudSyncSchedule.ToSlot(day, hour));
+    private void SetScheduleSlot(DayOfWeek day, int hour, bool active)
+    {
+        int slot = CloudSyncSchedule.ToSlot(day, hour);
+        if (active) _model.ActiveScheduleSlots.Add(slot); else _model.ActiveScheduleSlots.Remove(slot);
+    }
+    private void PaintScheduleSlot(DayOfWeek day, int hour) => SetScheduleSlot(day, hour, SchedulePaintValue);
+    private void PaintScheduleDay(DayOfWeek day)
+    {
+        foreach (int hour in Enumerable.Range(0, CloudSyncSchedule.HoursPerDay)) SetScheduleSlot(day, hour, SchedulePaintValue);
+    }
+    private void PaintScheduleHour(int hour)
+    {
+        foreach (DayOfWeek day in ScheduleDays) SetScheduleSlot(day, hour, SchedulePaintValue);
+    }
+    private void ClearSchedule() => _model.ActiveScheduleSlots.Clear();
+    private string ScheduleDayActionLabel(DayOfWeek day) => string.Format(R("Web_CloudSync_Schedule_Day_Paint"), ScheduleDayName(day), R(_schedulePaintMode == SchedulePaintMode.Select ? "Web_CloudSync_Schedule_Paint_Select" : "Web_CloudSync_Schedule_Paint_Deselect"));
+    private string ScheduleHourActionLabel(int hour) => string.Format(R("Web_CloudSync_Schedule_Hour_Paint"), hour.ToString("00"), R(_schedulePaintMode == SchedulePaintMode.Select ? "Web_CloudSync_Schedule_Paint_Select" : "Web_CloudSync_Schedule_Paint_Deselect"));
+    private static string ScheduleSlotLabel(DayOfWeek day, int hour, bool active) => string.Format(R(active ? "Web_CloudSync_Schedule_Slot_On" : "Web_CloudSync_Schedule_Slot_Off"), ScheduleDayName(day), hour.ToString("00"), ((hour + 1) % CloudSyncSchedule.HoursPerDay).ToString("00"));
+    [JSInvokable]
+    public Task PaintScheduleRectangleFromJs(int startRow, int startHour, int endRow, int endHour)
+    {
+        if (!_model.ScheduleEnabled || startRow < 0 || endRow < 0 || startRow >= ScheduleDays.Length || endRow >= ScheduleDays.Length || startHour is < 0 or >= CloudSyncSchedule.HoursPerDay || endHour is < 0 or >= CloudSyncSchedule.HoursPerDay) return Task.CompletedTask;
+        for (int row = Math.Min(startRow, endRow); row <= Math.Max(startRow, endRow); row++)
+            for (int hour = Math.Min(startHour, endHour); hour <= Math.Max(startHour, endHour); hour++)
+                SetScheduleSlot(ScheduleDays[row], hour, SchedulePaintValue);
+        return InvokeAsync(StateHasChanged);
+    }
     private bool ShareMatchesConnection(ShareDefinition share)
         => VM.Connections.FirstOrDefault(c => c.Id == _model.ConnectionId)?.DepartmentId == share.DepartmentId;
     private static long? ToUnit(long? value, long divisor) => value is > 0 ? (long)Math.Ceiling(value.Value / (double)divisor) : null;
     private static string DisplayName(ExternalStorageSyncListItem item) => string.IsNullOrWhiteSpace(item.Definition.DisplayName) ? item.ShareName : item.Definition.DisplayName;
     private static string DisplayPath(string path) => string.IsNullOrEmpty(path) ? "/" : $"/{path}";
     private static string FormatDate(DateTime? value) => value?.ToLocalTime().ToString("g") ?? R("Web_CloudSync_Never");
-    private static string ProviderName(string id) => id.Equals("onedrive", StringComparison.OrdinalIgnoreCase) ? "Microsoft OneDrive" : id.Equals("google", StringComparison.OrdinalIgnoreCase) ? "Google Drive" : id;
+    private string ProviderName(string id) => VM.GetProviderName(id);
+    private string ProviderFor(ExternalStorageSyncListItem item)
+        => VM.Connections.FirstOrDefault(connection => connection.Id == item.Definition.ConnectionId) is { } connection
+            ? VM.GetProviderName(connection.ProviderId)
+            : "—";
+    private bool SelectedConnectionSupports(StorageProviderCapabilities capability)
+        => VM.Connections.FirstOrDefault(c => c.Id == _model.ConnectionId) is { } connection
+           && VM.Supports(connection, capability);
     private static string ModeName(SyncMode mode) => mode switch { SyncMode.Pull => R("Web_CloudSync_Mode_Pull"), SyncMode.Push => R("Web_CloudSync_Mode_Push"), _ => R("Web_CloudSync_Mode_TwoWay") };
     private static string Health(ExternalStorageSyncListItem item) => string.IsNullOrWhiteSpace(item.Runtime?.LastErrorCode) ? R("Web_ExternalStorage_Healthy") : R("Web_ExternalStorage_AttentionRequired");
+    private static string SyncState(ExternalStorageSyncListItem item)
+        => item.Definition.Enabled ? Health(item) : R("Web_ExternalStorage_Disabled");
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+    public async ValueTask DisposeAsync()
+    {
+        if (_scheduleGrid.Context is not null)
+        {
+            try { await JS.InvokeVoidAsync("schedulePaint.dispose", _scheduleGrid); }
+            catch (JSDisconnectedException) { }
+        }
+        _schedulePaintReference?.Dispose();
+    }
 }

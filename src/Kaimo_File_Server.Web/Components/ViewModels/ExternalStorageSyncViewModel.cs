@@ -7,6 +7,7 @@ using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Clouds;
 using Microsoft.AspNetCore.Components.Authorization;
 
@@ -20,7 +21,6 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 public sealed class ExternalStorageSyncViewModel(
     ISyncDefinitionRepository syncDefinitions,
     IStorageConnectionRepository connections,
-    ICredentialVault credentialVault,
     IShareRepository shares,
     ILegacyCloudSyncMigrationService legacyMigration,
     IManagementAuthService managementAuth,
@@ -28,7 +28,7 @@ public sealed class ExternalStorageSyncViewModel(
     AuthenticationStateProvider authenticationState,
     IFileServiceFactory fileServices,
     ICloudSyncExecutionService executionService,
-    ICloudProviderFactory providerFactory,
+    IStorageConnectionProviderCatalog providerCatalog,
     ICloudSyncOperationCoordinator syncOperations,
     CloudSyncSchedulerSignal schedulerSignal,
     ILogger<ExternalStorageSyncViewModel> logger)
@@ -110,6 +110,8 @@ public sealed class ExternalStorageSyncViewModel(
         await EnsureActorAsync();
         var share = await GetAuthorizedShareAsync(model.LocalShareId, ManagementPermission.CreateSyncs);
         var connection = await GetUsableConnectionAsync(model.ConnectionId);
+        EnsureCapability(connection, StorageProviderCapabilities.Sync, "Web_ExternalStorage_SyncUnsupported",
+            "This provider does not support synchronization.");
         ValidateDepartmentMatch(share, connection);
         await ValidateModelAsync(model, share, existingId: null);
 
@@ -144,6 +146,8 @@ public sealed class ExternalStorageSyncViewModel(
                              "Web_ExternalStorage_SyncMissing", "The sync no longer exists."));
         var share = await GetAuthorizedShareAsync(definition.LocalShareId, ManagementPermission.ConfigureSyncs);
         var connection = await GetUsableConnectionAsync(model.ConnectionId);
+        EnsureCapability(connection, StorageProviderCapabilities.Sync, "Web_ExternalStorage_SyncUnsupported",
+            "This provider does not support synchronization.");
         ValidateDepartmentMatch(share, connection);
         await ValidateModelAsync(model, share, definition.Id);
 
@@ -226,37 +230,31 @@ public sealed class ExternalStorageSyncViewModel(
         var storageConnection = await GetUsableConnectionAsync(connectionId);
         ValidateDepartmentMatch(share, storageConnection);
 
-        var credentials = credentialVault.UnprotectConnectionCredentials(storageConnection);
-        credentials["connectionId"] = storageConnection.Id.ToString("D");
-        var folder = new SyncedFolder(
-            storageConnection.ProviderId,
-            credentials,
-            NormalizeRemotePath(path));
-        var providerConnection = providerFactory.CreateOrLoad(share.Id, folder);
-        var items = await providerConnection.ListAsync(NormalizeRemotePath(path));
-
-        if (providerConnection.HasPendingCredentialChanges)
-        {
-            foreach (var (key, value) in providerConnection.GetPendingCredentialChanges())
-                credentials[key] = value;
-            credentials.Remove("connectionId");
-            string protectedGrant = credentialVault.ProtectConnectionCredentials(
-                storageConnection, credentials);
-            await connections.UpdateRuntimeAsync(
-                storageConnection.Id,
-                protectedGrant,
-                storageConnection.AccountDisplayName,
-                storageConnection.AccountEmail,
-                StorageConnectionState.Ready,
-                null);
-            providerConnection.AcknowledgeCredentialChanges();
-        }
-
+        var provider = providerCatalog.GetRequired(storageConnection.ProviderId);
+        if (!provider.Capabilities.HasFlag(StorageProviderCapabilities.Browse))
+            throw new NotSupportedException(Text(
+                "Web_ExternalStorage_BrowseUnsupported", "This provider does not support remote browsing."));
+        await using var session = await provider.OpenSessionAsync(storageConnection);
+        var remoteFiles = session.RemoteFiles
+                          ?? throw new NotSupportedException(Text(
+                              "Web_ExternalStorage_BrowseUnsupported", "This provider does not support remote browsing."));
+        var items = await remoteFiles.ListAsync(NormalizeRemotePath(path));
         return items.Where(item => item.IsDirectory)
             .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
             .Select(item => new CloudDirectoryItem(item.Name, NormalizeRemotePath(item.Path)))
             .ToArray();
     }
+
+    public StorageProviderCapabilities GetCapabilities(StorageConnection connection)
+        => providerCatalog.TryGet(connection.ProviderId, out var provider)
+            ? provider.Capabilities
+            : StorageProviderCapabilities.None;
+
+    public bool Supports(StorageConnection connection, StorageProviderCapabilities capability)
+        => GetCapabilities(connection).HasFlag(capability);
+
+    public string GetProviderName(string providerId)
+        => providerCatalog.TryGet(providerId, out var provider) ? provider.DisplayName : providerId;
 
     private async Task ValidateModelAsync(
         ExternalStorageSyncEditModel model,
@@ -269,6 +267,8 @@ public sealed class ExternalStorageSyncViewModel(
             throw new ArgumentException(Text("Web_ExternalStorage_InvalidDescription", "The description is too long."));
         if (model.IntervalSeconds is < CloudSyncSchedule.MinIntervalSeconds or > CloudSyncSchedule.MaxIntervalSeconds)
             throw new ArgumentException(Text("Web_CloudSync_Schedule_Error_Interval", "Enter an interval between 1 and 86400 seconds."));
+        if (model.ScheduleEnabled && !model.ActiveScheduleSlots.Any(CloudSyncSchedule.IsValidSlot))
+            throw new ArgumentException(Text("Web_CloudSync_Schedule_Error_Empty", "Select at least one hour before enabling the timer."));
         if (model.MaxFileSizeMb is < 0 || model.MaxUploadRateKbps is < 0 || model.MaxDownloadRateKbps is < 0)
             throw new ArgumentException(Text("Web_CloudSync_Advanced_Error_Negative", "Advanced limits cannot be negative."));
 
@@ -327,11 +327,26 @@ public sealed class ExternalStorageSyncViewModel(
             throw new UnauthorizedAccessException(Text(
                 "Web_StorageConnection_UseDenied", "You may not use connections in this department."));
         if (connection.State != StorageConnectionState.Ready
-            || string.IsNullOrWhiteSpace(connection.EncryptedCredentialPayload))
+            || (RequiresProtectedCredential(connection.AuthorizationMode)
+                && string.IsNullOrWhiteSpace(connection.EncryptedCredentialPayload)))
             throw new InvalidOperationException(Text(
                 "Web_CloudAccess_ConnectionNotReady", "The connection is not ready."));
         return connection;
     }
+
+    private void EnsureCapability(
+        StorageConnection connection,
+        StorageProviderCapabilities capability,
+        string resourceKey,
+        string fallback)
+    {
+        var provider = providerCatalog.GetRequired(connection.ProviderId);
+        if (!provider.Capabilities.HasFlag(capability))
+            throw new NotSupportedException(Text(resourceKey, fallback));
+    }
+
+    private static bool RequiresProtectedCredential(StorageAuthorizationMode mode)
+        => mode is not (StorageAuthorizationMode.HostMount or StorageAuthorizationMode.SshKey);
 
     private static void ValidateDepartmentMatch(ShareDefinition share, StorageConnection connection)
     {
@@ -362,9 +377,7 @@ public sealed class ExternalStorageSyncViewModel(
     {
         IsEnabled = model.ScheduleEnabled,
         IntervalSeconds = model.IntervalSeconds,
-        ActiveSlots = model.ScheduleEnabled
-            ? Enumerable.Range(0, CloudSyncSchedule.SlotCount).ToHashSet()
-            : []
+        ActiveSlots = new HashSet<int>(model.ActiveScheduleSlots.Where(CloudSyncSchedule.IsValidSlot))
     };
 
     private static CloudSyncAdvancedSettings BuildAdvancedSettings(ExternalStorageSyncEditModel model) => new()
@@ -409,6 +422,7 @@ public sealed class ExternalStorageSyncEditModel
     public bool Enabled { get; set; } = true;
     public bool ScheduleEnabled { get; set; }
     public int IntervalSeconds { get; set; } = 3600;
+    public HashSet<int> ActiveScheduleSlots { get; set; } = [];
     public long? MaxFileSizeMb { get; set; }
     public long? MaxUploadRateKbps { get; set; }
     public long? MaxDownloadRateKbps { get; set; }

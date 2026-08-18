@@ -847,11 +847,11 @@ Exit criterion: an administrator authorizes a connection once and can create sup
 
 ### Phase 7: protocol providers
 
-- [ ] Add SMB with strict transport and identity validation.
-- [ ] Add rsync/SSH with pinned host identity and secret references.
-- [ ] Add NFS only through an operator-managed mount or isolated helper design.
-- [ ] Add provider capability contract tests.
-- [ ] Verify that unsupported UI operations remain hidden and backend-enforced.
+- [x] Add SMB with strict transport and identity validation.
+- [x] Add rsync/SSH with pinned host identity and secret references.
+- [x] Add NFS only through an operator-managed mount or isolated helper design.
+- [x] Add provider capability contract tests.
+- [x] Verify that unsupported UI operations remain hidden and backend-enforced.
 
 Exit criterion: adding a provider does not add provider-specific conditionals to generic Syncs, Connections, Shares, or File Browser pages.
 

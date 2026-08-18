@@ -6,6 +6,7 @@ using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -26,6 +27,7 @@ public sealed class CloudAccessViewModel
     private readonly IShareRepository _localShares;
     private readonly OneDriveStorageConnectionFactory _oneDriveConnections;
     private readonly ILogger<CloudAccessViewModel> _logger;
+    private readonly IStorageConnectionProviderCatalog? _providerCatalog;
     private UserContext? _actor;
 
     public CloudAccessViewModel(
@@ -40,7 +42,8 @@ public sealed class CloudAccessViewModel
         IGroupRepository groups,
         IShareRepository localShares,
         OneDriveStorageConnectionFactory oneDriveConnections,
-        ILogger<CloudAccessViewModel> logger)
+        ILogger<CloudAccessViewModel> logger,
+        IStorageConnectionProviderCatalog? providerCatalog = null)
     {
         _repository = repository;
         _connections = connections;
@@ -54,6 +57,7 @@ public sealed class CloudAccessViewModel
         _localShares = localShares;
         _oneDriveConnections = oneDriveConnections;
         _logger = logger;
+        _providerCatalog = providerCatalog;
     }
 
     public List<StorageConnection> Connections { get; private set; } = [];
@@ -133,9 +137,57 @@ public sealed class CloudAccessViewModel
         return $"/api/cloud-access/onedrive/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
     }
 
+    /// <summary>
+    /// Creates an operator-configured protocol connection without accepting
+    /// inline credentials. The provider validates mount attestations or secret
+    /// references before the connection can enter the ready state.
+    /// </summary>
+    public async Task CreateConfiguredConnectionAsync(
+        string providerId,
+        string name,
+        Guid departmentId,
+        string settingsJson)
+    {
+        await EnsureCanManageConnectionDepartmentAsync(departmentId);
+        if (_providerCatalog is null)
+            throw new NotSupportedException(R("Web_ExternalStorage_ProviderUnsupported"));
+        var provider = _providerCatalog.GetRequired(providerId);
+        var authorizationMode = provider.AuthorizationModes.SingleOrDefault(mode =>
+            mode is StorageAuthorizationMode.HostMount or StorageAuthorizationMode.SshKey);
+        if (authorizationMode is not (StorageAuthorizationMode.HostMount or StorageAuthorizationMode.SshKey))
+            throw new NotSupportedException(R("Web_ExternalStorage_ProviderUnsupported"));
+        string normalizedName = name.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedName) || normalizedName.Length > 200)
+            throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
+        if (string.IsNullOrWhiteSpace(settingsJson) || settingsJson.Length > 64 * 1024)
+            throw new ArgumentException(R("Web_ExternalStorage_InvalidSettings"));
+
+        var connection = new StorageConnection
+        {
+            DepartmentId = departmentId,
+            CreatedByUserId = _actor!.User.Id,
+            ProviderId = provider.Id,
+            Name = normalizedName,
+            AuthorizationMode = authorizationMode,
+            SettingsJson = settingsJson,
+            State = StorageConnectionState.PendingConfiguration
+        };
+        var health = await provider.TestAsync(connection);
+        connection.State = MapUnhealthyState(connection, health);
+        connection.LastVerifiedAtUtc = health.CheckedAtUtc;
+        connection.LastErrorCode = health.IsHealthy ? null : health.Code;
+        await _connections.SaveAsync(connection);
+        await LoadAsync();
+    }
+
     public async Task<string> AuthorizeConnectionAsync(Guid connectionId)
     {
         var connection = await GetManagedConnectionAsync(connectionId);
+        var provider = _providerCatalog?.GetRequired(connection.ProviderId);
+        if (provider is not null
+            && (!provider.Capabilities.HasFlag(StorageProviderCapabilities.DelegatedAuthorization)
+                || connection.AuthorizationMode != StorageAuthorizationMode.DeviceCode))
+            throw new NotSupportedException(R("Web_ExternalStorage_AuthorizeUnsupported"));
         var ticket = await _tickets.IssueAsync(
             connection.Id, string.Empty, "onedrive-access", _actor!.User.Id, connection.DepartmentId);
         return $"/api/cloud-access/onedrive/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
@@ -169,19 +221,29 @@ public sealed class CloudAccessViewModel
     }
 
     /// <summary>
-    /// Verifies the currently supported OneDrive connection by listing its root.
+    /// Verifies a connection through its provider-neutral health contract.
     /// Provider response details remain behind the sanitized provider boundary.
     /// </summary>
     public async Task TestConnectionAsync(Guid connectionId)
     {
         var connection = await GetManagedConnectionAsync(connectionId);
-        if (!string.Equals(connection.ProviderId, "onedrive", StringComparison.OrdinalIgnoreCase))
-            throw new NotSupportedException(R("Web_ExternalStorage_TestUnsupported"));
-        await ListOneDriveFoldersAsync(connectionId, "/");
-        connection = await GetManagedConnectionAsync(connectionId);
-        connection.State = StorageConnectionState.Ready;
-        connection.LastVerifiedAtUtc = DateTime.UtcNow;
-        connection.LastErrorCode = null;
+        if (_providerCatalog is null)
+        {
+            if (!string.Equals(connection.ProviderId, "onedrive", StringComparison.OrdinalIgnoreCase))
+                throw new NotSupportedException(R("Web_ExternalStorage_TestUnsupported"));
+            await ListOneDriveFoldersAsync(connectionId, "/");
+            connection = await GetManagedConnectionAsync(connectionId);
+            connection.State = StorageConnectionState.Ready;
+            connection.LastVerifiedAtUtc = DateTime.UtcNow;
+            connection.LastErrorCode = null;
+        }
+        else
+        {
+            var result = await _providerCatalog.GetRequired(connection.ProviderId).TestAsync(connection);
+            connection.State = MapUnhealthyState(connection, result);
+            connection.LastVerifiedAtUtc = result.CheckedAtUtc;
+            connection.LastErrorCode = result.IsHealthy ? null : result.Code;
+        }
         await _connections.SaveAsync(connection);
         await LoadAsync();
     }
@@ -224,6 +286,10 @@ public sealed class CloudAccessViewModel
         IEnumerable<Guid> principalIds)
     {
         var connectionRecord = await GetUsableConnectionAsync(connectionId);
+        if (_providerCatalog is not null
+            && !_providerCatalog.GetRequired(connectionRecord.ProviderId).Capabilities
+                .HasFlag(StorageProviderCapabilities.StableItemIds))
+            throw new NotSupportedException(R("Web_ExternalStorage_VirtualShareUnsupported"));
         if (connectionRecord.State != StorageConnectionState.Ready
             || string.IsNullOrWhiteSpace(connectionRecord.EncryptedCredentialPayload))
             throw new InvalidOperationException(R("Web_CloudAccess_ConnectionNotReady"));
@@ -403,6 +469,19 @@ public sealed class CloudAccessViewModel
 
     private static bool HasDepartments(AuthorizedScopeResult scope)
         => scope.IsUnrestricted || scope.ScopeIds.Count > 0;
+
+    private static StorageConnectionState MapUnhealthyState(
+        StorageConnection connection,
+        StorageConnectionHealthResult health)
+    {
+        if (health.IsHealthy)
+            return StorageConnectionState.Ready;
+        if (connection.AuthorizationMode is StorageAuthorizationMode.HostMount or StorageAuthorizationMode.SshKey)
+            return StorageConnectionState.PendingConfiguration;
+        return health.State == StorageConnectionHealthState.IdentityMismatch
+            ? StorageConnectionState.NeedsReauthorization
+            : StorageConnectionState.Degraded;
+    }
 
     private static HashSet<Guid> GetDepartmentIds(
         AuthorizedScopeResult scope,

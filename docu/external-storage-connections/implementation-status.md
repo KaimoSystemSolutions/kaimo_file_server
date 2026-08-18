@@ -161,19 +161,34 @@ after operational verification. No user-facing text was added in Package 5, so n
 - [x] Add test, authorize/reauthorize, disable/enable, and guarded delete actions.
 - [x] Add provider-neutral remote-folder browsing with safe rotated-grant persistence.
 - [x] Add all Package 6 labels and messages to English and German resource files.
-- [ ] Render provider-declared capabilities after the final `IStorageConnectionProvider` contract replaces the legacy cloud adapter.
+- [x] Render provider-declared capabilities after the final `IStorageConnectionProvider` contract replaces the legacy cloud adapter.
 - [ ] Link a connection audit summary after durable external-storage audit events are introduced.
 
 The additive compatibility boundary remains intact. Editing an imported sync makes the first-class row
 authoritative; deleting one retains a disabled tombstone. The Package 5 importer now observes all share/path
 keys and cannot overwrite or recreate a Package 6-owned record from retained legacy JSON. See
 [`package-6-unified-administration-ui.md`](package-6-unified-administration-ui.md) for behavior and rollout notes.
-The two remaining detail-pane items intentionally do not infer capabilities from provider IDs or present normal
-application logs as an immutable audit trail. They depend on the still-open provider-contract and audit work.
+Package 7 completed the capability-driven detail and action rendering without provider-ID branches. The remaining
+audit item intentionally does not present normal application logs as an immutable audit trail; it depends on the
+still-open durable audit work.
 
-### Packages 7–8 — planned
+### Package 7: protocol providers — implemented
 
-- Add SMB, rsync/SSH, and NFS provider adapters.
+- [x] Add the provider-neutral capability, health, session, remote-file, and optimized-sync contracts.
+- [x] Add SMB 3+ through verified operator-managed mounts with mandatory signing and encryption assurances.
+- [x] Add NFSv4+ only through verified operator-managed mounts and host-allowlist assurances.
+- [x] Add rsync/SSH with pinned host identity and absolute secret-file references.
+- [x] Drive generic connection and sync actions from capabilities and enforce unsupported operations in the backend.
+- [x] Add provider contract and fail-closed identity/configuration tests.
+
+SMB and NFS participate in the existing ACL-aware reconciliation engine through a neutral remote-file adapter.
+The rsync/SSH process adapter is registered and health-checkable, but deliberately advertises only optimized
+sync rather than generic sync: direct process execution would bypass application ACL and version-history rules.
+The UI therefore does not offer a sync action for it until an isolated helper preserves those guarantees. See
+[`package-7-protocol-providers.md`](package-7-protocol-providers.md) for settings, attestation, and rollout details.
+
+### Package 8 — planned
+
 - Complete multi-instance hardening, key rotation, migration cleanup, and operational acceptance tests.
 
 ## Verification log
@@ -196,3 +211,5 @@ application logs as an immutable audit trail. They depend on the still-open prov
 | 2026-08-18 | Package 5 EF Core model check | No pending model changes after `FirstClassSyncDefinitions`. |
 | 2026-08-19 | Package 6 focused sync cutover, repository, and connection UI tests | 10 passed, 0 failed, 0 skipped. |
 | 2026-08-19 | Package 6 full `Kaimo_File_Server.Tests` suite | 804 passed, 0 failed, 0 skipped. |
+| 2026-08-19 | Package 7 protocol provider contract tests | 6 passed, 0 failed, 0 skipped. |
+| 2026-08-19 | Package 7 full `Kaimo_File_Server.Tests` suite | 810 passed, 0 failed, 0 skipped. |

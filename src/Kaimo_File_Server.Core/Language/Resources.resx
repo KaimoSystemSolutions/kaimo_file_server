@@ -2298,4 +2298,32 @@
   <data name="Web_ShareList_Tab_Cloud" xml:space="preserve"><value>Cloud</value></data>
   <data name="Web_ShareList_SelectHint" xml:space="preserve"><value>Select a share to view its details and settings.</value></data>
   <data name="Web_ShareList_CloudConnected" xml:space="preserve"><value>The cloud connection was added successfully.</value></data>
+  <data name="Web_ExternalStorage_Capabilities" xml:space="preserve"><value>Capabilities</value></data>
+  <data name="Web_ExternalStorage_None" xml:space="preserve"><value>None</value></data>
+  <data name="Web_ExternalStorage_BrowseUnsupported" xml:space="preserve"><value>This provider does not support remote browsing.</value></data>
+  <data name="Web_ExternalStorage_SyncUnsupported" xml:space="preserve"><value>This provider does not support synchronization.</value></data>
+  <data name="Web_ExternalStorage_VirtualShareUnsupported" xml:space="preserve"><value>This provider cannot be used for virtual shares.</value></data>
+  <data name="Web_ExternalStorage_AuthorizeUnsupported" xml:space="preserve"><value>This connection does not support interactive authorization.</value></data>
+  <data name="Web_ExternalStorage_Capability_Browse" xml:space="preserve"><value>Browse</value></data>
+  <data name="Web_ExternalStorage_Capability_Read" xml:space="preserve"><value>Read</value></data>
+  <data name="Web_ExternalStorage_Capability_Write" xml:space="preserve"><value>Write</value></data>
+  <data name="Web_ExternalStorage_Capability_CreateDirectory" xml:space="preserve"><value>Create folders</value></data>
+  <data name="Web_ExternalStorage_Capability_Delete" xml:space="preserve"><value>Delete</value></data>
+  <data name="Web_ExternalStorage_Capability_Rename" xml:space="preserve"><value>Rename</value></data>
+  <data name="Web_ExternalStorage_Capability_Move" xml:space="preserve"><value>Move</value></data>
+  <data name="Web_ExternalStorage_Capability_ServerSideCopy" xml:space="preserve"><value>Server-side copy</value></data>
+  <data name="Web_ExternalStorage_Capability_Sync" xml:space="preserve"><value>Synchronization</value></data>
+  <data name="Web_ExternalStorage_Capability_StableItemIds" xml:space="preserve"><value>Stable item IDs</value></data>
+  <data name="Web_ExternalStorage_Capability_WatchChanges" xml:space="preserve"><value>Change tracking</value></data>
+  <data name="Web_ExternalStorage_Capability_DelegatedAuthorization" xml:space="preserve"><value>Delegated authorization</value></data>
+  <data name="Web_ExternalStorage_Capability_ApplicationAuthorization" xml:space="preserve"><value>Application authorization</value></data>
+  <data name="Web_ExternalStorage_Capability_RequiresHostMount" xml:space="preserve"><value>Operator-managed mount</value></data>
+  <data name="Web_ExternalStorage_Capability_OptimizedSync" xml:space="preserve"><value>Optimized synchronization</value></data>
+  <data name="Web_ExternalStorage_ConnectionSettings" xml:space="preserve"><value>Protocol settings (JSON)</value></data>
+  <data name="Web_ExternalStorage_ConnectionSettingsHelp" xml:space="preserve"><value>Use only operator-managed mount attestations or absolute secret-file references. Never enter a password or private key.</value></data>
+  <data name="Web_ExternalStorage_InvalidSettings" xml:space="preserve"><value>Enter valid protocol settings of at most 64 KiB.</value></data>
+  <data name="Web_ExternalStorage_ProviderUnsupported" xml:space="preserve"><value>This provider cannot be configured through this workflow.</value></data>
+  <data name="Web_ExternalStorage_Identity" xml:space="preserve"><value>Identity and authorization</value></data>
+  <data name="Web_ExternalStorage_CapabilitiesAndUsage" xml:space="preserve"><value>Capabilities and usage</value></data>
+  <data name="Web_ExternalStorage_SelectSyncHint" xml:space="preserve"><value>Select Edit on a synchronization to open its settings.</value></data>
 </root>
