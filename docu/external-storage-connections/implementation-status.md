@@ -151,9 +151,28 @@ The final unchecked item is deliberately deferred: the legacy editor remains the
 the unified Package 6 administration UI is available. Package 8 performs the irreversible JSON cleanup only
 after operational verification. No user-facing text was added in Package 5, so no new resource keys were needed.
 
-### Packages 6–8 — planned
+### Package 6: unified administration UI — implemented foundation
 
-- Unify the administration UI and virtual-share placement.
+- [x] Add one External Storage navigation entry with Syncs and Connections tabs.
+- [x] Move virtual-share administration under Local Shares / Virtual Shares tabs.
+- [x] Make the sync editor read and write first-class `SyncDefinition` records.
+- [x] Add connection-first creation for syncs and virtual shares.
+- [x] Show connection identity, authorization, scope, health, verification, and usage details.
+- [x] Add test, authorize/reauthorize, disable/enable, and guarded delete actions.
+- [x] Add provider-neutral remote-folder browsing with safe rotated-grant persistence.
+- [x] Add all Package 6 labels and messages to English and German resource files.
+- [ ] Render provider-declared capabilities after the final `IStorageConnectionProvider` contract replaces the legacy cloud adapter.
+- [ ] Link a connection audit summary after durable external-storage audit events are introduced.
+
+The additive compatibility boundary remains intact. Editing an imported sync makes the first-class row
+authoritative; deleting one retains a disabled tombstone. The Package 5 importer now observes all share/path
+keys and cannot overwrite or recreate a Package 6-owned record from retained legacy JSON. See
+[`package-6-unified-administration-ui.md`](package-6-unified-administration-ui.md) for behavior and rollout notes.
+The two remaining detail-pane items intentionally do not infer capabilities from provider IDs or present normal
+application logs as an immutable audit trail. They depend on the still-open provider-contract and audit work.
+
+### Packages 7–8 — planned
+
 - Add SMB, rsync/SSH, and NFS provider adapters.
 - Complete multi-instance hardening, key rotation, migration cleanup, and operational acceptance tests.
 
@@ -175,3 +194,5 @@ after operational verification. No user-facing text was added in Package 5, so n
 | 2026-08-18 | Package 5 first-class sync migration and execution tests | 16 passed, 0 failed, 0 skipped. |
 | 2026-08-18 | Package 5 full `Kaimo_File_Server.Tests` suite | 801 passed, 0 failed, 0 skipped. |
 | 2026-08-18 | Package 5 EF Core model check | No pending model changes after `FirstClassSyncDefinitions`. |
+| 2026-08-19 | Package 6 focused sync cutover, repository, and connection UI tests | 10 passed, 0 failed, 0 skipped. |
+| 2026-08-19 | Package 6 full `Kaimo_File_Server.Tests` suite | 804 passed, 0 failed, 0 skipped. |

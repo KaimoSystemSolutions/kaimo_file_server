@@ -48,18 +48,11 @@
                 <span class="nav-label">@Resources.Web_Nav_BrowseFiles</span>
             </NavLink>
             
-            @if (canManageSyncs())
+            @if (canManageSyncs() || _canManageCloudAccess)
             {
-                <NavLink class="nav-item" href="/sync" Match="NavLinkMatch.Prefix">
+                <NavLink class="nav-item" href="/external-storage" Match="NavLinkMatch.Prefix">
                     @Assets.SVG("cloud-download.svg", new SvgOptions())
-                    <span class="nav-label">@Text("Web_Nav_CloudSync", "Cloud Sync")</span>
-                </NavLink>
-            }
-            @if (_canManageCloudAccess)
-            {
-                <NavLink class="nav-item" href="/cloud-access" Match="NavLinkMatch.Prefix">
-                    @Assets.SVG("cloud-download.svg", new SvgOptions())
-                    <span class="nav-label">@Text("Web_CloudAccess_Title", "Cloud Access")</span>
+                    <span class="nav-label">@Text("Web_ExternalStorage_Title", "External Storage")</span>
                 </NavLink>
             }
             
@@ -337,8 +330,12 @@
             _canManageSyncs = _currentUser != null
                               && await ManagementAuthService.HasAnyPermissionAsync(_currentUser, ManagementPermission.SyncAdmin);
             _canManageCloudAccess = _currentUser != null
-                                    && await ManagementAuthService.HasAnyPermissionAsync(
-                                        _currentUser, ManagementPermission.CloudAccessAdmin);
+                                    && (await ManagementAuthService.HasAnyPermissionAsync(
+                                            _currentUser, ManagementPermission.ManageConnections)
+                                        || await ManagementAuthService.HasAnyPermissionAsync(
+                                            _currentUser, ManagementPermission.UseConnections)
+                                        || await ManagementAuthService.HasAnyPermissionAsync(
+                                            _currentUser, ManagementPermission.ManageCloudAccess));
         }
     }
 

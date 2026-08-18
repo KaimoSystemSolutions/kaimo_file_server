@@ -1,0 +1,54 @@
+@page "/external-storage"
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.Pages.ExternalStorage.Components
+
+<PageTitle>@R("Web_ExternalStorage_Title") - Kaimo Files</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>@R("Web_ExternalStorage_Title")</h1>
+        <p class="subtitle">@R("Web_ExternalStorage_Subtitle")</p>
+    </div>
+</div>
+
+<div class="external-storage-tabs" role="tablist" aria-label="@R("Web_ExternalStorage_Title")">
+    <button class="@TabClass(ExternalStorageTab.Syncs)" type="button" role="tab"
+            aria-selected="@(_activeTab == ExternalStorageTab.Syncs)"
+            @onclick="() => SelectTab(ExternalStorageTab.Syncs)">@R("Web_ExternalStorage_Tab_Syncs")</button>
+    <button class="@TabClass(ExternalStorageTab.Connections)" type="button" role="tab"
+            aria-selected="@(_activeTab == ExternalStorageTab.Connections)"
+            @onclick="() => SelectTab(ExternalStorageTab.Connections)">@R("Web_ExternalStorage_Tab_Connections")</button>
+</div>
+
+@if (_activeTab == ExternalStorageTab.Syncs)
+{
+    <SyncAdministration InitialConnectionId="Connection" />
+}
+else
+{
+    <ConnectionAdministration />
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "tab")]
+    [Parameter]
+    public string? Tab { get; set; }
+
+    [SupplyParameterFromQuery(Name = "connection")]
+    [Parameter]
+    public Guid? Connection { get; set; }
+
+    private ExternalStorageTab _activeTab = ExternalStorageTab.Syncs;
+
+    protected override void OnParametersSet()
+        => _activeTab = string.Equals(Tab, "connections", StringComparison.OrdinalIgnoreCase)
+            ? ExternalStorageTab.Connections
+            : ExternalStorageTab.Syncs;
+
+    private void SelectTab(ExternalStorageTab tab) => _activeTab = tab;
+    private string TabClass(ExternalStorageTab tab)
+        => tab == _activeTab ? "external-storage-tab external-storage-tab--active" : "external-storage-tab";
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+
+    private enum ExternalStorageTab { Syncs, Connections }
+}

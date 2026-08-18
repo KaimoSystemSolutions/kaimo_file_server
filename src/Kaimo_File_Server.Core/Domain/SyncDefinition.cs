@@ -11,6 +11,7 @@ namespace Kaimo_File_Server.Core.Domain;
 public sealed class SyncDefinition
 {
     public const string LegacyCloudSettingsSource = "legacy-cloud-settings";
+    public const string DeletedByFirstClassEditorSource = "first-class-deleted";
 
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid ConnectionId { get; set; }

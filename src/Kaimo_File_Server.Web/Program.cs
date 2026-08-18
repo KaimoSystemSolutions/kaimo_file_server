@@ -142,6 +142,7 @@ builder.Services.AddScoped<UserListViewModel>();
 builder.Services.AddScoped<AclEditorViewModel>();
 builder.Services.AddScoped<DepartmentViewModel>();
 builder.Services.AddScoped<CloudSyncViewModel>();
+builder.Services.AddScoped<ExternalStorageSyncViewModel>();
 builder.Services.AddScoped<CloudAccessViewModel>();
 builder.Services.AddScoped<CloudAccessShareBrowserViewModel>();
 builder.Services.AddScoped<OneDriveCloudAccessFileBrowserViewModel>();

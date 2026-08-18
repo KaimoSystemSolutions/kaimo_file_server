@@ -114,4 +114,42 @@ public sealed class LegacyCloudSyncMigrationTests : DatabaseTestBase
         Assert.False((await verification.SyncDefinitions.SingleAsync()).Enabled);
         Assert.Single(await verification.StorageConnections.ToListAsync());
     }
+
+    [Fact]
+    public async Task EnsureMigratedAsync_DoesNotOverwriteDefinitionOwnedByFirstClassEditor()
+    {
+        var share = SeedShare("authoritative-sync");
+        using (var db = NewContext())
+        {
+            var persisted = await db.ShareDefinitions.SingleAsync(item => item.Id == share.Id);
+            persisted.CloudSettings.Folders["projects"] = new SyncedFolder(
+                "onedrive", new Dictionary<string, string> { ["refreshToken"] = "original" }, "/legacy");
+            persisted.CloudSettings = new CloudSettings(
+                new Dictionary<string, SyncedFolder>(persisted.CloudSettings.Folders));
+            await db.SaveChangesAsync();
+        }
+        var sut = new LegacyCloudSyncMigrationService(
+            DbFactory,
+            new DataProtectionCredentialVault(new EphemeralDataProtectionProvider()),
+            NullLogger<LegacyCloudSyncMigrationService>.Instance);
+        await sut.EnsureMigratedAsync();
+
+        using (var db = NewContext())
+        {
+            var definition = await db.SyncDefinitions.SingleAsync();
+            definition.MigrationSource = null;
+            definition.RemotePath = "/first-class";
+            var persisted = await db.ShareDefinitions.SingleAsync(item => item.Id == share.Id);
+            persisted.CloudSettings.Folders["projects"].RemotePath = "/changed-legacy";
+            persisted.CloudSettings = new CloudSettings(
+                new Dictionary<string, SyncedFolder>(persisted.CloudSettings.Folders));
+            await db.SaveChangesAsync();
+        }
+
+        await sut.EnsureMigratedAsync();
+
+        using var verification = NewContext();
+        Assert.Equal("/first-class", (await verification.SyncDefinitions.SingleAsync()).RemotePath);
+        Assert.Single(await verification.StorageConnections.ToListAsync());
+    }
 }

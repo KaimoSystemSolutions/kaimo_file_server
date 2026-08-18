@@ -10,8 +10,13 @@
 @inject IJSRuntime JS
 @inject AssetProvider Assets
 
-<PageTitle>@R("Web_CloudAccess_Title") - Kaimo Files</PageTitle>
+@if (!Embedded)
+{
+    <PageTitle>@R("Web_CloudAccess_Title") - Kaimo Files</PageTitle>
+}
 
+@if (!Embedded)
+{
 <div class="page-header cloud-access-header">
     <div>
         <h1>@R("Web_CloudAccess_Title")</h1>
@@ -20,7 +25,7 @@
     @if (VM.CanManageConnections || (VM.CanManageVirtualShares && VM.CanUseConnections))
     {
         <div class="page-header-actions">
-            @if (VM.CanManageConnections)
+            @if (VM.CanManageConnections && !VirtualSharesOnly)
             {
                 <button class="btn-secondary" type="button" @onclick="ToggleConnectionForm">
                     @Assets.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
@@ -37,6 +42,7 @@
         </div>
     }
 </div>
+}
 
 @if (VM.IsLoading)
 {
@@ -53,7 +59,7 @@ else
         <div class="error-banner">@(_error ?? VM.ErrorMessage)</div>
     }
 
-    @if (_showConnectionForm)
+    @if (_showConnectionForm && !VirtualSharesOnly)
     {
         <section class="create-form-card cloud-access-create-card">
             <div class="detail-header">
@@ -253,6 +259,8 @@ else
         </aside>
     </div>
 
+    @if (!VirtualSharesOnly)
+    {
     <section class="cloud-access-connections">
         <h3>@R("Web_CloudAccess_Connections")</h3>
         @if (VM.Connections.Count == 0)
@@ -292,6 +300,7 @@ else
             </div>
         }
     </section>
+    }
 }
 
 <DirectoryPickerDialog IsOpen="@_pickerOpen"
@@ -306,6 +315,9 @@ else
                        OnClosed="ClosePicker" />
 
 @code {
+    [Parameter] public bool Embedded { get; set; }
+    [Parameter] public bool VirtualSharesOnly { get; set; }
+    [Parameter] public Guid? InitialConnectionId { get; set; }
     private bool _showConnectionForm;
     private bool _showShareForm;
     private string _connectionProvider = "";
@@ -346,6 +358,13 @@ else
     {
         if (!firstRender) return;
         await VM.LoadAsync();
+        if (InitialConnectionId is Guid connectionId
+            && VM.Connections.Any(connection => connection.Id == connectionId && IsReady(connection)))
+        {
+            _shareConnectionId = connectionId;
+            _showShareForm = true;
+            await VM.LoadPrincipalsAsync(VM.Connections.Single(connection => connection.Id == connectionId).DepartmentId);
+        }
         StateHasChanged();
     }
 

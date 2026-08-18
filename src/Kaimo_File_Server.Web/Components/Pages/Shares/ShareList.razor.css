@@ -218,3 +218,25 @@
         margin-inline: -14px;
     }
 }
+.share-kind-tabs {
+    display: flex;
+    gap: .5rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.share-kind-tab {
+    padding: .8rem 1.15rem;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.share-kind-tab--active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}

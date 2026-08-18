@@ -2196,4 +2196,83 @@
   <data name="Web_GoogleOAuth_InvalidCallback" xml:space="preserve"><value>Google hat einen ungültigen Autorisierungsrückruf gesendet.</value></data>
   <data name="Web_GoogleOAuth_ExchangeFailed" xml:space="preserve"><value>Die Google-Autorisierung konnte nicht abgeschlossen werden. Es wurden keine Zugangsdaten gespeichert.</value></data>
   <data name="Web_GoogleOAuth_CallbackConflict" xml:space="preserve"><value>„{0}“ überschneidet sich jetzt mit dem synchronisierten Ordner „{1}“. Es wurde keine Verbindung hergestellt.</value></data>
+  <data name="Web_ExternalStorage_Title" xml:space="preserve"><value>Externer Speicher</value></data>
+  <data name="Web_ExternalStorage_Subtitle" xml:space="preserve"><value>Wiederverwendbare Anbieter-Verbindungen und die zugehörigen Synchronisierungen verwalten.</value></data>
+  <data name="Web_ExternalStorage_Tab_Syncs" xml:space="preserve"><value>Synchronisierungen</value></data>
+  <data name="Web_ExternalStorage_Tab_Connections" xml:space="preserve"><value>Verbindungen</value></data>
+  <data name="Web_ExternalStorage_Loading" xml:space="preserve"><value>Externer Speicher wird geladen…</value></data>
+  <data name="Web_ExternalStorage_LoadFailed" xml:space="preserve"><value>Der externe Speicher konnte nicht geladen werden.</value></data>
+  <data name="Web_ExternalStorage_SyncsHelp" xml:space="preserve"><value>Lokale Ordner über wiederverwendbare, geschützte Verbindungen synchronisieren.</value></data>
+  <data name="Web_ExternalStorage_ConnectionsHelp" xml:space="preserve"><value>Einen Anbieter einmal autorisieren, den Zustand prüfen und die Verbindung sicher wiederverwenden.</value></data>
+  <data name="Web_ExternalStorage_CreateSync" xml:space="preserve"><value>Synchronisierung erstellen</value></data>
+  <data name="Web_ExternalStorage_EditSync" xml:space="preserve"><value>Synchronisierung bearbeiten</value></data>
+  <data name="Web_ExternalStorage_CreateSyncFromConnection" xml:space="preserve"><value>Synchronisierung erstellen</value></data>
+  <data name="Web_ExternalStorage_CreateShareFromConnection" xml:space="preserve"><value>Virtuelle Freigabe erstellen</value></data>
+  <data name="Web_ExternalStorage_NoSyncs" xml:space="preserve"><value>Es sind keine Synchronisierungen konfiguriert.</value></data>
+  <data name="Web_ExternalStorage_Name" xml:space="preserve"><value>Name</value></data>
+  <data name="Web_ExternalStorage_Description" xml:space="preserve"><value>Beschreibung</value></data>
+  <data name="Web_ExternalStorage_Connection" xml:space="preserve"><value>Verbindung</value></data>
+  <data name="Web_ExternalStorage_LocalShare" xml:space="preserve"><value>Lokale Freigabe</value></data>
+  <data name="Web_ExternalStorage_LocalPath" xml:space="preserve"><value>Lokaler Ordner</value></data>
+  <data name="Web_ExternalStorage_RemotePath" xml:space="preserve"><value>Entfernter Ordner</value></data>
+  <data name="Web_ExternalStorage_Mode" xml:space="preserve"><value>Richtung</value></data>
+  <data name="Web_ExternalStorage_Select" xml:space="preserve"><value>Auswählen…</value></data>
+  <data name="Web_ExternalStorage_Enabled" xml:space="preserve"><value>Aktiviert</value></data>
+  <data name="Web_ExternalStorage_Disabled" xml:space="preserve"><value>Deaktiviert</value></data>
+  <data name="Web_ExternalStorage_Enable" xml:space="preserve"><value>Aktivieren</value></data>
+  <data name="Web_ExternalStorage_Disable" xml:space="preserve"><value>Deaktivieren</value></data>
+  <data name="Web_ExternalStorage_ScheduleEnabled" xml:space="preserve"><value>Automatisch ausführen</value></data>
+  <data name="Web_ExternalStorage_Interval" xml:space="preserve"><value>Mindestintervall (Sekunden)</value></data>
+  <data name="Web_ExternalStorage_ExcludedExtensions" xml:space="preserve"><value>Ausgeschlossene Dateiendungen</value></data>
+  <data name="Web_ExternalStorage_MaxFileSize" xml:space="preserve"><value>Maximale Dateigröße (MB)</value></data>
+  <data name="Web_ExternalStorage_MaxUploadRate" xml:space="preserve"><value>Upload-Limit (KB/s)</value></data>
+  <data name="Web_ExternalStorage_MaxDownloadRate" xml:space="preserve"><value>Download-Limit (KB/s)</value></data>
+  <data name="Web_ExternalStorage_LastRun" xml:space="preserve"><value>Letzte Ausführung</value></data>
+  <data name="Web_ExternalStorage_Health" xml:space="preserve"><value>Zustand</value></data>
+  <data name="Web_ExternalStorage_Healthy" xml:space="preserve"><value>Fehlerfrei</value></data>
+  <data name="Web_ExternalStorage_AttentionRequired" xml:space="preserve"><value>Aktion erforderlich</value></data>
+  <data name="Web_ExternalStorage_RunNow" xml:space="preserve"><value>Jetzt ausführen</value></data>
+  <data name="Web_ExternalStorage_OperationFailed" xml:space="preserve"><value>Der Vorgang ist fehlgeschlagen. Prüfen Sie das Serverprotokoll.</value></data>
+  <data name="Web_ExternalStorage_SyncMissing" xml:space="preserve"><value>Die Synchronisierung ist nicht mehr vorhanden.</value></data>
+  <data name="Web_ExternalStorage_SyncUnavailable" xml:space="preserve"><value>Die Synchronisierung ist belegt oder nicht verfügbar.</value></data>
+  <data name="Web_ExternalStorage_ShareMissing" xml:space="preserve"><value>Die lokale Freigabe ist nicht mehr vorhanden.</value></data>
+  <data name="Web_ExternalStorage_InvalidName" xml:space="preserve"><value>Geben Sie einen Namen mit höchstens 200 Zeichen ein.</value></data>
+  <data name="Web_ExternalStorage_InvalidDescription" xml:space="preserve"><value>Die Beschreibung ist zu lang.</value></data>
+  <data name="Web_ExternalStorage_PathInUse" xml:space="preserve"><value>Für diesen lokalen Ordner ist bereits eine Synchronisierung eingerichtet.</value></data>
+  <data name="Web_ExternalStorage_DepartmentMismatch" xml:space="preserve"><value>Verbindung und lokale Freigabe müssen zur selben Abteilung gehören.</value></data>
+  <data name="Web_ExternalStorage_SelectConnection" xml:space="preserve"><value>Wählen Sie eine Verbindung aus, um Details anzuzeigen.</value></data>
+  <data name="Web_ExternalStorage_AuthorizationMode" xml:space="preserve"><value>Autorisierungsmodus</value></data>
+  <data name="Web_ExternalStorage_Tenant" xml:space="preserve"><value>Mandant / Organisation</value></data>
+  <data name="Web_ExternalStorage_Scopes" xml:space="preserve"><value>Effektive Berechtigungsbereiche</value></data>
+  <data name="Web_ExternalStorage_State" xml:space="preserve"><value>Status</value></data>
+  <data name="Web_ExternalStorage_LastVerified" xml:space="preserve"><value>Zuletzt geprüft</value></data>
+  <data name="Web_ExternalStorage_ProfileHealth" xml:space="preserve"><value>Anbieterprofil</value></data>
+  <data name="Web_ExternalStorage_SecretHealth" xml:space="preserve"><value>Anmeldedatenspeicher</value></data>
+  <data name="Web_ExternalStorage_Usage" xml:space="preserve"><value>Verwendung</value></data>
+  <data name="Web_ExternalStorage_UsageFormat" xml:space="preserve"><value>{0} Synchronisierung(en), {1} virtuelle Freigabe(n)</value></data>
+  <data name="Web_ExternalStorage_ProfileLegacy" xml:space="preserve"><value>Legacy / nicht zugewiesen</value></data>
+  <data name="Web_ExternalStorage_ProfileConfigured" xml:space="preserve"><value>Konfiguriert</value></data>
+  <data name="Web_ExternalStorage_Protected" xml:space="preserve"><value>Geschützt</value></data>
+  <data name="Web_ExternalStorage_NotAuthorized" xml:space="preserve"><value>Nicht autorisiert</value></data>
+  <data name="Web_ExternalStorage_Test" xml:space="preserve"><value>Testen</value></data>
+  <data name="Web_ExternalStorage_TestUnsupported" xml:space="preserve"><value>Für diesen Anbieter ist noch kein Verbindungstest verfügbar.</value></data>
+  <data name="Web_ExternalStorage_State_PendingAuthorization" xml:space="preserve"><value>Autorisierung ausstehend</value></data>
+  <data name="Web_ExternalStorage_State_Ready" xml:space="preserve"><value>Bereit</value></data>
+  <data name="Web_ExternalStorage_State_Degraded" xml:space="preserve"><value>Beeinträchtigt</value></data>
+  <data name="Web_ExternalStorage_State_Disabled" xml:space="preserve"><value>Deaktiviert</value></data>
+  <data name="Web_ExternalStorage_State_PendingConfiguration" xml:space="preserve"><value>Konfiguration ausstehend</value></data>
+  <data name="Web_ExternalStorage_State_NeedsReauthorization" xml:space="preserve"><value>Erneute Autorisierung erforderlich</value></data>
+  <data name="Web_ExternalStorage_Auth_DeviceCode" xml:space="preserve"><value>Gerätecode</value></data>
+  <data name="Web_ExternalStorage_Auth_DelegatedAuthorizationCode" xml:space="preserve"><value>Delegierter Autorisierungscode</value></data>
+  <data name="Web_ExternalStorage_Auth_ApplicationCredential" xml:space="preserve"><value>Anwendungsanmeldedaten</value></data>
+  <data name="Web_ExternalStorage_Auth_ServiceAccount" xml:space="preserve"><value>Dienstkonto</value></data>
+  <data name="Web_ExternalStorage_Auth_UsernamePassword" xml:space="preserve"><value>Benutzername und Kennwort</value></data>
+  <data name="Web_ExternalStorage_Auth_SshKey" xml:space="preserve"><value>SSH-Schlüssel</value></data>
+  <data name="Web_ExternalStorage_Auth_HostMount" xml:space="preserve"><value>Host-Einhängung</value></data>
+  <data name="Web_Shares_LocalShares" xml:space="preserve"><value>Lokale Freigaben</value></data>
+  <data name="Web_Shares_VirtualShares" xml:space="preserve"><value>Virtuelle Freigaben</value></data>
+  <data name="Web_ExternalStorage_RemoteBrowseFailed" xml:space="preserve"><value>Die entfernten Ordner konnten nicht geladen werden.</value></data>
+  <data name="Web_ShareList_Tab_Cloud" xml:space="preserve"><value>Cloud</value></data>
+  <data name="Web_ShareList_SelectHint" xml:space="preserve"><value>Wählen Sie eine Freigabe aus, um Details und Einstellungen anzuzeigen.</value></data>
+  <data name="Web_ShareList_CloudConnected" xml:space="preserve"><value>Die Cloud-Verbindung wurde erfolgreich hinzugefügt.</value></data>
 </root>

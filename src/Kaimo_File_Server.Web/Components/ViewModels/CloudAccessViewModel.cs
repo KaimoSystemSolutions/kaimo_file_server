@@ -57,6 +57,8 @@ public sealed class CloudAccessViewModel
     }
 
     public List<StorageConnection> Connections { get; private set; } = [];
+    public IReadOnlyDictionary<Guid, StorageConnectionUsage> ConnectionUsage { get; private set; }
+        = new Dictionary<Guid, StorageConnectionUsage>();
     public List<CloudAccessShare> Shares { get; private set; } = [];
     public List<Department> ManageableDepartments { get; private set; } = [];
     public List<Identity> AvailablePrincipals { get; private set; } = [];
@@ -84,7 +86,7 @@ public sealed class CloudAccessViewModel
             CanManageConnections = HasDepartments(connectionScope);
             CanUseConnections = HasDepartments(usageScope);
             CanManageVirtualShares = HasDepartments(shareScope);
-            CanManage = CanManageConnections || CanManageVirtualShares;
+            CanManage = CanManageConnections || CanManageVirtualShares || CanUseConnections;
             var allDepartments = await _departments.GetAllAsync();
             var connectionManagementIds = GetDepartmentIds(connectionScope, allDepartments);
             var connectionUsageIds = GetDepartmentIds(usageScope, allDepartments);
@@ -94,6 +96,11 @@ public sealed class CloudAccessViewModel
             var visibleConnectionIds = connectionManagementIds.Concat(connectionUsageIds).ToHashSet();
             Connections = (await _connections.GetAllAsync())
                 .Where(x => visibleConnectionIds.Contains(x.DepartmentId)).ToList();
+            ConnectionUsage = (await Task.WhenAll(Connections.Select(async connection =>
+                    new KeyValuePair<Guid, StorageConnectionUsage>(
+                        connection.Id,
+                        await _connections.GetUsageAsync(connection.Id)))))
+                .ToDictionary(item => item.Key, item => item.Value);
             Shares = (await _repository.GetSharesAsync())
                 .Where(x => shareIds.Contains(x.DepartmentId)).ToList();
         }
@@ -143,6 +150,38 @@ public sealed class CloudAccessViewModel
             throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
 
         connection.Name = normalizedName;
+        await _connections.SaveAsync(connection);
+        await LoadAsync();
+    }
+
+    /// <summary>Disables or re-enables a connection without removing its consumers.</summary>
+    public async Task SetConnectionEnabledAsync(Guid connectionId, bool enabled)
+    {
+        var connection = await GetManagedConnectionAsync(connectionId);
+        connection.State = enabled
+            ? string.IsNullOrWhiteSpace(connection.EncryptedCredentialPayload)
+                ? StorageConnectionState.PendingAuthorization
+                : StorageConnectionState.Ready
+            : StorageConnectionState.Disabled;
+        connection.LastErrorCode = null;
+        await _connections.SaveAsync(connection);
+        await LoadAsync();
+    }
+
+    /// <summary>
+    /// Verifies the currently supported OneDrive connection by listing its root.
+    /// Provider response details remain behind the sanitized provider boundary.
+    /// </summary>
+    public async Task TestConnectionAsync(Guid connectionId)
+    {
+        var connection = await GetManagedConnectionAsync(connectionId);
+        if (!string.Equals(connection.ProviderId, "onedrive", StringComparison.OrdinalIgnoreCase))
+            throw new NotSupportedException(R("Web_ExternalStorage_TestUnsupported"));
+        await ListOneDriveFoldersAsync(connectionId, "/");
+        connection = await GetManagedConnectionAsync(connectionId);
+        connection.State = StorageConnectionState.Ready;
+        connection.LastVerifiedAtUtc = DateTime.UtcNow;
+        connection.LastErrorCode = null;
         await _connections.SaveAsync(connection);
         await LoadAsync();
     }

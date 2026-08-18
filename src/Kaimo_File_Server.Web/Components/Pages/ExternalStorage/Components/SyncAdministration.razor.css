@@ -1,0 +1,20 @@
+.storage-toolbar, .storage-card-heading { display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
+.storage-toolbar { margin-bottom: 1rem; }
+.storage-toolbar h2 { margin: 0; }
+.storage-editor, .storage-card { border: 1px solid var(--border-color); border-radius: 12px; background: var(--surface); padding: 1rem; }
+.storage-editor { margin-bottom: 1rem; }
+.storage-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.storage-form-grid label { display: grid; gap: .4rem; color: var(--text-secondary); font-size: .9rem; }
+.storage-form-grid .storage-wide { grid-column: 1 / -1; }
+.storage-form-grid .storage-check { display: flex; align-items: center; }
+.storage-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+.storage-card-heading strong, .storage-card-heading small { display: block; }
+.storage-card-heading small { color: var(--text-secondary); margin-top: .25rem; }
+.storage-card dl { display: grid; grid-template-columns: max-content 1fr; gap: .45rem .8rem; margin: 1rem 0; }
+.storage-card dt { color: var(--text-secondary); }
+.storage-card dd { margin: 0; overflow-wrap: anywhere; }
+.storage-state { color: var(--success); font-size: .8rem; font-weight: 700; }
+.storage-state--disabled { color: var(--text-tertiary); }
+.storage-path-field { display: flex; gap: .5rem; }
+.storage-path-field .edit-input { min-width: 0; flex: 1; }
+@media (max-width: 760px) { .storage-form-grid { grid-template-columns: 1fr; } .storage-form-grid .storage-wide { grid-column: auto; } }

@@ -6,6 +6,15 @@ namespace Kaimo_File_Server.Web.Components.Pages.Shares;
 
 public partial class ShareList
 {
+    [SupplyParameterFromQuery(Name = "view")]
+    [Parameter]
+    public string? View { get; set; }
+
+    [SupplyParameterFromQuery(Name = "connection")]
+    [Parameter]
+    public Guid? Connection { get; set; }
+
+    private ShareKind _shareKind = ShareKind.Local;
     
     [SupplyParameterFromQuery]
     [Parameter]
@@ -16,6 +25,11 @@ public partial class ShareList
     private string _aclEditorKey = "";
     private bool _accessLoaded;
     private bool _showExtendedShareInfo;
+
+    protected override void OnParametersSet()
+        => _shareKind = string.Equals(View, "virtual", StringComparison.OrdinalIgnoreCase)
+            ? ShareKind.Virtual
+            : ShareKind.Local;
     
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -44,7 +58,7 @@ public partial class ShareList
         HandleCardClick(share);
         SwitchTab(ShareDetailTab.Cloud);
         StateHasChanged();
-        Toasts.Show("Successfully synced Cloud with Share", ToastType.Success);
+        Toasts.Show(Text("Web_ShareList_CloudConnected", "The cloud connection was added successfully."), ToastType.Success);
     }
     
     private void HandleCardClick(ShareDefinition share)
@@ -92,6 +106,14 @@ public partial class ShareList
     private void ToggleExtendedShareInfo()
         => _showExtendedShareInfo = !_showExtendedShareInfo;
 
+    private void SelectShareKind(ShareKind kind) => _shareKind = kind;
+
+    private string ShareKindClass(ShareKind kind)
+        => kind == _shareKind ? "share-kind-tab share-kind-tab--active" : "share-kind-tab";
+
+    private static string Text(string key, string fallback)
+        => Core.Language.Resources.ResourceManager.GetString(key) ?? fallback;
+
     private void OpenShare(string name) => Nav.NavigateTo($"/files/{name}");
 
     private void HandleShareDeleted()
@@ -100,6 +122,12 @@ public partial class ShareList
         _accessLoaded = false;
         StateHasChanged();
     }
+}
+
+internal enum ShareKind
+{
+    Local,
+    Virtual
 }
 
 internal enum ShareDetailTab

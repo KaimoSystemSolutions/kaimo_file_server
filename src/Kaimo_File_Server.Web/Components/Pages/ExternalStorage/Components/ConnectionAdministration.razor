@@ -1,0 +1,147 @@
+@using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Repositories
+@using Kaimo_File_Server.Web.Components.ViewModels
+@inject CloudAccessViewModel VM
+@inject NavigationManager Nav
+
+@if (VM.IsLoading)
+{
+    <div class="loading-state"><div class="spinner"></div><p>@R("Web_ExternalStorage_Loading")</p></div>
+}
+else if (!VM.CanManage)
+{
+    <div class="error-banner">@R("Web_CloudAccess_NoPermission")</div>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(_error ?? VM.ErrorMessage))
+    {
+        <div class="error-banner">@(_error ?? VM.ErrorMessage)</div>
+    }
+    <div class="connection-toolbar">
+        <div><h2>@R("Web_ExternalStorage_Tab_Connections")</h2><p class="subtitle">@R("Web_ExternalStorage_ConnectionsHelp")</p></div>
+        @if (VM.CanManageConnections)
+        {
+            <button class="btn-primary" type="button" @onclick="() => _creating = !_creating">@R("Web_CloudAccess_AddConnection")</button>
+        }
+    </div>
+
+    @if (_creating)
+    {
+        <section class="connection-editor">
+            <h3>@R("Web_CloudAccess_AddConnection")</h3>
+            <div class="connection-form">
+                <label><span>@R("Web_CloudAccess_Provider")</span><select class="edit-input" @bind="_provider"><option value="onedrive">Microsoft OneDrive</option></select></label>
+                <label><span>@R("Web_CloudAccess_ConnectionName")</span><input class="edit-input" maxlength="200" @bind="_name" /></label>
+                <label><span>@R("Web_CloudAccess_Department")</span><select class="edit-input" @bind="_departmentId"><option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>@foreach (var department in VM.ManageableDepartments) { <option value="@department.Id">@department.Name</option> }</select></label>
+            </div>
+            <div class="detail-actions"><button class="btn-secondary" type="button" @onclick="CancelCreate">@R("Web_Button_Cancel")</button><button class="btn-primary" type="button" disabled="@(_busy || !CanCreate)" @onclick="CreateAsync">@R("Web_CloudAccess_Connect")</button></div>
+        </section>
+    }
+
+    @if (VM.Connections.Count == 0)
+    {
+        <div class="empty-state"><p>@R("Web_CloudAccess_NoConnections")</p></div>
+    }
+    else
+    {
+        <div class="connection-layout">
+            <div class="connection-list">
+                @foreach (var connection in VM.Connections)
+                {
+                    <button class="connection-row @(_selected?.Id == connection.Id ? "connection-row--selected" : "")" type="button" @onclick="() => _selected = connection">
+                        <span><strong>@connection.Name</strong><small>@ProviderName(connection.ProviderId) · @StateName(connection.State)</small></span>
+                        <span class="connection-health connection-health--@StateClass(connection.State)"></span>
+                    </button>
+                }
+            </div>
+            <aside class="connection-detail">
+                @if (_selected is null)
+                {
+                    <div class="detail-empty"><p>@R("Web_ExternalStorage_SelectConnection")</p></div>
+                }
+                else
+                {
+                    var usage = Usage(_selected.Id);
+                    <div class="detail-header"><h3>@_selected.Name</h3><span class="detail-subtitle">@ProviderName(_selected.ProviderId)</span></div>
+                    <dl>
+                        <dt>@R("Web_ExternalStorage_AuthorizationMode")</dt><dd>@AuthorizationName(_selected.AuthorizationMode)</dd>
+                        <dt>@R("Web_CloudAccess_Account")</dt><dd>@(_selected.AccountEmail ?? _selected.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</dd>
+                        <dt>@R("Web_ExternalStorage_Tenant")</dt><dd>@(_selected.ProviderTenantId ?? "—")</dd>
+                        <dt>@R("Web_ExternalStorage_Scopes")</dt><dd>@(_selected.EffectiveScopes ?? "—")</dd>
+                        <dt>@R("Web_ExternalStorage_State")</dt><dd>@StateName(_selected.State)</dd>
+                        <dt>@R("Web_ExternalStorage_LastVerified")</dt><dd>@FormatDate(_selected.LastVerifiedAtUtc)</dd>
+                        <dt>@R("Web_ExternalStorage_ProfileHealth")</dt><dd>@(_selected.ProviderProfileId is null ? R("Web_ExternalStorage_ProfileLegacy") : R("Web_ExternalStorage_ProfileConfigured"))</dd>
+                        <dt>@R("Web_ExternalStorage_SecretHealth")</dt><dd>@(string.IsNullOrWhiteSpace(_selected.EncryptedCredentialPayload) ? R("Web_ExternalStorage_NotAuthorized") : R("Web_ExternalStorage_Protected"))</dd>
+                        <dt>@R("Web_ExternalStorage_Usage")</dt><dd>@string.Format(R("Web_ExternalStorage_UsageFormat"), usage.SyncCount, usage.VirtualShareCount)</dd>
+                    </dl>
+                    @if (!string.IsNullOrWhiteSpace(_selected.LastErrorCode))
+                    {
+                        <div class="error-banner">@R("Web_ExternalStorage_AttentionRequired") (@_selected.LastErrorCode)</div>
+                    }
+                    <div class="detail-actions connection-actions">
+                        <button class="btn-primary" type="button" disabled="@(_selected.State != StorageConnectionState.Ready)" @onclick="CreateSyncFromSelected">@R("Web_ExternalStorage_CreateSyncFromConnection")</button>
+                        <button class="btn-secondary" type="button" disabled="@(_selected.State != StorageConnectionState.Ready)" @onclick="CreateShareFromSelected">@R("Web_ExternalStorage_CreateShareFromConnection")</button>
+                        @if (VM.CanManageConnections)
+                        {
+                            <button class="btn-secondary" type="button" disabled="@_busy" @onclick="TestAsync">@R("Web_ExternalStorage_Test")</button>
+                            <button class="btn-secondary" type="button" disabled="@_busy" @onclick="AuthorizeAsync">@(_selected.State == StorageConnectionState.Ready ? R("Web_CloudAccess_Reauthorize") : R("Web_CloudAccess_Authorize"))</button>
+                            <button class="btn-secondary" type="button" disabled="@_busy" @onclick="ToggleEnabledAsync">@(_selected.State == StorageConnectionState.Disabled ? R("Web_ExternalStorage_Enable") : R("Web_ExternalStorage_Disable"))</button>
+                            <button class="btn-danger-outline" type="button" disabled="@(_busy || usage.TotalCount > 0)" @onclick="DeleteAsync">@R("Web_Action_Delete")</button>
+                        }
+                    </div>
+                }
+            </aside>
+        </div>
+    }
+}
+
+@code {
+    private StorageConnection? _selected;
+    private bool _creating;
+    private bool _busy;
+    private string _provider = "onedrive";
+    private string _name = string.Empty;
+    private Guid _departmentId;
+    private string? _error;
+    private bool CanCreate => _provider == "onedrive" && !string.IsNullOrWhiteSpace(_name) && _departmentId != Guid.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await VM.LoadAsync();
+        _selected = VM.Connections.FirstOrDefault();
+        StateHasChanged();
+    }
+
+    private async Task CreateAsync() => await ActAsync(async () =>
+    {
+        string uri = await VM.CreateOneDriveConnectionAsync(_name, _departmentId);
+        Nav.NavigateTo(uri, forceLoad: true);
+    });
+    private async Task AuthorizeAsync() => await ActAsync(async () => Nav.NavigateTo(await VM.AuthorizeConnectionAsync(_selected!.Id), forceLoad: true));
+    private async Task TestAsync() => await ActAsync(() => VM.TestConnectionAsync(_selected!.Id));
+    private async Task ToggleEnabledAsync() => await ActAsync(() => VM.SetConnectionEnabledAsync(_selected!.Id, _selected.State == StorageConnectionState.Disabled));
+    private async Task DeleteAsync() => await ActAsync(() => VM.DeleteConnectionAsync(_selected!.Id));
+    private async Task ActAsync(Func<Task> action)
+    {
+        Guid? selectedId = _selected?.Id;
+        _busy = true; _error = null;
+        try { await action(); _selected = selectedId is Guid id ? VM.Connections.FirstOrDefault(c => c.Id == id) : VM.Connections.FirstOrDefault(); }
+        catch (InvalidOperationException exception) { _error = exception.Message; }
+        catch (ArgumentException exception) { _error = exception.Message; }
+        catch { _error = R("Web_ExternalStorage_OperationFailed"); }
+        finally { _busy = false; }
+    }
+    private void CreateSyncFromSelected() => Nav.NavigateTo($"/external-storage?tab=syncs&connection={_selected!.Id:D}");
+    private void CreateShareFromSelected() => Nav.NavigateTo($"/?view=virtual&connection={_selected!.Id:D}");
+    private void CancelCreate() { _creating = false; _name = string.Empty; _departmentId = Guid.Empty; }
+    private StorageConnectionUsage Usage(Guid id) => VM.ConnectionUsage.GetValueOrDefault(id) ?? new StorageConnectionUsage(0, 0);
+    private static string ProviderName(string id) => id.Equals("onedrive", StringComparison.OrdinalIgnoreCase) ? "Microsoft OneDrive" : id.Equals("google", StringComparison.OrdinalIgnoreCase) ? "Google Drive" : id;
+    private static string StateName(StorageConnectionState state) => R($"Web_ExternalStorage_State_{state}");
+    private static string StateClass(StorageConnectionState state) => state switch { StorageConnectionState.Ready => "ready", StorageConnectionState.Disabled => "disabled", _ => "attention" };
+    private static string AuthorizationName(StorageAuthorizationMode mode) => R($"Web_ExternalStorage_Auth_{mode}");
+    private static string FormatDate(DateTime? value) => value?.ToLocalTime().ToString("g") ?? R("Web_CloudSync_Never");
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+}

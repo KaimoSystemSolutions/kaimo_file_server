@@ -55,10 +55,8 @@ public sealed class LegacyCloudSyncMigrationService(
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var shares = await db.ShareDefinitions.ToListAsync(cancellationToken);
-        var imported = await db.SyncDefinitions
-            .Where(sync => sync.MigrationSource == SyncDefinition.LegacyCloudSettingsSource)
-            .ToListAsync(cancellationToken);
-        var importedByKey = imported.ToDictionary(
+        var allDefinitions = await db.SyncDefinitions.ToListAsync(cancellationToken);
+        var definitionsByKey = allDefinitions.ToDictionary(
             sync => new SourceKey(sync.LocalShareId, sync.LocalPath),
             SourceKeyComparer.Instance);
         var observedKeys = new HashSet<SourceKey>(SourceKeyComparer.Instance);
@@ -74,7 +72,7 @@ public sealed class LegacyCloudSyncMigrationService(
                 var key = new SourceKey(share.Id, localPath);
                 observedKeys.Add(key);
                 string checksum = CalculateChecksum(folder);
-                if (!importedByKey.TryGetValue(key, out var definition))
+                if (!definitionsByKey.TryGetValue(key, out var definition))
                 {
                     Guid? runAsUserId = await ResolveRunAsUserIdAsync(
                         db, folder.Schedule?.RunAsUsername, cancellationToken);
@@ -94,10 +92,16 @@ public sealed class LegacyCloudSyncMigrationService(
                         LastSuccessfulRunAtUtc = folder.LastSync,
                         UpdatedAtUtc = DateTime.UtcNow
                     });
-                    importedByKey.Add(key, definition);
+                    definitionsByKey.Add(key, definition);
                     createdCount++;
                     continue;
                 }
+
+                // A Package 6 edit or delete clears MigrationSource. Such a row
+                // is authoritative and must never be overwritten or recreated
+                // from the retained rollback JSON.
+                if (definition.MigrationSource != SyncDefinition.LegacyCloudSettingsSource)
+                    continue;
 
                 if (definition.MigrationSourceChecksum == checksum && definition.Enabled)
                     continue;
@@ -122,7 +126,9 @@ public sealed class LegacyCloudSyncMigrationService(
             }
         }
 
-        foreach (var definition in imported.Where(sync => !observedKeys.Contains(
+        foreach (var definition in allDefinitions.Where(sync =>
+                     sync.MigrationSource == SyncDefinition.LegacyCloudSettingsSource
+                     && !observedKeys.Contains(
                      new SourceKey(sync.LocalShareId, sync.LocalPath))))
         {
             if (!definition.Enabled)
