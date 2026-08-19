@@ -2382,4 +2382,6 @@
   <data name="Web_ExternalStorage_SshSetupError_helper_timeout" xml:space="preserve"><value>The SSH setup request timed out.</value></data>
   <data name="Web_ExternalStorage_TestSuccessful" xml:space="preserve"><value>Connection successful</value></data>
   <data name="Web_ExternalStorage_TestFailed" xml:space="preserve"><value>Connection test failed</value></data>
+  <data name="Web_ExternalStorage_NoConnectionSelected" xml:space="preserve"><value>No connection selected</value></data>
+  <data name="Web_ExternalStorage_NoConnectionSelectedHint" xml:space="preserve"><value>Select a connection from the list to view its details, test connectivity, or manage its settings.</value></data>
 </root>

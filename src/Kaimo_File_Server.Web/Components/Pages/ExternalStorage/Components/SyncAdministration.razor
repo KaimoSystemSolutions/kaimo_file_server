@@ -4,11 +4,13 @@
 @using Kaimo_File_Server.Core.Services.ExternalStorage
 @using Kaimo_File_Server.Web.Components.Pages.CloudSync.Components
 @using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
 @using Microsoft.JSInterop
 @using System.Globalization
 @implements IAsyncDisposable
 @inject ExternalStorageSyncViewModel VM
 @inject IJSRuntime JS
+@inject AssetProvider Assets
 
 @if (VM.IsLoading)
 {
@@ -49,8 +51,11 @@ else
                     {
                         <button class="sync-row @(_selectedId == item.Definition.Id ? "sync-row--selected" : "")" type="button" @onclick="() => Select(item)">
                             <span class="sync-name">
-                                <strong>@DisplayName(item)</strong>
-                                <small>@item.ConnectionName · @ProviderFor(item)</small>
+                                <span class="sync-provider-icon" style="color: @ProviderColor(ProviderIdFor(item))">@Assets.SVG(ProviderIcon(ProviderIdFor(item)), new SvgOptions(Width: 18, Height: 18))</span>
+                                <span class="sync-name-text">
+                                    <strong>@DisplayName(item)</strong>
+                                    <small>@item.ConnectionName · @ProviderFor(item)</small>
+                                </span>
                             </span>
                             <span class="storage-state storage-state--@SyncStateClass(item)">
                                 <span class="storage-state-dot" aria-hidden="true"></span>@SyncState(item)
@@ -218,7 +223,10 @@ else
         {
             <div class="detail-header sync-detail-header">
                 <div class="sync-detail-title">
-                    <h3>@DisplayName(selected)</h3>
+                    <div class="sync-title-row">
+                        <span class="sync-detail-icon" style="color: @ProviderColor(ProviderIdFor(selected))">@Assets.SVG(ProviderIcon(ProviderIdFor(selected)), new SvgOptions(Width: 22, Height: 22))</span>
+                        <h3>@DisplayName(selected)</h3>
+                    </div>
                     <span class="detail-subtitle">@selected.ConnectionName · @ProviderFor(selected)</span>
                 </div>
                 <span class="storage-state storage-state--@SyncStateClass(selected)">
@@ -499,10 +507,28 @@ else
     private static string DisplayPath(string path) => string.IsNullOrEmpty(path) ? "/" : $"/{path}";
     private static string FormatDate(DateTime? value) => value?.ToLocalTime().ToString("g") ?? R("Web_CloudSync_Never");
     private string ProviderName(string id) => VM.GetProviderName(id);
+    private string ProviderIdFor(ExternalStorageSyncListItem item)
+        => VM.Connections.FirstOrDefault(connection => connection.Id == item.Definition.ConnectionId)?.ProviderId ?? "";
     private string ProviderFor(ExternalStorageSyncListItem item)
-        => VM.Connections.FirstOrDefault(connection => connection.Id == item.Definition.ConnectionId) is { } connection
-            ? VM.GetProviderName(connection.ProviderId)
-            : "—";
+        => ProviderIdFor(item) is { Length: > 0 } id ? VM.GetProviderName(id) : "—";
+    private static string ProviderIcon(string id) => id.ToLowerInvariant() switch
+    {
+        "smb" => "connection_smb.svg",
+        "rsync-ssh" => "connection_rsync.svg",
+        "sftp" => "connection_sftp.svg",
+        "onedrive" => "connection_onedrive.svg",
+        "google" or "googledrive" => "connection_google.svg",
+        _ => "cloud-download.svg"
+    };
+    private static string ProviderColor(string id) => id.ToLowerInvariant() switch
+    {
+        "smb" => "var(--provider-smb, #5b7fa4)",
+        "rsync-ssh" => "var(--provider-rsync, #6a9a5b)",
+        "sftp" => "var(--provider-sftp, #8b6baf)",
+        "onedrive" => "var(--provider-onedrive, #0078d4)",
+        "google" or "googledrive" => "var(--provider-google, #e67c35)",
+        _ => "var(--text-secondary)"
+    };
     private bool SelectedConnectionSupports(StorageProviderCapabilities capability)
         => VM.Connections.FirstOrDefault(c => c.Id == _model.ConnectionId) is { } connection
            && VM.Supports(connection, capability);

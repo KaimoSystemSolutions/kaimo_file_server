@@ -296,24 +296,42 @@
 .connection-row--selected:hover { background: var(--accent-selected); }
 
 .connection-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     min-width: 0;
 }
 
-.connection-name strong,
-.connection-name small {
+.connection-provider-icon {
+    display: flex;
+    flex: 0 0 30px;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    background: color-mix(in srgb, currentColor 8%, var(--bg-tertiary));
+}
+
+.connection-name-text {
+    min-width: 0;
+}
+
+.connection-name-text strong,
+.connection-name-text small {
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.connection-name strong {
+.connection-name-text strong {
     color: var(--text-primary);
     font-size: 13.5px;
     font-weight: 650;
 }
 
-.connection-name small {
+.connection-name-text small {
     margin-top: 3px;
     color: var(--text-tertiary);
     font-size: 11.5px;
@@ -385,35 +403,87 @@
 .connection-title-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 9px;
     min-width: 0;
 }
 
-.connection-rename-action {
-    flex: 0 0 auto;
-    width: auto;
-    min-height: 27px;
-    padding-inline: 9px;
-    font-size: 11px;
+.connection-detail-icon {
+    display: flex;
+    flex: 0 0 34px;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 7px;
+    background: color-mix(in srgb, currentColor 10%, var(--bg-secondary));
 }
 
-.connection-rename {
-    display: flex;
+.connection-rename-trigger {
+    display: inline-flex;
+    flex: 0 0 auto;
     align-items: center;
-    flex-wrap: wrap;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: background 110ms ease, color 110ms ease, border-color 110ms ease;
+}
+
+.connection-rename-trigger:hover {
+    border-color: var(--border);
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.connection-rename-trigger:disabled {
+    opacity: .4;
+    pointer-events: none;
+}
+
+.connection-rename-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px solid var(--accent-border);
+    border-radius: 7px;
+    background: var(--bg-secondary);
+    box-shadow: 0 1px 3px rgb(0 0 0 / .06);
+}
+
+.connection-rename-label {
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+.connection-rename-row {
+    display: flex;
     gap: 7px;
 }
 
-.connection-rename .edit-input {
-    min-width: 0;
-    flex: 1 1 200px;
-    min-height: 32px;
+.connection-rename-input {
+    flex: 1 1 0;
+    min-height: 34px;
 }
 
-.connection-rename > button {
+.connection-rename-actions {
+    display: flex;
+    gap: 7px;
+    justify-content: flex-end;
+}
+
+.connection-rename-actions > button {
     flex: 0 0 auto;
     width: auto;
-    min-height: 32px;
+    min-height: 30px;
+    padding-inline: 12px;
+    font-size: 12px;
 }
 
 .connection-detail-header h3 {
@@ -492,8 +562,40 @@
 }
 
 .connection-detail .error-banner { margin-top: 14px; }
-.connection-detail .detail-empty { min-height: 420px; height: 100%; padding: 24px; color: var(--text-tertiary); }
-.connection-detail .detail-empty p { max-width: 260px; font-size: 12.5px; line-height: 1.5; }
+
+.connection-detail .detail-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 420px;
+    height: 100%;
+    padding: 24px;
+    color: var(--text-tertiary);
+    text-align: center;
+}
+
+.detail-empty-icon {
+    margin-bottom: 12px;
+    opacity: .55;
+}
+
+.detail-empty-title {
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.connection-detail .detail-empty p {
+    max-width: 280px;
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+.connection-detail .detail-empty p + p {
+    margin-top: 6px;
+}
 
 @media (max-width: 1050px) {
     .connection-form { grid-template-columns: 1fr; }
@@ -510,6 +612,8 @@
     .connection-usage { display: none; }
     .connection-detail { padding-inline: 14px; }
     .connection-detail-header { flex-direction: column; }
+    .connection-detail-icon { width: 28px; height: 28px; flex-basis: 28px; }
+    .connection-rename-card { padding: 10px 12px; }
     .connection-detail dl { grid-template-columns: 1fr; gap: 3px; }
     .connection-detail dd { margin-bottom: 7px; }
 }

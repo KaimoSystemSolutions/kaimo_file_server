@@ -4,6 +4,7 @@
 @using Kaimo_File_Server.Core.Services.ExternalStorage
 @using Kaimo_File_Server.Infrastructure.ExternalStorage
 @using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.JSInterop
 @using System.Security.Cryptography
@@ -13,6 +14,7 @@
 @inject IRsyncSshSetupService RsyncSshSetup
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject AssetProvider Assets
 
 @if (VM.IsLoading)
 {
@@ -129,8 +131,11 @@ else
                 {
                     <button class="connection-row @(_selected?.Id == connection.Id ? "connection-row--selected" : "")" type="button" @onclick="() => SelectConnection(connection)">
                         <span class="connection-name">
-                            <strong>@connection.Name</strong>
-                            <small>@ProviderName(connection.ProviderId) · @(connection.AccountEmail ?? connection.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</small>
+                            <span class="connection-provider-icon" style="color: @ProviderColor(connection.ProviderId)">@Assets.SVG(ProviderIcon(connection.ProviderId), new SvgOptions(Width: 18, Height: 18))</span>
+                            <span class="connection-name-text">
+                                <strong>@connection.Name</strong>
+                                <small>@ProviderName(connection.ProviderId) · @(connection.AccountEmail ?? connection.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</small>
+                            </span>
                         </span>
                         <span class="connection-state connection-state--@StateClass(connection.State)"><span class="connection-health connection-health--@StateClass(connection.State)"></span>@StateName(connection.State)</span>
                         <span class="connection-usage">@UsageSummary(connection.Id)</span>
@@ -140,7 +145,11 @@ else
             <aside class="connection-detail">
                 @if (_selected is null)
                 {
-                    <div class="detail-empty"><p>@R("Web_ExternalStorage_SelectConnection")</p></div>
+                    <div class="detail-empty">
+                        <div class="detail-empty-icon">@Assets.SVG("cloud-download.svg", new SvgOptions(Width: 32, Height: 32, Color: "var(--text-tertiary)"))</div>
+                        <p class="detail-empty-title">@R("Web_ExternalStorage_NoConnectionSelected")</p>
+                        <p>@R("Web_ExternalStorage_NoConnectionSelectedHint")</p>
+                    </div>
                 }
                 else
                 {
@@ -149,20 +158,25 @@ else
                         <div class="connection-detail-title">
                             @if (_renaming)
                             {
-                                <div class="connection-rename">
-                                    <input class="edit-input" maxlength="200" @bind="_renameValue" @bind:event="oninput" aria-label="@R("Web_CloudAccess_ConnectionName")" />
-                                    <button class="btn-primary" type="button" disabled="@(_busy || string.IsNullOrWhiteSpace(_renameValue))" @onclick="SaveRenameAsync">@R("Web_CloudAccess_Save")</button>
-                                    <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelRename">@R("Web_Button_Cancel")</button>
+                                <div class="connection-rename-card">
+                                    <label class="connection-rename-label">@R("Web_CloudAccess_ConnectionName")</label>
+                                    <div class="connection-rename-row">
+                                        <input class="edit-input connection-rename-input" maxlength="200" @bind="_renameValue" @bind:event="oninput" aria-label="@R("Web_CloudAccess_ConnectionName")" @onkeydown="RenameKeyDownAsync" />
+                                    </div>
+                                    <div class="connection-rename-actions">
+                                        <button class="btn-primary" type="button" disabled="@(_busy || string.IsNullOrWhiteSpace(_renameValue))" @onclick="SaveRenameAsync">@R("Web_CloudAccess_Save")</button>
+                                        <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelRename">@R("Web_Button_Cancel")</button>
+                                    </div>
                                 </div>
-                                <span class="detail-subtitle">@ProviderName(_selected.ProviderId)</span>
                             }
                             else
                             {
                                 <div class="connection-title-row">
+                                    <span class="connection-detail-icon" style="color: @ProviderColor(_selected.ProviderId)">@Assets.SVG(ProviderIcon(_selected.ProviderId), new SvgOptions(Width: 22, Height: 22))</span>
                                     <h3>@_selected.Name</h3>
                                     @if (VM.CanManageConnections)
                                     {
-                                        <button class="btn-secondary connection-rename-action" type="button" disabled="@_busy" @onclick="StartRename">@R("Web_CloudAccess_Rename")</button>
+                                        <button class="connection-rename-trigger" type="button" disabled="@_busy" @onclick="StartRename" title="@R("Web_CloudAccess_Rename")">@Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 1.75f))</button>
                                     }
                                 </div>
                                 <span class="detail-subtitle">@ProviderName(_selected.ProviderId)</span>
@@ -292,7 +306,6 @@ else
     {
         if (!firstRender) return;
         await VM.LoadAsync();
-        _selected = VM.Connections.FirstOrDefault();
         StateHasChanged();
     }
 
@@ -408,6 +421,24 @@ else
         return $"{usage.SyncCount} / {usage.VirtualShareCount}";
     }
     private string ProviderName(string id) => ProviderCatalog.TryGet(id, out var provider) ? provider.DisplayName : id;
+    private static string ProviderIcon(string id) => id.ToLowerInvariant() switch
+    {
+        "smb" => "connection_smb.svg",
+        "rsync-ssh" => "connection_rsync.svg",
+        "sftp" => "connection_sftp.svg",
+        "onedrive" => "connection_onedrive.svg",
+        "google" or "googledrive" => "connection_google.svg",
+        _ => "cloud-download.svg"
+    };
+    private static string ProviderColor(string id) => id.ToLowerInvariant() switch
+    {
+        "smb" => "var(--provider-smb, #5b7fa4)",
+        "rsync-ssh" => "var(--provider-rsync, #6a9a5b)",
+        "sftp" => "var(--provider-sftp, #8b6baf)",
+        "onedrive" => "var(--provider-onedrive, #0078d4)",
+        "google" or "googledrive" => "var(--provider-google, #e67c35)",
+        _ => "var(--text-secondary)"
+    };
     private bool Supports(StorageConnection connection, StorageProviderCapabilities capability)
         => ProviderCatalog.TryGet(connection.ProviderId, out var provider) && provider.Capabilities.HasFlag(capability);
     private bool SupportsAuthorization(StorageConnection connection)
@@ -571,6 +602,14 @@ else
     }
 
     private void CancelRename() => _renaming = false;
+
+    private async Task RenameKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter" && !string.IsNullOrWhiteSpace(_renameValue) && !_busy)
+            await SaveRenameAsync();
+        else if (args.Key == "Escape")
+            CancelRename();
+    }
 
     private async Task SaveRenameAsync()
     {
