@@ -146,7 +146,28 @@ else
                 {
                     var usage = Usage(_selected.Id);
                     <div class="detail-header connection-detail-header">
-                        <div><h3>@_selected.Name</h3><span class="detail-subtitle">@ProviderName(_selected.ProviderId)</span></div>
+                        <div class="connection-detail-title">
+                            @if (_renaming)
+                            {
+                                <div class="connection-rename">
+                                    <input class="edit-input" maxlength="200" @bind="_renameValue" @bind:event="oninput" aria-label="@R("Web_CloudAccess_ConnectionName")" />
+                                    <button class="btn-primary" type="button" disabled="@(_busy || string.IsNullOrWhiteSpace(_renameValue))" @onclick="SaveRenameAsync">@R("Web_CloudAccess_Save")</button>
+                                    <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelRename">@R("Web_Button_Cancel")</button>
+                                </div>
+                                <span class="detail-subtitle">@ProviderName(_selected.ProviderId)</span>
+                            }
+                            else
+                            {
+                                <div class="connection-title-row">
+                                    <h3>@_selected.Name</h3>
+                                    @if (VM.CanManageConnections)
+                                    {
+                                        <button class="btn-secondary connection-rename-action" type="button" disabled="@_busy" @onclick="StartRename">@R("Web_CloudAccess_Rename")</button>
+                                    }
+                                </div>
+                                <span class="detail-subtitle">@ProviderName(_selected.ProviderId)</span>
+                            }
+                        </div>
                         <span class="connection-state connection-state--@StateClass(_selected.State)"><span class="connection-health connection-health--@StateClass(_selected.State)"></span>@StateName(_selected.State)</span>
                     </div>
                     <div class="connection-detail-grid">
@@ -230,6 +251,8 @@ else
     private bool _testFailed;
     private Guid _departmentId;
     private string? _error;
+    private bool _renaming;
+    private string _renameValue = string.Empty;
     private IEnumerable<IStorageConnectionProvider> CreatableProviders => ProviderCatalog.Providers
         .Where(provider => provider.AuthorizationModes.Any(mode => mode is StorageAuthorizationMode.DeviceCode
             or StorageAuthorizationMode.UsernamePassword or StorageAuthorizationMode.NetworkIdentity
@@ -538,6 +561,25 @@ else
     {
         _selected = connection;
         _testSucceeded = _testFailed = false;
+        _renaming = false;
+    }
+
+    private void StartRename()
+    {
+        _renameValue = _selected?.Name ?? string.Empty;
+        _renaming = true;
+    }
+
+    private void CancelRename() => _renaming = false;
+
+    private async Task SaveRenameAsync()
+    {
+        if (_selected is null)
+            return;
+        var connectionId = _selected.Id;
+        await ActAsync(() => VM.UpdateConnectionAsync(connectionId, _renameValue));
+        if (_error is null)
+            _renaming = false;
     }
 
     private static string SetupError(Exception exception)

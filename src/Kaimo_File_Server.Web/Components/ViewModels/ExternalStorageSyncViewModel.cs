@@ -235,13 +235,39 @@ public sealed class ExternalStorageSyncViewModel(
         string path)
     {
         await EnsureActorAsync();
-        var share = await GetBrowsableShareAsync(localShareId);
         var storageConnection = await GetUsableConnectionAsync(connectionId);
-        ValidateDepartmentMatch(share, storageConnection);
+        // A local share is optional while browsing: authorization is already
+        // enforced on the connection. When one is chosen we still verify the two
+        // belong to the same department, matching the create/update guard.
+        if (localShareId != Guid.Empty)
+            ValidateDepartmentMatch(await GetBrowsableShareAsync(localShareId), storageConnection);
 
         var items = await directoryTargets.ListDirectoriesAsync(storageConnection, path);
         return items
             .Select(item => new CloudDirectoryItem(item.Name, NormalizeRemotePath(item.Path)))
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Lists local child directories inside the selected share through the
+    /// share-scoped file service so ACL and path-containment rules stay enforced
+    /// while an administrator picks the folder to synchronize.
+    /// </summary>
+    public async Task<IReadOnlyList<CloudDirectoryItem>> ListLocalDirectoriesAsync(
+        Guid localShareId,
+        string path)
+    {
+        await EnsureActorAsync();
+        var share = await GetBrowsableShareAsync(localShareId);
+        string normalized = ShareRelativePath.Normalize(path);
+        var items = await fileServices.CreateForShare(share.Id, share.Path)
+            .ListAsync(normalized, _actor!);
+        return items
+            .Where(item => item.IsDirectory)
+            .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+            .Select(item => new CloudDirectoryItem(
+                item.Name,
+                normalized.Length == 0 ? item.Name : $"{normalized}/{item.Name}"))
             .ToArray();
     }
 

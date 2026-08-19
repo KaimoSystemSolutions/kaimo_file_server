@@ -39,35 +39,24 @@ else
             }
             else
             {
-                <div class="sync-list" role="table" aria-label="@R("Web_ExternalStorage_Tab_Syncs")">
-                    <div class="sync-list-header" role="row">
-                        <span role="columnheader">@R("Web_ExternalStorage_Name")</span>
-                        <span role="columnheader">@R("Web_ExternalStorage_Connection")</span>
-                        <span role="columnheader">@R("Web_ExternalStorage_Health")</span>
-                        <span role="columnheader" aria-hidden="true"></span>
+                <div class="sync-list">
+                    <div class="sync-list-header" aria-hidden="true">
+                        <span>@R("Web_ExternalStorage_Name")</span>
+                        <span>@R("Web_ExternalStorage_Health")</span>
+                        <span>@R("Web_ExternalStorage_Mode")</span>
                     </div>
                     @foreach (var item in VM.Syncs)
                     {
-                        <article class="sync-list-row @(_editingId == item.Definition.Id ? "sync-list-row--selected" : "")" role="row">
-                            <div class="sync-primary" role="cell">
+                        <button class="sync-row @(_selectedId == item.Definition.Id ? "sync-row--selected" : "")" type="button" @onclick="() => Select(item)">
+                            <span class="sync-name">
                                 <strong>@DisplayName(item)</strong>
-                                <small class="sync-path" title="@DisplayPath(item.Definition.LocalPath)">@item.ShareName · @DisplayPath(item.Definition.LocalPath)</small>
-                                <small class="sync-path" title="@item.Definition.RemotePath">@R("Web_ExternalStorage_RemotePath"): @item.Definition.RemotePath</small>
-                            </div>
-                            <div class="sync-cell sync-connection" role="cell"><strong>@item.ConnectionName</strong><small>@ProviderFor(item)</small></div>
-                            <div class="sync-cell" role="cell">
-                                <span class="storage-state storage-state--@SyncStateClass(item)">
-                                    <span class="storage-state-dot" aria-hidden="true"></span>@SyncState(item)
-                                </span>
-                                <small>@ModeName(item.Definition.Mode) · @(item.Definition.Schedule.IsEnabled ? R("Web_ExternalStorage_ScheduleEnabled") : R("Web_ExternalStorage_Disabled"))</small>
-                                <small>@R("Web_ExternalStorage_LastRun"): @FormatDate(item.Runtime?.LastRunAtUtc)</small>
-                            </div>
-                            <div class="sync-row-actions" role="cell">
-                                <button class="btn-secondary" type="button" disabled="@(_busy || !item.Definition.Enabled)" @onclick="() => RunAsync(item)">@R("Web_ExternalStorage_RunNow")</button>
-                                <button class="btn-secondary sync-edit-action" type="button" disabled="@_busy" @onclick="() => StartEdit(item)">@R("Web_CloudAccess_Edit")</button>
-                                <button class="btn-danger-outline" type="button" disabled="@_busy" @onclick="() => DeleteAsync(item)">@R("Web_Action_Delete")</button>
-                            </div>
-                        </article>
+                                <small>@item.ConnectionName · @ProviderFor(item)</small>
+                            </span>
+                            <span class="storage-state storage-state--@SyncStateClass(item)">
+                                <span class="storage-state-dot" aria-hidden="true"></span>@SyncState(item)
+                            </span>
+                            <span class="sync-mode">@ModeName(item.Definition.Mode) · @(item.Definition.Schedule.IsEnabled ? R("Web_ExternalStorage_ScheduleEnabled") : R("Web_ExternalStorage_Disabled"))</span>
+                        </button>
                     }
                 </div>
             }
@@ -126,8 +115,8 @@ else
                         }
                         <option value="@SyncMode.Pull">@R("Web_CloudSync_Mode_Pull")</option>
                     </select></label>
-                    <label><span>@R("Web_ExternalStorage_LocalPath")</span><input class="edit-input" placeholder="/" @bind="_model.LocalPath" /></label>
-                    <label><span>@R("Web_ExternalStorage_RemotePath")</span><span class="storage-path-field"><input class="edit-input" placeholder="/" @bind="_model.RemotePath" />@if (SelectedConnectionSupports(StorageProviderCapabilities.Browse)) { <button class="btn-secondary" type="button" disabled="@(_model.LocalShareId == Guid.Empty)" @onclick="OpenRemotePickerAsync">@R("Web_CloudAccess_Browse")</button> }</span></label>
+                    <label><span>@R("Web_ExternalStorage_LocalPath")</span><span class="storage-path-field"><input class="edit-input" placeholder="/" @bind="_model.LocalPath" /><button class="btn-secondary" type="button" disabled="@(_model.LocalShareId == Guid.Empty)" @onclick="OpenLocalPickerAsync">@R("Web_CloudAccess_Browse")</button></span></label>
+                    <label><span>@R("Web_ExternalStorage_RemotePath")</span><span class="storage-path-field"><input class="edit-input" placeholder="/" @bind="_model.RemotePath" />@if (SelectedConnectionSupports(StorageProviderCapabilities.Browse)) { <button class="btn-secondary" type="button" disabled="@(_model.ConnectionId == Guid.Empty)" @onclick="OpenRemotePickerAsync">@R("Web_CloudAccess_Browse")</button> }</span></label>
                     <label class="storage-wide"><span>@R("Web_ExternalStorage_Description")</span><textarea class="edit-input" maxlength="2000" @bind="_model.Description"></textarea></label>
                 </div>
             }
@@ -217,6 +206,54 @@ else
                 <button class="btn-primary" type="button" disabled="@(_busy || !CanSave)" @onclick="SaveAsync">@R("Web_CloudAccess_Save")</button>
             </div>
         }
+        else if (SelectedItem is { } selected)
+        {
+            <div class="detail-header sync-detail-header">
+                <div class="sync-detail-title">
+                    <h3>@DisplayName(selected)</h3>
+                    <span class="detail-subtitle">@selected.ConnectionName · @ProviderFor(selected)</span>
+                </div>
+                <span class="storage-state storage-state--@SyncStateClass(selected)">
+                    <span class="storage-state-dot" aria-hidden="true"></span>@SyncState(selected)
+                </span>
+            </div>
+            <div class="sync-detail-grid">
+                <section class="sync-detail-group">
+                    <h4>@R("Web_ExternalStorage_Tab_Syncs")</h4>
+                    <dl>
+                        <dt>@R("Web_ExternalStorage_Connection")</dt><dd>@selected.ConnectionName</dd>
+                        <dt>@R("Web_ExternalStorage_LocalShare")</dt><dd>@selected.ShareName</dd>
+                        <dt>@R("Web_ExternalStorage_LocalPath")</dt><dd>@DisplayPath(selected.Definition.LocalPath)</dd>
+                        <dt>@R("Web_ExternalStorage_RemotePath")</dt><dd>@selected.Definition.RemotePath</dd>
+                        <dt>@R("Web_ExternalStorage_Mode")</dt><dd>@ModeName(selected.Definition.Mode)</dd>
+                    </dl>
+                </section>
+                <section class="sync-detail-group">
+                    <h4>@R("Web_ExternalStorage_Health")</h4>
+                    <dl>
+                        <dt>@R("Web_ExternalStorage_State")</dt><dd>@SyncState(selected)</dd>
+                        <dt>@R("Web_CloudSync_Schedule")</dt><dd>@(selected.Definition.Schedule.IsEnabled ? R("Web_ExternalStorage_ScheduleEnabled") : R("Web_ExternalStorage_Disabled"))</dd>
+                        <dt>@R("Web_ExternalStorage_LastRun")</dt><dd>@FormatDate(selected.Runtime?.LastRunAtUtc)</dd>
+                    </dl>
+                </section>
+                @if (!string.IsNullOrWhiteSpace(selected.Definition.Description))
+                {
+                    <section class="sync-detail-group sync-detail-group--wide">
+                        <h4>@R("Web_ExternalStorage_Description")</h4>
+                        <p class="sync-detail-description">@selected.Definition.Description</p>
+                    </section>
+                }
+            </div>
+            @if (!string.IsNullOrWhiteSpace(selected.Runtime?.LastErrorCode))
+            {
+                <div class="error-banner">@R("Web_ExternalStorage_AttentionRequired") (@selected.Runtime!.LastErrorCode)</div>
+            }
+            <div class="detail-actions sync-summary-actions">
+                <button class="btn-secondary" type="button" disabled="@(_busy || !selected.Definition.Enabled)" @onclick="() => RunAsync(selected)">@R("Web_ExternalStorage_RunNow")</button>
+                <button class="btn-secondary sync-edit-action" type="button" disabled="@_busy" @onclick="() => StartEdit(selected)">@R("Web_CloudAccess_Edit")</button>
+                <button class="btn-danger-outline" type="button" disabled="@_busy" @onclick="() => DeleteAsync(selected)">@R("Web_Action_Delete")</button>
+            </div>
+        }
         else
         {
             <div class="detail-empty">
@@ -228,15 +265,15 @@ else
 }
 
 <DirectoryPickerDialog IsOpen="@_pickerOpen"
-                       IsRemote="true"
+                       IsRemote="@_pickerIsRemote"
                        IsLoading="@_pickerLoading"
-                       Title="@R("Web_CloudAccess_FolderPickerTitle")"
+                       Title="@PickerTitle"
                        CurrentPath="@_pickerPath"
                        Items="@_pickerItems"
                        ErrorMessage="@_pickerError"
-                       OnNavigate="NavigateRemotePickerAsync"
-                       OnSelected="SelectRemoteFolderAsync"
-                       OnClosed="CloseRemotePicker" />
+                       OnNavigate="NavigatePickerAsync"
+                       OnSelected="SelectPickerFolderAsync"
+                       OnClosed="ClosePicker" />
 
 @code {
     private enum SyncSettingsTab { General, Schedule, Advanced }
@@ -247,13 +284,20 @@ else
     private bool _editing;
     private bool _busy;
     private Guid? _editingId;
+    private Guid? _selectedId;
     private string? _error;
     private ExternalStorageSyncEditModel _model = new();
     private bool _pickerOpen;
+    private bool _pickerIsRemote = true;
     private bool _pickerLoading;
     private string _pickerPath = "/";
     private string? _pickerError;
     private IReadOnlyList<CloudDirectoryItem> _pickerItems = [];
+    private ExternalStorageSyncListItem? SelectedItem
+        => _selectedId is Guid id ? VM.Syncs.FirstOrDefault(sync => sync.Definition.Id == id) : null;
+    private string PickerTitle => _pickerIsRemote
+        ? R("Web_CloudAccess_FolderPickerTitle")
+        : R("Web_CloudSync_Directory_LocalTitle");
     private SyncSettingsTab _activeSettingsTab = SyncSettingsTab.General;
     private SchedulePaintMode _schedulePaintMode = SchedulePaintMode.Select;
     private ElementReference _scheduleGrid;
@@ -283,10 +327,19 @@ else
     {
         _editing = true;
         _editingId = null;
+        _selectedId = null;
         _error = null;
         _activeSettingsTab = SyncSettingsTab.General;
         _model = new ExternalStorageSyncEditModel { ConnectionId = connectionId ?? Guid.Empty };
         ConnectionChanged();
+    }
+
+    private void Select(ExternalStorageSyncListItem item)
+    {
+        _selectedId = item.Definition.Id;
+        _editing = false;
+        _editingId = null;
+        _error = null;
     }
 
     private void ConnectionChanged()
@@ -303,6 +356,7 @@ else
         var definition = item.Definition;
         _editing = true;
         _editingId = definition.Id;
+        _selectedId = definition.Id;
         _error = null;
         _activeSettingsTab = SyncSettingsTab.General;
         _model = new ExternalStorageSyncEditModel
@@ -333,8 +387,11 @@ else
     private async Task DeleteAsync(ExternalStorageSyncListItem item)
     {
         await ActAsync(() => VM.DeleteAsync(item.Definition.Id));
-        if (_editingId == item.Definition.Id && VM.Syncs.All(sync => sync.Definition.Id != item.Definition.Id))
-            CancelEdit();
+        if (VM.Syncs.All(sync => sync.Definition.Id != item.Definition.Id))
+        {
+            if (_selectedId == item.Definition.Id) _selectedId = null;
+            if (_editingId == item.Definition.Id) CancelEdit();
+        }
     }
     private async Task RunAsync(ExternalStorageSyncListItem item) => await ActAsync(() => VM.RunAsync(item.Definition.Id));
     private async Task ActAsync(Func<Task> action)
@@ -350,30 +407,50 @@ else
     private void CancelEdit() { _editing = false; _editingId = null; _model = new(); }
     private async Task OpenRemotePickerAsync()
     {
+        _pickerIsRemote = true;
         _pickerOpen = true;
         _pickerPath = string.IsNullOrWhiteSpace(_model.RemotePath) ? "/" : _model.RemotePath;
-        await LoadRemotePickerAsync(_pickerPath);
+        await LoadPickerAsync(_pickerPath);
     }
-    private async Task NavigateRemotePickerAsync(string path)
+    private async Task OpenLocalPickerAsync()
+    {
+        _pickerIsRemote = false;
+        _pickerOpen = true;
+        _pickerPath = _model.LocalPath ?? string.Empty;
+        await LoadPickerAsync(_pickerPath);
+    }
+    private async Task NavigatePickerAsync(string path)
     {
         _pickerPath = path;
-        await LoadRemotePickerAsync(path);
+        await LoadPickerAsync(path);
     }
-    private async Task LoadRemotePickerAsync(string path)
+    private async Task LoadPickerAsync(string path)
     {
         _pickerLoading = true;
         _pickerError = null;
-        try { _pickerItems = await VM.ListRemoteDirectoriesAsync(_model.ConnectionId, _model.LocalShareId, path); }
-        catch { _pickerItems = []; _pickerError = R("Web_ExternalStorage_RemoteBrowseFailed"); }
+        try
+        {
+            _pickerItems = _pickerIsRemote
+                ? await VM.ListRemoteDirectoriesAsync(_model.ConnectionId, _model.LocalShareId, path)
+                : await VM.ListLocalDirectoriesAsync(_model.LocalShareId, path);
+        }
+        catch
+        {
+            _pickerItems = [];
+            _pickerError = _pickerIsRemote
+                ? R("Web_ExternalStorage_RemoteBrowseFailed")
+                : R("Web_CloudSync_Directory_Error");
+        }
         finally { _pickerLoading = false; }
     }
-    private Task SelectRemoteFolderAsync(string path)
+    private Task SelectPickerFolderAsync(string path)
     {
-        _model.RemotePath = path;
-        CloseRemotePicker();
+        if (_pickerIsRemote) _model.RemotePath = path;
+        else _model.LocalPath = path;
+        ClosePicker();
         return Task.CompletedTask;
     }
-    private void CloseRemotePicker() { _pickerOpen = false; _pickerItems = []; _pickerError = null; }
+    private void ClosePicker() { _pickerOpen = false; _pickerItems = []; _pickerError = null; }
     private string SettingsTabClass(SyncSettingsTab tab) => _activeSettingsTab == tab ? "detail-tab detail-tab--active" : "detail-tab";
     private string SchedulePaintModeClass => _schedulePaintMode == SchedulePaintMode.Select ? "cloud-schedule-scroll--paint-select" : "cloud-schedule-scroll--paint-deselect";
     private bool SchedulePaintValue => _schedulePaintMode == SchedulePaintMode.Select;

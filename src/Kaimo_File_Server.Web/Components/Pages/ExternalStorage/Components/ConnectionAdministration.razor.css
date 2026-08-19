@@ -380,6 +380,42 @@
 
 .connection-detail-header > div { min-width: 0; }
 
+.connection-detail-title { display: grid; gap: 3px; }
+
+.connection-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.connection-rename-action {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 27px;
+    padding-inline: 9px;
+    font-size: 11px;
+}
+
+.connection-rename {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.connection-rename .edit-input {
+    min-width: 0;
+    flex: 1 1 200px;
+    min-height: 32px;
+}
+
+.connection-rename > button {
+    flex: 0 0 auto;
+    width: auto;
+    min-height: 32px;
+}
+
 .connection-detail-header h3 {
     overflow: hidden;
     margin: 0;

@@ -68,7 +68,7 @@ else
                     @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--folder-stroke)", CssClass: "file-icon"))
                     <span>@share.Name</span>
                 </div>
-                <div class="col-share-path">Microsoft OneDrive · @share.RemotePath</div>
+                <div class="col-share-path">@share.ProviderDisplayName · @share.RemotePath</div>
                 <div class="col-size">@(share.IsReadOnly ? Text("Web_CloudAccess_ReadOnly") : Text("Web_CloudAccess_Remote"))</div>
             </button>
         }

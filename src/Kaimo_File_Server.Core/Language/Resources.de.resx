@@ -2092,6 +2092,7 @@
   <data name="Web_CloudAccess_Select" xml:space="preserve"><value>Bitte auswählen</value></data>
   <data name="Web_CloudAccess_Connect" xml:space="preserve"><value>Verbinden</value></data>
   <data name="Web_CloudAccess_Edit" xml:space="preserve"><value>Bearbeiten</value></data>
+  <data name="Web_CloudAccess_Rename" xml:space="preserve"><value>Umbenennen</value></data>
   <data name="Web_CloudAccess_Save" xml:space="preserve"><value>Änderungen speichern</value></data>
   <data name="Web_CloudAccess_Cancel" xml:space="preserve"><value>Abbrechen</value></data>
   <data name="Web_CloudAccess_EditConnection" xml:space="preserve"><value>Verbindung bearbeiten</value></data>

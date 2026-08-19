@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 
@@ -10,6 +11,7 @@ public sealed class CloudAccessShareBrowserViewModel(
     CloudAccessAuthorizationService authorization,
     IUserContextFactory userContextFactory,
     AuthenticationStateProvider authenticationState,
+    IStorageConnectionProviderCatalog providerCatalog,
     ILogger<CloudAccessShareBrowserViewModel> logger)
 {
     public List<CloudAccessShareListItem> Shares { get; private set; } = [];
@@ -29,7 +31,9 @@ public sealed class CloudAccessShareBrowserViewModel(
             Shares = visible.Where(x => connections.TryGetValue(x.ConnectionId, out var connection)
                                         && connection.State == StorageConnectionState.Ready)
                 .Select(x => new CloudAccessShareListItem(
-                    x.Id, x.Name, connections[x.ConnectionId].ProviderId, x.RemoteRootPath, x.IsReadOnly))
+                    x.Id, x.Name, connections[x.ConnectionId].ProviderId,
+                    ProviderDisplayName(connections[x.ConnectionId].ProviderId),
+                    x.RemoteRootPath, x.IsReadOnly))
                 .OrderBy(x => x.Name).ToList();
         }
         catch (Exception exception)
@@ -39,6 +43,10 @@ public sealed class CloudAccessShareBrowserViewModel(
         }
         finally { IsLoading = false; }
     }
+
+    private string ProviderDisplayName(string providerId)
+        => providerCatalog.TryGet(providerId, out var provider) ? provider.DisplayName : providerId;
 }
 
-public sealed record CloudAccessShareListItem(Guid Id, string Name, string Provider, string RemotePath, bool IsReadOnly);
+public sealed record CloudAccessShareListItem(
+    Guid Id, string Name, string Provider, string ProviderDisplayName, string RemotePath, bool IsReadOnly);
