@@ -306,6 +306,27 @@ public class GoogleDriveConnection : ICloudConnection
     }
     
 
+    /// <inheritdoc />
+    public async Task DeleteAsync(
+        string path,
+        bool isDirectory,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureWritable();
+
+        // Resolve the id for the item's own kind; a Drive delete of a folder id
+        // removes the whole subtree, matching the recursive local delete.
+        string? id = isDirectory
+            ? await FindFolderByPathAsync(path, cancellationToken)
+            : await FindFileByPathAsync(path, cancellationToken);
+
+        // Already gone (e.g. removed by a prior partial run): nothing to do.
+        if (id is null || id == "root")
+            return;
+
+        await _service.Files.Delete(id).ExecuteAsync(cancellationToken);
+    }
+
     /// <summary>Walks a provider path segment by segment and returns its folder id.</summary>
     private async Task<string?> FindFolderByPathAsync(
         string path,

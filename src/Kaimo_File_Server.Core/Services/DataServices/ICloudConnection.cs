@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Infrastructure.Clouds;
 
@@ -54,6 +55,15 @@ public interface ICloudConnection
     /// <summary>Creates a remote directory, including missing parents where supported.</summary>
     Task CreateDirectoryAsync(string path, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Removes a remote file or directory (recursively for directories). Used by
+    /// two-way delete propagation. The default throws so a provider that cannot
+    /// delete fails loudly instead of silently resurrecting the item.
+    /// </summary>
+    Task DeleteAsync(string path, bool isDirectory, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException(
+            $"{ServiceName} does not support remote deletion required for delete synchronization.");
+
     /// <summary>Recursively calculates the total size used for sync progress reporting.</summary>
     Task<long> GetDirectorySizeAsync(string path, CancellationToken cancellationToken = default);
     
@@ -67,13 +77,23 @@ public interface ICloudConnection
     /// checked between local file-service calls and is forwarded to every cloud
     /// operation so long-running uploads and downloads can stop immediately.
     /// </summary>
-    async Task SyncAsync(
+    /// <param name="previousManifest">
+    /// The set of share-relative paths that existed after the previous successful
+    /// run, used to distinguish a new item from one deleted on the other endpoint.
+    /// Pass <c>null</c> when delete propagation is off or no baseline exists yet.
+    /// </param>
+    /// <returns>
+    /// The manifest of paths present after this run when delete propagation is
+    /// active (persist it for the next run), otherwise <c>null</c>.
+    /// </returns>
+    async Task<SyncManifest?> SyncAsync(
         IFileService fileService,
         UserContext user,
         string remotePath,
         string localPath,
         SyncMode mode,
         CloudSyncTransferOptions? transferOptions = null,
+        SyncManifest? previousManifest = null,
         Action<string?, int>? reportProgress = null,
         CancellationToken cancellationToken = default)
     {
@@ -89,7 +109,7 @@ public interface ICloudConnection
         };
 
         cancellationToken.ThrowIfCancellationRequested();
-        
+
         var progress = new SyncProgress
         {
             TotalBytes = totalBytes,
@@ -99,6 +119,16 @@ public interface ICloudConnection
         progress.Update("Scanning...");
 
         var options = transferOptions ?? new CloudSyncTransferOptions(null);
+
+        // A manifest of the converged state is maintained for every two-way run,
+        // even when delete propagation is off, so that enabling the option later
+        // has a baseline immediately instead of wasting the first run establishing
+        // one. The previous manifest is only *consulted* (to delete) when the
+        // option is on; otherwise deletions are ignored and items are copied.
+        bool buildManifest = mode == SyncMode.TwoWay;
+        bool applyDeletions = options.SyncDeletions && mode == SyncMode.TwoWay;
+        var newManifest = buildManifest ? new SyncManifest() : null;
+
         await SyncDirectory(
             fileService,
             user,
@@ -107,8 +137,12 @@ public interface ICloudConnection
             mode,
             options,
             progress,
+            applyDeletions ? previousManifest : null,
+            newManifest,
             cancellationToken
             );
+
+        return newManifest;
     }
     
     /// <summary>
@@ -130,6 +164,15 @@ public interface ICloudConnection
     /// Recursively reconciles one directory level according to the selected sync
     /// mode and checks cancellation before each child is processed.
     /// </summary>
+    /// <param name="previousManifest">
+    /// Paths present after the previous run (null unless delete propagation is
+    /// active). An item on only one side that appears here was deleted on the
+    /// other endpoint; one that does not is newly created.
+    /// </param>
+    /// <param name="newManifest">
+    /// Accumulator for every path that remains present after this run; null unless
+    /// delete propagation is active.
+    /// </param>
     private async Task SyncDirectory(
         IFileService fileService,
         UserContext user,
@@ -138,6 +181,8 @@ public interface ICloudConnection
         SyncMode mode,
         CloudSyncTransferOptions options,
         SyncProgress syncProgress,
+        SyncManifest? previousManifest,
+        SyncManifest? newManifest,
         CancellationToken cancellationToken
         )
     {
@@ -169,6 +214,12 @@ public interface ICloudConnection
             string remoteChild = $"{remoteDir}/{name}";
             string localChild = $"{localDir}/{name}";
 
+            // The recycle bin and internal Kaimo namespaces are share bookkeeping,
+            // not user content. Skipping them keeps a locally recycled file from
+            // being re-uploaded (which would otherwise defeat delete propagation).
+            if (ShareEntryPolicy.Classify(localChild).Kind != ShareEntryKind.Regular)
+                continue;
+
             //--------------------------------------------------
             // Only local
             //--------------------------------------------------
@@ -177,9 +228,20 @@ public interface ICloudConnection
                 if (mode == SyncMode.Pull)
                     continue;
 
+                // Present locally, absent remotely, and known from the last run:
+                // it was deleted remotely, so remove it locally instead of
+                // re-uploading it. The local delete honors the share recycle bin.
+                if (previousManifest?.Contains(localChild) == true)
+                {
+                    syncProgress.Update($"Removing {local!.Name}...");
+                    await fileService.DeleteFileAsync(localChild, user, options.HonorRecycleBin);
+                    continue;
+                }
+
                 if (local!.IsDirectory)
                 {
                     await CreateDirectoryAsync(remoteChild, cancellationToken);
+                    newManifest?.Paths.Add(localChild);
 
                     await UploadDirectoryRecursive(
                         fileService,
@@ -188,6 +250,7 @@ public interface ICloudConnection
                         remoteChild,
                         syncProgress,
                         options,
+                        newManifest,
                         cancellationToken);
                 }
                 else
@@ -196,6 +259,7 @@ public interface ICloudConnection
 
                     await using var stream = options.LimitUpload(await fileService.ReadFileAsync(localChild, user));
                     await UploadAsync(remoteChild, stream, local.ModifiedAt, cancellationToken);
+                    newManifest?.Paths.Add(localChild);
 
                     syncProgress.TransferredBytes += local.Size;
                     syncProgress.Update($"Pushing {local.Name}...");
@@ -212,10 +276,21 @@ public interface ICloudConnection
                 if (mode == SyncMode.Push)
                     continue;
 
+                // Present remotely, absent locally, and known from the last run:
+                // it was deleted locally, so remove it remotely instead of
+                // re-downloading it.
+                if (previousManifest?.Contains(localChild) == true)
+                {
+                    syncProgress.Update($"Removing {remote!.Name}...");
+                    await DeleteAsync(remoteChild, remote.IsDirectory, cancellationToken);
+                    continue;
+                }
+
                 if (remote!.IsDirectory)
                 {
                     await fileService.CreateDirectoryAsync(localChild, user);
                     cancellationToken.ThrowIfCancellationRequested();
+                    newManifest?.Paths.Add(localChild);
 
                     await SyncDirectory(
                         fileService,
@@ -225,6 +300,8 @@ public interface ICloudConnection
                         mode,
                         options,
                         syncProgress,
+                        previousManifest,
+                        newManifest,
                         cancellationToken);
                 }
                 else
@@ -240,7 +317,8 @@ public interface ICloudConnection
                     await fileService.WriteFileAsync(localChild, ms, user);
                     cancellationToken.ThrowIfCancellationRequested();
                     await fileService.SetModifiedAtAsync(localChild, user, remote.ModifiedAt);
-                    
+                    newManifest?.Paths.Add(localChild);
+
                     syncProgress.TransferredBytes += remote.Size;
                     syncProgress.Update($"Pulling {remote.Name}...");
                 }
@@ -253,6 +331,7 @@ public interface ICloudConnection
             //--------------------------------------------------
             if (local!.IsDirectory && remote!.IsDirectory)
             {
+                newManifest?.Paths.Add(localChild);
                 await SyncDirectory(
                     fileService,
                     user,
@@ -261,6 +340,8 @@ public interface ICloudConnection
                     mode,
                     options,
                     syncProgress,
+                    previousManifest,
+                    newManifest,
                     cancellationToken);
 
                 continue;
@@ -268,6 +349,10 @@ public interface ICloudConnection
 
             if (local.IsDirectory != remote.IsDirectory)
                 continue;
+
+            // Present on both sides as files: reconciled below regardless of which
+            // way the newer copy flows, so it stays in the converged manifest.
+            newManifest?.Paths.Add(localChild);
 
             //--------------------------------------------------
             // Pull
@@ -358,6 +443,7 @@ public interface ICloudConnection
         string remoteDir,
         SyncProgress syncProgress,
         CloudSyncTransferOptions options,
+        SyncManifest? newManifest,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -369,8 +455,14 @@ public interface ICloudConnection
             string localChild = $"{localDir}/{item.Name}";
             string remoteChild = $"{remoteDir}/{item.Name}";
 
+            // Keep the recycle bin and internal namespaces out of the remote copy
+            // and the manifest, matching the top-level reconciliation guard.
+            if (ShareEntryPolicy.Classify(localChild).Kind != ShareEntryKind.Regular)
+                continue;
+
             if (item.IsDirectory)
             {
+                newManifest?.Paths.Add(localChild);
                 await UploadDirectoryRecursive(
                     fileService,
                     user,
@@ -378,6 +470,7 @@ public interface ICloudConnection
                     remoteChild,
                     syncProgress,
                     options,
+                    newManifest,
                     cancellationToken);
             }
             else
@@ -388,6 +481,7 @@ public interface ICloudConnection
                     continue;
                 await using var stream = options.LimitUpload(await fileService.ReadFileAsync(localChild, user));
                 await UploadAsync(remoteChild, stream, item.ModifiedAt, cancellationToken);
+                newManifest?.Paths.Add(localChild);
 
                 syncProgress.TransferredBytes += item.Size;
                 syncProgress.Update($"Pushing {item.Name}");

@@ -70,5 +70,14 @@ public sealed class SyncDefinitionRuntime
     public string? LeaseOwner { get; set; }
     public int? ProgressPercent { get; set; }
     public string? LastErrorCode { get; set; }
+
+    /// <summary>
+    /// Serialized <see cref="Kaimo_File_Server.Core.Services.DataServices.SyncManifest"/>
+    /// captured after the last successful two-way run. It lets the next run tell a
+    /// newly created item apart from one deleted on the opposite endpoint. Null
+    /// until a delete-propagating sync has completed at least once.
+    /// </summary>
+    public string? LastSyncManifest { get; set; }
+
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 }

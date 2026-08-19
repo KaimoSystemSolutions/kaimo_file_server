@@ -42,6 +42,23 @@ public interface ISyncDefinitionRepository
         DateTime completedAtUtc,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Returns the serialized last-sync manifest for a definition, or <c>null</c>
+    /// when no delete-propagating run has completed yet.
+    /// </summary>
+    Task<string?> GetManifestAsync(
+        Guid syncDefinitionId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Persists (or clears, with <c>null</c>) the last-sync manifest recorded
+    /// after a successful two-way run with delete propagation enabled.
+    /// </summary>
+    Task SaveManifestAsync(
+        Guid syncDefinitionId,
+        string? manifestJson,
+        CancellationToken cancellationToken = default);
+
     Task MarkFailedAsync(
         Guid syncDefinitionId,
         DateTime failedAtUtc,

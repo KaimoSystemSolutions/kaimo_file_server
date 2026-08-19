@@ -151,6 +151,37 @@ public sealed class SyncDefinitionRepository(IDbContextFactory<ApplicationDbCont
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<string?> GetManifestAsync(
+        Guid syncDefinitionId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.SyncDefinitionRuntimes.AsNoTracking()
+            .Where(item => item.SyncDefinitionId == syncDefinitionId)
+            .Select(item => item.LastSyncManifest)
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task SaveManifestAsync(
+        Guid syncDefinitionId,
+        string? manifestJson,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var runtime = await db.SyncDefinitionRuntimes.SingleOrDefaultAsync(
+            item => item.SyncDefinitionId == syncDefinitionId,
+            cancellationToken);
+        if (runtime is null)
+        {
+            runtime = new SyncDefinitionRuntime { SyncDefinitionId = syncDefinitionId };
+            db.SyncDefinitionRuntimes.Add(runtime);
+        }
+
+        runtime.LastSyncManifest = manifestJson;
+        runtime.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task MarkFailedAsync(
         Guid syncDefinitionId,
         DateTime failedAtUtc,

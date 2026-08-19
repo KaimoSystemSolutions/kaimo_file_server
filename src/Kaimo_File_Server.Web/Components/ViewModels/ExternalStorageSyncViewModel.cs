@@ -430,7 +430,8 @@ public sealed class ExternalStorageSyncViewModel(
         ExcludedExtensions = (model.ExcludedExtensions ?? string.Empty)
             .Split([',', ';', ' ', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(extension => extension.StartsWith('.') ? extension : $".{extension}")
-            .ToHashSet(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase),
+        SyncDeletions = model.SyncDeletions
     };
 
     private static long? ToBytes(long? value, long multiplier)
@@ -469,4 +470,7 @@ public sealed class ExternalStorageSyncEditModel
     public long? MaxUploadRateKbps { get; set; }
     public long? MaxDownloadRateKbps { get; set; }
     public string ExcludedExtensions { get; set; } = string.Empty;
+
+    /// <summary>Propagate deletions in two-way mode instead of restoring them.</summary>
+    public bool SyncDeletions { get; set; }
 }

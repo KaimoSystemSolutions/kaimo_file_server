@@ -2015,6 +2015,8 @@
   <data name="Web_CloudSync_Advanced_MaxDownload" xml:space="preserve"><value>Maximale Downloadrate (KB/s)</value></data>
   <data name="Web_CloudSync_Advanced_Error_Negative" xml:space="preserve"><value>Erweiterte Limits dürfen nicht negativ sein.</value></data>
   <data name="Web_CloudSync_Advanced_Unlimited_Help" xml:space="preserve"><value>0 eingeben oder leer lassen für kein Limit.</value></data>
+  <data name="Web_CloudSync_Advanced_SyncDeletions" xml:space="preserve"><value>Löschungen synchronisieren</value></data>
+  <data name="Web_CloudSync_Advanced_SyncDeletions_Help" xml:space="preserve"><value>Wird eine Datei oder ein Ordner auf einer Seite gelöscht, wird sie auch auf der anderen Seite gelöscht, statt wiederhergestellt zu werden. Wirksam ab dem zweiten Lauf nach dem Aktivieren. Hat der Share einen Papierkorb, werden lokal gelöschte Elemente dorthin verschoben und bleiben wiederherstellbar.</value></data>
   <data name="Web_CloudSync_Schedule" xml:space="preserve"><value>Automatische Synchronisierung</value></data>
   <data name="Web_CloudSync_Schedule_Help" xml:space="preserve"><value>Wähle die stündlichen Zeitfenster aus, in denen dieser Ordner synchronisiert werden soll.</value></data>
   <data name="Web_CloudSync_Schedule_Toggle" xml:space="preserve"><value>Automatische Synchronisierung ein- oder ausschalten</value></data>

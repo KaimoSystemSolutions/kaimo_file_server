@@ -145,12 +145,14 @@ public sealed class CloudSyncExecutionServiceTests
                 "projects",
                 SyncMode.TwoWay,
                 It.IsAny<CloudSyncTransferOptions?>(),
+                It.IsAny<SyncManifest?>(),
                 It.IsAny<Action<string?, int>?>(),
                 It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
                 started.SetResult();
                 await release.Task;
+                return (SyncManifest?)null;
             });
         var providers = new Mock<ICloudProviderFactory>();
         providers.Setup(factory => factory.CreateOrLoad(

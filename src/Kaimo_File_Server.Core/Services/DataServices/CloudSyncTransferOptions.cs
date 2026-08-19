@@ -8,8 +8,26 @@ public sealed class CloudSyncTransferOptions
 {
     private readonly CloudSyncAdvancedSettings _settings;
 
-    public CloudSyncTransferOptions(CloudSyncAdvancedSettings? settings)
-        => _settings = settings?.Clone() ?? new CloudSyncAdvancedSettings();
+    public CloudSyncTransferOptions(
+        CloudSyncAdvancedSettings? settings,
+        bool honorRecycleBin = false)
+    {
+        _settings = settings?.Clone() ?? new CloudSyncAdvancedSettings();
+        HonorRecycleBin = honorRecycleBin;
+    }
+
+    /// <summary>
+    /// Propagate deletions in two-way mode instead of restoring the missing item.
+    /// Mirrors <see cref="CloudSyncAdvancedSettings.SyncDeletions"/>.
+    /// </summary>
+    public bool SyncDeletions => _settings.SyncDeletions;
+
+    /// <summary>
+    /// When a deletion is applied to the local endpoint, route it through the
+    /// share's recycle bin so the file stays recoverable. Set from the share's
+    /// <c>IsRecycleEnabled</c> flag; the remote endpoint has no Kaimo recycle bin.
+    /// </summary>
+    public bool HonorRecycleBin { get; }
 
     public bool ShouldSkip(string name, long size)
     {

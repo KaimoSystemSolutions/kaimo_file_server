@@ -36,6 +36,9 @@ internal sealed class RemoteFileStoreSyncAdapter(
     public Task CreateDirectoryAsync(string path, CancellationToken cancellationToken = default)
         => remoteFiles.CreateDirectoryAsync(path, cancellationToken);
 
+    public Task DeleteAsync(string path, bool isDirectory, CancellationToken cancellationToken = default)
+        => remoteFiles.DeleteAsync(path, recursive: isDirectory, cancellationToken);
+
     public async Task<long> GetDirectorySizeAsync(
         string path,
         CancellationToken cancellationToken = default)

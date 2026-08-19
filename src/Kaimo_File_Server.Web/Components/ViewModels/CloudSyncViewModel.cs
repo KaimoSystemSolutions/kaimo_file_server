@@ -91,6 +91,9 @@ public sealed class CloudSyncViewModel
     public string EditExcludedExtensions { get; set; } = "";
     public long? EditMaxUploadRateKbps { get; set; }
     public long? EditMaxDownloadRateKbps { get; set; }
+
+    /// <summary>Propagate deletions in two-way mode instead of restoring them.</summary>
+    public bool EditSyncDeletions { get; set; }
     public bool EditScheduleEnabled { get; set; }
     public int EditScheduleIntervalSeconds { get; set; } = CloudSyncSchedule.DefaultIntervalSeconds;
     public HashSet<int> EditScheduleSlots { get; private set; } = [];
@@ -134,6 +137,7 @@ public sealed class CloudSyncViewModel
                    || EditMaxUploadRateKbps != ToKilobytes(configuration.AdvancedSettings?.MaxUploadBytesPerSecond)
                    || EditMaxDownloadRateKbps != ToKilobytes(configuration.AdvancedSettings?.MaxDownloadBytesPerSecond)
                    || !ParseExtensions(EditExcludedExtensions).SetEquals(configuration.AdvancedSettings?.ExcludedExtensions ?? [])
+                   || EditSyncDeletions != (configuration.AdvancedSettings?.SyncDeletions ?? false)
                    || EditScheduleEnabled != schedule.IsEnabled
                    || EditScheduleIntervalSeconds != schedule.GetEffectiveIntervalSeconds()
                    || !EditScheduleSlots.SetEquals(schedule.ActiveSlots.Where(CloudSyncSchedule.IsValidSlot));
@@ -246,6 +250,7 @@ public sealed class CloudSyncViewModel
         EditExcludedExtensions = string.Join(", ", item.Configuration.AdvancedSettings?.ExcludedExtensions?.Order(StringComparer.OrdinalIgnoreCase) ?? Enumerable.Empty<string>());
         EditMaxUploadRateKbps = ToKilobytes(item.Configuration.AdvancedSettings?.MaxUploadBytesPerSecond);
         EditMaxDownloadRateKbps = ToKilobytes(item.Configuration.AdvancedSettings?.MaxDownloadBytesPerSecond);
+        EditSyncDeletions = item.Configuration.AdvancedSettings?.SyncDeletions ?? false;
         EditScheduleEnabled = item.Configuration.Schedule?.IsEnabled == true;
         EditScheduleIntervalSeconds = item.Configuration.Schedule?.GetEffectiveIntervalSeconds()
             ?? CloudSyncSchedule.DefaultIntervalSeconds;
@@ -283,6 +288,7 @@ public sealed class CloudSyncViewModel
         EditExcludedExtensions = "";
         EditMaxUploadRateKbps = null;
         EditMaxDownloadRateKbps = null;
+        EditSyncDeletions = false;
         _remoteFolderSelectedExplicitly = false;
         ErrorMessage = null;
     }
@@ -486,7 +492,8 @@ public sealed class CloudSyncViewModel
             MaxFileSizeBytes = ToBytes(EditMaxFileSizeMb, 1024L * 1024),
             ExcludedExtensions = ParseExtensions(EditExcludedExtensions),
             MaxUploadBytesPerSecond = ToBytes(EditMaxUploadRateKbps, 1024L),
-            MaxDownloadBytesPerSecond = ToBytes(EditMaxDownloadRateKbps, 1024L)
+            MaxDownloadBytesPerSecond = ToBytes(EditMaxDownloadRateKbps, 1024L),
+            SyncDeletions = EditSyncDeletions
         };
         var previousSchedule = folder.Schedule ?? new CloudSyncSchedule();
         folder.Schedule = new CloudSyncSchedule

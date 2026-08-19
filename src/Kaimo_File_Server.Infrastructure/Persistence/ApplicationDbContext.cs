@@ -323,6 +323,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasKey(x => x.SyncDefinitionId);
                 entity.Property(x => x.LeaseOwner).HasMaxLength(200);
                 entity.Property(x => x.LastErrorCode).HasMaxLength(200);
+                entity.Property(x => x.LastSyncManifest).HasColumnType("text");
                 entity.HasIndex(x => x.LastSuccessfulRunAtUtc);
                 entity.HasOne<SyncDefinition>().WithOne()
                     .HasForeignKey<SyncDefinitionRuntime>(x => x.SyncDefinitionId)

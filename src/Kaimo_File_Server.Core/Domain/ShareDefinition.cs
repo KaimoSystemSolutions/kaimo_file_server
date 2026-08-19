@@ -353,12 +353,26 @@ namespace Kaimo_File_Server.Core.Domain
         /// <summary>Maximum download throughput in bytes/second; null means unlimited.</summary>
         public long? MaxDownloadBytesPerSecond { get; set; }
 
+        /// <summary>
+        /// When <c>true</c>, a two-way sync propagates deletions instead of
+        /// restoring the missing item from the other endpoint. A file or folder
+        /// removed on one side is then removed on the other side as well, so both
+        /// endpoints converge on the same state. Deletion detection relies on the
+        /// snapshot recorded after the previous successful run
+        /// (<see cref="SyncDefinitionRuntime.LastSyncManifest"/>): the first run
+        /// after enabling this option has no baseline and therefore only copies —
+        /// it never mass-deletes. Ignored for push and pull, which have no
+        /// ambiguity to resolve.
+        /// </summary>
+        public bool SyncDeletions { get; set; }
+
         public CloudSyncAdvancedSettings Clone() => new()
         {
             MaxFileSizeBytes = MaxFileSizeBytes,
             ExcludedExtensions = new HashSet<string>(ExcludedExtensions ?? [], StringComparer.OrdinalIgnoreCase),
             MaxUploadBytesPerSecond = MaxUploadBytesPerSecond,
-            MaxDownloadBytesPerSecond = MaxDownloadBytesPerSecond
+            MaxDownloadBytesPerSecond = MaxDownloadBytesPerSecond,
+            SyncDeletions = SyncDeletions
         };
 
         public bool Equals(CloudSyncAdvancedSettings? other)
@@ -366,6 +380,7 @@ namespace Kaimo_File_Server.Core.Domain
                && MaxFileSizeBytes == other.MaxFileSizeBytes
                && MaxUploadBytesPerSecond == other.MaxUploadBytesPerSecond
                && MaxDownloadBytesPerSecond == other.MaxDownloadBytesPerSecond
+               && SyncDeletions == other.SyncDeletions
                && (ExcludedExtensions ?? []).SetEquals(other.ExcludedExtensions ?? []);
 
         public override bool Equals(object? obj) => Equals(obj as CloudSyncAdvancedSettings);
@@ -376,6 +391,7 @@ namespace Kaimo_File_Server.Core.Domain
             hash.Add(MaxFileSizeBytes);
             hash.Add(MaxUploadBytesPerSecond);
             hash.Add(MaxDownloadBytesPerSecond);
+            hash.Add(SyncDeletions);
             foreach (var extension in (ExcludedExtensions ?? []).Order(StringComparer.OrdinalIgnoreCase))
                 hash.Add(extension, StringComparer.OrdinalIgnoreCase);
             return hash.ToHashCode();

@@ -125,15 +125,29 @@ public sealed class CloudSyncExecutionService(
             };
 
             var fileService = fileServices.CreateForShare(share.Id, share.Path);
+
+            // Two-way runs always refresh the converged-state manifest so enabling
+            // delete propagation later takes effect on the next run. The baseline
+            // is only loaded (to detect deletions) when the option is on.
+            bool isTwoWay = definition.Mode == SyncMode.TwoWay;
+            bool applyDeletions = isTwoWay && definition.AdvancedSettings.SyncDeletions;
+            SyncManifest? previousManifest = applyDeletions
+                ? SyncManifest.Deserialize(
+                    await syncDefinitions.GetManifestAsync(definition.Id, cancellationToken))
+                : null;
+            SyncManifest? newManifest;
             try
             {
-                await connection.SyncAsync(
+                newManifest = await connection.SyncAsync(
                     fileService,
                     actor,
                     NormalizeRemotePath(folder.RemotePath),
                     normalizedPath,
                     folder.Mode,
-                    new CloudSyncTransferOptions(folder.AdvancedSettings),
+                    // Local deletes route through the share recycle bin when it is
+                    // enabled, keeping removed files recoverable.
+                    new CloudSyncTransferOptions(folder.AdvancedSettings, share.IsRecycleEnabled),
+                    previousManifest,
                     reportProgress,
                     cancellationToken);
             }
@@ -187,6 +201,13 @@ public sealed class CloudSyncExecutionService(
 
             await syncDefinitions.MarkCompletedAsync(
                 definition.Id, completedAtUtc, cancellationToken);
+
+            // Persist the converged tree after every two-way run so a later
+            // enable of delete propagation has a ready baseline. newManifest is
+            // non-null for any two-way sync (see SyncAsync).
+            if (isTwoWay && newManifest is not null)
+                await syncDefinitions.SaveManifestAsync(
+                    definition.Id, newManifest.Serialize(), cancellationToken);
 
             // Compatibility dual-write only. The first-class runtime and protected
             // connection are authoritative; a removed legacy mapping is not an

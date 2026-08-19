@@ -195,6 +195,13 @@ public sealed class OneDriveConnection : ICloudConnection, IAsyncDisposable
         return result;
     }
 
+    /// <summary>
+    /// Two-way delete propagation entry point. A Graph delete removes folders
+    /// recursively, so the <paramref name="isDirectory"/> hint is not needed here.
+    /// </summary>
+    public Task DeleteAsync(string path, bool isDirectory, CancellationToken cancellationToken = default)
+        => DeleteItemAsync(path, cancellationToken);
+
     public async Task DeleteItemAsync(string path, CancellationToken cancellationToken = default)
     {
         var normalizedPath = RequireFilePath(path);

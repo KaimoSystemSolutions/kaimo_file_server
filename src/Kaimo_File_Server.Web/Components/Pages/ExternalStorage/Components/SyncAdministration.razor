@@ -199,6 +199,14 @@ else
                         <label><span>@R("Web_CloudSync_Advanced_MaxUpload")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxUploadRateKbps" /><small>@R("Web_CloudSync_Advanced_Unlimited_Help")</small></label>
                         <label><span>@R("Web_CloudSync_Advanced_MaxDownload")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxDownloadRateKbps" /><small>@R("Web_CloudSync_Advanced_Unlimited_Help")</small></label>
                     </div>
+                    @if (_model.Mode == SyncMode.TwoWay)
+                    {
+                        <label class="storage-form-checkbox">
+                            <input type="checkbox" @bind="_model.SyncDeletions" />
+                            <span>@R("Web_CloudSync_Advanced_SyncDeletions")</span>
+                            <small>@R("Web_CloudSync_Advanced_SyncDeletions_Help")</small>
+                        </label>
+                    }
                 </div>
             }
             <div class="detail-actions">
@@ -375,7 +383,8 @@ else
             MaxFileSizeMb = ToUnit(definition.AdvancedSettings.MaxFileSizeBytes, 1024L * 1024),
             MaxUploadRateKbps = ToUnit(definition.AdvancedSettings.MaxUploadBytesPerSecond, 1024L),
             MaxDownloadRateKbps = ToUnit(definition.AdvancedSettings.MaxDownloadBytesPerSecond, 1024L),
-            ExcludedExtensions = string.Join(", ", definition.AdvancedSettings.ExcludedExtensions)
+            ExcludedExtensions = string.Join(", ", definition.AdvancedSettings.ExcludedExtensions),
+            SyncDeletions = definition.AdvancedSettings.SyncDeletions
         };
     }
 

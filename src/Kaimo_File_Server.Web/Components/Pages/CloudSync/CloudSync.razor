@@ -385,6 +385,14 @@ else
                             <small>@Text("Web_CloudSync_Advanced_Unlimited_Help", "Enter 0 or leave empty for no limit.")</small>
                         </label>
                     </div>
+                    @if (VM.EditMode == SyncMode.TwoWay)
+                    {
+                        <label class="detail-field cloud-sync-checkbox">
+                            <input type="checkbox" @bind="VM.EditSyncDeletions" disabled="@(!VM.CanConfigureSelected)" />
+                            <span>@Text("Web_CloudSync_Advanced_SyncDeletions", "Synchronize deletions")</span>
+                            <small>@Text("Web_CloudSync_Advanced_SyncDeletions_Help", "When a file is deleted on one side, delete it on the other side too instead of restoring it. Recoverable via the recycle bin when the share has one enabled.")</small>
+                        </label>
+                    }
                 </div>
                 }
 

@@ -262,7 +262,11 @@ public sealed class LegacyCloudSyncMigrationService(
                 ExcludedExtensions = (advanced.ExcludedExtensions ?? [])
                     .Order(StringComparer.OrdinalIgnoreCase).ToArray(),
                 advanced.MaxUploadBytesPerSecond,
-                advanced.MaxDownloadBytesPerSecond
+                advanced.MaxDownloadBytesPerSecond,
+                // Must be part of the fingerprint: otherwise toggling delete
+                // propagation in the legacy editor leaves the checksum unchanged
+                // and the refreshed setting never reaches the first-class row.
+                advanced.SyncDeletions
             },
             folder.DisplayName,
             folder.Description

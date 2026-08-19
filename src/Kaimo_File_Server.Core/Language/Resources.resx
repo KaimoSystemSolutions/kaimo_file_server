@@ -2015,6 +2015,8 @@
   <data name="Web_CloudSync_Advanced_MaxDownload" xml:space="preserve"><value>Maximum download rate (KB/s)</value></data>
   <data name="Web_CloudSync_Advanced_Error_Negative" xml:space="preserve"><value>Advanced limits cannot be negative.</value></data>
   <data name="Web_CloudSync_Advanced_Unlimited_Help" xml:space="preserve"><value>Enter 0 or leave empty for no limit.</value></data>
+  <data name="Web_CloudSync_Advanced_SyncDeletions" xml:space="preserve"><value>Synchronize deletions</value></data>
+  <data name="Web_CloudSync_Advanced_SyncDeletions_Help" xml:space="preserve"><value>When a file or folder is deleted on one side, delete it on the other side too instead of restoring it. Takes effect from the second run after enabling. If the share has a recycle bin, locally deleted items are moved there and stay recoverable.</value></data>
   <data name="Web_CloudSync_Schedule" xml:space="preserve"><value>Automatic sync</value></data>
   <data name="Web_CloudSync_Schedule_Help" xml:space="preserve"><value>Select the hourly windows in which this folder should synchronize.</value></data>
   <data name="Web_CloudSync_Schedule_Toggle" xml:space="preserve"><value>Enable or disable automatic sync</value></data>
