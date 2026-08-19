@@ -59,6 +59,7 @@ public partial class FileBrowser
         long totalUploadedBytes = 0;
         int completedCount = 0;
         var failedFiles = new List<string>();
+        var failureReasons = new List<string>();
 
         var stopwatch = Stopwatch.StartNew();
         long lastSampleBytes = 0;
@@ -169,7 +170,11 @@ public partial class FileBrowser
                         job.CancellationToken);
 
                     if (!result.Success)
+                    {
                         failedFiles.Add(file.Name);
+                        if (!string.IsNullOrWhiteSpace(result.Error))
+                            failureReasons.Add(result.Error);
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -205,9 +210,13 @@ public partial class FileBrowser
             }
             else
             {
+                string summary = string.Format(Resources.Web_Upload_BatchPartialFailure,
+                    files.Count - failedFiles.Count, files.Count);
+                string? reason = failureReasons.Distinct(StringComparer.CurrentCulture).FirstOrDefault();
                 Toast.Update(toastId,
-                    string.Format(Resources.Web_Upload_BatchPartialFailure,
-                        files.Count - failedFiles.Count, files.Count),
+                    files.Count == 1 && reason is not null
+                        ? reason
+                        : reason is null ? summary : $"{summary} {reason}",
                     type: ToastType.Error);
             }
         }

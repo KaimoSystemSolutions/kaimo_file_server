@@ -21,7 +21,9 @@ public enum StorageAuthorizationMode
     ServiceAccount = 3,
     UsernamePassword = 4,
     SshKey = 5,
-    HostMount = 6
+    HostMount = 6,
+    /// <summary>Network protocol identity supplied by the runtime host (for example NFS AUTH_SYS/Kerberos).</summary>
+    NetworkIdentity = 7
 }
 
 /// <summary>

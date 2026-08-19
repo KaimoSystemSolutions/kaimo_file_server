@@ -80,7 +80,8 @@ public sealed class CloudSyncExecutionService(
                 if (!storageProvider.Capabilities.HasFlag(StorageProviderCapabilities.Sync))
                     return CloudSyncExecutionResult.Missing;
             }
-            if (storageProvider?.Capabilities.HasFlag(StorageProviderCapabilities.RequiresHostMount) == true)
+            if (storageProvider?.Capabilities.HasFlag(StorageProviderCapabilities.DirectFileAccess) == true
+                || storageProvider?.Capabilities.HasFlag(StorageProviderCapabilities.RequiresHostMount) == true)
             {
                 providerSession = await storageProvider.OpenSessionAsync(storageConnection, cancellationToken);
                 var remoteFiles = providerSession.RemoteFiles
@@ -130,9 +131,12 @@ public sealed class CloudSyncExecutionService(
             }
             catch (Exception exception)
             {
-                string errorCode = exception is ProviderRequestException providerError
-                    ? providerError.ErrorCode
-                    : "sync_failed";
+                string errorCode = exception switch
+                {
+                    RemoteStorageAccessDeniedException => "remote_access_denied",
+                    ProviderRequestException providerError => providerError.ErrorCode,
+                    _ => "sync_failed"
+                };
                 await syncDefinitions.MarkFailedAsync(
                     definition.Id,
                     DateTime.UtcNow,

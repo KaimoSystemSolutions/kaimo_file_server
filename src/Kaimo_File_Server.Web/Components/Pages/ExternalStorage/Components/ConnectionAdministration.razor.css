@@ -78,6 +78,29 @@
     line-height: 1.45;
 }
 
+.connection-form-hint {
+    margin: 0;
+    color: var(--text-tertiary);
+    font-size: 11.5px;
+    line-height: 1.5;
+}
+
+.connection-form .storage-check {
+    display: flex;
+    min-height: 36px;
+    align-items: center;
+    align-self: end;
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+    color: var(--text-primary);
+}
+
+.connection-form .storage-check input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
 .connection-editor .detail-actions {
     flex-direction: row;
     align-items: center;

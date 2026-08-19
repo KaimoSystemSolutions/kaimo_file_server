@@ -100,7 +100,7 @@ else
             {
                 <div class="storage-form-grid storage-tab-panel" role="tabpanel">
                     <label><span>@R("Web_ExternalStorage_Name")</span><input class="edit-input" maxlength="200" @bind="_model.DisplayName" /></label>
-                    <label><span>@R("Web_ExternalStorage_Connection")</span><select class="edit-input" @bind="_model.ConnectionId">
+                    <label><span>@R("Web_ExternalStorage_Connection")</span><select class="edit-input" @bind="_model.ConnectionId" @bind:after="ConnectionChanged">
                         <option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>
                         @foreach (var connection in ReadyConnections)
                         {
@@ -115,9 +115,12 @@ else
                         }
                     </select></label>
                     <label><span>@R("Web_ExternalStorage_Mode")</span><select class="edit-input" @bind="_model.Mode">
-                        <option value="@SyncMode.TwoWay">@R("Web_CloudSync_Mode_TwoWay")</option>
+                        @if (SelectedConnectionSupports(StorageProviderCapabilities.Write))
+                        {
+                            <option value="@SyncMode.TwoWay">@R("Web_CloudSync_Mode_TwoWay")</option>
+                            <option value="@SyncMode.Push">@R("Web_CloudSync_Mode_Push")</option>
+                        }
                         <option value="@SyncMode.Pull">@R("Web_CloudSync_Mode_Pull")</option>
-                        <option value="@SyncMode.Push">@R("Web_CloudSync_Mode_Push")</option>
                     </select></label>
                     <label><span>@R("Web_ExternalStorage_LocalPath")</span><input class="edit-input" placeholder="/" @bind="_model.LocalPath" /></label>
                     <label><span>@R("Web_ExternalStorage_RemotePath")</span><span class="storage-path-field"><input class="edit-input" placeholder="/" @bind="_model.RemotePath" />@if (SelectedConnectionSupports(StorageProviderCapabilities.Browse)) { <button class="btn-secondary" type="button" disabled="@(_model.LocalShareId == Guid.Empty)" @onclick="OpenRemotePickerAsync">@R("Web_CloudAccess_Browse")</button> }</span></label>
@@ -279,6 +282,14 @@ else
         _error = null;
         _activeSettingsTab = SyncSettingsTab.General;
         _model = new ExternalStorageSyncEditModel { ConnectionId = connectionId ?? Guid.Empty };
+        ConnectionChanged();
+    }
+
+    private void ConnectionChanged()
+    {
+        if (_model.ConnectionId != Guid.Empty
+            && !SelectedConnectionSupports(StorageProviderCapabilities.Write))
+            _model.Mode = SyncMode.Pull;
     }
 
     private void StartEdit(ExternalStorageSyncListItem item)

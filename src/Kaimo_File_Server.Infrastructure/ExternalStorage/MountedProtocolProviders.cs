@@ -1,46 +1,47 @@
+using System.Globalization;
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 
 namespace Kaimo_File_Server.Infrastructure.ExternalStorage;
 
-public sealed partial class SmbStorageConnectionProvider : IStorageConnectionProvider
+public sealed class SmbStorageConnectionProvider(
+    ICredentialVault credentialVault,
+    IProtocolCommandRunner commandRunner) : IStorageConnectionProvider
 {
-    private readonly ProtocolMountVerifier _mountVerifier = new();
-
     public string Id => "smb";
     public string DisplayName => "SMB";
-    public StorageProviderCapabilities Capabilities => ReadWriteMountedCapabilities
-        | StorageProviderCapabilities.RequiresHostMount;
+    public StorageProviderCapabilities Capabilities => ReadWriteCapabilities
+        | StorageProviderCapabilities.DirectFileAccess;
     public IReadOnlySet<StorageAuthorizationMode> AuthorizationModes { get; }
-        = new HashSet<StorageAuthorizationMode> { StorageAuthorizationMode.HostMount };
+        = new HashSet<StorageAuthorizationMode> { StorageAuthorizationMode.UsernamePassword };
 
     public Task<IStorageSession> OpenSessionAsync(
         StorageConnection connection,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        ValidateConnection(connection);
-        var settings = ProtocolConnectionSettings.Parse<SmbMountConnectionSettings>(
-            connection.SettingsJson, "SMB");
-        ValidateSettings(settings);
-        string endpoint = $"//{settings.Server}/{settings.Share}";
-        _mountVerifier.Verify(
-            Id,
-            settings.MountPath,
-            settings.AttestationPath,
-            endpoint,
-            settings.ExpectedServerIdentity,
-            ["operator-managed", "smb3", "signing", "encryption"]);
-        StorageProviderCapabilities capabilities = settings.ReadOnly
-            ? ReadOnlyMountedCapabilities | StorageProviderCapabilities.RequiresHostMount
-            : Capabilities;
-        IStorageSession session = new MountedStorageSession(
-            connection.Id,
-            capabilities,
-            new MountedRemoteFileStore(settings.MountPath, settings.ReadOnly));
-        return Task.FromResult(session);
+        SmbConnectionSettings settings = ParseAndValidate(connection);
+        Dictionary<string, string> credentials = credentialVault.UnprotectConnectionCredentials(connection);
+        if (!credentials.TryGetValue("username", out string? username)
+            || string.IsNullOrWhiteSpace(username)
+            || username.Length > 256
+            || username.IndexOfAny(['\r', '\n']) >= 0
+            || !credentials.TryGetValue("password", out string? password)
+            || password.Length > 4096
+            || password.IndexOfAny(['\r', '\n']) >= 0)
+            throw new ProtocolConfigurationException("credentials_invalid", "The SMB credentials are invalid.");
+        credentials.TryGetValue("domain", out string? credentialDomain);
+        if (credentialDomain is { Length: > 256 } || credentialDomain?.IndexOfAny(['\r', '\n']) >= 0)
+            throw new ProtocolConfigurationException("credentials_invalid", "The SMB credentials are invalid.");
+        IRemoteFileStore files = new SmbCommandRemoteFileStore(
+            settings,
+            new SmbCredentials(username, password, settings.Domain ?? credentialDomain),
+            commandRunner);
+        return Task.FromResult<IStorageSession>(new ProtocolStorageSession(connection.Id, Capabilities, files));
     }
 
     public async Task<StorageConnectionHealthResult> TestAsync(
@@ -49,70 +50,58 @@ public sealed partial class SmbStorageConnectionProvider : IStorageConnectionPro
     {
         try
         {
-            await using var session = await OpenSessionAsync(connection, cancellationToken);
+            await using IStorageSession session = await OpenSessionAsync(connection, cancellationToken);
             await session.RemoteFiles!.ListAsync("/", cancellationToken);
             return Healthy();
         }
-        catch (ProtocolConfigurationException exception)
-        {
-            return Invalid(exception);
-        }
-        catch (IOException)
-        {
-            return Unavailable("mount_io_failed");
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Unavailable("mount_access_denied");
-        }
+        catch (ProtocolConfigurationException exception) { return Invalid(exception); }
+        catch (IOException) { return Unavailable("smb_connection_failed"); }
+        catch (UnauthorizedAccessException) { return Unavailable("smb_access_denied"); }
     }
 
     public Task RevokeAsync(StorageConnection connection, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
 
-    private static void ValidateSettings(SmbMountConnectionSettings settings)
+    internal static SmbConnectionSettings ParseAndValidate(StorageConnection connection)
     {
+        ValidateConnection(connection, "smb", StorageAuthorizationMode.UsernamePassword);
+        var settings = ProtocolConnectionSettings.Parse<SmbConnectionSettings>(connection.SettingsJson, "SMB");
         ValidateHost(settings.Server);
-        if (string.IsNullOrWhiteSpace(settings.Share)
-            || settings.Share.Length > 80
-            || settings.Share.EndsWithAny('.', ' ')
-            || !SmbShareName().IsMatch(settings.Share))
-            throw new ProtocolConfigurationException("share_invalid", "The SMB share name is invalid.");
-        ValidateIdentity(settings.ExpectedServerIdentity);
+        ValidatePort(settings.Port);
+        if (settings.Domain is { Length: > 256 } || settings.Domain?.IndexOfAny(['\r', '\n']) >= 0)
+            throw new ProtocolConfigurationException("domain_invalid", "The SMB domain is invalid.");
         if (settings.MinimumDialect is not ("3.0" or "3.02" or "3.1.1"))
             throw new ProtocolConfigurationException("dialect_invalid", "SMB 3.0 or newer is required.");
         if (!settings.RequireSigning || !settings.RequireEncryption)
             throw new ProtocolConfigurationException(
-                "transport_policy_unsafe",
-                "SMB signing and encryption must be required.");
+                "transport_policy_unsafe", "SMB signing and encryption must be required.");
+        return settings;
     }
-
-    [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9._$ -]{0,79}$", RegexOptions.CultureInvariant)]
-    private static partial Regex SmbShareName();
 
     internal static void ValidateHost(string host)
     {
         if (string.IsNullOrWhiteSpace(host)
             || host.Length > 253
             || host.ContainsAny('/', '\\', ':', '@', '\r', '\n')
-            || (!Uri.CheckHostName(host).Equals(UriHostNameType.Dns)
-                && !IPAddress.TryParse(host, out _)))
+            || (!Uri.CheckHostName(host).Equals(UriHostNameType.Dns) && !IPAddress.TryParse(host, out _)))
             throw new ProtocolConfigurationException("host_invalid", "The protocol host is invalid.");
     }
 
-    internal static void ValidateIdentity(string identity)
+    internal static void ValidatePort(int port)
     {
-        if (string.IsNullOrWhiteSpace(identity)
-            || identity.Length > 512
-            || identity.ContainsAny('\r', '\n'))
-            throw new ProtocolConfigurationException("identity_invalid", "The expected server identity is invalid.");
+        if (port is < 1 or > 65535)
+            throw new ProtocolConfigurationException("port_invalid", "The protocol port is invalid.");
     }
 
-    internal static void ValidateConnection(StorageConnection connection, string expectedProvider = "smb")
+    internal static void ValidateConnection(
+        StorageConnection connection,
+        string expectedProvider,
+        StorageAuthorizationMode expectedMode)
     {
         if (!string.Equals(connection.ProviderId, expectedProvider, StringComparison.OrdinalIgnoreCase)
-            || connection.AuthorizationMode != StorageAuthorizationMode.HostMount)
-            throw new ProtocolConfigurationException("connection_mode_invalid", "The connection mode is invalid for this provider.");
+            || connection.AuthorizationMode != expectedMode)
+            throw new ProtocolConfigurationException(
+                "connection_mode_invalid", "The connection mode is invalid for this provider.");
     }
 
     internal static StorageConnectionHealthResult Healthy()
@@ -121,70 +110,50 @@ public sealed partial class SmbStorageConnectionProvider : IStorageConnectionPro
         => new(exception.Code is "identity_mismatch" or "host_key_mismatch" or "host_key_missing"
                 ? StorageConnectionHealthState.IdentityMismatch
                 : StorageConnectionHealthState.InvalidConfiguration,
-            exception.Code,
-            DateTime.UtcNow);
+            exception.Code, DateTime.UtcNow);
     internal static StorageConnectionHealthResult Unavailable(string code)
         => new(StorageConnectionHealthState.Unavailable, code, DateTime.UtcNow);
 
-    internal const StorageProviderCapabilities ReadOnlyMountedCapabilities =
-        StorageProviderCapabilities.Browse
-        | StorageProviderCapabilities.Read
-        | StorageProviderCapabilities.Sync;
-
-    internal const StorageProviderCapabilities ReadWriteMountedCapabilities =
-        ReadOnlyMountedCapabilities
+    internal const StorageProviderCapabilities ReadOnlyCapabilities =
+        StorageProviderCapabilities.Browse | StorageProviderCapabilities.Read;
+    internal const StorageProviderCapabilities ReadWriteCapabilities =
+        ReadOnlyCapabilities
         | StorageProviderCapabilities.Write
         | StorageProviderCapabilities.CreateDirectory
         | StorageProviderCapabilities.Delete
         | StorageProviderCapabilities.Rename
-        | StorageProviderCapabilities.Move;
+        | StorageProviderCapabilities.Move
+        | StorageProviderCapabilities.Sync;
 }
 
-public sealed class NfsStorageConnectionProvider : IStorageConnectionProvider
+public sealed class NfsStorageConnectionProvider(IProtocolCommandRunner commandRunner)
+    : IStorageConnectionProvider
 {
-    private readonly ProtocolMountVerifier _mountVerifier = new();
-
     public string Id => "nfs";
     public string DisplayName => "NFS";
-    public StorageProviderCapabilities Capabilities => SmbStorageConnectionProvider.ReadWriteMountedCapabilities
-        | StorageProviderCapabilities.RequiresHostMount;
+    public StorageProviderCapabilities Capabilities => SmbStorageConnectionProvider.ReadOnlyCapabilities
+        | StorageProviderCapabilities.Sync
+        | StorageProviderCapabilities.DirectFileAccess;
     public IReadOnlySet<StorageAuthorizationMode> AuthorizationModes { get; }
-        = new HashSet<StorageAuthorizationMode> { StorageAuthorizationMode.HostMount };
+        = new HashSet<StorageAuthorizationMode> { StorageAuthorizationMode.NetworkIdentity };
 
     public Task<IStorageSession> OpenSessionAsync(
         StorageConnection connection,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        SmbStorageConnectionProvider.ValidateConnection(connection, Id);
-        var settings = ProtocolConnectionSettings.Parse<NfsMountConnectionSettings>(
-            connection.SettingsJson, "NFS");
+        SmbStorageConnectionProvider.ValidateConnection(connection, Id, StorageAuthorizationMode.NetworkIdentity);
+        var settings = ProtocolConnectionSettings.Parse<NfsConnectionSettings>(connection.SettingsJson, "NFS");
         SmbStorageConnectionProvider.ValidateHost(settings.Server);
-        SmbStorageConnectionProvider.ValidateIdentity(settings.ExpectedServerIdentity);
-        if (string.IsNullOrWhiteSpace(settings.Export)
-            || !settings.Export.StartsWith('/')
-            || settings.Export.ContainsAny('\r', '\n', ':'))
-            throw new ProtocolConfigurationException("export_invalid", "The NFS export is invalid.");
+        SmbStorageConnectionProvider.ValidatePort(settings.Port);
         if (settings.MinimumMajorVersion < 4)
             throw new ProtocolConfigurationException("nfs_version_unsafe", "NFSv4 or newer is required.");
-        var required = new List<string> { "operator-managed", "host-allowlist", "nfs4" };
         if (settings.RequireKerberos)
-            required.Add("kerberos");
-        _mountVerifier.Verify(
-            Id,
-            settings.MountPath,
-            settings.AttestationPath,
-            $"{settings.Server}:{settings.Export}",
-            settings.ExpectedServerIdentity,
-            required);
-        StorageProviderCapabilities capabilities = settings.ReadOnly
-            ? SmbStorageConnectionProvider.ReadOnlyMountedCapabilities | StorageProviderCapabilities.RequiresHostMount
-            : Capabilities;
-        IStorageSession session = new MountedStorageSession(
-            connection.Id,
-            capabilities,
-            new MountedRemoteFileStore(settings.MountPath, settings.ReadOnly));
-        return Task.FromResult(session);
+            throw new ProtocolConfigurationException(
+                "nfs_kerberos_unavailable",
+                "Kerberos-backed NFS requires a configured runtime identity and is not available yet.");
+        IRemoteFileStore files = new NfsCommandRemoteFileStore(settings, commandRunner);
+        return Task.FromResult<IStorageSession>(new ProtocolStorageSession(connection.Id, Capabilities, files));
     }
 
     public async Task<StorageConnectionHealthResult> TestAsync(
@@ -193,33 +162,418 @@ public sealed class NfsStorageConnectionProvider : IStorageConnectionProvider
     {
         try
         {
-            await using var session = await OpenSessionAsync(connection, cancellationToken);
+            await using IStorageSession session = await OpenSessionAsync(connection, cancellationToken);
             await session.RemoteFiles!.ListAsync("/", cancellationToken);
             return SmbStorageConnectionProvider.Healthy();
         }
-        catch (ProtocolConfigurationException exception)
-        {
-            return SmbStorageConnectionProvider.Invalid(exception);
-        }
-        catch (IOException)
-        {
-            return SmbStorageConnectionProvider.Unavailable("mount_io_failed");
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return SmbStorageConnectionProvider.Unavailable("mount_access_denied");
-        }
+        catch (ProtocolConfigurationException exception) { return SmbStorageConnectionProvider.Invalid(exception); }
+        catch (IOException) { return SmbStorageConnectionProvider.Unavailable("nfs_connection_failed"); }
+        catch (UnauthorizedAccessException) { return SmbStorageConnectionProvider.Unavailable("nfs_access_denied"); }
     }
 
     public Task RevokeAsync(StorageConnection connection, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
 }
 
+public interface IProtocolCommandRunner
+{
+    Task<ProtocolCommandResult> RunAsync(
+        string executable,
+        IReadOnlyList<string> arguments,
+        CancellationToken cancellationToken,
+        bool throwOnFailure = true);
+}
+
+public sealed record ProtocolCommandResult(int ExitCode, string StandardOutput, string StandardError = "");
+internal sealed record SmbCredentials(string Username, string Password, string? Domain);
+
+internal sealed class SmbCommandRemoteFileStore(
+    SmbConnectionSettings settings,
+    SmbCredentials credentials,
+    IProtocolCommandRunner runner) : IRemoteFileStore
+{
+    public async Task<IReadOnlyList<RemoteStorageItem>> ListAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        string normalized = Normalize(path);
+        if (normalized == "/")
+        {
+            ProtocolCommandResult result = await RunAsync(null, null, listShares: true, cancellationToken);
+            return ParseShares(result.StandardOutput);
+        }
+        (string share, string relative) = Split(normalized);
+        // smbclient's ls argument is a mask in the current directory, not a
+        // directory to enter. Change directory first so nested browsing lists
+        // the children instead of merely matching the selected folder itself.
+        string command = relative.Length == 0 ? "ls" : $"cd {QuoteRemote(relative)}; ls";
+        ProtocolCommandResult listing = await RunAsync(share, command, false, cancellationToken);
+        return ParseDirectory(share, relative, listing.StandardOutput);
+    }
+
+    public async Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
+    {
+        (string share, string relative) = SplitFile(path);
+        string temporary = ProtocolTemporaryFile.CreatePath();
+        try
+        {
+            await RunAsync(share, $"get {QuoteRemote(relative)} {QuoteLocal(temporary)}", false, cancellationToken);
+            return ProtocolTemporaryFile.OpenDeleteOnClose(temporary);
+        }
+        catch { File.Delete(temporary); throw; }
+    }
+
+    public async Task WriteAsync(
+        string path,
+        Stream content,
+        bool overwrite,
+        CancellationToken cancellationToken = default)
+    {
+        (string share, string relative) = SplitFile(path);
+        if (!overwrite)
+        {
+            int separator = relative.LastIndexOf('/');
+            string parent = separator < 0 ? $"/{share}" : $"/{share}/{relative[..separator]}";
+            string name = relative[(separator + 1)..];
+            if ((await ListAsync(parent, cancellationToken)).Any(item =>
+                    string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase)))
+                throw new IOException("The remote item already exists.");
+        }
+        string temporary = ProtocolTemporaryFile.CreatePath();
+        try
+        {
+            await using (var target = new FileStream(
+                             temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 65536, true))
+                await content.CopyToAsync(target, cancellationToken);
+            await RunAsync(share, $"put {QuoteLocal(temporary)} {QuoteRemote(relative)}", false, cancellationToken);
+        }
+        finally { File.Delete(temporary); }
+    }
+
+    public async Task CreateDirectoryAsync(string path, CancellationToken cancellationToken = default)
+    {
+        (string share, string relative) = SplitFile(path);
+        await RunAsync(share, $"mkdir {QuoteRemote(relative)}", false, cancellationToken);
+    }
+
+    public async Task DeleteAsync(string path, bool recursive, CancellationToken cancellationToken = default)
+    {
+        (string share, string relative) = SplitFile(path);
+        if (recursive)
+        {
+            await RunAsync(share, $"deltree {QuoteRemote(relative)}", false, cancellationToken);
+            return;
+        }
+        ProtocolCommandResult deleted = await RunAsync(
+            share, $"del {QuoteRemote(relative)}", false, cancellationToken, throwOnFailure: false);
+        if (deleted.ExitCode != 0)
+            await RunAsync(share, $"rmdir {QuoteRemote(relative)}", false, cancellationToken);
+    }
+
+    public async Task MoveAsync(
+        string sourcePath,
+        string destinationPath,
+        CancellationToken cancellationToken = default)
+    {
+        (string sourceShare, string source) = SplitFile(sourcePath);
+        (string destinationShare, string destination) = SplitFile(destinationPath);
+        if (!string.Equals(sourceShare, destinationShare, StringComparison.OrdinalIgnoreCase))
+            throw new NotSupportedException("SMB items cannot be moved between shares in one operation.");
+        await RunAsync(sourceShare,
+            $"rename {QuoteRemote(source)} {QuoteRemote(destination)}", false, cancellationToken);
+    }
+
+    private async Task<ProtocolCommandResult> RunAsync(
+        string? share,
+        string? command,
+        bool listShares,
+        CancellationToken cancellationToken,
+        bool throwOnFailure = true)
+    {
+        string authFile = ProtocolTemporaryFile.CreatePath();
+        try
+        {
+            var auth = new StringBuilder()
+                .Append("username = ").AppendLine(credentials.Username)
+                .Append("password = ").AppendLine(credentials.Password);
+            if (!string.IsNullOrWhiteSpace(credentials.Domain))
+                auth.Append("domain = ").AppendLine(credentials.Domain);
+            await ProtocolTemporaryFile.WriteRestrictedTextAsync(authFile, auth.ToString(), cancellationToken);
+            var arguments = new List<string> { "-g" };
+            if (listShares)
+                arguments.AddRange(["-L", $"//{settings.Server}"]);
+            else
+                arguments.Add($"//{settings.Server}/{share}");
+            arguments.AddRange(["-A", authFile, "-p", settings.Port.ToString(CultureInfo.InvariantCulture)]);
+            string minimumProtocol = settings.MinimumDialect switch
+            {
+                "3.1.1" => "SMB3_11",
+                "3.02" => "SMB3_02",
+                _ => "SMB3"
+            };
+            arguments.AddRange(["--option", $"client min protocol={minimumProtocol}"]);
+            arguments.Add("--client-protection=encrypt");
+            if (command is not null)
+                arguments.AddRange(["-c", command]);
+            return await runner.RunAsync("smbclient", arguments, cancellationToken, throwOnFailure);
+        }
+        finally { File.Delete(authFile); }
+    }
+
+    private static IReadOnlyList<RemoteStorageItem> ParseShares(string output)
+        => output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split('|'))
+            .Where(fields => fields.Length >= 2 && string.Equals(fields[0], "Disk", StringComparison.OrdinalIgnoreCase))
+            .Where(fields => !fields[1].EndsWith('$'))
+            .Select(fields => new RemoteStorageItem(
+                fields[1], $"/{fields[1]}", true, null, null, $"smb-share:{fields[1]}"))
+            .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private static IReadOnlyList<RemoteStorageItem> ParseDirectory(string share, string parent, string output)
+    {
+        var result = new List<RemoteStorageItem>();
+        foreach (string line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!TryParseDirectoryLine(
+                    line, out string name, out string attributes, out long? size, out DateTime? modifiedAtUtc))
+                continue;
+            if (name is "." or ".." || name.Length == 0)
+                continue;
+            bool directory = attributes.Contains('D', StringComparison.OrdinalIgnoreCase);
+            string child = string.Join('/', new[] { share, parent, name }.Where(value => value.Length > 0));
+            result.Add(new RemoteStorageItem(
+                name, $"/{child}", directory, directory ? null : size, modifiedAtUtc));
+        }
+        return result;
+    }
+
+    private static bool TryParseDirectoryLine(
+        string line,
+        out string name,
+        out string attributes,
+        out long? size,
+        out DateTime? modifiedAtUtc)
+    {
+        name = string.Empty;
+        attributes = string.Empty;
+        size = null;
+        modifiedAtUtc = null;
+
+        // Some downstream Samba builds expose a pipe-delimited directory
+        // format. Accept both known field orders without confusing timestamps
+        // with names.
+        string[] fields = line.Split('|');
+        if (fields.Length >= 4)
+        {
+            if (IsAttributeField(fields[0]) && TrySize(fields[1], out size))
+            {
+                attributes = fields[0].Trim();
+                name = fields[^1].Trim();
+                modifiedAtUtc = ParseDate(fields[2]);
+                return name.Length > 0;
+            }
+            if (IsAttributeField(fields[1]) && TrySize(fields[2], out size))
+            {
+                name = fields[0].Trim();
+                attributes = fields[1].Trim();
+                modifiedAtUtc = ParseDate(string.Join('|', fields.Skip(3)));
+                return name.Length > 0;
+            }
+        }
+
+        // Upstream smbclient applies --grepable to server/share discovery but
+        // normally keeps the classic fixed-column directory representation.
+        // Parse from the attribute/size boundary so names may contain spaces.
+        Match match = Regex.Match(
+            line,
+            @"^\s*(?<name>.+?)\s+(?<attributes>[ADHNRSTV]+)\s+(?<size>\d+)\s+(?<date>.+)$",
+            RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+        if (!match.Success || !TrySize(match.Groups["size"].Value, out size))
+            return false;
+        name = match.Groups["name"].Value.Trim();
+        attributes = match.Groups["attributes"].Value;
+        modifiedAtUtc = ParseDate(match.Groups["date"].Value);
+        return name.Length > 0;
+    }
+
+    private static bool IsAttributeField(string value)
+    {
+        string candidate = value.Trim();
+        return candidate.Length > 0 && candidate.All(character => "ADHNRSTV".Contains(
+            char.ToUpperInvariant(character), StringComparison.Ordinal));
+    }
+
+    private static bool TrySize(string value, out long? size)
+    {
+        bool parsed = long.TryParse(value.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out long result);
+        size = parsed ? result : null;
+        return parsed;
+    }
+
+    private static DateTime? ParseDate(string value)
+    {
+        string normalized = value.Trim();
+        if (DateTime.TryParseExact(
+                normalized,
+                "ddd MMM d HH:mm:ss yyyy",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeLocal,
+                out DateTime classic))
+            return classic.ToUniversalTime();
+        return DateTimeOffset.TryParse(
+            normalized,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeLocal,
+            out DateTimeOffset parsed)
+            ? parsed.UtcDateTime
+            : null;
+    }
+
+    private static (string Share, string Relative) Split(string path)
+    {
+        string[] segments = path.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0)
+            throw new ProtocolConfigurationException("remote_path_invalid", "Select an SMB share first.");
+        return (segments[0], string.Join('/', segments.Skip(1)));
+    }
+
+    private static (string Share, string Relative) SplitFile(string path)
+    {
+        var split = Split(Normalize(path));
+        if (split.Relative.Length == 0)
+            throw new ProtocolConfigurationException("remote_path_invalid", "The SMB share root is not a file path.");
+        return split;
+    }
+
+    private static string Normalize(string path)
+    {
+        string normalized = string.IsNullOrWhiteSpace(path) ? "/" : "/" + path.Replace('\\', '/').Trim('/');
+        foreach (string segment in normalized.Split('/', StringSplitOptions.RemoveEmptyEntries))
+            if (segment is "." or ".." || segment.IndexOfAny(['\r', '\n', '"', ';']) >= 0)
+                throw new ProtocolConfigurationException("remote_path_invalid", "The SMB path is invalid.");
+        return normalized;
+    }
+
+    internal static string QuoteRemote(string value) => $"\"{value.Replace('/', '\\')}\"";
+    internal static string QuoteLocal(string value) => $"\"{value}\"";
+}
+
+internal sealed partial class NfsCommandRemoteFileStore(
+    NfsConnectionSettings settings,
+    IProtocolCommandRunner runner) : IRemoteFileStore
+{
+    public async Task<IReadOnlyList<RemoteStorageItem>> ListAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        string normalized = Normalize(path);
+        ProtocolCommandResult result = await runner.RunAsync("nfs-ls", [BuildUrl(normalized)], cancellationToken);
+        var items = new List<RemoteStorageItem>();
+        foreach (string line in result.StandardOutput.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            Match match = NfsListing().Match(line.Trim());
+            if (!match.Success)
+                continue;
+            string name = match.Groups["name"].Value.TrimEnd('/').Split('/').Last();
+            if (name is "." or ".." || name.Length == 0)
+                continue;
+            bool directory = match.Groups["mode"].Value.StartsWith('d');
+            long? size = long.TryParse(match.Groups["size"].Value, out long parsed) ? parsed : null;
+            string child = normalized.TrimEnd('/') + "/" + name;
+            items.Add(new RemoteStorageItem(name, child, directory, directory ? null : size, null));
+        }
+        return items;
+    }
+
+    public async Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
+    {
+        string temporary = ProtocolTemporaryFile.CreatePath();
+        try
+        {
+            await runner.RunAsync("nfs-cp", [BuildUrl(Normalize(path)), temporary], cancellationToken);
+            return ProtocolTemporaryFile.OpenDeleteOnClose(temporary);
+        }
+        catch { File.Delete(temporary); throw; }
+    }
+
+    public Task WriteAsync(string path, Stream content, bool overwrite, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Direct NFS connections are currently read-only.");
+    public Task CreateDirectoryAsync(string path, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Direct NFS connections are currently read-only.");
+    public Task DeleteAsync(string path, bool recursive, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Direct NFS connections are currently read-only.");
+    public Task MoveAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Direct NFS connections are currently read-only.");
+
+    private string BuildUrl(string path)
+    {
+        string host = settings.Port == 2049 ? settings.Server : $"{settings.Server}:{settings.Port}";
+        return $"nfs://{host}{path}?version={settings.MinimumMajorVersion}";
+    }
+
+    private static string Normalize(string path)
+    {
+        string normalized = string.IsNullOrWhiteSpace(path) ? "/" : "/" + path.Replace('\\', '/').Trim('/');
+        if (normalized.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(segment => segment is "." or ".."))
+            throw new ProtocolConfigurationException("remote_path_invalid", "The NFS path is invalid.");
+        return normalized;
+    }
+
+    [GeneratedRegex("^(?<mode>[d-][rwxstST-]{9})\\s+\\d+\\s+\\d+\\s+\\d+\\s+(?<size>\\d+)\\s+(?<name>.+)$")]
+    private static partial Regex NfsListing();
+}
+
+internal sealed class ProtocolStorageSession(
+    Guid connectionId,
+    StorageProviderCapabilities capabilities,
+    IRemoteFileStore remoteFiles) : IStorageSession
+{
+    public Guid ConnectionId { get; } = connectionId;
+    public StorageProviderCapabilities Capabilities { get; } = capabilities;
+    public IRemoteFileStore RemoteFiles { get; } = remoteFiles;
+    IRemoteFileStore? IStorageSession.RemoteFiles => RemoteFiles;
+    public IOptimizedStorageSync? OptimizedSync => null;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}
+
+internal static class ProtocolTemporaryFile
+{
+    public static string CreatePath() => Path.Combine(Path.GetTempPath(), $"kaimo-protocol-{Guid.NewGuid():N}");
+    public static FileStream OpenDeleteOnClose(string path)
+        => new(path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536,
+            FileOptions.Asynchronous | FileOptions.SequentialScan | FileOptions.DeleteOnClose);
+    public static async Task WriteRestrictedTextAsync(
+        string path,
+        string content,
+        CancellationToken cancellationToken)
+    {
+        FileStream stream;
+        if (OperatingSystem.IsWindows())
+        {
+            stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, true);
+        }
+        else
+        {
+            stream = new FileStream(path, new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
+                Options = FileOptions.Asynchronous,
+                UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+            });
+        }
+        await using (stream)
+        await using (var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: false))
+        {
+            await writer.WriteAsync(content.AsMemory(), cancellationToken);
+        }
+    }
+}
+
 internal static class ProtocolStringExtensions
 {
     public static bool ContainsAny(this string value, params char[] candidates)
         => value.IndexOfAny(candidates) >= 0;
-
-    public static bool EndsWithAny(this string value, params char[] candidates)
-        => value.Length > 0 && candidates.Contains(value[^1]);
 }

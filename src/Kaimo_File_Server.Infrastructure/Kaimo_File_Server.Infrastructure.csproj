@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Kaimo_File_Server.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.4.2" />
     <PackageReference Include="Google.Apis.Auth" Version="1.75.0" />

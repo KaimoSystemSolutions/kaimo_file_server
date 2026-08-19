@@ -1,6 +1,7 @@
 @page "/cloud-access"
 @using Kaimo_File_Server.Core.Domain
 @using Kaimo_File_Server.Core.Domain.Identity
+@using Kaimo_File_Server.Core.Services.ExternalStorage
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Pages.CloudSync.Components
 @using Kaimo_File_Server.Web.Components.ViewModels
@@ -125,7 +126,8 @@ else
                     <span class="detail-label">@R("Web_CloudAccess_Connection")</span>
                     <select class="edit-input" value="@_shareConnectionId" @onchange="ConnectionChangedAsync">
                         <option value="@Guid.Empty">@R("Web_CloudAccess_Select")</option>
-                        @foreach (var connection in VM.Connections.Where(IsReady))
+                        @foreach (var connection in VM.Connections.Where(connection =>
+                                      IsReady(connection) && VM.Supports(connection, StorageProviderCapabilities.Browse)))
                         {
                             <option value="@connection.Id">@ConnectionDisplay(connection)</option>
                         }
@@ -292,7 +294,7 @@ else
                     <article class="cloud-access-connection-card">
                         <div>
                             <strong>@connection.Name</strong>
-                            <small>Microsoft OneDrive · @ConnectionState(connection)</small>
+                            <small>@VM.GetProviderName(connection.ProviderId) · @ConnectionState(connection)</small>
                             <small>@(connection.AccountEmail ?? connection.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</small>
                         </div>
                         @if (VM.CanManageConnections)
@@ -308,7 +310,10 @@ else
                             {
                                 <button class="btn-secondary" type="button" @onclick="() => StartEditConnection(connection)">@R("Web_CloudAccess_Edit")</button>
                             }
-                            <button class="btn-secondary" type="button" @onclick="() => AuthorizeConnectionAsync(connection)">@(IsReady(connection) ? R("Web_CloudAccess_Reauthorize") : R("Web_CloudAccess_Authorize"))</button>
+                            @if (VM.Supports(connection, StorageProviderCapabilities.DelegatedAuthorization))
+                            {
+                                <button class="btn-secondary" type="button" @onclick="() => AuthorizeConnectionAsync(connection)">@(IsReady(connection) ? R("Web_CloudAccess_Reauthorize") : R("Web_CloudAccess_Authorize"))</button>
+                            }
                             <button class="btn-danger-outline" type="button" @onclick="() => DeleteConnectionAsync(connection)">@Resources.Web_Action_Delete</button>
                         </div>
                         }
@@ -376,7 +381,8 @@ else
         if (!firstRender) return;
         await VM.LoadAsync();
         if (InitialConnectionId is Guid connectionId
-            && VM.Connections.Any(connection => connection.Id == connectionId && IsReady(connection)))
+            && VM.Connections.Any(connection => connection.Id == connectionId
+                && IsReady(connection) && VM.Supports(connection, StorageProviderCapabilities.Browse)))
         {
             _shareConnectionId = connectionId;
             _showShareForm = true;
@@ -475,7 +481,7 @@ else
         _pickerError = null;
         try
         {
-            _pickerItems = await VM.ListOneDriveFoldersAsync(_pickerConnectionId, _pickerPath);
+            _pickerItems = await VM.ListRemoteFoldersAsync(_pickerConnectionId, _pickerPath);
         }
         catch (Exception exception)
         {
@@ -616,7 +622,7 @@ else
         => connection.State == StorageConnectionState.Ready;
 
     private string ConnectionDisplay(StorageConnection connection)
-        => $"{connection.Name} ({connection.AccountEmail ?? connection.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized")})";
+        => $"{connection.Name} · {VM.GetProviderName(connection.ProviderId)}";
 
     private string ConnectionState(StorageConnection connection) => connection.State switch
     {

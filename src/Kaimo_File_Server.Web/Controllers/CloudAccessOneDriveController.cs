@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Net.Http.Headers;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
 using System.Globalization;
 
 namespace Kaimo_File_Server.Web.Controllers;
@@ -22,6 +23,7 @@ public sealed class CloudAccessOneDriveController(
     ICloudAuthorizationTicketStore tickets,
     IOneDriveDeviceAuthorizationService deviceAuthorization,
     OneDriveStorageConnectionFactory oneDriveConnections,
+    IStorageConnectionProviderCatalog storageProviders,
     CloudAccessDownloadTicketStore downloadTickets,
     IUserContextFactory userContextFactory,
     CloudAccessAuthorizationService authorization,
@@ -37,24 +39,38 @@ public sealed class CloudAccessOneDriveController(
         if (share is null || actor is null || !await authorization.CanAccessAsync(actor, share))
             return Forbid();
         var record = await connections.GetAsync(share.ConnectionId);
-        if (record?.State != StorageConnectionState.Ready
-            || string.IsNullOrWhiteSpace(record.EncryptedCredentialPayload))
+        if (record?.State != StorageConnectionState.Ready)
             return NotFound();
         if (!ShareRelativePath.TryNormalizeStrict(download.RelativePath, out var relative, allowRoot: false))
             return BadRequest("The download path is invalid.");
 
-        await using var connection = oneDriveConnections.Create(record);
-        var contentDisposition = new ContentDispositionHeaderValue("attachment")
+        await using var session = await storageProviders.GetRequired(record.ProviderId)
+            .OpenSessionAsync(record, HttpContext.RequestAborted);
+        var remoteFiles = session.RemoteFiles;
+        if (remoteFiles is null) return NotFound();
+        Stream content;
+        try
         {
-            FileNameStar = download.FileName
-        };
-        Response.Headers.ContentDisposition = contentDisposition.ToString();
-        Response.ContentType = "application/octet-stream";
-        Response.Headers.CacheControl = "no-store";
-        await connection.DownloadAsync(
-            ShareRelativePath.Combine(share.RemoteRootPath, relative),
-            Response.Body,
-            HttpContext.RequestAborted);
+            content = await remoteFiles.OpenReadAsync(
+                ShareRelativePath.Combine(share.RemoteRootPath, relative), HttpContext.RequestAborted);
+        }
+        catch (RemoteStorageAccessDeniedException)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                title: R("Web_ExternalStorage_RemoteReadDenied"));
+        }
+        await using (content)
+        {
+            var contentDisposition = new ContentDispositionHeaderValue("attachment")
+            {
+                FileNameStar = download.FileName
+            };
+            Response.Headers.ContentDisposition = contentDisposition.ToString();
+            Response.ContentType = "application/octet-stream";
+            Response.Headers.CacheControl = "no-store";
+            await content.CopyToAsync(Response.Body, HttpContext.RequestAborted);
+        }
         return new EmptyResult();
     }
 

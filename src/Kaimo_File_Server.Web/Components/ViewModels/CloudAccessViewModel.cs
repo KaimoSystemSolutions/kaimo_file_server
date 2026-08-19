@@ -28,6 +28,8 @@ public sealed class CloudAccessViewModel
     private readonly OneDriveStorageConnectionFactory _oneDriveConnections;
     private readonly ILogger<CloudAccessViewModel> _logger;
     private readonly IStorageConnectionProviderCatalog? _providerCatalog;
+    private readonly ICredentialVault? _credentialVault;
+    private readonly IStorageDirectoryTargetResolver? _directoryTargets;
     private UserContext? _actor;
 
     public CloudAccessViewModel(
@@ -43,7 +45,9 @@ public sealed class CloudAccessViewModel
         IShareRepository localShares,
         OneDriveStorageConnectionFactory oneDriveConnections,
         ILogger<CloudAccessViewModel> logger,
-        IStorageConnectionProviderCatalog? providerCatalog = null)
+        IStorageConnectionProviderCatalog? providerCatalog = null,
+        ICredentialVault? credentialVault = null,
+        IStorageDirectoryTargetResolver? directoryTargets = null)
     {
         _repository = repository;
         _connections = connections;
@@ -58,6 +62,8 @@ public sealed class CloudAccessViewModel
         _oneDriveConnections = oneDriveConnections;
         _logger = logger;
         _providerCatalog = providerCatalog;
+        _credentialVault = credentialVault;
+        _directoryTargets = directoryTargets;
     }
 
     public List<StorageConnection> Connections { get; private set; } = [];
@@ -138,29 +144,40 @@ public sealed class CloudAccessViewModel
     }
 
     /// <summary>
-    /// Creates an operator-configured protocol connection without accepting
-    /// inline credentials. The provider validates mount attestations or secret
-    /// references before the connection can enter the ready state.
+    /// Creates a provider-configured protocol connection. Passwords are stored
+    /// only in the context-bound credential vault and never in SettingsJson.
     /// </summary>
     public async Task CreateConfiguredConnectionAsync(
         string providerId,
         string name,
         Guid departmentId,
-        string settingsJson)
+        string settingsJson,
+        string? username = null,
+        string? password = null,
+        string? domain = null)
     {
         await EnsureCanManageConnectionDepartmentAsync(departmentId);
         if (_providerCatalog is null)
             throw new NotSupportedException(R("Web_ExternalStorage_ProviderUnsupported"));
         var provider = _providerCatalog.GetRequired(providerId);
-        var authorizationMode = provider.AuthorizationModes.SingleOrDefault(mode =>
-            mode is StorageAuthorizationMode.HostMount or StorageAuthorizationMode.SshKey);
-        if (authorizationMode is not (StorageAuthorizationMode.HostMount or StorageAuthorizationMode.SshKey))
+        if (provider.AuthorizationModes.Count != 1)
+            throw new NotSupportedException(R("Web_ExternalStorage_ProviderUnsupported"));
+        var authorizationMode = provider.AuthorizationModes.Single();
+        if (authorizationMode is not (StorageAuthorizationMode.HostMount
+            or StorageAuthorizationMode.SshKey
+            or StorageAuthorizationMode.UsernamePassword
+            or StorageAuthorizationMode.NetworkIdentity))
             throw new NotSupportedException(R("Web_ExternalStorage_ProviderUnsupported"));
         string normalizedName = name.Trim();
         if (string.IsNullOrWhiteSpace(normalizedName) || normalizedName.Length > 200)
             throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
         if (string.IsNullOrWhiteSpace(settingsJson) || settingsJson.Length > 64 * 1024)
             throw new ArgumentException(R("Web_ExternalStorage_InvalidSettings"));
+        bool hasUsername = !string.IsNullOrWhiteSpace(username);
+        bool hasPassword = !string.IsNullOrEmpty(password);
+        if (string.Equals(provider.Id, "smb", StringComparison.OrdinalIgnoreCase)
+            && (!hasUsername || !hasPassword))
+            throw new ArgumentException(R("Web_ExternalStorage_InvalidCredentials"));
 
         var connection = new StorageConnection
         {
@@ -172,6 +189,21 @@ public sealed class CloudAccessViewModel
             SettingsJson = settingsJson,
             State = StorageConnectionState.PendingConfiguration
         };
+        if (hasUsername || hasPassword)
+        {
+            if (!hasUsername || !hasPassword || _credentialVault is null)
+                throw new ArgumentException(R("Web_ExternalStorage_InvalidCredentials"));
+            var credentials = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["username"] = username!.Trim(),
+                ["password"] = password!
+            };
+            if (!string.IsNullOrWhiteSpace(domain))
+                credentials["domain"] = domain.Trim();
+            connection.EncryptedCredentialPayload = _credentialVault.ProtectConnectionCredentials(connection, credentials);
+            connection.AccountDisplayName = username.Trim();
+            connection.CredentialUpdatedAtUtc = DateTime.UtcNow;
+        }
         var health = await provider.TestAsync(connection);
         connection.State = MapUnhealthyState(connection, health);
         connection.LastVerifiedAtUtc = health.CheckedAtUtc;
@@ -211,7 +243,8 @@ public sealed class CloudAccessViewModel
     {
         var connection = await GetManagedConnectionAsync(connectionId);
         connection.State = enabled
-            ? string.IsNullOrWhiteSpace(connection.EncryptedCredentialPayload)
+            ? connection.AuthorizationMode != StorageAuthorizationMode.NetworkIdentity
+              && string.IsNullOrWhiteSpace(connection.EncryptedCredentialPayload)
                 ? StorageConnectionState.PendingAuthorization
                 : StorageConnectionState.Ready
             : StorageConnectionState.Disabled;
@@ -231,7 +264,7 @@ public sealed class CloudAccessViewModel
         {
             if (!string.Equals(connection.ProviderId, "onedrive", StringComparison.OrdinalIgnoreCase))
                 throw new NotSupportedException(R("Web_ExternalStorage_TestUnsupported"));
-            await ListOneDriveFoldersAsync(connectionId, "/");
+            await ListRemoteFoldersAsync(connectionId, "/");
             connection = await GetManagedConnectionAsync(connectionId);
             connection.State = StorageConnectionState.Ready;
             connection.LastVerifiedAtUtc = DateTime.UtcNow;
@@ -248,12 +281,17 @@ public sealed class CloudAccessViewModel
         await LoadAsync();
     }
 
-    public async Task<List<CloudDirectoryItem>> ListOneDriveFoldersAsync(Guid connectionId, string path)
+    public async Task<List<CloudDirectoryItem>> ListRemoteFoldersAsync(Guid connectionId, string path)
     {
-        var connectionRecord = await GetManagedConnectionAsync(connectionId);
-        if (connectionRecord.State != StorageConnectionState.Ready
-            || string.IsNullOrWhiteSpace(connectionRecord.EncryptedCredentialPayload))
+        var connectionRecord = await GetUsableConnectionAsync(connectionId);
+        if (connectionRecord.State != StorageConnectionState.Ready)
             throw new InvalidOperationException(R("Web_CloudAccess_ConnectionNotReady"));
+        if (_directoryTargets is not null)
+            return (await _directoryTargets.ListDirectoriesAsync(connectionRecord, path))
+                .Select(item => new CloudDirectoryItem(item.Name, NormalizeRemotePath(item.Path)))
+                .ToList();
+
+        // Compatibility path for isolated legacy hosts without the provider catalog.
         if (!ShareRelativePath.TryNormalizeStrict(path.Trim('/'), out var normalized))
             throw new UnauthorizedAccessException(R("Web_CloudAccess_InvalidRemotePath"));
         await using var connection = _oneDriveConnections.Create(connectionRecord);
@@ -288,10 +326,9 @@ public sealed class CloudAccessViewModel
         var connectionRecord = await GetUsableConnectionAsync(connectionId);
         if (_providerCatalog is not null
             && !_providerCatalog.GetRequired(connectionRecord.ProviderId).Capabilities
-                .HasFlag(StorageProviderCapabilities.StableItemIds))
+                .HasFlag(StorageProviderCapabilities.Browse))
             throw new NotSupportedException(R("Web_ExternalStorage_VirtualShareUnsupported"));
-        if (connectionRecord.State != StorageConnectionState.Ready
-            || string.IsNullOrWhiteSpace(connectionRecord.EncryptedCredentialPayload))
+        if (connectionRecord.State != StorageConnectionState.Ready)
             throw new InvalidOperationException(R("Web_CloudAccess_ConnectionNotReady"));
         var normalizedName = name.Trim();
         if (string.IsNullOrWhiteSpace(normalizedName)
@@ -303,8 +340,15 @@ public sealed class CloudAccessViewModel
         if (!ShareRelativePath.TryNormalizeStrict(remoteRootPath.Trim('/'), out var root))
             throw new UnauthorizedAccessException(R("Web_CloudAccess_InvalidRemotePath"));
 
-        await using var connection = _oneDriveConnections.Create(connectionRecord);
-        var folder = await connection.ResolveFolderAsync(root);
+        StorageDirectoryTarget folder;
+        if (_directoryTargets is not null)
+            folder = await _directoryTargets.ResolveDirectoryAsync(connectionRecord, root);
+        else
+        {
+            await using var legacyConnection = _oneDriveConnections.Create(connectionRecord);
+            var legacyFolder = await legacyConnection.ResolveFolderAsync(root);
+            folder = new StorageDirectoryTarget(NormalizeRemotePath(legacyFolder.Path), legacyFolder.ProviderId);
+        }
 
         var share = new CloudAccessShare
         {
@@ -312,8 +356,8 @@ public sealed class CloudAccessViewModel
             DepartmentId = connectionRecord.DepartmentId,
             Name = normalizedName,
             RemoteRootPath = folder.Path,
-            RemoteRootItemId = folder.ProviderId,
-            IsReadOnly = isReadOnly,
+            RemoteRootItemId = folder.StableId,
+            IsReadOnly = isReadOnly || !Supports(connectionRecord, StorageProviderCapabilities.Write),
             IsEnabled = true
         };
         await _repository.UpsertShareAsync(share);
@@ -354,17 +398,23 @@ public sealed class CloudAccessViewModel
             throw new UnauthorizedAccessException(R("Web_CloudAccess_InvalidRemotePath"));
 
         var connectionRecord = await GetUsableConnectionAsync(share.ConnectionId);
-        if (connectionRecord.State != StorageConnectionState.Ready
-            || string.IsNullOrWhiteSpace(connectionRecord.EncryptedCredentialPayload))
+        if (connectionRecord.State != StorageConnectionState.Ready)
             throw new InvalidOperationException(R("Web_CloudAccess_ConnectionNotReady"));
 
-        await using var connection = _oneDriveConnections.Create(connectionRecord);
-        var folder = await connection.ResolveFolderAsync(root);
+        StorageDirectoryTarget folder;
+        if (_directoryTargets is not null)
+            folder = await _directoryTargets.ResolveDirectoryAsync(connectionRecord, root);
+        else
+        {
+            await using var legacyConnection = _oneDriveConnections.Create(connectionRecord);
+            var legacyFolder = await legacyConnection.ResolveFolderAsync(root);
+            folder = new StorageDirectoryTarget(NormalizeRemotePath(legacyFolder.Path), legacyFolder.ProviderId);
+        }
 
         share.Name = normalizedName;
         share.RemoteRootPath = folder.Path;
-        share.RemoteRootItemId = folder.ProviderId;
-        share.IsReadOnly = isReadOnly;
+        share.RemoteRootItemId = folder.StableId;
+        share.IsReadOnly = isReadOnly || !Supports(connectionRecord, StorageProviderCapabilities.Write);
         await _repository.UpsertShareAsync(share);
         await LoadAsync();
     }
@@ -460,6 +510,18 @@ public sealed class CloudAccessViewModel
         return !(await _localShares.GetAllAsync()).Any(x => comparer.Equals(x.Name, name));
     }
 
+    public bool Supports(StorageConnection connection, StorageProviderCapabilities capability)
+    {
+        if (_providerCatalog is null) return true;
+        return _providerCatalog.TryGet(connection.ProviderId, out var provider)
+               && provider.Capabilities.HasFlag(capability);
+    }
+
+    public string GetProviderName(string providerId)
+        => _providerCatalog?.TryGet(providerId, out var provider) == true
+            ? provider.DisplayName
+            : providerId;
+
     private async Task<UserContext?> GetActorAsync()
     {
         var state = await _authenticationState.GetAuthenticationStateAsync();
@@ -489,6 +551,12 @@ public sealed class CloudAccessViewModel
         => scope.IsUnrestricted
             ? allDepartments.Select(department => department.Id).ToHashSet()
             : scope.ScopeIds.ToHashSet();
+
+    private static string NormalizeRemotePath(string? path)
+    {
+        string normalized = (path ?? string.Empty).Replace('\\', '/').Trim('/');
+        return normalized.Length == 0 ? "/" : $"/{normalized}";
+    }
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 }

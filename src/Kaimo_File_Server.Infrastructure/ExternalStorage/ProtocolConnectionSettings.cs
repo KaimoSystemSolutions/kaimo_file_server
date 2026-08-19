@@ -3,26 +3,19 @@ using System.Text.Json.Serialization;
 
 namespace Kaimo_File_Server.Infrastructure.ExternalStorage;
 
-public sealed record SmbMountConnectionSettings(
+public sealed record SmbConnectionSettings(
     string Server,
-    string Share,
-    string ExpectedServerIdentity,
-    string MountPath,
-    string AttestationPath,
+    int Port = 445,
+    string? Domain = null,
     string MinimumDialect = "3.0",
     bool RequireSigning = true,
-    bool RequireEncryption = true,
-    bool ReadOnly = false);
+    bool RequireEncryption = true);
 
-public sealed record NfsMountConnectionSettings(
+public sealed record NfsConnectionSettings(
     string Server,
-    string Export,
-    string ExpectedServerIdentity,
-    string MountPath,
-    string AttestationPath,
+    int Port = 2049,
     int MinimumMajorVersion = 4,
-    bool RequireKerberos = false,
-    bool ReadOnly = false);
+    bool RequireKerberos = false);
 
 public sealed record RsyncSshConnectionSettings(
     string Host,
@@ -32,14 +25,6 @@ public sealed record RsyncSshConnectionSettings(
     string ExpectedHostKeySha256,
     string PrivateKeySecretReference,
     string KnownHostsSecretReference);
-
-public sealed record ProtocolMountAttestation(
-    string ProviderId,
-    string MountPath,
-    string Endpoint,
-    string ServerIdentity,
-    string[] Assurances,
-    DateTime ValidUntilUtc);
 
 internal static class ProtocolConnectionSettings
 {

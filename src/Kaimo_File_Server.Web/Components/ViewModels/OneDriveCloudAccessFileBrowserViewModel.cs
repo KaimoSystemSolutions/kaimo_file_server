@@ -5,7 +5,7 @@ using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services;
-using Kaimo_File_Server.Infrastructure.Clouds;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Web.Helpers;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -29,14 +29,14 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     private readonly CloudAccessAuthorizationService _authorization;
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authenticationState;
-    private readonly OneDriveStorageConnectionFactory _oneDriveConnections;
+    private readonly IStorageConnectionProviderCatalog _providers;
     private readonly ILogger<OneDriveCloudAccessFileBrowserViewModel> _logger;
     private readonly CloudAccessDownloadTicketStore _downloadTickets;
     private readonly CloudAccessDirectoryCache _directoryCache;
     private CloudAccessShare? _share;
     private StorageConnection? _connectionRecord;
-    private OneDriveConnection? _connection;
-    private DateTimeOffset _rootRevalidationAt;
+    private IStorageSession? _session;
+    private IRemoteFileStore? _remoteFiles;
 
     public OneDriveCloudAccessFileBrowserViewModel(
         ICloudAccessRepository repository,
@@ -44,7 +44,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
         CloudAccessAuthorizationService authorization,
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authenticationState,
-        OneDriveStorageConnectionFactory oneDriveConnections,
+        IStorageConnectionProviderCatalog providers,
         CloudAccessDownloadTicketStore downloadTickets,
         CloudAccessDirectoryCache directoryCache,
         ILogger<OneDriveCloudAccessFileBrowserViewModel> logger)
@@ -55,7 +55,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
         _authorization = authorization;
         _userContextFactory = userContextFactory;
         _authenticationState = authenticationState;
-        _oneDriveConnections = oneDriveConnections;
+        _providers = providers;
         _downloadTickets = downloadTickets;
         _directoryCache = directoryCache;
         _logger = logger;
@@ -79,33 +79,22 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
 
             var connectionRecord = await _connections.GetAsync(share.ConnectionId)
                                    ?? throw new InvalidOperationException("The provider connection is missing.");
-            if (connectionRecord.State != StorageConnectionState.Ready
-                || !string.Equals(connectionRecord.ProviderId, "onedrive", StringComparison.OrdinalIgnoreCase)
-                || string.IsNullOrWhiteSpace(connectionRecord.EncryptedCredentialPayload))
-                throw new InvalidOperationException("The OneDrive connection is not ready.");
+            if (connectionRecord.State != StorageConnectionState.Ready)
+                throw new InvalidOperationException("The storage connection is not ready.");
 
-            var connectionChanged = _connectionRecord?.Id != connectionRecord.Id;
-            var shareChanged = _share?.Id != share.Id;
             await ReplaceConnectionAsync(connectionRecord);
             _share = share;
-            if (!string.IsNullOrWhiteSpace(share.RemoteRootItemId)
-                && (connectionChanged || shareChanged || DateTimeOffset.UtcNow >= _rootRevalidationAt))
-            {
-                var currentRoot = await _connection!.ResolveFolderByIdAsync(share.RemoteRootItemId);
-                if (!string.Equals(currentRoot.Path, share.RemoteRootPath, StringComparison.Ordinal))
-                {
-                    share.RemoteRootPath = currentRoot.Path;
-                    await _repository.UpsertShareAsync(share);
-                    _directoryCache.InvalidateShare(share.Id);
-                }
-                _rootRevalidationAt = DateTimeOffset.UtcNow + await _directoryCache.GetTimeToLiveAsync();
-            }
-            Capabilities = share.IsReadOnly ? ReadOnlyCapabilities : WritableCapabilities;
+            Capabilities = BuildCapabilities(_session!.Capabilities, share.IsReadOnly);
             var items = await ListCoreAsync(relativePath);
             CompleteLoad(
-                new BrowserShareInfo(share.Id, share.Name, BrowserShareKind.Remote, "onedrive"),
+                new BrowserShareInfo(share.Id, share.Name, BrowserShareKind.Remote, connectionRecord.ProviderId),
                 relativePath,
                 items);
+        }
+        catch (RemoteStorageAccessDeniedException exception)
+        {
+            _logger.LogWarning(exception, "Remote storage denied read access to virtual share {ShareKey}", shareKey);
+            FailLoad(R("Web_ExternalStorage_RemoteReadDenied"));
         }
         catch (UnauthorizedAccessException)
         {
@@ -122,34 +111,33 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     {
         if (_share is null) return;
         _directoryCache.InvalidateShare(_share.Id);
-        _rootRevalidationAt = DateTimeOffset.MinValue;
         await LoadShareAsync(_share.Id.ToString(), CurrentPath);
     }
 
     public override async Task<OperationResult> CreateFolderAsync(string folderName)
-        => await RunWriteAsync(async connection =>
-            await connection.CreateDirectoryAsync(RemotePath(ShareRelativePath.Combine(CurrentPath, folderName))),
+        => await RunWriteAsync(files =>
+            files.CreateDirectoryAsync(RemotePath(ShareRelativePath.Combine(CurrentPath, folderName))),
             R("Web_CloudAccess_Error_CreateFolder"));
 
     public override async Task CreateFolderAtAsync(string path)
     {
-        var result = await RunWriteAsync(async connection =>
-            await connection.CreateDirectoryAsync(RemotePath(path)), R("Web_CloudAccess_Error_CreateFolder"));
+        var result = await RunWriteAsync(files => files.CreateDirectoryAsync(RemotePath(path)),
+            R("Web_CloudAccess_Error_CreateFolder"));
         if (!result.Success) throw new IOException(result.Error);
     }
 
     public override Task<OperationResult> DeleteAsync(FileMetadata item)
-        => RunWriteAsync(connection => connection.DeleteItemAsync(RemotePath(ShareRelativeOf(item))),
+        => RunWriteAsync(files => files.DeleteAsync(RemotePath(ShareRelativeOf(item)), item.IsDirectory),
             R("Web_CloudAccess_Error_Delete"));
 
     public override Task<OperationResult> RenameAsync(FileMetadata item, string newName)
-        => RunWriteAsync(connection => connection.MoveItemAsync(
+        => RunWriteAsync(files => files.MoveAsync(
                 RemotePath(ShareRelativeOf(item)),
                 RemotePath(ShareRelativePath.Combine(ShareRelativePath.GetParent(ShareRelativeOf(item)), newName))),
             R("Web_CloudAccess_Error_Rename"));
 
     public override Task<OperationResult> MoveAsync(FileMetadata item, string destinationPath)
-        => RunWriteAsync(connection => connection.MoveItemAsync(
+        => RunWriteAsync(files => files.MoveAsync(
                 RemotePath(ShareRelativeOf(item)),
                 RemotePath(ShareRelativePath.Combine(destinationPath, item.Name))),
             R("Web_CloudAccess_Error_Move"));
@@ -159,17 +147,18 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
 
     public override async Task CopyAsync(FileMetadata item, string targetPath, CancellationToken cancellationToken)
     {
-        var result = await RunWriteAsync(connection => connection.CopyItemAsync(
-            RemotePath(ShareRelativeOf(item)), RemotePath(targetPath), cancellationToken),
+        var result = await RunWriteAsync(files => CopyRemoteItemAsync(files,
+            RemotePath(ShareRelativeOf(item)), RemotePath(targetPath), item.IsDirectory, cancellationToken),
             R("Web_CloudAccess_Error_RemoteCopy"));
         if (!result.Success) throw new IOException(result.Error);
     }
 
     public override async Task<(byte[] Data, string ContentType, PreviewKind Kind)?> ReadFileForPreviewAsync(FileMetadata file)
     {
-        if (_connection is null || file.Size > GetMaxPreviewSizeBytes()) return null;
+        if (_remoteFiles is null || file.Size > GetMaxPreviewSizeBytes()) return null;
         await using var memory = new MemoryStream(file.Size is > 0 and <= int.MaxValue ? (int)file.Size : 0);
-        await _connection.DownloadAsync(RemotePath(ShareRelativeOf(file)), memory);
+        await using var source = await _remoteFiles.OpenReadAsync(RemotePath(ShareRelativeOf(file)));
+        await source.CopyToAsync(memory);
         return (memory.ToArray(), FileHelper.GetContentType(file.Name), FileHelper.GetPreviewKind(file.Name));
     }
 
@@ -180,7 +169,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     public override async Task<long?> CalculateDirectorySizeAsync(
         FileMetadata directory, CancellationToken cancellationToken = default)
     {
-        if (!directory.IsDirectory || _connection is null || _share is null)
+        if (!directory.IsDirectory || _remoteFiles is null || _share is null)
             return null;
 
         try
@@ -201,10 +190,10 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
 
     public override async Task<OperationResult> UploadFileAsync(
         string fileName, Stream fileStream, CancellationToken cancellationToken = default)
-        => await RunWriteAsync(connection => connection.UploadAsync(
+        => await RunWriteAsync(files => files.WriteAsync(
                 RemotePath(ShareRelativePath.Combine(CurrentPath, fileName)),
                 fileStream,
-                DateTime.UtcNow,
+                overwrite: true,
                 cancellationToken),
             R("Web_CloudAccess_Error_Upload"));
 
@@ -222,21 +211,21 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
 
     private async Task<List<FileMetadata>> ListCoreAsync(string relativePath)
     {
-        var connection = _connection ?? throw new InvalidOperationException("The OneDrive connection is not initialized.");
+        var files = _remoteFiles ?? throw new InvalidOperationException("The storage connection is not initialized.");
         var shareId = _share?.Id ?? throw new InvalidOperationException("No virtual share is loaded.");
         return await _directoryCache.GetOrCreateAsync(shareId, relativePath, async () =>
         {
-            var remoteItems = await connection.ListDetailedAsync(RemotePath(relativePath));
+            var remoteItems = await files.ListAsync(RemotePath(relativePath));
             return remoteItems.Select(item => new FileMetadata
             {
-                Id = StableGuid(item.ProviderId),
+                Id = StableGuid(item.StableId ?? item.Path),
                 ShareId = shareId,
                 Path = StripRoot(item.Path),
                 Name = item.Name,
                 IsDirectory = item.IsDirectory,
-                Size = item.IsDirectory ? 0 : item.Size,
-                CreatedAt = item.CreatedAtUtc,
-                ModifiedAt = item.ModifiedAtUtc
+                Size = item.IsDirectory ? 0 : item.Size ?? 0,
+                CreatedAt = item.ModifiedAtUtc ?? DateTime.UnixEpoch,
+                ModifiedAt = item.ModifiedAtUtc ?? DateTime.UnixEpoch
             }).ToList();
         });
     }
@@ -244,32 +233,37 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     private async Task<long> CalculateDirectorySizeCoreAsync(string relativePath, CancellationToken cancellationToken)
     {
         long total = 0;
-        foreach (var item in await _connection!.ListDetailedAsync(RemotePath(relativePath), cancellationToken))
+        foreach (var item in await _remoteFiles!.ListAsync(RemotePath(relativePath), cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             total = checked(total + (item.IsDirectory
                 ? await CalculateDirectorySizeCoreAsync(StripRoot(item.Path), cancellationToken)
-                : item.Size));
+                : item.Size ?? 0));
         }
         return total;
     }
 
-    private async Task<OperationResult> RunWriteAsync(Func<OneDriveConnection, Task> action, string userError)
+    private async Task<OperationResult> RunWriteAsync(Func<IRemoteFileStore, Task> action, string userError)
     {
-        if (_share?.IsReadOnly != false || _connection is null)
+        if (_share?.IsReadOnly != false || _remoteFiles is null)
             return OperationResult.Fail(R("Web_CloudAccess_Error_ReadOnly"));
         try
         {
-            await action(_connection);
+            await action(_remoteFiles);
             _directoryCache.InvalidateShare(_share.Id);
             return OperationResult.Ok();
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "OneDrive write operation failed for Cloud Access share {ShareId}", _share.Id);
-            return OperationResult.Fail(userError);
+            _logger.LogError(exception, "Provider write operation failed for virtual share {ShareId}", _share.Id);
+            return OperationResult.Fail(WriteError(exception, userError));
         }
     }
+
+    internal static string WriteError(Exception exception, string fallback)
+        => exception is RemoteStorageAccessDeniedException
+            ? R("Web_ExternalStorage_RemoteWriteDenied")
+            : fallback;
 
     private string RemotePath(string relativePath)
     {
@@ -293,10 +287,51 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
 
     private async Task ReplaceConnectionAsync(StorageConnection record)
     {
-        if (_connectionRecord?.Id == record.Id && _connection is not null) return;
-        if (_connection is not null) await _connection.Dispose();
-        _connection = _oneDriveConnections.Create(record);
+        if (_connectionRecord?.Id == record.Id && _session is not null) return;
+        if (_session is not null) await _session.DisposeAsync();
+        _session = await _providers.GetRequired(record.ProviderId).OpenSessionAsync(record);
+        _remoteFiles = _session.RemoteFiles
+                       ?? throw new NotSupportedException("The provider does not expose virtual-share file access.");
         _connectionRecord = record;
+    }
+
+    private static BrowserCapabilities BuildCapabilities(
+        StorageProviderCapabilities capabilities,
+        bool readOnly)
+    {
+        if (readOnly) return ReadOnlyCapabilities;
+        return new BrowserCapabilities
+        {
+            CanOpen = capabilities.HasFlag(StorageProviderCapabilities.Read),
+            CanUpload = capabilities.HasFlag(StorageProviderCapabilities.Write),
+            CanCreateDirectory = capabilities.HasFlag(StorageProviderCapabilities.CreateDirectory),
+            CanRename = capabilities.HasFlag(StorageProviderCapabilities.Rename),
+            CanDelete = capabilities.HasFlag(StorageProviderCapabilities.Delete),
+            CanMove = capabilities.HasFlag(StorageProviderCapabilities.Move),
+            CanCopy = capabilities.HasFlag(StorageProviderCapabilities.Read)
+                      && capabilities.HasFlag(StorageProviderCapabilities.Write),
+            CanCopyToLocal = capabilities.HasFlag(StorageProviderCapabilities.Read),
+            HasProperties = true
+        };
+    }
+
+    private static async Task CopyRemoteItemAsync(
+        IRemoteFileStore files,
+        string sourcePath,
+        string destinationPath,
+        bool isDirectory,
+        CancellationToken cancellationToken)
+    {
+        if (!isDirectory)
+        {
+            await using var content = await files.OpenReadAsync(sourcePath, cancellationToken);
+            await files.WriteAsync(destinationPath, content, overwrite: false, cancellationToken);
+            return;
+        }
+        await files.CreateDirectoryAsync(destinationPath, cancellationToken);
+        foreach (var child in await files.ListAsync(sourcePath, cancellationToken))
+            await CopyRemoteItemAsync(files, child.Path,
+                ShareRelativePath.Combine(destinationPath, child.Name), child.IsDirectory, cancellationToken);
     }
 
     private async Task<Kaimo_File_Server.Core.Domain.Identity.UserContext?> GetActorAsync()
@@ -318,6 +353,6 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
 
     public async ValueTask DisposeAsync()
     {
-        if (_connection is not null) await _connection.Dispose();
+        if (_session is not null) await _session.DisposeAsync();
     }
 }

@@ -5,7 +5,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 USER root
 # Npgsql probes GSSAPI during startup. Keep the runtime dependency available so
 # password-authenticated deployments do not emit a native-library load error.
-RUN apt-get update && apt-get install -y --no-install-recommends libgssapi-krb5-2 \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgssapi-krb5-2 smbclient libnfs-utils \
     && rm -rf /var/lib/apt/lists/*
 USER $APP_UID
 WORKDIR /app

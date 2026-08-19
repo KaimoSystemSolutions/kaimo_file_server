@@ -37,10 +37,27 @@ else
                 <p>@R("Web_ExternalStorage_ConnectionsHelp")</p>
             </div>
             <div class="connection-form">
-                <label><span>@R("Web_CloudAccess_Provider")</span><select class="edit-input" @bind="_provider">@foreach (var provider in CreatableProviders) { <option value="@provider.Id">@provider.DisplayName</option> }</select></label>
+                <label><span>@R("Web_CloudAccess_Provider")</span><select class="edit-input" @bind="_provider" @bind:after="ProviderChanged">@foreach (var provider in CreatableProviders) { <option value="@provider.Id">@provider.DisplayName</option> }</select></label>
                 <label><span>@R("Web_CloudAccess_ConnectionName")</span><input class="edit-input" maxlength="200" @bind="_name" /></label>
                 <label><span>@R("Web_CloudAccess_Department")</span><select class="edit-input" @bind="_departmentId"><option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>@foreach (var department in VM.ManageableDepartments) { <option value="@department.Id">@department.Name</option> }</select></label>
-                @if (!SelectedProviderUsesInteractiveAuthorization)
+                @if (IsSmbProvider)
+                {
+                    <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="192.168.1.10" @bind="_server" /></label>
+                    <label><span>@R("Web_ExternalStorage_Port")</span><input class="edit-input" type="number" min="1" max="65535" @bind="_port" /></label>
+                    <label><span>@R("Web_ExternalStorage_Username")</span><input class="edit-input" maxlength="256" autocomplete="username" @bind="_username" /></label>
+                    <label><span>@R("Web_ExternalStorage_Password")</span><input class="edit-input" type="password" maxlength="4096" autocomplete="new-password" @bind="_password" /></label>
+                    <label><span>@R("Web_ExternalStorage_Domain")</span><input class="edit-input" maxlength="256" placeholder="WORKGROUP" @bind="_domain" /></label>
+                    <label><span>@R("Web_ExternalStorage_MinimumDialect")</span><select class="edit-input" @bind="_minimumDialect"><option value="3.0">SMB 3.0</option><option value="3.02">SMB 3.0.2</option><option value="3.1.1">SMB 3.1.1</option></select></label>
+                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_SmbSharePickerHelp")</p>
+                }
+                else if (IsNfsProvider)
+                {
+                    <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="192.168.1.10" @bind="_server" /></label>
+                    <label><span>@R("Web_ExternalStorage_Port")</span><input class="edit-input" type="number" min="1" max="65535" @bind="_port" /></label>
+                    <label><span>@R("Web_ExternalStorage_NfsVersion")</span><input class="edit-input" type="number" min="4" max="4" @bind="_minimumNfsVersion" /></label>
+                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_NfsExportPickerHelp")</p>
+                }
+                else if (!SelectedProviderUsesInteractiveAuthorization)
                 {
                     <label class="storage-wide"><span>@R("Web_ExternalStorage_ConnectionSettings")</span><textarea class="edit-input" rows="10" maxlength="65536" @bind="_settingsJson"></textarea><small>@R("Web_ExternalStorage_ConnectionSettingsHelp")</small></label>
                 }
@@ -102,7 +119,7 @@ else
                                 <dt>@R("Web_ExternalStorage_State")</dt><dd>@StateName(_selected.State)</dd>
                                 <dt>@R("Web_ExternalStorage_LastVerified")</dt><dd>@FormatDate(_selected.LastVerifiedAtUtc)</dd>
                                 <dt>@R("Web_ExternalStorage_ProfileHealth")</dt><dd>@(_selected.ProviderProfileId is null ? R("Web_ExternalStorage_ProfileLegacy") : R("Web_ExternalStorage_ProfileConfigured"))</dd>
-                                <dt>@R("Web_ExternalStorage_SecretHealth")</dt><dd>@(string.IsNullOrWhiteSpace(_selected.EncryptedCredentialPayload) ? R("Web_ExternalStorage_NotAuthorized") : R("Web_ExternalStorage_Protected"))</dd>
+                                <dt>@R("Web_ExternalStorage_SecretHealth")</dt><dd>@(_selected.AuthorizationMode == StorageAuthorizationMode.NetworkIdentity ? R("Web_ExternalStorage_RuntimeIdentity") : string.IsNullOrWhiteSpace(_selected.EncryptedCredentialPayload) ? R("Web_ExternalStorage_NotAuthorized") : R("Web_ExternalStorage_Protected"))</dd>
                             </dl>
                         </section>
                         <section class="connection-detail-group connection-detail-group--wide">
@@ -142,19 +159,37 @@ else
     private string _provider = "onedrive";
     private string _name = string.Empty;
     private string _settingsJson = string.Empty;
+    private string _server = string.Empty;
+    private string _username = string.Empty;
+    private string _password = string.Empty;
+    private string _domain = string.Empty;
+    private int _port = 445;
+    private string _minimumDialect = "3.1.1";
+    private int _minimumNfsVersion = 4;
     private Guid _departmentId;
     private string? _error;
     private IEnumerable<IStorageConnectionProvider> CreatableProviders => ProviderCatalog.Providers
         .Where(provider => provider.AuthorizationModes.Any(mode => mode is StorageAuthorizationMode.DeviceCode
+            or StorageAuthorizationMode.UsernamePassword or StorageAuthorizationMode.NetworkIdentity
             or StorageAuthorizationMode.HostMount or StorageAuthorizationMode.SshKey))
         .OrderBy(provider => provider.DisplayName, StringComparer.CurrentCultureIgnoreCase);
     private IStorageConnectionProvider? SelectedProvider => ProviderCatalog.TryGet(_provider, out var provider) ? provider : null;
     private bool SelectedProviderUsesInteractiveAuthorization =>
         SelectedProvider?.AuthorizationModes.Contains(StorageAuthorizationMode.DeviceCode) == true;
+    private bool IsSmbProvider => string.Equals(_provider, "smb", StringComparison.OrdinalIgnoreCase);
+    private bool IsNfsProvider => string.Equals(_provider, "nfs", StringComparison.OrdinalIgnoreCase);
     private bool CanCreate => !string.IsNullOrWhiteSpace(_name)
                               && _departmentId != Guid.Empty
                               && SelectedProvider is not null
-                              && (SelectedProviderUsesInteractiveAuthorization || !string.IsNullOrWhiteSpace(_settingsJson));
+                              && (SelectedProviderUsesInteractiveAuthorization
+                                  || (IsSmbProvider && !string.IsNullOrWhiteSpace(_server)
+                                      && _port is >= 1 and <= 65535
+                                      && !string.IsNullOrWhiteSpace(_username)
+                                      && !string.IsNullOrEmpty(_password))
+                                  || (IsNfsProvider && !string.IsNullOrWhiteSpace(_server)
+                                      && _port is >= 1 and <= 65535
+                                      && _minimumNfsVersion >= 4)
+                                  || (!IsSmbProvider && !IsNfsProvider && !string.IsNullOrWhiteSpace(_settingsJson)));
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -173,7 +208,12 @@ else
         }
         else
         {
-            await VM.CreateConfiguredConnectionAsync(_provider, _name, _departmentId, _settingsJson);
+            string settingsJson = BuildSettingsJson();
+            await VM.CreateConfiguredConnectionAsync(
+                _provider, _name, _departmentId, settingsJson,
+                IsSmbProvider ? _username : null,
+                IsSmbProvider ? _password : null,
+                IsSmbProvider ? _domain : null);
             _creating = false;
             _selected = VM.Connections.FirstOrDefault(connection =>
                 connection.Name == _name && connection.DepartmentId == _departmentId);
@@ -183,6 +223,7 @@ else
     private async Task TestAsync() => await ActAsync(() => VM.TestConnectionAsync(_selected!.Id));
     private async Task ToggleEnabledAsync() => await ActAsync(() => VM.SetConnectionEnabledAsync(_selected!.Id, _selected.State == StorageConnectionState.Disabled));
     private async Task DeleteAsync() => await ActAsync(() => VM.DeleteConnectionAsync(_selected!.Id));
+    private void ProviderChanged() => _port = IsNfsProvider ? 2049 : IsSmbProvider ? 445 : _port;
     private async Task ActAsync(Func<Task> action)
     {
         Guid? selectedId = _selected?.Id;
@@ -193,7 +234,37 @@ else
         catch { _error = R("Web_ExternalStorage_OperationFailed"); }
         finally { _busy = false; }
     }
-    private void CancelCreate() { _creating = false; _name = string.Empty; _settingsJson = string.Empty; _departmentId = Guid.Empty; }
+    private string BuildSettingsJson()
+    {
+        if (IsSmbProvider)
+            return System.Text.Json.JsonSerializer.Serialize(new
+            {
+                Server = _server.Trim(),
+                Port = _port,
+                Domain = string.IsNullOrWhiteSpace(_domain) ? null : _domain.Trim(),
+                MinimumDialect = _minimumDialect,
+                RequireSigning = true,
+                RequireEncryption = true
+            });
+        if (IsNfsProvider)
+            return System.Text.Json.JsonSerializer.Serialize(new
+            {
+                Server = _server.Trim(),
+                Port = _port,
+                MinimumMajorVersion = _minimumNfsVersion,
+                RequireKerberos = false
+            });
+        return _settingsJson;
+    }
+    private void CancelCreate()
+    {
+        _creating = false;
+        _name = _settingsJson = _server = _username = _password = _domain = string.Empty;
+        _port = 445;
+        _minimumDialect = "3.1.1";
+        _minimumNfsVersion = 4;
+        _departmentId = Guid.Empty;
+    }
     private StorageConnectionUsage Usage(Guid id) => VM.ConnectionUsage.GetValueOrDefault(id) ?? new StorageConnectionUsage(0, 0);
     private string UsageSummary(Guid id)
     {

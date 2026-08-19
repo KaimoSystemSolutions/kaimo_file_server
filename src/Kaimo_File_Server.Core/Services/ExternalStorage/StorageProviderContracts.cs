@@ -24,7 +24,9 @@ public enum StorageProviderCapabilities
     DelegatedAuthorization = 1 << 11,
     ApplicationAuthorization = 1 << 12,
     RequiresHostMount = 1 << 13,
-    OptimizedSync = 1 << 14
+    OptimizedSync = 1 << 14,
+    /// <summary>The provider exposes its own remote file-store session without a preconfigured host mount.</summary>
+    DirectFileAccess = 1 << 15
 }
 
 public enum StorageConnectionHealthState
@@ -53,6 +55,31 @@ public sealed record RemoteStorageItem(
     long? Size,
     DateTime? ModifiedAtUtc,
     string? StableId = null);
+
+/// <summary>A validated remote directory that can be persisted by a virtual share or sync.</summary>
+public sealed record StorageDirectoryTarget(string Path, string? StableId = null);
+
+/// <summary>The authenticated remote system rejected an operation.</summary>
+public sealed class RemoteStorageAccessDeniedException(string message, Exception? innerException = null)
+    : IOException(message, innerException);
+
+/// <summary>
+/// Provider-neutral boundary for selecting and validating durable remote roots.
+/// Consumers do not need to know whether a provider identifies directories by
+/// path, share/export name, or a stable provider item ID.
+/// </summary>
+public interface IStorageDirectoryTargetResolver
+{
+    Task<IReadOnlyList<RemoteStorageItem>> ListDirectoriesAsync(
+        StorageConnection connection,
+        string path,
+        CancellationToken cancellationToken = default);
+
+    Task<StorageDirectoryTarget> ResolveDirectoryAsync(
+        StorageConnection connection,
+        string path,
+        CancellationToken cancellationToken = default);
+}
 
 /// <summary>Optional file-store operations exposed by browse-capable providers.</summary>
 public interface IRemoteFileStore

@@ -29,6 +29,7 @@ public sealed class ExternalStorageSyncViewModel(
     IFileServiceFactory fileServices,
     ICloudSyncExecutionService executionService,
     IStorageConnectionProviderCatalog providerCatalog,
+    IStorageDirectoryTargetResolver directoryTargets,
     ICloudSyncOperationCoordinator syncOperations,
     CloudSyncSchedulerSignal schedulerSignal,
     ILogger<ExternalStorageSyncViewModel> logger)
@@ -112,7 +113,11 @@ public sealed class ExternalStorageSyncViewModel(
         var connection = await GetUsableConnectionAsync(model.ConnectionId);
         EnsureCapability(connection, StorageProviderCapabilities.Sync, "Web_ExternalStorage_SyncUnsupported",
             "This provider does not support synchronization.");
+        EnsureDirectionSupported(connection, model.Mode);
         ValidateDepartmentMatch(share, connection);
+        if (providerCatalog.GetRequired(connection.ProviderId).Capabilities
+            .HasFlag(StorageProviderCapabilities.Browse))
+            model.RemotePath = (await directoryTargets.ResolveDirectoryAsync(connection, model.RemotePath)).Path;
         await ValidateModelAsync(model, share, existingId: null);
 
         string normalizedLocalPath = ShareRelativePath.Normalize(model.LocalPath);
@@ -148,7 +153,11 @@ public sealed class ExternalStorageSyncViewModel(
         var connection = await GetUsableConnectionAsync(model.ConnectionId);
         EnsureCapability(connection, StorageProviderCapabilities.Sync, "Web_ExternalStorage_SyncUnsupported",
             "This provider does not support synchronization.");
+        EnsureDirectionSupported(connection, model.Mode);
         ValidateDepartmentMatch(share, connection);
+        if (providerCatalog.GetRequired(connection.ProviderId).Capabilities
+            .HasFlag(StorageProviderCapabilities.Browse))
+            model.RemotePath = (await directoryTargets.ResolveDirectoryAsync(connection, model.RemotePath)).Path;
         await ValidateModelAsync(model, share, definition.Id);
 
         string newLocalPath = ShareRelativePath.Normalize(model.LocalPath);
@@ -230,17 +239,8 @@ public sealed class ExternalStorageSyncViewModel(
         var storageConnection = await GetUsableConnectionAsync(connectionId);
         ValidateDepartmentMatch(share, storageConnection);
 
-        var provider = providerCatalog.GetRequired(storageConnection.ProviderId);
-        if (!provider.Capabilities.HasFlag(StorageProviderCapabilities.Browse))
-            throw new NotSupportedException(Text(
-                "Web_ExternalStorage_BrowseUnsupported", "This provider does not support remote browsing."));
-        await using var session = await provider.OpenSessionAsync(storageConnection);
-        var remoteFiles = session.RemoteFiles
-                          ?? throw new NotSupportedException(Text(
-                              "Web_ExternalStorage_BrowseUnsupported", "This provider does not support remote browsing."));
-        var items = await remoteFiles.ListAsync(NormalizeRemotePath(path));
-        return items.Where(item => item.IsDirectory)
-            .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
+        var items = await directoryTargets.ListDirectoriesAsync(storageConnection, path);
+        return items
             .Select(item => new CloudDirectoryItem(item.Name, NormalizeRemotePath(item.Path)))
             .ToArray();
     }
@@ -345,8 +345,20 @@ public sealed class ExternalStorageSyncViewModel(
             throw new NotSupportedException(Text(resourceKey, fallback));
     }
 
+    private void EnsureDirectionSupported(StorageConnection connection, SyncMode mode)
+    {
+        if (mode != SyncMode.Pull
+            && !providerCatalog.GetRequired(connection.ProviderId).Capabilities
+                .HasFlag(StorageProviderCapabilities.Write))
+            throw new NotSupportedException(Text(
+                "Web_ExternalStorage_ReadOnlyPullRequired",
+                "This connection supports pull synchronization only."));
+    }
+
     private static bool RequiresProtectedCredential(StorageAuthorizationMode mode)
-        => mode is not (StorageAuthorizationMode.HostMount or StorageAuthorizationMode.SshKey);
+        => mode is not (StorageAuthorizationMode.HostMount
+            or StorageAuthorizationMode.SshKey
+            or StorageAuthorizationMode.NetworkIdentity);
 
     private static void ValidateDepartmentMatch(ShareDefinition share, StorageConnection connection)
     {

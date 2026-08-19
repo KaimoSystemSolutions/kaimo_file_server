@@ -2178,6 +2178,9 @@
   <data name="Web_CloudAccess_Error_Move" xml:space="preserve"><value>The item could not be moved.</value></data>
   <data name="Web_CloudAccess_Error_RemoteCopy" xml:space="preserve"><value>The item could not be copied.</value></data>
   <data name="Web_CloudAccess_Error_Upload" xml:space="preserve"><value>The file could not be uploaded.</value></data>
+  <data name="Web_ExternalStorage_RemoteReadDenied" xml:space="preserve"><value>The remote storage server denied read access. Check the permissions of the account configured for this connection.</value></data>
+  <data name="Web_ExternalStorage_RemoteWriteDenied" xml:space="preserve"><value>The remote storage server denied write access. Check the share and file-system permissions of the account configured for this connection.</value></data>
+  <data name="Web_ExternalStorage_RemoteOperationDenied" xml:space="preserve"><value>The remote storage server denied this operation. Check the permissions of the account configured for this connection.</value></data>
   <data name="Web_CloudAccess_Error_ReadOnly" xml:space="preserve"><value>This virtual share is read only.</value></data>
   <data name="Web_Transfer_Error_NoSelection" xml:space="preserve"><value>Select at least one item.</value></data>
   <data name="Web_Transfer_Error_RemoteCut" xml:space="preserve"><value>Items from a virtual share can only be copied.</value></data>
@@ -2302,6 +2305,7 @@
   <data name="Web_ExternalStorage_None" xml:space="preserve"><value>None</value></data>
   <data name="Web_ExternalStorage_BrowseUnsupported" xml:space="preserve"><value>This provider does not support remote browsing.</value></data>
   <data name="Web_ExternalStorage_SyncUnsupported" xml:space="preserve"><value>This provider does not support synchronization.</value></data>
+  <data name="Web_ExternalStorage_ReadOnlyPullRequired" xml:space="preserve"><value>This connection supports pull synchronization only.</value></data>
   <data name="Web_ExternalStorage_VirtualShareUnsupported" xml:space="preserve"><value>This provider cannot be used for virtual shares.</value></data>
   <data name="Web_ExternalStorage_AuthorizeUnsupported" xml:space="preserve"><value>This connection does not support interactive authorization.</value></data>
   <data name="Web_ExternalStorage_Capability_Browse" xml:space="preserve"><value>Browse</value></data>
@@ -2321,6 +2325,26 @@
   <data name="Web_ExternalStorage_Capability_OptimizedSync" xml:space="preserve"><value>Optimized synchronization</value></data>
   <data name="Web_ExternalStorage_ConnectionSettings" xml:space="preserve"><value>Protocol settings (JSON)</value></data>
   <data name="Web_ExternalStorage_ConnectionSettingsHelp" xml:space="preserve"><value>Use only operator-managed mount attestations or absolute secret-file references. Never enter a password or private key.</value></data>
+  <data name="Web_ExternalStorage_Server" xml:space="preserve"><value>Server / IP address</value></data>
+  <data name="Web_ExternalStorage_Port" xml:space="preserve"><value>Port</value></data>
+  <data name="Web_ExternalStorage_Domain" xml:space="preserve"><value>Domain (optional)</value></data>
+  <data name="Web_ExternalStorage_SmbShare" xml:space="preserve"><value>SMB share</value></data>
+  <data name="Web_ExternalStorage_NfsExport" xml:space="preserve"><value>NFS export</value></data>
+  <data name="Web_ExternalStorage_Username" xml:space="preserve"><value>Username</value></data>
+  <data name="Web_ExternalStorage_Password" xml:space="preserve"><value>Password</value></data>
+  <data name="Web_ExternalStorage_ExpectedServerIdentity" xml:space="preserve"><value>Expected server identity</value></data>
+  <data name="Web_ExternalStorage_MountPath" xml:space="preserve"><value>Local mount path</value></data>
+  <data name="Web_ExternalStorage_AttestationPath" xml:space="preserve"><value>Mount attestation file</value></data>
+  <data name="Web_ExternalStorage_MinimumDialect" xml:space="preserve"><value>Minimum SMB version</value></data>
+  <data name="Web_ExternalStorage_NfsVersion" xml:space="preserve"><value>Minimum NFS version</value></data>
+  <data name="Web_ExternalStorage_RequireKerberos" xml:space="preserve"><value>Require Kerberos</value></data>
+  <data name="Web_ExternalStorage_ReadOnly" xml:space="preserve"><value>Read only</value></data>
+  <data name="Web_ExternalStorage_InvalidCredentials" xml:space="preserve"><value>Enter a username and password for the SMB connection.</value></data>
+  <data name="Web_ExternalStorage_SmbSharePickerHelp" xml:space="preserve"><value>Available SMB shares are loaded after connecting and can be selected when configuring a sync.</value></data>
+  <data name="Web_ExternalStorage_NfsExportPickerHelp" xml:space="preserve"><value>Available NFS exports and folders are loaded after connecting and can be selected when configuring a consumer.</value></data>
+  <data name="Web_ExternalStorage_RuntimeIdentity" xml:space="preserve"><value>Runtime network identity</value></data>
+  <data name="Web_ExternalStorage_Auth_NetworkIdentity" xml:space="preserve"><value>Network identity</value></data>
+  <data name="Web_ExternalStorage_Capability_DirectFileAccess" xml:space="preserve"><value>Direct protocol access</value></data>
   <data name="Web_ExternalStorage_InvalidSettings" xml:space="preserve"><value>Enter valid protocol settings of at most 64 KiB.</value></data>
   <data name="Web_ExternalStorage_ProviderUnsupported" xml:space="preserve"><value>This provider cannot be configured through this workflow.</value></data>
   <data name="Web_ExternalStorage_Identity" xml:space="preserve"><value>Identity and authorization</value></data>

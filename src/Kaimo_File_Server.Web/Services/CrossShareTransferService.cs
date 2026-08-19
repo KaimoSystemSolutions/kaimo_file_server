@@ -5,7 +5,7 @@ using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
-using Kaimo_File_Server.Infrastructure.Clouds;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Microsoft.AspNetCore.Components.Authorization;
 
@@ -30,7 +30,7 @@ public sealed class CrossShareTransferService(
     IFileServiceFactory fileServiceFactory,
     IUserContextFactory userContextFactory,
     AuthenticationStateProvider authenticationState,
-    OneDriveStorageConnectionFactory oneDriveConnections,
+    IStorageConnectionProviderCatalog storageProviders,
     ILogger<CrossShareTransferService> logger)
 {
     public async Task<List<CrossShareTransferTarget>> GetTargetsAsync()
@@ -49,7 +49,12 @@ public sealed class CrossShareTransferService(
         foreach (var share in await cloudRepository.GetSharesAsync())
         {
             if (share.IsEnabled && !share.IsReadOnly && await cloudAuthorization.CanAccessAsync(actor, share))
-                targets.Add(new(new BrowserShareInfo(share.Id, share.Name, BrowserShareKind.Remote, "onedrive")));
+            {
+                var connection = await connections.GetAsync(share.ConnectionId);
+                if (connection?.State == StorageConnectionState.Ready)
+                    targets.Add(new(new BrowserShareInfo(
+                        share.Id, share.Name, BrowserShareKind.Remote, connection.ProviderId)));
+            }
         }
         return targets.OrderBy(target => target.Share.Name).ToList();
     }
@@ -108,6 +113,12 @@ public sealed class CrossShareTransferService(
             logger.LogWarning(exception, "Cross-share transfer was denied from {Source} to {Target}", source.Id, target.Id);
             return Fail("Web_Transfer_Error_AccessDenied");
         }
+        catch (RemoteStorageAccessDeniedException exception)
+        {
+            logger.LogWarning(exception, "Remote storage denied cross-share transfer from {Source} to {Target}",
+                source.Id, target.Id);
+            return Fail("Web_ExternalStorage_RemoteOperationDenied");
+        }
         catch (Exception exception)
         {
             logger.LogError(exception, "Cross-share transfer failed from {Source} to {Target}", source.Id, target.Id);
@@ -135,10 +146,16 @@ public sealed class CrossShareTransferService(
             || !await cloudAuthorization.CanAccessAsync(actor, shareRemote))
             throw new UnauthorizedAccessException("The virtual share is not accessible.");
         var record = await connections.GetAsync(shareRemote.ConnectionId, cancellationToken);
-        if (record?.State != StorageConnectionState.Ready || string.IsNullOrWhiteSpace(record.EncryptedCredentialPayload))
+        if (record?.State != StorageConnectionState.Ready)
             throw new InvalidOperationException("The virtual-share connection is unavailable.");
-        return new(oneDriveConnections.Create(record),
-            shareRemote);
+        var session = await storageProviders.GetRequired(record.ProviderId)
+            .OpenSessionAsync(record, cancellationToken);
+        if (session.RemoteFiles is null)
+        {
+            await session.DisposeAsync();
+            throw new NotSupportedException("The provider does not expose virtual-share file access.");
+        }
+        return new(session, shareRemote);
     }
 
     private static async Task CopyItemAsync(TransferBackend source, TransferBackend target,
@@ -179,36 +196,29 @@ public sealed class CrossShareTransferService(
     private sealed class TransferBackend : IAsyncDisposable
     {
         public TransferBackend(IFileService local, ShareDefinition share) { Local = local; LocalShare = share; }
-        public TransferBackend(OneDriveConnection remote, CloudAccessShare share)
-        { Remote = remote; RemoteShare = share; }
+        public TransferBackend(IStorageSession session, CloudAccessShare share)
+        { Session = session; Remote = session.RemoteFiles; RemoteShare = share; }
         public IFileService? Local { get; }
         public ShareDefinition? LocalShare { get; }
-        public OneDriveConnection? Remote { get; }
+        public IStorageSession? Session { get; }
+        public IRemoteFileStore? Remote { get; }
         public CloudAccessShare? RemoteShare { get; }
 
         public async Task<List<FileMetadata>> ListAsync(string path, UserContext actor, CancellationToken cancellationToken)
         {
             if (Local is not null) return await Local.ListAsync(path, actor);
-            var items = await Remote!.ListDetailedAsync(RemotePath(path), cancellationToken);
+            var items = await Remote!.ListAsync(RemotePath(path), cancellationToken);
             return items.Select(item => new FileMetadata { Name = item.Name, Path = StripRoot(item.Path), IsDirectory = item.IsDirectory }).ToList();
         }
         public async Task<Stream> ReadAsync(string path, UserContext actor, CancellationToken cancellationToken)
         {
             if (Local is not null) return await Local.ReadFileAsync(path, actor);
-            var pipe = new Pipe();
-            _ = Task.Run(async () =>
-            {
-                Exception? error = null;
-                try { await Remote!.DownloadAsync(RemotePath(path), pipe.Writer.AsStream(), cancellationToken); }
-                catch (Exception exception) { error = exception; }
-                finally { await pipe.Writer.CompleteAsync(error); }
-            }, cancellationToken);
-            return pipe.Reader.AsStream();
+            return await Remote!.OpenReadAsync(RemotePath(path), cancellationToken);
         }
         public async Task WriteAsync(string path, Stream input, UserContext actor, CancellationToken cancellationToken)
         {
             if (Local is not null) { await Local.WriteFileAsync(path, input, actor, cancellationToken); return; }
-            await Remote!.UploadAsync(RemotePath(path), input, DateTime.UtcNow, cancellationToken);
+            await Remote!.WriteAsync(RemotePath(path), input, overwrite: false, cancellationToken);
         }
         public async Task CreateDirectoryAsync(string path, UserContext actor, CancellationToken cancellationToken)
         {
@@ -222,6 +232,6 @@ public sealed class CrossShareTransferService(
             path = ShareRelativePath.Normalize(path);
             return root.Length == 0 ? path : path[(root.Length + 1)..];
         }
-        public async ValueTask DisposeAsync() { if (Remote is not null) await Remote.DisposeAsync(); }
+        public async ValueTask DisposeAsync() { if (Session is not null) await Session.DisposeAsync(); }
     }
 }

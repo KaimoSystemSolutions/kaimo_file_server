@@ -5,7 +5,7 @@ using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
-using Kaimo_File_Server.Infrastructure.Clouds;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Kaimo_File_Server.Web.Services;
@@ -22,7 +22,7 @@ public sealed class CloudToLocalTransferService(
     IFileServiceFactory fileServiceFactory,
     IUserContextFactory userContextFactory,
     AuthenticationStateProvider authenticationState,
-    OneDriveStorageConnectionFactory oneDriveConnections,
+    IStorageConnectionProviderCatalog storageProviders,
     ILogger<CloudToLocalTransferService> logger)
 {
     public async Task<List<LocalTransferTarget>> GetTargetsAsync()
@@ -67,10 +67,12 @@ public sealed class CloudToLocalTransferService(
         if (!await local.CanCreateAsync(destination, actor)) return new(false, R("Web_CloudAccess_Error_LocalWriteDenied"));
 
         var connectionRecord = await connections.GetAsync(remoteShare.ConnectionId);
-        if (connectionRecord?.State != StorageConnectionState.Ready
-            || string.IsNullOrWhiteSpace(connectionRecord.EncryptedCredentialPayload))
+        if (connectionRecord?.State != StorageConnectionState.Ready)
             return new(false, R("Web_CloudAccess_ConnectionNotReady"));
-        await using var remote = oneDriveConnections.Create(connectionRecord);
+        await using var session = await storageProviders.GetRequired(connectionRecord.ProviderId)
+            .OpenSessionAsync(connectionRecord, cancellationToken);
+        var remote = session.RemoteFiles;
+        if (remote is null) return new(false, R("Web_CloudAccess_ConnectionNotReady"));
         try
         {
             foreach (var item in selectedItems)
@@ -86,6 +88,12 @@ public sealed class CloudToLocalTransferService(
         {
             return new(false, R("Web_CloudAccess_Error_CopyCancelled"));
         }
+        catch (RemoteStorageAccessDeniedException exception)
+        {
+            logger.LogWarning(exception, "Remote storage denied read access for virtual share {RemoteShareId}",
+                remoteShareId);
+            return new(false, R("Web_ExternalStorage_RemoteReadDenied"));
+        }
         catch (Exception exception)
         {
             logger.LogError(exception,
@@ -96,7 +104,7 @@ public sealed class CloudToLocalTransferService(
     }
 
     private static async Task CopyItemAsync(
-        OneDriveConnection remote,
+        IRemoteFileStore remote,
         CloudAccessShare remoteShare,
         IFileService local,
         Kaimo_File_Server.Core.Domain.Identity.UserContext actor,
@@ -109,7 +117,7 @@ public sealed class CloudToLocalTransferService(
         {
             await local.CreateDirectoryAsync(localRelativePath, actor);
             var remoteDirectory = ShareRelativePath.Combine(remoteShare.RemoteRootPath, remoteRelativePath);
-            foreach (var child in await remote.ListDetailedAsync(remoteDirectory, cancellationToken))
+            foreach (var child in await remote.ListAsync(remoteDirectory, cancellationToken))
             {
                 var childRelative = StripRemoteRoot(remoteShare.RemoteRootPath, child.Path);
                 await CopyItemAsync(remote, remoteShare, local, actor, childRelative,
@@ -118,35 +126,9 @@ public sealed class CloudToLocalTransferService(
             return;
         }
 
-        var pipe = new Pipe(new PipeOptions(
-            pauseWriterThreshold: 8 * 1024 * 1024,
-            resumeWriterThreshold: 4 * 1024 * 1024,
-            useSynchronizationContext: false));
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var producer = Task.Run(async () =>
-        {
-            Exception? error = null;
-            try
-            {
-                await remote.DownloadAsync(
-                    ShareRelativePath.Combine(remoteShare.RemoteRootPath, remoteRelativePath),
-                    pipe.Writer.AsStream(), linked.Token);
-            }
-            catch (Exception exception) { error = exception; throw; }
-            finally { await pipe.Writer.CompleteAsync(error); }
-        }, linked.Token);
-        try
-        {
-            await local.WriteFileAsync(localRelativePath, pipe.Reader.AsStream(), actor, linked.Token);
-            await producer;
-        }
-        catch
-        {
-            linked.Cancel();
-            try { await producer; } catch { }
-            throw;
-        }
-        finally { await pipe.Reader.CompleteAsync(); }
+        await using var content = await remote.OpenReadAsync(
+            ShareRelativePath.Combine(remoteShare.RemoteRootPath, remoteRelativePath), cancellationToken);
+        await local.WriteFileAsync(localRelativePath, content, actor, cancellationToken);
     }
 
     private static string StripRemoteRoot(string root, string path)
@@ -156,7 +138,7 @@ public sealed class CloudToLocalTransferService(
         if (root.Length == 0) return path;
         var prefix = root + "/";
         if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            throw new UnauthorizedAccessException("Microsoft returned an item outside the configured remote root.");
+            throw new UnauthorizedAccessException("The provider returned an item outside the configured remote root.");
         return path[prefix.Length..];
     }
 

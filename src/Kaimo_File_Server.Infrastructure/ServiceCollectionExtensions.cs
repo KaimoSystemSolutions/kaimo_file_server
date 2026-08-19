@@ -95,14 +95,25 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddSingleton<ICloudProvider, OneDriveProvider>();
             services.AddSingleton<ICloudProviderFactory, CloudProviderFactory>();
 
-            // -- Capability-based external-storage providers --
-            services.AddSingleton<IRsyncProcessRunner, RsyncProcessRunner>();
-            services.AddSingleton<IStorageConnectionProvider, SmbStorageConnectionProvider>();
-            services.AddSingleton<IStorageConnectionProvider, NfsStorageConnectionProvider>();
-            services.AddSingleton<IStorageConnectionProvider, RsyncSshStorageConnectionProvider>();
-            services.AddScoped<IStorageConnectionProviderCatalog, StorageConnectionProviderCatalog>();
-            
             return services;
+        }
+
+        /// <summary>
+        /// Registers external-storage protocol providers for the Web runtime.
+        /// This is intentionally separate from <see cref="AddInfrastructure"/>
+        /// because SMB/NFS providers depend on the Web-owned credential vault;
+        /// the Host and SMB Bridge must not construct or validate them.
+        /// </summary>
+        public static IServiceCollection AddExternalStorageProviders(this IServiceCollection services)
+        {
+            services.AddSingleton<IRsyncProcessRunner, RsyncProcessRunner>();
+            services.AddSingleton<IProtocolCommandRunner, ProtocolCommandRunner>();
+            services.AddScoped<IStorageConnectionProvider, SmbStorageConnectionProvider>();
+            services.AddScoped<IStorageConnectionProvider, NfsStorageConnectionProvider>();
+            services.AddSingleton<IStorageConnectionProvider, RsyncSshStorageConnectionProvider>();
+        services.AddScoped<IStorageConnectionProviderCatalog, StorageConnectionProviderCatalog>();
+        services.AddScoped<IStorageDirectoryTargetResolver, StorageDirectoryTargetResolver>();
+        return services;
         }
 
         /// <summary>
