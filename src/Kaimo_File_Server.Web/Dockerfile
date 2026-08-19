@@ -6,7 +6,7 @@ USER root
 # Npgsql probes GSSAPI during startup. Keep the runtime dependency available so
 # password-authenticated deployments do not emit a native-library load error.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libgssapi-krb5-2 smbclient libnfs-utils \
+        libgssapi-krb5-2 openssh-client rsync smbclient \
     && rm -rf /var/lib/apt/lists/*
 USER $APP_UID
 WORKDIR /app

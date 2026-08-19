@@ -1,10 +1,13 @@
 using System.Security.Claims;
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.ExternalStorage;
+using Kaimo_File_Server.Infrastructure.ExternalStorage;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -148,6 +151,67 @@ public sealed class CloudAccessViewModelTests
             It.IsAny<string>(), It.IsAny<CredentialContext>()), Times.Never);
         cloudRepository.Verify(x => x.UpsertShareAsync(
             It.IsAny<CloudAccessShare>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateConfiguredConnectionAsync_ProtectsManagedSshKeyOutsideSettingsJson()
+    {
+        var departmentId = Guid.NewGuid();
+        var user = new User(Guid.NewGuid(), "Alice", "alice", "hash", "nt");
+        var actor = new UserContext(user, [], [], []);
+        var savedConnections = new List<StorageConnection>();
+        var connectionRepository = new Mock<IStorageConnectionRepository>();
+        connectionRepository.Setup(x => x.SaveAsync(It.IsAny<StorageConnection>(), default))
+            .Callback<StorageConnection, CancellationToken>((connection, _) => savedConnections.Add(connection))
+            .Returns(Task.CompletedTask);
+        connectionRepository.Setup(x => x.GetAllAsync(default)).ReturnsAsync(() => savedConnections);
+        connectionRepository.Setup(x => x.GetUsageAsync(It.IsAny<Guid>(), default))
+            .ReturnsAsync(new StorageConnectionUsage(0, 0));
+        var cloudRepository = new Mock<ICloudAccessRepository>();
+        cloudRepository.Setup(x => x.GetSharesAsync(default)).ReturnsAsync([]);
+        var management = new Mock<IManagementAuthService>();
+        management.Setup(x => x.CanManageDepartmentAsync(actor, departmentId, ManagementPermission.ManageConnections))
+            .ReturnsAsync(true);
+        management.Setup(x => x.GetAuthorizedDepartmentIdsAsync(actor, It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(AuthorizedScopeResult.Unrestricted());
+        var contexts = new Mock<IUserContextFactory>();
+        contexts.Setup(x => x.CreateByUsernameAsync("alice")).ReturnsAsync(actor);
+        var authentication = new Mock<AuthenticationStateProvider>();
+        authentication.Setup(x => x.GetAuthenticationStateAsync()).ReturnsAsync(new AuthenticationState(
+            new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "alice")], "test"))));
+        var departments = new Mock<IDepartmentRepository>();
+        departments.Setup(x => x.GetAllAsync()).ReturnsAsync([new Department("Finance") { Id = departmentId }]);
+        IReadOnlyDictionary<string, string>? protectedCredentials = null;
+        var vault = new Mock<ICredentialVault>();
+        vault.Setup(x => x.Protect(
+                It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CredentialContext>()))
+            .Callback<IReadOnlyDictionary<string, string>, CredentialContext>((credentials, _) =>
+                protectedCredentials = credentials)
+            .Returns("protected-key");
+        var provider = new Mock<IStorageConnectionProvider>();
+        provider.SetupGet(x => x.Id).Returns("rsync-ssh");
+        provider.SetupGet(x => x.AuthorizationModes).Returns(new HashSet<StorageAuthorizationMode>
+            { StorageAuthorizationMode.SshKey });
+        provider.Setup(x => x.TestAsync(It.IsAny<StorageConnection>(), default))
+            .ReturnsAsync(new StorageConnectionHealthResult(
+                StorageConnectionHealthState.Healthy, "ok", DateTime.UtcNow));
+        var viewModel = new CloudAccessViewModel(
+            cloudRepository.Object, connectionRepository.Object, Mock.Of<ICloudAuthorizationTicketStore>(),
+            management.Object, contexts.Object, authentication.Object, departments.Object,
+            Mock.Of<IUserRepository>(), Mock.Of<IGroupRepository>(), Mock.Of<IShareRepository>(),
+            ConnectionFactory(connectionRepository.Object, vault.Object),
+            NullLogger<CloudAccessViewModel>.Instance,
+            new StorageConnectionProviderCatalog([provider.Object]), vault.Object);
+        byte[] privateKey = "PRIVATE KEY CONTENT"u8.ToArray();
+        const string settings = "{\"Host\":\"backup.example.com\",\"PrivateKeySecretReference\":\"\"}";
+
+        await viewModel.CreateConfiguredConnectionAsync(
+            "rsync-ssh", "Backup", departmentId, settings, sshPrivateKey: privateKey);
+
+        StorageConnection connection = Assert.Single(savedConnections);
+        Assert.Equal("protected-key", connection.EncryptedCredentialPayload);
+        Assert.DoesNotContain(Convert.ToBase64String(privateKey), connection.SettingsJson, StringComparison.Ordinal);
+        Assert.Equal(Convert.ToBase64String(privateKey), protectedCredentials?["privateKeyBase64"]);
     }
 
     private static OneDriveStorageConnectionFactory ConnectionFactory(

@@ -2283,6 +2283,7 @@
   <data name="Web_ExternalStorage_BrowseUnsupported" xml:space="preserve"><value>Dieser Anbieter unterstützt kein Durchsuchen entfernter Ordner.</value></data>
   <data name="Web_ExternalStorage_SyncUnsupported" xml:space="preserve"><value>Dieser Anbieter unterstützt keine Synchronisierung.</value></data>
   <data name="Web_ExternalStorage_ReadOnlyPullRequired" xml:space="preserve"><value>Diese Verbindung unterstützt ausschließlich abrufende Synchronisierungen.</value></data>
+  <data name="Web_ExternalStorage_RsyncDirectionRequired" xml:space="preserve"><value>Rsync-Verbindungen benötigen eine eindeutige Abruf- oder Übertragungsrichtung; bidirektionale Synchronisierung wird nicht unterstützt.</value></data>
   <data name="Web_ExternalStorage_VirtualShareUnsupported" xml:space="preserve"><value>Dieser Anbieter kann nicht für virtuelle Freigaben verwendet werden.</value></data>
   <data name="Web_ExternalStorage_AuthorizeUnsupported" xml:space="preserve"><value>Diese Verbindung unterstützt keine interaktive Autorisierung.</value></data>
   <data name="Web_ExternalStorage_Capability_Browse" xml:space="preserve"><value>Durchsuchen</value></data>
@@ -2301,24 +2302,20 @@
   <data name="Web_ExternalStorage_Capability_RequiresHostMount" xml:space="preserve"><value>Vom Betreiber verwaltete Einhängung</value></data>
   <data name="Web_ExternalStorage_Capability_OptimizedSync" xml:space="preserve"><value>Optimierte Synchronisierung</value></data>
   <data name="Web_ExternalStorage_ConnectionSettings" xml:space="preserve"><value>Protokolleinstellungen (JSON)</value></data>
-  <data name="Web_ExternalStorage_ConnectionSettingsHelp" xml:space="preserve"><value>Verwenden Sie nur vom Betreiber verwaltete Einhängenachweise oder absolute Verweise auf Secret-Dateien. Geben Sie niemals ein Kennwort oder einen privaten Schlüssel ein.</value></data>
+  <data name="Web_ExternalStorage_ConnectionSettingsHelp" xml:space="preserve"><value>Geben Sie nur die dokumentierten Anbietereinstellungen ein. Secrets müssen im Zugangsdaten-Tresor gespeichert oder über einen absoluten Secret-Dateipfad referenziert werden.</value></data>
   <data name="Web_ExternalStorage_Server" xml:space="preserve"><value>Server / IP-Adresse</value></data>
   <data name="Web_ExternalStorage_Port" xml:space="preserve"><value>Port</value></data>
   <data name="Web_ExternalStorage_Domain" xml:space="preserve"><value>Domäne (optional)</value></data>
   <data name="Web_ExternalStorage_SmbShare" xml:space="preserve"><value>SMB-Freigabe</value></data>
-  <data name="Web_ExternalStorage_NfsExport" xml:space="preserve"><value>NFS-Export</value></data>
   <data name="Web_ExternalStorage_Username" xml:space="preserve"><value>Benutzername</value></data>
   <data name="Web_ExternalStorage_Password" xml:space="preserve"><value>Kennwort</value></data>
   <data name="Web_ExternalStorage_ExpectedServerIdentity" xml:space="preserve"><value>Erwartete Serveridentität</value></data>
   <data name="Web_ExternalStorage_MountPath" xml:space="preserve"><value>Lokaler Einhängepfad</value></data>
   <data name="Web_ExternalStorage_AttestationPath" xml:space="preserve"><value>Datei mit Einhängenachweis</value></data>
   <data name="Web_ExternalStorage_MinimumDialect" xml:space="preserve"><value>Minimale SMB-Version</value></data>
-  <data name="Web_ExternalStorage_NfsVersion" xml:space="preserve"><value>Minimale NFS-Version</value></data>
-  <data name="Web_ExternalStorage_RequireKerberos" xml:space="preserve"><value>Kerberos voraussetzen</value></data>
   <data name="Web_ExternalStorage_ReadOnly" xml:space="preserve"><value>Schreibgeschützt</value></data>
-  <data name="Web_ExternalStorage_InvalidCredentials" xml:space="preserve"><value>Geben Sie Benutzername und Kennwort für die SMB-Verbindung ein.</value></data>
+  <data name="Web_ExternalStorage_InvalidCredentials" xml:space="preserve"><value>Geben Sie einen gültigen Benutzernamen und ein Kennwort für diese Verbindung ein.</value></data>
   <data name="Web_ExternalStorage_SmbSharePickerHelp" xml:space="preserve"><value>Verfügbare SMB-Freigaben werden nach dem Verbinden geladen und können beim Einrichten einer Synchronisierung ausgewählt werden.</value></data>
-  <data name="Web_ExternalStorage_NfsExportPickerHelp" xml:space="preserve"><value>Verfügbare NFS-Exports und Ordner werden nach dem Verbinden geladen und können beim Einrichten eines Verbrauchers ausgewählt werden.</value></data>
   <data name="Web_ExternalStorage_RuntimeIdentity" xml:space="preserve"><value>Netzwerkidentität der Laufzeit</value></data>
   <data name="Web_ExternalStorage_Auth_NetworkIdentity" xml:space="preserve"><value>Netzwerkidentität</value></data>
   <data name="Web_ExternalStorage_Capability_DirectFileAccess" xml:space="preserve"><value>Direkter Protokollzugriff</value></data>
@@ -2327,4 +2324,36 @@
   <data name="Web_ExternalStorage_Identity" xml:space="preserve"><value>Identität und Autorisierung</value></data>
   <data name="Web_ExternalStorage_CapabilitiesAndUsage" xml:space="preserve"><value>Funktionen und Verwendung</value></data>
   <data name="Web_ExternalStorage_SelectSyncHint" xml:space="preserve"><value>Wählen Sie bei einer Synchronisierung „Bearbeiten“, um ihre Einstellungen zu öffnen.</value></data>
+  <data name="Web_ExternalStorage_RemoteRoot" xml:space="preserve"><value>Entfernter Stammordner</value></data>
+  <data name="Web_ExternalStorage_SshHostFingerprint" xml:space="preserve"><value>SSH-Hostschlüssel-Fingerabdruck (SHA-256)</value></data>
+  <data name="Web_ExternalStorage_PrivateKeySecretReference" xml:space="preserve"><value>Secret-Datei mit privatem Schlüssel</value></data>
+  <data name="Web_ExternalStorage_KnownHostsSecretReference" xml:space="preserve"><value>Secret-Datei mit bekannten Hosts</value></data>
+  <data name="Web_ExternalStorage_RsyncSshHelp" xml:space="preserve"><value>Verwenden Sie absolute Pfade zu schreibgeschützten Secret-Dateien. Der festgelegte SHA-256-Fingerabdruck muss zum ausgewählten Hosteintrag in der Known-Hosts-Datei passen.</value></data>
+  <data name="Web_ExternalStorage_SecretFileReferences" xml:space="preserve"><value>Externe Secret-Dateien</value></data>
+  <data name="Web_ExternalStorage_SshKeySetup" xml:space="preserve"><value>Geführte SSH-Einrichtung</value></data>
+  <data name="Web_ExternalStorage_SshKeySetupHelp" xml:space="preserve"><value>Laden oder erzeugen Sie einen Schlüssel, hinterlegen Sie den öffentlichen Schlüssel beim entfernten Konto und prüfen Sie ausdrücklich die Serveridentität.</value></data>
+  <data name="Web_ExternalStorage_SshAdvancedMode" xml:space="preserve"><value>Externe Secret-Dateien verwenden</value></data>
+  <data name="Web_ExternalStorage_SshPrivateKey" xml:space="preserve"><value>Client-Schlüssel vorbereiten</value></data>
+  <data name="Web_ExternalStorage_SshPrivateKeyHelp" xml:space="preserve"><value>Laden Sie einen unverschlüsselten privaten OpenSSH-Schlüssel hoch oder erzeugen Sie einen neuen Ed25519-Schlüssel. Der private Schlüssel wird verschlüsselt im Verbindungs-Tresor gespeichert.</value></data>
+  <data name="Web_ExternalStorage_SshGenerateKey" xml:space="preserve"><value>Ed25519-Schlüssel erzeugen</value></data>
+  <data name="Web_ExternalStorage_SshGeneratedKeyReady" xml:space="preserve"><value>Erzeugter Schlüssel ist bereit</value></data>
+  <data name="Web_ExternalStorage_SshPublicKey" xml:space="preserve"><value>Öffentlicher Schlüssel für den Server</value></data>
+  <data name="Web_ExternalStorage_CopyPublicKey" xml:space="preserve"><value>Öffentlichen Schlüssel kopieren</value></data>
+  <data name="Web_ExternalStorage_SshHostVerification" xml:space="preserve"><value>SSH-Server überprüfen</value></data>
+  <data name="Web_ExternalStorage_SshHostVerificationHelp" xml:space="preserve"><value>Rufen Sie den öffentlichen Hostschlüssel ab, vergleichen Sie dessen Fingerabdruck über einen unabhängigen vertrauenswürdigen Kanal und bestätigen Sie ihn anschließend. Der Abruf allein stellt kein Vertrauen her.</value></data>
+  <data name="Web_ExternalStorage_SshFetchHostKey" xml:space="preserve"><value>Hostschlüssel abrufen</value></data>
+  <data name="Web_ExternalStorage_SshHostKey" xml:space="preserve"><value>Verfügbarer Hostschlüssel</value></data>
+  <data name="Web_ExternalStorage_SshConfirmFingerprint" xml:space="preserve"><value>Ich habe diesen Fingerabdruck über einen vertrauenswürdigen Kanal geprüft.</value></data>
+  <data name="Web_ExternalStorage_SshHostKeyNotFound" xml:space="preserve"><value>Es wurde kein verwendbarer SSH-Hostschlüssel zurückgegeben. Prüfen Sie Server und Port.</value></data>
+  <data name="Web_ExternalStorage_SshSetupIncomplete" xml:space="preserve"><value>Schließen Sie zuerst die Schlüssel- und Hostprüfungs-Schritte ab.</value></data>
+  <data name="Web_ExternalStorage_InvalidPrivateKey" xml:space="preserve"><value>Wählen Sie einen gültigen privaten SSH-Schlüssel mit höchstens 1 MiB aus.</value></data>
+  <data name="Web_ExternalStorage_SshSetupError" xml:space="preserve"><value>Der SSH-Einrichtungsschritt konnte nicht abgeschlossen werden.</value></data>
+  <data name="Web_ExternalStorage_SshSetupError_private_key_invalid" xml:space="preserve"><value>Der private Schlüssel ist ungültig, nicht unterstützt oder mit einer Passphrase geschützt. Verwenden Sie einen unverschlüsselten OpenSSH-Schlüssel.</value></data>
+  <data name="Web_ExternalStorage_SshSetupError_key_generation_failed" xml:space="preserve"><value>Der Server konnte keinen SSH-Schlüssel erzeugen.</value></data>
+  <data name="Web_ExternalStorage_SshSetupError_host_key_discovery_failed" xml:space="preserve"><value>Es konnte kein SSH-Hostschlüssel abgerufen werden. Prüfen Sie Endpunkt und Firewall.</value></data>
+  <data name="Web_ExternalStorage_SshSetupError_host_key_invalid" xml:space="preserve"><value>Der ausgewählte SSH-Hostschlüssel ist ungültig.</value></data>
+  <data name="Web_ExternalStorage_SshSetupError_helper_unavailable" xml:space="preserve"><value>Das benötigte OpenSSH-Einrichtungswerkzeug ist auf dem Server nicht verfügbar.</value></data>
+  <data name="Web_ExternalStorage_SshSetupError_helper_timeout" xml:space="preserve"><value>Die SSH-Einrichtungsanfrage hat das Zeitlimit überschritten.</value></data>
+  <data name="Web_ExternalStorage_TestSuccessful" xml:space="preserve"><value>Verbindung erfolgreich</value></data>
+  <data name="Web_ExternalStorage_TestFailed" xml:space="preserve"><value>Verbindungstest fehlgeschlagen</value></data>
 </root>

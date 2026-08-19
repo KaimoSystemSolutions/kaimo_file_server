@@ -347,9 +347,13 @@ public sealed class ExternalStorageSyncViewModel(
 
     private void EnsureDirectionSupported(StorageConnection connection, SyncMode mode)
     {
-        if (mode != SyncMode.Pull
-            && !providerCatalog.GetRequired(connection.ProviderId).Capabilities
-                .HasFlag(StorageProviderCapabilities.Write))
+        StorageProviderCapabilities capabilities = providerCatalog.GetRequired(connection.ProviderId).Capabilities;
+        if (mode == SyncMode.TwoWay
+            && capabilities.HasFlag(StorageProviderCapabilities.OptimizedSync))
+            throw new NotSupportedException(Text(
+                "Web_ExternalStorage_RsyncDirectionRequired",
+                "Rsync connections require an explicit pull or push direction."));
+        if (mode != SyncMode.Pull && !capabilities.HasFlag(StorageProviderCapabilities.Write))
             throw new NotSupportedException(Text(
                 "Web_ExternalStorage_ReadOnlyPullRequired",
                 "This connection supports pull synchronization only."));

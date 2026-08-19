@@ -175,17 +175,18 @@ still-open durable audit work.
 ### Package 7: protocol providers — implemented
 
 - [x] Add the provider-neutral capability, health, session, remote-file, and optimized-sync contracts.
-- [x] Add SMB 3+ through verified operator-managed mounts with mandatory signing and encryption assurances.
-- [x] Add NFSv4+ only through verified operator-managed mounts and host-allowlist assurances.
-- [x] Add rsync/SSH with pinned host identity and absolute secret-file references.
+- [x] Add direct SMB 3+ access with protected credentials and mandatory signing and encryption.
+- [ ] Re-evaluate NFS separately; it is not registered or exposed by External Storage.
+- [x] Add executable rsync/SSH sync with pinned host identity and guided key/host-key setup or absolute secret-file references.
+- [x] Add browsable SFTP (SSH.NET) with the shared pinned-SSH trust model, in-memory key handling, and in-process host-key pinning so it can back virtual shares.
 - [x] Drive generic connection and sync actions from capabilities and enforce unsupported operations in the backend.
 - [x] Add provider contract and fail-closed identity/configuration tests.
 
-SMB and NFS participate in the existing ACL-aware reconciliation engine through a neutral remote-file adapter.
-The rsync/SSH process adapter is registered and health-checkable, but deliberately advertises only optimized
-sync rather than generic sync: direct process execution would bypass application ACL and version-history rules.
-The UI therefore does not offer a sync action for it until an isolated helper preserves those guarantees. See
-[`package-7-protocol-providers.md`](package-7-protocol-providers.md) for settings, attestation, and rollout details.
+SMB and SFTP participate in the existing reconciliation engine through a neutral remote-file adapter and can back
+virtual shares. The rsync-over-SSH transport instead participates in the shared manual and scheduled execution path
+through the optimized-sync contract; it requires an explicit pull or push direction and does not expose browsing or
+virtual shares. rsync over SSH and SFTP share one pinned-SSH trust model (client key plus SHA-256 host-key pinning).
+See [`package-7-protocol-providers.md`](package-7-protocol-providers.md) for settings, security, and rollout details.
 
 ### Package 8 — planned
 

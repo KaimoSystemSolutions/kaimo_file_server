@@ -85,6 +85,130 @@
     line-height: 1.5;
 }
 
+.ssh-setup-card {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg-tertiary);
+}
+
+.ssh-setup-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 13px 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.ssh-setup-heading > div,
+.ssh-step-content {
+    display: grid;
+    min-width: 0;
+    gap: 5px;
+}
+
+.ssh-setup-heading strong,
+.ssh-step-content > strong {
+    color: var(--text-primary);
+    font-size: 12.5px;
+}
+
+.ssh-setup-section {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 11px;
+    padding: 14px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.ssh-setup-section:last-child { border-bottom: 0; }
+
+.ssh-step {
+    display: grid;
+    width: 25px;
+    height: 25px;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    font-size: 11px;
+    font-weight: 750;
+}
+
+.ssh-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 5px;
+}
+
+.ssh-actions input[type="file"] {
+    max-width: min(100%, 330px);
+    color: var(--text-secondary);
+    font-size: 11.5px;
+}
+
+.ssh-actions button,
+.ssh-step-content > button,
+.ssh-copy {
+    width: fit-content;
+    min-height: 32px;
+}
+
+.ssh-ready-line,
+.connection-test-success {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 7px;
+    margin-top: 5px;
+    padding: 5px 8px;
+    border: 1px solid color-mix(in srgb, var(--success) 38%, var(--border));
+    border-radius: 4px;
+    background: var(--success-subtle);
+    color: var(--success);
+    font-size: 11.5px;
+    font-weight: 650;
+}
+
+.ssh-public-key {
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 10.5px;
+    overflow-wrap: anywhere;
+}
+
+.ssh-copy { justify-self: start; }
+
+.ssh-fingerprint {
+    overflow-wrap: anywhere;
+    padding: 8px 9px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 11px;
+}
+
+.ssh-confirm { margin-top: 2px; }
+
+.ssh-advanced-grid {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+}
+
+.connection-test-success { margin: 0; }
+
+.connection-test-failed {
+    color: var(--danger);
+    font-size: 11.5px;
+    font-weight: 650;
+}
+
 .connection-form .storage-check {
     display: flex;
     min-height: 36px;

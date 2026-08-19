@@ -63,13 +63,13 @@ public sealed class ProtocolStorageProviderTests : IDisposable
     public async Task DirectoryTargetResolver_RejectsTraversalBeforeOpeningProviderSession()
     {
         var provider = new Mock<IStorageConnectionProvider>();
-        provider.SetupGet(candidate => candidate.Id).Returns("nfs");
+        provider.SetupGet(candidate => candidate.Id).Returns("mock-storage");
         provider.SetupGet(candidate => candidate.Capabilities).Returns(StorageProviderCapabilities.Browse);
         var resolver = new StorageDirectoryTargetResolver(
             new StorageConnectionProviderCatalog([provider.Object]));
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => resolver.ResolveDirectoryAsync(
-            new StorageConnection { ProviderId = "nfs" }, "/exports/../private"));
+            new StorageConnection { ProviderId = "mock-storage" }, "/exports/../private"));
 
         provider.Verify(candidate => candidate.OpenSessionAsync(
             It.IsAny<StorageConnection>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -307,48 +307,6 @@ public sealed class ProtocolStorageProviderTests : IDisposable
     }
 
     [Fact]
-    public async Task NfsProvider_RejectsLegacyProtocolVersions()
-    {
-        var connection = Connection(
-            "nfs",
-            StorageAuthorizationMode.NetworkIdentity,
-            new NfsConnectionSettings("nfs.example.test", MinimumMajorVersion: 3));
-
-        var result = await new NfsStorageConnectionProvider(Mock.Of<IProtocolCommandRunner>()).TestAsync(connection);
-
-        Assert.Equal(StorageConnectionHealthState.InvalidConfiguration, result.State);
-        Assert.Equal("nfs_version_unsafe", result.Code);
-    }
-
-    [Fact]
-    public async Task NfsProvider_BrowsesServerRootWithoutUserSuppliedMountPath()
-    {
-        var runner = new Mock<IProtocolCommandRunner>();
-        runner.Setup(candidate => candidate.RunAsync(
-                "nfs-ls", It.Is<IReadOnlyList<string>>(arguments =>
-                    arguments.Single() == "nfs://nfs.example.test/?version=4"),
-                It.IsAny<CancellationToken>(), true))
-            .ReturnsAsync(new ProtocolCommandResult(
-                0, "drwxr-xr-x  2  0  0  4096  exports/\n"));
-        var provider = new NfsStorageConnectionProvider(runner.Object);
-        var connection = Connection(
-            "nfs", StorageAuthorizationMode.NetworkIdentity,
-            new NfsConnectionSettings("nfs.example.test"));
-
-        await using var session = await provider.OpenSessionAsync(connection);
-        var items = await session.RemoteFiles!.ListAsync("/");
-
-        Assert.True(session.Capabilities.HasFlag(StorageProviderCapabilities.DirectFileAccess));
-        Assert.True(session.Capabilities.HasFlag(StorageProviderCapabilities.Sync));
-        Assert.False(session.Capabilities.HasFlag(StorageProviderCapabilities.Write));
-        Assert.Collection(items, item =>
-        {
-            Assert.Equal("exports", item.Name);
-            Assert.Equal("/exports", item.Path);
-        });
-    }
-
-    [Fact]
     public async Task RsyncSshProvider_RequiresPinnedKnownHostAndExposesNoBrowseContract()
     {
         string privateKey = WriteFile("id_ed25519", "private-key-placeholder");
@@ -373,6 +331,7 @@ public sealed class ProtocolStorageProviderTests : IDisposable
         var health = await provider.TestAsync(connection);
 
         Assert.True(health.IsHealthy);
+        Assert.True(session.Capabilities.HasFlag(StorageProviderCapabilities.Sync));
         Assert.True(session.Capabilities.HasFlag(StorageProviderCapabilities.OptimizedSync));
         Assert.False(session.Capabilities.HasFlag(StorageProviderCapabilities.Browse));
         Assert.Null(session.RemoteFiles);
@@ -402,6 +361,151 @@ public sealed class ProtocolStorageProviderTests : IDisposable
         Assert.Equal(StorageConnectionHealthState.IdentityMismatch, result.State);
         Assert.Equal("host_key_mismatch", result.Code);
     }
+
+    [Fact]
+    public async Task RsyncSshProvider_MaterializesProtectedKeyOnlyForOperationLifetime()
+    {
+        byte[] privateKeyBytes = Encoding.UTF8.GetBytes("protected-private-key");
+        byte[] publicKey = RandomNumberGenerator.GetBytes(32);
+        string knownHosts = WriteFile(
+            "managed-known-hosts",
+            $"backup.example.test ssh-ed25519 {Convert.ToBase64String(publicKey)}");
+        string fingerprint = "SHA256:"
+                             + Convert.ToBase64String(SHA256.HashData(publicKey)).TrimEnd('=');
+        var connection = Connection(
+            "rsync-ssh",
+            StorageAuthorizationMode.SshKey,
+            new RsyncSshConnectionSettings(
+                "backup.example.test", 22, "backup", "/srv/archive", fingerprint,
+                null, knownHosts));
+        connection.EncryptedCredentialPayload = "protected";
+        var vault = new Mock<ICredentialVault>();
+        vault.Setup(candidate => candidate.Unprotect<Dictionary<string, string>>(
+                "protected", It.IsAny<CredentialContext>()))
+            .Returns(new Dictionary<string, string>
+            {
+                ["privateKeyBase64"] = Convert.ToBase64String(privateKeyBytes)
+            });
+        string? materializedPath = null;
+        var runner = new Mock<IRsyncProcessRunner>();
+        runner.Setup(candidate => candidate.TestSshAsync(
+                It.IsAny<RsyncSshConnectionSettings>(), It.IsAny<CancellationToken>()))
+            .Returns<RsyncSshConnectionSettings, CancellationToken>((settings, _) =>
+            {
+                materializedPath = settings.PrivateKeySecretReference;
+                Assert.NotNull(materializedPath);
+                Assert.Equal(privateKeyBytes, File.ReadAllBytes(materializedPath));
+                return Task.FromResult(true);
+            });
+        var provider = new RsyncSshStorageConnectionProvider(runner.Object, vault.Object);
+
+        var health = await provider.TestAsync(connection);
+
+        Assert.True(health.IsHealthy);
+        Assert.NotNull(materializedPath);
+        Assert.False(File.Exists(materializedPath));
+    }
+
+    [Fact]
+    public async Task RsyncSshSetup_PersistsAndRevokesOnlyValidatedManagedKnownHost()
+    {
+        byte[] key = RandomNumberGenerator.GetBytes(32);
+        string encoded = Convert.ToBase64String(key);
+        string fingerprint = "SHA256:"
+                             + Convert.ToBase64String(SHA256.HashData(key)).TrimEnd('=');
+        var candidate = new RsyncSshHostKeyCandidate(
+            "ssh-ed25519",
+            fingerprint,
+            $"backup.example.test ssh-ed25519 {encoded}");
+        var service = new RsyncSshSetupService(_temporaryRoot);
+
+        string path = await service.PersistKnownHostAsync(candidate);
+
+        Assert.True(File.Exists(path));
+        Assert.Equal(candidate.KnownHostsLine, (await File.ReadAllTextAsync(path)).Trim());
+        await service.DeleteManagedKnownHostAsync(path);
+        Assert.False(File.Exists(path));
+
+        var tampered = candidate with { FingerprintSha256 = fingerprint + "x" };
+        await Assert.ThrowsAsync<ProtocolConfigurationException>(
+            () => service.PersistKnownHostAsync(tampered));
+    }
+
+    [Fact]
+    public void SftpProvider_ExposesBrowsableReadWriteFileContract()
+    {
+        var provider = new SftpStorageConnectionProvider(CredentialVault());
+
+        Assert.Equal("sftp", provider.Id);
+        Assert.True(provider.Capabilities.HasFlag(StorageProviderCapabilities.Browse));
+        Assert.True(provider.Capabilities.HasFlag(StorageProviderCapabilities.Read));
+        Assert.True(provider.Capabilities.HasFlag(StorageProviderCapabilities.Write));
+        Assert.True(provider.Capabilities.HasFlag(StorageProviderCapabilities.DirectFileAccess));
+        Assert.False(provider.Capabilities.HasFlag(StorageProviderCapabilities.OptimizedSync));
+        Assert.Equal([StorageAuthorizationMode.SshKey], provider.AuthorizationModes);
+    }
+
+    [Fact]
+    public void SftpProvider_ParseValidatesFingerprintWithoutRequiringKnownHostsFile()
+    {
+        string fingerprint = SampleFingerprint();
+        var connection = Connection(
+            "sftp",
+            StorageAuthorizationMode.SshKey,
+            new RsyncSshConnectionSettings(
+                "backup.example.test", 22, "backup", "/srv/archive", fingerprint,
+                PrivateKeySecretReference: null, KnownHostsSecretReference: string.Empty));
+
+        var settings = PinnedSshSettings.ParseAndValidate(connection, "sftp", requireKnownHosts: false);
+        Assert.Equal("/srv/archive", settings.RemoteRoot);
+
+        var tampered = Connection(
+            "sftp",
+            StorageAuthorizationMode.SshKey,
+            new RsyncSshConnectionSettings(
+                "backup.example.test", 22, "backup", "/srv/archive", "not-a-fingerprint",
+                PrivateKeySecretReference: null, KnownHostsSecretReference: string.Empty));
+        var exception = Assert.Throws<ProtocolConfigurationException>(
+            () => PinnedSshSettings.ParseAndValidate(tampered, "sftp", requireKnownHosts: false));
+        Assert.Equal("host_key_invalid", exception.Code);
+    }
+
+    [Fact]
+    public async Task SftpProvider_MissingPrivateKeyIsInvalidConfiguration()
+    {
+        var connection = Connection(
+            "sftp",
+            StorageAuthorizationMode.SshKey,
+            new RsyncSshConnectionSettings(
+                "backup.example.test", 22, "backup", "/srv/archive", SampleFingerprint(),
+                PrivateKeySecretReference: null, KnownHostsSecretReference: string.Empty));
+        // No credential payload and no external key reference: resolution must
+        // fail before any network access is attempted.
+        connection.EncryptedCredentialPayload = null;
+
+        var result = await new SftpStorageConnectionProvider(CredentialVault()).TestAsync(connection);
+
+        Assert.Equal(StorageConnectionHealthState.InvalidConfiguration, result.State);
+        Assert.Equal("private_key_missing", result.Code);
+    }
+
+    [Fact]
+    public void SftpPaths_RejectTraversalAndResolveBeneathRemoteRoot()
+    {
+        Assert.Equal("/", SftpPaths.NormalizeStorePath(null));
+        Assert.Equal("/foo/bar", SftpPaths.NormalizeStorePath("foo\\bar"));
+        Assert.Throws<ProtocolConfigurationException>(() => SftpPaths.NormalizeStorePath("/foo/../etc"));
+        Assert.Throws<ProtocolConfigurationException>(() => SftpPaths.NormalizeStorePath("/a\nb"));
+
+        Assert.Equal("/srv/archive", SftpPaths.ToServerPath("/srv/archive/", "/"));
+        Assert.Equal("/srv/archive/team/docs", SftpPaths.ToServerPath("/srv/archive", "/team/docs"));
+        Assert.Equal("/team/docs", SftpPaths.CombineChild("/team", "docs"));
+        Assert.Equal("/docs", SftpPaths.CombineChild("/", "docs"));
+    }
+
+    private static string SampleFingerprint()
+        => "SHA256:" + Convert.ToBase64String(
+            SHA256.HashData(RandomNumberGenerator.GetBytes(32))).TrimEnd('=');
 
     public void Dispose()
     {

@@ -113,7 +113,7 @@ builder.Services.AddSingleton<ICloudAuthorizationTicketStore, CloudAuthorization
 builder.Services.AddSingleton<IOneDriveDeviceAuthorizationService, OneDriveDeviceAuthorizationService>();
 builder.Services.AddSingleton<GoogleOAuthService>();
 builder.Services.AddSingleton<ICredentialVault, DataProtectionCredentialVault>();
-builder.Services.AddExternalStorageProviders();
+builder.Services.AddExternalStorageProviders(applicationDataPath);
 builder.Services.AddScoped<IStorageConnectionProvider>(services =>
     new LegacyCloudStorageConnectionProvider(
         "onedrive",

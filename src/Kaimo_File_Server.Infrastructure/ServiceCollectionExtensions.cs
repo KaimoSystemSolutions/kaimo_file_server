@@ -101,16 +101,20 @@ namespace Kaimo_File_Server.Infrastructure
         /// <summary>
         /// Registers external-storage protocol providers for the Web runtime.
         /// This is intentionally separate from <see cref="AddInfrastructure"/>
-        /// because SMB/NFS providers depend on the Web-owned credential vault;
+        /// because password-backed protocol providers depend on the Web-owned credential vault;
         /// the Host and SMB Bridge must not construct or validate them.
         /// </summary>
-        public static IServiceCollection AddExternalStorageProviders(this IServiceCollection services)
+        public static IServiceCollection AddExternalStorageProviders(
+            this IServiceCollection services,
+            string applicationDataPath)
         {
+            services.AddSingleton<IRsyncSshSetupService>(
+                new RsyncSshSetupService(applicationDataPath));
             services.AddSingleton<IRsyncProcessRunner, RsyncProcessRunner>();
             services.AddSingleton<IProtocolCommandRunner, ProtocolCommandRunner>();
             services.AddScoped<IStorageConnectionProvider, SmbStorageConnectionProvider>();
-            services.AddScoped<IStorageConnectionProvider, NfsStorageConnectionProvider>();
-            services.AddSingleton<IStorageConnectionProvider, RsyncSshStorageConnectionProvider>();
+            services.AddScoped<IStorageConnectionProvider, RsyncSshStorageConnectionProvider>();
+            services.AddScoped<IStorageConnectionProvider, SftpStorageConnectionProvider>();
         services.AddScoped<IStorageConnectionProviderCatalog, StorageConnectionProviderCatalog>();
         services.AddScoped<IStorageDirectoryTargetResolver, StorageDirectoryTargetResolver>();
         return services;

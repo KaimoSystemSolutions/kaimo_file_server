@@ -1,5 +1,10 @@
 # External Storage Connections, Syncs, and Virtual Shares
 
+> Status note (August 2026): this document records the broader architecture
+> exploration. NFS is deferred and is not registered or exposed by the current
+> External Storage implementation. The current protocol-provider behavior is
+> documented in `package-7-protocol-providers.md`.
+
 ## Architecture, Authentication, Credential Security, and Incremental Delivery Plan
 
 Status: **proposed architecture and implementation roadmap**  
@@ -849,7 +854,7 @@ Exit criterion: an administrator authorizes a connection once and can create sup
 
 - [x] Add SMB with strict transport and identity validation.
 - [x] Add rsync/SSH with pinned host identity and secret references.
-- [x] Add NFS only through an operator-managed mount or isolated helper design.
+- [ ] Re-evaluate NFS through an operator-managed mount or isolated helper design (deferred).
 - [x] Add provider capability contract tests.
 - [x] Verify that unsupported UI operations remain hidden and backend-enforced.
 

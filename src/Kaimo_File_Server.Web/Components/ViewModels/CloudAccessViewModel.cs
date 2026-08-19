@@ -154,7 +154,8 @@ public sealed class CloudAccessViewModel
         string settingsJson,
         string? username = null,
         string? password = null,
-        string? domain = null)
+        string? domain = null,
+        byte[]? sshPrivateKey = null)
     {
         await EnsureCanManageConnectionDepartmentAsync(departmentId);
         if (_providerCatalog is null)
@@ -178,6 +179,9 @@ public sealed class CloudAccessViewModel
         if (string.Equals(provider.Id, "smb", StringComparison.OrdinalIgnoreCase)
             && (!hasUsername || !hasPassword))
             throw new ArgumentException(R("Web_ExternalStorage_InvalidCredentials"));
+        if (authorizationMode == StorageAuthorizationMode.SshKey
+            && sshPrivateKey is { Length: > 1024 * 1024 })
+            throw new ArgumentException(R("Web_ExternalStorage_InvalidPrivateKey"));
 
         var connection = new StorageConnection
         {
@@ -202,6 +206,18 @@ public sealed class CloudAccessViewModel
                 credentials["domain"] = domain.Trim();
             connection.EncryptedCredentialPayload = _credentialVault.ProtectConnectionCredentials(connection, credentials);
             connection.AccountDisplayName = username.Trim();
+            connection.CredentialUpdatedAtUtc = DateTime.UtcNow;
+        }
+        else if (sshPrivateKey is { Length: > 0 })
+        {
+            if (_credentialVault is null)
+                throw new ArgumentException(R("Web_ExternalStorage_InvalidPrivateKey"));
+            var credentials = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["privateKeyBase64"] = Convert.ToBase64String(sshPrivateKey)
+            };
+            connection.EncryptedCredentialPayload = _credentialVault.ProtectConnectionCredentials(
+                connection, credentials);
             connection.CredentialUpdatedAtUtc = DateTime.UtcNow;
         }
         var health = await provider.TestAsync(connection);
@@ -243,7 +259,7 @@ public sealed class CloudAccessViewModel
     {
         var connection = await GetManagedConnectionAsync(connectionId);
         connection.State = enabled
-            ? connection.AuthorizationMode != StorageAuthorizationMode.NetworkIdentity
+            ? RequiresProtectedCredential(connection.AuthorizationMode)
               && string.IsNullOrWhiteSpace(connection.EncryptedCredentialPayload)
                 ? StorageConnectionState.PendingAuthorization
                 : StorageConnectionState.Ready
@@ -462,6 +478,9 @@ public sealed class CloudAccessViewModel
         var result = await _connections.DeleteAsync(connection.Id);
         if (result == StorageConnectionDeleteResult.InUse)
             throw new InvalidOperationException(R("Web_StorageConnection_DeleteInUse"));
+        if (result == StorageConnectionDeleteResult.Deleted
+            && _providerCatalog?.TryGet(connection.ProviderId, out var provider) == true)
+            await provider.RevokeAsync(connection);
         await LoadAsync();
     }
 
@@ -544,6 +563,11 @@ public sealed class CloudAccessViewModel
             ? StorageConnectionState.NeedsReauthorization
             : StorageConnectionState.Degraded;
     }
+
+    private static bool RequiresProtectedCredential(StorageAuthorizationMode mode)
+        => mode is not (StorageAuthorizationMode.HostMount
+            or StorageAuthorizationMode.SshKey
+            or StorageAuthorizationMode.NetworkIdentity);
 
     private static HashSet<Guid> GetDepartmentIds(
         AuthorizedScopeResult scope,

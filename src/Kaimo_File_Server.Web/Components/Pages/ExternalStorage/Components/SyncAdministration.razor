@@ -115,9 +115,13 @@ else
                         }
                     </select></label>
                     <label><span>@R("Web_ExternalStorage_Mode")</span><select class="edit-input" @bind="_model.Mode">
-                        @if (SelectedConnectionSupports(StorageProviderCapabilities.Write))
+                        @if (SelectedConnectionSupports(StorageProviderCapabilities.Write)
+                            && !SelectedConnectionSupports(StorageProviderCapabilities.OptimizedSync))
                         {
                             <option value="@SyncMode.TwoWay">@R("Web_CloudSync_Mode_TwoWay")</option>
+                        }
+                        @if (SelectedConnectionSupports(StorageProviderCapabilities.Write))
+                        {
                             <option value="@SyncMode.Push">@R("Web_CloudSync_Mode_Push")</option>
                         }
                         <option value="@SyncMode.Pull">@R("Web_CloudSync_Mode_Pull")</option>
@@ -288,7 +292,9 @@ else
     private void ConnectionChanged()
     {
         if (_model.ConnectionId != Guid.Empty
-            && !SelectedConnectionSupports(StorageProviderCapabilities.Write))
+            && (!SelectedConnectionSupports(StorageProviderCapabilities.Write)
+                || (SelectedConnectionSupports(StorageProviderCapabilities.OptimizedSync)
+                    && _model.Mode == SyncMode.TwoWay)))
             _model.Mode = SyncMode.Pull;
     }
 
@@ -337,6 +343,7 @@ else
         try { await action(); }
         catch (ArgumentException exception) { _error = exception.Message; }
         catch (InvalidOperationException exception) { _error = exception.Message; }
+        catch (NotSupportedException exception) { _error = exception.Message; }
         catch { _error = R("Web_ExternalStorage_OperationFailed"); }
         finally { _busy = false; }
     }

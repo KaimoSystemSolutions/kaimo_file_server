@@ -11,19 +11,13 @@ public sealed record SmbConnectionSettings(
     bool RequireSigning = true,
     bool RequireEncryption = true);
 
-public sealed record NfsConnectionSettings(
-    string Server,
-    int Port = 2049,
-    int MinimumMajorVersion = 4,
-    bool RequireKerberos = false);
-
 public sealed record RsyncSshConnectionSettings(
     string Host,
     int Port,
     string Username,
     string RemoteRoot,
     string ExpectedHostKeySha256,
-    string PrivateKeySecretReference,
+    string? PrivateKeySecretReference,
     string KnownHostsSecretReference);
 
 internal static class ProtocolConnectionSettings

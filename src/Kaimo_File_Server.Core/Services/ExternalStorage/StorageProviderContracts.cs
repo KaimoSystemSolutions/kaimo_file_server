@@ -112,7 +112,10 @@ public sealed record OptimizedSyncRequest(
     string LocalRelativePath,
     string RemotePath,
     OptimizedSyncDirection Direction,
-    bool DeleteExtraneousFiles = false);
+    bool DeleteExtraneousFiles = false,
+    IReadOnlyCollection<string>? ExcludedExtensions = null,
+    long? MaximumFileSizeBytes = null,
+    long? MaximumTransferBytesPerSecond = null);
 
 /// <summary>Optional native sync transport, for example rsync over pinned SSH.</summary>
 public interface IOptimizedStorageSync

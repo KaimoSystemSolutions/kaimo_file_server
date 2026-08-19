@@ -80,6 +80,18 @@ public sealed class CloudSyncExecutionService(
                 if (!storageProvider.Capabilities.HasFlag(StorageProviderCapabilities.Sync))
                     return CloudSyncExecutionResult.Missing;
             }
+            if (storageProvider?.Capabilities.HasFlag(StorageProviderCapabilities.OptimizedSync) == true)
+            {
+                await RunOptimizedAsync(
+                    storageProvider,
+                    storageConnection,
+                    share,
+                    definition,
+                    normalizedPath,
+                    reportProgress,
+                    cancellationToken);
+                return CloudSyncExecutionResult.Completed;
+            }
             if (storageProvider?.Capabilities.HasFlag(StorageProviderCapabilities.DirectFileAccess) == true
                 || storageProvider?.Capabilities.HasFlag(StorageProviderCapabilities.RequiresHostMount) == true)
             {
@@ -186,6 +198,71 @@ public sealed class CloudSyncExecutionService(
                 credentialChanges);
             return CloudSyncExecutionResult.Completed;
         }
+    }
+
+    private async Task RunOptimizedAsync(
+        IStorageConnectionProvider provider,
+        StorageConnection connection,
+        ShareDefinition share,
+        SyncDefinition definition,
+        string normalizedLocalPath,
+        Action<string?, int>? reportProgress,
+        CancellationToken cancellationToken)
+    {
+        if (definition.Mode == SyncMode.TwoWay)
+            throw new NotSupportedException(
+                "Native rsync transports require an explicit pull or push direction.");
+
+        var direction = definition.Mode == SyncMode.Pull
+            ? OptimizedSyncDirection.Pull
+            : OptimizedSyncDirection.Push;
+        long? transferLimit = direction == OptimizedSyncDirection.Pull
+            ? definition.AdvancedSettings.MaxDownloadBytesPerSecond
+            : definition.AdvancedSettings.MaxUploadBytesPerSecond;
+        var request = new OptimizedSyncRequest(
+            share.Path,
+            normalizedLocalPath,
+            definition.RemotePath,
+            direction,
+            DeleteExtraneousFiles: false,
+            definition.AdvancedSettings.ExcludedExtensions,
+            definition.AdvancedSettings.MaxFileSizeBytes,
+            transferLimit);
+
+        IStorageSession? session = null;
+        try
+        {
+            session = await provider.OpenSessionAsync(connection, cancellationToken);
+            IOptimizedStorageSync optimizedSync = session.OptimizedSync
+                ?? throw new NotSupportedException(
+                    "The storage provider did not expose its advertised optimized synchronization contract.");
+            reportProgress?.Invoke(null, 0);
+            await optimizedSync.SynchronizeAsync(request, cancellationToken);
+            reportProgress?.Invoke(null, 100);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            await syncDefinitions.MarkFailedAsync(
+                definition.Id, DateTime.UtcNow, "sync_failed", cancellationToken);
+            throw;
+        }
+        finally
+        {
+            if (session is not null)
+                await session.DisposeAsync();
+        }
+
+        DateTime completedAtUtc = DateTime.UtcNow;
+        await syncDefinitions.MarkCompletedAsync(definition.Id, completedAtUtc, cancellationToken);
+        await shares.UpdateCloudSyncRuntimeStateAsync(
+            share.Id,
+            normalizedLocalPath,
+            completedAtUtc,
+            new Dictionary<string, string>());
     }
 
     private static string NormalizeRemotePath(string? path)

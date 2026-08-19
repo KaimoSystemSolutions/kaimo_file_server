@@ -1,99 +1,59 @@
 # Package 7: Protocol Storage Providers
 
-Package 7 introduces a provider-neutral capability and session contract and
-registers SMB, NFS, and rsync over SSH adapters. Generic administration code
-uses provider capabilities rather than provider IDs. Unsupported actions are
-both omitted from the UI and rejected by the application boundary.
+Package 7 provides capability-driven SMB, rsync-over-SSH, and SFTP connections.
+NFS is intentionally not registered or exposed in the External Storage UI while
+its security and deployment model is evaluated separately. The unencrypted rsync
+daemon transport is intentionally not offered: rsync is exposed only over
+pinned SSH.
 
-## Capability contract
+SSH connectivity is offered through two complementary providers that share the
+same pinned-SSH trust model (client key + SHA-256 host-key pinning + guided
+setup): **rsync / SSH** is a sync-only bulk transport, and **SFTP** is a
+browsable, read-write file store that can back a virtual share.
 
-`IStorageConnectionProvider` declares the provider ID, display name,
-authorization modes, capabilities, session factory, sanitized health check,
-and revocation boundary. A session may expose an `IRemoteFileStore`, an
-`IOptimizedStorageSync`, or both. Consumers must not infer support from the
-provider ID.
+## Capability and execution model
 
-SMB and NFS expose browse, read, write, folder creation, delete, move, and sync
-when configured read/write. Read-only mounts expose only browse, read, and
-sync. rsync/SSH exposes only `OptimizedSync`: it is intentionally not offered
-as a normal application sync because invoking rsync directly would bypass the
-file-service ACL and versioning pipeline. Activation requires a future isolated
-helper that preserves those guarantees.
+`IStorageConnectionProvider` declares each provider's authorization modes and
+capabilities. Browse-capable providers expose `IRemoteFileStore`; native rsync
+providers expose `IOptimizedStorageSync`. The common execution service invokes
+the optimized contract for manual and scheduled syncs and persists the same
+runtime completion or failure state used by other providers.
 
-## Operator-managed SMB and NFS mounts
+Rsync jobs must select `Pull` or `Push`. Two-way mode is rejected because rsync
+does not provide conflict detection or two-way conflict resolution. Native
+rsync does not expose browsing or virtual shares.
 
-The application never mounts SMB or NFS and never accepts a protocol password.
-An operator mounts the remote export with operating-system controls and writes
-a short-lived attestation file outside the mounted tree. The application
-verifies the absolute mount path, endpoint, expected server identity, expiry,
-and required assurances before every session.
+Advanced file-size, extension-exclusion, and direction-specific bandwidth
+limits are translated to rsync arguments. Destructive `--delete` behavior is
+not enabled by the current administration model.
 
-Example SMB settings:
+## Rsync over pinned SSH
 
-```json
-{
-  "Server": "files.example.test",
-  "Share": "finance",
-  "ExpectedServerIdentity": "certificate-sha256:BASE64_FINGERPRINT",
-  "MountPath": "/srv/kaimo/mounts/finance",
-  "AttestationPath": "/run/kaimo-storage/finance-smb.json",
-  "MinimumDialect": "3.1.1",
-  "RequireSigning": true,
-  "RequireEncryption": true,
-  "ReadOnly": false
-}
-```
+Select **rsync / SSH** to use public-key authentication. The default UI is a
+guided two-step setup:
 
-The SMB attestation must contain `operator-managed`, `smb3`, `signing`, and
-`encryption` assurances. SMB dialects older than 3.0, disabled signing, or
-disabled encryption are rejected.
+1. upload an unencrypted OpenSSH private key or generate a new Ed25519 key;
+2. copy the displayed public key to the remote account, retrieve the server's
+   public host keys, independently verify the selected SHA-256 fingerprint,
+   and explicitly confirm it.
 
-Example NFS settings:
+Uploaded and generated private keys are protected in the connection's
+context-bound Data Protection credential payload. Plaintext key bytes are kept
+only while the setup request is active. Each SSH operation materializes a
+random mode-0600 temporary key file and deletes it when the provider session is
+disposed. Passphrase-protected keys are rejected because background jobs must
+remain non-interactive.
 
-```json
-{
-  "Server": "nfs.example.test",
-  "Export": "/exports/finance",
-  "ExpectedServerIdentity": "host-key-sha256:BASE64_FINGERPRINT",
-  "MountPath": "/srv/kaimo/mounts/finance-nfs",
-  "AttestationPath": "/run/kaimo-storage/finance-nfs.json",
-  "MinimumMajorVersion": 4,
-  "RequireKerberos": true,
-  "ReadOnly": false
-}
-```
+`ssh-keyscan` is used only for discovery. Its result is never trusted
+automatically: the administrator must compare the fingerprint using an
+independent trusted channel before the connection can be created. The selected
+public known-host entry is stored in the managed application-data directory;
+it is removed when an unused connection is deleted.
 
-The NFS attestation must contain `operator-managed`, `host-allowlist`, and
-`nfs4`; it must also contain `kerberos` when requested. NFSv3 and older are
-rejected.
-
-Example mount attestation:
-
-```json
-{
-  "ProviderId": "smb",
-  "MountPath": "/srv/kaimo/mounts/finance",
-  "Endpoint": "//files.example.test/finance",
-  "ServerIdentity": "certificate-sha256:BASE64_FINGERPRINT",
-  "Assurances": ["operator-managed", "smb3", "signing", "encryption"],
-  "ValidUntilUtc": "2026-08-19T14:30:00Z"
-}
-```
-
-On Unix, attestation files must be read-only to the application process, and
-secret files must not be group- or world-writable.
-Mount roots and traversed paths must not be symbolic links or reparse points.
-Attestations should be generated by the privileged mount supervisor, renewed
-frequently, written atomically, and readable by the application account.
-Attestations with more than 15 minutes of remaining validity are rejected.
-
-## rsync over pinned SSH
-
-The rsync adapter accepts only absolute references to a private-key file and a
-dedicated `known_hosts` file. It rejects inline key material, passwords,
-interactive authentication, missing host entries, and host-key fingerprint
-mismatches. Processes are started without a shell, with strict host-key
-checking and batch mode. Provider output is not returned to the UI.
+The **external secret files** option preserves the operator-managed setup.
+Both secret references must be absolute paths. On Unix, private keys must be
+inaccessible to group and other users, and the known-hosts file must not be
+group- or world-writable.
 
 ```json
 {
@@ -107,22 +67,61 @@ checking and batch mode. Provider output is not returned to the UI.
 }
 ```
 
-Use a dedicated unprivileged remote account and restrict its SSH key on the
-server. Rotate the known-hosts file and configured fingerprint together after
-an independently verified host-key change. An identity mismatch moves the
-connection out of the ready state and is never treated as a transient network
-failure.
+The configured fingerprint must match the key for the exact host and port in
+the dedicated known-hosts file. Hashed host entries are intentionally rejected
+because the application must independently bind the selected entry to the
+configured endpoint. SSH runs with batch mode, strict host-key checking,
+password authentication disabled, and keyboard-interactive authentication
+disabled. A missing or mismatched host key is an identity failure, not a
+transient connection error. Transfers also run with an rsync `--timeout` so a
+stalled remote cannot pin an operation open indefinitely.
 
-## Administration and rollout
+Use a dedicated unprivileged remote account. Restrict the authorized key and
+remote filesystem permissions to the required backup root. Rotate the
+known-hosts secret and configured fingerprint together only after verifying a
+host-key change through an independent channel.
 
-Protocol connections can be added on the External Storage / Connections page
-by selecting the provider and entering its JSON settings. Configuration is
-health-checked before it can become ready. An unhealthy record remains in
-`PendingConfiguration` with a sanitized error code so an operator can correct
-the host mount or secret reference and test it again.
+## SFTP virtual shares
 
-Deploy the mount supervisor and attestations before creating SMB or NFS
-connections. Deploy the SSH client, rsync executable, key file, and known-hosts
-file before creating an rsync connection. No database migration is required;
-the existing `StorageConnection.SettingsJson`, authorization mode, lifecycle,
-and health fields hold the non-secret protocol configuration.
+Select **SFTP** to expose a remote directory as a browsable, read-write virtual
+share. Unlike rsync — which is a sync-only bulk transport — SFTP implements the
+full item-level `IRemoteFileStore` contract (list, read, write, create
+directory, delete, rename/move), so a virtual share, the file browser, and
+cross-share transfers work exactly as they do for SMB.
+
+SFTP reuses the rsync-over-SSH setup verbatim: the identical settings shape, the
+guided key/host-key wizard, and the vault-protected private key. It is
+implemented with the managed **SSH.NET** client rather than an external binary,
+so the private key is loaded straight from the credential vault in memory and
+never written to a temporary file. Host identity is pinned **in process**: the
+server key is trusted only when its SHA-256 fingerprint matches the value the
+administrator confirmed during setup, and a mismatch is reported as an identity
+failure rather than a transient outage. Because the fingerprint is pinned
+directly, SFTP does not require an OpenSSH known-hosts file; the guided wizard
+still records one for parity with rsync, but the advanced (external secret file)
+mode may omit it.
+
+Incoming paths are normalized and rejected on traversal before every request,
+resolved beneath the configured remote root, and symbolic links are never
+traversed. Settings use the same shape as rsync over SSH (`Host`, `Port`,
+`Username`, `RemoteRoot`, `ExpectedHostKeySha256`, and the optional secret-file
+references).
+
+## Runtime requirements and rollout
+
+The Web image installs `rsync` and `openssh-client` for the rsync provider. A
+custom deployment must make both executables available on `PATH`, and the remote
+SSH host also needs a compatible rsync executable. The SFTP provider has no such
+dependency: it uses the managed SSH.NET client and needs only network access and
+a running SFTP subsystem on the remote host.
+
+Connection health checks return only sanitized codes. Helper stdout and stderr
+are never returned to the UI or attached to exceptions because remote output
+can contain sensitive paths or server-controlled text. Local paths are resolved
+under the configured share root, and symbolic/reparse-point roots are rejected
+before starting a helper process.
+
+No database migration is required. Non-secret protocol configuration remains
+in `StorageConnection.SettingsJson`; UI-managed SSH private keys remain in the
+protected credential payload. Advanced deployments may continue to keep SSH key
+material in operator-managed secret files.

@@ -2,10 +2,17 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Core.Repositories
 @using Kaimo_File_Server.Core.Services.ExternalStorage
+@using Kaimo_File_Server.Infrastructure.ExternalStorage
 @using Kaimo_File_Server.Web.Components.ViewModels
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using System.Security.Cryptography
+@implements IAsyncDisposable
 @inject CloudAccessViewModel VM
 @inject IStorageConnectionProviderCatalog ProviderCatalog
+@inject IRsyncSshSetupService RsyncSshSetup
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 @if (VM.IsLoading)
 {
@@ -50,19 +57,58 @@ else
                     <label><span>@R("Web_ExternalStorage_MinimumDialect")</span><select class="edit-input" @bind="_minimumDialect"><option value="3.0">SMB 3.0</option><option value="3.02">SMB 3.0.2</option><option value="3.1.1">SMB 3.1.1</option></select></label>
                     <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_SmbSharePickerHelp")</p>
                 }
-                else if (IsNfsProvider)
+                else if (UsesPinnedSshSetup)
                 {
-                    <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="192.168.1.10" @bind="_server" /></label>
-                    <label><span>@R("Web_ExternalStorage_Port")</span><input class="edit-input" type="number" min="1" max="65535" @bind="_port" /></label>
-                    <label><span>@R("Web_ExternalStorage_NfsVersion")</span><input class="edit-input" type="number" min="4" max="4" @bind="_minimumNfsVersion" /></label>
-                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_NfsExportPickerHelp")</p>
+                    <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="backup.example.com" @bind="_server" @bind:after="SshEndpointChangedAsync" /></label>
+                    <label><span>@R("Web_ExternalStorage_Port")</span><input class="edit-input" type="number" min="1" max="65535" @bind="_port" @bind:after="SshEndpointChangedAsync" /></label>
+                    <label><span>@R("Web_ExternalStorage_Username")</span><input class="edit-input" maxlength="64" autocomplete="username" @bind="_username" /></label>
+                    <label><span>@R("Web_ExternalStorage_RemoteRoot")</span><input class="edit-input" maxlength="4096" placeholder="/srv/backups" @bind="_remoteRoot" /></label>
+                    <section class="storage-wide ssh-setup-card">
+                        <div class="ssh-setup-heading"><div><strong>@R("Web_ExternalStorage_SshKeySetup")</strong><small>@R("Web_ExternalStorage_SshKeySetupHelp")</small></div><label class="storage-check"><input type="checkbox" @bind="_advancedSshSetup" @bind:after="SshModeChangedAsync" /> <span>@R("Web_ExternalStorage_SshAdvancedMode")</span></label></div>
+                        @if (!_advancedSshSetup)
+                        {
+                            <div class="ssh-setup-section">
+                                <span class="ssh-step">1</span><div class="ssh-step-content"><strong>@R("Web_ExternalStorage_SshPrivateKey")</strong><small>@R("Web_ExternalStorage_SshPrivateKeyHelp")</small>
+                                    <div class="ssh-actions"><InputFile OnChange="UploadSshPrivateKeyAsync" accept=".key,.pem,.openssh" /><button class="btn-secondary" type="button" disabled="@_sshSetupBusy" @onclick="GenerateSshPrivateKeyAsync">@R("Web_ExternalStorage_SshGenerateKey")</button></div>
+                                    @if (_sshPrivateKey is not null)
+                                    {
+                                        <div class="ssh-ready-line"><span class="connection-health"></span>@(_sshPrivateKeyName ?? R("Web_ExternalStorage_SshGeneratedKeyReady"))</div>
+                                        <label><span>@R("Web_ExternalStorage_SshPublicKey")</span><textarea class="edit-input ssh-public-key" readonly rows="3">@_sshPublicKey</textarea></label>
+                                        <button class="btn-secondary ssh-copy" type="button" @onclick="CopyPublicKeyAsync">@R("Web_ExternalStorage_CopyPublicKey")</button>
+                                    }
+                                </div>
+                            </div>
+                            <div class="ssh-setup-section">
+                                <span class="ssh-step">2</span><div class="ssh-step-content"><strong>@R("Web_ExternalStorage_SshHostVerification")</strong><small>@R("Web_ExternalStorage_SshHostVerificationHelp")</small>
+                                    <button class="btn-secondary" type="button" disabled="@(_sshSetupBusy || string.IsNullOrWhiteSpace(_server) || _port is < 1 or > 65535)" @onclick="DiscoverHostKeysAsync">@R("Web_ExternalStorage_SshFetchHostKey")</button>
+                                    @if (_hostKeyCandidates.Count > 0)
+                                    {
+                                        <label><span>@R("Web_ExternalStorage_SshHostKey")</span><select class="edit-input" @bind="_selectedHostFingerprint" @bind:after="HostKeySelectionChanged">
+                                            @foreach (var candidate in _hostKeyCandidates) { <option value="@candidate.FingerprintSha256">@candidate.Algorithm — @candidate.FingerprintSha256</option> }
+                                        </select></label>
+                                        <div class="ssh-fingerprint">@SelectedHostKey?.FingerprintSha256</div>
+                                        <label class="storage-check ssh-confirm"><input type="checkbox" @bind="_hostKeyConfirmed" /> <span>@R("Web_ExternalStorage_SshConfirmFingerprint")</span></label>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="ssh-advanced-grid">
+                                <label><span>@R("Web_ExternalStorage_SshHostFingerprint")</span><input class="edit-input" maxlength="100" placeholder="SHA256:…" @bind="_sshHostFingerprint" /></label>
+                                <label><span>@R("Web_ExternalStorage_PrivateKeySecretReference")</span><input class="edit-input" maxlength="4096" placeholder="/run/secrets/kaimo_rsync_key" @bind="_privateKeySecretReference" /></label>
+                                <label><span>@R("Web_ExternalStorage_KnownHostsSecretReference")</span><input class="edit-input" maxlength="4096" placeholder="/run/secrets/kaimo_known_hosts" @bind="_knownHostsSecretReference" /></label>
+                            </div>
+                        }
+                    </section>
+                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_RsyncSshHelp")</p>
                 }
                 else if (!SelectedProviderUsesInteractiveAuthorization)
                 {
                     <label class="storage-wide"><span>@R("Web_ExternalStorage_ConnectionSettings")</span><textarea class="edit-input" rows="10" maxlength="65536" @bind="_settingsJson"></textarea><small>@R("Web_ExternalStorage_ConnectionSettingsHelp")</small></label>
                 }
             </div>
-            <div class="detail-actions"><button class="btn-secondary" type="button" @onclick="CancelCreate">@R("Web_Button_Cancel")</button><button class="btn-primary" type="button" disabled="@(_busy || !CanCreate)" @onclick="CreateAsync">@R("Web_CloudAccess_Connect")</button></div>
+            <div class="detail-actions"><button class="btn-secondary" type="button" @onclick="CancelCreateAsync">@R("Web_Button_Cancel")</button><button class="btn-primary" type="button" disabled="@(_busy || _sshSetupBusy || !CanCreate)" @onclick="CreateAsync">@R("Web_CloudAccess_Connect")</button></div>
         </section>
     }
 
@@ -81,7 +127,7 @@ else
                 </div>
                 @foreach (var connection in VM.Connections)
                 {
-                    <button class="connection-row @(_selected?.Id == connection.Id ? "connection-row--selected" : "")" type="button" @onclick="() => _selected = connection">
+                    <button class="connection-row @(_selected?.Id == connection.Id ? "connection-row--selected" : "")" type="button" @onclick="() => SelectConnection(connection)">
                         <span class="connection-name">
                             <strong>@connection.Name</strong>
                             <small>@ProviderName(connection.ProviderId) · @(connection.AccountEmail ?? connection.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</small>
@@ -119,7 +165,7 @@ else
                                 <dt>@R("Web_ExternalStorage_State")</dt><dd>@StateName(_selected.State)</dd>
                                 <dt>@R("Web_ExternalStorage_LastVerified")</dt><dd>@FormatDate(_selected.LastVerifiedAtUtc)</dd>
                                 <dt>@R("Web_ExternalStorage_ProfileHealth")</dt><dd>@(_selected.ProviderProfileId is null ? R("Web_ExternalStorage_ProfileLegacy") : R("Web_ExternalStorage_ProfileConfigured"))</dd>
-                                <dt>@R("Web_ExternalStorage_SecretHealth")</dt><dd>@(_selected.AuthorizationMode == StorageAuthorizationMode.NetworkIdentity ? R("Web_ExternalStorage_RuntimeIdentity") : string.IsNullOrWhiteSpace(_selected.EncryptedCredentialPayload) ? R("Web_ExternalStorage_NotAuthorized") : R("Web_ExternalStorage_Protected"))</dd>
+                                <dt>@R("Web_ExternalStorage_SecretHealth")</dt><dd>@SecretHealth(_selected)</dd>
                             </dl>
                         </section>
                         <section class="connection-detail-group connection-detail-group--wide">
@@ -138,6 +184,8 @@ else
                         @if (VM.CanManageConnections)
                         {
                             <button class="btn-secondary" type="button" disabled="@_busy" @onclick="TestAsync">@R("Web_ExternalStorage_Test")</button>
+                            @if (_testSucceeded) { <span class="connection-test-success"><span class="connection-health"></span>@R("Web_ExternalStorage_TestSuccessful")</span> }
+                            else if (_testFailed) { <span class="connection-test-failed">@R("Web_ExternalStorage_TestFailed")</span> }
                             @if (SupportsAuthorization(_selected))
                             {
                                 <button class="btn-secondary" type="button" disabled="@_busy" @onclick="AuthorizeAsync">@(_selected.State == StorageConnectionState.Ready ? R("Web_CloudAccess_Reauthorize") : R("Web_CloudAccess_Authorize"))</button>
@@ -165,7 +213,21 @@ else
     private string _domain = string.Empty;
     private int _port = 445;
     private string _minimumDialect = "3.1.1";
-    private int _minimumNfsVersion = 4;
+    private string _remoteRoot = "/";
+    private string _sshHostFingerprint = string.Empty;
+    private string _privateKeySecretReference = string.Empty;
+    private string _knownHostsSecretReference = string.Empty;
+    private bool _advancedSshSetup;
+    private bool _sshSetupBusy;
+    private byte[]? _sshPrivateKey;
+    private string? _sshPrivateKeyName;
+    private string _sshPublicKey = string.Empty;
+    private List<RsyncSshHostKeyCandidate> _hostKeyCandidates = [];
+    private string _selectedHostFingerprint = string.Empty;
+    private bool _hostKeyConfirmed;
+    private string? _managedKnownHostsPath;
+    private bool _testSucceeded;
+    private bool _testFailed;
     private Guid _departmentId;
     private string? _error;
     private IEnumerable<IStorageConnectionProvider> CreatableProviders => ProviderCatalog.Providers
@@ -177,7 +239,10 @@ else
     private bool SelectedProviderUsesInteractiveAuthorization =>
         SelectedProvider?.AuthorizationModes.Contains(StorageAuthorizationMode.DeviceCode) == true;
     private bool IsSmbProvider => string.Equals(_provider, "smb", StringComparison.OrdinalIgnoreCase);
-    private bool IsNfsProvider => string.Equals(_provider, "nfs", StringComparison.OrdinalIgnoreCase);
+    private bool IsRsyncSshProvider => string.Equals(_provider, "rsync-ssh", StringComparison.OrdinalIgnoreCase);
+    private bool IsSftpProvider => string.Equals(_provider, "sftp", StringComparison.OrdinalIgnoreCase);
+    // rsync-over-SSH and SFTP share the identical pinned-SSH setup (key + host key).
+    private bool UsesPinnedSshSetup => IsRsyncSshProvider || IsSftpProvider;
     private bool CanCreate => !string.IsNullOrWhiteSpace(_name)
                               && _departmentId != Guid.Empty
                               && SelectedProvider is not null
@@ -186,10 +251,19 @@ else
                                       && _port is >= 1 and <= 65535
                                       && !string.IsNullOrWhiteSpace(_username)
                                       && !string.IsNullOrEmpty(_password))
-                                  || (IsNfsProvider && !string.IsNullOrWhiteSpace(_server)
+                                  || (UsesPinnedSshSetup && !string.IsNullOrWhiteSpace(_server)
                                       && _port is >= 1 and <= 65535
-                                      && _minimumNfsVersion >= 4)
-                                  || (!IsSmbProvider && !IsNfsProvider && !string.IsNullOrWhiteSpace(_settingsJson)));
+                                      && !string.IsNullOrWhiteSpace(_username)
+                                      && !string.IsNullOrWhiteSpace(_remoteRoot)
+                                      && (_advancedSshSetup
+                                          ? !string.IsNullOrWhiteSpace(_sshHostFingerprint)
+                                            && !string.IsNullOrWhiteSpace(_privateKeySecretReference)
+                                            && (IsSftpProvider || !string.IsNullOrWhiteSpace(_knownHostsSecretReference))
+                                          : _sshPrivateKey is not null
+                                            && SelectedHostKey is not null
+                                            && _hostKeyConfirmed))
+                                  || (!IsSmbProvider && !UsesPinnedSshSetup
+                                      && !string.IsNullOrWhiteSpace(_settingsJson)));
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -208,22 +282,56 @@ else
         }
         else
         {
+            if (UsesPinnedSshSetup && !_advancedSshSetup)
+                await PrepareManagedSshSettingsAsync();
             string settingsJson = BuildSettingsJson();
             await VM.CreateConfiguredConnectionAsync(
                 _provider, _name, _departmentId, settingsJson,
                 IsSmbProvider ? _username : null,
                 IsSmbProvider ? _password : null,
-                IsSmbProvider ? _domain : null);
+                IsSmbProvider ? _domain : null,
+                UsesPinnedSshSetup && !_advancedSshSetup ? _sshPrivateKey : null);
+            if (_sshPrivateKey is not null)
+                CryptographicOperations.ZeroMemory(_sshPrivateKey);
+            _sshPrivateKey = null;
+            _managedKnownHostsPath = null;
             _creating = false;
             _selected = VM.Connections.FirstOrDefault(connection =>
                 connection.Name == _name && connection.DepartmentId == _departmentId);
         }
     });
     private async Task AuthorizeAsync() => await ActAsync(async () => Nav.NavigateTo(await VM.AuthorizeConnectionAsync(_selected!.Id), forceLoad: true));
-    private async Task TestAsync() => await ActAsync(() => VM.TestConnectionAsync(_selected!.Id));
+    private async Task TestAsync()
+    {
+        _testSucceeded = _testFailed = false;
+        Guid selectedId = _selected!.Id;
+        _busy = true; _error = null;
+        try
+        {
+            await VM.TestConnectionAsync(selectedId);
+            _selected = VM.Connections.FirstOrDefault(connection => connection.Id == selectedId);
+            _testSucceeded = _selected?.State == StorageConnectionState.Ready
+                             && string.IsNullOrWhiteSpace(_selected.LastErrorCode);
+            _testFailed = !_testSucceeded;
+        }
+        catch (Exception exception)
+        {
+            _error = exception is InvalidOperationException or ArgumentException
+                ? exception.Message
+                : R("Web_ExternalStorage_OperationFailed");
+            _testFailed = true;
+        }
+        finally { _busy = false; }
+    }
     private async Task ToggleEnabledAsync() => await ActAsync(() => VM.SetConnectionEnabledAsync(_selected!.Id, _selected.State == StorageConnectionState.Disabled));
     private async Task DeleteAsync() => await ActAsync(() => VM.DeleteConnectionAsync(_selected!.Id));
-    private void ProviderChanged() => _port = IsNfsProvider ? 2049 : IsSmbProvider ? 445 : _port;
+    private async Task ProviderChanged()
+    {
+        if (!UsesPinnedSshSetup)
+            await ResetGuidedSshStateAsync();
+        _port = IsSmbProvider ? 445 : UsesPinnedSshSetup ? 22 : _port;
+        _remoteRoot = "/";
+    }
     private async Task ActAsync(Func<Task> action)
     {
         Guid? selectedId = _selected?.Id;
@@ -246,23 +354,28 @@ else
                 RequireSigning = true,
                 RequireEncryption = true
             });
-        if (IsNfsProvider)
+        if (UsesPinnedSshSetup)
             return System.Text.Json.JsonSerializer.Serialize(new
             {
-                Server = _server.Trim(),
+                Host = _server.Trim(),
                 Port = _port,
-                MinimumMajorVersion = _minimumNfsVersion,
-                RequireKerberos = false
+                Username = _username.Trim(),
+                RemoteRoot = _remoteRoot.Trim(),
+                ExpectedHostKeySha256 = _sshHostFingerprint.Trim(),
+                PrivateKeySecretReference = _privateKeySecretReference.Trim(),
+                KnownHostsSecretReference = _knownHostsSecretReference.Trim()
             });
         return _settingsJson;
     }
-    private void CancelCreate()
+    private async Task CancelCreateAsync()
     {
+        await ResetGuidedSshStateAsync();
         _creating = false;
         _name = _settingsJson = _server = _username = _password = _domain = string.Empty;
+        _sshHostFingerprint = _privateKeySecretReference = _knownHostsSecretReference = string.Empty;
+        _remoteRoot = "/";
         _port = 445;
         _minimumDialect = "3.1.1";
-        _minimumNfsVersion = 4;
         _departmentId = Guid.Empty;
     }
     private StorageConnectionUsage Usage(Guid id) => VM.ConnectionUsage.GetValueOrDefault(id) ?? new StorageConnectionUsage(0, 0);
@@ -290,6 +403,147 @@ else
     private static string StateName(StorageConnectionState state) => R($"Web_ExternalStorage_State_{state}");
     private static string StateClass(StorageConnectionState state) => state switch { StorageConnectionState.Ready => "ready", StorageConnectionState.Disabled => "disabled", _ => "attention" };
     private static string AuthorizationName(StorageAuthorizationMode mode) => R($"Web_ExternalStorage_Auth_{mode}");
+    private static string SecretHealth(StorageConnection connection) => connection.AuthorizationMode switch
+    {
+        StorageAuthorizationMode.NetworkIdentity => R("Web_ExternalStorage_RuntimeIdentity"),
+        StorageAuthorizationMode.SshKey => string.IsNullOrWhiteSpace(connection.EncryptedCredentialPayload)
+            ? R("Web_ExternalStorage_SecretFileReferences")
+            : R("Web_ExternalStorage_Protected"),
+        _ => string.IsNullOrWhiteSpace(connection.EncryptedCredentialPayload)
+            ? R("Web_ExternalStorage_NotAuthorized")
+            : R("Web_ExternalStorage_Protected")
+    };
     private static string FormatDate(DateTime? value) => value?.ToLocalTime().ToString("g") ?? R("Web_CloudSync_Never");
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+
+    private RsyncSshHostKeyCandidate? SelectedHostKey => _hostKeyCandidates.FirstOrDefault(
+        candidate => candidate.FingerprintSha256 == _selectedHostFingerprint);
+
+    private async Task UploadSshPrivateKeyAsync(InputFileChangeEventArgs args)
+    {
+        _sshSetupBusy = true; _error = null;
+        try
+        {
+            await using Stream stream = args.File.OpenReadStream(1024 * 1024);
+            using var memory = new MemoryStream();
+            await stream.CopyToAsync(memory);
+            byte[] uploaded = memory.ToArray();
+            try { SetSshKey(await RsyncSshSetup.ValidatePrivateKeyAsync(uploaded), args.File.Name); }
+            finally { CryptographicOperations.ZeroMemory(uploaded); }
+        }
+        catch (Exception exception) { _error = SetupError(exception); }
+        finally { _sshSetupBusy = false; }
+    }
+
+    private async Task GenerateSshPrivateKeyAsync()
+    {
+        _sshSetupBusy = true; _error = null;
+        try { SetSshKey(await RsyncSshSetup.GeneratePrivateKeyAsync(), R("Web_ExternalStorage_SshGeneratedKeyReady")); }
+        catch (Exception exception) { _error = SetupError(exception); }
+        finally { _sshSetupBusy = false; }
+    }
+
+    private void SetSshKey(RsyncSshKeyMaterial material, string name)
+    {
+        if (_sshPrivateKey is not null)
+            CryptographicOperations.ZeroMemory(_sshPrivateKey);
+        _sshPrivateKey = material.PrivateKey;
+        _sshPublicKey = material.PublicKey;
+        _sshPrivateKeyName = name;
+    }
+
+    private async Task CopyPublicKeyAsync()
+    {
+        if (_sshPublicKey.Length > 0)
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _sshPublicKey);
+    }
+
+    private async Task DiscoverHostKeysAsync()
+    {
+        _sshSetupBusy = true; _error = null; _hostKeyConfirmed = false;
+        try
+        {
+            _hostKeyCandidates = (await RsyncSshSetup.DiscoverHostKeysAsync(_server.Trim(), _port)).ToList();
+            _selectedHostFingerprint = _hostKeyCandidates.FirstOrDefault()?.FingerprintSha256 ?? string.Empty;
+            if (_hostKeyCandidates.Count == 0)
+                _error = R("Web_ExternalStorage_SshHostKeyNotFound");
+        }
+        catch (Exception exception) { _error = SetupError(exception); }
+        finally { _sshSetupBusy = false; }
+    }
+
+    private void HostKeySelectionChanged() => _hostKeyConfirmed = false;
+
+    private async Task SshEndpointChangedAsync()
+    {
+        _hostKeyCandidates = [];
+        _selectedHostFingerprint = string.Empty;
+        _hostKeyConfirmed = false;
+        if (_managedKnownHostsPath is not null)
+        {
+            await RsyncSshSetup.DeleteManagedKnownHostAsync(_managedKnownHostsPath);
+            _managedKnownHostsPath = null;
+        }
+    }
+
+    private async Task SshModeChangedAsync()
+    {
+        _error = null;
+        if (_advancedSshSetup)
+        {
+            if (_sshPrivateKey is not null)
+                CryptographicOperations.ZeroMemory(_sshPrivateKey);
+            _sshPrivateKey = null;
+            _sshPrivateKeyName = null;
+            _sshPublicKey = string.Empty;
+            await SshEndpointChangedAsync();
+        }
+        else
+        {
+            _sshHostFingerprint = string.Empty;
+            _privateKeySecretReference = string.Empty;
+            _knownHostsSecretReference = string.Empty;
+        }
+    }
+
+    private async Task PrepareManagedSshSettingsAsync()
+    {
+        RsyncSshHostKeyCandidate candidate = SelectedHostKey
+            ?? throw new InvalidOperationException(R("Web_ExternalStorage_SshHostKeyNotFound"));
+        if (!_hostKeyConfirmed || _sshPrivateKey is null)
+            throw new InvalidOperationException(R("Web_ExternalStorage_SshSetupIncomplete"));
+        _managedKnownHostsPath ??= await RsyncSshSetup.PersistKnownHostAsync(candidate);
+        _sshHostFingerprint = candidate.FingerprintSha256;
+        _knownHostsSecretReference = _managedKnownHostsPath;
+        _privateKeySecretReference = string.Empty;
+    }
+
+    private async Task ResetGuidedSshStateAsync()
+    {
+        if (_sshPrivateKey is not null)
+            CryptographicOperations.ZeroMemory(_sshPrivateKey);
+        _sshPrivateKey = null;
+        _sshPrivateKeyName = null;
+        _sshPublicKey = string.Empty;
+        _hostKeyCandidates = [];
+        _selectedHostFingerprint = string.Empty;
+        _hostKeyConfirmed = false;
+        if (_managedKnownHostsPath is not null)
+            await RsyncSshSetup.DeleteManagedKnownHostAsync(_managedKnownHostsPath);
+        _managedKnownHostsPath = null;
+        _advancedSshSetup = false;
+    }
+
+    private void SelectConnection(StorageConnection connection)
+    {
+        _selected = connection;
+        _testSucceeded = _testFailed = false;
+    }
+
+    private static string SetupError(Exception exception)
+        => exception is ProtocolConfigurationException configuration
+            ? R($"Web_ExternalStorage_SshSetupError_{configuration.Code}")
+            : R("Web_ExternalStorage_SshSetupError");
+
+    public async ValueTask DisposeAsync() => await ResetGuidedSshStateAsync();
 }

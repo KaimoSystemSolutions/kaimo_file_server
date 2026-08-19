@@ -126,55 +126,6 @@ public sealed class SmbStorageConnectionProvider(
         | StorageProviderCapabilities.Sync;
 }
 
-public sealed class NfsStorageConnectionProvider(IProtocolCommandRunner commandRunner)
-    : IStorageConnectionProvider
-{
-    public string Id => "nfs";
-    public string DisplayName => "NFS";
-    public StorageProviderCapabilities Capabilities => SmbStorageConnectionProvider.ReadOnlyCapabilities
-        | StorageProviderCapabilities.Sync
-        | StorageProviderCapabilities.DirectFileAccess;
-    public IReadOnlySet<StorageAuthorizationMode> AuthorizationModes { get; }
-        = new HashSet<StorageAuthorizationMode> { StorageAuthorizationMode.NetworkIdentity };
-
-    public Task<IStorageSession> OpenSessionAsync(
-        StorageConnection connection,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        SmbStorageConnectionProvider.ValidateConnection(connection, Id, StorageAuthorizationMode.NetworkIdentity);
-        var settings = ProtocolConnectionSettings.Parse<NfsConnectionSettings>(connection.SettingsJson, "NFS");
-        SmbStorageConnectionProvider.ValidateHost(settings.Server);
-        SmbStorageConnectionProvider.ValidatePort(settings.Port);
-        if (settings.MinimumMajorVersion < 4)
-            throw new ProtocolConfigurationException("nfs_version_unsafe", "NFSv4 or newer is required.");
-        if (settings.RequireKerberos)
-            throw new ProtocolConfigurationException(
-                "nfs_kerberos_unavailable",
-                "Kerberos-backed NFS requires a configured runtime identity and is not available yet.");
-        IRemoteFileStore files = new NfsCommandRemoteFileStore(settings, commandRunner);
-        return Task.FromResult<IStorageSession>(new ProtocolStorageSession(connection.Id, Capabilities, files));
-    }
-
-    public async Task<StorageConnectionHealthResult> TestAsync(
-        StorageConnection connection,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            await using IStorageSession session = await OpenSessionAsync(connection, cancellationToken);
-            await session.RemoteFiles!.ListAsync("/", cancellationToken);
-            return SmbStorageConnectionProvider.Healthy();
-        }
-        catch (ProtocolConfigurationException exception) { return SmbStorageConnectionProvider.Invalid(exception); }
-        catch (IOException) { return SmbStorageConnectionProvider.Unavailable("nfs_connection_failed"); }
-        catch (UnauthorizedAccessException) { return SmbStorageConnectionProvider.Unavailable("nfs_access_denied"); }
-    }
-
-    public Task RevokeAsync(StorageConnection connection, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
-}
-
 public interface IProtocolCommandRunner
 {
     Task<ProtocolCommandResult> RunAsync(
@@ -459,71 +410,6 @@ internal sealed class SmbCommandRemoteFileStore(
     internal static string QuoteLocal(string value) => $"\"{value}\"";
 }
 
-internal sealed partial class NfsCommandRemoteFileStore(
-    NfsConnectionSettings settings,
-    IProtocolCommandRunner runner) : IRemoteFileStore
-{
-    public async Task<IReadOnlyList<RemoteStorageItem>> ListAsync(
-        string path,
-        CancellationToken cancellationToken = default)
-    {
-        string normalized = Normalize(path);
-        ProtocolCommandResult result = await runner.RunAsync("nfs-ls", [BuildUrl(normalized)], cancellationToken);
-        var items = new List<RemoteStorageItem>();
-        foreach (string line in result.StandardOutput.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
-        {
-            Match match = NfsListing().Match(line.Trim());
-            if (!match.Success)
-                continue;
-            string name = match.Groups["name"].Value.TrimEnd('/').Split('/').Last();
-            if (name is "." or ".." || name.Length == 0)
-                continue;
-            bool directory = match.Groups["mode"].Value.StartsWith('d');
-            long? size = long.TryParse(match.Groups["size"].Value, out long parsed) ? parsed : null;
-            string child = normalized.TrimEnd('/') + "/" + name;
-            items.Add(new RemoteStorageItem(name, child, directory, directory ? null : size, null));
-        }
-        return items;
-    }
-
-    public async Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
-    {
-        string temporary = ProtocolTemporaryFile.CreatePath();
-        try
-        {
-            await runner.RunAsync("nfs-cp", [BuildUrl(Normalize(path)), temporary], cancellationToken);
-            return ProtocolTemporaryFile.OpenDeleteOnClose(temporary);
-        }
-        catch { File.Delete(temporary); throw; }
-    }
-
-    public Task WriteAsync(string path, Stream content, bool overwrite, CancellationToken cancellationToken = default)
-        => throw new NotSupportedException("Direct NFS connections are currently read-only.");
-    public Task CreateDirectoryAsync(string path, CancellationToken cancellationToken = default)
-        => throw new NotSupportedException("Direct NFS connections are currently read-only.");
-    public Task DeleteAsync(string path, bool recursive, CancellationToken cancellationToken = default)
-        => throw new NotSupportedException("Direct NFS connections are currently read-only.");
-    public Task MoveAsync(string sourcePath, string destinationPath, CancellationToken cancellationToken = default)
-        => throw new NotSupportedException("Direct NFS connections are currently read-only.");
-
-    private string BuildUrl(string path)
-    {
-        string host = settings.Port == 2049 ? settings.Server : $"{settings.Server}:{settings.Port}";
-        return $"nfs://{host}{path}?version={settings.MinimumMajorVersion}";
-    }
-
-    private static string Normalize(string path)
-    {
-        string normalized = string.IsNullOrWhiteSpace(path) ? "/" : "/" + path.Replace('\\', '/').Trim('/');
-        if (normalized.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(segment => segment is "." or ".."))
-            throw new ProtocolConfigurationException("remote_path_invalid", "The NFS path is invalid.");
-        return normalized;
-    }
-
-    [GeneratedRegex("^(?<mode>[d-][rwxstST-]{9})\\s+\\d+\\s+\\d+\\s+\\d+\\s+(?<size>\\d+)\\s+(?<name>.+)$")]
-    private static partial Regex NfsListing();
-}
-
 internal sealed class ProtocolStorageSession(
     Guid connectionId,
     StorageProviderCapabilities capabilities,
@@ -569,6 +455,25 @@ internal static class ProtocolTemporaryFile
         {
             await writer.WriteAsync(content.AsMemory(), cancellationToken);
         }
+    }
+
+    public static async Task WriteRestrictedBytesAsync(
+        string path,
+        ReadOnlyMemory<byte> content,
+        CancellationToken cancellationToken)
+    {
+        FileStream stream = OperatingSystem.IsWindows()
+            ? new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, true)
+            : new FileStream(path, new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
+                Options = FileOptions.Asynchronous,
+                UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+            });
+        await using (stream)
+            await stream.WriteAsync(content, cancellationToken);
     }
 }
 

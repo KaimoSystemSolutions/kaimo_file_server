@@ -2306,6 +2306,7 @@
   <data name="Web_ExternalStorage_BrowseUnsupported" xml:space="preserve"><value>This provider does not support remote browsing.</value></data>
   <data name="Web_ExternalStorage_SyncUnsupported" xml:space="preserve"><value>This provider does not support synchronization.</value></data>
   <data name="Web_ExternalStorage_ReadOnlyPullRequired" xml:space="preserve"><value>This connection supports pull synchronization only.</value></data>
+  <data name="Web_ExternalStorage_RsyncDirectionRequired" xml:space="preserve"><value>Rsync connections require an explicit pull or push direction; two-way synchronization is not supported.</value></data>
   <data name="Web_ExternalStorage_VirtualShareUnsupported" xml:space="preserve"><value>This provider cannot be used for virtual shares.</value></data>
   <data name="Web_ExternalStorage_AuthorizeUnsupported" xml:space="preserve"><value>This connection does not support interactive authorization.</value></data>
   <data name="Web_ExternalStorage_Capability_Browse" xml:space="preserve"><value>Browse</value></data>
@@ -2324,24 +2325,20 @@
   <data name="Web_ExternalStorage_Capability_RequiresHostMount" xml:space="preserve"><value>Operator-managed mount</value></data>
   <data name="Web_ExternalStorage_Capability_OptimizedSync" xml:space="preserve"><value>Optimized synchronization</value></data>
   <data name="Web_ExternalStorage_ConnectionSettings" xml:space="preserve"><value>Protocol settings (JSON)</value></data>
-  <data name="Web_ExternalStorage_ConnectionSettingsHelp" xml:space="preserve"><value>Use only operator-managed mount attestations or absolute secret-file references. Never enter a password or private key.</value></data>
+  <data name="Web_ExternalStorage_ConnectionSettingsHelp" xml:space="preserve"><value>Enter only the documented provider settings. Secrets must be stored through the credential vault or referenced by an absolute secret-file path.</value></data>
   <data name="Web_ExternalStorage_Server" xml:space="preserve"><value>Server / IP address</value></data>
   <data name="Web_ExternalStorage_Port" xml:space="preserve"><value>Port</value></data>
   <data name="Web_ExternalStorage_Domain" xml:space="preserve"><value>Domain (optional)</value></data>
   <data name="Web_ExternalStorage_SmbShare" xml:space="preserve"><value>SMB share</value></data>
-  <data name="Web_ExternalStorage_NfsExport" xml:space="preserve"><value>NFS export</value></data>
   <data name="Web_ExternalStorage_Username" xml:space="preserve"><value>Username</value></data>
   <data name="Web_ExternalStorage_Password" xml:space="preserve"><value>Password</value></data>
   <data name="Web_ExternalStorage_ExpectedServerIdentity" xml:space="preserve"><value>Expected server identity</value></data>
   <data name="Web_ExternalStorage_MountPath" xml:space="preserve"><value>Local mount path</value></data>
   <data name="Web_ExternalStorage_AttestationPath" xml:space="preserve"><value>Mount attestation file</value></data>
   <data name="Web_ExternalStorage_MinimumDialect" xml:space="preserve"><value>Minimum SMB version</value></data>
-  <data name="Web_ExternalStorage_NfsVersion" xml:space="preserve"><value>Minimum NFS version</value></data>
-  <data name="Web_ExternalStorage_RequireKerberos" xml:space="preserve"><value>Require Kerberos</value></data>
   <data name="Web_ExternalStorage_ReadOnly" xml:space="preserve"><value>Read only</value></data>
-  <data name="Web_ExternalStorage_InvalidCredentials" xml:space="preserve"><value>Enter a username and password for the SMB connection.</value></data>
+  <data name="Web_ExternalStorage_InvalidCredentials" xml:space="preserve"><value>Enter a valid username and password for this connection.</value></data>
   <data name="Web_ExternalStorage_SmbSharePickerHelp" xml:space="preserve"><value>Available SMB shares are loaded after connecting and can be selected when configuring a sync.</value></data>
-  <data name="Web_ExternalStorage_NfsExportPickerHelp" xml:space="preserve"><value>Available NFS exports and folders are loaded after connecting and can be selected when configuring a consumer.</value></data>
   <data name="Web_ExternalStorage_RuntimeIdentity" xml:space="preserve"><value>Runtime network identity</value></data>
   <data name="Web_ExternalStorage_Auth_NetworkIdentity" xml:space="preserve"><value>Network identity</value></data>
   <data name="Web_ExternalStorage_Capability_DirectFileAccess" xml:space="preserve"><value>Direct protocol access</value></data>
@@ -2350,4 +2347,36 @@
   <data name="Web_ExternalStorage_Identity" xml:space="preserve"><value>Identity and authorization</value></data>
   <data name="Web_ExternalStorage_CapabilitiesAndUsage" xml:space="preserve"><value>Capabilities and usage</value></data>
   <data name="Web_ExternalStorage_SelectSyncHint" xml:space="preserve"><value>Select Edit on a synchronization to open its settings.</value></data>
+  <data name="Web_ExternalStorage_RemoteRoot" xml:space="preserve"><value>Remote root</value></data>
+  <data name="Web_ExternalStorage_SshHostFingerprint" xml:space="preserve"><value>SSH host-key fingerprint (SHA-256)</value></data>
+  <data name="Web_ExternalStorage_PrivateKeySecretReference" xml:space="preserve"><value>Private-key secret file</value></data>
+  <data name="Web_ExternalStorage_KnownHostsSecretReference" xml:space="preserve"><value>Known-hosts secret file</value></data>
+  <data name="Web_ExternalStorage_RsyncSshHelp" xml:space="preserve"><value>Use absolute paths to read-only secret files. The pinned SHA-256 fingerprint must match the selected host entry in the known-hosts file.</value></data>
+  <data name="Web_ExternalStorage_SecretFileReferences" xml:space="preserve"><value>External secret files</value></data>
+  <data name="Web_ExternalStorage_SshKeySetup" xml:space="preserve"><value>Guided SSH setup</value></data>
+  <data name="Web_ExternalStorage_SshKeySetupHelp" xml:space="preserve"><value>Upload or generate a key, install the public key on the remote account, and explicitly verify the server identity.</value></data>
+  <data name="Web_ExternalStorage_SshAdvancedMode" xml:space="preserve"><value>Use external secret files</value></data>
+  <data name="Web_ExternalStorage_SshPrivateKey" xml:space="preserve"><value>Prepare the client key</value></data>
+  <data name="Web_ExternalStorage_SshPrivateKeyHelp" xml:space="preserve"><value>Upload an unencrypted OpenSSH private key or generate a new Ed25519 key. The private key is encrypted in the connection vault.</value></data>
+  <data name="Web_ExternalStorage_SshGenerateKey" xml:space="preserve"><value>Generate Ed25519 key</value></data>
+  <data name="Web_ExternalStorage_SshGeneratedKeyReady" xml:space="preserve"><value>Generated key is ready</value></data>
+  <data name="Web_ExternalStorage_SshPublicKey" xml:space="preserve"><value>Public key to install on the server</value></data>
+  <data name="Web_ExternalStorage_CopyPublicKey" xml:space="preserve"><value>Copy public key</value></data>
+  <data name="Web_ExternalStorage_SshHostVerification" xml:space="preserve"><value>Verify the SSH server</value></data>
+  <data name="Web_ExternalStorage_SshHostVerificationHelp" xml:space="preserve"><value>Retrieve the public host key, compare its fingerprint through an independent trusted channel, and confirm it below. Retrieval alone does not establish trust.</value></data>
+  <data name="Web_ExternalStorage_SshFetchHostKey" xml:space="preserve"><value>Retrieve host key</value></data>
+  <data name="Web_ExternalStorage_SshHostKey" xml:space="preserve"><value>Available host key</value></data>
+  <data name="Web_ExternalStorage_SshConfirmFingerprint" xml:space="preserve"><value>I verified this fingerprint through a trusted channel.</value></data>
+  <data name="Web_ExternalStorage_SshHostKeyNotFound" xml:space="preserve"><value>No usable SSH host key was returned. Check the server and port.</value></data>
+  <data name="Web_ExternalStorage_SshSetupIncomplete" xml:space="preserve"><value>Complete the SSH key and host-verification steps first.</value></data>
+  <data name="Web_ExternalStorage_InvalidPrivateKey" xml:space="preserve"><value>Select a valid SSH private key no larger than 1 MiB.</value></data>
+  <data name="Web_ExternalStorage_SshSetupError" xml:space="preserve"><value>The SSH setup step could not be completed.</value></data>
+  <data name="Web_ExternalStorage_SshSetupError_private_key_invalid" xml:space="preserve"><value>The private key is invalid, unsupported, or protected by a passphrase. Use an unencrypted OpenSSH key.</value></data>
+  <data name="Web_ExternalStorage_SshSetupError_key_generation_failed" xml:space="preserve"><value>The server could not generate an SSH key.</value></data>
+  <data name="Web_ExternalStorage_SshSetupError_host_key_discovery_failed" xml:space="preserve"><value>No SSH host key could be retrieved. Check the endpoint and firewall.</value></data>
+  <data name="Web_ExternalStorage_SshSetupError_host_key_invalid" xml:space="preserve"><value>The selected SSH host key is invalid.</value></data>
+  <data name="Web_ExternalStorage_SshSetupError_helper_unavailable" xml:space="preserve"><value>The required OpenSSH setup tool is unavailable on the server.</value></data>
+  <data name="Web_ExternalStorage_SshSetupError_helper_timeout" xml:space="preserve"><value>The SSH setup request timed out.</value></data>
+  <data name="Web_ExternalStorage_TestSuccessful" xml:space="preserve"><value>Connection successful</value></data>
+  <data name="Web_ExternalStorage_TestFailed" xml:space="preserve"><value>Connection test failed</value></data>
 </root>

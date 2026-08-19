@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.RegularExpressions;
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 
 namespace Kaimo_File_Server.Infrastructure.ExternalStorage;
@@ -16,28 +16,37 @@ public interface IRsyncProcessRunner
         CancellationToken cancellationToken);
 }
 
-public sealed partial class RsyncSshStorageConnectionProvider(IRsyncProcessRunner processRunner)
+public sealed class RsyncSshStorageConnectionProvider(
+    IRsyncProcessRunner processRunner,
+    ICredentialVault? credentialVault = null,
+    IRsyncSshSetupService? setupService = null)
     : IStorageConnectionProvider
 {
     public string Id => "rsync-ssh";
     public string DisplayName => "rsync / SSH";
-    // Native execution is deliberately not advertised as a generic Sync yet:
-    // rsync bypasses the file-service ACL/versioning pipeline. A later isolated
-    // helper may opt in after it can preserve those application guarantees.
-    public StorageProviderCapabilities Capabilities => StorageProviderCapabilities.OptimizedSync;
+    // Native rsync is intentionally sync-only: it does not provide the
+    // item-level file contract required by browsing and virtual shares.
+    public StorageProviderCapabilities Capabilities => StorageProviderCapabilities.Sync
+        | StorageProviderCapabilities.OptimizedSync
+        | StorageProviderCapabilities.Read
+        | StorageProviderCapabilities.Write;
     public IReadOnlySet<StorageAuthorizationMode> AuthorizationModes { get; }
         = new HashSet<StorageAuthorizationMode> { StorageAuthorizationMode.SshKey };
 
-    public Task<IStorageSession> OpenSessionAsync(
+    public async Task<IStorageSession> OpenSessionAsync(
         StorageConnection connection,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var settings = ParseAndValidate(connection);
-        IStorageSession session = new RsyncSshStorageSession(
+        (settings, string? temporaryKey) = await ResolvePrivateKeyAsync(
+            connection, settings, cancellationToken);
+        IStorageSession session = new RsyncOptimizedStorageSession(
             connection.Id,
-            new RsyncSshOptimizedSync(settings, processRunner));
-        return Task.FromResult(session);
+            Capabilities,
+            new RsyncSshOptimizedSync(settings, processRunner),
+            temporaryKey);
+        return session;
     }
 
     public async Task<StorageConnectionHealthResult> TestAsync(
@@ -47,10 +56,20 @@ public sealed partial class RsyncSshStorageConnectionProvider(IRsyncProcessRunne
         try
         {
             var settings = ParseAndValidate(connection);
-            bool connected = await processRunner.TestSshAsync(settings, cancellationToken);
-            return connected
-                ? SmbStorageConnectionProvider.Healthy()
-                : SmbStorageConnectionProvider.Unavailable("ssh_connection_failed");
+            (settings, string? temporaryKey) = await ResolvePrivateKeyAsync(
+                connection, settings, cancellationToken);
+            try
+            {
+                bool connected = await processRunner.TestSshAsync(settings, cancellationToken);
+                return connected
+                    ? SmbStorageConnectionProvider.Healthy()
+                    : SmbStorageConnectionProvider.Unavailable("ssh_connection_failed");
+            }
+            finally
+            {
+                if (temporaryKey is not null)
+                    File.Delete(temporaryKey);
+            }
         }
         catch (ProtocolConfigurationException exception)
         {
@@ -66,115 +85,79 @@ public sealed partial class RsyncSshStorageConnectionProvider(IRsyncProcessRunne
         }
     }
 
-    public Task RevokeAsync(StorageConnection connection, CancellationToken cancellationToken = default)
-        => Task.CompletedTask;
+    public async Task RevokeAsync(StorageConnection connection, CancellationToken cancellationToken = default)
+    {
+        if (setupService is null)
+            return;
+        try
+        {
+            var settings = ProtocolConnectionSettings.Parse<RsyncSshConnectionSettings>(
+                connection.SettingsJson, "rsync over SSH");
+            await setupService.DeleteManagedKnownHostAsync(settings.KnownHostsSecretReference);
+        }
+        catch (ProtocolConfigurationException)
+        {
+            // Revocation is best-effort for an already-invalid connection.
+        }
+        catch (IOException)
+        {
+            // Revocation is best-effort after the connection record was deleted.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Revocation is best-effort after the connection record was deleted.
+        }
+        catch (ArgumentException)
+        {
+            // Revocation is best-effort for malformed legacy paths.
+        }
+    }
 
     internal static RsyncSshConnectionSettings ParseAndValidate(StorageConnection connection)
-    {
-        if (!string.Equals(connection.ProviderId, "rsync-ssh", StringComparison.OrdinalIgnoreCase)
-            || connection.AuthorizationMode != StorageAuthorizationMode.SshKey)
-            throw new ProtocolConfigurationException("connection_mode_invalid", "The connection mode is invalid for rsync over SSH.");
-        var settings = ProtocolConnectionSettings.Parse<RsyncSshConnectionSettings>(
-            connection.SettingsJson, "rsync over SSH");
-        SmbStorageConnectionProvider.ValidateHost(settings.Host);
-        if (settings.Port is < 1 or > 65535)
-            throw new ProtocolConfigurationException("port_invalid", "The SSH port is invalid.");
-        if (string.IsNullOrWhiteSpace(settings.Username) || !UsernamePattern().IsMatch(settings.Username))
-            throw new ProtocolConfigurationException("username_invalid", "The SSH username is invalid.");
-        ValidateRemotePath(settings.RemoteRoot);
-        ValidatePinnedHostKey(settings);
-        ValidateSecretFile(settings.PrivateKeySecretReference, privateKey: true);
-        ValidateSecretFile(settings.KnownHostsSecretReference, privateKey: false);
-        return settings;
-    }
+        => PinnedSshSettings.ParseAndValidate(connection, "rsync-ssh", requireKnownHosts: true);
 
-    private static void ValidatePinnedHostKey(RsyncSshConnectionSettings settings)
+    private async Task<(RsyncSshConnectionSettings Settings, string? TemporaryKey)> ResolvePrivateKeyAsync(
+        StorageConnection connection,
+        RsyncSshConnectionSettings settings,
+        CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(settings.ExpectedHostKeySha256)
-            || !settings.ExpectedHostKeySha256.StartsWith("SHA256:", StringComparison.Ordinal)
-            || settings.ExpectedHostKeySha256.Length is < 20 or > 100)
-            throw new ProtocolConfigurationException("host_key_invalid", "A SHA-256 SSH host-key fingerprint is required.");
-        ValidateSecretFile(settings.KnownHostsSecretReference, privateKey: false);
-        string expectedHost = settings.Port == 22 ? settings.Host : $"[{settings.Host}]:{settings.Port}";
-        bool matchedHost = false;
-        foreach (string line in File.ReadLines(settings.KnownHostsSecretReference))
+        if (!string.IsNullOrWhiteSpace(settings.PrivateKeySecretReference))
+            return (settings, null);
+        if (!PinnedSshSettings.TryReadVaultPrivateKey(connection, credentialVault, out byte[] privateKey))
+            throw new ProtocolConfigurationException(
+                "private_key_missing", "The SSH private key is missing.");
+        string temporary = ProtocolTemporaryFile.CreatePath();
+        try
         {
-            string trimmed = line.Trim();
-            if (trimmed.Length == 0 || trimmed.StartsWith('#'))
-                continue;
-            string[] fields = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (fields.Length < 3 || fields[0].StartsWith('|'))
-                continue;
-            if (!fields[0].Split(',').Contains(expectedHost, StringComparer.OrdinalIgnoreCase))
-                continue;
-            matchedHost = true;
-            try
-            {
-                byte[] key = Convert.FromBase64String(fields[2]);
-                string fingerprint = "SHA256:" + Convert.ToBase64String(SHA256.HashData(key)).TrimEnd('=');
-                if (CryptographicOperations.FixedTimeEquals(
-                        Encoding.ASCII.GetBytes(fingerprint),
-                        Encoding.ASCII.GetBytes(settings.ExpectedHostKeySha256)))
-                    return;
-            }
-            catch (FormatException)
-            {
-                throw new ProtocolConfigurationException("known_hosts_invalid", "The SSH known-hosts file is invalid.");
-            }
+            await ProtocolTemporaryFile.WriteRestrictedBytesAsync(
+                temporary, privateKey, cancellationToken);
+            return (settings with { PrivateKeySecretReference = temporary }, temporary);
         }
-        throw new ProtocolConfigurationException(
-            matchedHost ? "host_key_mismatch" : "host_key_missing",
-            "The pinned SSH host identity does not match the known-hosts secret.");
-    }
-
-    private static void ValidateSecretFile(string path, bool privateKey)
-    {
-        if (string.IsNullOrWhiteSpace(path)
-            || !Path.IsPathFullyQualified(path)
-            || path.IndexOfAny(['\r', '\n']) >= 0
-            || !File.Exists(path))
-            throw new ProtocolConfigurationException("secret_reference_invalid", "The SSH secret reference is invalid.");
-        if (!OperatingSystem.IsWindows())
+        finally
         {
-            UnixFileMode mode = File.GetUnixFileMode(path);
-            UnixFileMode forbidden = privateKey
-                ? UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute
-                  | UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute
-                : UnixFileMode.GroupWrite | UnixFileMode.OtherWrite;
-            if ((mode & forbidden) != 0)
-                throw new ProtocolConfigurationException("secret_permissions_unsafe", "The SSH secret file permissions are unsafe.");
+            CryptographicOperations.ZeroMemory(privateKey);
         }
-        if (new FileInfo(path).Length is <= 0 or > 1024 * 1024)
-            throw new ProtocolConfigurationException("secret_reference_invalid", "The SSH secret file is empty or too large.");
     }
-
-    internal static void ValidateRemotePath(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path)
-            || !path.StartsWith('/')
-            || path.Length > 4096
-            || !RemotePathPattern().IsMatch(path)
-            || path.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(segment => segment is "." or ".."))
-            throw new ProtocolConfigurationException("remote_path_invalid", "The rsync remote path is invalid.");
-    }
-
-    [GeneratedRegex("^[A-Za-z_][A-Za-z0-9._-]{0,63}$", RegexOptions.CultureInvariant)]
-    private static partial Regex UsernamePattern();
-
-    [GeneratedRegex("^/[A-Za-z0-9._/-]*$", RegexOptions.CultureInvariant)]
-    private static partial Regex RemotePathPattern();
 }
 
-internal sealed class RsyncSshStorageSession(Guid connectionId, IOptimizedStorageSync optimizedSync)
+internal sealed class RsyncOptimizedStorageSession(
+    Guid connectionId,
+    StorageProviderCapabilities capabilities,
+    IOptimizedStorageSync optimizedSync,
+    string? temporaryPrivateKey = null)
     : IStorageSession
 {
     public Guid ConnectionId { get; } = connectionId;
-    public StorageProviderCapabilities Capabilities =>
-        StorageProviderCapabilities.OptimizedSync;
+    public StorageProviderCapabilities Capabilities { get; } = capabilities;
     public IRemoteFileStore? RemoteFiles => null;
     public IOptimizedStorageSync OptimizedSync { get; } = optimizedSync;
     IOptimizedStorageSync? IStorageSession.OptimizedSync => OptimizedSync;
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        if (temporaryPrivateKey is not null)
+            File.Delete(temporaryPrivateKey);
+        return ValueTask.CompletedTask;
+    }
 }
 
 internal sealed class RsyncSshOptimizedSync(
@@ -207,16 +190,51 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
         CancellationToken cancellationToken)
     {
         string localPath = ResolveLocalPath(request.LocalRootPath, request.LocalRelativePath);
-        RsyncSshStorageConnectionProvider.ValidateRemotePath(request.RemotePath);
+        PinnedSshSettings.ValidateRemotePath(request.RemotePath);
         string remotePath = CombineRemote(settings.RemoteRoot, request.RemotePath);
         string remote = $"{settings.Username}@{settings.Host}:{remotePath.TrimEnd('/')}/";
         string local = Path.TrimEndingDirectorySeparator(localPath) + Path.DirectorySeparatorChar;
         string remoteShell = BuildRemoteShell(settings);
-        var arguments = new List<string> { "--archive", "--protect-args", "-e", remoteShell };
-        if (request.DeleteExtraneousFiles)
-            arguments.Insert(2, "--delete");
+        var arguments = BuildTransferArguments(request);
+        // Abort a transfer that stalls with no I/O so a hung remote cannot pin
+        // the operation open indefinitely; ssh ConnectTimeout only guards setup.
+        arguments.Add("--timeout=300");
+        arguments.AddRange(["-e", remoteShell]);
         arguments.Add("--");
-        if (request.Direction == OptimizedSyncDirection.Pull)
+        AddEndpoints(arguments, request.Direction, local, remote);
+        await RunAsync("rsync", arguments, cancellationToken, throwOnFailure: true);
+    }
+
+    private static List<string> BuildTransferArguments(OptimizedSyncRequest request)
+    {
+        var arguments = new List<string> { "--archive", "--protect-args" };
+        if (request.DeleteExtraneousFiles)
+            arguments.Add("--delete");
+        if (request.MaximumFileSizeBytes is > 0)
+            arguments.Add($"--max-size={request.MaximumFileSizeBytes.Value}");
+        if (request.MaximumTransferBytesPerSecond is > 0)
+            arguments.Add($"--bwlimit={Math.Max(1, request.MaximumTransferBytesPerSecond.Value / 1024)}");
+        foreach (string extension in request.ExcludedExtensions ?? [])
+        {
+            string normalized = extension.Trim().TrimStart('.');
+            if (normalized.Length == 0
+                || normalized.Length > 32
+                || normalized.Any(character => !char.IsAsciiLetterOrDigit(character)
+                    && character is not '_' and not '-'))
+                throw new ProtocolConfigurationException(
+                    "exclude_invalid", "An excluded file extension is invalid.");
+            arguments.Add($"--exclude=*.{normalized}");
+        }
+        return arguments;
+    }
+
+    private static void AddEndpoints(
+        ICollection<string> arguments,
+        OptimizedSyncDirection direction,
+        string local,
+        string remote)
+    {
+        if (direction == OptimizedSyncDirection.Pull)
         {
             arguments.Add(remote);
             arguments.Add(local);
@@ -226,30 +244,38 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
             arguments.Add(local);
             arguments.Add(remote);
         }
-        await RunAsync("rsync", arguments, cancellationToken, throwOnFailure: true);
     }
 
-    private static List<string> BuildSshArguments(RsyncSshConnectionSettings settings) =>
-    [
-        "-o", "BatchMode=yes",
-        "-o", "StrictHostKeyChecking=yes",
-        "-o", $"UserKnownHostsFile={settings.KnownHostsSecretReference}",
-        "-o", "PasswordAuthentication=no",
-        "-o", "KbdInteractiveAuthentication=no",
-        "-i", settings.PrivateKeySecretReference,
-        "-p", settings.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)
-    ];
+    private static List<string> BuildSshArguments(RsyncSshConnectionSettings settings)
+    {
+        string privateKey = settings.PrivateKeySecretReference
+            ?? throw new ProtocolConfigurationException("private_key_missing", "The SSH private key is missing.");
+        return
+        [
+            "-o", "BatchMode=yes",
+            "-o", "ConnectTimeout=15",
+            "-o", "IdentitiesOnly=yes",
+            "-o", "StrictHostKeyChecking=yes",
+            "-o", $"UserKnownHostsFile={settings.KnownHostsSecretReference}",
+            "-o", "PasswordAuthentication=no",
+            "-o", "KbdInteractiveAuthentication=no",
+            "-i", privateKey,
+            "-p", settings.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        ];
+    }
 
     private static string BuildRemoteShell(RsyncSshConnectionSettings settings)
     {
         // rsync parses -e as one command string. Secret paths are therefore
         // deliberately restricted to shell-neutral absolute paths.
-        if (!ShellNeutralPath(settings.PrivateKeySecretReference)
+        if (string.IsNullOrWhiteSpace(settings.PrivateKeySecretReference)
+            || !ShellNeutralPath(settings.PrivateKeySecretReference)
             || !ShellNeutralPath(settings.KnownHostsSecretReference))
             throw new ProtocolConfigurationException(
                 "secret_path_unsafe",
                 "SSH secret references used by rsync must contain only shell-neutral path characters.");
-        return $"ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "
+        return $"ssh -o BatchMode=yes -o ConnectTimeout=15 -o IdentitiesOnly=yes "
+               + "-o StrictHostKeyChecking=yes "
                + $"-o UserKnownHostsFile={settings.KnownHostsSecretReference} "
                + "-o PasswordAuthentication=no -o KbdInteractiveAuthentication=no "
                + $"-i {settings.PrivateKeySecretReference} -p {settings.Port}";
@@ -271,17 +297,32 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
         if (!string.Equals(candidate, root, comparison)
             && !candidate.StartsWith(root + Path.DirectorySeparatorChar, comparison))
             throw new ProtocolConfigurationException("local_path_invalid", "The local sync path escapes its share root.");
-        if (!Directory.Exists(candidate)
-            || (File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0
-            || (File.GetAttributes(candidate) & FileAttributes.ReparsePoint) != 0)
+        if (!Directory.Exists(candidate) || ContainsReparsePoint(root, candidate))
             throw new ProtocolConfigurationException("local_path_invalid", "The local sync path is unavailable or symbolic.");
         return candidate;
+    }
+
+    private static bool ContainsReparsePoint(string root, string candidate)
+    {
+        if ((File.GetAttributes(root) & FileAttributes.ReparsePoint) != 0)
+            return true;
+        string relative = Path.GetRelativePath(root, candidate);
+        string current = root;
+        foreach (string segment in relative.Split(
+                     [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                return true;
+        }
+        return false;
     }
 
     private static string CombineRemote(string root, string child)
     {
         string combined = root.TrimEnd('/') + "/" + child.Trim('/');
-        RsyncSshStorageConnectionProvider.ValidateRemotePath(combined);
+        PinnedSshSettings.ValidateRemotePath(combined);
         return combined;
     }
 
@@ -296,7 +337,9 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            CreateNoWindow = true
+            CreateNoWindow = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
         };
         foreach (string argument in arguments)
             startInfo.ArgumentList.Add(argument);
@@ -311,8 +354,8 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
             throw new ProtocolConfigurationException("helper_unavailable", "The required protocol helper is unavailable.", exception);
         }
 
-        Task<string> stderr = process.StandardError.ReadToEndAsync(cancellationToken);
-        Task<string> stdout = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        Task<string> stderr = ReadBoundedAsync(process.StandardError, cancellationToken);
+        Task<string> stdout = ReadBoundedAsync(process.StandardOutput, cancellationToken);
         try
         {
             await process.WaitForExitAsync(cancellationToken);
@@ -333,5 +376,22 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
             throw new IOException($"The rsync helper failed with exit code {process.ExitCode}.");
         }
         return process.ExitCode;
+    }
+
+    private static async Task<string> ReadBoundedAsync(
+        StreamReader reader,
+        CancellationToken cancellationToken)
+    {
+        char[] buffer = new char[1024];
+        var result = new StringBuilder();
+        while (true)
+        {
+            int read = await reader.ReadAsync(buffer.AsMemory(), cancellationToken);
+            if (read == 0)
+                return result.ToString();
+            int remaining = MaximumDiagnosticCharacters - result.Length;
+            if (remaining > 0)
+                result.Append(buffer, 0, Math.Min(read, remaining));
+        }
     }
 }
