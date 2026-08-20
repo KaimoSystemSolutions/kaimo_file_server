@@ -2386,4 +2386,6 @@
   <data name="Web_ExternalStorage_TestFailed" xml:space="preserve"><value>Connection test failed</value></data>
   <data name="Web_ExternalStorage_NoConnectionSelected" xml:space="preserve"><value>No connection selected</value></data>
   <data name="Web_ExternalStorage_NoConnectionSelectedHint" xml:space="preserve"><value>Select a connection from the list to view its details, test connectivity, or manage its settings.</value></data>
+  <data name="Web_ExternalStorage_WebDavServerUrl" xml:space="preserve"><value>Server URL</value></data>
+  <data name="Web_ExternalStorage_WebDavHelp" xml:space="preserve"><value>Enter the full WebDAV endpoint URL. Credentials are stored encrypted in the connection vault. HTTPS is strongly recommended.</value></data>
 </root>

@@ -11,6 +11,9 @@ public sealed record SmbConnectionSettings(
     bool RequireSigning = true,
     bool RequireEncryption = true);
 
+public sealed record WebDavConnectionSettings(
+    string ServerUrl);
+
 public sealed record RsyncSshConnectionSettings(
     string Host,
     int Port,

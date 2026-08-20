@@ -115,6 +115,7 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IStorageConnectionProvider, SmbStorageConnectionProvider>();
             services.AddScoped<IStorageConnectionProvider, RsyncSshStorageConnectionProvider>();
             services.AddScoped<IStorageConnectionProvider, SftpStorageConnectionProvider>();
+            services.AddScoped<IStorageConnectionProvider, WebDavStorageConnectionProvider>();
         services.AddScoped<IStorageConnectionProviderCatalog, StorageConnectionProviderCatalog>();
         services.AddScoped<IStorageDirectoryTargetResolver, StorageDirectoryTargetResolver>();
         return services;
