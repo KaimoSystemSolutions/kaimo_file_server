@@ -266,7 +266,7 @@ public sealed class ProtocolStorageProviderTests : IDisposable
     [Fact]
     public void VirtualShare_MapsRemotePermissionFailureToExplicitUserMessage()
     {
-        string message = OneDriveCloudAccessFileBrowserViewModel.WriteError(
+        string message = RemoteCloudAccessFileBrowserViewModel.WriteError(
             new RemoteStorageAccessDeniedException("denied"), "fallback");
 
         Assert.Equal(

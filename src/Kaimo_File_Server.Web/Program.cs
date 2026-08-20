@@ -187,7 +187,7 @@ builder.Services.AddScoped<CloudSyncViewModel>();
 builder.Services.AddScoped<ExternalStorageSyncViewModel>();
 builder.Services.AddScoped<CloudAccessViewModel>();
 builder.Services.AddScoped<CloudAccessShareBrowserViewModel>();
-builder.Services.AddScoped<OneDriveCloudAccessFileBrowserViewModel>();
+builder.Services.AddScoped<RemoteCloudAccessFileBrowserViewModel>();
 
 // ShareListViewModel receives configured pool destinations. File I/O itself
 // always uses the absolute path persisted on the selected share.

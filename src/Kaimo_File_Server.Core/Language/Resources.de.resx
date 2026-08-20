@@ -2176,7 +2176,10 @@
   <data name="Web_CloudAccess_CopySuccess" xml:space="preserve"><value>Die entfernten Elemente wurden in den lokalen Share kopiert.</value></data>
   <data name="Web_CloudAccess_Error_InvalidShare" xml:space="preserve"><value>Der virtuelle Share ist ungültig.</value></data>
   <data name="Web_CloudAccess_Error_InvalidPath" xml:space="preserve"><value>Der angeforderte Pfad ist ungültig.</value></data>
-  <data name="Web_CloudAccess_Error_LoadShare" xml:space="preserve"><value>Der OneDrive-Share konnte nicht geladen werden.</value></data>
+  <data name="Web_CloudAccess_Error_LoadShare" xml:space="preserve"><value>Der virtuelle Share konnte nicht geladen werden.</value></data>
+  <data name="Web_CloudAccess_Error_ConnectionDisabled" xml:space="preserve"><value>Dieser virtuelle Share kann nicht geöffnet werden, da seine Speicherverbindung „{0}“ deaktiviert ist. Bitte lassen Sie die Verbindung von einem Administrator wieder aktivieren.</value></data>
+  <data name="Web_CloudAccess_Error_ConnectionNeedsAuthorization" xml:space="preserve"><value>Dieser virtuelle Share kann nicht geöffnet werden, da seine Speicherverbindung „{0}“ noch autorisiert werden muss. Bitte lassen Sie einen Administrator die Verbindung erneut anmelden.</value></data>
+  <data name="Web_CloudAccess_Error_ConnectionUnavailable" xml:space="preserve"><value>Dieser virtuelle Share kann nicht geöffnet werden, da seine Speicherverbindung „{0}“ derzeit nicht verfügbar ist. Bitte versuchen Sie es später erneut oder wenden Sie sich an einen Administrator.</value></data>
   <data name="Web_CloudAccess_Error_CreateFolder" xml:space="preserve"><value>Der Ordner konnte nicht erstellt werden.</value></data>
   <data name="Web_CloudAccess_Error_Delete" xml:space="preserve"><value>Das Element konnte nicht gelöscht werden.</value></data>
   <data name="Web_CloudAccess_Error_Rename" xml:space="preserve"><value>Das Element konnte nicht umbenannt werden.</value></data>

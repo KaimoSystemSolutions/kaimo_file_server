@@ -2176,7 +2176,10 @@
   <data name="Web_CloudAccess_CopySuccess" xml:space="preserve"><value>The remote items were copied to the local share.</value></data>
   <data name="Web_CloudAccess_Error_InvalidShare" xml:space="preserve"><value>The virtual share is invalid.</value></data>
   <data name="Web_CloudAccess_Error_InvalidPath" xml:space="preserve"><value>The requested path is invalid.</value></data>
-  <data name="Web_CloudAccess_Error_LoadShare" xml:space="preserve"><value>The OneDrive share could not be loaded.</value></data>
+  <data name="Web_CloudAccess_Error_LoadShare" xml:space="preserve"><value>The virtual share could not be loaded.</value></data>
+  <data name="Web_CloudAccess_Error_ConnectionDisabled" xml:space="preserve"><value>This virtual share cannot be opened because its storage connection "{0}" is disabled. Please ask an administrator to re-enable the connection.</value></data>
+  <data name="Web_CloudAccess_Error_ConnectionNeedsAuthorization" xml:space="preserve"><value>This virtual share cannot be opened because its storage connection "{0}" still needs to be authorized. Please ask an administrator to sign in to the connection again.</value></data>
+  <data name="Web_CloudAccess_Error_ConnectionUnavailable" xml:space="preserve"><value>This virtual share cannot be opened because its storage connection "{0}" is currently unavailable. Please try again later or contact an administrator.</value></data>
   <data name="Web_CloudAccess_Error_CreateFolder" xml:space="preserve"><value>The folder could not be created.</value></data>
   <data name="Web_CloudAccess_Error_Delete" xml:space="preserve"><value>The item could not be deleted.</value></data>
   <data name="Web_CloudAccess_Error_Rename" xml:space="preserve"><value>The item could not be renamed.</value></data>
