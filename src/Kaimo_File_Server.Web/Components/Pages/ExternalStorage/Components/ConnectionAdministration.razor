@@ -59,6 +59,13 @@ else
                     <label><span>@R("Web_ExternalStorage_MinimumDialect")</span><select class="edit-input" @bind="_minimumDialect"><option value="3.0">SMB 3.0</option><option value="3.02">SMB 3.0.2</option><option value="3.1.1">SMB 3.1.1</option></select></label>
                     <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_SmbSharePickerHelp")</p>
                 }
+                else if (IsWebDavProvider)
+                {
+                    <label><span>@R("Web_ExternalStorage_WebDavServerUrl")</span><input class="edit-input" maxlength="2048" placeholder="https://cloud.example.com/remote.php/dav/files/user/" @bind="_serverUrl" /></label>
+                    <label><span>@R("Web_ExternalStorage_Username")</span><input class="edit-input" maxlength="256" autocomplete="username" @bind="_username" /></label>
+                    <label><span>@R("Web_ExternalStorage_Password")</span><input class="edit-input" type="password" maxlength="4096" autocomplete="new-password" @bind="_password" /></label>
+                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_WebDavHelp")</p>
+                }
                 else if (UsesPinnedSshSetup)
                 {
                     <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="backup.example.com" @bind="_server" @bind:after="SshEndpointChangedAsync" /></label>
@@ -248,6 +255,7 @@ else
     private string _domain = string.Empty;
     private int _port = 445;
     private string _minimumDialect = "3.1.1";
+    private string _serverUrl = string.Empty;
     private string _remoteRoot = "/";
     private string _sshHostFingerprint = string.Empty;
     private string _privateKeySecretReference = string.Empty;
@@ -278,6 +286,7 @@ else
     private bool IsSmbProvider => string.Equals(_provider, "smb", StringComparison.OrdinalIgnoreCase);
     private bool IsRsyncSshProvider => string.Equals(_provider, "rsync-ssh", StringComparison.OrdinalIgnoreCase);
     private bool IsSftpProvider => string.Equals(_provider, "sftp", StringComparison.OrdinalIgnoreCase);
+    private bool IsWebDavProvider => string.Equals(_provider, "webdav", StringComparison.OrdinalIgnoreCase);
     // rsync-over-SSH and SFTP share the identical pinned-SSH setup (key + host key).
     private bool UsesPinnedSshSetup => IsRsyncSshProvider || IsSftpProvider;
     private bool CanCreate => !string.IsNullOrWhiteSpace(_name)
@@ -286,6 +295,9 @@ else
                               && (SelectedProviderUsesInteractiveAuthorization
                                   || (IsSmbProvider && !string.IsNullOrWhiteSpace(_server)
                                       && _port is >= 1 and <= 65535
+                                      && !string.IsNullOrWhiteSpace(_username)
+                                      && !string.IsNullOrEmpty(_password))
+                                  || (IsWebDavProvider && !string.IsNullOrWhiteSpace(_serverUrl)
                                       && !string.IsNullOrWhiteSpace(_username)
                                       && !string.IsNullOrEmpty(_password))
                                   || (UsesPinnedSshSetup && !string.IsNullOrWhiteSpace(_server)
@@ -321,10 +333,11 @@ else
             if (UsesPinnedSshSetup && !_advancedSshSetup)
                 await PrepareManagedSshSettingsAsync();
             string settingsJson = BuildSettingsJson();
+            bool usesUsernamePassword = IsSmbProvider || IsWebDavProvider;
             await VM.CreateConfiguredConnectionAsync(
                 _provider, _name, _departmentId, settingsJson,
-                IsSmbProvider ? _username : null,
-                IsSmbProvider ? _password : null,
+                usesUsernamePassword ? _username : null,
+                usesUsernamePassword ? _password : null,
                 IsSmbProvider ? _domain : null,
                 UsesPinnedSshSetup && !_advancedSshSetup ? _sshPrivateKey : null);
             if (_sshPrivateKey is not null)
@@ -367,6 +380,7 @@ else
             await ResetGuidedSshStateAsync();
         _port = IsSmbProvider ? 445 : UsesPinnedSshSetup ? 22 : _port;
         _remoteRoot = "/";
+        _serverUrl = string.Empty;
     }
     private async Task ActAsync(Func<Task> action)
     {
@@ -380,6 +394,11 @@ else
     }
     private string BuildSettingsJson()
     {
+        if (IsWebDavProvider)
+            return System.Text.Json.JsonSerializer.Serialize(new
+            {
+                ServerUrl = _serverUrl.Trim()
+            });
         if (IsSmbProvider)
             return System.Text.Json.JsonSerializer.Serialize(new
             {
@@ -407,7 +426,7 @@ else
     {
         await ResetGuidedSshStateAsync();
         _creating = false;
-        _name = _settingsJson = _server = _username = _password = _domain = string.Empty;
+        _name = _settingsJson = _server = _username = _password = _domain = _serverUrl = string.Empty;
         _sshHostFingerprint = _privateKeySecretReference = _knownHostsSecretReference = string.Empty;
         _remoteRoot = "/";
         _port = 445;
@@ -426,6 +445,7 @@ else
         "smb" => "connection_smb.svg",
         "rsync-ssh" => "connection_rsync.svg",
         "sftp" => "connection_sftp.svg",
+        "webdav" => "connection_webdav.svg",
         "onedrive" => "connection_onedrive.svg",
         "google" or "googledrive" => "connection_google.svg",
         _ => "cloud-download.svg"
@@ -435,6 +455,7 @@ else
         "smb" => "var(--provider-smb, #5b7fa4)",
         "rsync-ssh" => "var(--provider-rsync, #6a9a5b)",
         "sftp" => "var(--provider-sftp, #8b6baf)",
+        "webdav" => "var(--provider-webdav, #2e8b57)",
         "onedrive" => "var(--provider-onedrive, #0078d4)",
         "google" or "googledrive" => "var(--provider-google, #e67c35)",
         _ => "var(--text-secondary)"

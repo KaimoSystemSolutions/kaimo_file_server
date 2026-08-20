@@ -2361,4 +2361,6 @@
   <data name="Web_ExternalStorage_TestFailed" xml:space="preserve"><value>Verbindungstest fehlgeschlagen</value></data>
   <data name="Web_ExternalStorage_NoConnectionSelected" xml:space="preserve"><value>Keine Verbindung ausgewählt</value></data>
   <data name="Web_ExternalStorage_NoConnectionSelectedHint" xml:space="preserve"><value>Wählen Sie eine Verbindung aus der Liste, um Details anzuzeigen, die Konnektivität zu testen oder Einstellungen zu verwalten.</value></data>
+  <data name="Web_ExternalStorage_WebDavServerUrl" xml:space="preserve"><value>Server-URL</value></data>
+  <data name="Web_ExternalStorage_WebDavHelp" xml:space="preserve"><value>Geben Sie die vollständige WebDAV-Endpunkt-URL ein. Zugangsdaten werden verschlüsselt im Verbindungs-Tresor gespeichert. HTTPS wird dringend empfohlen.</value></data>
 </root>
