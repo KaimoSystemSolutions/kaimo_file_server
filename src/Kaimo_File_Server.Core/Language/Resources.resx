@@ -2107,6 +2107,8 @@
   <data name="Web_CloudAccess_DeleteConnectionConfirm" xml:space="preserve"><value>Delete connection '{0}' and all of its virtual shares?</value></data>
   <data name="Web_CloudAccess_Shares" xml:space="preserve"><value>Virtual shares</value></data>
   <data name="Web_CloudAccess_NoShares" xml:space="preserve"><value>No virtual shares have been created.</value></data>
+  <data name="Web_CloudAccess_NoReadyConnections" xml:space="preserve"><value>No connections are available. Create and authorize a connection before creating a virtual share.</value></data>
+  <data name="Web_CloudAccess_GoToConnections" xml:space="preserve"><value>Go to Connections</value></data>
   <data name="Web_CloudAccess_CreateShareHelp" xml:space="preserve"><value>Select a connected account and expose one of its remote folders in the web file browser.</value></data>
   <data name="Web_CloudAccess_Connection" xml:space="preserve"><value>Connection</value></data>
   <data name="Web_CloudAccess_ShareName" xml:space="preserve"><value>Share name</value></data>

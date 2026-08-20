@@ -18,18 +18,20 @@
 
 @if (Embedded && VirtualSharesOnly)
 {
-    <div class="virtual-share-toolbar">
+    <div class="page-header vs-page-header">
         <div>
             <h1>@R("Web_Shares_VirtualShares")</h1>
             <p class="subtitle">@R("Web_CloudAccess_Subtitle")</p>
         </div>
-        @if (VM.CanManageVirtualShares && VM.CanUseConnections)
-        {
-            <button class="btn-primary" type="button" disabled="@(!VM.Connections.Any(IsReady))" @onclick="ToggleShareForm">
-                @Assets.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
-                <span>@R("Web_CloudAccess_AddShare")</span>
-            </button>
-        }
+        <div class="page-header-actions">
+            @if (VM.CanManageVirtualShares && VM.CanUseConnections)
+            {
+                <button class="btn-primary vs-create-button" type="button" @onclick="ToggleShareForm">
+                    @Assets.SVG("plus.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                    <span>@R("Web_CloudAccess_AddShare")</span>
+                </button>
+            }
+        </div>
     </div>
 }
 
@@ -116,91 +118,146 @@ else
 
     @if (_showShareForm)
     {
-        <section class="create-form-card cloud-access-create-card">
-            <div class="detail-header">
-                <h3>@R("Web_CloudAccess_AddShare")</h3>
-                <span class="detail-subtitle">@R("Web_CloudAccess_CreateShareHelp")</span>
+        @if (!VM.Connections.Any(IsReady))
+        {
+            <div class="vs-no-connections-banner">
+                <p>@R("Web_CloudAccess_NoReadyConnections")</p>
+                <a href="/external-storage?tab=connections" class="btn-secondary vs-connections-link">
+                    @Assets.SVG("arrow_right.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                    <span>@R("Web_CloudAccess_GoToConnections")</span>
+                </a>
             </div>
-            <div class="cloud-access-form">
-                <label>
-                    <span class="detail-label">@R("Web_CloudAccess_Connection")</span>
-                    <select class="edit-input" value="@_shareConnectionId" @onchange="ConnectionChangedAsync">
-                        <option value="@Guid.Empty">@R("Web_CloudAccess_Select")</option>
-                        @foreach (var connection in VM.Connections.Where(connection =>
-                                      IsReady(connection) && VM.Supports(connection, StorageProviderCapabilities.Browse)))
-                        {
-                            <option value="@connection.Id">@ConnectionDisplay(connection)</option>
-                        }
-                    </select>
-                </label>
-                <label>
-                    <span class="detail-label">@R("Web_CloudAccess_ShareName")</span>
-                    <input class="edit-input" @bind="_shareName" @bind:event="oninput" maxlength="200" />
-                </label>
-                <label>
-                    <span class="detail-label">@R("Web_CloudAccess_AccessMode")</span>
-                    <select class="edit-input" @bind="_readOnly">
-                        <option value="false">@R("Web_CloudAccess_ReadWrite")</option>
-                        <option value="true">@R("Web_CloudAccess_ReadOnly")</option>
-                    </select>
-                </label>
-                <label class="cloud-access-folder-field">
-                    <span class="detail-label">@R("Web_CloudAccess_RemoteFolder")</span>
-                    <div class="cloud-access-path">
-                        <input class="edit-input" value="@_remoteRoot" readonly />
-                        <button class="btn-secondary" type="button" disabled="@(_shareConnectionId == Guid.Empty)" @onclick="OpenPickerAsync">@R("Web_CloudAccess_Browse")</button>
-                    </div>
-                </label>
-            </div>
-
-            @if (_shareConnectionId != Guid.Empty)
-            {
-                <div class="detail-section cloud-access-principal-editor">
-                    <span class="detail-label">@R("Web_CloudAccess_Access")</span>
-                    <p class="share-help-text">@R("Web_CloudAccess_AccessHelp")</p>
-                    <select class="edit-input"
-                            aria-label="@R("Web_CloudAccess_Access")"
-                            value="@Guid.Empty"
-                            @onchange="AddCreatePrincipal">
-                        <option value="@Guid.Empty">@R("Web_CloudAccess_PrincipalPlaceholder")</option>
-                        @foreach (var principal in AvailableUnselectedPrincipals(_principalIds))
-                        {
-                            <option value="@principal.Id">@PrincipalDisplay(principal)</option>
-                        }
-                    </select>
-                    @PrincipalList(_principalIds, RemoveCreatePrincipal)
+        }
+        else
+        {
+            <section class="create-form-card cloud-access-create-card">
+                <div class="detail-header">
+                    <h3>@R("Web_CloudAccess_AddShare")</h3>
+                    <span class="detail-subtitle">@R("Web_CloudAccess_CreateShareHelp")</span>
                 </div>
-            }
+                <div class="cloud-access-form">
+                    <label>
+                        <span class="detail-label">@R("Web_CloudAccess_Connection")</span>
+                        <select class="edit-input" value="@_shareConnectionId" @onchange="ConnectionChangedAsync">
+                            <option value="@Guid.Empty">@R("Web_CloudAccess_Select")</option>
+                            @foreach (var connection in VM.Connections.Where(connection =>
+                                          IsReady(connection) && VM.Supports(connection, StorageProviderCapabilities.Browse)))
+                            {
+                                <option value="@connection.Id">@ConnectionDisplay(connection)</option>
+                            }
+                        </select>
+                    </label>
+                    <label>
+                        <span class="detail-label">@R("Web_CloudAccess_ShareName")</span>
+                        <input class="edit-input" @bind="_shareName" @bind:event="oninput" maxlength="200" />
+                    </label>
+                    <label>
+                        <span class="detail-label">@R("Web_CloudAccess_AccessMode")</span>
+                        <select class="edit-input" @bind="_readOnly">
+                            <option value="false">@R("Web_CloudAccess_ReadWrite")</option>
+                            <option value="true">@R("Web_CloudAccess_ReadOnly")</option>
+                        </select>
+                    </label>
+                    <label class="cloud-access-folder-field">
+                        <span class="detail-label">@R("Web_CloudAccess_RemoteFolder")</span>
+                        <div class="cloud-access-path">
+                            <input class="edit-input" value="@_remoteRoot" readonly />
+                            <button class="btn-secondary" type="button" disabled="@(_shareConnectionId == Guid.Empty)" @onclick="OpenPickerAsync">@R("Web_CloudAccess_Browse")</button>
+                        </div>
+                    </label>
+                </div>
 
-            <div class="detail-actions cloud-access-form-actions">
-                <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CloseShareForm">@Resources.Web_Button_Cancel</button>
-                <button class="btn-primary" type="button" disabled="@(_busy || !CanCreateShare)" @onclick="CreateShareAsync">@Resources.Web_Button_Create</button>
-            </div>
-        </section>
+                @if (_shareConnectionId != Guid.Empty)
+                {
+                    <div class="detail-section cloud-access-principal-editor">
+                        <span class="detail-label">@R("Web_CloudAccess_Access")</span>
+                        <p class="share-help-text">@R("Web_CloudAccess_AccessHelp")</p>
+                        <select class="edit-input"
+                                aria-label="@R("Web_CloudAccess_Access")"
+                                value="@Guid.Empty"
+                                @onchange="AddCreatePrincipal">
+                            <option value="@Guid.Empty">@R("Web_CloudAccess_PrincipalPlaceholder")</option>
+                            @foreach (var principal in AvailableUnselectedPrincipals(_principalIds))
+                            {
+                                <option value="@principal.Id">@PrincipalDisplay(principal)</option>
+                            }
+                        </select>
+                        @PrincipalList(_principalIds, RemoveCreatePrincipal)
+                    </div>
+                }
+
+                <div class="detail-actions cloud-access-form-actions">
+                    <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CloseShareForm">@Resources.Web_Button_Cancel</button>
+                    <button class="btn-primary" type="button" disabled="@(_busy || !CanCreateShare)" @onclick="CreateShareAsync">@Resources.Web_Button_Create</button>
+                </div>
+            </section>
+        }
     }
 
-    <div class="admin-content cloud-access-workspace">
-        <section class="cloud-access-share-list" aria-label="@R("Web_CloudAccess_Shares")">
-            <div class="cloud-access-list-header">@R("Web_CloudAccess_Shares")</div>
-            @if (VM.Shares.Count == 0)
-            {
-                <div class="detail-empty"><p>@R("Web_CloudAccess_NoShares")</p></div>
-            }
-            else
-            {
-                @foreach (var share in VM.Shares)
+    @if (Embedded && VirtualSharesOnly && !VM.Shares.Any() && !_showShareForm)
+    {
+        <div class="empty-state">
+            @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 64, Height: 64, Color: "var(--text-tertiary)"))
+            <p>@R("Web_CloudAccess_NoShares")</p>
+        </div>
+    }
+    else if (VM.Shares.Any() || !(Embedded && VirtualSharesOnly))
+    {
+    <div class="admin-content @(Embedded && VirtualSharesOnly ? "vs-workspace" : "cloud-access-workspace")">
+        @if (Embedded && VirtualSharesOnly)
+        {
+            <div class="vs-share-table" role="listbox" aria-label="@R("Web_CloudAccess_Shares")">
+                <div class="vs-table-header" aria-hidden="true">
+                    <span>@Resources.Web_ShareList_Label_Name</span>
+                    <span>@R("Web_CloudAccess_AccessMode")</span>
+                </div>
+                <div class="vs-table-body">
+                    @foreach (var share in VM.Shares)
+                    {
+                        var isSelected = _selectedShare?.Id == share.Id;
+                        <button class="vs-table-row @(isSelected ? "vs-table-row--selected" : "")"
+                                type="button" role="option" aria-selected="@isSelected"
+                                @onclick="() => SelectShareAsync(share)" @ondblclick="() => OpenShare(share)">
+                            <span class="vs-table-cell vs-table-name">
+                                <span class="vs-share-icon" aria-hidden="true">
+                                    @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 24, Height: 24))
+                                </span>
+                                <span class="vs-share-name" title="@share.Name">@share.Name</span>
+                            </span>
+                            <span class="vs-table-cell">
+                                <span class="vs-access-mode">
+                                    @(share.IsReadOnly ? R("Web_CloudAccess_ReadOnly") : R("Web_CloudAccess_ReadWrite"))
+                                </span>
+                            </span>
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <section class="cloud-access-share-list" aria-label="@R("Web_CloudAccess_Shares")">
+                <div class="cloud-access-list-header">@R("Web_CloudAccess_Shares")</div>
+                @if (VM.Shares.Count == 0)
                 {
-                    <button class="cloud-access-share-row @(_selectedShare?.Id == share.Id ? "cloud-access-share-row--selected" : "")"
-                            type="button" @onclick="() => SelectShareAsync(share)" @ondblclick="() => OpenShare(share)">
-                        @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 22, Height: 22))
-                        <span><strong>@share.Name</strong><small>@share.RemoteRootPath</small></span>
-                        <span class="share-state">@(share.IsReadOnly ? R("Web_CloudAccess_ReadOnly") : R("Web_CloudAccess_ReadWrite"))</span>
-                    </button>
+                    <div class="detail-empty"><p>@R("Web_CloudAccess_NoShares")</p></div>
                 }
-            }
-        </section>
+                else
+                {
+                    @foreach (var share in VM.Shares)
+                    {
+                        <button class="cloud-access-share-row @(_selectedShare?.Id == share.Id ? "cloud-access-share-row--selected" : "")"
+                                type="button" @onclick="() => SelectShareAsync(share)" @ondblclick="() => OpenShare(share)">
+                            @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 22, Height: 22))
+                            <span><strong>@share.Name</strong><small>@share.RemoteRootPath</small></span>
+                            <span class="share-state">@(share.IsReadOnly ? R("Web_CloudAccess_ReadOnly") : R("Web_CloudAccess_ReadWrite"))</span>
+                        </button>
+                    }
+                }
+            </section>
+        }
 
-        <aside class="admin-detail cloud-access-detail-pane">
+        <aside class="admin-detail @(Embedded && VirtualSharesOnly ? "vs-detail-pane" : "cloud-access-detail-pane")">
             @if (_selectedShare is not null)
             {
                 <div class="detail-header">
@@ -277,6 +334,7 @@ else
             }
         </aside>
     </div>
+    }
 
     @if (!VirtualSharesOnly)
     {

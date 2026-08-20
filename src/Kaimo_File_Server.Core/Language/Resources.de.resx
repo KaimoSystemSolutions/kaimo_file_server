@@ -2107,6 +2107,8 @@
   <data name="Web_CloudAccess_DeleteConnectionConfirm" xml:space="preserve"><value>Verbindung „{0}“ und alle zugehörigen virtuellen Shares löschen?</value></data>
   <data name="Web_CloudAccess_Shares" xml:space="preserve"><value>Virtuelle Shares</value></data>
   <data name="Web_CloudAccess_NoShares" xml:space="preserve"><value>Noch keine virtuellen Shares vorhanden.</value></data>
+  <data name="Web_CloudAccess_NoReadyConnections" xml:space="preserve"><value>Keine Verbindungen verfügbar. Erstelle und autorisiere zuerst eine Verbindung, bevor du einen virtuellen Share anlegst.</value></data>
+  <data name="Web_CloudAccess_GoToConnections" xml:space="preserve"><value>Zu den Verbindungen</value></data>
   <data name="Web_CloudAccess_CreateShareHelp" xml:space="preserve"><value>Eine verbundene Cloud auswählen und einen ihrer entfernten Ordner im Web-Dateibrowser bereitstellen.</value></data>
   <data name="Web_CloudAccess_Connection" xml:space="preserve"><value>Verbindung</value></data>
   <data name="Web_CloudAccess_ShareName" xml:space="preserve"><value>Share-Name</value></data>
