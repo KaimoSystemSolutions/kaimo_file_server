@@ -23,6 +23,8 @@ public partial class Settings
                 _activeTab = SettingsTab.DataServices;
             else if (VM.CanManageCertificates)
                 _activeTab = SettingsTab.Certificate;
+            else if (VM.CanManageBackups)
+                _activeTab = SettingsTab.Backup;
         }
 
         _initialLoadComplete = true;
@@ -61,5 +63,6 @@ internal enum SettingsTab
     Search,
     CloudAccess,
     Logging,
-    Certificate
+    Certificate,
+    Backup
 }

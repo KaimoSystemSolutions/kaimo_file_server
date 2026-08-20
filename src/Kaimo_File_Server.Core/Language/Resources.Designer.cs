@@ -3458,7 +3458,16 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Perm_ViewSystemLogs", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Manage database backups ähnelt.
+        /// </summary>
+        public static string Web_Perm_ManageBackups {
+            get {
+                return ResourceManager.GetString("Web_Perm_ManageBackups", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Manage data services ähnelt.
         /// </summary>

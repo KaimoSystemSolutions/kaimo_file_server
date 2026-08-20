@@ -5,6 +5,7 @@ using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
+using Kaimo_File_Server.Infrastructure.Backup;
 using Kaimo_File_Server.Infrastructure.Clouds;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.ExternalStorage;
@@ -82,6 +83,13 @@ namespace Kaimo_File_Server.Infrastructure
 
             // -- Global log level (cross-process, read by the LoggingLevelReloader) --
             services.AddSingleton<Core.Logging.ILoggingConfigStore, Configuration.LoggingConfigStore>();
+
+            // -- Database backup (pg_dump/pg_restore). Used by the Host (scheduled/
+            //    pre-migration/restore) and the Web UI (manual create + download). --
+            services.AddSingleton<Backup.IProcessRunner, Backup.ProcessRunner>();
+            services.AddSingleton<Backup.IDatabaseBackupService, Backup.DatabaseBackupService>();
+            services.AddSingleton<Backup.IBackupSettingsStore, Backup.BackupSettingsStore>();
+            services.AddSingleton<Backup.BackupSchedulerSignal>();
 
             // -- Seeder --
             services.AddScoped<DatabaseSeeder>();
@@ -169,11 +177,17 @@ namespace Kaimo_File_Server.Infrastructure
         }
 
         /// <summary>
-        /// Applies pending migrations / EnsureCreated and runs the seeder.
-        /// Retries up to 5 times with a 3-second delay for cold-start scenarios
-        /// (e.g. Docker Compose where the DB container isn't ready yet).
+        /// Host-only database ownership: optionally applies a one-shot startup
+        /// restore, takes a safety backup before pending migrations, applies
+        /// migrations, and runs the seeder. Retries up to 5 times with a 3-second
+        /// delay for cold-start scenarios (e.g. Docker Compose where the DB
+        /// container isn't ready yet).
+        ///
+        /// Only the Host calls this. Web and SmbBridge call
+        /// <see cref="WaitForDatabaseReadyAsync"/> instead and never migrate, so
+        /// there is a single, well-defined owner of the schema.
         /// </summary>
-        public static async Task InitializeDatabaseAsync(this IHost host)
+        public static async Task MigrateSeedAndBackupAsync(this IHost host)
         {
             const int maxRetries = 5;
 
@@ -187,34 +201,38 @@ namespace Kaimo_File_Server.Infrastructure
                     using var scope = host.Services.CreateScope();
                     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-                    // Both the Host and the Web app call this on startup and each
-                    // runs MigrateAsync() + the seeder against the same database.
-                    // On a fresh DB they would otherwise race:
-                    //   * migrations: both read an empty __EFMigrationsHistory and
-                    //     apply the full chain concurrently, corrupting each other
-                    //     (e.g. one process drops an index the other hasn't created
-                    //     yet).
-                    //   * seeding: the seeder guards with `if (Users.AnyAsync())
-                    //     return;`, a check-then-insert that only holds if the two
-                    //     processes are serialized — otherwise both insert the
-                    //     'admin' account and hit a duplicate-key violation.
-                    // A Postgres session-level advisory lock serializes them: the
-                    // first process migrates + seeds, the second blocks here and
-                    // then finds migrations already applied (no-op) and rows
-                    // already present (seeder skips).
-                    //
                     // The connection is opened explicitly so it stays the same
                     // physical session for the whole critical section — EF does not
                     // close a connection it did not open, so the advisory lock is
-                    // held across MigrateAsync() and the seeder (which shares this
-                    // scoped DbContext / connection).
+                    // held across restore + MigrateAsync() + the seeder (which share
+                    // this scoped DbContext / connection). The lock also blocks any
+                    // second Host instance from migrating concurrently.
                     await db.Database.OpenConnectionAsync();
                     try
                     {
                         await db.Database.ExecuteSqlRawAsync(
                             "SELECT pg_advisory_lock(hashtext('kaimo_file_server_migrations'))");
 
-                        //await db.Database.EnsureCreatedAsync();
+                        // 1) One-shot startup restore (if requested via config),
+                        //    before any migration. A .done marker prevents a repeat.
+                        bool justRestored = await TryRestoreOnStartupAsync(host, logger);
+
+                        // 2) Pre-migration safety backup: only when there is
+                        //    existing data (applied migrations) AND pending changes.
+                        //    Skipped right after a restore (that dump IS the backup)
+                        //    and on a fresh database (nothing to protect yet).
+                        if (!justRestored)
+                        {
+                            var applied = await db.Database.GetAppliedMigrationsAsync();
+                            var pending = await db.Database.GetPendingMigrationsAsync();
+                            if (applied.Any() && pending.Any())
+                            {
+                                var backup = host.Services.GetRequiredService<IDatabaseBackupService>();
+                                await backup.CreateBackupAsync(BackupTrigger.PreMigration);
+                            }
+                        }
+
+                        // 3) Migrate + seed.
                         await db.Database.MigrateAsync();
                         logger.LogInformation(LogEvents.DatabaseReady, LogMessages.DatabaseReady);
 
@@ -244,6 +262,110 @@ namespace Kaimo_File_Server.Infrastructure
                     await Task.Delay(3000);
                 }
             }
+        }
+
+        /// <summary>
+        /// Non-owner processes (Web, SmbBridge): wait until the Host has applied
+        /// all migrations, then continue. Never migrates or seeds. Polls the
+        /// migration state (no pending migrations) until the Host is done. This is
+        /// the single, orchestration-independent readiness guarantee — it works
+        /// regardless of Docker Compose ordering. Times out after 10 minutes.
+        /// </summary>
+        public static async Task WaitForDatabaseReadyAsync(this IHost host)
+        {
+            var logger = host.Services.GetRequiredService<ILoggerFactory>()
+                .CreateLogger("Kaimo_File_Server.Infrastructure.Database");
+
+            var pollDelay = TimeSpan.FromSeconds(3);
+            var deadline = DateTimeOffset.UtcNow + TimeSpan.FromMinutes(10);
+
+            while (true)
+            {
+                try
+                {
+                    using var scope = host.Services.CreateScope();
+                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+                    if (pending.Count == 0)
+                    {
+                        logger.LogInformation(LogEvents.DatabaseReady, LogMessages.DatabaseReady);
+                        return;
+                    }
+
+                    logger.LogInformation(
+                        "Waiting for the database owner (Host) to finish migrations ({Count} pending).",
+                        pending.Count);
+                }
+                catch (Exception ex) when (ex is Npgsql.NpgsqlException or InvalidOperationException)
+                {
+                    logger.LogInformation(
+                        "Waiting for the database to become reachable: {Message}", ex.Message);
+                }
+
+                if (DateTimeOffset.UtcNow > deadline)
+                    throw new InvalidOperationException(
+                        "Database was not ready (migrations still pending) after waiting. " +
+                        "Ensure the Host process is running and able to migrate.");
+
+                await Task.Delay(pollDelay);
+            }
+        }
+
+        /// <summary>
+        /// Restores a backup on startup when <c>Backup:RestoreFromPath</c> points
+        /// at an existing dump that has not yet been restored (no <c>.done</c>
+        /// marker). Returns <c>true</c> when a restore was performed. Runs under
+        /// the caller's advisory lock, before migrations.
+        /// </summary>
+        private static async Task<bool> TryRestoreOnStartupAsync(IHost host, ILogger logger)
+        {
+            var configuration = host.Services.GetRequiredService<IConfiguration>();
+            var restorePath = configuration["Backup:RestoreFromPath"];
+            if (string.IsNullOrWhiteSpace(restorePath))
+                return false;
+
+            if (!File.Exists(restorePath))
+            {
+                logger.LogWarning(
+                    "Backup:RestoreFromPath is set to '{Path}', but no such file exists. Skipping startup restore.",
+                    restorePath);
+                return false;
+            }
+
+            var markerPath = restorePath + ".done";
+            if (File.Exists(markerPath))
+            {
+                logger.LogInformation(
+                    "Startup restore for '{Path}' was already applied (marker present). Skipping.",
+                    restorePath);
+                return false;
+            }
+
+            logger.LogWarning(
+                "Startup restore requested from '{Path}'. Restoring now — this OVERWRITES the current database.",
+                restorePath);
+
+            var backup = host.Services.GetRequiredService<IDatabaseBackupService>();
+            await backup.RestoreAsync(restorePath);
+
+            try
+            {
+                await File.WriteAllTextAsync(
+                    markerPath,
+                    $"Restored at {DateTimeOffset.UtcNow:O}. Delete this marker to restore the same file again.");
+            }
+            catch (Exception ex)
+            {
+                // A missing marker would re-restore on the next boot. Fail loudly
+                // rather than risk a restore loop.
+                throw new InvalidOperationException(
+                    $"Restore succeeded but the .done marker could not be written at '{markerPath}'. " +
+                    "Refusing to continue to avoid restoring again on the next start.", ex);
+            }
+
+            logger.LogWarning("Startup restore from '{Path}' completed; wrote marker '{Marker}'.",
+                restorePath, markerPath);
+            return true;
         }
 
         public static List<string> GetAllActiveMounts()

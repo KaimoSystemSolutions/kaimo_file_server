@@ -258,6 +258,7 @@ public class UserListViewModel
             new(ManagementPermission.ManageDataServices, Resources.Web_Perm_ManageDataServices),
             new(ManagementPermission.ManageCertificates, Resources.Web_Perm_ManageCertificates),
             new(ManagementPermission.ViewSystemLogs, Resources.Web_Perm_ViewSystemLogs),
+            new(ManagementPermission.ManageBackups, Resources.Web_Perm_ManageBackups),
         ]),
         new(Resources.Web_PermGroup_ExternalStorage,
         [

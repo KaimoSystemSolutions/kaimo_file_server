@@ -3,10 +3,20 @@
 # This stage is used when run by VS in quick mode (default for debug configuration).
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 USER root
-# Npgsql probes GSSAPI during startup. Keep the runtime dependency available so
-# password-authenticated deployments do not emit a native-library load error.
+# Npgsql probes GSSAPI during startup — keep libgssapi-krb5-2 so password-
+# authenticated deployments do not emit a native-library load error.
+# postgresql-client-17 (pg_dump) lets the Web UI create on-demand backups into
+# the shared backup folder (a read-only dump; the destructive restore stays on
+# the Host). Pulled from the PGDG apt repo so the client matches the server.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libgssapi-krb5-2 openssh-client rsync smbclient \
+        libgssapi-krb5-2 openssh-client rsync smbclient ca-certificates curl gnupg \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+        -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" \
+        > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 \
+    && apt-get purge -y --auto-remove curl gnupg \
     && rm -rf /var/lib/apt/lists/*
 USER $APP_UID
 WORKDIR /app

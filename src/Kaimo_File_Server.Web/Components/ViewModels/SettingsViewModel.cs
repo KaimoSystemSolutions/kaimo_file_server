@@ -4,6 +4,7 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.DataServices;
+using Kaimo_File_Server.Infrastructure.Backup;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Infrastructure.Logging;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -27,6 +28,9 @@ public class SettingsViewModel
     private readonly ILoggingConfigStore _loggingStore;
     private readonly LoggingLevelConfigurationSource _loggingSource;
     private readonly ICloudAccessSettingsStore _cloudAccessSettingsStore;
+    private readonly IBackupSettingsStore _backupSettingsStore;
+    private readonly IDatabaseBackupService _backupService;
+    private readonly BackupDownloadTokenService _backupDownloadTokens;
     private readonly ILogger<SettingsViewModel> _logger;
 
     public SettingsViewModel(
@@ -40,6 +44,9 @@ public class SettingsViewModel
         ILoggingConfigStore loggingStore,
         LoggingLevelConfigurationSource loggingSource,
         ICloudAccessSettingsStore cloudAccessSettingsStore,
+        IBackupSettingsStore backupSettingsStore,
+        IDatabaseBackupService backupService,
+        BackupDownloadTokenService backupDownloadTokens,
         ILogger<SettingsViewModel> logger)
     {
         _config = config;
@@ -52,6 +59,9 @@ public class SettingsViewModel
         _loggingStore = loggingStore;
         _loggingSource = loggingSource;
         _cloudAccessSettingsStore = cloudAccessSettingsStore;
+        _backupSettingsStore = backupSettingsStore;
+        _backupService = backupService;
+        _backupDownloadTokens = backupDownloadTokens;
         _logger = logger;
     }
 
@@ -75,8 +85,11 @@ public class SettingsViewModel
     /// <summary>May view and download retained service logs.</summary>
     public bool CanViewLogs { get; private set; }
 
+    /// <summary>May configure, create and download database backups.</summary>
+    public bool CanManageBackups { get; private set; }
+
     /// <summary>True if the user may access the settings page at all.</summary>
-    public bool CanAccessPage => CanManageSettings || CanManageDataServices || CanManageCertificates || CanViewLogs;
+    public bool CanAccessPage => CanManageSettings || CanManageDataServices || CanManageCertificates || CanViewLogs || CanManageBackups;
 
     // ── Language ──
 
@@ -196,6 +209,17 @@ public class SettingsViewModel
     public CloudAccessRuntimeSettings CloudAccessSettings { get; private set; }
         = CloudAccessRuntimeSettings.Default();
 
+    // ── Database backup ──
+
+    /// <summary>Backup schedule/retention working copy edited on the Backup tab.</summary>
+    public BackupSettings BackupSettings { get; private set; } = BackupSettings.Default();
+
+    /// <summary>Existing backups on disk, newest first.</summary>
+    public IReadOnlyList<BackupFileInfo> Backups { get; private set; } = [];
+
+    /// <summary>True while a manual backup is being created.</summary>
+    public bool BackupInProgress { get; private set; }
+
     public static int MinSessionRevalidationSeconds => SessionSecuritySettings.MinRevalidationSeconds;
     public static int MaxSessionRevalidationSeconds => SessionSecuritySettings.MaxRevalidationSeconds;
 
@@ -253,6 +277,12 @@ public class SettingsViewModel
                 RefreshSystemInfo();
             }
 
+            if (CanManageBackups)
+            {
+                BackupSettings = await _backupSettingsStore.GetAsync();
+                RefreshBackups();
+            }
+
             if (CanManageCertificates)
                 await LoadCertificateStateAsync();
 
@@ -288,6 +318,7 @@ public class SettingsViewModel
             CanManageDataServices = false;
             CanManageCertificates = false;
             CanViewLogs = false;
+            CanManageBackups = false;
             return;
         }
 
@@ -299,6 +330,7 @@ public class SettingsViewModel
         CanManageDataServices = permissions.HasFlag(ManagementPermission.ManageDataServices);
         CanManageCertificates = permissions.HasFlag(ManagementPermission.ManageCertificates);
         CanViewLogs = permissions.HasFlag(ManagementPermission.ViewSystemLogs);
+        CanManageBackups = permissions.HasFlag(ManagementPermission.ManageBackups);
     }
 
     private async Task<UserContext?> BuildActorContextAsync()
@@ -548,6 +580,89 @@ public class SettingsViewModel
             _logger.LogError(ex, "Failed to save Cloud Access settings");
             ErrorMessage = R("Web_Settings_CloudAccess_CacheSaveFailed");
             return false;
+        }
+    }
+
+    // ── Database backup ──
+
+    /// <summary>Re-reads the list of backups on disk (newest first).</summary>
+    public void RefreshBackups() => Backups = _backupService.ListBackups();
+
+    /// <summary>
+    /// Builds a short-lived capability URL to download a backup. Authorization is
+    /// enforced here (in the authenticated circuit); the token embeds the file
+    /// name and the controller re-validates it. Returns "" without permission.
+    /// </summary>
+    public string CreateBackupDownloadUrl(string baseUri, string fileName)
+    {
+        if (!CanManageBackups)
+            return "";
+        var token = Uri.EscapeDataString(_backupDownloadTokens.Protect(fileName));
+        return $"{baseUri.TrimEnd('/')}/api/database-backups/download?token={token}";
+    }
+
+    /// <summary>Saves the backup schedule/retention settings.</summary>
+    public async Task<bool> SaveBackupAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!CanManageBackups)
+        {
+            ErrorMessage = Resources.Web_Settings_NoPermissionChange;
+            return false;
+        }
+
+        BackupSettings.Normalize();
+
+        try
+        {
+            await _backupSettingsStore.SetAsync(BackupSettings);
+            _logger.LogInformation(
+                "Backup settings saved (enabled={Enabled}, window={Start}-{End}, keep={Count}/{Days}d).",
+                BackupSettings.Enabled, BackupSettings.WindowStart, BackupSettings.WindowEnd,
+                BackupSettings.RetentionCount, BackupSettings.RetentionDays);
+            SuccessMessage = R("Web_Settings_Backup_Saved");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save backup settings");
+            ErrorMessage = R("Web_Settings_Backup_SaveFailed");
+            return false;
+        }
+    }
+
+    /// <summary>Creates a manual backup immediately and refreshes the list.</summary>
+    public async Task<bool> CreateBackupNowAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!CanManageBackups)
+        {
+            ErrorMessage = Resources.Web_Settings_NoPermissionChange;
+            return false;
+        }
+
+        BackupInProgress = true;
+        try
+        {
+            var created = await _backupService.CreateBackupAsync(BackupTrigger.Manual);
+            _logger.LogInformation("Manual database backup created: {FileName}", created.FileName);
+            RefreshBackups();
+            SuccessMessage = R("Web_Settings_Backup_Created");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Manual database backup failed");
+            ErrorMessage = R("Web_Settings_Backup_CreateFailed");
+            return false;
+        }
+        finally
+        {
+            BackupInProgress = false;
         }
     }
 

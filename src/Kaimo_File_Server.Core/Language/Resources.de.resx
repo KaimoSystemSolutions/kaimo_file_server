@@ -1164,6 +1164,87 @@
   <data name="Web_Perm_ViewSystemLogs" xml:space="preserve">
     <value>Systemprotokolle anzeigen und herunterladen</value>
   </data>
+  <data name="Web_Perm_ManageBackups" xml:space="preserve">
+    <value>Datenbank-Backups verwalten</value>
+  </data>
+  <data name="Web_Settings_Tab_Backup" xml:space="preserve">
+    <value>Datensicherung</value>
+  </data>
+  <data name="Web_Settings_Backup_ScheduleTitle" xml:space="preserve">
+    <value>Geplante Backups</value>
+  </data>
+  <data name="Web_Settings_Backup_ScheduleDescription" xml:space="preserve">
+    <value>Erstellt automatisch einmal täglich innerhalb des eingestellten Zeitfensters ein Datenbank-Backup. War der Server während des Fensters aus, wird das Backup beim nächsten Start innerhalb des Fensters nachgeholt.</value>
+  </data>
+  <data name="Web_Settings_Backup_Enabled" xml:space="preserve">
+    <value>Geplante Backups aktivieren</value>
+  </data>
+  <data name="Web_Settings_Backup_WindowStart" xml:space="preserve">
+    <value>Fensterbeginn</value>
+  </data>
+  <data name="Web_Settings_Backup_WindowEnd" xml:space="preserve">
+    <value>Fensterende</value>
+  </data>
+  <data name="Web_Settings_Backup_RetentionCount" xml:space="preserve">
+    <value>Letzte behalten (Backups)</value>
+  </data>
+  <data name="Web_Settings_Backup_RetentionDays" xml:space="preserve">
+    <value>Löschen nach (Tagen)</value>
+  </data>
+  <data name="Web_Settings_Backup_ManualTitle" xml:space="preserve">
+    <value>Manuelles Backup</value>
+  </data>
+  <data name="Web_Settings_Backup_ManualDescription" xml:space="preserve">
+    <value>Erstellt sofort ein Backup. Es wird zusammen mit den automatischen Backups im Backup-Ordner abgelegt.</value>
+  </data>
+  <data name="Web_Settings_Backup_CreateNow" xml:space="preserve">
+    <value>Backup jetzt erstellen</value>
+  </data>
+  <data name="Web_Settings_Backup_Creating" xml:space="preserve">
+    <value>Backup wird erstellt…</value>
+  </data>
+  <data name="Web_Settings_Backup_ExistingTitle" xml:space="preserve">
+    <value>Vorhandene Backups</value>
+  </data>
+  <data name="Web_Settings_Backup_None" xml:space="preserve">
+    <value>Noch keine Backups vorhanden.</value>
+  </data>
+  <data name="Web_Settings_Backup_Col_Created" xml:space="preserve">
+    <value>Erstellt</value>
+  </data>
+  <data name="Web_Settings_Backup_Col_Type" xml:space="preserve">
+    <value>Typ</value>
+  </data>
+  <data name="Web_Settings_Backup_Col_Size" xml:space="preserve">
+    <value>Größe</value>
+  </data>
+  <data name="Web_Settings_Backup_Download" xml:space="preserve">
+    <value>Herunterladen</value>
+  </data>
+  <data name="Web_Settings_Backup_Trigger_Scheduled" xml:space="preserve">
+    <value>Geplant</value>
+  </data>
+  <data name="Web_Settings_Backup_Trigger_PreMigration" xml:space="preserve">
+    <value>Vor Migration</value>
+  </data>
+  <data name="Web_Settings_Backup_Trigger_Manual" xml:space="preserve">
+    <value>Manuell</value>
+  </data>
+  <data name="Web_Settings_Backup_Saved" xml:space="preserve">
+    <value>Backup-Einstellungen gespeichert.</value>
+  </data>
+  <data name="Web_Settings_Backup_SaveFailed" xml:space="preserve">
+    <value>Backup-Einstellungen konnten nicht gespeichert werden.</value>
+  </data>
+  <data name="Web_Settings_Backup_Created" xml:space="preserve">
+    <value>Backup erfolgreich erstellt.</value>
+  </data>
+  <data name="Web_Settings_Backup_CreateFailed" xml:space="preserve">
+    <value>Backup konnte nicht erstellt werden.</value>
+  </data>
+  <data name="Web_Settings_Backup_InvalidWindow" xml:space="preserve">
+    <value>Bitte eine gültige Start- und Endzeit angeben (HH:mm).</value>
+  </data>
   <data name="Web_Perm_ManageCloudAccess" xml:space="preserve">
     <value>Virtuelle Shares verwalten</value>
   </data>

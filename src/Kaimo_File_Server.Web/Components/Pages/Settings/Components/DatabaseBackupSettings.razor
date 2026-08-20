@@ -1,0 +1,113 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Infrastructure.Backup
+@inject NavigationManager Nav
+
+<div class="detail-section">
+    <span class="detail-label">@R("Web_Settings_Backup_ScheduleTitle")</span>
+    <p class="settings-description">@R("Web_Settings_Backup_ScheduleDescription")</p>
+
+    <div class="service-row">
+        <div class="service-info"><span class="service-name">@R("Web_Settings_Backup_Enabled")</span></div>
+        <label class="toggle-switch" title="@R("Web_Settings_Backup_Enabled")"><input type="checkbox" @bind="VM.BackupSettings.Enabled" /><span class="toggle-slider"></span></label>
+    </div>
+
+    <div class="settings-row settings-row-spaced">
+        <label class="settings-field-label" for="backup-window-start">@R("Web_Settings_Backup_WindowStart")</label>
+        <input id="backup-window-start" type="time" class="edit-input settings-number" @bind="VM.BackupSettings.WindowStart" @bind:format="HH:mm" />
+    </div>
+    <div class="settings-row settings-row-spaced">
+        <label class="settings-field-label" for="backup-window-end">@R("Web_Settings_Backup_WindowEnd")</label>
+        <input id="backup-window-end" type="time" class="edit-input settings-number" @bind="VM.BackupSettings.WindowEnd" @bind:format="HH:mm" />
+    </div>
+
+    <div class="settings-row settings-row-spaced">
+        <label class="settings-field-label" for="backup-retention-count">@R("Web_Settings_Backup_RetentionCount")</label>
+        <input id="backup-retention-count" type="number"
+               min="@BackupSettings.MinRetentionCount" max="@BackupSettings.MaxRetentionCount"
+               class="edit-input settings-number" @bind="VM.BackupSettings.RetentionCount" @bind:event="oninput" />
+    </div>
+    <div class="settings-row settings-row-spaced">
+        <label class="settings-field-label" for="backup-retention-days">@R("Web_Settings_Backup_RetentionDays")</label>
+        <input id="backup-retention-days" type="number"
+               min="@BackupSettings.MinRetentionDays" max="@BackupSettings.MaxRetentionDays"
+               class="edit-input settings-number" @bind="VM.BackupSettings.RetentionDays" @bind:event="oninput" />
+    </div>
+
+    <div class="settings-actions">
+        <button class="btn-primary" @onclick="Save">@Resources.Web_Settings_Button_Save</button>
+    </div>
+</div>
+
+<div class="detail-section">
+    <span class="detail-label">@R("Web_Settings_Backup_ManualTitle")</span>
+    <p class="settings-description">@R("Web_Settings_Backup_ManualDescription")</p>
+    <div class="settings-actions">
+        <button class="btn-primary" @onclick="CreateNow" disabled="@VM.BackupInProgress">
+            @(VM.BackupInProgress ? R("Web_Settings_Backup_Creating") : R("Web_Settings_Backup_CreateNow"))
+        </button>
+    </div>
+</div>
+
+<div class="detail-section">
+    <span class="detail-label">@R("Web_Settings_Backup_ExistingTitle")</span>
+    @if (VM.Backups.Count == 0)
+    {
+        <p class="settings-description">@R("Web_Settings_Backup_None")</p>
+    }
+    else
+    {
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>@R("Web_Settings_Backup_Col_Created")</th>
+                    <th>@R("Web_Settings_Backup_Col_Type")</th>
+                    <th>@R("Web_Settings_Backup_Col_Size")</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var backup in VM.Backups)
+                {
+                    <tr>
+                        <td>@backup.CreatedAtLocal.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@TriggerLabel(backup.Trigger)</td>
+                        <td>@FormatSize(backup.SizeBytes)</td>
+                        <td><a class="btn-secondary" href="@VM.CreateBackupDownloadUrl(Nav.BaseUri, backup.FileName)">@R("Web_Settings_Backup_Download")</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+
+    private async Task Save() { await VM.SaveBackupAsync(); StateHasChanged(); }
+
+    private async Task CreateNow()
+    {
+        StateHasChanged();               // show the disabled/creating state immediately
+        await VM.CreateBackupNowAsync();
+        StateHasChanged();
+    }
+
+    private static string TriggerLabel(BackupTrigger trigger) => trigger switch
+    {
+        BackupTrigger.Scheduled => R("Web_Settings_Backup_Trigger_Scheduled"),
+        BackupTrigger.PreMigration => R("Web_Settings_Backup_Trigger_PreMigration"),
+        BackupTrigger.Manual => R("Web_Settings_Backup_Trigger_Manual"),
+        _ => trigger.ToString(),
+    };
+
+    private static string FormatSize(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        double size = bytes;
+        int unit = 0;
+        while (size >= 1024 && unit < units.Length - 1) { size /= 1024; unit++; }
+        return $"{size:0.#} {units[unit]}";
+    }
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+}

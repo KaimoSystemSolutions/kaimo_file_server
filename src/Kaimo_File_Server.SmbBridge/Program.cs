@@ -80,10 +80,10 @@ builder.WebHost.ConfigureKestrel(options =>
 
 var app = builder.Build();
 
-// P1-11 receipts are part of the bridge's correctness boundary. Do not depend
-// on Host/Web winning startup first; the shared advisory lock makes concurrent
-// migration/seeding safe.
-await app.InitializeDatabaseAsync();
+// The Host process owns the schema (migrations + seeding). The bridge must not
+// migrate; it waits until the Host has finished before serving requests, so its
+// P1-11 receipt tables and everything else are guaranteed to exist.
+await app.WaitForDatabaseReadyAsync();
 
 app.MapGrpcService<AuthGrpcService>();       // Phase 1: NT-Hashes (GetNtHash/ListUsers)
 app.MapGrpcService<AuthzGrpcService>();      // Phase 2: Autorisierung (Connect/Open)
