@@ -24,6 +24,21 @@
             <p class="subtitle">@R("Web_CloudAccess_Subtitle")</p>
         </div>
         <div class="page-header-actions">
+            @if (VM.Shares.Any())
+            {
+                <button class="btn-secondary vs-info-toggle @(_showVirtualShareDetails ? "vs-info-toggle--active" : "")"
+                        type="button"
+                        title="@(_showVirtualShareDetails
+                            ? R("Web_ShareList_Card_HideDetails")
+                            : R("Web_ShareList_Card_ShowDetails"))"
+                        aria-pressed="@_showVirtualShareDetails"
+                        @onclick="ToggleVirtualShareDetails">
+                    @Assets.SVG("circle_info.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                    <span>@(_showVirtualShareDetails
+                        ? R("Web_ShareList_Card_HideDetails")
+                        : R("Web_ShareList_Card_ShowDetails"))</span>
+                </button>
+            }
             @if (VM.CanManageVirtualShares && VM.CanUseConnections)
             {
                 <button class="btn-primary vs-create-button" type="button" @onclick="ToggleShareForm">
@@ -206,15 +221,23 @@ else
     <div class="admin-content @(Embedded && VirtualSharesOnly ? "vs-workspace" : "cloud-access-workspace")">
         @if (Embedded && VirtualSharesOnly)
         {
-            <div class="vs-share-table" role="listbox" aria-label="@R("Web_CloudAccess_Shares")">
+            <div class="vs-share-table @(_showVirtualShareDetails ? "vs-table--extended" : "vs-table--compact")"
+                 role="listbox" aria-label="@R("Web_CloudAccess_Shares")">
                 <div class="vs-table-header" aria-hidden="true">
                     <span>@Resources.Web_ShareList_Label_Name</span>
+                    <span>@Resources.Web_ShareList_Label_Status</span>
                     <span>@R("Web_CloudAccess_AccessMode")</span>
+                    @if (_showVirtualShareDetails)
+                    {
+                        <span>@R("Web_CloudAccess_Connection")</span>
+                    }
                 </div>
                 <div class="vs-table-body">
                     @foreach (var share in VM.Shares)
                     {
                         var isSelected = _selectedShare?.Id == share.Id;
+                        var connection = VM.Connections.FirstOrDefault(x => x.Id == share.ConnectionId);
+                        var isUsable = IsShareUsable(share, connection);
                         <button class="vs-table-row @(isSelected ? "vs-table-row--selected" : "")"
                                 type="button" role="option" aria-selected="@isSelected"
                                 @onclick="() => SelectShareAsync(share)" @ondblclick="() => OpenShare(share)">
@@ -225,10 +248,22 @@ else
                                 <span class="vs-share-name" title="@share.Name">@share.Name</span>
                             </span>
                             <span class="vs-table-cell">
+                                <span class="vs-status @(isUsable ? "vs-status--usable" : "vs-status--unusable")">
+                                    <span class="vs-status-dot" aria-hidden="true"></span>
+                                    <span>@ShareStatusText(share, connection)</span>
+                                </span>
+                            </span>
+                            <span class="vs-table-cell">
                                 <span class="vs-access-mode">
                                     @(share.IsReadOnly ? R("Web_CloudAccess_ReadOnly") : R("Web_CloudAccess_ReadWrite"))
                                 </span>
                             </span>
+                            @if (_showVirtualShareDetails)
+                            {
+                                <span class="vs-table-cell vs-connection" title="@(connection?.Name)">
+                                    @(connection?.Name ?? "—")
+                                </span>
+                            }
                         </button>
                     }
                 </div>
@@ -426,6 +461,7 @@ else
     private bool _editShareReadOnly;
     private Guid? _editingConnectionId;
     private string _editConnectionName = "";
+    private bool _showVirtualShareDetails;
 
     private bool CanConnect => _connectionProvider == "onedrive"
                                && !string.IsNullOrWhiteSpace(_connectionName)
@@ -678,6 +714,28 @@ else
 
     private static bool IsReady(StorageConnection connection)
         => connection.State == StorageConnectionState.Ready;
+
+    private void ToggleVirtualShareDetails() => _showVirtualShareDetails = !_showVirtualShareDetails;
+
+    /// <summary>
+    /// A virtual share is usable only when it is enabled and its backing connection is ready;
+    /// this mirrors the availability semantics of local shares.
+    /// </summary>
+    private static bool IsShareUsable(CloudAccessShare share, StorageConnection? connection)
+        => share.IsEnabled && connection is not null && IsReady(connection);
+
+    /// <summary>
+    /// Resolves the status label shown in the share list. Reuses the local-share wording so both
+    /// share kinds present identical states (available / not available / disabled).
+    /// </summary>
+    private string ShareStatusText(CloudAccessShare share, StorageConnection? connection)
+    {
+        if (!share.IsEnabled)
+            return R("Web_ShareList_Card_Disabled");
+        if (connection is null || !IsReady(connection))
+            return R("Web_ShareList_Card_Unavailable");
+        return R("Web_ShareList_Card_Available");
+    }
 
     private string ConnectionDisplay(StorageConnection connection)
         => $"{connection.Name} · {VM.GetProviderName(connection.ProviderId)}";
