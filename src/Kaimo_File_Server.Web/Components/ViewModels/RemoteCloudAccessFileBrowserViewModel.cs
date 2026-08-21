@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
-public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserViewModelBase, IAsyncDisposable
+public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserViewModelBase, IAsyncDisposable
 {
     private static readonly BrowserCapabilities WritableCapabilities = new()
     {
@@ -30,7 +30,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authenticationState;
     private readonly IStorageConnectionProviderCatalog _providers;
-    private readonly ILogger<OneDriveCloudAccessFileBrowserViewModel> _logger;
+    private readonly ILogger<RemoteCloudAccessFileBrowserViewModel> _logger;
     private readonly CloudAccessDownloadTicketStore _downloadTickets;
     private readonly CloudAccessDirectoryCache _directoryCache;
     private CloudAccessShare? _share;
@@ -38,7 +38,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     private IStorageSession? _session;
     private IRemoteFileStore? _remoteFiles;
 
-    public OneDriveCloudAccessFileBrowserViewModel(
+    public RemoteCloudAccessFileBrowserViewModel(
         ICloudAccessRepository repository,
         IStorageConnectionRepository connections,
         CloudAccessAuthorizationService authorization,
@@ -47,7 +47,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
         IStorageConnectionProviderCatalog providers,
         CloudAccessDownloadTicketStore downloadTickets,
         CloudAccessDirectoryCache directoryCache,
-        ILogger<OneDriveCloudAccessFileBrowserViewModel> logger)
+        ILogger<RemoteCloudAccessFileBrowserViewModel> logger)
         : base(WritableCapabilities)
     {
         _repository = repository;
@@ -79,8 +79,18 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
 
             var connectionRecord = await _connections.GetAsync(share.ConnectionId)
                                    ?? throw new InvalidOperationException("The provider connection is missing.");
+
+            // A disabled or not-yet-authorized connection is an expected configuration
+            // state, not a load failure. Explain the concrete reason to the user instead
+            // of surfacing the generic "could not be loaded" message, and stop here.
             if (connectionRecord.State != StorageConnectionState.Ready)
-                throw new InvalidOperationException("The storage connection is not ready.");
+            {
+                _logger.LogInformation(
+                    "Virtual share {ShareKey} is unavailable: storage connection {ConnectionId} is in state {State}.",
+                    shareKey, connectionRecord.Id, connectionRecord.State);
+                FailLoad(ConnectionUnavailableMessage(connectionRecord));
+                return;
+            }
 
             await ReplaceConnectionAsync(connectionRecord);
             _share = share;
@@ -102,7 +112,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Unable to load OneDrive Cloud Access share {ShareKey}", shareKey);
+            _logger.LogError(exception, "Unable to load Cloud Access virtual share {ShareKey}", shareKey);
             FailLoad(R("Web_CloudAccess_Error_LoadShare"));
         }
     }
@@ -163,7 +173,7 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     }
 
     /// <summary>
-    /// OneDrive directory listings do not carry an aggregate size. Walk the selected
+    /// Remote directory listings do not carry an aggregate size. Walk the selected
     /// subtree on demand for Properties, keeping normal browsing metadata-only.
     /// </summary>
     public override async Task<long?> CalculateDirectorySizeAsync(
@@ -347,6 +357,26 @@ public sealed class OneDriveCloudAccessFileBrowserViewModel : RemoteFileBrowserV
     {
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
         return new Guid(hash.AsSpan(0, 16));
+    }
+
+    /// <summary>
+    /// Builds a provider-neutral, user-facing explanation for a virtual share whose
+    /// backing <see cref="StorageConnection"/> is not <see cref="StorageConnectionState.Ready"/>.
+    /// The message names the affected connection and states the concrete reason (disabled,
+    /// awaiting authorization, or otherwise unavailable) so the reader can tell an
+    /// administrator exactly which connection needs attention.
+    /// </summary>
+    private static string ConnectionUnavailableMessage(StorageConnection connection)
+    {
+        var key = connection.State switch
+        {
+            StorageConnectionState.Disabled => "Web_CloudAccess_Error_ConnectionDisabled",
+            StorageConnectionState.PendingAuthorization or StorageConnectionState.NeedsReauthorization
+                => "Web_CloudAccess_Error_ConnectionNeedsAuthorization",
+            _ => "Web_CloudAccess_Error_ConnectionUnavailable"
+        };
+        var label = string.IsNullOrWhiteSpace(connection.Name) ? connection.ProviderId : connection.Name;
+        return string.Format(R(key), label);
     }
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;

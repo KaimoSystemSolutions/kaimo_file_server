@@ -373,6 +373,10 @@ public class SettingsViewModelSmbTests
                 loggingStore.Object,
                 new Kaimo_File_Server.Infrastructure.Logging.LoggingLevelConfigurationSource(),
                 CloudAccessSettings.Object,
+                Mock.Of<Kaimo_File_Server.Infrastructure.Backup.IBackupSettingsStore>(),
+                Mock.Of<Kaimo_File_Server.Infrastructure.Backup.IDatabaseBackupService>(),
+                new Kaimo_File_Server.Web.Services.BackupDownloadTokenService(
+                    Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create("KaimoTests")),
                 NullLogger<SettingsViewModel>.Instance);
         }
 

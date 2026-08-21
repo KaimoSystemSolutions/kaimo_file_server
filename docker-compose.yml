@@ -4,6 +4,8 @@ x-app-data: &app-data
   ${LOCATION_APP_DATA:-./tests/data/kaimo-system}:/data/kaimo-system
 x-logs: &logs
   ${LOCATION_LOGS:-./tests/data/logs}:/data/kaimo-logs
+x-backups: &backups
+  ${LOCATION_BACKUP:-./tests/data/backups}:/data/kaimo-backups
 
 x-bounded-logging: &bounded-logging
   driver: json-file
@@ -21,6 +23,11 @@ x-dotnet-environment: &dotnet-environment
   LogArchive__RetentionDays: ${KAIMO_LOG_ARCHIVE_RETENTION_DAYS:-14}
   LogArchive__MaxBytesPerSource: ${KAIMO_LOG_ARCHIVE_MAX_SOURCE_BYTES:-262144000}
   NtHash__EncryptionKey: ${NT_HASH_ENCRYPTION_KEY:-}
+  # Database backups are written here (mounted from LOCATION_BACKUP). Only the
+  # Host acts as DB owner and reads Backup__RestoreFromPath for the one-shot
+  # startup restore; leave KAIMO_DB_RESTORE_FROM empty for normal operation.
+  Backup__RootPath: /data/kaimo-backups
+  Backup__RestoreFromPath: ${KAIMO_DB_RESTORE_FROM:-}
 
 services:
   # Generates the local mTLS control-plane PKI once. Externally managed
@@ -48,6 +55,7 @@ services:
       - *storage-pool-01
       - *app-data
       - *logs
+      - *backups
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
@@ -83,6 +91,11 @@ services:
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
+      # Host owns the schema; the bridge waits for it in-app
+      # (WaitForDatabaseReadyAsync) and never migrates. service_started is only a
+      # container-ordering hint — the in-app wait is the real guarantee.
+      kaimo_file_server.host:
+        condition: service_started
       kaimo_smb_pki_init:
         condition: service_completed_successfully
     networks:
@@ -176,10 +189,13 @@ services:
       - *storage-pool-01
       - *app-data
       - *logs
+      - *backups
       - ${LOCATION_GDRIVE_CREDENTIALS:-./tests/data/logins/google-service-account.json}:/data/logins/google-service-account.json:ro
     depends_on:
       kaimo_file_server_db:
         condition: service_healthy
+      # Host owns the schema; Web waits for it in-app (WaitForDatabaseReadyAsync)
+      # and never migrates. service_started is only a container-ordering hint.
       kaimo_file_server.host:
         condition: service_started
     networks:

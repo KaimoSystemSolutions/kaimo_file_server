@@ -106,6 +106,7 @@ builder.Services.AddScoped<ThemeService>();
 builder.Services.AddScoped<ToastService>();
 builder.Services.AddScoped<JobService>();
 builder.Services.AddSingleton<LogDownloadTokenService>();
+builder.Services.AddSingleton<BackupDownloadTokenService>();
 builder.Services.AddScoped<FileUploadCoordinator>();
 builder.Services.AddScoped<FileSelectionCoordinator>();
 builder.Services.AddSingleton<AssetProvider>();
@@ -187,7 +188,7 @@ builder.Services.AddScoped<CloudSyncViewModel>();
 builder.Services.AddScoped<ExternalStorageSyncViewModel>();
 builder.Services.AddScoped<CloudAccessViewModel>();
 builder.Services.AddScoped<CloudAccessShareBrowserViewModel>();
-builder.Services.AddScoped<OneDriveCloudAccessFileBrowserViewModel>();
+builder.Services.AddScoped<RemoteCloudAccessFileBrowserViewModel>();
 
 // ShareListViewModel receives configured pool destinations. File I/O itself
 // always uses the absolute path persisted on the selected share.
@@ -247,12 +248,11 @@ builder.Services.AddHostedService<CloudSyncSchedulerService>();
 
 var app = builder.Build();
 
-// BUG FIX: DB was never initialized in the Web project.
-// Without this, tables and seed data are missing when Web starts
-// independently of the Host project.
-// Must run BEFORE search init: the search router reads its on/off flag from the
-// config table, which only exists once migrations have run.
-await app.InitializeDatabaseAsync();
+// The Host process owns the schema (migrations + seeding). Web must not migrate;
+// it waits until the Host has finished so tables and seed data are present.
+// Must complete BEFORE search init: the search router reads its on/off flag from
+// the config table, which only exists once migrations have run.
+await app.WaitForDatabaseReadyAsync();
 
 // Upgrade a bounded number of legacy credential envelopes after migrations
 // have completed. Failures leave the original ciphertext untouched and do not

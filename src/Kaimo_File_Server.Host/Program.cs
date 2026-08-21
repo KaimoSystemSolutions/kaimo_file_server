@@ -45,10 +45,15 @@ builder.Services.AddSingleton<IManagedDataService, Kaimo_File_Server.Host.SambaS
 // -- Reconciler: drives Start/Stop of all managed data services from config flags --
 builder.Services.AddHostedService<Kaimo_File_Server.Host.DataServiceReconciler>();
 
+// -- Scheduled database backups (Host is the sole DB owner) --
+builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Backup.DatabaseBackupSchedulerService>();
+
 
 
 var host = builder.Build();
-await host.InitializeDatabaseAsync();
+// Host owns the database: apply the one-shot startup restore (if requested),
+// take a pre-migration safety backup, migrate + seed, then signal readiness.
+await host.MigrateSeedAndBackupAsync();
 
 // Ensure the index exists with the correct (n-gram) mapping before the SMB
 // server starts writing. Otherwise the first indexed document would let ES

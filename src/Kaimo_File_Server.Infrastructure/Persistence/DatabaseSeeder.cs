@@ -199,6 +199,7 @@ public class DatabaseSeeder
         ("DepartmentAdmin",   ManagementPermission.DepartmentAdmin,                                true, WellKnownGUIDs.ROLE_DEPARTMENT_ADMIN),
         ("CertificateManager",ManagementPermission.ManageCertificates,                            true, WellKnownGUIDs.ROLE_CERTIFICATE_MANAGER),
         ("SyncManager",       ManagementPermission.SyncAdmin,                                      true, WellKnownGUIDs.ROLE_SYNC_MANAGER),
+        ("BackupManager",     ManagementPermission.ManageBackups,                                  true, WellKnownGUIDs.ROLE_BACKUP_MANAGER),
         ("User",              ManagementPermission.None,                                           true, WellKnownGUIDs.ROLE_USER),
     ];
 

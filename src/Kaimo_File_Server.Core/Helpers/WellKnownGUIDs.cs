@@ -14,5 +14,6 @@ namespace Kaimo_File_Server.Core.Helpers
         public static readonly Guid ROLE_DEPARTMENT_ADMIN =     Guid.Parse("00000000-0000-0000-0000-100000000004");
         public static readonly Guid ROLE_CERTIFICATE_MANAGER =  Guid.Parse("00000000-0000-0000-0000-100000000005");
         public static readonly Guid ROLE_SYNC_MANAGER =         Guid.Parse("00000000-0000-0000-0000-100000000006");
+        public static readonly Guid ROLE_BACKUP_MANAGER =       Guid.Parse("00000000-0000-0000-0000-100000000007");
     }
 }

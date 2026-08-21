@@ -1164,6 +1164,87 @@
   <data name="Web_Perm_ViewSystemLogs" xml:space="preserve">
     <value>View and download system logs</value>
   </data>
+  <data name="Web_Perm_ManageBackups" xml:space="preserve">
+    <value>Manage database backups</value>
+  </data>
+  <data name="Web_Settings_Tab_Backup" xml:space="preserve">
+    <value>Backup</value>
+  </data>
+  <data name="Web_Settings_Backup_ScheduleTitle" xml:space="preserve">
+    <value>Scheduled backups</value>
+  </data>
+  <data name="Web_Settings_Backup_ScheduleDescription" xml:space="preserve">
+    <value>Automatically create one database backup per day within the configured time window. If the server was off during the window, the backup runs on the next start that still falls inside it.</value>
+  </data>
+  <data name="Web_Settings_Backup_Enabled" xml:space="preserve">
+    <value>Enable scheduled backups</value>
+  </data>
+  <data name="Web_Settings_Backup_WindowStart" xml:space="preserve">
+    <value>Window start</value>
+  </data>
+  <data name="Web_Settings_Backup_WindowEnd" xml:space="preserve">
+    <value>Window end</value>
+  </data>
+  <data name="Web_Settings_Backup_RetentionCount" xml:space="preserve">
+    <value>Keep last (backups)</value>
+  </data>
+  <data name="Web_Settings_Backup_RetentionDays" xml:space="preserve">
+    <value>Delete after (days)</value>
+  </data>
+  <data name="Web_Settings_Backup_ManualTitle" xml:space="preserve">
+    <value>Manual backup</value>
+  </data>
+  <data name="Web_Settings_Backup_ManualDescription" xml:space="preserve">
+    <value>Create a backup right now. It is stored in the backup folder alongside the automatic ones.</value>
+  </data>
+  <data name="Web_Settings_Backup_CreateNow" xml:space="preserve">
+    <value>Create backup now</value>
+  </data>
+  <data name="Web_Settings_Backup_Creating" xml:space="preserve">
+    <value>Creating backup…</value>
+  </data>
+  <data name="Web_Settings_Backup_ExistingTitle" xml:space="preserve">
+    <value>Existing backups</value>
+  </data>
+  <data name="Web_Settings_Backup_None" xml:space="preserve">
+    <value>No backups yet.</value>
+  </data>
+  <data name="Web_Settings_Backup_Col_Created" xml:space="preserve">
+    <value>Created</value>
+  </data>
+  <data name="Web_Settings_Backup_Col_Type" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="Web_Settings_Backup_Col_Size" xml:space="preserve">
+    <value>Size</value>
+  </data>
+  <data name="Web_Settings_Backup_Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="Web_Settings_Backup_Trigger_Scheduled" xml:space="preserve">
+    <value>Scheduled</value>
+  </data>
+  <data name="Web_Settings_Backup_Trigger_PreMigration" xml:space="preserve">
+    <value>Before migration</value>
+  </data>
+  <data name="Web_Settings_Backup_Trigger_Manual" xml:space="preserve">
+    <value>Manual</value>
+  </data>
+  <data name="Web_Settings_Backup_Saved" xml:space="preserve">
+    <value>Backup settings saved.</value>
+  </data>
+  <data name="Web_Settings_Backup_SaveFailed" xml:space="preserve">
+    <value>Backup settings could not be saved.</value>
+  </data>
+  <data name="Web_Settings_Backup_Created" xml:space="preserve">
+    <value>Backup created successfully.</value>
+  </data>
+  <data name="Web_Settings_Backup_CreateFailed" xml:space="preserve">
+    <value>Backup could not be created.</value>
+  </data>
+  <data name="Web_Settings_Backup_InvalidWindow" xml:space="preserve">
+    <value>Please enter a valid start and end time (HH:mm).</value>
+  </data>
   <data name="Web_Perm_ManageCloudAccess" xml:space="preserve">
     <value>Manage virtual shares</value>
   </data>
@@ -2107,6 +2188,8 @@
   <data name="Web_CloudAccess_DeleteConnectionConfirm" xml:space="preserve"><value>Delete connection '{0}' and all of its virtual shares?</value></data>
   <data name="Web_CloudAccess_Shares" xml:space="preserve"><value>Virtual shares</value></data>
   <data name="Web_CloudAccess_NoShares" xml:space="preserve"><value>No virtual shares have been created.</value></data>
+  <data name="Web_CloudAccess_NoReadyConnections" xml:space="preserve"><value>No connections are available. Create and authorize a connection before creating a virtual share.</value></data>
+  <data name="Web_CloudAccess_GoToConnections" xml:space="preserve"><value>Go to Connections</value></data>
   <data name="Web_CloudAccess_CreateShareHelp" xml:space="preserve"><value>Select a connected account and expose one of its remote folders in the web file browser.</value></data>
   <data name="Web_CloudAccess_Connection" xml:space="preserve"><value>Connection</value></data>
   <data name="Web_CloudAccess_ShareName" xml:space="preserve"><value>Share name</value></data>
@@ -2174,7 +2257,10 @@
   <data name="Web_CloudAccess_CopySuccess" xml:space="preserve"><value>The remote items were copied to the local share.</value></data>
   <data name="Web_CloudAccess_Error_InvalidShare" xml:space="preserve"><value>The virtual share is invalid.</value></data>
   <data name="Web_CloudAccess_Error_InvalidPath" xml:space="preserve"><value>The requested path is invalid.</value></data>
-  <data name="Web_CloudAccess_Error_LoadShare" xml:space="preserve"><value>The OneDrive share could not be loaded.</value></data>
+  <data name="Web_CloudAccess_Error_LoadShare" xml:space="preserve"><value>The virtual share could not be loaded.</value></data>
+  <data name="Web_CloudAccess_Error_ConnectionDisabled" xml:space="preserve"><value>This virtual share cannot be opened because its storage connection "{0}" is disabled. Please ask an administrator to re-enable the connection.</value></data>
+  <data name="Web_CloudAccess_Error_ConnectionNeedsAuthorization" xml:space="preserve"><value>This virtual share cannot be opened because its storage connection "{0}" still needs to be authorized. Please ask an administrator to sign in to the connection again.</value></data>
+  <data name="Web_CloudAccess_Error_ConnectionUnavailable" xml:space="preserve"><value>This virtual share cannot be opened because its storage connection "{0}" is currently unavailable. Please try again later or contact an administrator.</value></data>
   <data name="Web_CloudAccess_Error_CreateFolder" xml:space="preserve"><value>The folder could not be created.</value></data>
   <data name="Web_CloudAccess_Error_Delete" xml:space="preserve"><value>The item could not be deleted.</value></data>
   <data name="Web_CloudAccess_Error_Rename" xml:space="preserve"><value>The item could not be renamed.</value></data>
