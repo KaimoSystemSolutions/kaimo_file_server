@@ -14,7 +14,7 @@ public sealed class WebDavStorageConnectionProvider(
     public string Id => "webdav";
     public string DisplayName => "WebDAV";
     public StorageProviderCapabilities Capabilities =>
-        SmbStorageConnectionProvider.ReadWriteCapabilities
+        StorageProviderHelpers.ReadWriteCapabilities
         | StorageProviderCapabilities.DirectFileAccess;
     public IReadOnlySet<StorageAuthorizationMode> AuthorizationModes { get; }
         = new HashSet<StorageAuthorizationMode> { StorageAuthorizationMode.UsernamePassword };
@@ -41,11 +41,11 @@ public sealed class WebDavStorageConnectionProvider(
         {
             await using IStorageSession session = await OpenSessionAsync(connection, cancellationToken);
             await session.RemoteFiles!.ListAsync("/", cancellationToken);
-            return SmbStorageConnectionProvider.Healthy();
+            return StorageProviderHelpers.Healthy();
         }
         catch (ProtocolConfigurationException exception)
         {
-            return SmbStorageConnectionProvider.Invalid(exception);
+            return StorageProviderHelpers.Invalid(exception);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -53,11 +53,11 @@ public sealed class WebDavStorageConnectionProvider(
         }
         catch (HttpRequestException)
         {
-            return SmbStorageConnectionProvider.Unavailable("webdav_connection_failed");
+            return StorageProviderHelpers.Unavailable("webdav_connection_failed");
         }
         catch (IOException)
         {
-            return SmbStorageConnectionProvider.Unavailable("webdav_connection_failed");
+            return StorageProviderHelpers.Unavailable("webdav_connection_failed");
         }
     }
 
@@ -66,7 +66,7 @@ public sealed class WebDavStorageConnectionProvider(
 
     internal static WebDavConnectionSettings ParseAndValidate(StorageConnection connection)
     {
-        SmbStorageConnectionProvider.ValidateConnection(connection, "webdav", StorageAuthorizationMode.UsernamePassword);
+        StorageProviderHelpers.ValidateConnection(connection, "webdav", StorageAuthorizationMode.UsernamePassword);
         var settings = ProtocolConnectionSettings.Parse<WebDavConnectionSettings>(connection.SettingsJson, "WebDAV");
         if (string.IsNullOrWhiteSpace(settings.ServerUrl)
             || settings.ServerUrl.Length > 2048
@@ -76,7 +76,7 @@ public sealed class WebDavStorageConnectionProvider(
         return settings;
     }
 
-    private static void ValidateCredentials(Dictionary<string, string> credentials)
+    internal static void ValidateCredentials(Dictionary<string, string> credentials)
     {
         if (!credentials.TryGetValue("username", out string? username)
             || string.IsNullOrWhiteSpace(username)
@@ -88,7 +88,7 @@ public sealed class WebDavStorageConnectionProvider(
             throw new ProtocolConfigurationException("credentials_invalid", "The WebDAV credentials are invalid.");
     }
 
-    private static HttpClient CreateHttpClient(
+    internal static HttpClient CreateHttpClient(
         WebDavConnectionSettings settings,
         string username,
         string password)
@@ -169,20 +169,23 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
     {
         Uri requestUri = ResolveFileUri(path);
         HttpResponseMessage response = await client.GetAsync(requestUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        await EnsureSuccessOrThrowAsync(response, cancellationToken);
-        return await response.Content.ReadAsStreamAsync(cancellationToken);
+        try
+        {
+            await EnsureSuccessOrThrowAsync(response, cancellationToken);
+            Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            return new ResponseOwningStream(contentStream, response);
+        }
+        catch
+        {
+            response.Dispose();
+            throw;
+        }
     }
 
     public async Task WriteAsync(
         string path, Stream content, bool overwrite, CancellationToken cancellationToken = default)
     {
         Uri requestUri = ResolveFileUri(path);
-        if (!overwrite)
-        {
-            bool exists = await ExistsAsync(requestUri, cancellationToken);
-            if (exists)
-                throw new IOException("The remote item already exists.");
-        }
         using var request = new HttpRequestMessage(HttpMethod.Put, requestUri)
         {
             Content = new StreamContent(content)
@@ -223,7 +226,7 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
         await EnsureSuccessOrThrowAsync(response, cancellationToken);
     }
 
-    private IReadOnlyList<RemoteStorageItem> ParseMultiStatusResponse(string xml, string parentPath)
+    internal IReadOnlyList<RemoteStorageItem> ParseMultiStatusResponse(string xml, string parentPath)
     {
         XDocument document = XDocument.Parse(xml);
         var items = new List<RemoteStorageItem>();
@@ -289,7 +292,7 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
         return lastSlash >= 0 ? trimmed[(lastSlash + 1)..] : trimmed;
     }
 
-    private Uri ResolveUri(string normalizedPath, bool trailingSlash = false)
+    internal Uri ResolveUri(string normalizedPath, bool trailingSlash = false)
     {
         string baseUrl = serverUrl.TrimEnd('/');
         string resolved = normalizedPath == "/"
@@ -306,14 +309,7 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
         return ResolveUri(normalizedPath, trailingSlash);
     }
 
-    private async Task<bool> ExistsAsync(Uri uri, CancellationToken cancellationToken)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Head, uri);
-        using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
-        return response.IsSuccessStatusCode;
-    }
-
-    private static async Task EnsureSuccessOrThrowAsync(
+    internal static async Task EnsureSuccessOrThrowAsync(
         HttpResponseMessage response, CancellationToken cancellationToken)
     {
         if (response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.MultiStatus)
@@ -329,11 +325,48 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
                 new IOException($"WebDAV resource not found: {response.RequestMessage?.RequestUri}"),
             HttpStatusCode.Conflict =>
                 new IOException("WebDAV server returned 409 Conflict. A parent directory may not exist."),
+            HttpStatusCode.PreconditionFailed =>
+                new IOException("The remote item already exists."),
             HttpStatusCode.InsufficientStorage =>
                 new IOException("WebDAV server returned 507 Insufficient Storage."),
             _ => new IOException(
                 $"WebDAV request failed with status {(int)response.StatusCode}: {body[..Math.Min(body.Length, 500)]}")
         };
+    }
+}
+
+internal sealed class ResponseOwningStream(Stream inner, HttpResponseMessage response) : Stream
+{
+    public override bool CanRead => inner.CanRead;
+    public override bool CanSeek => inner.CanSeek;
+    public override bool CanWrite => inner.CanWrite;
+    public override long Length => inner.Length;
+    public override long Position { get => inner.Position; set => inner.Position = value; }
+    public override void Flush() => inner.Flush();
+    public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+    public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
+    public override void SetLength(long value) => inner.SetLength(value);
+    public override void Write(byte[] buffer, int offset, int count) => inner.Write(buffer, offset, count);
+    public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        => inner.ReadAsync(buffer, offset, count, cancellationToken);
+    public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        => inner.ReadAsync(buffer, cancellationToken);
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            inner.Dispose();
+            response.Dispose();
+        }
+        base.Dispose(disposing);
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        await inner.DisposeAsync();
+        response.Dispose();
+        await base.DisposeAsync();
     }
 }
 
