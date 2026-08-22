@@ -13,6 +13,13 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <summary>Returns all (including revoked) devices owned by a user, newest first.</summary>
         Task<List<SyncDevice>> GetByUserAsync(Guid userId);
 
+        /// <summary>
+        /// Returns every device registration across all users, newest-seen first.
+        /// Intended for the admin management surface; callers must enforce the
+        /// <see cref="Core.Security.ManagementPermission.ManageClientDevices"/> permission.
+        /// </summary>
+        Task<List<SyncDevice>> GetAllAsync();
+
         /// <summary>Persists a new device registration.</summary>
         Task<SyncDevice> CreateAsync(SyncDevice device);
 

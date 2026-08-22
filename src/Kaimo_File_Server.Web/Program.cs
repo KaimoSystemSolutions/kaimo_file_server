@@ -212,6 +212,7 @@ builder.Services.AddScoped<DepartmentViewModel>();
 builder.Services.AddScoped<CloudSyncViewModel>();
 builder.Services.AddScoped<ExternalStorageSyncViewModel>();
 builder.Services.AddScoped<DeviceSyncViewModel>();
+builder.Services.AddScoped<ClientDeviceAdminViewModel>();
 builder.Services.AddScoped<CloudAccessViewModel>();
 builder.Services.AddScoped<CloudAccessShareBrowserViewModel>();
 builder.Services.AddScoped<RemoteCloudAccessFileBrowserViewModel>();

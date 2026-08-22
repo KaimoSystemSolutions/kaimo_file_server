@@ -2467,4 +2467,16 @@
   <data name="Web_Devices_Mode_TwoWay" xml:space="preserve"><value>Beide Richtungen</value></data>
   <data name="Web_Common_Yes" xml:space="preserve"><value>Ja</value></data>
   <data name="Web_Common_No" xml:space="preserve"><value>Nein</value></data>
+  <data name="Web_Nav_DeviceAdmin" xml:space="preserve"><value>Client-Geräte</value></data>
+  <data name="Web_DeviceAdmin_Title" xml:space="preserve"><value>Client-Geräteverwaltung</value></data>
+  <data name="Web_DeviceAdmin_Subtitle" xml:space="preserve"><value>Die verbundenen Apps und Instanzen aller Benutzer. Ein Gerät zu widerrufen macht dessen Tokens ungültig und entfernt seine Sync-Auswahl — nützlich für veraltete oder ungenutzte Geräte.</value></data>
+  <data name="Web_DeviceAdmin_Forbidden" xml:space="preserve"><value>Sie haben keine Berechtigung, Client-Geräte zu verwalten.</value></data>
+  <data name="Web_DeviceAdmin_LoadFailed" xml:space="preserve"><value>Client-Geräte konnten nicht geladen werden.</value></data>
+  <data name="Web_DeviceAdmin_None" xml:space="preserve"><value>Es sind noch keine Client-Geräte registriert.</value></data>
+  <data name="Web_DeviceAdmin_Owner" xml:space="preserve"><value>Besitzer</value></data>
+  <data name="Web_DeviceAdmin_Revoke" xml:space="preserve"><value>Gerät widerrufen</value></data>
+  <data name="Web_DeviceAdmin_ConfirmRevoke" xml:space="preserve"><value>Dieses Gerät widerrufen? Seine Tokens funktionieren sofort nicht mehr.</value></data>
+  <data name="Web_DeviceAdmin_ConfirmYes" xml:space="preserve"><value>Ja, widerrufen</value></data>
+  <data name="Web_DeviceAdmin_AlreadyRevoked" xml:space="preserve"><value>Dieses Gerät ist bereits widerrufen.</value></data>
+  <data name="Web_DeviceAdmin_RevokeFailed" xml:space="preserve"><value>Das Gerät konnte nicht widerrufen werden.</value></data>
 </root>

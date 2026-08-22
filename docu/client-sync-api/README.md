@@ -27,9 +27,13 @@ These rules are fixed and must be preserved by all clients and by the server:
 2. **Connections are created only from the client.** A sync connection is created,
    edited, and deleted exclusively by a client app through this API
    (`/api/v1/sync/profiles`). Nothing else creates them.
-3. **The web UI is display-only.** The web page under `/devices` only *shows* which
-   devices/instances are connected to the user's account and, for reference, the
-   connections each has. It never creates, edits, or deletes a connection.
+3. **The web UI is display-only for connections.** The web page under `/devices`
+   only *shows* which devices/instances are connected to the user's account and, for
+   reference, the connections each has. It never creates or edits a connection. The
+   one exception is administrative revocation: an operator holding the
+   `ManageClientDevices` permission can, from `/admin/devices`, revoke another user's
+   device (see rule 5). Revoking drops that device's connections but never mints or
+   edits them.
 4. **Two endpoints per connection.** Every connection pairs a **remote** endpoint
    (`shareId` + `relativePath`, a share subtree) with a **local** endpoint
    (`localPath`, a folder on the device). The client picks both: the remote folder
@@ -37,6 +41,12 @@ These rules are fixed and must be preserved by all clients and by the server:
    `localPath` is opaque to the server — it is stored verbatim and never resolved,
    validated, or accessed server-side. Direction (`Pull`/`Push`/`TwoWay`) applies to
    the pair.
+5. **Admin revocation is immediate.** Revoking a device marks it revoked, revokes all
+   its refresh tokens, and deletes its sync selections. Because every client-API token
+   carries a `device_id` claim that the server re-checks against the device's active
+   state on each request, a revoked device's *access* token stops working at once —
+   not only when it expires — and it can no longer refresh. The device must sign in
+   again to obtain a fresh registration.
 
 ## Contents
 1. [Concepts](#1-concepts)

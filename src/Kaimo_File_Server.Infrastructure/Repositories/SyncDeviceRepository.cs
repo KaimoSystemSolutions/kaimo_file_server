@@ -28,6 +28,14 @@ public sealed class SyncDeviceRepository : ISyncDeviceRepository
             .ToListAsync();
     }
 
+    public async Task<List<SyncDevice>> GetAllAsync()
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.SyncDevices
+            .OrderByDescending(d => d.LastSeenUtc)
+            .ToListAsync();
+    }
+
     public async Task<SyncDevice> CreateAsync(SyncDevice device)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();

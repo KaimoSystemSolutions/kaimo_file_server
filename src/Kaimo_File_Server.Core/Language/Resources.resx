@@ -2490,4 +2490,16 @@
   <data name="Web_Devices_Mode_TwoWay" xml:space="preserve"><value>Both directions</value></data>
   <data name="Web_Common_Yes" xml:space="preserve"><value>Yes</value></data>
   <data name="Web_Common_No" xml:space="preserve"><value>No</value></data>
+  <data name="Web_Nav_DeviceAdmin" xml:space="preserve"><value>Client devices</value></data>
+  <data name="Web_DeviceAdmin_Title" xml:space="preserve"><value>Client device administration</value></data>
+  <data name="Web_DeviceAdmin_Subtitle" xml:space="preserve"><value>Every user's connected apps and instances. Revoke a device to invalidate its tokens and drop its sync selections — useful for stale or unused devices.</value></data>
+  <data name="Web_DeviceAdmin_Forbidden" xml:space="preserve"><value>You do not have permission to manage client devices.</value></data>
+  <data name="Web_DeviceAdmin_LoadFailed" xml:space="preserve"><value>Could not load client devices.</value></data>
+  <data name="Web_DeviceAdmin_None" xml:space="preserve"><value>No client devices are registered yet.</value></data>
+  <data name="Web_DeviceAdmin_Owner" xml:space="preserve"><value>owner</value></data>
+  <data name="Web_DeviceAdmin_Revoke" xml:space="preserve"><value>Revoke device</value></data>
+  <data name="Web_DeviceAdmin_ConfirmRevoke" xml:space="preserve"><value>Revoke this device? Its tokens stop working immediately.</value></data>
+  <data name="Web_DeviceAdmin_ConfirmYes" xml:space="preserve"><value>Yes, revoke</value></data>
+  <data name="Web_DeviceAdmin_AlreadyRevoked" xml:space="preserve"><value>This device is already revoked.</value></data>
+  <data name="Web_DeviceAdmin_RevokeFailed" xml:space="preserve"><value>Could not revoke the device.</value></data>
 </root>

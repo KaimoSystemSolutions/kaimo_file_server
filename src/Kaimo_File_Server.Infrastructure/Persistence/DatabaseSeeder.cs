@@ -200,6 +200,7 @@ public class DatabaseSeeder
         ("CertificateManager",ManagementPermission.ManageCertificates,                            true, WellKnownGUIDs.ROLE_CERTIFICATE_MANAGER),
         ("SyncManager",       ManagementPermission.SyncAdmin,                                      true, WellKnownGUIDs.ROLE_SYNC_MANAGER),
         ("BackupManager",     ManagementPermission.ManageBackups,                                  true, WellKnownGUIDs.ROLE_BACKUP_MANAGER),
+        ("ClientDeviceManager", ManagementPermission.ManageClientDevices,                          true, WellKnownGUIDs.ROLE_CLIENT_DEVICE_MANAGER),
         ("User",              ManagementPermission.None,                                           true, WellKnownGUIDs.ROLE_USER),
     ];
 

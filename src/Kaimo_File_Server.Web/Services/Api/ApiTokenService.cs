@@ -67,7 +67,8 @@ public sealed class ApiTokenService
             user.User.Id,
             user.User.Username,
             user.User.Name,
-            user.Roles.Select(r => r.Name));
+            user.Roles.Select(r => r.Name),
+            deviceId);
 
         (string secret, string hash) = GenerateOpaqueToken();
         var now = _clock.GetUtcNow().UtcDateTime;
@@ -140,7 +141,7 @@ public sealed class ApiTokenService
 
         string accessToken = _jwt.GenerateToken(
             user.User.Id, user.User.Username, user.User.Name,
-            user.Roles.Select(r => r.Name));
+            user.Roles.Select(r => r.Name), device.Id);
 
         return new RefreshResult(
             RefreshOutcome.Success,

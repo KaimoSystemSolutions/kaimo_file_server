@@ -16,6 +16,13 @@ public class JwtTokenService
     private const int MinSecretLength = 32; // 256-bit minimum for HMAC-SHA256
 
     /// <summary>
+    /// Claim carrying the client-API device registration id. Present only on tokens
+    /// minted for a device (the REST client API); absent on the Blazor web login
+    /// token. The API's per-request auth uses it to reject a revoked device at once.
+    /// </summary>
+    public const string DeviceIdClaim = "device_id";
+
+    /// <summary>
     /// Secrets that have shipped in source control / documentation and are
     /// therefore public knowledge. Since forging a valid token requires nothing
     /// more than the signing secret, a well-known value is equivalent to having
@@ -57,7 +64,14 @@ public class JwtTokenService
         _logger.LogInformation("JWT initialisiert: Issuer={Issuer}, Expiration={Hours}h", _issuer, _expirationHours);
     }
 
-    public string GenerateToken(Guid userId, string username, string displayName, IEnumerable<string> roles)
+    /// <param name="deviceId">
+    /// When set, stamps a <see cref="DeviceIdClaim"/> so the client API can bind the
+    /// token to a device and reject it the moment that device is revoked. Left null
+    /// for the Blazor web login, whose tokens are not device-scoped.
+    /// </param>
+    public string GenerateToken(
+        Guid userId, string username, string displayName, IEnumerable<string> roles,
+        Guid? deviceId = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -69,6 +83,9 @@ public class JwtTokenService
             new("display_name", displayName),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+
+        if (deviceId is { } id)
+            claims.Add(new Claim(DeviceIdClaim, id.ToString()));
 
         foreach (var role in roles)
             claims.Add(new Claim(ClaimTypes.Role, role));

@@ -11,7 +11,9 @@ What it covers
   * Auth:   login (registers/reuses a device), refresh (token rotation), logout.
   * Browse: list shares, navigate a share, download a file, upload a file.
   * Sync:   list devices, list/create/delete per-device sync profiles,
-            delta enumeration, and the long-poll change-wait.
+            delta enumeration, the long-poll change-wait, and — on top of those —
+            an actual file synchronizer that reconciles a share subtree with a
+            local folder (one-shot "Sync now" plus a long-poll auto-sync loop).
 
 Every HTTP call is echoed to the Debug log at the bottom (method, URL, status,
 elapsed time, and a truncated body) so you can see exactly what the server does.
@@ -28,7 +30,9 @@ This is a developer tool for a server you control — not a hardened client.
 
 from __future__ import annotations
 
+import datetime
 import json
+import os
 import ssl
 import threading
 import time
@@ -172,6 +176,325 @@ class ApiClient:
         return ApiResult(ok, status, elapsed, headers, body, parsed)
 
 
+# ────────────────────────────── Sync engine ──────────────────────────────
+
+
+def _parse_utc(iso: str) -> float:
+    """Parse an ISO-8601 UTC timestamp into a POSIX epoch (seconds)."""
+    if not iso:
+        return 0.0
+    text = iso.strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.datetime.fromisoformat(text)
+    except ValueError:
+        # Fall back to whole-second precision if the fraction is unusual.
+        dt = datetime.datetime.strptime(text[:19], "%Y-%m-%dT%H:%M:%S")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.timestamp()
+
+
+@dataclass
+class SyncStats:
+    """Tally of everything one sync run did, for the summary line."""
+
+    downloaded: int = 0
+    uploaded: int = 0
+    created_local_dirs: int = 0
+    created_remote_dirs: int = 0
+    deleted_local: int = 0
+    deleted_remote: int = 0
+    skipped: int = 0
+    failed: int = 0
+
+    def summary(self) -> str:
+        return (
+            f"↓{self.downloaded} ↑{self.uploaded}  "
+            f"mkdir(local {self.created_local_dirs}, remote {self.created_remote_dirs})  "
+            f"del(local {self.deleted_local}, remote {self.deleted_remote})  "
+            f"skip {self.skipped}  fail {self.failed}"
+        )
+
+
+class SyncEngine:
+    """
+    One-shot, stateless folder synchronizer for the test client.
+
+    It enumerates the remote subtree via the sync delta endpoint, walks the local
+    folder, and reconciles the two according to the connection's direction:
+
+      * Pull   — the server is authoritative: copy remote → local.
+      * Push   — the device is authoritative: copy local → remote.
+      * TwoWay — the newest-modified side wins, in either direction.
+
+    Transfers reuse the same browse endpoints the Browse tab uses (content GET/PUT,
+    directory POST, item DELETE), so this is a faithful exercise of the real API.
+
+    Because the server keeps no per-device sync state, the client has no memory of
+    the previous run and cannot tell a brand-new file apart from one deleted on the
+    other side. Deletions are therefore only performed when "mirror" is enabled,
+    and only in the single authoritative direction (Pull deletes local extras, Push
+    deletes remote extras); TwoWay never deletes.
+
+    Two files count as equal when their sizes match and their modification times
+    agree within MTIME_TOLERANCE. On download the local mtime is set to the remote
+    one so the two sides converge and the next run skips the file.
+    """
+
+    MTIME_TOLERANCE = 2.0  # seconds; absorbs filesystem/rounding differences
+
+    def __init__(self, client: ApiClient, *, share_id: str, remote_root: str,
+                 local_root: str, mode: str, mirror: bool, dry_run: bool,
+                 log: Callable[[str], None], should_stop: Callable[[], bool]):
+        self.client = client
+        self.share_id = share_id
+        self.remote_root = remote_root.strip("/")
+        self.local_root = local_root
+        self.mode = mode              # "Pull" | "Push" | "TwoWay"
+        self.mirror = mirror
+        self.dry_run = dry_run
+        self.log = log
+        self.should_stop = should_stop
+        self.stats = SyncStats()
+
+    # -- path mapping between the remote subtree and the local folder --
+
+    def _remote_path(self, rel: str) -> str:
+        """Share-relative path of a subtree-relative item."""
+        return f"{self.remote_root}/{rel}" if self.remote_root else rel
+
+    def _local_path(self, rel: str) -> str:
+        """Absolute local path of a subtree-relative item."""
+        return os.path.join(self.local_root, rel.replace("/", os.sep))
+
+    def _rel_from_remote(self, path: str) -> Optional[str]:
+        """Strip the subtree-root prefix; returns None for the root itself."""
+        if not self.remote_root:
+            return path or None
+        if path == self.remote_root:
+            return None
+        prefix = self.remote_root + "/"
+        return path[len(prefix):] if path.startswith(prefix) else None
+
+    # -- enumeration of both sides --
+
+    def _enumerate_remote(self) -> tuple[dict[str, None], dict[str, tuple[int, float]], Optional[str]]:
+        res = self.client.request(
+            "GET", f"/api/v1/sync/{self.share_id}/delta",
+            query={"path": self.remote_root})
+        if not res.ok or not isinstance(res.json, dict):
+            raise RuntimeError(f"delta failed: HTTP {res.status}")
+        dirs: dict[str, None] = {}
+        files: dict[str, tuple[int, float]] = {}
+        for entry in res.json.get("entries", []):
+            rel = self._rel_from_remote(entry["path"])
+            if rel is None:
+                continue
+            if entry["isDirectory"]:
+                dirs[rel] = None
+            else:
+                files[rel] = (entry["size"], _parse_utc(entry["modifiedAtUtc"]))
+        return dirs, files, res.json.get("token")
+
+    def _scan_local(self) -> tuple[dict[str, None], dict[str, tuple[int, float]]]:
+        dirs: dict[str, None] = {}
+        files: dict[str, tuple[int, float]] = {}
+        if not os.path.isdir(self.local_root):
+            return dirs, files
+        for base, subdirs, filenames in os.walk(self.local_root):
+            rel_base = os.path.relpath(base, self.local_root)
+            rel_base = "" if rel_base == "." else rel_base.replace(os.sep, "/")
+            for name in subdirs:
+                dirs[f"{rel_base}/{name}" if rel_base else name] = None
+            for name in filenames:
+                rel = f"{rel_base}/{name}" if rel_base else name
+                try:
+                    st = os.stat(os.path.join(base, name))
+                except OSError:
+                    continue
+                files[rel] = (st.st_size, st.st_mtime)
+        return dirs, files
+
+    # -- the reconcile pass --
+
+    def run(self) -> Optional[str]:
+        """Reconcile the two sides once; returns the delta token seen at the start."""
+        self.log(f"  enumerating remote '{self.remote_root or '/'}' …\n")
+        remote_dirs, remote_files, token = self._enumerate_remote()
+        local_dirs, local_files = self._scan_local()
+        self.log(
+            f"  remote: {len(remote_dirs)} dirs / {len(remote_files)} files    "
+            f"local: {len(local_dirs)} dirs / {len(local_files)} files\n")
+
+        pull = self.mode in ("Pull", "TwoWay")
+        push = self.mode in ("Push", "TwoWay")
+
+        # 1) Directories first (shallow → deep) so file transfers have a parent.
+        if pull:
+            for rel in sorted(remote_dirs, key=lambda r: r.count("/")):
+                if self.should_stop():
+                    return self._stopped(token)
+                if rel not in local_dirs:
+                    self._make_local_dir(rel)
+        if push:
+            for rel in sorted(local_dirs, key=lambda r: r.count("/")):
+                if self.should_stop():
+                    return self._stopped(token)
+                if rel not in remote_dirs:
+                    self._make_remote_dir(rel)
+
+        # 2) Files.
+        for rel in sorted(set(remote_files) | set(local_files)):
+            if self.should_stop():
+                return self._stopped(token)
+            self._reconcile_file(rel, remote_files.get(rel), local_files.get(rel), pull, push)
+
+        # 3) Mirror deletions of extras on the target, deepest path first.
+        if self.mirror and self.mode == "Pull":
+            self._mirror_delete_local(
+                set(local_files) - set(remote_files), set(local_dirs) - set(remote_dirs))
+        elif self.mirror and self.mode == "Push":
+            self._mirror_delete_remote(
+                set(remote_files) - set(local_files), set(remote_dirs) - set(local_dirs))
+
+        verb = "would sync" if self.dry_run else "done"
+        self.log(f"  {verb}: {self.stats.summary()}\n")
+        return token
+
+    def _reconcile_file(self, rel: str, remote: Optional[tuple[int, float]],
+                        local: Optional[tuple[int, float]], pull: bool, push: bool) -> None:
+        if remote is not None and local is not None:
+            if self._same(remote, local):
+                self.stats.skipped += 1
+            elif self.mode == "Pull":
+                self._download(rel, remote)
+            elif self.mode == "Push":
+                self._upload(rel)
+            elif remote[1] >= local[1]:  # TwoWay: newer modification wins
+                self._download(rel, remote)
+            else:
+                self._upload(rel)
+        elif remote is not None and pull:      # only remote has it → bring it local
+            self._download(rel, remote)
+        elif local is not None and push:       # only local has it → send it up
+            self._upload(rel)
+        # The remaining "only one side" cases are handled by mirror deletion, or
+        # left untouched when mirror is off.
+
+    def _same(self, remote: tuple[int, float], local: tuple[int, float]) -> bool:
+        return remote[0] == local[0] and abs(remote[1] - local[1]) <= self.MTIME_TOLERANCE
+
+    # -- individual operations (each honours dry-run and tallies its outcome) --
+
+    def _download(self, rel: str, remote: tuple[int, float]) -> None:
+        self.log(f"    ↓ {rel}\n")
+        if self.dry_run:
+            self.stats.downloaded += 1
+            return
+        res = self.client.request(
+            "GET", f"/api/v1/browse/{self.share_id}/content",
+            query={"path": self._remote_path(rel)})
+        if not res.ok:
+            self.stats.failed += 1
+            return
+        local_path = self._local_path(rel)
+        os.makedirs(os.path.dirname(local_path) or ".", exist_ok=True)
+        with open(local_path, "wb") as fh:
+            fh.write(res.body_bytes)
+        # Match the remote mtime so the next run sees the two sides as equal.
+        os.utime(local_path, (time.time(), remote[1]))
+        self.stats.downloaded += 1
+
+    def _upload(self, rel: str) -> None:
+        self.log(f"    ↑ {rel}\n")
+        if self.dry_run:
+            self.stats.uploaded += 1
+            return
+        try:
+            with open(self._local_path(rel), "rb") as fh:
+                data = fh.read()
+        except OSError:
+            self.stats.failed += 1
+            return
+        res = self.client.request(
+            "PUT", f"/api/v1/browse/{self.share_id}/content",
+            query={"path": self._remote_path(rel)}, raw_body=data)
+        self._tally(res.ok, "uploaded")
+
+    def _make_local_dir(self, rel: str) -> None:
+        self.log(f"    + local dir {rel}\n")
+        if not self.dry_run:
+            os.makedirs(self._local_path(rel), exist_ok=True)
+        self.stats.created_local_dirs += 1
+
+    def _make_remote_dir(self, rel: str) -> None:
+        self.log(f"    + remote dir {rel}\n")
+        if self.dry_run:
+            self.stats.created_remote_dirs += 1
+            return
+        res = self.client.request(
+            "POST", f"/api/v1/browse/{self.share_id}/directory",
+            query={"path": self._remote_path(rel)})
+        self._tally(res.ok, "created_remote_dirs")
+
+    def _mirror_delete_local(self, extra_files: set[str], extra_dirs: set[str]) -> None:
+        for rel in sorted(extra_files, key=lambda r: -r.count("/")):
+            if self.should_stop():
+                return
+            self.log(f"    − local {rel}\n")
+            self._delete_local_path(self._local_path(rel), is_dir=False)
+        for rel in sorted(extra_dirs, key=lambda r: -r.count("/")):
+            if self.should_stop():
+                return
+            self.log(f"    − local dir {rel}\n")
+            self._delete_local_path(self._local_path(rel), is_dir=True)
+
+    def _delete_local_path(self, path: str, is_dir: bool) -> None:
+        if self.dry_run:
+            self.stats.deleted_local += 1
+            return
+        try:
+            os.rmdir(path) if is_dir else os.remove(path)
+            self.stats.deleted_local += 1
+        except OSError:
+            self.stats.failed += 1
+
+    def _mirror_delete_remote(self, extra_files: set[str], extra_dirs: set[str]) -> None:
+        # Files first, then directories deepest-first, so a directory is empty
+        # by the time we remove it.
+        for rel in sorted(extra_files, key=lambda r: -r.count("/")):
+            if self.should_stop():
+                return
+            self.log(f"    − remote {rel}\n")
+            self._delete_remote_path(rel)
+        for rel in sorted(extra_dirs, key=lambda r: -r.count("/")):
+            if self.should_stop():
+                return
+            self.log(f"    − remote dir {rel}\n")
+            self._delete_remote_path(rel)
+
+    def _delete_remote_path(self, rel: str) -> None:
+        if self.dry_run:
+            self.stats.deleted_remote += 1
+            return
+        res = self.client.request(
+            "DELETE", f"/api/v1/browse/{self.share_id}/item",
+            query={"path": self._remote_path(rel)})
+        self._tally(res.ok, "deleted_remote")
+
+    def _tally(self, ok: bool, field_name: str) -> None:
+        if ok:
+            setattr(self.stats, field_name, getattr(self.stats, field_name) + 1)
+        else:
+            self.stats.failed += 1
+
+    def _stopped(self, token: Optional[str]) -> Optional[str]:
+        self.log(f"  ⧗ stopped before completion — {self.stats.summary()}\n")
+        return token
+
+
 # ────────────────────────────── GUI ──────────────────────────────
 
 
@@ -188,6 +511,10 @@ class App:
         self.shares: list[dict] = []          # [{Id, Name, IsRecycleEnabled}]
         self.current_share_id: Optional[str] = None
         self.current_path: str = ""
+        self.profiles_by_id: dict[str, dict] = {}   # raw sync profiles, keyed by id
+        self.sync_running: bool = False             # a one-shot or loop sync is active
+        self.auto_thread: Optional[threading.Thread] = None
+        self.auto_stop = threading.Event()          # signals the auto-sync loop to quit
 
         self._build_connection_frame()
         self._build_auth_frame()
@@ -349,6 +676,29 @@ class App:
             side="left", padx=4)
         self.last_token_var = tk.StringVar(value="last token: —")
         ttk.Label(delta, textvariable=self.last_token_var, foreground="#666").pack(side="left", padx=8)
+
+        transfer = ttk.LabelFrame(tab, text="Synchronize (actually transfer files ↔ local folder)")
+        transfer.pack(fill="x", pady=4)
+        row = ttk.Frame(transfer)
+        row.pack(fill="x", padx=4, pady=4)
+        ttk.Button(row, text="Sync selected connection now", command=self.sync_selected_now).pack(
+            side="left", padx=2)
+        self.auto_sync_btn = ttk.Button(
+            row, text="Start auto-sync (long-poll)", command=self.toggle_auto_sync)
+        self.auto_sync_btn.pack(side="left", padx=2)
+        self.mirror_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(row, text="Mirror deletes", variable=self.mirror_var).pack(side="left", padx=(12, 2))
+        self.dry_run_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(row, text="Dry run", variable=self.dry_run_var).pack(side="left", padx=2)
+        ttk.Label(
+            transfer, foreground="#666", wraplength=920, justify="left",
+            text=(
+                "Select a connection above, then Sync. Pull = server→local, "
+                "Push = local→server, TwoWay = newest wins. \"Mirror deletes\" removes "
+                "extras on the target (Pull/Push only). Auto-sync reconciles once, then "
+                "keeps syncing: Pull long-polls for server changes; Push/TwoWay also "
+                "poll the local folder so local edits get pushed up too.")
+        ).pack(anchor="w", padx=6, pady=(0, 4))
 
     def _build_log(self) -> None:
         frame = ttk.LabelFrame(self.root, text="Debug log")
@@ -643,6 +993,8 @@ class App:
         if not result.ok or not isinstance(result.json, list):
             messagebox.showerror("Failed", self._describe(result))
             return
+        # Keep the raw profiles so the synchronizer can read shareId/paths/mode.
+        self.profiles_by_id = {p["id"]: p for p in result.json}
         for p in result.json:
             self.profile_tree.insert(
                 "", "end", iid=p["id"],
@@ -750,6 +1102,187 @@ class App:
             self.log(f"  → changed={changed}, token {token}\n")
         else:
             messagebox.showerror("Wait failed", self._describe(result))
+
+    # ────────────── real synchronization ──────────────
+
+    def _selected_profile(self) -> Optional[dict]:
+        """The sync connection highlighted in the profile list, or None."""
+        sel = self.profile_tree.selection()
+        if not sel:
+            messagebox.showinfo("Pick a connection", "Select a sync connection in the list first.")
+            return None
+        profile = self.profiles_by_id.get(sel[0])
+        if profile is None:
+            messagebox.showinfo("Reload", "Reload connections and try again.")
+            return None
+        if not profile.get("localPath"):
+            messagebox.showerror("No local folder", "This connection has no local folder set.")
+            return None
+        return profile
+
+    def _make_engine(self, client: ApiClient, profile: dict,
+                     should_stop: Callable[[], bool]) -> SyncEngine:
+        return SyncEngine(
+            client,
+            share_id=profile["shareId"],
+            remote_root=profile.get("relativePath") or "",
+            local_root=profile["localPath"],
+            mode=profile["mode"],
+            mirror=self.mirror_var.get(),
+            dry_run=self.dry_run_var.get(),
+            log=self.log,
+            should_stop=should_stop,
+        )
+
+    def sync_selected_now(self) -> None:
+        client = self.ensure_client()
+        if client is None:
+            return
+        if self.sync_running:
+            messagebox.showinfo("Busy", "A sync is already running.")
+            return
+        profile = self._selected_profile()
+        if profile is None:
+            return
+        engine = self._make_engine(client, profile, lambda: False)
+        self.sync_running = True
+        self.log(
+            f"\n=== SYNC {profile['mode']} '{profile.get('relativePath') or '/'}' "
+            f"↔ {profile['localPath']}"
+            f"{' (dry run)' if self.dry_run_var.get() else ''} ===\n")
+
+        def work() -> None:
+            try:
+                engine.run()
+            except Exception as exc:  # noqa: BLE001 - surface any failure in the log
+                self.log(f"  ✗ sync error: {exc}\n")
+            finally:
+                self.sync_running = False
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def toggle_auto_sync(self) -> None:
+        # Second click: ask the running loop to stop and flip the button back.
+        if self.auto_thread and self.auto_thread.is_alive():
+            self.auto_stop.set()
+            self.auto_sync_btn.config(text="Start auto-sync (long-poll)")
+            self.log("\n=== AUTO-SYNC stopping… ===\n")
+            return
+
+        client = self.ensure_client()
+        if client is None:
+            return
+        profile = self._selected_profile()
+        if profile is None:
+            return
+        self.auto_stop = threading.Event()
+        self.auto_sync_btn.config(text="Stop auto-sync")
+        self.log(
+            f"\n=== AUTO-SYNC {profile['mode']} '{profile.get('relativePath') or '/'}' "
+            f"↔ {profile['localPath']} ===\n")
+        self.auto_thread = threading.Thread(
+            target=self._auto_sync_loop, args=(client, profile), daemon=True)
+        self.auto_thread.start()
+
+    # How often the auto-sync loop re-checks a folder it has to watch locally.
+    AUTO_POLL_SECONDS = 3.0
+
+    @staticmethod
+    def _local_signature(root: str) -> tuple:
+        """A cheap fingerprint of the local tree (rel path, size, mtime) for change
+        detection. Two calls compare equal iff no file was added, removed, or
+        touched — this is how the loop notices local edits the server can't."""
+        if not os.path.isdir(root):
+            return ()
+        sig: list[tuple[str, int, int]] = []
+        for base, _dirs, files in os.walk(root):
+            for name in files:
+                full = os.path.join(base, name)
+                try:
+                    st = os.stat(full)
+                except OSError:
+                    continue
+                sig.append((os.path.relpath(full, root), st.st_size, int(st.st_mtime)))
+        return tuple(sorted(sig))
+
+    def _auto_sync_loop(self, client: ApiClient, profile: dict) -> None:
+        """
+        Reconcile once, then keep the two sides in sync until auto_stop.
+
+        The server's change-wait long-poll only reports *server-side* changes, so
+        it cannot on its own drive a local→server sync. Therefore:
+
+          * Pull            — nothing local to watch, so we use the efficient
+                              long-poll and re-sync whenever the server changes.
+          * Push / TwoWay   — we also poll a local fingerprint every
+                              AUTO_POLL_SECONDS and re-sync when either side moved,
+                              so local edits get pushed up without a server event.
+        """
+        share_id = profile["shareId"]
+        remote_root = profile.get("relativePath") or ""
+        local_root = profile["localPath"]
+        watch_local = profile["mode"] in ("Push", "TwoWay")
+        stop = self.auto_stop
+
+        def current_token() -> Optional[str]:
+            # An empty "since" makes the wait endpoint return the current token at
+            # once — a cheap "what's the server on now?" probe.
+            res = client.request(
+                "GET", "/api/v1/sync/changes/wait",
+                query={"shareId": share_id, "path": remote_root, "since": None}, timeout=45.0)
+            return res.json.get("token") if res.ok and isinstance(res.json, dict) else None
+
+        def reconcile() -> None:
+            self.log("\n--- auto-sync: reconciling ---\n")
+            self.sync_running = True
+            try:
+                self._make_engine(client, profile, stop.is_set).run()
+            except Exception as exc:  # noqa: BLE001
+                self.log(f"  ✗ sync error: {exc}\n")
+            finally:
+                self.sync_running = False
+
+        token: Optional[str] = None
+        local_sig = self._local_signature(local_root) if watch_local else ()
+        first = True
+        while not stop.is_set():
+            trigger = first
+            first = False
+
+            if watch_local:
+                # Poll both sides: cheap token probe + local fingerprint.
+                new_token = current_token()
+                new_sig = self._local_signature(local_root)
+                if new_token != token or new_sig != local_sig:
+                    trigger = True
+                token, local_sig = new_token, new_sig
+            else:
+                # Pull: block on the long-poll until the server actually changes.
+                res = client.request(
+                    "GET", "/api/v1/sync/changes/wait",
+                    query={"shareId": share_id, "path": remote_root, "since": token or None},
+                    timeout=45.0)
+                if stop.is_set():
+                    break
+                if not res.ok or not isinstance(res.json, dict):
+                    self.log("  auto-sync: change-wait failed; retrying in 5s\n")
+                    stop.wait(5.0)
+                    continue
+                if res.json.get("changed"):
+                    trigger = True
+                token = res.json.get("token") or token
+
+            self.last_token_var.set(f"last token: {token}")
+            if trigger:
+                reconcile()
+                if watch_local:
+                    # Re-baseline so our own writes don't re-trigger next tick.
+                    token = current_token()
+                    local_sig = self._local_signature(local_root)
+
+            if watch_local:
+                stop.wait(self.AUTO_POLL_SECONDS)
+        self.log("=== AUTO-SYNC stopped ===\n")
 
     # -- shared result handling --
 

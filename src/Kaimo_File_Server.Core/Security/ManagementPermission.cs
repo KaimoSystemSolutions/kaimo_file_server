@@ -60,7 +60,13 @@
         // -- Reusable external-storage connections --
         ManageConnections = 1L << 53,
         UseConnections = 1L << 54,
-        
+
+        // -- Client devices (end-user app/device registrations of the REST client API) --
+        // Manage OTHER users' client devices: view them and revoke them. Revoking a
+        // device kills its refresh tokens and, via the per-request device check,
+        // immediately invalidates its access token too.
+        ManageClientDevices = 1L << 55,
+
         // -- Shortcuts --
         UserAdmin = CreateUsers | DeleteUsers | EditUserProfiles
                   | ResetPasswords | EnableDisableUsers,
@@ -79,7 +85,8 @@
         FullAdmin = UserAdmin | GroupAdmin | ShareAdmin
                   | AssignGroups | AssignRoles | AssignDepartments
                   | EditDepartment | ViewDepartment
-                  | SystemAdmin | SyncAdmin | CloudAccessAdmin,
+                  | SystemAdmin | SyncAdmin | CloudAccessAdmin
+                  | ManageClientDevices,
         
         SyncAdmin = CreateSyncs | DeleteSyncs | ConfigureSyncs | SyncManually,
 

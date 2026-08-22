@@ -1,0 +1,147 @@
+@page "/admin/devices"
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Domain.ClientSync
+@using Kaimo_File_Server.Core.Services.DataServices
+@inject ClientDeviceAdminViewModel VM
+
+<PageTitle>@Text("Web_Nav_DeviceAdmin", "Client devices") - Kaimo Files</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>@Text("Web_DeviceAdmin_Title", "Client device administration")</h1>
+        <p class="subtitle">@Text("Web_DeviceAdmin_Subtitle", "Every user's connected apps and instances. Revoke a device to invalidate its tokens and drop its sync selections — useful for stale or unused devices.")</p>
+    </div>
+</div>
+
+@if (VM.IsLoading)
+{
+    <p>@Text("Web_Common_Loading", "Loading…")</p>
+}
+else if (!VM.CanManage)
+{
+    <p class="error">@Text("Web_DeviceAdmin_Forbidden", "You do not have permission to manage client devices.")</p>
+}
+else if (VM.LoadFailed)
+{
+    <p class="error">@Text("Web_DeviceAdmin_LoadFailed", "Could not load client devices.")</p>
+}
+else if (VM.Devices.Count == 0)
+{
+    <div class="empty-state">
+        <p>@Text("Web_DeviceAdmin_None", "No client devices are registered yet.")</p>
+    </div>
+}
+else
+{
+    @foreach (var device in VM.Devices)
+    {
+        <section class="device-card">
+            <header class="device-card__header">
+                <h2>@device.DisplayName</h2>
+                <span class="device-card__meta">
+                    @Text("Web_DeviceAdmin_Owner", "owner"): @VM.OwnerName(device.UserId)
+                    · @device.Platform
+                    · @Text("Web_Devices_LastSeen", "last seen") @device.LastSeenUtc.ToString("yyyy-MM-dd HH:mm") UTC
+                    @if (!device.IsActive)
+                    {
+                        <span class="badge badge-muted">@Text("Web_Devices_Revoked", "revoked")</span>
+                    }
+                </span>
+            </header>
+
+            @{
+                var profiles = VM.ProfilesByDevice.TryGetValue(device.Id, out var list) ? list : new();
+            }
+
+            @if (profiles.Count == 0)
+            {
+                <p class="muted">@Text("Web_Devices_NoFolders", "No synced folders yet.")</p>
+            }
+            else
+            {
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>@Text("Web_Devices_Col_Share", "Share")</th>
+                            <th>@Text("Web_Devices_Col_RemoteFolder", "Remote folder")</th>
+                            <th>@Text("Web_Devices_Col_LocalFolder", "Local folder")</th>
+                            <th>@Text("Web_Devices_Col_Direction", "Direction")</th>
+                            <th>@Text("Web_Devices_Col_Enabled", "Enabled")</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var profile in profiles)
+                        {
+                            <tr>
+                                <td>@VM.ShareName(profile.ShareId)</td>
+                                <td>@(string.IsNullOrEmpty(profile.RelativePath) ? "/" : profile.RelativePath)</td>
+                                <td>@(string.IsNullOrEmpty(profile.LocalPath) ? "—" : profile.LocalPath)</td>
+                                <td>@ModeLabel(profile.Mode)</td>
+                                <td>@(profile.Enabled ? Text("Web_Common_Yes", "Yes") : Text("Web_Common_No", "No"))</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <footer class="device-card__actions">
+                @if (!device.IsActive)
+                {
+                    <span class="muted">@Text("Web_DeviceAdmin_AlreadyRevoked", "This device is already revoked.")</span>
+                }
+                else if (_pendingRevoke == device.Id)
+                {
+                    <span class="muted">@Text("Web_DeviceAdmin_ConfirmRevoke", "Revoke this device? Its tokens stop working immediately.")</span>
+                    <button class="btn-danger" disabled="@_busy" @onclick="() => ConfirmRevokeAsync(device.Id)">
+                        @Text("Web_DeviceAdmin_ConfirmYes", "Yes, revoke")
+                    </button>
+                    <button class="btn-secondary" disabled="@_busy" @onclick="() => _pendingRevoke = null">
+                        @Text("Web_Common_Cancel", "Cancel")
+                    </button>
+                }
+                else
+                {
+                    <button class="btn-danger" @onclick="() => _pendingRevoke = device.Id">
+                        @Text("Web_DeviceAdmin_Revoke", "Revoke device")
+                    </button>
+                }
+            </footer>
+        </section>
+    }
+
+    @if (_error is not null)
+    {
+        <p class="error">@_error</p>
+    }
+}
+
+@code {
+    private Guid? _pendingRevoke;
+    private bool _busy;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await VM.LoadAsync();
+
+    private async Task ConfirmRevokeAsync(Guid deviceId)
+    {
+        _busy = true;
+        _error = null;
+        var ok = await VM.RevokeDeviceAsync(deviceId);
+        _pendingRevoke = null;
+        _busy = false;
+        if (ok)
+            await VM.LoadAsync();
+        else
+            _error = Text("Web_DeviceAdmin_RevokeFailed", "Could not revoke the device.");
+    }
+
+    private static string ModeLabel(SyncMode mode) => mode switch
+    {
+        SyncMode.Pull => Text("Web_Devices_Mode_Pull", "Download only"),
+        SyncMode.Push => Text("Web_Devices_Mode_Push", "Upload only"),
+        _ => Text("Web_Devices_Mode_TwoWay", "Both directions"),
+    };
+
+    private static string Text(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
+}

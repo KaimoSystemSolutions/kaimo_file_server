@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Kaimo_File_Server.Web.Controllers.Api;
 
@@ -30,6 +32,17 @@ public abstract class ApiControllerBase : ControllerBase
         var idValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(idValue, out var userId))
             return null;
+
+        // Device-scoped tokens (all client-API tokens) are only valid while their
+        // device is still active. Re-checking here means an admin revoking a device
+        // takes effect on the very next request, not only when the JWT expires.
+        if (Guid.TryParse(User.FindFirstValue(JwtTokenService.DeviceIdClaim), out var deviceId))
+        {
+            var devices = HttpContext.RequestServices.GetRequiredService<ISyncDeviceRepository>();
+            var device = await devices.GetByIdAsync(deviceId);
+            if (device is null || !device.IsActive)
+                return null;
+        }
 
         var context = await factory.CreateByUserIdAsync(userId);
         return context is { User.IsEnabled: true } ? context : null;
