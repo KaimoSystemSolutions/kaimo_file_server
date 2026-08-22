@@ -262,6 +262,8 @@ Generated_Code/
 # because we have git ;-)
 _UpgradeReport_Files/
 Backup*/
+# Do not ignore the Infrastructure source folder that happens to be named "Backup".
+!src/Kaimo_File_Server.Infrastructure/Backup/
 UpgradeLog*.XML
 UpgradeLog*.htm
 ServiceFabricBackup/

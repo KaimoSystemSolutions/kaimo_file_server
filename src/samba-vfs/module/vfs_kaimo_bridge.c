@@ -1875,7 +1875,8 @@ static int kaimo_renameat(vfs_handle_struct *handle,
 			  struct files_struct *srcdir_fsp,
 			  const struct smb_filename *smb_fname_src,
 			  struct files_struct *dstdir_fsp,
-			  const struct smb_filename *smb_fname_dst)
+			  const struct smb_filename *smb_fname_dst,
+			  const struct vfs_rename_how *how)
 {
 	if ((smb_fname_src != NULL && smb_fname_src->twrp != 0) ||
 	    (smb_fname_dst != NULL && smb_fname_dst->twrp != 0)) {
@@ -1957,7 +1958,9 @@ static int kaimo_renameat(vfs_handle_struct *handle,
 	/* Narrow the RPC TOCTOU window. If either directory entry disappeared,
 	 * appeared, changed type, or was exchanged for another inode while the
 	 * bridge decided, fail closed. renameat itself remains the final atomic
-	 * operation; Samba 4.19.5 exposes no replace flag to this VFS hook. */
+	 * operation; the caller's requested semantics (RENAME_NOREPLACE /
+	 * RENAME_EXCHANGE) are carried unchanged in `how` and passed straight
+	 * through to the next VFS layer. */
 	SMB_STRUCT_STAT source_after;
 	SMB_STRUCT_STAT destination_after;
 	bool source_still_exists = false;
@@ -1985,7 +1988,7 @@ static int kaimo_renameat(vfs_handle_struct *handle,
 	}
 
 	int ret = SMB_VFS_NEXT_RENAMEAT(handle, srcdir_fsp, smb_fname_src,
-					dstdir_fsp, smb_fname_dst);
+					dstdir_fsp, smb_fname_dst, how);
 
 	if (ret == 0 && oldlogical[0] != '\0' && newlogical[0] != '\0') {
 		kaimo_notify_send(KAIMO_LOCAL_OP_RENAME, &event_request);
