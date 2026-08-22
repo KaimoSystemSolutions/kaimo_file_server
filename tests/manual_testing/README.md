@@ -37,10 +37,11 @@ python api_client.py
 - **Browse** — load the shares you can access, navigate a share (double-click a
   folder), download a file, upload a file into the current folder, create a folder,
   delete an item.
-- **Sync** — list your devices and their sync connections, and **create** a
-  connection the way a real client does: pick a **remote** endpoint (a share folder —
-  use "Pick from Browse tab" to reuse whatever you have open there) and a **local**
-  endpoint (a folder on this machine, via "Browse…"), then a direction
+- **Sync** — this client *is* the device (registered at login), so the Sync tab
+  works on **this** device: "Load connections" lists its sync connections. **Create**
+  a connection the way a real client does: pick a **remote** endpoint (a share
+  folder — use "Pick from Browse tab" to reuse whatever you have open there) and a
+  **local** endpoint (a folder on this machine, via "Browse…"), then a direction
   (TwoWay / Pull = download-only / Push = upload-only). You can also run a **delta**
   enumeration and try the **long-poll** change wait (it blocks up to ~30 s and
   returns as soon as the watched subtree changes — try it, then upload a file from

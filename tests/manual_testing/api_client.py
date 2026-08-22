@@ -186,7 +186,6 @@ class App:
         self.device_id: Optional[str] = None
         self.refresh_token: Optional[str] = None
         self.shares: list[dict] = []          # [{Id, Name, IsRecycleEnabled}]
-        self.devices: list[dict] = []
         self.current_share_id: Optional[str] = None
         self.current_path: str = ""
 
@@ -297,10 +296,9 @@ class App:
 
         top = ttk.Frame(tab)
         top.pack(fill="x", pady=4)
-        ttk.Button(top, text="Load devices", command=self.load_devices).pack(side="left", padx=2)
-        self.device_combo = ttk.Combobox(top, state="readonly", width=40)
-        self.device_combo.pack(side="left", padx=2)
-        self.device_combo.bind("<<ComboboxSelected>>", lambda _e: self.load_profiles())
+        ttk.Button(top, text="Load connections", command=self.load_profiles).pack(side="left", padx=2)
+        self.this_device_var = tk.StringVar(value="this device: — (log in first)")
+        ttk.Label(top, textvariable=self.this_device_var, foreground="#666").pack(side="left", padx=8)
 
         self.profile_tree = ttk.Treeview(
             tab, columns=("share", "remote", "local", "mode", "enabled"), show="headings", height=8)
@@ -422,6 +420,8 @@ class App:
             self.device_id = result.json.get("deviceId") or self.device_id
             self.status_var.set(f"signed in as {self.username_var.get()}")
             self._update_token_label(result.json.get("expiresInSeconds"))
+            self.this_device_var.set(
+                f"this device: {self.device_name_var.get()} ({self.device_id})")
         else:
             self.status_var.set("login failed")
             messagebox.showerror("Login failed", self._describe(result))
@@ -463,6 +463,7 @@ class App:
         self.refresh_token = None
         self.status_var.set("signed out")
         self.token_var.set("access token: —   device: —")
+        self.this_device_var.set("this device: — (log in first)")
 
     def _update_token_label(self, expires: Optional[int]) -> None:
         token = self.client.access_token if self.client else None
@@ -622,39 +623,19 @@ class App:
             lambda r: self._simple_done(r, "Deleted", refresh_list=True))
 
     # ────────────── sync actions ──────────────
-
-    def load_devices(self) -> None:
-        client = self.ensure_client()
-        if client is None:
-            return
-        self.log("\n=== DEVICES ===\n")
-        self.run_async(lambda: client.request("GET", "/api/v1/sync/devices"), self._on_devices)
-
-    def _on_devices(self, result: ApiResult) -> None:
-        if not result.ok or not isinstance(result.json, list):
-            messagebox.showerror("Failed", self._describe(result))
-            return
-        self.devices = result.json
-        self.device_combo["values"] = [
-            f"{d['displayName']}  ({d['platform']}, {d['id'][:8]}…)" for d in self.devices]
-        if self.devices:
-            self.device_combo.current(0)
-            self.load_profiles()
-
-    def _selected_device_id(self) -> Optional[str]:
-        idx = self.device_combo.current()
-        if idx < 0 or idx >= len(self.devices):
-            return None
-        return self.devices[idx]["id"]
+    # This client *is* the device (registered at login), so all sync actions
+    # operate on self.device_id — there is no device to choose.
 
     def load_profiles(self) -> None:
         client = self.ensure_client()
-        device_id = self._selected_device_id()
-        if client is None or not device_id:
+        if client is None or not self.device_id:
+            messagebox.showinfo(
+                "Not signed in", "Log in first — this client registers itself as the device.")
             return
-        self.log("\n=== PROFILES ===\n")
+        self.log("\n=== CONNECTIONS ===\n")
         self.run_async(
-            lambda: client.request("GET", "/api/v1/sync/profiles", query={"deviceId": device_id}),
+            lambda: client.request(
+                "GET", "/api/v1/sync/profiles", query={"deviceId": self.device_id}),
             self._on_profiles)
 
     def _on_profiles(self, result: ApiResult) -> None:
@@ -697,13 +678,12 @@ class App:
 
     def create_profile(self) -> None:
         client = self.ensure_client()
-        device_id = self._selected_device_id()
         share_id = self._selected_share_id(self.sync_share_combo)
-        if client is None or not device_id or not share_id:
-            messagebox.showinfo("Missing", "Load devices and shares, then pick one of each.")
+        if client is None or not self.device_id or not share_id:
+            messagebox.showinfo("Missing", "Log in and pick a remote share first.")
             return
         body = {
-            "deviceId": device_id,
+            "deviceId": self.device_id,
             "shareId": share_id,
             "relativePath": self.sync_path_var.get().strip(),
             "localPath": self.sync_local_var.get().strip(),
