@@ -6,6 +6,7 @@ using Kaimo_File_Server.Infrastructure.Logging;
 using Kaimo_File_Server.Search;
 using Microsoft.Extensions.DependencyInjection;
 
+
 var builder = Host.CreateApplicationBuilder(args);
 
 // -- Infrastructure (DB + Repositories + AuthenticationLookup) --
