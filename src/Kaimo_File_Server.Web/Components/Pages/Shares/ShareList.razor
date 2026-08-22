@@ -6,7 +6,7 @@
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject ShareListViewModel VM
 @inject NavigationManager Nav
-@inject AssetProvider Assets
+@inherits AppComponentBase
 @inject ToastService Toasts
 
 <PageTitle>@Resources.Web_Nav_Shares - Kaimo Files</PageTitle>

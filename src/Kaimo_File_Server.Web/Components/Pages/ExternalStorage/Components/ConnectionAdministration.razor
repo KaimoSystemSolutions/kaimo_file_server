@@ -14,7 +14,7 @@
 @inject IRsyncSshSetupService RsyncSshSetup
 @inject NavigationManager Nav
 @inject IJSRuntime JS
-@inject AssetProvider Assets
+@inherits AppComponentBase
 
 @if (VM.IsLoading)
 {

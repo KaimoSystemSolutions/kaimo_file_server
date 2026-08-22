@@ -347,7 +347,7 @@ public interface ICloudConnection
                 continue;
             }
 
-            if (local.IsDirectory != remote.IsDirectory)
+            if (local!.IsDirectory != remote!.IsDirectory)
                 continue;
 
             // Present on both sides as files: reconciled below regardless of which

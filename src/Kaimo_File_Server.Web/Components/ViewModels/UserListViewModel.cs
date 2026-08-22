@@ -613,7 +613,7 @@ public class UserListViewModel
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error saving user {UserId}", SelectedUser.Id);
+            _logger.LogError(ex, "Error saving user {UserId}", SelectedUser?.Id);
             ErrorMessage = Resources.Web_Error_SaveFailed;
         }
         finally { IsSaving = false; }

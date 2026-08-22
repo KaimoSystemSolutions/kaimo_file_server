@@ -4,7 +4,7 @@
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Microsoft.Extensions.Logging
 @inject AclEditorViewModel VM
-@inject AssetProvider Assets
+@inherits AppComponentBase
 @inject ILogger<AclEditor> Logger
 
 <div class="acl-editor">

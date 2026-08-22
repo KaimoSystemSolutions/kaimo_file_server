@@ -10,7 +10,7 @@
 @implements IAsyncDisposable
 @inject ExternalStorageSyncViewModel VM
 @inject IJSRuntime JS
-@inject AssetProvider Assets
+@inherits AppComponentBase
 
 @if (VM.IsLoading)
 {

@@ -56,7 +56,7 @@ public partial class ShareList
         _handledSuccessfulConnection = true;
 
         HandleCardClick(share);
-        SwitchTab(ShareDetailTab.Cloud);
+        await SwitchTab(ShareDetailTab.Cloud);
         StateHasChanged();
         Toasts.Show(Text("Web_ShareList_CloudConnected", "The cloud connection was added successfully."), ToastType.Success);
     }

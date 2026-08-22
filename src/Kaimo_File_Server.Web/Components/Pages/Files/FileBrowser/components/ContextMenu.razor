@@ -1,7 +1,7 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Kaimo_File_Server.Infrastructure.Configuration
-@inject AssetProvider Assets
+@inherits AppComponentBase
 @inject IConfigRepository Config
 @inject IJSRuntime JS
 
@@ -157,7 +157,7 @@
 
         "versions" => async () => { CloseContextMenu(); await FileBrowser.OpenVersionDialog(target!); },
 
-        "rename" => () => { ContextRename(target!); return Task.CompletedTask; },
+        "rename" => async () => await ContextRename(target!),
 
         "delete" when scope == ContextMenuScope.MultiSelection
             => async () => { foreach (var item in selected) await ContextDelete(item); },
@@ -242,10 +242,10 @@
         FileBrowser.TriggerReRender();
     }
 
-    private void ContextRename(FileMetadata item)
+    private async Task ContextRename(FileMetadata item)
     {
-        FileBrowser.RenameSelected();
         CloseContextMenu();
+        await FileBrowser.RenameSelected();
         FileBrowser.TriggerReRender();
     }
 

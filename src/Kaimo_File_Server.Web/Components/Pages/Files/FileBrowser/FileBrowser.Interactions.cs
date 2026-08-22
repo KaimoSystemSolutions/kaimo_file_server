@@ -38,8 +38,8 @@ public partial class FileBrowser
 
     private ElementReference _deleteModalRef;
 
-    private FilePreview _filePreviewComponent;
-    private ContextMenu _contextMenuComponent;
+    private FilePreview _filePreviewComponent = default!;
+    private ContextMenu _contextMenuComponent = default!;
     private VersionDialog _versionDialogComponent = default!;
     private PropertiesDialog _propertiesDialogComponent = default!;
 
@@ -219,7 +219,7 @@ public partial class FileBrowser
 
         RemoveClipboardToast();
         
-        ClearClipboard();
+        await ClearClipboard();
         _clipboardStartPath = VM.CurrentPath;
         _clipboardSourceShare = VM.CurrentBrowserShare;
         _deleteOnPaste = deleteOnPaste;
@@ -274,7 +274,7 @@ public partial class FileBrowser
             {
                 Toast.Show(_deleteOnPaste ? T("Web_Transfer_CutSuccess") : T("Web_Transfer_CopySuccess"), ToastType.Success);
                 await VM.RefreshCurrentDirectoryAsync();
-                ClearClipboard();
+                await ClearClipboard();
             }
             else
             {

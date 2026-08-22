@@ -30,11 +30,16 @@
 	
 	<ItemGroup>
 	  <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
-	  <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+	  <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
+	  <!-- Pin the patched Microsoft.OpenApi 2.x (NU1903, GHSA-v5pm-xwqc-g5wc affects 2.0.0).
+	       Must stay on 2.x: the AspNetCore.OpenApi 10.0.11 XML-comment source generator targets
+	       the 2.x API (settable IOpenApiMediaType.Example); 3.x makes it read-only and breaks it. -->
+	  <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
+	  <PackageReference Include="Microsoft.IdentityModel.Protocols" Version="8.20.0" />
+	  <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.20.0" />
 	  <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.20.0" />
 	  <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
 	  <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.20.0" />
-	  <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.10" />
 	</ItemGroup>
 
 </Project>

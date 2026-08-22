@@ -280,7 +280,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel
 
     public async Task CreateFolderAtAsync(string path)
     {
-        await _fileService.CreateDirectoryAsync(path, await GetCurrentUserContextAsync());
+        var (service, user) = await RequireServiceAndUserAsync();
+        await service.CreateDirectoryAsync(path, user);
     }
 
     /// <summary>Create a new sub-folder inside the current directory.</summary>
@@ -424,15 +425,15 @@ public class FileBrowserViewModel : IFileBrowserViewModel
 
     public async Task<List<FileMetadata>> ListDirectoryAsync(string dirPath)
     {
-        var userContext = await GetCurrentUserContextAsync();
-        return await _fileService.ListAsync(dirPath, userContext);
+        var (service, user) = await RequireServiceAndUserAsync();
+        return await service.ListAsync(dirPath, user);
     }
-    
+
     public async Task CopyAsync(FileMetadata item, string targetPath, CancellationToken cancellationToken)
     {
-        var userContext = await GetCurrentUserContextAsync();
-        Stream fileToCopy = await _fileService.ReadFileAsync(item.Path, userContext);
-        await _fileService.WriteFileAsync(targetPath, fileToCopy, userContext, cancellationToken);
+        var (service, user) = await RequireServiceAndUserAsync();
+        Stream fileToCopy = await service.ReadFileAsync(item.Path, user);
+        await service.WriteFileAsync(targetPath, fileToCopy, user, cancellationToken);
     }
 
     private string GetCurrentPath(string fileName)
@@ -489,6 +490,22 @@ public class FileBrowserViewModel : IFileBrowserViewModel
         var username = state.User.Identity?.Name;
         if (string.IsNullOrEmpty(username)) return null;
         return await _userContextFactory.CreateByUsernameAsync(username);
+    }
+
+    /// <summary>
+    /// Resolves the active file service and authenticated user for operations that
+    /// require a loaded share and a signed-in user. Throws when either precondition is
+    /// not met, so callers can rely on non-null results.
+    /// </summary>
+    private async Task<(IFileService Service, UserContext User)> RequireServiceAndUserAsync()
+    {
+        if (_fileService is null)
+            throw new InvalidOperationException("No share is currently loaded.");
+
+        var userContext = await GetCurrentUserContextAsync()
+            ?? throw new InvalidOperationException("No authenticated user context is available.");
+
+        return (_fileService, userContext);
     }
 
     /// <summary>Load ACL counts for current path + all visible items in one DB call.</summary>

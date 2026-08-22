@@ -4,14 +4,13 @@
 @using Kaimo_File_Server.Core.Services
 @using Kaimo_File_Server.Search
 @using Kaimo_File_Server.Web.DynamicHelpers
-@inherits LayoutComponentBase
+@inherits AppLayoutComponentBase
 @inject ThemeService Theme
 @inject NavigationManager Nav
 @inject JwtAuthenticationStateProvider AuthState
 @inject AuthenticationStateProvider AuthStateProvider
 @inject FileUploadCoordinator UploadCoordinator
 @inject FileSelectionCoordinator FileSelectionCoordinator
-@inject AssetProvider Assets
 @inject ISearchService SearchService
 @inject IUserContextFactory UserContextFactory
 @inject IManagementAuthService ManagementAuthService

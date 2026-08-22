@@ -13,7 +13,7 @@
 @inject JobService Jobs
 @inject FileUploadCoordinator UploadCoordinator
 @inject FileSelectionCoordinator FileSelectionCoordinator
-@inject AssetProvider Assets
+@inherits AppComponentBase
 @inject CloudToLocalTransferService CloudTransfer
 @inject CrossShareTransferService CrossShareTransfer
 @inject FileBrowserClipboardService BrowserClipboard
@@ -255,7 +255,7 @@ else
             </div>
             <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclPath}-{_showAclPanel}")"
                        Path="@_aclPath"
-                       ShareId="@VM.CurrentShare.Id"
+                       ShareId="@VM.CurrentShare!.Id"
                        IsDirectory="true"
                        OnChanged="LoadAclCounts"/>
         </div>
@@ -438,7 +438,7 @@ else
                             </button>
                         </div>
                         <AclEditor @key="@($"acl-{VM.CurrentShare?.Id}-{_aclFolderPath}-{_showFolderAcl}")"
-                                   Path="@_aclFolderPath" ShareId="@VM.CurrentShare.Id"
+                                   Path="@_aclFolderPath" ShareId="@VM.CurrentShare!.Id"
                                    IsDirectory="@entry.IsDirectory" OnChanged="LoadAclCounts"/>
                     </div>
                 </div>

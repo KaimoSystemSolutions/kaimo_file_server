@@ -1,7 +1,7 @@
 @using Kaimo_File_Server.Web.DynamicHelpers
 @implements IDisposable
 @inject ToastService Toasts
-@inject AssetProvider Assets
+@inherits AppComponentBase
 
 <div class="toast-container">
     @foreach (var toast in Toasts.Toasts)

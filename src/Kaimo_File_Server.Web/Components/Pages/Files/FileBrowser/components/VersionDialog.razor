@@ -1,6 +1,6 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
-@inject AssetProvider Assets
+@inherits AppComponentBase
 @inject IJSRuntime JS
 @inject ToastService Toast
 
@@ -203,7 +203,7 @@
         }
 
         _loading = false;
-        _dialogRef.FocusAsync();
+        await _dialogRef.FocusAsync();
         StateHasChanged();
     }
     

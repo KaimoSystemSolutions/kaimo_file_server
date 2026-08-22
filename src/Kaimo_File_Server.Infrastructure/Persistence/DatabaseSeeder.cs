@@ -112,7 +112,7 @@ public class DatabaseSeeder
             return;
         }
 
-        string configuredPassword = _configuration["Seed:AdminPassword"];
+        string? configuredPassword = _configuration["Seed:AdminPassword"];
 
         var generated = string.IsNullOrWhiteSpace(configuredPassword);
         var password = generated ? GenerateStrongPassword() : configuredPassword!;

@@ -66,7 +66,7 @@ namespace Kaimo_File_Server.Core.Domain
         /// </summary>
         public bool IsRecycleEnabled { get; set; }
 
-        public CloudSettings CloudSettings { get; set; }
+        public CloudSettings CloudSettings { get; set; } = new CloudSettings(new Dictionary<string, SyncedFolder>());
 
         public ICloudConnection? CloudConnection { get; set; }
 

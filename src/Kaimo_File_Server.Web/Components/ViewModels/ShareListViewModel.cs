@@ -1061,7 +1061,7 @@ public partial class ShareListViewModel
         await using var cloudOperationLease = cloudOperation.Lease;
 
         SelectedShare.CloudConnection?.Dispose();
-        SelectedShare.CloudSettings = null;
+        SelectedShare.CloudSettings = new CloudSettings(new Dictionary<string, SyncedFolder>());
         SelectedShare.CloudConnection = null;
         await _shareRepo.UpdateAsync(SelectedShare);
     }

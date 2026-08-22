@@ -2,7 +2,7 @@
 @using Kaimo_File_Server.Web.DynamicHelpers
 @implements IDisposable
 @inject JobService JobService
-@inject AssetProvider Assets
+@inherits AppComponentBase
 
 <div class="job-menu">
     <button class="job-menu-toggle @(_isOpen ? "job-menu-toggle--open" : "")"
