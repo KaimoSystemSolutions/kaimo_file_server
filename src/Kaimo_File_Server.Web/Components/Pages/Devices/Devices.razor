@@ -1,0 +1,97 @@
+@page "/devices"
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Domain.ClientSync
+@using Kaimo_File_Server.Core.Services.DataServices
+@inject DeviceSyncViewModel VM
+
+<PageTitle>@Text("Web_Nav_Devices", "Devices & Sync") - Kaimo Files</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>@Text("Web_Devices_Title", "My devices & sync")</h1>
+        <p class="subtitle">@Text("Web_Devices_Subtitle", "The apps and instances connected to your account. Sync connections are created in the apps themselves — this page is read-only.")</p>
+    </div>
+</div>
+
+@if (VM.IsLoading)
+{
+    <p>@Text("Web_Common_Loading", "Loading…")</p>
+}
+else if (VM.LoadFailed)
+{
+    <p class="error">@Text("Web_Devices_LoadFailed", "Could not load your devices.")</p>
+}
+else if (VM.Devices.Count == 0)
+{
+    <div class="empty-state">
+        <p>@Text("Web_Devices_None", "No devices yet. Sign in from a mobile or desktop app to register one, then it will appear here.")</p>
+    </div>
+}
+else
+{
+    @foreach (var device in VM.Devices)
+    {
+        <section class="device-card">
+            <header class="device-card__header">
+                <h2>@device.DisplayName</h2>
+                <span class="device-card__meta">
+                    @device.Platform · @Text("Web_Devices_LastSeen", "last seen")
+                    @device.LastSeenUtc.ToString("yyyy-MM-dd HH:mm") UTC
+                    @if (!device.IsActive)
+                    {
+                        <span class="badge badge-muted">@Text("Web_Devices_Revoked", "revoked")</span>
+                    }
+                </span>
+            </header>
+
+            @{
+                var profiles = VM.ProfilesByDevice.TryGetValue(device.Id, out var list) ? list : new();
+            }
+
+            @if (profiles.Count == 0)
+            {
+                <p class="muted">@Text("Web_Devices_NoFolders", "No synced folders yet.")</p>
+            }
+            else
+            {
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>@Text("Web_Devices_Col_Share", "Share")</th>
+                            <th>@Text("Web_Devices_Col_RemoteFolder", "Remote folder")</th>
+                            <th>@Text("Web_Devices_Col_LocalFolder", "Local folder")</th>
+                            <th>@Text("Web_Devices_Col_Direction", "Direction")</th>
+                            <th>@Text("Web_Devices_Col_Enabled", "Enabled")</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var profile in profiles)
+                        {
+                            <tr>
+                                <td>@VM.ShareName(profile.ShareId)</td>
+                                <td>@(string.IsNullOrEmpty(profile.RelativePath) ? "/" : profile.RelativePath)</td>
+                                <td>@(string.IsNullOrEmpty(profile.LocalPath) ? "—" : profile.LocalPath)</td>
+                                <td>@ModeLabel(profile.Mode)</td>
+                                <td>@(profile.Enabled ? Text("Web_Common_Yes", "Yes") : Text("Web_Common_No", "No"))</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+    }
+}
+
+@code {
+    protected override async Task OnInitializedAsync() => await VM.LoadAsync();
+
+    private static string ModeLabel(SyncMode mode) => mode switch
+    {
+        SyncMode.Pull => Text("Web_Devices_Mode_Pull", "Download only"),
+        SyncMode.Push => Text("Web_Devices_Mode_Push", "Upload only"),
+        _ => Text("Web_Devices_Mode_TwoWay", "Both directions"),
+    };
+
+    private static string Text(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
+}

@@ -2472,4 +2472,22 @@
   <data name="Web_ExternalStorage_NoConnectionSelectedHint" xml:space="preserve"><value>Select a connection from the list to view its details, test connectivity, or manage its settings.</value></data>
   <data name="Web_ExternalStorage_WebDavServerUrl" xml:space="preserve"><value>Server URL</value></data>
   <data name="Web_ExternalStorage_WebDavHelp" xml:space="preserve"><value>Enter the full WebDAV endpoint URL. Credentials are stored encrypted in the connection vault. HTTPS is strongly recommended.</value></data>
+  <data name="Web_Nav_Devices" xml:space="preserve"><value>Devices &amp; Sync</value></data>
+  <data name="Web_Devices_Title" xml:space="preserve"><value>My devices &amp; sync</value></data>
+  <data name="Web_Devices_Subtitle" xml:space="preserve"><value>The apps and instances connected to your account. Sync connections are created in the apps themselves — this page is read-only.</value></data>
+  <data name="Web_Devices_LoadFailed" xml:space="preserve"><value>Could not load your devices.</value></data>
+  <data name="Web_Devices_None" xml:space="preserve"><value>No devices yet. Sign in from a mobile or desktop app to register one, then it will appear here.</value></data>
+  <data name="Web_Devices_LastSeen" xml:space="preserve"><value>last seen</value></data>
+  <data name="Web_Devices_Revoked" xml:space="preserve"><value>revoked</value></data>
+  <data name="Web_Devices_NoFolders" xml:space="preserve"><value>No synced folders yet.</value></data>
+  <data name="Web_Devices_Col_Share" xml:space="preserve"><value>Share</value></data>
+  <data name="Web_Devices_Col_RemoteFolder" xml:space="preserve"><value>Remote folder</value></data>
+  <data name="Web_Devices_Col_LocalFolder" xml:space="preserve"><value>Local folder</value></data>
+  <data name="Web_Devices_Col_Direction" xml:space="preserve"><value>Direction</value></data>
+  <data name="Web_Devices_Col_Enabled" xml:space="preserve"><value>Enabled</value></data>
+  <data name="Web_Devices_Mode_Pull" xml:space="preserve"><value>Download only</value></data>
+  <data name="Web_Devices_Mode_Push" xml:space="preserve"><value>Upload only</value></data>
+  <data name="Web_Devices_Mode_TwoWay" xml:space="preserve"><value>Both directions</value></data>
+  <data name="Web_Common_Yes" xml:space="preserve"><value>Yes</value></data>
+  <data name="Web_Common_No" xml:space="preserve"><value>No</value></data>
 </root>

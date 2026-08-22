@@ -16,7 +16,9 @@ using Kaimo_File_Server.Web.Components;
 using Kaimo_File_Server.Web.Components.ViewModels;
 using Kaimo_File_Server.Web.Middleware;
 using Kaimo_File_Server.Web.Services;
+using Kaimo_File_Server.Web.Services.Api;
 using Kaimo_File_Server.Web.Services.Https;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 
@@ -86,7 +88,11 @@ builder.Services.AddRazorComponents()
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorizationCore();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    // Serialize/accept enums (e.g. SyncMode) as their names in the client API JSON.
+    .AddJsonOptions(options =>
+        options.JsonSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddHttpClient(nameof(OneDriveDeviceAuthorizationService), client =>
     client.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddHttpClient("CloudAccessOneDrive", client =>
@@ -97,6 +103,25 @@ builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<JwtAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
     sp.GetRequiredService<JwtAuthenticationStateProvider>());
+
+// -- JWT bearer authentication for the client REST API (/api/v1). Uses the SAME
+//    validation parameters as the Blazor token path (JwtTokenService) so the two
+//    can never drift apart. The Blazor localStorage flow is unaffected — it does
+//    not depend on this handler. --
+var apiJwtSecret = builder.Configuration["Jwt:Secret"]
+    ?? throw new InvalidOperationException("Jwt:Secret not configured");
+var apiJwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "KaimoFileServer";
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+        options.TokenValidationParameters =
+            JwtTokenService.CreateValidationParameters(apiJwtSecret, apiJwtIssuer));
+
+// Issues/rotates client-API access + refresh tokens.
+builder.Services.AddScoped<ApiTokenService>();
+
+// OpenAPI document for per-platform client code generation (served at /openapi/v1.json).
+builder.Services.AddOpenApi("v1");
 
 // ══════════════════════════════════════════
 //  Web-only services
@@ -186,6 +211,7 @@ builder.Services.AddScoped<AclEditorViewModel>();
 builder.Services.AddScoped<DepartmentViewModel>();
 builder.Services.AddScoped<CloudSyncViewModel>();
 builder.Services.AddScoped<ExternalStorageSyncViewModel>();
+builder.Services.AddScoped<DeviceSyncViewModel>();
 builder.Services.AddScoped<CloudAccessViewModel>();
 builder.Services.AddScoped<CloudAccessShareBrowserViewModel>();
 builder.Services.AddScoped<RemoteCloudAccessFileBrowserViewModel>();
@@ -311,7 +337,16 @@ else
     }
 }
 
+// Authenticate/authorize before antiforgery and endpoints so [Authorize] API
+// controllers see the JWT-derived principal. Blazor keeps its own cascading auth.
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseAntiforgery();
+
+// Serves the client-API OpenAPI document at /openapi/v1.json for client codegen.
+app.MapOpenApi();
+
 app.MapControllers();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

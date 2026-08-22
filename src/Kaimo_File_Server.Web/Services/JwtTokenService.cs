@@ -87,11 +87,37 @@ public class JwtTokenService
         return tokenString;
     }
 
+    /// <summary>
+    /// Builds the single, canonical set of validation parameters used by BOTH
+    /// the Blazor <see cref="ValidateToken"/> path and the REST API's JWT bearer
+    /// handler, so the two can never drift apart. The algorithm is pinned to
+    /// HMAC-SHA256 so a token cannot be presented with a forged "alg" header
+    /// (e.g. "none" or an asymmetric algorithm) to sidestep HMAC verification.
+    /// </summary>
+    public static TokenValidationParameters CreateValidationParameters(string secret, string issuer)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+        return new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = issuer,
+            ValidateAudience = true,
+            ValidAudience = issuer,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = key,
+            ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
+            ClockSkew = TimeSpan.FromMinutes(2)
+        };
+    }
+
+    /// <summary>Validation parameters for this instance's configured secret/issuer.</summary>
+    public TokenValidationParameters ValidationParameters => CreateValidationParameters(_secret, _issuer);
+
     public ClaimsPrincipal? ValidateToken(string token)
     {
         try
         {
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
             var handler = new JwtSecurityTokenHandler();
 
             if (!handler.CanReadToken(token))
@@ -100,21 +126,7 @@ public class JwtTokenService
                 return null;
             }
 
-            var principal = handler.ValidateToken(token, new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidIssuer = _issuer,
-                ValidateAudience = true,
-                ValidAudience = _issuer,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = key,
-                // Pin the algorithm so a token cannot be presented with a
-                // different/forged "alg" header (e.g. "none" or an asymmetric
-                // algorithm) to sidestep HMAC verification.
-                ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
-                ClockSkew = TimeSpan.FromMinutes(2)
-            }, out _);
+            var principal = handler.ValidateToken(token, ValidationParameters, out _);
 
             return principal;
         }

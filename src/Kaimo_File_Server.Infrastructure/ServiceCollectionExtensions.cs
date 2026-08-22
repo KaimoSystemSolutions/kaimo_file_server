@@ -56,6 +56,14 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<IFileVersionRepository, FileVersionRepository>();
             services.AddScoped<ISambaLifecycleEventRepository, SambaLifecycleEventRepository>();
 
+            // -- Client API (mobile/desktop apps): device registrations, refresh
+            //    tokens, per-device sync selections, and the change cursor --
+            services.AddScoped<ISyncDeviceRepository, SyncDeviceRepository>();
+            services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+            services.AddScoped<IDeviceSyncProfileRepository, DeviceSyncProfileRepository>();
+            services.AddScoped<IFileChangeCursorRepository, FileChangeCursorRepository>();
+            services.AddScoped<Core.Services.Sync.ISyncQueryService, Core.Services.Sync.SyncQueryService>();
+
             // -- Services (infrastructure-level) --
             services.AddScoped<IDepartmentPermissionService, DepartmentPermissionService>();
             services.AddSingleton<IPasswordService, PasswordService>();

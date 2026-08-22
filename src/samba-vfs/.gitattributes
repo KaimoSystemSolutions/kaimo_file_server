@@ -1,0 +1,7 @@
+# These files are sourced/executed inside Linux containers during the Samba
+# build. A CRLF checkout on Windows leaks a trailing carriage return into
+# every sourced variable (e.g. SAMBA_VERSION="4.22.1\r"), which corrupts the
+# download URL and breaks the build (wget exit code 8 / 404). Force LF.
+samba-build.env text eol=lf
+*.sh            text eol=lf
+Dockerfile*     text eol=lf

@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
@@ -33,6 +34,11 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<StorageDeviceAuthorizationSession> StorageDeviceAuthorizationSessions { get; set; }
         public DbSet<SyncDefinition> SyncDefinitions { get; set; }
         public DbSet<SyncDefinitionRuntime> SyncDefinitionRuntimes { get; set; }
+
+        // -- Client API (mobile/desktop apps) --
+        public DbSet<SyncDevice> SyncDevices { get; set; }
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<DeviceSyncProfile> DeviceSyncProfiles { get; set; }
 
         // -- Departments & Scoped Roles --
         public DbSet<Department> Departments { get; set; }
@@ -328,6 +334,59 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasOne<SyncDefinition>().WithOne()
                     .HasForeignKey<SyncDefinitionRuntime>(x => x.SyncDefinitionId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // -- Client API (mobile/desktop apps) --
+
+            modelBuilder.Entity<SyncDevice>(entity =>
+            {
+                entity.ToTable("sync_devices");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Platform).HasMaxLength(50);
+                entity.Property(e => e.PushToken).HasMaxLength(500);
+                entity.HasIndex(e => e.UserId);
+                entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<RefreshToken>(entity =>
+            {
+                entity.ToTable("refresh_tokens");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.DeviceId).IsRequired();
+                entity.HasIndex(e => e.TokenHash).IsUnique();
+                entity.HasIndex(e => e.DeviceId);
+                entity.HasIndex(e => e.UserId);
+                // UserId is denormalized (no FK) to avoid a second cascade path
+                // into refresh_tokens; deletes cascade through the device.
+                entity.HasOne<SyncDevice>().WithMany().HasForeignKey(e => e.DeviceId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<DeviceSyncProfile>(entity =>
+            {
+                entity.ToTable("device_sync_profiles");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.DeviceId).IsRequired();
+                entity.Property(e => e.ShareId).IsRequired();
+                entity.Property(e => e.RelativePath).IsRequired().HasMaxLength(2000);
+                // Opaque device-local path; the server stores it verbatim.
+                entity.Property(e => e.LocalPath).IsRequired().HasMaxLength(4000).HasDefaultValue(string.Empty);
+                entity.Property(e => e.Mode).HasConversion<int>();
+                entity.HasIndex(e => e.DeviceId);
+                entity.HasIndex(e => e.UserId);
+                entity.HasIndex(e => new { e.DeviceId, e.ShareId, e.RelativePath }).IsUnique();
+                entity.HasOne<SyncDevice>().WithMany().HasForeignKey(e => e.DeviceId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                // ShareId has no FK cascade here: shares are removed through their
+                // own admin flow, and a dangling profile is harmless (the API
+                // resolves the share and returns not-found).
+                entity.HasIndex(e => e.ShareId);
             });
 
             // -- Departments --
