@@ -206,6 +206,7 @@ class SyncStats:
     created_remote_dirs: int = 0
     deleted_local: int = 0
     deleted_remote: int = 0
+    conflicts: int = 0
     skipped: int = 0
     failed: int = 0
 
@@ -214,8 +215,67 @@ class SyncStats:
             f"↓{self.downloaded} ↑{self.uploaded}  "
             f"mkdir(local {self.created_local_dirs}, remote {self.created_remote_dirs})  "
             f"del(local {self.deleted_local}, remote {self.deleted_remote})  "
-            f"skip {self.skipped}  fail {self.failed}"
+            f"conflict {self.conflicts}  skip {self.skipped}  fail {self.failed}"
         )
+
+
+def _state_dir() -> str:
+    """Directory holding the per-profile sync baselines (created on demand)."""
+    path = os.path.join(os.path.expanduser("~"), ".kaimo_sync_client")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+class SyncState:
+    """
+    Persistent record of the converged state after the last successful two-way
+    sync of one connection, so the next run can tell a *newly created* file apart
+    from one *deleted on the other side*.
+
+    Without this memory a two-way sync sees a file present on only one side and
+    can only guess "new here" — so it copies it back, silently resurrecting a file
+    the user deleted on the other side. The baseline turns that guess into a fact:
+    a path in the baseline that is now gone on one side was deleted (propagate the
+    deletion); a path not in the baseline is genuinely new (copy it).
+
+    Per file we remember each side's (size, mtime) separately — the "r"emote and
+    "l"ocal observations can legitimately differ (e.g. the server stamps its own
+    modification time on upload) — so "did this side change since the last sync?"
+    is answered against that side's own last-seen value.
+
+    The state lives outside the synced folders (keyed by profile id under
+    ~/.kaimo_sync_client) so it is never itself swept up by the sync.
+    """
+
+    def __init__(self, profile_id: str):
+        self.path = os.path.join(_state_dir(), f"{profile_id}.json")
+
+    def load(self) -> tuple[dict[str, dict], set[str], bool]:
+        """Return (files, dirs, existed). `files` maps rel → {"r":[size,mtime], "l":[size,mtime]}."""
+        try:
+            with open(self.path, encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            return {}, set(), False
+        files = data.get("files", {}) if isinstance(data, dict) else {}
+        dirs = set(data.get("dirs", [])) if isinstance(data, dict) else set()
+        return files, dirs, True
+
+    def save(self, files: dict[str, dict], dirs: set[str]) -> None:
+        payload = {"files": files, "dirs": sorted(dirs)}
+        tmp = self.path + ".tmp"
+        try:
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(payload, fh)
+            os.replace(tmp, self.path)
+        except OSError:
+            pass  # a lost baseline only costs one extra reconcile, never data
+
+    def clear(self) -> None:
+        try:
+            os.remove(self.path)
+        except OSError:
+            pass
 
 
 class SyncEngine:
@@ -232,11 +292,16 @@ class SyncEngine:
     Transfers reuse the same browse endpoints the Browse tab uses (content GET/PUT,
     directory POST, item DELETE), so this is a faithful exercise of the real API.
 
-    Because the server keeps no per-device sync state, the client has no memory of
-    the previous run and cannot tell a brand-new file apart from one deleted on the
-    other side. Deletions are therefore only performed when "mirror" is enabled,
-    and only in the single authoritative direction (Pull deletes local extras, Push
-    deletes remote extras); TwoWay never deletes.
+    Deletions are only performed when "mirror" is enabled. For the one-directional
+    modes the authoritative side decides unambiguously (Pull deletes local extras,
+    Push deletes remote extras). TwoWay has no authoritative side, so it leans on a
+    persistent baseline (see SyncState): a path present on only one side is a
+    deletion to propagate when it was in the baseline, or a new file to copy when it
+    was not. A path modified on the surviving side after having been deleted on the
+    other counts as a conflict and is kept (re-copied), never deleted — data loss is
+    always resolved in favour of keeping the file. Without a baseline yet (the first
+    TwoWay run) nothing is deleted; the run just unions both sides and records the
+    baseline so subsequent runs can propagate deletions.
 
     Two files count as equal when their sizes match and their modification times
     agree within MTIME_TOLERANCE. On download the local mtime is set to the remote
@@ -247,7 +312,8 @@ class SyncEngine:
 
     def __init__(self, client: ApiClient, *, share_id: str, remote_root: str,
                  local_root: str, mode: str, mirror: bool, dry_run: bool,
-                 log: Callable[[str], None], should_stop: Callable[[], bool]):
+                 log: Callable[[str], None], should_stop: Callable[[], bool],
+                 state: Optional["SyncState"] = None):
         self.client = client
         self.share_id = share_id
         self.remote_root = remote_root.strip("/")
@@ -257,7 +323,17 @@ class SyncEngine:
         self.dry_run = dry_run
         self.log = log
         self.should_stop = should_stop
+        self.state = state
         self.stats = SyncStats()
+        # Baseline (loaded in run(), TwoWay only) and post-run existence tracking.
+        self._base_files: dict[str, dict] = {}
+        self._base_dirs: set[str] = set()
+        self._baseline_available = False
+        self._twoway_mirror = False   # mirror deletions armed for this run?
+        self._remote_after: set[str] = set()
+        self._local_after: set[str] = set()
+        self._dir_deletes_remote: list[str] = []
+        self._dir_deletes_local: list[str] = []
 
     # -- path mapping between the remote subtree and the local folder --
 
@@ -331,19 +407,37 @@ class SyncEngine:
         pull = self.mode in ("Pull", "TwoWay")
         push = self.mode in ("Push", "TwoWay")
 
+        # Load the baseline for two-way runs; arm deletion propagation only once we
+        # actually have one (the first run just unions the sides and records it).
+        if self.mode == "TwoWay" and self.state is not None:
+            self._base_files, self._base_dirs, self._baseline_available = self.state.load()
+            self._twoway_mirror = self.mirror and self._baseline_available
+            if self.mirror and not self._baseline_available:
+                self.log("  (first two-way run — building baseline; deletions apply next time)\n")
+
+        # Track what will exist on each side after this run, for dir-emptiness
+        # checks and for refreshing the baseline afterwards.
+        self._remote_after = set(remote_files)
+        self._local_after = set(local_files)
+        self._dir_deletes_remote = []
+        self._dir_deletes_local = []
+
         # 1) Directories first (shallow → deep) so file transfers have a parent.
-        if pull:
-            for rel in sorted(remote_dirs, key=lambda r: r.count("/")):
-                if self.should_stop():
-                    return self._stopped(token)
-                if rel not in local_dirs:
-                    self._make_local_dir(rel)
-        if push:
-            for rel in sorted(local_dirs, key=lambda r: r.count("/")):
-                if self.should_stop():
-                    return self._stopped(token)
-                if rel not in remote_dirs:
-                    self._make_remote_dir(rel)
+        if self._twoway_mirror:
+            self._reconcile_dirs_twoway(remote_dirs, local_dirs)
+        else:
+            if pull:
+                for rel in sorted(remote_dirs, key=lambda r: r.count("/")):
+                    if self.should_stop():
+                        return self._stopped(token)
+                    if rel not in local_dirs:
+                        self._make_local_dir(rel)
+            if push:
+                for rel in sorted(local_dirs, key=lambda r: r.count("/")):
+                    if self.should_stop():
+                        return self._stopped(token)
+                    if rel not in remote_dirs:
+                        self._make_remote_dir(rel)
 
         # 2) Files.
         for rel in sorted(set(remote_files) | set(local_files)):
@@ -358,10 +452,26 @@ class SyncEngine:
         elif self.mirror and self.mode == "Push":
             self._mirror_delete_remote(
                 set(remote_files) - set(local_files), set(remote_dirs) - set(local_dirs))
+        elif self._twoway_mirror:
+            # Two-way file deletions were propagated inline; now the emptied
+            # directories, deepest first, guarding against non-empty ones.
+            self._apply_twoway_dir_deletes()
+
+        # 4) Record the converged state so the next two-way run can reason about
+        #    deletions. Refresh when something changed, or to seed the first run.
+        if self.mode == "TwoWay" and self.state is not None and not self.dry_run \
+                and not self.should_stop() and (self._mutated() or not self._baseline_available):
+            self._refresh_baseline()
 
         verb = "would sync" if self.dry_run else "done"
         self.log(f"  {verb}: {self.stats.summary()}\n")
         return token
+
+    def _mutated(self) -> bool:
+        """Did this run change either side (as opposed to only skipping/failing)?"""
+        s = self.stats
+        return bool(s.downloaded or s.uploaded or s.created_local_dirs
+                    or s.created_remote_dirs or s.deleted_local or s.deleted_remote)
 
     def _reconcile_file(self, rel: str, remote: Optional[tuple[int, float]],
                         local: Optional[tuple[int, float]], pull: bool, push: bool) -> None:
@@ -376,15 +486,123 @@ class SyncEngine:
                 self._download(rel, remote)
             else:
                 self._upload(rel)
-        elif remote is not None and pull:      # only remote has it → bring it local
+        elif remote is not None:                # present only on the remote
+            if self._twoway_mirror and self._in_baseline(rel):
+                self._resolve_local_gone(rel, remote)
+            elif pull:                          # new remote file → bring it local
+                self._download(rel, remote)
+        elif local is not None:                 # present only on the local side
+            if self._twoway_mirror and self._in_baseline(rel):
+                self._resolve_remote_gone(rel, local)
+            elif push:                          # new local file → send it up
+                self._upload(rel)
+        # Any remaining "only one side" case (mirror off, or wrong direction) is
+        # left untouched.
+
+    def _resolve_local_gone(self, rel: str, remote: tuple[int, float]) -> None:
+        """The file is in the baseline but gone locally: a local delete, unless the
+        remote copy was edited since — then it is a conflict and we keep it."""
+        if self._matches_baseline(rel, "r", remote):
+            self.log(f"    − remote {rel} (deleted locally)\n")
+            self._delete_remote_file(rel)
+        else:
+            self.log(f"    ⚠ conflict {rel}: deleted locally but changed on server — keeping\n")
+            self.stats.conflicts += 1
             self._download(rel, remote)
-        elif local is not None and push:       # only local has it → send it up
+
+    def _resolve_remote_gone(self, rel: str, local: tuple[int, float]) -> None:
+        """The file is in the baseline but gone on the server: a remote delete,
+        unless the local copy was edited since — then it is a conflict, keep it."""
+        if self._matches_baseline(rel, "l", local):
+            self.log(f"    − local {rel} (deleted on server)\n")
+            self._delete_local_file(rel)
+        else:
+            self.log(f"    ⚠ conflict {rel}: deleted on server but changed locally — keeping\n")
+            self.stats.conflicts += 1
             self._upload(rel)
-        # The remaining "only one side" cases are handled by mirror deletion, or
-        # left untouched when mirror is off.
+
+    # -- baseline lookups --
+
+    def _in_baseline(self, rel: str) -> bool:
+        return rel in self._base_files
+
+    def _matches_baseline(self, rel: str, side: str, current: tuple[int, float]) -> bool:
+        """True when `current` (an "r" or "l" observation) equals what the baseline
+        last recorded for that side — i.e. the surviving side was not edited since."""
+        ref = self._base_files.get(rel, {}).get(side)
+        if not ref:
+            return False
+        return ref[0] == current[0] and abs(ref[1] - current[1]) <= self.MTIME_TOLERANCE
 
     def _same(self, remote: tuple[int, float], local: tuple[int, float]) -> bool:
         return remote[0] == local[0] and abs(remote[1] - local[1]) <= self.MTIME_TOLERANCE
+
+    # -- two-way directory reconciliation (baseline-driven) --
+
+    def _reconcile_dirs_twoway(self, remote_dirs: dict, local_dirs: dict) -> None:
+        """Create genuinely new directories on the opposite side; collect the ones
+        that vanished from one side (and were known) as deletion candidates for
+        after the file pass, when we can tell whether they are really empty."""
+        for rel in sorted(remote_dirs, key=lambda r: r.count("/")):
+            if self.should_stop():
+                return
+            if rel in local_dirs:
+                continue
+            if rel in self._base_dirs:
+                self._dir_deletes_remote.append(rel)   # gone locally → maybe delete remote
+            else:
+                self._make_local_dir(rel)              # new on the server → create local
+        for rel in sorted(local_dirs, key=lambda r: r.count("/")):
+            if self.should_stop():
+                return
+            if rel in remote_dirs:
+                continue
+            if rel in self._base_dirs:
+                self._dir_deletes_local.append(rel)    # gone on server → maybe delete local
+            else:
+                self._make_remote_dir(rel)             # new locally → create remote
+
+    def _apply_twoway_dir_deletes(self) -> None:
+        """Remove directories emptied by propagated deletions, deepest first, but
+        only when no (possibly newly added) file still lives under them."""
+        for rel in sorted(self._dir_deletes_remote, key=lambda r: -r.count("/")):
+            if self.should_stop():
+                return
+            if self._has_children(self._remote_after, rel):
+                continue                               # new content arrived → keep it
+            self.log(f"    − remote dir {rel} (deleted locally)\n")
+            self._delete_remote_path(rel)
+            self._remote_after.discard(rel)
+        for rel in sorted(self._dir_deletes_local, key=lambda r: -r.count("/")):
+            if self.should_stop():
+                return
+            if self._has_children(self._local_after, rel):
+                continue
+            self.log(f"    − local dir {rel} (deleted on server)\n")
+            self._delete_local_path(self._local_path(rel), is_dir=True)
+            self._local_after.discard(rel)
+
+    @staticmethod
+    def _has_children(paths: set[str], rel: str) -> bool:
+        prefix = rel + "/"
+        return any(p.startswith(prefix) for p in paths)
+
+    def _refresh_baseline(self) -> None:
+        """Re-observe both sides after reconciling and store the converged state
+        (paths present on both sides) as the baseline for the next two-way run."""
+        try:
+            remote_dirs, remote_files, _ = self._enumerate_remote()
+            local_dirs, local_files = self._scan_local()
+        except Exception as exc:  # noqa: BLE001 - keep the old baseline on any hiccup
+            self.log(f"  ⚠ baseline not updated: {exc}\n")
+            return
+        files = {
+            rel: {"r": list(remote_files[rel]), "l": list(local_files[rel])}
+            for rel in set(remote_files) & set(local_files)
+        }
+        dirs = set(remote_dirs) & set(local_dirs)
+        assert self.state is not None
+        self.state.save(files, dirs)
 
     # -- individual operations (each honours dry-run and tallies its outcome) --
 
@@ -405,6 +623,7 @@ class SyncEngine:
             fh.write(res.body_bytes)
         # Match the remote mtime so the next run sees the two sides as equal.
         os.utime(local_path, (time.time(), remote[1]))
+        self._local_after.add(rel)
         self.stats.downloaded += 1
 
     def _upload(self, rel: str) -> None:
@@ -421,6 +640,8 @@ class SyncEngine:
         res = self.client.request(
             "PUT", f"/api/v1/browse/{self.share_id}/content",
             query={"path": self._remote_path(rel)}, raw_body=data)
+        if res.ok:
+            self._remote_after.add(rel)
         self._tally(res.ok, "uploaded")
 
     def _make_local_dir(self, rel: str) -> None:
@@ -450,6 +671,16 @@ class SyncEngine:
                 return
             self.log(f"    − local dir {rel}\n")
             self._delete_local_path(self._local_path(rel), is_dir=True)
+
+    def _delete_local_file(self, rel: str) -> None:
+        """Delete a single local file (two-way delete propagation) and forget it."""
+        self._delete_local_path(self._local_path(rel), is_dir=False)
+        self._local_after.discard(rel)
+
+    def _delete_remote_file(self, rel: str) -> None:
+        """Delete a single remote file (two-way delete propagation) and forget it."""
+        self._delete_remote_path(rel)
+        self._remote_after.discard(rel)
 
     def _delete_local_path(self, path: str, is_dir: bool) -> None:
         if self.dry_run:
@@ -695,9 +926,13 @@ class App:
             text=(
                 "Select a connection above, then Sync. Pull = server→local, "
                 "Push = local→server, TwoWay = newest wins. \"Mirror deletes\" removes "
-                "extras on the target (Pull/Push only). Auto-sync reconciles once, then "
-                "keeps syncing: Pull long-polls for server changes; Push/TwoWay also "
-                "poll the local folder so local edits get pushed up too.")
+                "extras on the target: Pull/Push delete on the authoritative side; "
+                "TwoWay propagates a deletion in either direction using a per-connection "
+                "baseline (the first two-way run only builds that baseline). A file "
+                "edited on one side after being deleted on the other is kept as a "
+                "conflict, never lost. Auto-sync reconciles once, then keeps syncing: "
+                "Pull long-polls for server changes; Push/TwoWay also poll the local "
+                "folder so local edits get pushed up too.")
         ).pack(anchor="w", padx=6, pady=(0, 4))
 
     def _build_log(self) -> None:
@@ -1054,6 +1289,9 @@ class App:
             return
         profile_id = sel[0]
         self.log(f"\n=== DELETE PROFILE {profile_id} ===\n")
+        # Drop the local sync baseline too, so a later profile with the same id
+        # (or a fresh connection) does not inherit a stale converged state.
+        SyncState(profile_id).clear()
         self.run_async(
             lambda: client.request("DELETE", f"/api/v1/sync/profiles/{profile_id}"),
             lambda r: self._simple_done(r, "Deleted", reload_profiles=True))
@@ -1132,6 +1370,7 @@ class App:
             dry_run=self.dry_run_var.get(),
             log=self.log,
             should_stop=should_stop,
+            state=SyncState(profile["id"]),
         )
 
     def sync_selected_now(self) -> None:
