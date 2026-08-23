@@ -47,9 +47,31 @@ public class AssetProvider
 
         var svg = File.ReadAllText(fullPath);
 
-        // Only override width/height, the viewBox stays untouched
-        svg = Regex.Replace(svg, @"(?<=\bwidth="")\d+(?="")", width.ToString());
-        svg = Regex.Replace(svg, @"(?<=\bheight="")\d+(?="")", height.ToString());
+        svg = Regex.Replace(
+            svg,
+            @"<svg\b([^>]*)>",
+            match =>
+            {
+                var attributes = match.Groups[1].Value;
+
+                // Vorhandene width/height entfernen
+                attributes = Regex.Replace(
+                    attributes,
+                    @"\s+width\s*=\s*[""'][^""']*[""']",
+                    ""
+                );
+
+                attributes = Regex.Replace(
+                    attributes,
+                    @"\s+height\s*=\s*[""'][^""']*[""']",
+                    ""
+                );
+
+                // Neue Werte setzen
+                return $"""<svg width="{width}" height="{height}"{attributes}>""";
+            },
+            RegexOptions.Singleline
+        );
 
         return new MarkupString(svg);
     }
