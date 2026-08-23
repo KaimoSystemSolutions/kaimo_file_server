@@ -1,6 +1,8 @@
 using System;
+using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Services.Sync;
+using Kaimo_File_Server.Web.Controllers.Api;
 using Xunit;
 
 namespace Kaimo_File_Server.Tests;
@@ -90,5 +92,98 @@ public sealed class ClientSyncApiTests
 
         device.RevokedAtUtc = DateTime.UtcNow;
         Assert.False(device.IsActive);
+    }
+
+    // ─────────────────── ItemTag (conditional-op validator) ───────────────────
+
+    private static FileMetadata Meta(long size, DateTime modified, bool dir = false) =>
+        new() { Size = size, ModifiedAt = modified, IsDirectory = dir, Path = "x", Name = "x" };
+
+    [Fact]
+    public void Item_tag_is_derived_from_size_and_modified_ticks()
+    {
+        var when = new DateTime(2026, 8, 23, 12, 0, 0, DateTimeKind.Utc);
+        var tag = ItemTag.For(Meta(1234, when));
+        Assert.Equal($"\"1234:{when.Ticks}\"", tag);
+    }
+
+    [Fact]
+    public void Item_tag_changes_when_size_or_mtime_changes()
+    {
+        var when = new DateTime(2026, 8, 23, 12, 0, 0, DateTimeKind.Utc);
+        var baseTag = ItemTag.For(Meta(10, when));
+        Assert.NotEqual(baseTag, ItemTag.For(Meta(11, when)));
+        Assert.NotEqual(baseTag, ItemTag.For(Meta(10, when.AddSeconds(1))));
+    }
+
+    [Fact]
+    public void Item_tag_is_computed_in_utc_regardless_of_input_kind()
+    {
+        var utc = new DateTime(2026, 8, 23, 12, 0, 0, DateTimeKind.Utc);
+        var local = utc.ToLocalTime(); // same instant, Local kind
+        Assert.Equal(ItemTag.For(Meta(5, utc)), ItemTag.For(Meta(5, local)));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Empty_if_match_is_treated_as_no_condition(string? header)
+    {
+        Assert.True(ItemTag.Matches(header, Meta(1, DateTime.UnixEpoch)));
+    }
+
+    [Fact]
+    public void Star_if_match_matches_any_existing_item()
+    {
+        Assert.True(ItemTag.Matches("*", Meta(99, DateTime.UtcNow)));
+    }
+
+    [Fact]
+    public void If_match_matches_only_the_exact_tag()
+    {
+        var m = Meta(42, new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var tag = ItemTag.For(m);
+
+        Assert.True(ItemTag.Matches(tag, m));
+        Assert.True(ItemTag.Matches($"\"deadbeef\", {tag}", m)); // one of a list matches
+        Assert.True(ItemTag.Matches($"W/{tag}", m));             // weak-validator prefix tolerated
+        Assert.False(ItemTag.Matches("\"1:2\"", m));             // a different tag does not match
+    }
+
+    // ─────────────────── Idempotency fingerprint & decision ───────────────────
+
+    [Fact]
+    public void Fingerprint_is_stable_for_the_same_request()
+    {
+        var a = RequestFingerprint.Compute("POST", "share/rename", "a.txt", "b.txt");
+        var b = RequestFingerprint.Compute("POST", "share/rename", "a.txt", "b.txt");
+        Assert.Equal(a, b);
+    }
+
+    [Fact]
+    public void Fingerprint_differs_when_any_part_differs()
+    {
+        var baseline = RequestFingerprint.Compute("POST", "share/rename", "a.txt", "b.txt");
+        Assert.NotEqual(baseline, RequestFingerprint.Compute("DELETE", "share/rename", "a.txt", "b.txt"));
+        Assert.NotEqual(baseline, RequestFingerprint.Compute("POST", "share/rename", "a.txt", "c.txt"));
+    }
+
+    [Fact]
+    public void Fingerprint_has_no_boundary_ambiguity_between_parts()
+    {
+        // Length-prefixing means ("ab","c") and ("a","bc") must not collide.
+        var x = RequestFingerprint.Compute("POST", "p", "ab", "c");
+        var y = RequestFingerprint.Compute("POST", "p", "a", "bc");
+        Assert.NotEqual(x, y);
+    }
+
+    [Fact]
+    public void Idempotency_decides_proceed_replay_or_conflict()
+    {
+        const string hash = "abc";
+        Assert.Equal(IdempotencyOutcome.Proceed, IdempotencyDecision.Decide(null, hash));
+        Assert.Equal(IdempotencyOutcome.Replay, IdempotencyDecision.Decide(hash, hash));
+        Assert.Equal(IdempotencyOutcome.Conflict, IdempotencyDecision.Decide("other", hash));
     }
 }

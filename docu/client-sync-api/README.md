@@ -51,7 +51,7 @@ These rules are fixed and must be preserved by all clients and by the server:
 ## Contents
 1. [Concepts](#1-concepts)
 2. [Authentication & devices](#2-authentication--devices)
-3. [Browsing](#3-browsing)
+3. [Browsing](#3-browsing) · [3.1 Safe mutations: conditional requests & idempotency keys](#31-safe-mutations-conditional-requests--idempotency-keys)
 4. [Sync](#4-sync)
 5. [Change notification & battery model](#5-change-notification--battery-model)
 6. [Error format](#6-error-format)
@@ -71,6 +71,8 @@ These rules are fixed and must be preserved by all clients and by the server:
 | **Refresh token** | Long-lived opaque secret used to mint new access tokens. Rotated on every use. |
 | **Sync connection** | `DeviceSyncProfile`: one connection pairing a **remote** endpoint (a share + share-relative folder) with a **local** endpoint (a folder on the device, opaque to the server), plus a direction — `Pull` (download-only), `Push` (upload-only), or `TwoWay`. |
 | **Change token** | Opaque string fingerprinting a subtree; changes whenever anything under it is added, modified, or deleted — through any transport. |
+| **Item tag** | An `ETag`-style validator for one file/directory, `"{size}:{modifiedTicks}"` (quoted). Returned on `metadata`/`content`/upload and reproducible on the client from a delta entry, so it can be sent back as `If-Match` without a metadata round trip. See [§3.1](#31-safe-mutations-conditional-requests--idempotency-keys). |
+| **Idempotency key** | A client-chosen, per-device stable id for one mutating operation, sent as the `Idempotency-Key` header. Lets a retried request replay its original outcome instead of re-executing. |
 
 All timestamps are UTC ISO-8601. All enums serialize as their names (e.g. `"TwoWay"`).
 
@@ -128,25 +130,78 @@ ACLs) on refresh and on every request, so a disabled user loses access promptly.
 
 All browse endpoints are ACL-checked per call.
 
-| Method & path | Purpose |
-|---|---|
-| `GET /api/v1/browse/shares` | Shares the caller may browse. |
-| `GET /api/v1/browse/{shareId}/list?path=` | Directory children (+ `ETag`). |
-| `GET /api/v1/browse/{shareId}/metadata?path=` | One item's metadata. |
-| `GET /api/v1/browse/{shareId}/content?path=` | Download; supports `Range`. |
-| `PUT /api/v1/browse/{shareId}/content?path=` | Upload/overwrite (body = bytes). |
-| `POST /api/v1/browse/{shareId}/directory?path=` | Create a directory. |
-| `POST /api/v1/browse/{shareId}/rename` | Body `{ "from": "...", "to": "..." }`. |
-| `DELETE /api/v1/browse/{shareId}/item?path=` | Delete (recycle bin if the share has one). |
-| `GET /api/v1/browse/{shareId}/versions?path=` | Stored versions of a file (newest first). |
-| `GET /api/v1/browse/{shareId}/version-content?path=&timestamp=` | Download one version. |
+| Method & path | Purpose | Conditional / idempotent |
+|---|---|---|
+| `GET /api/v1/browse/shares` | Shares the caller may browse. | — |
+| `GET /api/v1/browse/{shareId}/list?path=` | Directory children (+ `ETag`). | `If-None-Match` → 304 |
+| `GET /api/v1/browse/{shareId}/metadata?path=` | One item's metadata (+ item-tag `ETag`). | — |
+| `GET /api/v1/browse/{shareId}/content?path=` | Download; supports `Range` (+ item-tag `ETag`). | — |
+| `PUT /api/v1/browse/{shareId}/content?path=` | Upload/overwrite (body = bytes). | `If-Match`, `If-None-Match: *`, `Idempotency-Key` |
+| `POST /api/v1/browse/{shareId}/directory?path=` | Create a directory. | `Idempotency-Key` |
+| `POST /api/v1/browse/{shareId}/rename` | Body `{ "from": "...", "to": "..." }`. | `If-Match`, `Idempotency-Key` |
+| `DELETE /api/v1/browse/{shareId}/item?path=` | Delete (recycle bin if the share has one). | `If-Match`, `Idempotency-Key` |
+| `GET /api/v1/browse/{shareId}/versions?path=` | Stored versions of a file (newest first). | — |
+| `GET /api/v1/browse/{shareId}/version-content?path=&timestamp=` | Download one version. | — |
 
-**Caching / bandwidth.** `list` returns an `ETag`. Send it back as `If-None-Match`;
-an unchanged directory answers `304 Not Modified` with an empty body — cheap on
-battery and data.
+**Caching / bandwidth.** `list` returns an `ETag` over the whole listing. Send it
+back as `If-None-Match`; an unchanged directory answers `304 Not Modified` with an
+empty body — cheap on battery and data. `metadata`, `content`, and a successful
+upload return a **per-item** `ETag` (the item tag) for use with `If-Match` on the
+mutating endpoints — see [§3.1](#31-safe-mutations-conditional-requests--idempotency-keys).
 
 **Large files.** `content` downloads honor HTTP `Range`, so a client can resume or
 segment a transfer. Uploads stream straight to disk with an atomic replace.
+
+### 3.1 Safe mutations: conditional requests & idempotency keys
+
+The mutating browse endpoints support two **opt-in** mechanisms that make an
+offline-first client's replay safe. Both are strictly opt-in: omit the headers and
+behavior is unchanged.
+
+**Conditional requests (`If-Match` / `If-None-Match`) — optimistic concurrency.**
+The *item tag* of a file/directory is `"{size}:{modifiedTicks}"` (quoted; `modifiedTicks`
+is the UTC `DateTime.Ticks` of its modified time). It is returned as the `ETag` on
+`metadata`, `content`, and a successful upload, and is reproducible on the client from
+a `delta` entry (`size` + `modifiedAtUtc`), so no extra round trip is needed to build it.
+
+- `PUT content` with `If-Match: "<tag>"` — overwrite **only** if the current item still
+  matches; a mismatch (or a missing file) → `412 precondition_failed`.
+- `PUT content` with `If-None-Match: *` — **create-only**; if the file already exists → `412`.
+- `POST rename` with `If-Match: "<tag>"` — validated against the **source** item; mismatch → `412`.
+- `DELETE item` with `If-Match: "<tag>"` — delete only if the item still matches; mismatch → `412`.
+
+`If-Match` also accepts `*` (matches any existing item) and a comma-separated list;
+a weak-validator `W/"…"` prefix is tolerated. This is exactly the precondition a
+two-way client uses to detect "the other side changed since I last saw it" instead of
+silently overwriting.
+
+**Idempotency keys (`Idempotency-Key`) — replay-safe retries.**
+Send `Idempotency-Key: <opId>` (a stable, per-device id for the operation) on `PUT content`,
+`POST directory`, `POST rename`, or `DELETE item`. The first request executes and the
+server records the outcome, scoped to `(device, key)`. A repeat:
+
+- **same key + same request** → the stored status and body are **replayed** (the operation
+  does *not* run again) — so a retry after a lost response is safe;
+- **same key + different request** → `422 idempotency_key_conflict` (a key can never mask a
+  different operation);
+- a key longer than 128 chars → `400 invalid_idempotency_key`.
+
+Only deterministic outcomes are stored (`2xx`, `412`, `409`); transient failures
+(`401`/`403`/`404`/`5xx`) are **not** stored, so a later retry can still succeed.
+Receipts are per-device and are removed when the device is revoked.
+
+**Natural idempotence** (independent of the header) makes replay robust even without a key:
+
+- `DELETE item` on an already-gone item → `204` (not `404`).
+- `POST rename` where the source is gone but the destination exists (the rename already
+  applied) → `204`.
+- `POST directory` on an existing directory → `204`.
+
+**Recommended pattern for the client outbox:** persist a stable `opId` per queued mutation
+and the item tag you last saw; on (re)connect, replay each op with
+`Idempotency-Key: <opId>` and `If-Match: <tag>`. A `2xx` (or a replayed one) → done; a
+`412` → a genuine conflict to resolve (e.g. keep-both); a network error → keep the op and
+retry later.
 
 ---
 
@@ -225,6 +280,12 @@ The goal is *fast propagation both ways* without draining mobile batteries.
   side sees them within one long-poll cycle.
 - **Coarse then precise.** The token only says "something changed"; the client then
   fetches the precise `delta`. This keeps the wait cheap and the transfer minimal.
+- **Known limitation (v1 token).** The token is `newestModified:itemCount`. A pure
+  **rename/move** (same count, unchanged mtime) and a net-zero "one deleted + one created"
+  within a single wait window do **not** move it, so `changes/wait` can miss them until the
+  next unrelated change. A future `change_seq` delta feed (monotonic per-share sequence bumped
+  on every mutation) will close this gap; until then, do a periodic full `delta` reconcile in
+  addition to long-poll if you must catch remote renames promptly.
 - **Future: native push.** A device may register an FCM/APNs push token (stored on
   `SyncDevice`); a later package will send a silent push on change so a backgrounded
   phone can wake, sync briefly, and drop its socket — the most battery-efficient
@@ -243,9 +304,16 @@ Every error uses a uniform envelope with a **stable, non-localized machine code*
 { "code": "forbidden", "message": "Access denied." }
 ```
 Common codes: `unauthorized` (401), `forbidden` (403), `not_found` (404),
-`invalid_path` / `invalid_request` / `invalid_timestamp` (400), `conflict` (409),
+`invalid_path` / `invalid_request` / `invalid_timestamp` / `invalid_idempotency_key` (400),
+`precondition_failed` (412), `idempotency_key_conflict` (422), `conflict` (409),
 `locked_out` (429). Clients should branch on `code`, not on `message` (the message
 is an English developer hint; user-facing text is localized in the app).
+
+> **OpenAPI note.** The generated `/openapi/v1.json` describes the routes, bodies, and
+> success shapes, but the opt-in `If-Match` / `If-None-Match` / `Idempotency-Key` headers
+> and the `412` / `422` responses from [§3.1](#31-safe-mutations-conditional-requests--idempotency-keys)
+> are documented **here**, not yet as OpenAPI annotations — treat this section as their
+> authoritative definition until the annotations are added.
 
 ---
 
@@ -268,6 +336,23 @@ is an English developer hint; user-facing text is localized in the app).
 
 ## 8. Roadmap
 
+**Shipped**
+- **Replay-safe mutations** — opt-in `If-Match`/`If-None-Match` conditional requests and
+  `Idempotency-Key` replay on upload/rename/delete/mkdir, plus natural idempotence
+  (see [§3.1](#31-safe-mutations-conditional-requests--idempotency-keys)). This is the server
+  foundation for offline-first two-way sync.
+
+**Next**
+- **`change_seq` delta feed** — a monotonic per-share change sequence (and/or a path-level
+  change list) so renames and net-zero changes are detected, replacing the coarse
+  `newestModified:itemCount` token (see the limitation in [§5](#5-change-notification--battery-model)).
+- **Client baseline + operation outbox** — a persisted last-synced snapshot and a durable
+  device-side journal that replays queued renames/deletes on reconnect using the mechanisms in
+  §3.1; enables true two-way delete/rename propagation and conflict handling.
+- **Search endpoint** — a thin `GET /api/v1/search` over the ACL-checked `ISearchService`
+  (Elasticsearch with filename fallback), server-side rate-limited; clients debounce input.
+- **Idempotency receipt pruning** — a background job calling
+  `IClientRequestReceiptRepository.PruneOlderThanAsync` (not yet wired).
 - **Native push** (FCM/APNs) for battery-optimal mobile wake-ups.
 - **Content hashing on live files** so sync can skip unchanged content and detect
   true edits robustly (today it uses size + modified-time; stored versions already

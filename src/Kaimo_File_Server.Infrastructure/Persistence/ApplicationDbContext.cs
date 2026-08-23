@@ -39,6 +39,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<SyncDevice> SyncDevices { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<DeviceSyncProfile> DeviceSyncProfiles { get; set; }
+        public DbSet<ClientRequestReceipt> ClientRequestReceipts { get; set; }
 
         // -- Departments & Scoped Roles --
         public DbSet<Department> Departments { get; set; }
@@ -387,6 +388,23 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 // own admin flow, and a dangling profile is harmless (the API
                 // resolves the share and returns not-found).
                 entity.HasIndex(e => e.ShareId);
+            });
+
+            modelBuilder.Entity<ClientRequestReceipt>(entity =>
+            {
+                entity.ToTable("client_request_receipts");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.DeviceId).IsRequired();
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.IdempotencyKey).IsRequired().HasMaxLength(128);
+                entity.Property(e => e.RequestHash).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.StatusCode).IsRequired();
+                // One outcome per (device, key): a retry finds it and replays it.
+                entity.HasIndex(e => new { e.DeviceId, e.IdempotencyKey }).IsUnique();
+                // Drives retention pruning of old receipts.
+                entity.HasIndex(e => e.CreatedAtUtc);
+                entity.HasOne<SyncDevice>().WithMany().HasForeignKey(e => e.DeviceId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             // -- Departments --

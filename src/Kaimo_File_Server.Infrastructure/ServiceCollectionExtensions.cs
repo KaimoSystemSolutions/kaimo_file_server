@@ -61,6 +61,7 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddScoped<ISyncDeviceRepository, SyncDeviceRepository>();
             services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
             services.AddScoped<IDeviceSyncProfileRepository, DeviceSyncProfileRepository>();
+            services.AddScoped<IClientRequestReceiptRepository, ClientRequestReceiptRepository>();
             services.AddScoped<IFileChangeCursorRepository, FileChangeCursorRepository>();
             services.AddScoped<Core.Services.Sync.ISyncQueryService, Core.Services.Sync.SyncQueryService>();
 
