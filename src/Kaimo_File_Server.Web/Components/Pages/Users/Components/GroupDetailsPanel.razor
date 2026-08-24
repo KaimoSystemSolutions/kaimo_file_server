@@ -15,33 +15,10 @@
                             </div>
                             <div class="detail-section">
 <span class="detail-label">@Resources.Web_Admin_Label_Users</span>
-                                <div class="multi-select @(membersOpen ? "open" : "")">
-                                    <div class="multi-select-display" @onclick="() => membersOpen = !membersOpen">
-                                        <span class="multi-select-text">
-@Checked(VM.EditGroupMembers.Where(m => m.IsChecked).Select(m => m.Item.Name), Resources.Web_Common_NoMembers)
-                                        </span>
-                                        @Icons.SVG("chevron_down_transparent.svg", new SvgOptions(
-                                                Width: 14,
-                                                Height: 14,
-                                                StrokeWidth: 2f,
-                                                CssClass: "multi-select-chevron"
-                                            ))
-                                    </div>
-                                    @if (membersOpen)
-                                    {
-                                        <div class="multi-select-backdrop" @onclick="() => membersOpen = false"></div>
-                                        <div class="multi-select-dropdown">
-                                            @foreach (var item in VM.EditGroupMembers)
-                                            {
-                                                <label class="multi-select-option">
-                                                    <input type="checkbox" @bind="item.IsChecked" />
-                                                    <span>@item.Item.Name</span>
-                                                    <span class="multi-select-hint">@item.Item.Username</span>
-                                                </label>
-                                            }
-                                        </div>
-                                    }
-                                </div>
+                                <MultiSelect Items="VM.EditGroupMembers"
+                                             Label="m => m.Name"
+                                             Hint="m => m.Username"
+                                             PlaceholderText="@Resources.Web_Common_NoMembers" />
                             </div>
                             @if (VM.ErrorMessage is not null)
                             {
@@ -108,11 +85,9 @@
 @code {
     [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
     [Parameter] public EventCallback OnChanged { get; set; }
-    private bool membersOpen;
     private async Task EditGroup() { await VM.StartEditGroupAsync(); StateHasChanged(); }
     private async Task SaveGroup() { await VM.SaveGroupAsync(); await OnChanged.InvokeAsync(); }
-    private void CancelEdit() { membersOpen = false; VM.CancelEdit(); StateHasChanged(); }
+    private void CancelEdit() { VM.CancelEdit(); StateHasChanged(); }
     private async Task ConfirmDeleteGroup() { await VM.ConfirmDeleteGroupAsync(); await OnChanged.InvokeAsync(); }
-    private static string Checked(IEnumerable<string> names, string fallback) { var list = names.ToList(); return list.Count > 0 ? string.Join(", ", list) : fallback; }
     private static string Format(IEnumerable<string> items, int max) { var list = items.ToList(); if (list.Count == 0) return ""; var visible = string.Join(", ", list.Take(max)); if (list.Count > max) visible += " " + string.Format(Resources.Web_Common_MoreItems, list.Count - max); return visible; }
 }

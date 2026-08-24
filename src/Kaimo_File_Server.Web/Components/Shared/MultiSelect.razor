@@ -1,0 +1,75 @@
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AssetProvider Icons
+@typeparam T
+
+@*
+    Central multi-select checkbox dropdown (shared UI library).
+
+    A closed box shows the comma-joined labels of the checked items (or a
+    placeholder); clicking opens a panel of checkbox rows with an optional
+    right-aligned hint per row. Open/close state is owned by the component.
+    Bind directly against the caller's CheckboxItem<T> list, so selection
+    flows back to the view model without extra wiring. Callers can pass extra
+    classes (e.g. "user-group-select" to open the panel upward).
+*@
+<div class="multi-select @(_open ? "open" : "") @Class">
+    <div class="multi-select-display" @onclick="Toggle">
+        <span class="multi-select-text">@SummaryText</span>
+        @Icons.SVG("chevron_down_transparent.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2f, CssClass: "multi-select-chevron"))
+    </div>
+    @if (_open)
+    {
+        <div class="multi-select-backdrop" @onclick="Close"></div>
+        <div class="multi-select-dropdown">
+            @foreach (var item in Items)
+            {
+                <label class="multi-select-option">
+                    <input type="checkbox" @bind="item.IsChecked" />
+                    <span>@Label(item.Item)</span>
+                    @if (Hint is not null)
+                    {
+                        <span class="multi-select-hint">@Hint(item.Item)</span>
+                    }
+                </label>
+            }
+            @if (Items.Count == 0 && !string.IsNullOrEmpty(EmptyText))
+            {
+                <span class="empty-hint">@EmptyText</span>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>The checkable items; the component binds their IsChecked directly.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<CheckboxItem<T>> Items { get; set; } = [];
+
+    /// <summary>Primary label for an item.</summary>
+    [Parameter, EditorRequired] public Func<T, string> Label { get; set; } = _ => string.Empty;
+
+    /// <summary>Optional secondary text shown right-aligned on each option row.</summary>
+    [Parameter] public Func<T, string?>? Hint { get; set; }
+
+    /// <summary>Closed-box text shown when nothing is selected.</summary>
+    [Parameter] public string PlaceholderText { get; set; } = string.Empty;
+
+    /// <summary>Shown inside the open panel when there are no items to choose from.</summary>
+    [Parameter] public string? EmptyText { get; set; }
+
+    /// <summary>Extra CSS classes for local overrides.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    private bool _open;
+
+    private void Toggle() => _open = !_open;
+    private void Close() => _open = false;
+
+    private string SummaryText
+    {
+        get
+        {
+            var names = Items.Where(i => i.IsChecked).Select(i => Label(i.Item)).ToList();
+            return names.Count > 0 ? string.Join(", ", names) : PlaceholderText;
+        }
+    }
+}

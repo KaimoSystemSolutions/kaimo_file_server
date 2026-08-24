@@ -70,65 +70,19 @@
 
                 <div class="form-group">
                     <label>@Resources.Web_Admin_Label_Groups</label>
-                    <div class="multi-select user-group-select @(groupsOpen ? "open" : "")">
-                        <div class="multi-select-display" @onclick="() => groupsOpen = !groupsOpen">
-                            <span class="multi-select-text">
-                                @Checked(VM.EditUserGroups.Where(g => g.IsChecked).Select(g => g.Item.Name), Resources.Web_Common_NoGroupsAssigned)
-                            </span>
-                            @Icons.SVG("chevron_down_transparent.svg", new SvgOptions(
-                                Width: 14,
-                                Height: 14,
-                                StrokeWidth: 2f,
-                                CssClass: "multi-select-chevron"))
-                        </div>
-                        @if (groupsOpen)
-                        {
-                            <div class="multi-select-backdrop" @onclick="() => groupsOpen = false"></div>
-                            <div class="multi-select-dropdown">
-                                @foreach (var item in VM.EditUserGroups)
-                                {
-                                    <label class="multi-select-option">
-                                        <input type="checkbox" @bind="item.IsChecked" />
-                                        <span>@item.Item.Name</span>
-                                        <span class="multi-select-hint">@VM.GetDepartmentName(item.Item.DepartmentId)</span>
-                                    </label>
-                                }
-                                @if (!VM.EditUserGroups.Any())
-                                {
-                                    <span class="empty-hint">@Resources.Web_Common_NoGroups</span>
-                                }
-                            </div>
-                        }
-                    </div>
+                    <MultiSelect Class="user-group-select"
+                                 Items="VM.EditUserGroups"
+                                 Label="g => g.Name"
+                                 Hint="g => VM.GetDepartmentName(g.DepartmentId)"
+                                 PlaceholderText="@Resources.Web_Common_NoGroupsAssigned"
+                                 EmptyText="@Resources.Web_Common_NoGroups" />
                 </div>
 
                 <div class="form-group">
                     <label>@Resources.Web_Admin_Label_Roles</label>
-                    <div class="multi-select @(rolesOpen ? "open" : "")">
-                        <div class="multi-select-display" @onclick="() => rolesOpen = !rolesOpen">
-                            <span class="multi-select-text">
-                                @Checked(VM.EditUserRoles.Where(r => r.IsChecked).Select(r => r.Item.Name), Resources.Web_Common_NoRolesAssigned)
-                            </span>
-                            @Icons.SVG("chevron_down_transparent.svg", new SvgOptions(
-                                Width: 14,
-                                Height: 14,
-                                StrokeWidth: 2f,
-                                CssClass: "multi-select-chevron"))
-                        </div>
-                        @if (rolesOpen)
-                        {
-                            <div class="multi-select-backdrop" @onclick="() => rolesOpen = false"></div>
-                            <div class="multi-select-dropdown">
-                                @foreach (var item in VM.EditUserRoles)
-                                {
-                                    <label class="multi-select-option">
-                                        <input type="checkbox" @bind="item.IsChecked" />
-                                        <span>@item.Item.Name</span>
-                                    </label>
-                                }
-                            </div>
-                        }
-                    </div>
+                    <MultiSelect Items="VM.EditUserRoles"
+                                 Label="r => r.Name"
+                                 PlaceholderText="@Resources.Web_Common_NoRolesAssigned" />
                 </div>
             </div>
 
@@ -374,13 +328,11 @@
 @code {
     [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
     [Parameter] public EventCallback OnChanged { get; set; }
-    private bool groupsOpen, rolesOpen;
     private async Task EditUser() { await VM.StartEditUserAsync(); StateHasChanged(); }
     private async Task SaveUser() { await VM.SaveUserAsync(); await OnChanged.InvokeAsync(); }
-    private void CancelEdit() { groupsOpen = rolesOpen = false; VM.CancelEdit(); StateHasChanged(); }
+    private void CancelEdit() { VM.CancelEdit(); StateHasChanged(); }
     private async Task ConfirmDeleteUser() { await VM.ConfirmDeleteUserAsync(); await OnChanged.InvokeAsync(); }
     private async Task DeleteAssignment(Guid id) { await VM.DeleteAssignmentAsync(id); StateHasChanged(); }
-    private static string Checked(IEnumerable<string> names, string fallback) { var list = names.ToList(); return list.Count > 0 ? string.Join(", ", list) : fallback; }
     private static string DisplayName(string? name, string username) => string.IsNullOrWhiteSpace(name) ? username : name;
     private static string Initials(string? name, string username)
     {

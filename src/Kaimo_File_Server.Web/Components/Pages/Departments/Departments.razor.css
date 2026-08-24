@@ -193,8 +193,7 @@
 /* -- Edit / create inputs: same size as the read-only view boxes
    (identical font, padding, line-height and min-height) -- */
 .edit-input,
-.form-group input,
-.multi-select-display {
+.form-group input {
     font-size: 12px;
     line-height: 1.4;
     padding: 5px 10px;
@@ -208,7 +207,15 @@ select.edit-input {
     min-height: 28px;
 }
 
-.multi-select-text {
+/* The multi-select box now lives in the shared <MultiSelect> component. */
+::deep .multi-select-display {
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 5px 10px;
+    min-height: 28px;
+}
+
+::deep .multi-select-text {
     font-size: 12px;
 }
 
