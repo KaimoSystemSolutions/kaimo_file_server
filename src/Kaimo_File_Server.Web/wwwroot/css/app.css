@@ -2804,9 +2804,14 @@ html, body, #app {
     gap: 12px;
 }
 
-    /* Select elements — match edit-input style */
+    /* Select elements — one consistent look for every dropdown: custom SVG
+       chevron instead of the native OS arrow. Covers the canonical
+       select.edit-input plus the former outliers (modal selects and bare
+       selects inside a .form-group). */
     .assignment-form select.edit-input,
-    select.edit-input {
+    select.edit-input,
+    select.modal-input,
+    .form-group select {
         padding: 9px 12px;
         background: var(--bg-primary);
         border: 1px solid var(--border-strong, var(--border));
@@ -2825,7 +2830,9 @@ html, body, #app {
     }
 
         .assignment-form select.edit-input:focus,
-        select.edit-input:focus {
+        select.edit-input:focus,
+        select.modal-input:focus,
+        .form-group select:focus {
             border-color: var(--accent);
             box-shadow: 0 0 0 3px var(--accent-subtle);
         }
@@ -3704,6 +3711,27 @@ textarea:focus {
 input[type="checkbox"],
 input[type="radio"] {
     accent-color: var(--accent);
+}
+
+/* Compact field density for admin create/edit panels. Opt-in via the
+   `admin-compact` class on the panel/card so shared cards elsewhere
+   (e.g. the CloudSync create card) keep the default size. Replaces the
+   dense blocks that were duplicated in the Users/Departments scoped CSS. */
+.admin-compact .edit-input,
+.admin-compact .form-group input,
+.admin-compact .multi-select-display {
+    min-height: 28px;
+    padding: 5px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.admin-compact select.edit-input {
+    padding: 5px 32px 5px 10px;
+}
+
+.admin-compact .multi-select-text {
+    font-size: 12px;
 }
 
 .error-banner,

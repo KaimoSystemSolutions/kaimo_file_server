@@ -26,17 +26,5 @@
     text-transform: none;
 }
 
-.edit-input,
-.form-group input {
-    min-height: 28px;
-    padding: 5px 10px;
-    font-size: 12px;
-    line-height: 1.4;
-}
-
-select.edit-input {
-    min-height: 28px;
-    padding: 5px 32px 5px 10px;
-    font-size: 12px;
-    line-height: 1.4;
-}
+/* Compact field density comes from the shared .admin-compact rule in app.css
+   (this card carries the admin-compact class). */

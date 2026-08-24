@@ -256,27 +256,9 @@
     color: var(--text-secondary);
 }
 
-/* -- Edit / create inputs: same size as the read-only view boxes
-   (identical font, padding, line-height and min-height) -- */
-::deep .edit-input,
-::deep .form-group input,
-::deep .multi-select-display {
-    font-size: 12px;
-    line-height: 1.4;
-    padding: 5px 10px;
-    min-height: 28px;
-}
-
-::deep select.edit-input {
-    font-size: 12px;
-    line-height: 1.4;
-    padding: 5px 32px 5px 10px;
-    min-height: 28px;
-}
-
-::deep .multi-select-text {
-    font-size: 12px;
-}
+/* Compact edit/create input density now comes from the shared .admin-compact
+   rule in app.css (the .admin-content workspace carries the admin-compact
+   class). The editing-shell size bump below still overrides it. */
 
 /* -- Responsive -- */
 

@@ -48,7 +48,7 @@ else
     @* -- Create Form -- *@
     @if (VM.IsCreating)
     {
-        <div class="create-form-card">
+        <div class="create-form-card admin-compact">
             <h3>@Resources.Web_Dept_NewDepartment</h3>
             <div class="create-form-fields">
                 <div class="form-group">
@@ -91,7 +91,7 @@ else
         <div class="error-banner">@VM.ErrorMessage</div>
     }
 
-    <div class="admin-content department-workspace">
+    <div class="admin-content department-workspace admin-compact">
 
         <DepartmentTree VM="VM" OnChanged="StateHasChanged" />
 

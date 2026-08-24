@@ -192,32 +192,8 @@
 
 /* -- Edit / create inputs: same size as the read-only view boxes
    (identical font, padding, line-height and min-height) -- */
-.edit-input,
-.form-group input {
-    font-size: 12px;
-    line-height: 1.4;
-    padding: 5px 10px;
-    min-height: 28px;
-}
-
-select.edit-input {
-    font-size: 12px;
-    line-height: 1.4;
-    padding: 5px 32px 5px 10px;
-    min-height: 28px;
-}
-
-/* The multi-select box now lives in the shared <MultiSelect> component. */
-::deep .multi-select-display {
-    font-size: 12px;
-    line-height: 1.4;
-    padding: 5px 10px;
-    min-height: 28px;
-}
-
-::deep .multi-select-text {
-    font-size: 12px;
-}
+/* Compact field density now comes from the shared .admin-compact rule in
+   app.css (the create card and the .admin-content workspace carry it). */
 
 /* Design-spec rollout */
 
