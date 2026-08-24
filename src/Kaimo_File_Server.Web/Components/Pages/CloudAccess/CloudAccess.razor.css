@@ -277,31 +277,11 @@
     font-size: 12px;
 }
 
-.vs-detail-pane .detail-tabs {
+/* Full-bleed framing comes from the shared .detail-tabs--panel variant;
+   only the pane-specific bleed offsets stay here. */
+.vs-detail-pane ::deep .detail-tabs {
     margin: 0 -18px 17px;
     padding: 0 10px;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-secondary);
-}
-
-.vs-detail-pane .detail-tab {
-    min-height: 39px;
-    padding: 8px 9px;
-    color: var(--text-secondary);
-    font-size: 12px;
-    font-weight: 620;
-}
-
-.vs-detail-pane .detail-tab:hover:not(:disabled) {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-}
-
-.vs-detail-pane .detail-tab--active {
-    background: transparent;
-    color: var(--accent-strong);
-    border-bottom-color: var(--accent);
 }
 
 .vs-detail-pane .detail-actions {
@@ -576,7 +556,7 @@
         padding-inline: 14px;
     }
 
-    .vs-detail-pane .detail-tabs {
+    .vs-detail-pane ::deep .detail-tabs {
         margin-inline: -14px;
     }
 

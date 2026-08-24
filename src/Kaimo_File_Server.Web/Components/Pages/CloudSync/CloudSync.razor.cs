@@ -338,9 +338,6 @@ public partial class CloudSync : IAsyncDisposable
 
     private bool SchedulePaintValue => _schedulePaintMode == SchedulePaintMode.Select;
 
-    private string SettingsTabClass(CloudSyncSettingsTab tab)
-        => _activeSettingsTab == tab ? "detail-tab detail-tab--active" : "detail-tab";
-
     private string SchedulePaintModeLabel()
         => _schedulePaintMode == SchedulePaintMode.Select
             ? Text("Web_CloudSync_Schedule_Paint_Select", "Select")

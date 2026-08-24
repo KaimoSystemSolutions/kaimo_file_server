@@ -1,0 +1,51 @@
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AssetProvider Icons
+
+@*
+    Shared tab button used inside <Tabs>. Emits the canonical `.detail-tab`
+    class so the strip styling (and page-level ::deep overrides) apply.
+    Content is either a simple Label, an optional leading Icon, or arbitrary
+    ChildContent when a caller needs more than an icon + text.
+*@
+<button class="detail-tab @(Active ? "detail-tab--active" : "") @Class"
+        type="button"
+        role="tab"
+        aria-selected="@Active"
+        disabled="@Disabled"
+        @onclick="OnClick"
+        @attributes="AdditionalAttributes">
+    @if (!string.IsNullOrEmpty(Icon))
+    {
+        @Icons.SVG(Icon, new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+    }
+    @if (ChildContent is not null)
+    {
+        @ChildContent
+    }
+    else
+    {
+        @Label
+    }
+</button>
+
+@code {
+    [Parameter] public bool Active { get; set; }
+
+    /// <summary>Optional leading icon file name (resolved via the shared asset provider).</summary>
+    [Parameter] public string? Icon { get; set; }
+
+    /// <summary>Simple text label. Ignored when ChildContent is supplied.</summary>
+    [Parameter] public string? Label { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    /// <summary>Extra CSS classes appended to the button, for local overrides.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IDictionary<string, object>? AdditionalAttributes { get; set; }
+}

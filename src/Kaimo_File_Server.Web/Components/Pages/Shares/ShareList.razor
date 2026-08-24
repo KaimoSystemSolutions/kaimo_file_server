@@ -11,16 +11,14 @@
 
 <PageTitle>@Resources.Web_Nav_Shares - Kaimo Files</PageTitle>
 
-<div class="share-kind-tabs" role="tablist" aria-label="@Resources.Web_Nav_Shares">
-    <button class="@ShareKindClass(ShareKind.Local)" type="button" role="tab"
-            aria-selected="@(_shareKind == ShareKind.Local)" @onclick="() => SelectShareKind(ShareKind.Local)">
+<Tabs aria-label="@Resources.Web_Nav_Shares">
+    <Tab Active="@(_shareKind == ShareKind.Local)" OnClick="() => SelectShareKind(ShareKind.Local)">
         @Text("Web_Shares_LocalShares", "Local Shares")
-    </button>
-    <button class="@ShareKindClass(ShareKind.Virtual)" type="button" role="tab"
-            aria-selected="@(_shareKind == ShareKind.Virtual)" @onclick="() => SelectShareKind(ShareKind.Virtual)">
+    </Tab>
+    <Tab Active="@(_shareKind == ShareKind.Virtual)" OnClick="() => SelectShareKind(ShareKind.Virtual)">
         @Text("Web_Shares_VirtualShares", "Virtual Shares")
-    </button>
-</div>
+    </Tab>
+</Tabs>
 
 @if (_shareKind == ShareKind.Virtual)
 {
@@ -107,19 +105,16 @@ else
                     </div>
                 }
 
-                <div class="detail-tabs" role="tablist">
-                    <button class="detail-tab @(_activeTab == ShareDetailTab.Settings ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == ShareDetailTab.Settings)"
-                            @onclick="() => SwitchTab(ShareDetailTab.Settings)"> @Assets.SVG("settings.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @Resources.Web_ShareList_Tab_General </button>
-                    <button class="detail-tab @(_activeTab == ShareDetailTab.Access ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == ShareDetailTab.Access)"
-                            disabled="@VM.IsSelectedShareReadOnly"
-                            @onclick="() => SwitchTab(ShareDetailTab.Access)"> @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @Resources.Web_ShareList_Tab_Visibility </button>
-                    <button class="detail-tab @(_activeTab == ShareDetailTab.Acl ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == ShareDetailTab.Acl)"
-                            disabled="@VM.IsSelectedShareReadOnly"
-                            @onclick="() => SwitchTab(ShareDetailTab.Acl)"> @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @Resources.Web_ShareList_Tab_ACL </button>
-                    <button class="detail-tab @(_activeTab == ShareDetailTab.Cloud ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == ShareDetailTab.Cloud)"
-                            disabled="@VM.IsSelectedShareReadOnly"
-                            @onclick="() => SwitchTab(ShareDetailTab.Cloud)"> @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @Text("Web_ShareList_Tab_Cloud", "Cloud") </button>
-                </div>
+                <Tabs class="detail-tabs--panel">
+                    <Tab Active="@(_activeTab == ShareDetailTab.Settings)" Icon="settings.svg" Label="@Resources.Web_ShareList_Tab_General"
+                         OnClick="() => SwitchTab(ShareDetailTab.Settings)" />
+                    <Tab Active="@(_activeTab == ShareDetailTab.Access)" Disabled="@VM.IsSelectedShareReadOnly" Icon="users.svg" Label="@Resources.Web_ShareList_Tab_Visibility"
+                         OnClick="() => SwitchTab(ShareDetailTab.Access)" />
+                    <Tab Active="@(_activeTab == ShareDetailTab.Acl)" Disabled="@VM.IsSelectedShareReadOnly" Icon="shield.svg" Label="@Resources.Web_ShareList_Tab_ACL"
+                         OnClick="() => SwitchTab(ShareDetailTab.Acl)" />
+                    <Tab Active="@(_activeTab == ShareDetailTab.Cloud)" Disabled="@VM.IsSelectedShareReadOnly" Icon="cloud-download.svg" Label="@Text("Web_ShareList_Tab_Cloud", "Cloud")"
+                         OnClick="() => SwitchTab(ShareDetailTab.Cloud)" />
+                </Tabs>
 
                 @switch (_activeTab)
                 {

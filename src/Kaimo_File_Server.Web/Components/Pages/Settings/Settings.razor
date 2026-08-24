@@ -24,35 +24,35 @@ else
 {
     <div class="admin-content settings-workspace">
         <div class="admin-detail settings-page">
-            <div class="detail-tabs settings-nav" role="tablist">
+            <Tabs Orientation="TabOrientation.Vertical">
                 @if (VM.CanManageSettings)
                 {
-                    <SettingsTabButton Active="@(_activeTab == SettingsTab.Language)" Icon="globe.svg" Label="@Resources.Web_Settings_Tab_Language" OnClick="() => SwitchTab(SettingsTab.Language)" />
-                    <SettingsTabButton Active="@(_activeTab == SettingsTab.ContextMenu)" Icon="edit.svg" Label="@Resources.Web_Settings_Tab_ContextMenu" OnClick="() => SwitchTab(SettingsTab.ContextMenu)" />
-                    <SettingsTabButton Active="@(_activeTab == SettingsTab.PasswordPolicy)" Icon="shield.svg" Label="@Resources.Web_Settings_Tab_Password" OnClick="() => SwitchTab(SettingsTab.PasswordPolicy)" />
-                    <SettingsTabButton Active="@(_activeTab == SettingsTab.Network)" Icon="compass.svg" Label="@Resources.Web_Settings_Tab_IP_Address" OnClick="() => SwitchTab(SettingsTab.Network)" />
-                    <SettingsTabButton Active="@(_activeTab == SettingsTab.Storage)" Icon="folder.svg" Label="@Resources.Web_Settings_Tab_Storage" OnClick="() => SwitchTab(SettingsTab.Storage)" />
-                    <SettingsTabButton Active="@(_activeTab == SettingsTab.Memory)" Icon="gear.svg" Label="@Resources.Web_Settings_Tab_Ram" OnClick="() => SwitchTab(SettingsTab.Memory)" />
-                    <SettingsTabButton Active="@(_activeTab == SettingsTab.Search)" Icon="search.svg" Label="@Resources.Web_Settings_Tab_Search" OnClick="() => SwitchTab(SettingsTab.Search)" />
-                    <SettingsTabButton Active="@(_activeTab == SettingsTab.CloudAccess)" Icon="cloud-download.svg" Label="@R("Web_Settings_Tab_CloudAccess")" OnClick="() => SwitchTab(SettingsTab.CloudAccess)" />
+                    <Tab Active="@(_activeTab == SettingsTab.Language)" Icon="globe.svg" Label="@Resources.Web_Settings_Tab_Language" OnClick="() => SwitchTab(SettingsTab.Language)" />
+                    <Tab Active="@(_activeTab == SettingsTab.ContextMenu)" Icon="edit.svg" Label="@Resources.Web_Settings_Tab_ContextMenu" OnClick="() => SwitchTab(SettingsTab.ContextMenu)" />
+                    <Tab Active="@(_activeTab == SettingsTab.PasswordPolicy)" Icon="shield.svg" Label="@Resources.Web_Settings_Tab_Password" OnClick="() => SwitchTab(SettingsTab.PasswordPolicy)" />
+                    <Tab Active="@(_activeTab == SettingsTab.Network)" Icon="compass.svg" Label="@Resources.Web_Settings_Tab_IP_Address" OnClick="() => SwitchTab(SettingsTab.Network)" />
+                    <Tab Active="@(_activeTab == SettingsTab.Storage)" Icon="folder.svg" Label="@Resources.Web_Settings_Tab_Storage" OnClick="() => SwitchTab(SettingsTab.Storage)" />
+                    <Tab Active="@(_activeTab == SettingsTab.Memory)" Icon="gear.svg" Label="@Resources.Web_Settings_Tab_Ram" OnClick="() => SwitchTab(SettingsTab.Memory)" />
+                    <Tab Active="@(_activeTab == SettingsTab.Search)" Icon="search.svg" Label="@Resources.Web_Settings_Tab_Search" OnClick="() => SwitchTab(SettingsTab.Search)" />
+                    <Tab Active="@(_activeTab == SettingsTab.CloudAccess)" Icon="cloud-download.svg" Label="@R("Web_Settings_Tab_CloudAccess")" OnClick="() => SwitchTab(SettingsTab.CloudAccess)" />
                 }
                 @if (VM.CanManageSettings || VM.CanViewLogs)
                 {
-                    <SettingsTabButton Active="@(_activeTab == SettingsTab.Logging)" Icon="gear.svg" Label="@Resources.Web_Settings_Tab_Logging" OnClick="() => SwitchTab(SettingsTab.Logging)" />
+                    <Tab Active="@(_activeTab == SettingsTab.Logging)" Icon="gear.svg" Label="@Resources.Web_Settings_Tab_Logging" OnClick="() => SwitchTab(SettingsTab.Logging)" />
                 }
                 @if (VM.CanManageDataServices)
                 {
-                    <SettingsTabButton Active="@(_activeTab == SettingsTab.DataServices)" Icon="archive.svg" Label="@Resources.Web_Settings_Tab_Fileservices" OnClick="() => SwitchTab(SettingsTab.DataServices)" />
+                    <Tab Active="@(_activeTab == SettingsTab.DataServices)" Icon="archive.svg" Label="@Resources.Web_Settings_Tab_Fileservices" OnClick="() => SwitchTab(SettingsTab.DataServices)" />
                 }
                 @if (VM.CanManageCertificates)
                 {
-                    <SettingsTabButton Active="@(_activeTab == SettingsTab.Certificate)" Icon="shield.svg" Label="@Resources.Web_Settings_Tab_Certificate" OnClick="() => SwitchTab(SettingsTab.Certificate)" />
+                    <Tab Active="@(_activeTab == SettingsTab.Certificate)" Icon="shield.svg" Label="@Resources.Web_Settings_Tab_Certificate" OnClick="() => SwitchTab(SettingsTab.Certificate)" />
                 }
                 @if (VM.CanManageBackups)
                 {
-                    <SettingsTabButton Active="@(_activeTab == SettingsTab.Backup)" Icon="archive.svg" Label="@R("Web_Settings_Tab_Backup")" OnClick="() => SwitchTab(SettingsTab.Backup)" />
+                    <Tab Active="@(_activeTab == SettingsTab.Backup)" Icon="archive.svg" Label="@R("Web_Settings_Tab_Backup")" OnClick="() => SwitchTab(SettingsTab.Backup)" />
                 }
-            </div>
+            </Tabs>
 
             <div class="settings-content">
                 @if (VM.SuccessMessage is not null) { <div class="success-banner">@VM.SuccessMessage</div> }

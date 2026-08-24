@@ -11,14 +11,12 @@
     </div>
 </div>
 
-<div class="external-storage-tabs" role="tablist" aria-label="@R("Web_ExternalStorage_Title")">
-    <button class="@TabClass(ExternalStorageTab.Syncs)" type="button" role="tab"
-            aria-selected="@(_activeTab == ExternalStorageTab.Syncs)"
-            @onclick="() => SelectTab(ExternalStorageTab.Syncs)">@R("Web_ExternalStorage_Tab_Syncs")</button>
-    <button class="@TabClass(ExternalStorageTab.Connections)" type="button" role="tab"
-            aria-selected="@(_activeTab == ExternalStorageTab.Connections)"
-            @onclick="() => SelectTab(ExternalStorageTab.Connections)">@R("Web_ExternalStorage_Tab_Connections")</button>
-</div>
+<Tabs aria-label="@R("Web_ExternalStorage_Title")">
+    <Tab Active="@(_activeTab == ExternalStorageTab.Syncs)" Label="@R("Web_ExternalStorage_Tab_Syncs")"
+         OnClick="() => SelectTab(ExternalStorageTab.Syncs)" />
+    <Tab Active="@(_activeTab == ExternalStorageTab.Connections)" Label="@R("Web_ExternalStorage_Tab_Connections")"
+         OnClick="() => SelectTab(ExternalStorageTab.Connections)" />
+</Tabs>
 
 @if (_activeTab == ExternalStorageTab.Syncs)
 {
@@ -46,8 +44,6 @@ else
             : ExternalStorageTab.Syncs;
 
     private void SelectTab(ExternalStorageTab tab) => _activeTab = tab;
-    private string TabClass(ExternalStorageTab tab)
-        => tab == _activeTab ? "external-storage-tab external-storage-tab--active" : "external-storage-tab";
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 
     private enum ExternalStorageTab { Syncs, Connections }

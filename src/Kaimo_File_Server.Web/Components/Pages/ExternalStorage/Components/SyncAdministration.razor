@@ -78,17 +78,14 @@ else
                 <label class="storage-enabled"><input type="checkbox" @bind="_model.Enabled" /> <span>@R("Web_ExternalStorage_Enabled")</span></label>
             </div>
 
-            <div class="detail-tabs cloud-sync-tabs" role="tablist" aria-label="@R("Web_ExternalStorage_EditSync")">
-                <button class="@SettingsTabClass(SyncSettingsTab.General)" type="button" role="tab"
-                        aria-selected="@(_activeSettingsTab == SyncSettingsTab.General)"
-                        @onclick="() => _activeSettingsTab = SyncSettingsTab.General">@R("Web_CloudSync_Tab_General")</button>
-                <button class="@SettingsTabClass(SyncSettingsTab.Schedule)" type="button" role="tab"
-                        aria-selected="@(_activeSettingsTab == SyncSettingsTab.Schedule)"
-                        @onclick="() => _activeSettingsTab = SyncSettingsTab.Schedule">@R("Web_CloudSync_Tab_Schedule")</button>
-                <button class="@SettingsTabClass(SyncSettingsTab.Advanced)" type="button" role="tab"
-                        aria-selected="@(_activeSettingsTab == SyncSettingsTab.Advanced)"
-                        @onclick="() => _activeSettingsTab = SyncSettingsTab.Advanced">@R("Web_CloudSync_Tab_Advanced")</button>
-            </div>
+            <Tabs class="detail-tabs--panel" aria-label="@R("Web_ExternalStorage_EditSync")">
+                <Tab Active="@(_activeSettingsTab == SyncSettingsTab.General)" Label="@R("Web_CloudSync_Tab_General")"
+                     OnClick="() => _activeSettingsTab = SyncSettingsTab.General" />
+                <Tab Active="@(_activeSettingsTab == SyncSettingsTab.Schedule)" Label="@R("Web_CloudSync_Tab_Schedule")"
+                     OnClick="() => _activeSettingsTab = SyncSettingsTab.Schedule" />
+                <Tab Active="@(_activeSettingsTab == SyncSettingsTab.Advanced)" Label="@R("Web_CloudSync_Tab_Advanced")"
+                     OnClick="() => _activeSettingsTab = SyncSettingsTab.Advanced" />
+            </Tabs>
 
             @if (_activeSettingsTab == SyncSettingsTab.General)
             {
@@ -468,7 +465,6 @@ else
         return Task.CompletedTask;
     }
     private void ClosePicker() { _pickerOpen = false; _pickerItems = []; _pickerError = null; }
-    private string SettingsTabClass(SyncSettingsTab tab) => _activeSettingsTab == tab ? "detail-tab detail-tab--active" : "detail-tab";
     private string SchedulePaintModeClass => _schedulePaintMode == SchedulePaintMode.Select ? "cloud-schedule-scroll--paint-select" : "cloud-schedule-scroll--paint-deselect";
     private bool SchedulePaintValue => _schedulePaintMode == SchedulePaintMode.Select;
     private static string ScheduleDayName(DayOfWeek day) => CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(day);

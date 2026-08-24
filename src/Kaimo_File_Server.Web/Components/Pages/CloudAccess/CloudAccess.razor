@@ -299,16 +299,12 @@ else
                     <h3>@_selectedShare.Name</h3>
                     <span class="detail-subtitle">@R("Web_CloudAccess_Title")</span>
                 </div>
-                <div class="detail-tabs" role="tablist">
-                    <button class="detail-tab @(_activeTab == CloudAccessTab.General ? "detail-tab--active" : "")" type="button" role="tab"
-                            aria-selected="@(_activeTab == CloudAccessTab.General)" @onclick="() => SwitchTabAsync(CloudAccessTab.General)">
-                        @Assets.SVG("settings.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @R("Web_CloudAccess_TabGeneral")
-                    </button>
-                    <button class="detail-tab @(_activeTab == CloudAccessTab.Access ? "detail-tab--active" : "")" type="button" role="tab"
-                            aria-selected="@(_activeTab == CloudAccessTab.Access)" @onclick="() => SwitchTabAsync(CloudAccessTab.Access)">
-                        @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) @R("Web_CloudAccess_TabAccess")
-                    </button>
-                </div>
+                <Tabs class="detail-tabs--panel">
+                    <Tab Active="@(_activeTab == CloudAccessTab.General)" Icon="settings.svg" Label="@R("Web_CloudAccess_TabGeneral")"
+                         OnClick="() => SwitchTabAsync(CloudAccessTab.General)" />
+                    <Tab Active="@(_activeTab == CloudAccessTab.Access)" Icon="users.svg" Label="@R("Web_CloudAccess_TabAccess")"
+                         OnClick="() => SwitchTabAsync(CloudAccessTab.Access)" />
+                </Tabs>
 
                 @if (_activeTab == CloudAccessTab.General)
                 {

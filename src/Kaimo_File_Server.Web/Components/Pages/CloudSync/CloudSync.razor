@@ -152,26 +152,14 @@ else
                     </div>
                 }
 
-                <div class="detail-tabs cloud-sync-tabs" role="tablist" aria-label="@Text("Web_CloudSync_Title", "Cloud Sync")">
-                    <button class="@SettingsTabClass(CloudSyncSettingsTab.General)" type="button"
-                            role="tab" aria-selected="@(_activeSettingsTab == CloudSyncSettingsTab.General)"
-                            @onclick="() => _activeSettingsTab = CloudSyncSettingsTab.General">
-                        @Assets.SVG("refresh.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        @Text("Web_CloudSync_Tab_General", "General")
-                    </button>
-                    <button class="@SettingsTabClass(CloudSyncSettingsTab.Schedule)" type="button"
-                            role="tab" aria-selected="@(_activeSettingsTab == CloudSyncSettingsTab.Schedule)"
-                            @onclick="() => _activeSettingsTab = CloudSyncSettingsTab.Schedule">
-                        @Assets.SVG("history.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        @Text("Web_CloudSync_Tab_Schedule", "Timing")
-                    </button>
-                    <button class="@SettingsTabClass(CloudSyncSettingsTab.Advanced)" type="button"
-                            role="tab" aria-selected="@(_activeSettingsTab == CloudSyncSettingsTab.Advanced)"
-                            @onclick="() => _activeSettingsTab = CloudSyncSettingsTab.Advanced">
-                        @Assets.SVG("edit_box.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                        @Text("Web_CloudSync_Tab_Advanced", "Advanced")
-                    </button>
-                </div>
+                <Tabs aria-label="@Text("Web_CloudSync_Title", "Cloud Sync")">
+                    <Tab Active="@(_activeSettingsTab == CloudSyncSettingsTab.General)" Icon="refresh.svg" Label="@Text("Web_CloudSync_Tab_General", "General")"
+                         OnClick="() => _activeSettingsTab = CloudSyncSettingsTab.General" />
+                    <Tab Active="@(_activeSettingsTab == CloudSyncSettingsTab.Schedule)" Icon="history.svg" Label="@Text("Web_CloudSync_Tab_Schedule", "Timing")"
+                         OnClick="() => _activeSettingsTab = CloudSyncSettingsTab.Schedule" />
+                    <Tab Active="@(_activeSettingsTab == CloudSyncSettingsTab.Advanced)" Icon="edit_box.svg" Label="@Text("Web_CloudSync_Tab_Advanced", "Advanced")"
+                         OnClick="() => _activeSettingsTab = CloudSyncSettingsTab.Advanced" />
+                </Tabs>
 
                 @if (_activeSettingsTab == CloudSyncSettingsTab.General)
                 {

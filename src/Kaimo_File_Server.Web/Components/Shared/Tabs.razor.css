@@ -1,0 +1,170 @@
+/*
+    Central tab styling for the shared <Tabs> / <Tab> components.
+    Tab buttons live in the separate <Tab> component, so every rule that
+    targets a button reaches it through ::deep.
+
+    Variants:
+      .detail-tabs--horizontal  underline bar (default)
+      .detail-tabs--vertical    sidebar (was .settings-nav)
+      .detail-tabs--panel       full-bleed framed bar inside detail panes
+*/
+
+/* -- Horizontal underline strip (default) -- */
+.detail-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 2px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    padding: 0;
+    margin: 16px 0 20px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+    /* Slim scrollbar so the horizontal strip stays unobtrusive. */
+    .detail-tabs::-webkit-scrollbar {
+        height: 4px;
+    }
+
+    .detail-tabs::-webkit-scrollbar-thumb {
+        background: var(--border-light);
+        border-radius: 2px;
+    }
+
+.detail-tabs ::deep .detail-tab {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 14px;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+    position: relative;
+}
+
+    .detail-tabs ::deep .detail-tab:hover {
+        color: var(--text-primary);
+        background: transparent;
+    }
+
+.detail-tabs ::deep .detail-tab--active {
+    background: transparent;
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    box-shadow: none;
+}
+
+    .detail-tabs ::deep .detail-tab--active:hover {
+        background: transparent;
+        color: var(--accent);
+    }
+
+    .detail-tabs ::deep .detail-tab svg {
+        opacity: 0.85;
+    }
+
+    .detail-tabs ::deep .detail-tab--active svg {
+        stroke: var(--accent);
+        opacity: 1;
+    }
+
+    .detail-tabs ::deep .detail-tab:disabled {
+        cursor: not-allowed;
+        opacity: 0.48;
+    }
+
+/* -- Panel framing: full-bleed bar inside detail panes -- */
+/* Shared recipe previously duplicated across the share / cloud / storage panes.
+   Page-specific offsets (negative margins) stay in each page's scoped CSS. */
+.detail-tabs--panel {
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+}
+
+    .detail-tabs--panel ::deep .detail-tab {
+        min-height: 39px;
+        padding: 8px 9px;
+        color: var(--text-secondary);
+        font-size: 12px;
+        font-weight: 620;
+    }
+
+        .detail-tabs--panel ::deep .detail-tab:hover:not(:disabled) {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+/* -- Vertical sidebar (was .settings-nav) -- */
+.detail-tabs--vertical {
+    min-width: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    margin: 0;
+    padding: 12px 10px;
+    overflow: visible;
+    border: 0;
+    border-right: 1px solid var(--border);
+    border-radius: 0;
+    background: var(--bg-tertiary);
+}
+
+    .detail-tabs--vertical ::deep .detail-tab {
+        width: 100%;
+        min-height: 38px;
+        justify-content: flex-start;
+        padding: 8px 10px;
+        border: 1px solid transparent;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--text-secondary);
+        font-size: 12.5px;
+        font-weight: 580;
+    }
+
+        .detail-tabs--vertical ::deep .detail-tab:hover {
+            border-color: var(--border);
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+    .detail-tabs--vertical ::deep .detail-tab--active {
+        border-color: var(--accent-border);
+        border-bottom-color: var(--accent-border);
+        background: var(--accent-subtle);
+        color: var(--text-primary);
+        box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+        .detail-tabs--vertical ::deep .detail-tab--active svg {
+            stroke: var(--accent);
+        }
+
+/* Vertical strip collapses to a horizontal scroller on narrow viewports. */
+@media (max-width: 800px) {
+    .detail-tabs--vertical {
+        flex-direction: row;
+        overflow-x: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+        .detail-tabs--vertical ::deep .detail-tab {
+            width: auto;
+            flex: 0 0 auto;
+            box-shadow: none;
+        }
+}

@@ -108,9 +108,6 @@ public partial class ShareList
 
     private void SelectShareKind(ShareKind kind) => _shareKind = kind;
 
-    private string ShareKindClass(ShareKind kind)
-        => kind == _shareKind ? "share-kind-tab share-kind-tab--active" : "share-kind-tab";
-
     private static string Text(string key, string fallback)
         => Core.Language.Resources.ResourceManager.GetString(key) ?? fallback;
 

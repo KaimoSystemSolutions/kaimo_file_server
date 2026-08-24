@@ -113,17 +113,14 @@ else
                         <span class="detail-subtitle">@VM.Selected.Name</span>
                     </div>
 
-                    <div class="detail-tabs" role="tablist" aria-label="Abteilungseinstellungen">
-                        <button class="detail-tab @(_activeTab == DepartmentDetailTab.General ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == DepartmentDetailTab.General)" @onclick="() => SwitchTab(DepartmentDetailTab.General)">
-                            @Assets.SVG("settings.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Allgemein
-                        </button>
-                        <button class="detail-tab @(_activeTab == DepartmentDetailTab.Permissions ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == DepartmentDetailTab.Permissions)" @onclick="() => SwitchTab(DepartmentDetailTab.Permissions)">
-                            @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Berechtigungen
-                        </button>
-                        <button class="detail-tab @(_activeTab == DepartmentDetailTab.Assignments ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == DepartmentDetailTab.Assignments)" @onclick="() => SwitchTab(DepartmentDetailTab.Assignments)">
-                            @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Zuordnungen
-                        </button>
-                    </div>
+                    <Tabs aria-label="Abteilungseinstellungen">
+                        <Tab Active="@(_activeTab == DepartmentDetailTab.General)" Icon="settings.svg" Label="Allgemein"
+                             OnClick="() => SwitchTab(DepartmentDetailTab.General)" />
+                        <Tab Active="@(_activeTab == DepartmentDetailTab.Permissions)" Icon="shield.svg" Label="Berechtigungen"
+                             OnClick="() => SwitchTab(DepartmentDetailTab.Permissions)" />
+                        <Tab Active="@(_activeTab == DepartmentDetailTab.Assignments)" Icon="users.svg" Label="Zuordnungen"
+                             OnClick="() => SwitchTab(DepartmentDetailTab.Assignments)" />
+                    </Tabs>
 
                     @if (_activeTab == DepartmentDetailTab.General)
                     {
@@ -322,17 +319,14 @@ else
                         </span>
                     </div>
 
-                    <div class="detail-tabs" role="tablist" aria-label="Abteilungsdetails">
-                        <button class="detail-tab @(_activeTab == DepartmentDetailTab.General ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == DepartmentDetailTab.General)" @onclick="() => SwitchTab(DepartmentDetailTab.General)">
-                            @Assets.SVG("settings.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Allgemein
-                        </button>
-                        <button class="detail-tab @(_activeTab == DepartmentDetailTab.Permissions ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == DepartmentDetailTab.Permissions)" @onclick="() => SwitchTab(DepartmentDetailTab.Permissions)">
-                            @Assets.SVG("shield.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Berechtigungen
-                        </button>
-                        <button class="detail-tab @(_activeTab == DepartmentDetailTab.Assignments ? "detail-tab--active" : "")" type="button" role="tab" aria-selected="@(_activeTab == DepartmentDetailTab.Assignments)" @onclick="() => SwitchTab(DepartmentDetailTab.Assignments)">
-                            @Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2)) Zuordnungen
-                        </button>
-                    </div>
+                    <Tabs aria-label="Abteilungsdetails">
+                        <Tab Active="@(_activeTab == DepartmentDetailTab.General)" Icon="settings.svg" Label="Allgemein"
+                             OnClick="() => SwitchTab(DepartmentDetailTab.General)" />
+                        <Tab Active="@(_activeTab == DepartmentDetailTab.Permissions)" Icon="shield.svg" Label="Berechtigungen"
+                             OnClick="() => SwitchTab(DepartmentDetailTab.Permissions)" />
+                        <Tab Active="@(_activeTab == DepartmentDetailTab.Assignments)" Icon="users.svg" Label="Zuordnungen"
+                             OnClick="() => SwitchTab(DepartmentDetailTab.Assignments)" />
+                    </Tabs>
 
                     <div class="detail-field-grid">
                         @if (_activeTab == DepartmentDetailTab.General)

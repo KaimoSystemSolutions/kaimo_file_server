@@ -33,9 +33,9 @@
 .storage-editor-heading h3 { overflow: hidden; margin: 0; text-overflow: ellipsis; white-space: nowrap; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 18px; letter-spacing: -.015em; }
 .storage-editor-heading span { color: var(--text-tertiary); font-size: 12px; }
 .storage-enabled { display: inline-flex; flex: 0 0 auto; align-items: center; gap: .45rem; color: var(--text-secondary); font-size: 12px; }
-.storage-editor .cloud-sync-tabs { margin: 0 -18px 0; padding: 0 10px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg-secondary); }
-.storage-editor .detail-tab { min-height: 39px; padding: 8px 9px; color: var(--text-secondary); font-size: 12px; font-weight: 620; }
-.storage-editor .detail-tab--active { background: transparent; color: var(--accent-strong); border-bottom-color: var(--accent); }
+/* Full-bleed framing comes from the shared .detail-tabs--panel variant;
+   only the editor-specific bleed offsets stay here. */
+.storage-editor ::deep .detail-tabs { margin: 0 -18px 0; padding: 0 10px; }
 .storage-tab-panel { padding: 17px 0 4px; }
 .storage-form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .storage-form-grid label { display: grid; gap: 5px; color: var(--text-secondary); font-size: 12px; }
@@ -70,4 +70,4 @@
 .sync-detail-pane .error-banner { margin-top: 14px; }
 
 @media (max-width: 1180px) { .sync-workspace { grid-template-columns: 1fr; overflow: visible; } .storage-editor { min-height: 390px; border-top: 1px solid var(--border); border-left: 0; } }
-@media (max-width: 760px) { .storage-toolbar { align-items: flex-start; flex-wrap: wrap; } .sync-workspace { margin-inline: -16px; border-right: 0; border-left: 0; border-radius: 0; } .sync-list-header { display: none; } .sync-row { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 13px 16px; } .sync-row .storage-state { grid-row: 2; justify-self: start; } .sync-mode { grid-row: 3; } .storage-editor { padding-inline: 14px; } .storage-editor .cloud-sync-tabs { margin-inline: -14px; } .storage-editor-heading { flex-direction: column; } .sync-detail-header { flex-direction: column; } .sync-detail-group dl { grid-template-columns: 1fr; gap: 3px; } .sync-detail-group dd { margin-bottom: 7px; } }
+@media (max-width: 760px) { .storage-toolbar { align-items: flex-start; flex-wrap: wrap; } .sync-workspace { margin-inline: -16px; border-right: 0; border-left: 0; border-radius: 0; } .sync-list-header { display: none; } .sync-row { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 13px 16px; } .sync-row .storage-state { grid-row: 2; justify-self: start; } .sync-mode { grid-row: 3; } .storage-editor { padding-inline: 14px; } .storage-editor ::deep .detail-tabs { margin-inline: -14px; } .storage-editor-heading { flex-direction: column; } .sync-detail-header { flex-direction: column; } .sync-detail-group dl { grid-template-columns: 1fr; gap: 3px; } .sync-detail-group dd { margin-bottom: 7px; } }

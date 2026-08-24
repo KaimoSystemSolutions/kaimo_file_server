@@ -106,31 +106,11 @@
     font-size: 12px;
 }
 
-.share-detail-pane .detail-tabs {
+/* Full-bleed framing comes from the shared .detail-tabs--panel variant;
+   only the pane-specific bleed offsets stay here. */
+.share-detail-pane ::deep .detail-tabs {
     margin: 0 -18px 17px;
     padding: 0 10px;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-secondary);
-}
-
-.share-detail-pane .detail-tab {
-    min-height: 39px;
-    padding: 8px 9px;
-    color: var(--text-secondary);
-    font-size: 12px;
-    font-weight: 620;
-}
-
-.share-detail-pane .detail-tab:hover:not(:disabled) {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-}
-
-.share-detail-pane .detail-tab--active {
-    background: transparent;
-    color: var(--accent-strong);
-    border-bottom-color: var(--accent);
 }
 
 .share-detail-pane .detail-actions {
@@ -164,11 +144,6 @@
     background: var(--bg-sunken);
     font-size: 12px;
     line-height: 1.45;
-}
-
-.detail-tab:disabled {
-    cursor: not-allowed;
-    opacity: 0.48;
 }
 
 .detail-empty {
@@ -226,29 +201,7 @@
         padding-inline: 14px;
     }
 
-    .share-detail-pane .detail-tabs {
+    .share-detail-pane ::deep .detail-tabs {
         margin-inline: -14px;
     }
-}
-.share-kind-tabs {
-    display: flex;
-    gap: .5rem;
-    margin-bottom: 1.25rem;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.share-kind-tab {
-    padding: .8rem 1.15rem;
-    border: 0;
-    border-bottom: 3px solid transparent;
-    background: transparent;
-    color: var(--text-secondary);
-    font: inherit;
-    font-weight: 650;
-    cursor: pointer;
-}
-
-.share-kind-tab--active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
 }

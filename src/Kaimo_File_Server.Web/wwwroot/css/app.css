@@ -1076,76 +1076,8 @@ html, body, #app {
 }
 
 /* -- Detail Tabs -- */
-
-.detail-tabs {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 2px;
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid var(--border);
-    border-radius: 0;
-    padding: 0;
-    margin: 16px 0 20px;
-    overflow-x: auto;
-    scrollbar-width: thin;
-}
-
-    /* Slim scrollbar so the horizontal strip stays unobtrusive. */
-    .detail-tabs::-webkit-scrollbar {
-        height: 4px;
-    }
-
-    .detail-tabs::-webkit-scrollbar-thumb {
-        background: var(--border-light);
-        border-radius: 2px;
-    }
-
-.detail-tab {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 10px 14px;
-    border: none;
-    background: transparent;
-    color: var(--text-tertiary);
-    font-size: 13px;
-    font-weight: 600;
-    border-radius: 0;
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    transition: color 0.15s ease, border-color 0.15s ease;
-    white-space: nowrap;
-    position: relative;
-}
-
-    .detail-tab:hover {
-        color: var(--text-primary);
-        background: transparent;
-    }
-
-.detail-tab--active {
-    background: transparent;
-    color: var(--accent);
-    border-bottom-color: var(--accent);
-    box-shadow: none;
-}
-
-    .detail-tab--active:hover {
-        background: transparent;
-        color: var(--accent);
-    }
-
-    .detail-tab svg {
-        opacity: 0.85;
-    }
-
-    .detail-tab--active svg {
-        stroke: var(--accent);
-        opacity: 1;
-    }
+/* The tab strip/button styling now lives with the shared <Tabs>/<Tab>
+   components in Components/Shared/Tabs.razor.css. */
 
 /* -- Tab Content Area -- */
 
@@ -3893,13 +3825,11 @@ input[type="radio"] {
     background: var(--bg-hover);
 }
 
-.properties-tabs,
-.detail-tabs {
+.properties-tabs {
     border-color: var(--border);
 }
 
-.properties-tab--active,
-.detail-tab--active {
+.properties-tab--active {
     color: var(--accent-strong);
     border-bottom-color: var(--accent);
 }
