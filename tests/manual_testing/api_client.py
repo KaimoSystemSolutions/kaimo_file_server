@@ -11,9 +11,11 @@ What it covers
   * Auth:   login (registers/reuses a device), refresh (token rotation), logout.
   * Browse: list shares, navigate a share, download a file, upload a file.
   * Sync:   list devices, list/create/delete per-device sync profiles,
-            delta enumeration, the long-poll change-wait, and — on top of those —
-            an actual file synchronizer that reconciles a share subtree with a
-            local folder (one-shot "Sync now" plus a long-poll auto-sync loop).
+            delta enumeration (which now also returns the change-log head `seq`),
+            the incremental `change_seq` feed (`changes?since=N` — precise per-path
+            deltas incl. renames), the seq-based long-poll change-wait, and — on top
+            of those — an actual file synchronizer that reconciles a share subtree
+            with a local folder (one-shot "Sync now" plus a long-poll auto-sync loop).
 
 Every HTTP call is echoed to the Debug log at the bottom (method, URL, status,
 elapsed time, and a truncated body) so you can see exactly what the server does.
@@ -901,12 +903,25 @@ class App:
 
         delta = ttk.LabelFrame(tab, text="Delta & change notification")
         delta.pack(fill="x", pady=4)
-        ttk.Button(delta, text="Get delta (share + path above)", command=self.get_delta).pack(
-            side="left", padx=4, pady=4)
-        ttk.Button(delta, text="Wait for change (long-poll)", command=self.wait_for_change).pack(
+        row1 = ttk.Frame(delta)
+        row1.pack(fill="x", padx=4, pady=(4, 0))
+        ttk.Button(row1, text="Get delta (share + path above)", command=self.get_delta).pack(
+            side="left", padx=4)
+        ttk.Button(row1, text="Wait for change (long-poll)", command=self.wait_for_change).pack(
             side="left", padx=4)
         self.last_token_var = tk.StringVar(value="last token: —")
-        ttk.Label(delta, textvariable=self.last_token_var, foreground="#666").pack(side="left", padx=8)
+        ttk.Label(row1, textvariable=self.last_token_var, foreground="#666").pack(side="left", padx=8)
+
+        # Incremental change_seq feed: fetch only the deltas past a stored sequence.
+        row2 = ttk.Frame(delta)
+        row2.pack(fill="x", padx=4, pady=(2, 4))
+        ttk.Button(row2, text="Get changes (since seq)", command=self.get_changes).pack(
+            side="left", padx=4)
+        ttk.Label(row2, text="since seq:").pack(side="left")
+        self.since_seq_var = tk.StringVar(value="0")
+        ttk.Entry(row2, textvariable=self.since_seq_var, width=10).pack(side="left", padx=(2, 8))
+        self.last_seq_var = tk.StringVar(value="head seq: —")
+        ttk.Label(row2, textvariable=self.last_seq_var, foreground="#666").pack(side="left", padx=8)
 
         transfer = ttk.LabelFrame(tab, text="Synchronize (actually transfer files ↔ local folder)")
         transfer.pack(fill="x", pady=4)
@@ -1312,10 +1327,53 @@ class App:
         if result.ok and isinstance(result.json, dict):
             entries = result.json.get("entries", [])
             token = result.json.get("token")
+            seq = result.json.get("seq")
             self.last_token_var.set(f"last token: {token}")
-            self.log(f"  → {len(entries)} entries, token {token}\n")
+            self.log(f"  → {len(entries)} entries, token {token}, seq {seq}\n")
+            # The delta seq is the baseline cursor — seed the incremental feed with it
+            # so "Get changes (since seq)" picks up exactly where this enumeration ended.
+            if seq is not None:
+                self.last_seq_var.set(f"head seq: {seq}")
+                self.since_seq_var.set(str(seq))
         else:
             messagebox.showerror("Delta failed", self._describe(result))
+
+    def get_changes(self) -> None:
+        """Fetch the incremental change_seq feed for the share/path since a stored seq."""
+        client = self.ensure_client()
+        share_id = self._selected_share_id(self.sync_share_combo)
+        if client is None or not share_id:
+            return
+        path = self.sync_path_var.get().strip()
+        try:
+            since = int(self.since_seq_var.get().strip() or "0")
+        except ValueError:
+            messagebox.showerror("Invalid seq", "'since seq' must be a whole number.")
+            return
+        self.log(f"\n=== CHANGES since={since} '{path or '/'}' ===\n")
+        self.run_async(
+            lambda: client.request(
+                "GET", f"/api/v1/sync/{share_id}/changes",
+                query={"since": since, "path": path}),
+            self._on_changes)
+
+    def _on_changes(self, result: ApiResult) -> None:
+        if not (result.ok and isinstance(result.json, dict)):
+            messagebox.showerror("Changes failed", self._describe(result))
+            return
+        changes = result.json.get("changes", [])
+        seq = result.json.get("seq")
+        truncated = result.json.get("truncated")
+        self.log(f"  → {len(changes)} change(s), next seq {seq}"
+                 f"{' (truncated — more remain)' if truncated else ''}\n")
+        for c in changes:
+            arrow = f"{c.get('oldPath')} → {c['path']}" if c.get("oldPath") else c["path"]
+            kind = "dir" if c.get("isDirectory") else "file"
+            self.log(f"      [{c['seq']}] {c['changeType']:<14} {kind}  {arrow}\n")
+        # Advance the cursor so a repeat only returns newer changes.
+        if seq is not None:
+            self.last_seq_var.set(f"head seq: {seq}")
+            self.since_seq_var.set(str(seq))
 
     def wait_for_change(self) -> None:
         client = self.ensure_client()

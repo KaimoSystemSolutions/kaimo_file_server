@@ -70,7 +70,8 @@ These rules are fixed and must be preserved by all clients and by the server:
 | **Access token** | Short-lived JWT presented as `Authorization: Bearer <token>` on every call. |
 | **Refresh token** | Long-lived opaque secret used to mint new access tokens. Rotated on every use. |
 | **Sync connection** | `DeviceSyncProfile`: one connection pairing a **remote** endpoint (a share + share-relative folder) with a **local** endpoint (a folder on the device, opaque to the server), plus a direction — `Pull` (download-only), `Push` (upload-only), or `TwoWay`. |
-| **Change token** | Opaque string fingerprinting a subtree; changes whenever anything under it is added, modified, or deleted — through any transport. |
+| **Change token** | Opaque string fingerprinting a subtree; changes whenever anything under it is added, modified, or deleted — through any transport. Now derived from the change sequence (below), so it also moves on renames and content overwrites. |
+| **Change sequence** | A monotonic per-share `seq` (an opaque, ever-increasing integer) assigned to every mutation and recorded in a path-level change log. A client stores the highest `seq` it has seen for a share and fetches only newer entries via `changes?since=`. Bootstrap it from a full `delta` (which returns the current `seq`). |
 | **Item tag** | An `ETag`-style validator for one file/directory, `"{size}:{modifiedTicks}"` (quoted). Returned on `metadata`/`content`/upload and reproducible on the client from a delta entry, so it can be sent back as `If-Match` without a metadata round trip. See [§3.1](#31-safe-mutations-conditional-requests--idempotency-keys). |
 | **Idempotency key** | A client-chosen, per-device stable id for one mutating operation, sent as the `Idempotency-Key` header. Lets a retried request replay its original outcome instead of re-executing. |
 
@@ -238,14 +239,16 @@ across the user's devices and is shown read-only in the web UI.
 ```
 GET /api/v1/sync/{shareId}/delta?path=projects/2026
 ```
-Returns every readable item under the subtree plus a change token:
+Returns every readable item under the subtree plus a change token and the current
+change **sequence**:
 ```jsonc
 {
   "entries": [
     { "path": "projects/2026", "isDirectory": true,  "size": 0,      "modifiedAtUtc": "…" },
     { "path": "projects/2026/a.pdf", "isDirectory": false, "size": 1234, "modifiedAtUtc": "…" }
   ],
-  "token": "638…:42"
+  "token": "638…",
+  "seq": 4211
 }
 ```
 The client diffs `entries` against its last-known state to compute adds/updates/
@@ -254,14 +257,57 @@ deletes, then transfers according to the profile's direction:
 - **Push** — upload device→server only.
 - **TwoWay** — both; the client resolves conflicts (e.g. keep-both) as it sees fit.
 
+`seq` is the baseline cursor: after this one full enumeration, switch to the
+incremental change feed below (`changes?since=<seq>`) and re-enumerate only when
+you need to reconcile from scratch.
+
+### Incremental change feed (`change_seq`)
+```
+GET /api/v1/sync/{shareId}/changes?since=4211&path=projects/2026&limit=1000
+```
+Returns just the mutations recorded under the subtree with a sequence greater than
+`since`, in ascending `seq` order — renames and net-zero (one-deleted-one-created)
+changes included, which the coarse token alone cannot see:
+```jsonc
+{
+  "changes": [
+    { "seq": 4212, "path": "projects/2026/b.pdf", "oldPath": "projects/2026/a.pdf",
+      "changeType": "Renamed", "isDirectory": false, "size": 1234, "modifiedAtUtc": "…" },
+    { "seq": 4213, "path": "projects/2026/c.pdf", "oldPath": null,
+      "changeType": "Modified", "isDirectory": false, "size": 5678, "modifiedAtUtc": "…" }
+  ],
+  "seq": 4213,
+  "truncated": false
+}
+```
+- `changeType` is one of `Created`, `Modified`, `Deleted`, `Renamed`, or
+  `SubtreeChanged` (a bulk op — archive/unzip/folder change — that the client
+  reconciles with a scoped `delta` of `path`).
+- `oldPath` is set only on `Renamed` (the source). A rename that moves an item
+  **out** of the watched subtree still appears (matched on its old path), so the
+  client can apply the disappearance.
+- `size` / `modifiedAtUtc` accompany creates and modifies so the client can rebuild
+  the item tag without a metadata round trip.
+- `seq` in the envelope is the cursor to store next. It advances even when a page is
+  empty or was entirely hidden by ACLs, so you never re-request the same range.
+- `truncated: true` means more entries remain past `limit` — call again immediately
+  with the new `seq`. `limit` defaults to 1000 (max 5000).
+
+Entries are ACL-filtered like a listing: a live item you may not list is omitted;
+deletes and rename-sources (whose ACL is already gone) are included because they
+fall under the subtree you were authorized to watch. Requires list access on `path`.
+
 ### Change wait (long-poll)
 ```
 GET /api/v1/sync/changes/wait?shareId={id}&path=projects/2026&since=638…:42
 ```
 Blocks until the subtree's token differs from `since`, then returns
 `{ "token": "…", "changed": true }`; if nothing changes within ~30 s it returns
-`changed: false`. Immediately call `delta` when `changed` is true, then wait again
-with the new token. See the battery model below.
+`changed: false`. The token is the subtree's change **sequence** head, so the wait
+now wakes on renames and content overwrites too (not only adds/deletes). When
+`changed` is true, call `changes?since=<your stored seq>` (or a full `delta`), then
+wait again with the new token. The token stays opaque — pass back whatever you last
+received. See the battery model below.
 
 ---
 
@@ -272,20 +318,22 @@ The goal is *fast propagation both ways* without draining mobile batteries.
 - **No busy polling.** Instead of repeatedly hitting `delta`, a client issues one
   long-poll `changes/wait` per synced root. It is a single idle HTTP request that
   returns the moment something changes.
-- **Transport-agnostic detection.** The change token is derived from the persisted
-  `file_metadata` (newest `ModifiedAt` + item count under the subtree). A change
-  made through the web UI, SMB, or the API itself all move the token — so an upload
-  from one device is noticed by every other device watching that subtree.
+- **Transport-agnostic detection.** Every mutation — through the web UI, SMB, or the
+  API itself — appends to a per-share change log and advances the subtree's change
+  **sequence**, so an upload, rename, or overwrite from one device is noticed by
+  every other device watching that subtree.
 - **Immediate uploads.** Device→server changes are `PUT` straight away, so the other
   side sees them within one long-poll cycle.
-- **Coarse then precise.** The token only says "something changed"; the client then
-  fetches the precise `delta`. This keeps the wait cheap and the transfer minimal.
-- **Known limitation (v1 token).** The token is `newestModified:itemCount`. A pure
-  **rename/move** (same count, unchanged mtime) and a net-zero "one deleted + one created"
-  within a single wait window do **not** move it, so `changes/wait` can miss them until the
-  next unrelated change. A future `change_seq` delta feed (monotonic per-share sequence bumped
-  on every mutation) will close this gap; until then, do a periodic full `delta` reconcile in
-  addition to long-poll if you must catch remote renames promptly.
+- **Coarse then precise.** The wait only says "the sequence advanced"; the client
+  then fetches the precise deltas with `changes?since=`. This keeps the wait cheap
+  and the transfer minimal.
+- **Renames and net-zero changes are covered.** Because each mutation appends its own
+  change-log entry (rather than only nudging an aggregate), a pure **rename/move** and
+  a net-zero "one deleted + one created" both advance the sequence and appear in
+  `changes?since=` — the gap the earlier `newestModified:itemCount` token had is
+  closed. A periodic full `delta` reconcile is still worthwhile as a belt-and-braces
+  safety net (change-log appends are best-effort), but is no longer required to catch
+  remote renames promptly.
 - **Future: native push.** A device may register an FCM/APNs push token (stored on
   `SyncDevice`); a later package will send a silent push on change so a backgrounded
   phone can wake, sync briefly, and drop its socket — the most battery-efficient
@@ -341,11 +389,15 @@ is an English developer hint; user-facing text is localized in the app).
   `Idempotency-Key` replay on upload/rename/delete/mkdir, plus natural idempotence
   (see [§3.1](#31-safe-mutations-conditional-requests--idempotency-keys)). This is the server
   foundation for offline-first two-way sync.
+- **`change_seq` delta feed** — a monotonic per-share change sequence and path-level change log,
+  appended on every mutation through every transport, exposed as
+  `GET /sync/{shareId}/changes?since=N` and as the token behind the seq-based `changes/wait`
+  (see [§4](#4-sync)). Detects renames and net-zero changes, closing the coarse-token gap.
 
 **Next**
-- **`change_seq` delta feed** — a monotonic per-share change sequence (and/or a path-level
-  change list) so renames and net-zero changes are detected, replacing the coarse
-  `newestModified:itemCount` token (see the limitation in [§5](#5-change-notification--battery-model)).
+- **Change-log retention** — a background job pruning old `file_change_log` entries
+  (`IFileChangeLogRepository.PruneOlderThanAsync`, not yet wired). The retention window must
+  exceed the longest expected client-offline period.
 - **Client baseline + operation outbox** — a persisted last-synced snapshot and a durable
   device-side journal that replays queued renames/deletes on reconnect using the mechanisms in
   §3.1; enables true two-way delete/rename propagation and conflict handling.

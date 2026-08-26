@@ -21,15 +21,18 @@ namespace Kaimo_File_Server.Core.Services.Sync
         private readonly IShareRepository _shares;
         private readonly IFileServiceFactory _fileServiceFactory;
         private readonly IFileChangeCursorRepository _changeCursors;
+        private readonly IFileChangeLogRepository _changeLog;
 
         public SyncQueryService(
             IShareRepository shares,
             IFileServiceFactory fileServiceFactory,
-            IFileChangeCursorRepository changeCursors)
+            IFileChangeCursorRepository changeCursors,
+            IFileChangeLogRepository changeLog)
         {
             _shares = shares;
             _fileServiceFactory = fileServiceFactory;
             _changeCursors = changeCursors;
+            _changeLog = changeLog;
         }
 
         public async Task<SyncDelta> EnumerateAsync(
@@ -44,15 +47,16 @@ namespace Kaimo_File_Server.Core.Services.Sync
             string root = ShareRelativePath.Normalize(rootRelativePath);
             var fileService = _fileServiceFactory.CreateForShare(share.Id, share.Path);
 
-            // Capture the change token BEFORE walking, so a change that lands
-            // mid-walk is not missed: the returned token is conservative and the
-            // next long-poll will report the change rather than silently skip it.
+            // Capture the change token and the change-log head sequence BEFORE walking, so a change
+            // that lands mid-walk is not missed: both are conservative, and the next
+            // long-poll / changes?since request reports the change rather than silently skipping it.
             var stateBefore = await _changeCursors.GetShareChangeStateAsync(shareId, root, ct);
+            var seqBefore = await _changeLog.GetHeadSeqAsync(shareId, root, ct);
 
             var entries = new List<SyncEntry>();
             await WalkAsync(fileService, root, user, entries, ct);
 
-            return new SyncDelta(entries, stateBefore.ToToken());
+            return new SyncDelta(entries, stateBefore.ToToken(), seqBefore);
         }
 
         private static async Task WalkAsync(

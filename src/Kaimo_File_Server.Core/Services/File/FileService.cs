@@ -1,4 +1,5 @@
 ﻿using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Logging;
@@ -100,6 +101,7 @@ public class FileService : IFileService
             var isDirty = _handle.IsDirty;
             var isDir = _handle.IsDirectory;
             var deleting = _handle.DeleteOnClose;
+            var length = _handle.Length;
 
             // === Pre-close hooks (need the open stream) ===
             // Versioning: snapshot the file content while the stream is still open.
@@ -138,6 +140,12 @@ public class FileService : IFileService
                 }
                 else if (isDirty && !isDir)
                 {
+                    // Content was written and closed — record it for the client change feed. A new
+                    // file already logged its Created at open; this marks the content as Modified.
+                    await _owner.AppendChangeAsync(
+                        FileChangeType.Modified, rel, isDirectory: false,
+                        size: length, modifiedAtUtc: DateTime.UtcNow);
+
                     // Re-open through storage for search indexing — closed stream
                     // means no race with the SMB session. The Task<Stream> contract
                     // your search hook expects is preserved.
@@ -203,6 +211,7 @@ public class FileService : IFileService
     private readonly IFileOwnershipService? _ownershipService;
     private readonly ICloudSyncPathUpdater? _cloudSyncPathUpdater;
     private readonly ICloudSyncOperationCoordinator? _cloudSyncOperations;
+    private readonly IFileChangeLog? _changeLog;
     private readonly ILogger<FileService> _logger;
     private readonly Guid _shareId;
     private readonly SemaphoreSlim _searchSideEffectLock = new(1, 1);
@@ -216,7 +225,8 @@ public class FileService : IFileService
     IFileOwnershipService? ownershipService = null,
     ILogger<FileService>? logger = null,
     ICloudSyncPathUpdater? cloudSyncPathUpdater = null,
-    ICloudSyncOperationCoordinator? cloudSyncOperations = null)
+    ICloudSyncOperationCoordinator? cloudSyncOperations = null,
+    IFileChangeLog? changeLog = null)
     {
         _storage = storage;
         _acl = acl;
@@ -226,6 +236,7 @@ public class FileService : IFileService
         _ownershipService = ownershipService;
         _cloudSyncPathUpdater = cloudSyncPathUpdater;
         _cloudSyncOperations = cloudSyncOperations;
+        _changeLog = changeLog;
         _logger = logger ?? NullLogger<FileService>.Instance;
     }
 
@@ -253,6 +264,52 @@ public class FileService : IFileService
         }
     }
 
+    /// <summary>
+    /// Appends one entry to the per-share change log that backs the client sync <c>change_seq</c>
+    /// feed. Best-effort: a failure must never fail the underlying file operation (a lost row is
+    /// recovered by the client's periodic full <c>delta</c> reconcile). No-op when no change log is
+    /// configured.
+    /// </summary>
+    private async Task AppendChangeAsync(
+        FileChangeType type, string relativePath, bool isDirectory,
+        string? oldRelativePath = null, long? size = null, DateTime? modifiedAtUtc = null)
+    {
+        if (_changeLog is null) return;
+        try
+        {
+            await _changeLog.AppendAsync(
+                _shareId, type, relativePath, isDirectory, oldRelativePath, size, modifiedAtUtc);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Change-log append ({ChangeType}) failed for {Path}", type, relativePath);
+        }
+    }
+
+    /// <summary>
+    /// Appends a create/modify entry for a file, enriching it with the just-written item's size and
+    /// modified time so a client can rebuild its item tag without a metadata round trip. The stat is
+    /// optional enrichment — its failure never blocks the entry.
+    /// </summary>
+    private async Task AppendFileUpsertAsync(FileChangeType type, string relativePath)
+    {
+        if (_changeLog is null) return;
+
+        long? size = null;
+        DateTime? modifiedAt = null;
+        try
+        {
+            var meta = await _storage.GetMetadataAsync(relativePath);
+            size = meta.Size;
+            modifiedAt = meta.ModifiedAt;
+        }
+        catch { /* size/mtime are optional enrichment for the change feed */ }
+
+        await AppendChangeAsync(
+            type, relativePath, isDirectory: false, size: size, modifiedAtUtc: modifiedAt);
+    }
+
     private async Task ApplyDeleteSideEffectsAsync(
         string relativePath, bool isDirectory, string absolutePath, bool bestEffort,
         bool includeSearch = true)
@@ -277,6 +334,10 @@ public class FileService : IFileService
             }
             catch (Exception ex) { failures.Add(ex); }
         }
+
+        // Record the deletion for the client change feed. The on-disk delete already happened,
+        // so log it regardless of whether a cleanup side-effect above failed.
+        await AppendChangeAsync(FileChangeType.Deleted, relativePath, isDirectory);
 
         if (failures.Count == 0) return;
         var aggregate = new AggregateException(
@@ -327,6 +388,11 @@ public class FileService : IFileService
             }
             catch (Exception ex) { failures.Add(ex); }
         }
+
+        // Record the rename for the client change feed (covers moves to the recycle bin too). The
+        // on-disk move already happened, so log it regardless of a failed cleanup side-effect.
+        await AppendChangeAsync(
+            FileChangeType.Renamed, newRelativePath, isDirectory, oldRelativePath);
 
         if (failures.Count == 0) return;
         var aggregate = new AggregateException(
@@ -481,6 +547,10 @@ public class FileService : IFileService
             catch (Exception ex) { failures.Add(ex); }
         }
 
+        // Record the write for the client change feed (create or overwrite; the client downloads
+        // the latest either way). The native SMB write already completed.
+        await AppendFileUpsertAsync(FileChangeType.Modified, rel);
+
         if (failures.Count != 0)
             throw new AggregateException(
                 $"One or more close side effects failed for '{rel}'.",
@@ -503,6 +573,9 @@ public class FileService : IFileService
             try { await _searchService.onDirectoryCreated(abs); }
             catch (Exception ex) { failures.Add(ex); }
         }
+
+        await AppendChangeAsync(FileChangeType.Created, rel, isDirectory: true);
+
         if (failures.Count != 0)
             throw new AggregateException(
                 $"One or more mkdir side effects failed for '{rel}'.",
@@ -728,6 +801,9 @@ public class FileService : IFileService
         if (!existedBefore)
             await RecordOwnerAsync(normalized, isDirectory: false, user);
 
+        await AppendFileUpsertAsync(
+            existedBefore ? FileChangeType.Modified : FileChangeType.Created, normalized);
+
         // Versioning: snapshot the freshly-written content so web uploads/overwrites
         // build the same version history that SMB writes do (FileSession.DisposeAsync).
         // Content-addressable dedup skips this when the content is unchanged. A
@@ -783,6 +859,9 @@ public class FileService : IFileService
             sourcePaths.Select(ShareRelativePath.Normalize).ToList(),
             normalizedTarget,
             format);
+
+        // Archiving produces a single new archive file at the target.
+        await AppendFileUpsertAsync(FileChangeType.Created, normalizedTarget);
     }
     
     public async Task UnzipAsync(string zipPath, string targetPath, UserContext user)
@@ -799,6 +878,10 @@ public class FileService : IFileService
         await EnsureAccessAsync(user, parentDir, true, FilePermission.CreateWriteData);
 
         await _storage.UnzipAsync(normalizedZip, normalizedTarget);
+
+        // Extraction can create an unbounded number of items under the target — record it as one
+        // coarse subtree change; the client reconciles that subtree with a scoped delta.
+        await AppendChangeAsync(FileChangeType.SubtreeChanged, normalizedTarget, isDirectory: true);
     }
     
 
@@ -812,6 +895,9 @@ public class FileService : IFileService
 
         await _storage.WriteAsync(normalized, Stream.Null);
         await RecordOwnerAsync(normalized, isDirectory: false, user);
+        await AppendChangeAsync(
+            FileChangeType.Created, normalized, isDirectory: false,
+            size: 0, modifiedAtUtc: DateTime.UtcNow);
     }
 
     public async Task CreateDirectoryAsync(string path, UserContext user)
@@ -824,6 +910,7 @@ public class FileService : IFileService
 
         await _storage.CreateDirectory(normalized);
         await RecordOwnerAsync(normalized, isDirectory: true, user);
+        await AppendChangeAsync(FileChangeType.Created, normalized, isDirectory: true);
         var absolutePath = ToAbsolutePath(normalized);
         StartSearchSideEffect(
             () => _searchService!.onDirectoryCreated(absolutePath),
@@ -990,7 +1077,13 @@ public class FileService : IFileService
         // Create-via-open is how the SMB transport creates files — stamp the creator as
         // owner here so SMB writes get the same ownership record as web uploads.
         if (status == FileOpenStatus.Created)
+        {
             await RecordOwnerAsync(normalized, storageHandle.IsDirectory, user);
+            // Record the creation now (covers an empty file that is opened and closed without a
+            // write); a subsequent content write is recorded as Modified at FileSession close.
+            await AppendChangeAsync(
+                FileChangeType.Created, normalized, storageHandle.IsDirectory);
+        }
 
         // A handle opened purely for reading must never accept data writes,
         // even if a later request slips through the transport layer.
@@ -1072,6 +1165,8 @@ public class FileService : IFileService
         // untouched.
         await using var restored = await _versionService.ReadVersionAsync(_shareId, normalized, snapshotTimestampUtc);
         await _storage.WriteAsync(normalized, restored);
+
+        await AppendFileUpsertAsync(FileChangeType.Modified, normalized);
 
         await OnFileCreated(ToAbsolutePath(normalized), _storage.ReadAsync(normalized));
     }

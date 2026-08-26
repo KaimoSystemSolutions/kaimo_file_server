@@ -24,7 +24,12 @@ namespace Kaimo_File_Server.Core.Services.Sync
     /// enumeration; pass it to the change-wait endpoint to be notified of the
     /// next change.
     /// </param>
-    public sealed record SyncDelta(IReadOnlyList<SyncEntry> Entries, string Token);
+    /// <param name="Seq">
+    /// The change-log head sequence for the subtree captured before the walk. A client
+    /// establishes its baseline from this full enumeration, then switches to the incremental
+    /// <c>changes?since=Seq</c> feed for subsequent catch-up.
+    /// </param>
+    public sealed record SyncDelta(IReadOnlyList<SyncEntry> Entries, string Token, long Seq);
 
     /// <summary>
     /// Thin, ACL-checked sync primitive: enumerates a synced subtree by composing

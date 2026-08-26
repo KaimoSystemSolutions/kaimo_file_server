@@ -40,6 +40,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<DeviceSyncProfile> DeviceSyncProfiles { get; set; }
         public DbSet<ClientRequestReceipt> ClientRequestReceipts { get; set; }
+        public DbSet<FileChangeLogEntry> FileChangeLog { get; set; }
 
         // -- Departments & Scoped Roles --
         public DbSet<Department> Departments { get; set; }
@@ -405,6 +406,22 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(e => e.CreatedAtUtc);
                 entity.HasOne<SyncDevice>().WithMany().HasForeignKey(e => e.DeviceId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<FileChangeLogEntry>(entity =>
+            {
+                entity.ToTable("file_change_log");
+                entity.HasKey(e => e.Seq);
+                // Database-assigned monotonic identity (Npgsql IDENTITY; SQLite AUTOINCREMENT).
+                entity.Property(e => e.Seq).ValueGeneratedOnAdd();
+                entity.Property(e => e.ShareId).IsRequired();
+                entity.Property(e => e.Path).IsRequired();
+                entity.Property(e => e.ChangeType).IsRequired();
+                entity.Property(e => e.CreatedAtUtc).IsRequired();
+                // The client's "since N under this subtree" cursor scan and the head-seq lookup.
+                entity.HasIndex(e => new { e.ShareId, e.Seq });
+                // Drives retention pruning of old entries.
+                entity.HasIndex(e => e.CreatedAtUtc);
             });
 
             // -- Departments --

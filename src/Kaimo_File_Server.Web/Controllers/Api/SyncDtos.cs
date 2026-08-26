@@ -45,8 +45,34 @@ public sealed record SyncEntryDto(string Path, bool IsDirectory, long Size, Date
         new(e.Path, e.IsDirectory, e.Size, e.ModifiedAtUtc);
 }
 
-/// <summary>A subtree enumeration plus its change token.</summary>
-public sealed record SyncDeltaDto(IReadOnlyList<SyncEntryDto> Entries, string Token);
+/// <summary>
+/// A subtree enumeration plus its change token and change-log head sequence. Use <see cref="Seq"/>
+/// as the baseline cursor for the incremental <c>changes?since=</c> feed.
+/// </summary>
+public sealed record SyncDeltaDto(IReadOnlyList<SyncEntryDto> Entries, string Token, long Seq);
 
 /// <summary>Result of a long-poll change wait.</summary>
 public sealed record ChangeWaitDto(string Token, bool Changed);
+
+/// <summary>
+/// One entry in the incremental change feed. <see cref="ChangeType"/> is a
+/// <see cref="FileChangeType"/> name (e.g. <c>"Renamed"</c>). <see cref="OldPath"/> is set only for
+/// renames (the source). <see cref="Size"/> / <see cref="ModifiedAtUtc"/> are present for
+/// creates/modifies so a client can rebuild the item tag without a metadata round trip.
+/// </summary>
+public sealed record FileChangeDto(
+    long Seq, string Path, string? OldPath, string ChangeType,
+    bool IsDirectory, long? Size, DateTime? ModifiedAtUtc)
+{
+    public static FileChangeDto From(FileChangeLogEntry e) => new(
+        e.Seq, e.Path, e.OldPath, e.ChangeType.ToString(), e.IsDirectory, e.Size, e.ModifiedAtUtc);
+}
+
+/// <summary>
+/// A page of the incremental change feed. <see cref="Seq"/> is the cursor the client stores next —
+/// the highest sequence in <see cref="Changes"/>, or the subtree head when the page is empty (or was
+/// fully filtered by ACLs), so the cursor always advances. <see cref="Truncated"/> is <c>true</c>
+/// when more entries remain past the requested limit — call again immediately with the new
+/// <see cref="Seq"/>.
+/// </summary>
+public sealed record ChangesFeedDto(IReadOnlyList<FileChangeDto> Changes, long Seq, bool Truncated);

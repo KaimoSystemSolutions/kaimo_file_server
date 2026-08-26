@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Domain.ClientSync;
+using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services.File;
@@ -30,6 +31,11 @@ public sealed class SyncApiController : ApiControllerBase
     private readonly IFileServiceFactory _fileServiceFactory;
     private readonly ISyncQueryService _syncQuery;
     private readonly IFileChangeCursorRepository _changeCursors;
+    private readonly IFileChangeLogRepository _changeLog;
+
+    // Default and ceiling for one change-feed page.
+    private const int DefaultChangeLimit = 1000;
+    private const int MaxChangeLimit = 5000;
 
     public SyncApiController(
         IUserContextFactory userContextFactory,
@@ -38,7 +44,8 @@ public sealed class SyncApiController : ApiControllerBase
         IShareRepository shares,
         IFileServiceFactory fileServiceFactory,
         ISyncQueryService syncQuery,
-        IFileChangeCursorRepository changeCursors)
+        IFileChangeCursorRepository changeCursors,
+        IFileChangeLogRepository changeLog)
     {
         _userContextFactory = userContextFactory;
         _devices = devices;
@@ -47,6 +54,7 @@ public sealed class SyncApiController : ApiControllerBase
         _fileServiceFactory = fileServiceFactory;
         _syncQuery = syncQuery;
         _changeCursors = changeCursors;
+        _changeLog = changeLog;
     }
 
     // ─────────────────────────── devices ───────────────────────────
@@ -188,8 +196,95 @@ public sealed class SyncApiController : ApiControllerBase
         if (!await fs.CanListAsync(root, user)) return ApiForbidden();
 
         var delta = await _syncQuery.EnumerateAsync(shareId, root, user, HttpContext.RequestAborted);
-        var dto = new SyncDeltaDto(delta.Entries.Select(SyncEntryDto.From).ToList(), delta.Token);
+        var dto = new SyncDeltaDto(
+            delta.Entries.Select(SyncEntryDto.From).ToList(), delta.Token, delta.Seq);
         return Ok(dto);
+    }
+
+    /// <summary>
+    /// Incremental change feed: returns the change-log entries for a subtree with a sequence greater
+    /// than <paramref name="since"/>, so a client fetches only the true deltas — renames and
+    /// net-zero changes included — instead of re-enumerating the whole subtree. Bootstrap the cursor
+    /// from a full <c>delta</c> (its <c>seq</c>), then advance it by the returned <c>seq</c>.
+    /// </summary>
+    [HttpGet("{shareId:guid}/changes")]
+    public async Task<IActionResult> Changes(
+        Guid shareId, [FromQuery] long since, [FromQuery] string? path, [FromQuery] int? limit)
+    {
+        var user = await ResolveUserAsync(_userContextFactory);
+        if (user is null) return ApiUnauthorized();
+
+        var share = await _shares.GetByIdAsync(shareId);
+        if (share is null || !share.IsEnabled) return ApiNotFound("Share not found.");
+
+        if (!ShareRelativePath.TryNormalizeStrict(path ?? string.Empty, out var root))
+            return ApiBadRequest("invalid_path", "The path is not a valid share-relative path.");
+
+        // Same gate as delta/wait: list access on the watched subtree, so the feed cannot be used to
+        // probe for hidden content.
+        var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        if (!await fs.CanListAsync(root, user)) return ApiForbidden();
+
+        var ct = HttpContext.RequestAborted;
+        int pageSize = Math.Clamp(limit ?? DefaultChangeLimit, 1, MaxChangeLimit);
+
+        // Fetch one extra to detect truncation without a second query.
+        var raw = await _changeLog.GetChangesSinceAsync(shareId, since, root, pageSize + 1, ct);
+        bool truncated = raw.Count > pageSize;
+        var page = truncated ? raw.Take(pageSize).ToList() : raw;
+
+        // ACL-filter live entries the same way ListAsync does — per-file ACLs can differ inside a
+        // listable folder. Deleted / renamed-away entries (their ACL is gone) stay in, because they
+        // fall under the caller-authorized root; this mirrors how delta only ever walks what the
+        // caller can list.
+        var visible = await FilterVisibleAsync(fs, user, page);
+
+        // Advance the cursor even when the page is empty or fully filtered, so the client never
+        // re-requests the same range: last raw seq on this page, else the subtree head.
+        long nextSeq = page.Count > 0
+            ? page[^1].Seq
+            : await _changeLog.GetHeadSeqAsync(shareId, root, ct);
+
+        var dto = new ChangesFeedDto(
+            visible.Select(FileChangeDto.From).ToList(), nextSeq, truncated);
+        return Ok(dto);
+    }
+
+    /// <summary>
+    /// Drops change entries whose live target the caller may not list. Entries whose item no longer
+    /// exists (<see cref="FileChangeType.Deleted"/>, and the source of a <see cref="FileChangeType.Renamed"/>)
+    /// are kept — their ACL is gone, and they already fall under the caller-authorized subtree root.
+    /// </summary>
+    private static async Task<List<FileChangeLogEntry>> FilterVisibleAsync(
+        IFileService fs, UserContext user, IReadOnlyList<FileChangeLogEntry> entries)
+    {
+        // The current-existence paths that carry a live ACL to check.
+        var liveItems = entries
+            .Where(e => e.ChangeType is FileChangeType.Created
+                     or FileChangeType.Modified
+                     or FileChangeType.Renamed
+                     or FileChangeType.SubtreeChanged)
+            .Select(e => (e.Path, e.IsDirectory))
+            .ToList();
+
+        var readable = liveItems.Count > 0
+            ? await fs.FilterReadablePathsAsync(liveItems, user)
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var result = new List<FileChangeLogEntry>(entries.Count);
+        foreach (var e in entries)
+        {
+            bool keep = e.ChangeType switch
+            {
+                FileChangeType.Deleted => true,
+                FileChangeType.Created or FileChangeType.Modified
+                    or FileChangeType.Renamed or FileChangeType.SubtreeChanged
+                    => readable.Contains(e.Path),
+                _ => true,
+            };
+            if (keep) result.Add(e);
+        }
+        return result;
     }
 
     /// <summary>
@@ -222,7 +317,10 @@ public sealed class SyncApiController : ApiControllerBase
 
         while (true)
         {
-            var current = (await _changeCursors.GetShareChangeStateAsync(shareId, root, ct)).ToToken();
+            // The change-log head is the token: unlike the coarse file_metadata fingerprint it
+            // advances on renames and content overwrites too, so this wakes on every mutation.
+            var current = (await _changeLog.GetHeadSeqAsync(shareId, root, ct))
+                .ToString(System.Globalization.CultureInfo.InvariantCulture);
             if (string.IsNullOrEmpty(since) || current != since)
                 return Ok(new ChangeWaitDto(current, Changed: current != since));
 
