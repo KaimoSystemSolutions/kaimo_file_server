@@ -14,6 +14,10 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <summary>Looks up a token by its SHA-256 hash, or <c>null</c> if unknown.</summary>
         Task<RefreshToken?> GetByHashAsync(string tokenHash);
 
+        /// <summary>Looks up a token by its id, or <c>null</c> if unknown. Used to
+        /// check the replacement of a rotated token when classifying a replay.</summary>
+        Task<RefreshToken?> GetByIdAsync(Guid id);
+
         /// <summary>Persists mutable fields of an existing token (revocation, rotation link).</summary>
         Task UpdateAsync(RefreshToken token);
 

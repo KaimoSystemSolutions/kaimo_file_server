@@ -26,6 +26,12 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
         return await db.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
     }
 
+    public async Task<RefreshToken?> GetByIdAsync(Guid id)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.RefreshTokens.FirstOrDefaultAsync(t => t.Id == id);
+    }
+
     public async Task UpdateAsync(RefreshToken token)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();

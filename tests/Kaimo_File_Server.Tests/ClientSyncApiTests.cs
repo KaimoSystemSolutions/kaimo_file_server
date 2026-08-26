@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Services.Sync;
 using Kaimo_File_Server.Web.Controllers.Api;
+using Kaimo_File_Server.Web.Services.Api;
 using Xunit;
 
 namespace Kaimo_File_Server.Tests;
@@ -80,6 +81,70 @@ public sealed class ClientSyncApiTests
         var now = DateTime.UtcNow;
         var token = new RefreshToken { ExpiresAtUtc = now.AddDays(1), RevokedAtUtc = now };
         Assert.False(token.IsActive(now));
+    }
+
+    // ─────────────── Refresh reuse grace (concurrent-refresh race) ───────────────
+
+    [Fact]
+    public void Recent_rotation_with_live_replacement_is_a_benign_race()
+    {
+        var now = DateTime.UtcNow;
+        Assert.True(ApiTokenService.IsBenignRefreshRace(
+            revokedAtUtc: now.AddSeconds(-2),
+            replacedByTokenId: Guid.NewGuid(),
+            replacementActive: true,
+            nowUtc: now,
+            grace: TimeSpan.FromSeconds(10)));
+    }
+
+    [Fact]
+    public void Replay_after_the_grace_window_is_treated_as_theft()
+    {
+        var now = DateTime.UtcNow;
+        Assert.False(ApiTokenService.IsBenignRefreshRace(
+            revokedAtUtc: now.AddSeconds(-30),
+            replacedByTokenId: Guid.NewGuid(),
+            replacementActive: true,
+            nowUtc: now,
+            grace: TimeSpan.FromSeconds(10)));
+    }
+
+    [Fact]
+    public void Replay_of_a_logged_out_token_without_replacement_is_theft()
+    {
+        var now = DateTime.UtcNow;
+        // Logout/device-revocation leaves no replacement link → never lenient.
+        Assert.False(ApiTokenService.IsBenignRefreshRace(
+            revokedAtUtc: now.AddSeconds(-2),
+            replacedByTokenId: null,
+            replacementActive: false,
+            nowUtc: now,
+            grace: TimeSpan.FromSeconds(10)));
+    }
+
+    [Fact]
+    public void Replay_when_replacement_already_dead_is_theft()
+    {
+        var now = DateTime.UtcNow;
+        // The chain was already compromised/revoked → re-revoke, don't be lenient.
+        Assert.False(ApiTokenService.IsBenignRefreshRace(
+            revokedAtUtc: now.AddSeconds(-2),
+            replacedByTokenId: Guid.NewGuid(),
+            replacementActive: false,
+            nowUtc: now,
+            grace: TimeSpan.FromSeconds(10)));
+    }
+
+    [Fact]
+    public void Zero_grace_disables_leniency()
+    {
+        var now = DateTime.UtcNow;
+        Assert.False(ApiTokenService.IsBenignRefreshRace(
+            revokedAtUtc: now.AddSeconds(-1),
+            replacedByTokenId: Guid.NewGuid(),
+            replacementActive: true,
+            nowUtc: now,
+            grace: TimeSpan.Zero));
     }
 
     // ─────────────────── SyncDevice revocation ───────────────────

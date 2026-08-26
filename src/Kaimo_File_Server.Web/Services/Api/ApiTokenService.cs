@@ -40,6 +40,7 @@ public sealed class ApiTokenService
     private readonly ILogger<ApiTokenService> _logger;
     private readonly int _accessTokenSeconds;
     private readonly int _refreshTokenDays;
+    private readonly TimeSpan _refreshReuseGrace;
 
     public ApiTokenService(
         JwtTokenService jwt,
@@ -58,6 +59,11 @@ public sealed class ApiTokenService
         _logger = logger;
         _accessTokenSeconds = config.GetValue("Jwt:ExpirationHours", 24) * 3600;
         _refreshTokenDays = config.GetValue("Jwt:RefreshTokenDays", 30);
+        // Grace window in which a replay of a just-rotated token is treated as a
+        // benign concurrent-refresh race rather than theft (see RefreshAsync).
+        // 0 disables the leniency and restores strict single-use behavior.
+        _refreshReuseGrace =
+            TimeSpan.FromSeconds(Math.Max(0, config.GetValue("Jwt:RefreshReuseGraceSeconds", 10)));
     }
 
     /// <summary>Mints an access token and a fresh refresh token for a device.</summary>
@@ -101,10 +107,36 @@ public sealed class ApiTokenService
 
         var now = _clock.GetUtcNow().UtcDateTime;
 
-        // Replay of an already-rotated/revoked token: treat as theft and revoke
-        // every active token for the device.
+        // Replay of an already-rotated/revoked token. This is usually theft — but
+        // it is also what a legitimate client produces when two refreshes race
+        // (e.g. a mobile app's foreground and background-sync isolates each present
+        // the same token before either has stored the rotated one). To avoid
+        // punishing that benign race with a full device-chain revocation, a replay
+        // of a *just-rotated* token whose replacement is still live is soft-rejected
+        // within a short grace window: the client simply retries with the newer
+        // token it already holds, and the chain survives. Anything else — a replay
+        // after the window, or of a token revoked by logout/device-revocation (no
+        // live replacement) — is treated as theft and revokes the whole chain.
         if (existing.RevokedAtUtc is not null)
         {
+            var rotatedInto = existing.ReplacedByTokenId is { } replacementId
+                ? await _refreshTokens.GetByIdAsync(replacementId)
+                : null;
+
+            if (IsBenignRefreshRace(
+                    existing.RevokedAtUtc.Value,
+                    existing.ReplacedByTokenId,
+                    rotatedInto is not null && rotatedInto.IsActive(now),
+                    now,
+                    _refreshReuseGrace))
+            {
+                _logger.LogInformation(
+                    "Refresh token replayed within the {GraceSeconds}s grace window for device " +
+                    "{DeviceId}; treating as a concurrent-refresh race, chain left intact",
+                    _refreshReuseGrace.TotalSeconds, existing.DeviceId);
+                return new RefreshResult(RefreshOutcome.Invalid);
+            }
+
             _logger.LogWarning(
                 "Refresh token reuse detected for device {DeviceId}; revoking device token chain",
                 existing.DeviceId);
@@ -161,6 +193,25 @@ public sealed class ApiTokenService
             await _refreshTokens.UpdateAsync(existing);
         }
     }
+
+    /// <summary>
+    /// Whether a replay of an already-revoked refresh token is a benign concurrent-
+    /// refresh race rather than a replay to defend against. True only when the token
+    /// was rotated (has a replacement), that replacement is still active, and the
+    /// rotation happened no longer than <paramref name="grace"/> ago. A
+    /// non-positive <paramref name="grace"/> disables the leniency entirely (strict
+    /// single-use). Pure and side-effect-free so the decision is unit-testable.
+    /// </summary>
+    public static bool IsBenignRefreshRace(
+        DateTime revokedAtUtc,
+        Guid? replacedByTokenId,
+        bool replacementActive,
+        DateTime nowUtc,
+        TimeSpan grace)
+        => grace > TimeSpan.Zero
+           && replacedByTokenId is not null
+           && replacementActive
+           && nowUtc - revokedAtUtc <= grace;
 
     // ─────────────────────────── helpers ───────────────────────────
 
