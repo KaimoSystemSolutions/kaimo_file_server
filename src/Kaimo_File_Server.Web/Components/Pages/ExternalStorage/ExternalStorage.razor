@@ -4,19 +4,19 @@
 
 <PageTitle>@R("Web_ExternalStorage_Title") - Kaimo Files</PageTitle>
 
-<div class="page-header">
-    <div>
-        <h1>@R("Web_ExternalStorage_Title")</h1>
-        <p class="subtitle">@R("Web_ExternalStorage_Subtitle")</p>
-    </div>
-</div>
-
 <Tabs aria-label="@R("Web_ExternalStorage_Title")">
     <Tab Active="@(_activeTab == ExternalStorageTab.Syncs)" Label="@R("Web_ExternalStorage_Tab_Syncs")"
          OnClick="() => SelectTab(ExternalStorageTab.Syncs)" />
     <Tab Active="@(_activeTab == ExternalStorageTab.Connections)" Label="@R("Web_ExternalStorage_Tab_Connections")"
          OnClick="() => SelectTab(ExternalStorageTab.Connections)" />
 </Tabs>
+
+<div class="page-header">
+    <div>
+        <h1>@R("Web_ExternalStorage_Title")</h1>
+        <p class="subtitle">@R("Web_ExternalStorage_Subtitle")</p>
+    </div>
+</div>
 
 @if (_activeTab == ExternalStorageTab.Syncs)
 {
