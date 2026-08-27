@@ -248,10 +248,8 @@ else
                                 <span class="vs-share-name" title="@share.Name">@share.Name</span>
                             </span>
                             <span class="vs-table-cell">
-                                <span class="vs-status @(isUsable ? "vs-status--usable" : "vs-status--unusable")">
-                                    <span class="vs-status-dot" aria-hidden="true"></span>
-                                    <span>@ShareStatusText(share, connection)</span>
-                                </span>
+                                <StatusBadge Tone="@(isUsable ? StatusTone.Positive : StatusTone.Negative)"
+                                             Label="@ShareStatusText(share, connection)" />
                             </span>
                             <span class="vs-table-cell">
                                 <span class="vs-access-mode">

@@ -207,35 +207,6 @@
     color: var(--text-secondary);
 }
 
-/* Status indicator — mirrors the local-share availability dot in ShareCardList. */
-.vs-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    color: var(--text-secondary);
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.vs-status--usable .vs-status-dot {
-    background: var(--success);
-}
-
-.vs-status--unusable {
-    color: var(--danger);
-}
-
-.vs-status--unusable .vs-status-dot {
-    background: var(--danger);
-}
-
-.vs-status-dot {
-    width: 7px;
-    height: 7px;
-    flex: 0 0 7px;
-    border-radius: 50%;
-    box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 12%, transparent);
-}
 
 .vs-connection {
     overflow: hidden;

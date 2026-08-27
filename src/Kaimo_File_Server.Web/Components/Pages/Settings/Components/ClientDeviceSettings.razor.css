@@ -49,28 +49,6 @@
     word-break: break-word;
 }
 
-/* ── Status badge ── */
-
-.status-badge {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 3px 9px;
-    border-radius: 999px;
-    flex-shrink: 0;
-}
-
-.status-badge--active {
-    background: var(--success-subtle);
-    color: var(--success);
-}
-
-.status-badge--revoked {
-    background: var(--danger-subtle);
-    color: var(--danger);
-}
-
 /* ── Metadata grid: label above value, each pair grouped ── */
 
 .device-meta {

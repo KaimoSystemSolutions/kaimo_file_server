@@ -45,14 +45,12 @@
                 </span>
 
                 <span class="share-table-cell">
-                    <span class="share-availability @(isUsable ? "share-availability--usable" : "share-availability--unusable")">
-                        <span class="share-status-dot" aria-hidden="true"></span>
-                        <span>@(isStorageUnavailable
-                            ? Resources.Web_ShareList_Card_Unavailable
-                            : share.IsEnabled
-                                ? Resources.Web_ShareList_Card_Available
-                                : Resources.Web_ShareList_Card_Disabled)</span>
-                    </span>
+                    <StatusBadge Tone="@(isUsable ? StatusTone.Positive : StatusTone.Negative)"
+                                 Label="@(isStorageUnavailable
+                                     ? Resources.Web_ShareList_Card_Unavailable
+                                     : share.IsEnabled
+                                         ? Resources.Web_ShareList_Card_Available
+                                         : Resources.Web_ShareList_Card_Disabled)" />
                 </span>
 
                 @if (ShowExtendedInfo)
@@ -61,18 +59,12 @@
                         @(StoragePoolName?.Invoke(share) ?? "—")
                     </span>
                     <span class="share-table-cell">
-                        <span class="share-state @(share.IsRecycleEnabled ? "share-state--positive" : "share-state--neutral")">
-                            @(share.IsRecycleEnabled
-                                ? Resources.Web_ShareList_Card_Yes
-                                : Resources.Web_ShareList_Card_No)
-                        </span>
+                        <StatusBadge Tone="@(share.IsRecycleEnabled ? StatusTone.Positive : StatusTone.Neutral)" ShowDot="false"
+                                     Label="@(share.IsRecycleEnabled ? Resources.Web_ShareList_Card_Yes : Resources.Web_ShareList_Card_No)" />
                     </span>
                     <span class="share-table-cell">
-                        <span class="share-state @(share.IsShareHidden ? "share-state--negative" : "share-state--positive")">
-                            @(share.IsShareHidden
-                                ? Resources.Web_ShareList_Card_Yes
-                                : Resources.Web_ShareList_Card_No)
-                        </span>
+                        <StatusBadge Tone="@(share.IsShareHidden ? StatusTone.Negative : StatusTone.Positive)" ShowDot="false"
+                                     Label="@(share.IsShareHidden ? Resources.Web_ShareList_Card_Yes : Resources.Web_ShareList_Card_No)" />
                     </span>
                 }
             </button>

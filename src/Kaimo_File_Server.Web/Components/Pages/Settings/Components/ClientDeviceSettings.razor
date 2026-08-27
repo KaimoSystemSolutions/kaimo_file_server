@@ -43,11 +43,11 @@
                     <h3 class="device-card__name">@device.DisplayName</h3>
                     @if (device.IsActive)
                     {
-                        <span class="status-badge status-badge--active">@R("Web_Devices_Active")</span>
+                        <StatusBadge Tone="StatusTone.Positive" Label="@R("Web_Devices_Active")" />
                     }
                     else
                     {
-                        <span class="status-badge status-badge--revoked">@R("Web_Devices_Revoked")</span>
+                        <StatusBadge Tone="StatusTone.Negative" Label="@R("Web_Devices_Revoked")" />
                     }
                 </header>
 

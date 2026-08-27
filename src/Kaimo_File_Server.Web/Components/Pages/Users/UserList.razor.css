@@ -89,43 +89,7 @@
     align-items: center;
 }
 
-/* -- Status Badge -- */
-
-::deep .status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-}
-
-::deep .status-badge--active {
-    background: var(--success-subtle);
-    color: var(--success);
-}
-
-::deep .status-badge--disabled {
-    background: var(--danger-subtle);
-    color: var(--danger);
-}
-
-::deep .status-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-::deep .status-dot--active {
-    background: var(--success);
-}
-
-::deep .status-dot--disabled {
-    background: var(--danger);
-}
+/* Status badges use the shared <StatusBadge> component (Components/Shared). */
 
 /* -- Detail Panel breiter für User-Felder -- */
 

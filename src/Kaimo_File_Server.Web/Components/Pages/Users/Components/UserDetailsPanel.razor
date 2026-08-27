@@ -116,15 +116,11 @@
                 </span>
                 @if (VM.SelectedUser.IsEnabled)
                 {
-                    <span class="status-badge status-badge--active">
-                        <span class="status-dot status-dot--active"></span>@Resources.Web_Common_Active
-                    </span>
+                    <StatusBadge Tone="StatusTone.Positive" Label="@Resources.Web_Common_Active" />
                 }
                 else
                 {
-                    <span class="status-badge status-badge--disabled">
-                        <span class="status-dot status-dot--disabled"></span>@Resources.Web_Common_Disabled
-                    </span>
+                    <StatusBadge Tone="StatusTone.Negative" Label="@Resources.Web_Common_Disabled" />
                 }
             </div>
 

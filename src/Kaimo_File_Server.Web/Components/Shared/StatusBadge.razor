@@ -1,0 +1,56 @@
+@*
+    Central status label (shared UI library).
+
+    A single pill used everywhere the UI reports the state of an entity:
+    users (Active / Disabled), shares (Available / Unavailable), external
+    storage connections (Ready / Attention required), syncs (Healthy / …),
+    client devices (Active / Revoked) and so on.
+
+    The colour comes from the semantic `Tone`; the wording comes from the
+    caller via `Label` (or richer `ChildContent`). This keeps one design in
+    one place while each page still chooses the tone and text that fit its
+    use case. A leading status dot is shown by default and can be turned off
+    with `ShowDot="false"` for compact boolean-style labels.
+*@
+<span class="status-badge status-badge--@ToneClass @Class" @attributes="AdditionalAttributes">
+    @if (ShowDot)
+    {
+        <span class="status-badge__dot" aria-hidden="true"></span>
+    }
+    @if (ChildContent is not null)
+    {
+        @ChildContent
+    }
+    else
+    {
+        @Label
+    }
+</span>
+
+@code {
+    /// <summary>Semantic colour of the badge. See <see cref="StatusTone"/>.</summary>
+    [Parameter] public StatusTone Tone { get; set; } = StatusTone.Neutral;
+
+    /// <summary>Localized text. Ignored when <see cref="ChildContent"/> is supplied.</summary>
+    [Parameter] public string? Label { get; set; }
+
+    /// <summary>Whether to render the leading status dot. Defaults to true.</summary>
+    [Parameter] public bool ShowDot { get; set; } = true;
+
+    /// <summary>Richer content in place of a plain <see cref="Label"/>.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Extra CSS classes appended to the pill, for local overrides.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private string ToneClass => Tone switch
+    {
+        StatusTone.Positive => "positive",
+        StatusTone.Negative => "negative",
+        StatusTone.Warning => "warning",
+        _ => "neutral"
+    };
+}

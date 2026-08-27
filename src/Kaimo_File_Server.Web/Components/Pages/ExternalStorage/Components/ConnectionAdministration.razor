@@ -144,7 +144,7 @@ else
                                 <small>@ProviderName(connection.ProviderId) · @(connection.AccountEmail ?? connection.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</small>
                             </span>
                         </span>
-                        <span class="connection-state connection-state--@StateClass(connection.State)"><span class="connection-health connection-health--@StateClass(connection.State)"></span>@StateName(connection.State)</span>
+                        <StatusBadge Tone="@StateTone(connection.State)" Class="connection-state" Label="@StateName(connection.State)" />
                         <span class="connection-usage">@UsageSummary(connection.Id)</span>
                     </button>
                 }
@@ -189,7 +189,7 @@ else
                                 <span class="detail-subtitle">@ProviderName(_selected.ProviderId)</span>
                             }
                         </div>
-                        <span class="connection-state connection-state--@StateClass(_selected.State)"><span class="connection-health connection-health--@StateClass(_selected.State)"></span>@StateName(_selected.State)</span>
+                        <StatusBadge Tone="@StateTone(_selected.State)" Class="connection-state" Label="@StateName(_selected.State)" />
                     </div>
                     <div class="connection-detail-grid">
                         <section class="connection-detail-group">
@@ -476,7 +476,7 @@ else
         return string.Join(", ", names);
     }
     private static string StateName(StorageConnectionState state) => R($"Web_ExternalStorage_State_{state}");
-    private static string StateClass(StorageConnectionState state) => state switch { StorageConnectionState.Ready => "ready", StorageConnectionState.Disabled => "disabled", _ => "attention" };
+    private static StatusTone StateTone(StorageConnectionState state) => state switch { StorageConnectionState.Ready => StatusTone.Positive, StorageConnectionState.Disabled => StatusTone.Neutral, _ => StatusTone.Warning };
     private static string AuthorizationName(StorageAuthorizationMode mode) => R($"Web_ExternalStorage_Auth_{mode}");
     private static string SecretHealth(StorageConnection connection) => connection.AuthorizationMode switch
     {
