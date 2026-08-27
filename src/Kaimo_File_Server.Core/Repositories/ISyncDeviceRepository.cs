@@ -28,5 +28,19 @@ namespace Kaimo_File_Server.Core.Repositories
 
         /// <summary>Stamps <see cref="SyncDevice.LastSeenUtc"/> without loading the aggregate first.</summary>
         Task TouchLastSeenAsync(Guid deviceId, DateTime whenUtc);
+
+        /// <summary>
+        /// Permanently removes device registrations that can no longer have access, so the
+        /// management surface is not cluttered with dead entries indefinitely. A device is
+        /// retired when either:
+        /// <list type="bullet">
+        /// <item>it was revoked before <paramref name="revokedBeforeUtc"/> (revocation grace period elapsed), or</item>
+        /// <item>it has not been seen since <paramref name="inactiveBeforeUtc"/> — its refresh tokens have
+        /// long expired, so it must sign in from scratch (a fresh registration) to regain access.</item>
+        /// </list>
+        /// Deleting a device cascades to its refresh tokens, sync selections and idempotency
+        /// receipts via the database foreign keys. Returns the number of devices removed.
+        /// </summary>
+        Task<int> DeleteRetiredAsync(DateTime revokedBeforeUtc, DateTime inactiveBeforeUtc);
     }
 }

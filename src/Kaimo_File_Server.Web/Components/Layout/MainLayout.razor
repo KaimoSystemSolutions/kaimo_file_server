@@ -47,24 +47,11 @@
                 <span class="nav-label">@Resources.Web_Nav_BrowseFiles</span>
             </NavLink>
 
-            <NavLink class="nav-item" href="/devices" Match="NavLinkMatch.Prefix">
-                @Assets.SVG("refresh.svg", new SvgOptions())
-                <span class="nav-label">@Text("Web_Nav_Devices", "Devices & Sync")</span>
-            </NavLink>
-
             @if (canManageSyncs() || _canManageCloudAccess)
             {
                 <NavLink class="nav-item" href="/external-storage" Match="NavLinkMatch.Prefix">
                     @Assets.SVG("cloud-download.svg", new SvgOptions())
                     <span class="nav-label">@Text("Web_ExternalStorage_Title", "External Storage")</span>
-                </NavLink>
-            }
-
-            @if (_canManageClientDevices)
-            {
-                <NavLink class="nav-item" href="/admin/devices" Match="NavLinkMatch.Prefix">
-                    @Assets.SVG("refresh.svg", new SvgOptions())
-                    <span class="nav-label">@Text("Web_Nav_DeviceAdmin", "Client devices")</span>
                 </NavLink>
             }
 
@@ -181,7 +168,6 @@
 
     private bool _canManageSyncs;
     private bool _canManageCloudAccess;
-    private bool _canManageClientDevices;
     private UserContext? _currentUser;
     
     [Inject] private IJSRuntime JS { get; set; } = default!;
@@ -349,9 +335,6 @@
                                             _currentUser, ManagementPermission.UseConnections)
                                         || await ManagementAuthService.HasAnyPermissionAsync(
                                             _currentUser, ManagementPermission.ManageCloudAccess));
-            _canManageClientDevices = _currentUser != null
-                                      && await ManagementAuthService.HasAnyPermissionAsync(
-                                            _currentUser, ManagementPermission.ManageClientDevices);
         }
     }
 

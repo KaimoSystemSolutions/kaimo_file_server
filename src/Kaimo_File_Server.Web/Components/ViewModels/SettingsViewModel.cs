@@ -88,8 +88,11 @@ public class SettingsViewModel
     /// <summary>May configure, create and download database backups.</summary>
     public bool CanManageBackups { get; private set; }
 
+    /// <summary>May review and revoke users' registered client devices.</summary>
+    public bool CanManageClientDevices { get; private set; }
+
     /// <summary>True if the user may access the settings page at all.</summary>
-    public bool CanAccessPage => CanManageSettings || CanManageDataServices || CanManageCertificates || CanViewLogs || CanManageBackups;
+    public bool CanAccessPage => CanManageSettings || CanManageDataServices || CanManageCertificates || CanViewLogs || CanManageBackups || CanManageClientDevices;
 
     // ── Language ──
 
@@ -319,6 +322,7 @@ public class SettingsViewModel
             CanManageCertificates = false;
             CanViewLogs = false;
             CanManageBackups = false;
+            CanManageClientDevices = false;
             return;
         }
 
@@ -331,6 +335,7 @@ public class SettingsViewModel
         CanManageCertificates = permissions.HasFlag(ManagementPermission.ManageCertificates);
         CanViewLogs = permissions.HasFlag(ManagementPermission.ViewSystemLogs);
         CanManageBackups = permissions.HasFlag(ManagementPermission.ManageBackups);
+        CanManageClientDevices = permissions.HasFlag(ManagementPermission.ManageClientDevices);
     }
 
     private async Task<UserContext?> BuildActorContextAsync()

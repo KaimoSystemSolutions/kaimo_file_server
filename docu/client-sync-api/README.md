@@ -27,13 +27,14 @@ These rules are fixed and must be preserved by all clients and by the server:
 2. **Connections are created only from the client.** A sync connection is created,
    edited, and deleted exclusively by a client app through this API
    (`/api/v1/sync/profiles`). Nothing else creates them.
-3. **The web UI is display-only for connections.** The web page under `/devices`
-   only *shows* which devices/instances are connected to the user's account and, for
-   reference, the connections each has. It never creates or edits a connection. The
-   one exception is administrative revocation: an operator holding the
-   `ManageClientDevices` permission can, from `/admin/devices`, revoke another user's
-   device (see rule 5). Revoking drops that device's connections but never mints or
-   edits them.
+3. **The web UI is display-only for connections.** The web UI never creates or edits a
+   connection. The one surface that touches devices is administrative: an operator
+   holding the `ManageClientDevices` permission can, from **Settings → Client devices**,
+   review every user's connected devices/instances (and, for reference, each device's
+   sync selections) and revoke a device (see rule 5). Revoking drops that device's
+   connections but never mints or edits them. (The former self-service `/devices` page
+   was removed — a user configures their own sync connections in the client apps, not on
+   the web.)
 4. **Two endpoints per connection.** Every connection pairs a **remote** endpoint
    (`shareId` + `relativePath`, a share subtree) with a **local** endpoint
    (`localPath`, a folder on the device). The client picks both: the remote folder
@@ -47,6 +48,15 @@ These rules are fixed and must be preserved by all clients and by the server:
    state on each request, a revoked device's *access* token stops working at once —
    not only when it expires — and it can no longer refresh. The device must sign in
    again to obtain a fresh registration.
+6. **Retired registrations are pruned automatically.** So the admin list does not grow
+   without bound, a registration that can no longer reach the server is deleted when
+   the operator opens **Settings → Client devices**. A device is retired once it has
+   been revoked for more than `RevokedRetentionDays` (30), or has not made a single
+   authenticated request for `InactivityRetentionDays` (90) — well beyond the 30-day
+   refresh-token lifetime, so only devices that would have to sign in from scratch are
+   removed. Deleting a device cascades to its refresh tokens, sync selections, and
+   idempotency receipts (`ISyncDeviceRepository.DeleteRetiredAsync`). Both windows are
+   constants on `ClientDeviceAdminViewModel`.
 
 ## Contents
 1. [Concepts](#1-concepts)
@@ -213,8 +223,8 @@ The server stores *what* each device syncs; the client runs the actual sync.
 ### Devices & connections
 | Method & path | Purpose | Caller |
 |---|---|---|
-| `GET /api/v1/sync/devices` | The caller's registered devices. | client + web UI (read) |
-| `GET /api/v1/sync/profiles?deviceId=` | Sync connections (all the caller's, or one device's). | client + web UI (read) |
+| `GET /api/v1/sync/devices` | The caller's registered devices. | client |
+| `GET /api/v1/sync/profiles?deviceId=` | Sync connections (all the caller's, or one device's). | client |
 | `POST /api/v1/sync/profiles` | Create a connection. | **client only** |
 | `PUT /api/v1/sync/profiles/{id}` | Update a connection. | **client only** |
 | `DELETE /api/v1/sync/profiles/{id}` | Remove a connection. | **client only** |
@@ -233,7 +243,8 @@ The server stores *what* each device syncs; the client runs the actual sync.
 `relativePath` is the remote endpoint (validated against the share and the user's
 ACLs — `403 forbidden` without list access). `localPath` is the device-local
 endpoint: the server stores it verbatim and never touches it. The connection roams
-across the user's devices and is shown read-only in the web UI.
+across the user's devices and is shown read-only to operators under
+**Settings → Client devices**.
 
 ### Delta enumeration
 ```

@@ -9,18 +9,38 @@ using Microsoft.Extensions.Logging;
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
 /// <summary>
-/// Backs the admin "Client devices" page. Where <see cref="DeviceSyncViewModel"/>
-/// shows the signed-in user their own devices read-only, this one lets an operator
-/// holding <see cref="ManagementPermission.ManageClientDevices"/> review every
-/// user's registered devices and revoke stale or unused ones.
+/// Backs the "Client devices" settings tab. It lets an operator holding
+/// <see cref="ManagementPermission.ManageClientDevices"/> review every user's
+/// registered devices (their connected apps and instances, plus each device's
+/// synced-folder selections) and revoke stale or unused ones.
 ///
 /// Revoking a device is the single mutation offered: it marks the device revoked,
 /// revokes all of its refresh tokens, and drops its sync selections. Combined with
 /// the per-request device check in the client API, this invalidates both the
 /// refresh token and any outstanding access token at once.
+///
+/// Retention: to keep the list from filling with entries that can no longer reach the
+/// server, <see cref="LoadAsync"/> prunes retired registrations before reading. A device
+/// is retired once it has been revoked for longer than <see cref="RevokedRetentionDays"/>,
+/// or has not checked in for <see cref="InactivityRetentionDays"/> — by then its refresh
+/// token (default 30-day lifetime, rotated on use) has long expired, so it could only come
+/// back by signing in again, which creates a fresh registration anyway.
 /// </summary>
 public sealed class ClientDeviceAdminViewModel
 {
+    /// <summary>
+    /// Days a revoked device is kept before it is pruned. A short grace period leaves the
+    /// revocation visible to an operator who wants to confirm it, then clears it out.
+    /// </summary>
+    public const int RevokedRetentionDays = 30;
+
+    /// <summary>
+    /// Days without a single authenticated request after which a device is pruned. Set well
+    /// beyond the 30-day refresh-token lifetime so only genuinely dead devices — ones that
+    /// would have to re-register to return — are removed.
+    /// </summary>
+    public const int InactivityRetentionDays = 90;
+
     private readonly AuthenticationStateProvider _authState;
     private readonly IUserContextFactory _userContextFactory;
     private readonly IManagementAuthService _mgmtAuth;
@@ -83,6 +103,8 @@ public sealed class ClientDeviceAdminViewModel
                 return;
             }
 
+            await PruneRetiredDevicesAsync();
+
             Devices = await _devices.GetAllAsync();
 
             var byDevice = new Dictionary<Guid, List<DeviceSyncProfile>>();
@@ -106,6 +128,30 @@ public sealed class ClientDeviceAdminViewModel
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Removes registrations that can no longer reach the server, so retired devices do not
+    /// pile up in the list. Runs opportunistically whenever an operator opens the page;
+    /// failures here are swallowed so a cleanup hiccup never blocks viewing the devices.
+    /// </summary>
+    private async Task PruneRetiredDevicesAsync()
+    {
+        try
+        {
+            var now = _clock.GetUtcNow().UtcDateTime;
+            var removed = await _devices.DeleteRetiredAsync(
+                revokedBeforeUtc: now.AddDays(-RevokedRetentionDays),
+                inactiveBeforeUtc: now.AddDays(-InactivityRetentionDays));
+            if (removed > 0)
+                _logger.LogInformation(
+                    "Pruned {Count} retired client device(s) (revoked > {RevokedDays}d ago or unseen > {InactiveDays}d)",
+                    removed, RevokedRetentionDays, InactivityRetentionDays);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to prune retired client devices; continuing to load the list");
         }
     }
 

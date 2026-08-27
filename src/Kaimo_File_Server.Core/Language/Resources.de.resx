@@ -2449,13 +2449,10 @@
   <data name="Web_ExternalStorage_NoConnectionSelectedHint" xml:space="preserve"><value>Wählen Sie eine Verbindung aus der Liste, um Details anzuzeigen, die Konnektivität zu testen oder Einstellungen zu verwalten.</value></data>
   <data name="Web_ExternalStorage_WebDavServerUrl" xml:space="preserve"><value>Server-URL</value></data>
   <data name="Web_ExternalStorage_WebDavHelp" xml:space="preserve"><value>Geben Sie die vollständige WebDAV-Endpunkt-URL ein. Zugangsdaten werden verschlüsselt im Verbindungs-Tresor gespeichert. HTTPS wird dringend empfohlen.</value></data>
-  <data name="Web_Nav_Devices" xml:space="preserve"><value>Geräte &amp; Sync</value></data>
-  <data name="Web_Devices_Title" xml:space="preserve"><value>Meine Geräte &amp; Sync</value></data>
-  <data name="Web_Devices_Subtitle" xml:space="preserve"><value>Die mit Ihrem Konto verbundenen Apps und Instanzen. Sync-Verbindungen werden in den Apps selbst erstellt – diese Seite dient nur zur Anzeige.</value></data>
-  <data name="Web_Devices_LoadFailed" xml:space="preserve"><value>Ihre Geräte konnten nicht geladen werden.</value></data>
-  <data name="Web_Devices_None" xml:space="preserve"><value>Noch keine Geräte. Melden Sie sich in einer Handy- oder Desktop-App an, um eines zu registrieren – danach erscheint es hier.</value></data>
-  <data name="Web_Devices_LastSeen" xml:space="preserve"><value>zuletzt gesehen</value></data>
+  <data name="Web_Devices_LastSeen" xml:space="preserve"><value>Zuletzt gesehen</value></data>
   <data name="Web_Devices_Revoked" xml:space="preserve"><value>widerrufen</value></data>
+  <data name="Web_Devices_Active" xml:space="preserve"><value>aktiv</value></data>
+  <data name="Web_Devices_Platform" xml:space="preserve"><value>Plattform</value></data>
   <data name="Web_Devices_NoFolders" xml:space="preserve"><value>Noch keine synchronisierten Ordner.</value></data>
   <data name="Web_Devices_Col_Share" xml:space="preserve"><value>Freigabe</value></data>
   <data name="Web_Devices_Col_RemoteFolder" xml:space="preserve"><value>Remote-Ordner</value></data>
@@ -2468,12 +2465,15 @@
   <data name="Web_Common_Yes" xml:space="preserve"><value>Ja</value></data>
   <data name="Web_Common_No" xml:space="preserve"><value>Nein</value></data>
   <data name="Web_Nav_DeviceAdmin" xml:space="preserve"><value>Client-Geräte</value></data>
-  <data name="Web_DeviceAdmin_Title" xml:space="preserve"><value>Client-Geräteverwaltung</value></data>
   <data name="Web_DeviceAdmin_Subtitle" xml:space="preserve"><value>Die verbundenen Apps und Instanzen aller Benutzer. Ein Gerät zu widerrufen macht dessen Tokens ungültig und entfernt seine Sync-Auswahl — nützlich für veraltete oder ungenutzte Geräte.</value></data>
+  <data name="Web_DeviceAdmin_Retention" xml:space="preserve"><value>Registrierungen werden automatisch aufgeräumt: Widerrufene Geräte werden {0} Tage nach dem Widerruf entfernt, und seit {1} Tagen nicht mehr gesehene Geräte werden entfernt, sobald ihre Anmeldung längst abgelaufen ist.</value></data>
   <data name="Web_DeviceAdmin_Forbidden" xml:space="preserve"><value>Sie haben keine Berechtigung, Client-Geräte zu verwalten.</value></data>
   <data name="Web_DeviceAdmin_LoadFailed" xml:space="preserve"><value>Client-Geräte konnten nicht geladen werden.</value></data>
   <data name="Web_DeviceAdmin_None" xml:space="preserve"><value>Es sind noch keine Client-Geräte registriert.</value></data>
   <data name="Web_DeviceAdmin_Owner" xml:space="preserve"><value>Besitzer</value></data>
+  <data name="Web_DeviceAdmin_Registered" xml:space="preserve"><value>Registriert</value></data>
+  <data name="Web_DeviceAdmin_RevokedOn" xml:space="preserve"><value>Widerrufen am</value></data>
+  <data name="Web_DeviceAdmin_SyncedFolders" xml:space="preserve"><value>Synchronisierte Ordner</value></data>
   <data name="Web_DeviceAdmin_Revoke" xml:space="preserve"><value>Gerät widerrufen</value></data>
   <data name="Web_DeviceAdmin_ConfirmRevoke" xml:space="preserve"><value>Dieses Gerät widerrufen? Seine Tokens funktionieren sofort nicht mehr.</value></data>
   <data name="Web_DeviceAdmin_ConfirmYes" xml:space="preserve"><value>Ja, widerrufen</value></data>

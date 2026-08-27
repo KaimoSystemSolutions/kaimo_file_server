@@ -52,6 +52,10 @@ else
                 {
                     <Tab Active="@(_activeTab == SettingsTab.Backup)" Icon="archive.svg" Label="@R("Web_Settings_Tab_Backup")" OnClick="() => SwitchTab(SettingsTab.Backup)" />
                 }
+                @if (VM.CanManageClientDevices)
+                {
+                    <Tab Active="@(_activeTab == SettingsTab.ClientDevices)" Icon="refresh.svg" Label="@R("Web_Nav_DeviceAdmin")" OnClick="() => SwitchTab(SettingsTab.ClientDevices)" />
+                }
             </Tabs>
 
             <div class="settings-content">
@@ -72,6 +76,7 @@ else
                     case SettingsTab.DataServices when VM.CanManageDataServices: <DataServiceSettings VM="VM" /> break;
                     case SettingsTab.Certificate when VM.CanManageCertificates: <CertificateSettings VM="VM" /> break;
                     case SettingsTab.Backup when VM.CanManageBackups: <DatabaseBackupSettings VM="VM" /> break;
+                    case SettingsTab.ClientDevices when VM.CanManageClientDevices: <ClientDeviceSettings /> break;
                 }
             </div>
         </div>

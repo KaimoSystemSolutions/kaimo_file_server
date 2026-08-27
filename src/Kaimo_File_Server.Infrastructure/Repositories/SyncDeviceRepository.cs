@@ -58,4 +58,15 @@ public sealed class SyncDeviceRepository : ISyncDeviceRepository
             .Where(d => d.Id == deviceId)
             .ExecuteUpdateAsync(s => s.SetProperty(d => d.LastSeenUtc, whenUtc));
     }
+
+    public async Task<int> DeleteRetiredAsync(DateTime revokedBeforeUtc, DateTime inactiveBeforeUtc)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        // A single set-based delete; the child rows (refresh_tokens, device_sync_profiles,
+        // client_request_receipts) are removed by their ON DELETE CASCADE foreign keys.
+        return await db.SyncDevices
+            .Where(d => (d.RevokedAtUtc != null && d.RevokedAtUtc < revokedBeforeUtc)
+                        || d.LastSeenUtc < inactiveBeforeUtc)
+            .ExecuteDeleteAsync();
+    }
 }

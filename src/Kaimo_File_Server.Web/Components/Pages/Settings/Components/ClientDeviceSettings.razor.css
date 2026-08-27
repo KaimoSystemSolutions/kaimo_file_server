@@ -1,0 +1,216 @@
+/* Client-devices settings tab: a card per registered device with a clearly
+   labelled metadata grid and its synced-folder table. */
+
+.client-devices__retention {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin-top: 4px;
+}
+
+.client-devices__empty {
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    text-align: center;
+    color: var(--text-tertiary);
+    background: var(--bg-sunken);
+    margin-top: 12px;
+}
+
+.client-devices__empty p {
+    margin: 0;
+    font-size: 13px;
+}
+
+/* ── Device card ── */
+
+.device-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-secondary);
+    padding: 16px 18px;
+    margin-top: 16px;
+}
+
+.device-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.device-card__name {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+/* ── Status badge ── */
+
+.status-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 3px 9px;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+
+.status-badge--active {
+    background: var(--success-subtle);
+    color: var(--success);
+}
+
+.status-badge--revoked {
+    background: var(--danger-subtle);
+    color: var(--danger);
+}
+
+/* ── Metadata grid: label above value, each pair grouped ── */
+
+.device-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px 20px;
+    margin: 14px 0 4px;
+}
+
+.device-meta__item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.device-meta__item dt {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-tertiary);
+}
+
+.device-meta__item dd {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+    word-break: break-word;
+}
+
+/* ── Synced folders ── */
+
+.device-card__folders {
+    margin-top: 16px;
+}
+
+.device-card__folders-title {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-tertiary);
+    margin-bottom: 8px;
+}
+
+.device-card__muted {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+.data-table-wrap {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.data-table thead th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-tertiary);
+    background: var(--bg-sunken);
+    padding: 8px 12px;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+}
+
+.data-table thead th:first-child {
+    border-top-left-radius: 6px;
+}
+
+.data-table thead th:last-child {
+    border-top-right-radius: 6px;
+}
+
+.data-table tbody td {
+    padding: 8px 12px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    word-break: break-word;
+}
+
+.data-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.data-table tbody tr:hover td {
+    background: var(--bg-hover);
+}
+
+/* ── Enabled pill ── */
+
+.pill {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.pill--on {
+    background: var(--success-subtle);
+    color: var(--success);
+}
+
+.pill--off {
+    background: var(--bg-sunken);
+    color: var(--text-tertiary);
+}
+
+/* ── Actions ── */
+
+.device-card__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+.device-card__confirm {
+    font-size: 13px;
+    color: var(--danger);
+    margin-right: auto;
+}
+
+.device-card__actions .device-card__muted {
+    margin-right: auto;
+}
