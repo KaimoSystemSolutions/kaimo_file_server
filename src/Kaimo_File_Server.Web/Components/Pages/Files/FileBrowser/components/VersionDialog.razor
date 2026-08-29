@@ -225,6 +225,17 @@
         StateHasChanged();
     }
 
+    /// <summary>
+    /// Re-shows the dialog in the state it was left in (used by the preview's back
+    /// button so the user returns to the version list they were viewing).
+    /// </summary>
+    public Task Reopen()
+    {
+        _show = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
     private async Task SelectSnapshot(DateTime ts)
     {
         _selectedSnapshot = ts;
@@ -254,8 +265,11 @@
         }
 
         var (data, contentType, kind) = result.Value;
-        await FilePreviewComponent.OpenPreviewFromDataAsync(data, contentType, kind, name);
-        Close();
+        // Hide (not close) the version dialog so its state survives, and give the
+        // preview a back button that brings the user back to it.
+        _show = false;
+        StateHasChanged();
+        await FilePreviewComponent.OpenPreviewFromDataAsync(data, contentType, kind, name, Reopen);
     }
 
     private async Task DownloadVersion(string shareRelativePath, DateTime ts, string name)

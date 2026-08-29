@@ -5453,7 +5453,16 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Version_FolderBack", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Back to versions ähnelt.
+        /// </summary>
+        public static string Web_Version_BackToVersions {
+            get {
+                return ResourceManager.GetString("Web_Version_BackToVersions", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die No files existed at that point in time. ähnelt.
         /// </summary>

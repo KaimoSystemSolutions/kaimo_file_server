@@ -3007,6 +3007,12 @@ html, body, #app {
     right: 1rem;
 }
 
+/* Back-to-versions arrow sits on the left, opposite the actions on the right. */
+.preview-header .preview-back {
+    left: 1rem;
+    right: auto;
+}
+
 .preview-frame {
     flex: 1;
     border: none;

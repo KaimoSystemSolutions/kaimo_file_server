@@ -11,6 +11,12 @@
     <div class="modal-backdrop" @ref="_previewRef" @onclick="CloseFilePreview" @onkeydown="OnKeyDown" tabindex="0">
         <div class="preview-dialog" @onclick:stopPropagation="true">
             <div class="preview-header">
+                @if (_onBack is not null)
+                {
+                    <button class="btn-icon preview-back" title="@Resources.Web_Version_BackToVersions" @onclick="CloseFilePreview">
+                        @Assets.SVG("chevron_left.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                    </button>
+                }
                 <span class="preview-title">@_previewFileName</span>
                 <div class="preview-actions">
                     @if (!string.IsNullOrEmpty(_downloadUrl))
@@ -19,9 +25,13 @@
                             @Assets.SVG("download.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
                         </a>
                     }
-                    <button class="btn-icon" title="Close" @onclick="CloseFilePreview">
-                        @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
-                    </button>
+                    @* No close button in version mode — the back arrow is the only exit, returning to the version dialog. *@
+                    @if (_onBack is null)
+                    {
+                        <button class="btn-icon" title="Close" @onclick="CloseFilePreview">
+                            @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                        </button>
+                    }
                 </div>
             </div>
             @if (_previewLoading)
@@ -100,26 +110,34 @@
     private bool _showFilePreview;
     public bool IsOpen => _showFilePreview;
 
+    // When set, the preview shows a back button that returns to the caller (e.g. the
+    // version dialog) instead of just closing.
+    private Func<Task>? _onBack;
+
     private ElementReference _previewRef;
 
     public async Task CloseFilePreview()
     {
+        // Capture before clearing: when the preview was opened from the version dialog,
+        // leaving it (back arrow, Escape, or backdrop click) returns there.
+        var onBack = _onBack;
+
         await RevokeUrlsAsync();
 
+        _onBack = null;
         _showFilePreview = false;
         _displayUrl = "";
         _downloadUrl = "";
+
+        if (onBack is not null)
+            await onBack();
     }
-    
-    
+
+
     private async Task OnKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Escape")
-        {
-            _showFilePreview = false;
-            StateHasChanged();
-        }
-        
+            await CloseFilePreview();
     }
 
 
@@ -128,6 +146,7 @@
         // Revoke any blobs left over from a previously opened preview.
         await RevokeUrlsAsync();
 
+        _onBack = null;
         _previewFileName = file.Name;
         _previewSize = file.Size;
         _displayUrl = "";
@@ -187,11 +206,14 @@
     /// <summary>
     /// Opens the preview modal for content already held in memory (e.g. a specific
     /// file version), rather than reading the current file from storage.
+    /// When <paramref name="onBack"/> is supplied, the preview shows a back button
+    /// that invokes it (e.g. to return to the version dialog) instead of just closing.
     /// </summary>
-    public async Task OpenPreviewFromDataAsync(byte[] data, string contentType, PreviewKind kind, string fileName)
+    public async Task OpenPreviewFromDataAsync(byte[] data, string contentType, PreviewKind kind, string fileName, Func<Task>? onBack = null)
     {
         await RevokeUrlsAsync();
 
+        _onBack = onBack;
         _previewFileName = fileName;
         _previewSize = data.Length;
         _displayUrl = "";

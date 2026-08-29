@@ -183,6 +183,9 @@
   <data name="Web_Version_FolderBack" xml:space="preserve">
     <value>Zurück zur Zeitpunktauswahl</value>
   </data>
+  <data name="Web_Version_BackToVersions" xml:space="preserve">
+    <value>Zurück zu den Versionen</value>
+  </data>
   <data name="Web_Version_FolderNoFiles" xml:space="preserve">
     <value>Zu diesem Zeitpunkt existierten keine Dateien.</value>
   </data>

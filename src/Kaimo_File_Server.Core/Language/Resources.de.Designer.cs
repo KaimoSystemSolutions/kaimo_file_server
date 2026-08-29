@@ -176,7 +176,13 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Version_FolderBack", resourceCulture);
             }
         }
-        
+
+        internal static string Web_Version_BackToVersions {
+            get {
+                return ResourceManager.GetString("Web_Version_BackToVersions", resourceCulture);
+            }
+        }
+
         internal static string Web_Version_FolderNoFiles {
             get {
                 return ResourceManager.GetString("Web_Version_FolderNoFiles", resourceCulture);
