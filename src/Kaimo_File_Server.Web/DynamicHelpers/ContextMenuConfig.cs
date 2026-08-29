@@ -13,6 +13,25 @@ public class ContextMenuConfig
     /// <summary>Scope name → ordered command ids.</summary>
     public Dictionary<string, List<string>> Menus { get; set; } = new();
 
+    /// <summary>
+    /// The single global command order the editor works in. Every scope's menu is
+    /// <c>Order ∩ (its assigned commands)</c>. Persisted alongside <see cref="Menus"/>;
+    /// null in configs saved before the matrix editor existed (then
+    /// <see cref="DefaultOrder"/> is used and <see cref="Menus"/> still renders as-is).
+    /// </summary>
+    public List<string>? Order { get; set; }
+
+    /// <summary>
+    /// The canonical command order used when no <see cref="Order"/> is stored. Matches
+    /// the relative order of the out-of-the-box per-scope menus in <see cref="DefaultForScope"/>.
+    /// </summary>
+    public static readonly IReadOnlyList<string> DefaultOrder = new[]
+    {
+        "open", "sync", "extract", "compress.zip", "compress.targz",
+        "rename", "versions", "delete", "permissions", "properties",
+        "newfolder", "refresh",
+    };
+
     /// <summary>Ordered command ids for a scope, falling back to the default layout.</summary>
     public List<string> ForScope(ContextMenuScope scope)
     {

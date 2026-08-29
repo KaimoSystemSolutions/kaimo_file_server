@@ -990,6 +990,69 @@
   <data name="Web_Settings_CtxScope_Multi" xml:space="preserve">
     <value>Multiple selection</value>
   </data>
+  <data name="Web_Settings_Ctx_Intro" xml:space="preserve">
+    <value>Click a row to set an action for every category at once. Click a column header to preview that category; the small “all” under the header toggles the whole column.</value>
+  </data>
+  <data name="Web_Settings_Ctx_Step1" xml:space="preserve">
+    <value>Assignment</value>
+  </data>
+  <data name="Web_Settings_Ctx_Step2" xml:space="preserve">
+    <value>Order</value>
+  </data>
+  <data name="Web_Settings_Ctx_MembershipTitle" xml:space="preserve">
+    <value>Which action in which category</value>
+  </data>
+  <data name="Web_Settings_Ctx_MembershipHint" xml:space="preserve">
+    <value>Invalid combinations are locked</value>
+  </data>
+  <data name="Web_Settings_Ctx_OrderTitle" xml:space="preserve">
+    <value>Global order</value>
+  </data>
+  <data name="Web_Settings_Ctx_OrderHint" xml:space="preserve">
+    <value>Drag to reorder</value>
+  </data>
+  <data name="Web_Settings_Ctx_PreviewTitle" xml:space="preserve">
+    <value>Live preview</value>
+  </data>
+  <data name="Web_Settings_Ctx_PreviewFor" xml:space="preserve">
+    <value>Menu for {0}</value>
+  </data>
+  <data name="Web_Settings_Ctx_Empty" xml:space="preserve">
+    <value>No entry in this category</value>
+  </data>
+  <data name="Web_Settings_Ctx_ToggleColumn" xml:space="preserve">
+    <value>Toggle whole category</value>
+  </data>
+  <data name="Web_Settings_Ctx_ToggleRow" xml:space="preserve">
+    <value>Toggle for all categories</value>
+  </data>
+  <data name="Web_Settings_Ctx_Corner" xml:space="preserve">
+    <value>Action \ Category</value>
+  </data>
+  <data name="Web_Settings_Ctx_ResetAll" xml:space="preserve">
+    <value>Reset all to default</value>
+  </data>
+  <data name="Web_Settings_Ctx_AllShort" xml:space="preserve">
+    <value>all</value>
+  </data>
+  <data name="Web_Settings_Ctx_Lead" xml:space="preserve">
+    <value>Choose which actions appear in the right-click menu — per file category and in which order.</value>
+  </data>
+  <data name="Web_Settings_Ctx_HelpTitle" xml:space="preserve">
+    <value>How it works</value>
+  </data>
+  <data name="Web_Settings_Ctx_Help1" xml:space="preserve">
+    <value>Click a row to toggle that action for every category at once.</value>
+  </data>
+  <data name="Web_Settings_Ctx_Help2" xml:space="preserve">
+    <value>Click a column header to preview that category's menu on the right.</value>
+  </data>
+  <data name="Web_Settings_Ctx_Help3" xml:space="preserve">
+    <value>The box in a column header turns the whole category on or off.</value>
+  </data>
+  <data name="Web_Settings_Ctx_Help4" xml:space="preserve">
+    <value>Drag the entries under “Order” to change the sequence — every category follows it.</value>
+  </data>
   <data name="Web_Settings_PwPolicy_TooShort" xml:space="preserve">
     <value>The password must be at least {0} characters long.</value>
   </data>

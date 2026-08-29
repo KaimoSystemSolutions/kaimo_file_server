@@ -990,6 +990,69 @@
   <data name="Web_Settings_CtxScope_Multi" xml:space="preserve">
     <value>Mehrfachauswahl</value>
   </data>
+  <data name="Web_Settings_Ctx_Intro" xml:space="preserve">
+    <value>Klicke auf eine Zeile, um eine Aktion für alle Kategorien auf einmal zu setzen. Klicke auf einen Spaltenkopf für die Vorschau dieser Kategorie; das kleine „alle“ unter dem Kopf schaltet die ganze Spalte.</value>
+  </data>
+  <data name="Web_Settings_Ctx_Step1" xml:space="preserve">
+    <value>Zuordnung</value>
+  </data>
+  <data name="Web_Settings_Ctx_Step2" xml:space="preserve">
+    <value>Reihenfolge</value>
+  </data>
+  <data name="Web_Settings_Ctx_MembershipTitle" xml:space="preserve">
+    <value>Welche Aktion in welcher Kategorie</value>
+  </data>
+  <data name="Web_Settings_Ctx_MembershipHint" xml:space="preserve">
+    <value>Ungültige Kombinationen sind gesperrt</value>
+  </data>
+  <data name="Web_Settings_Ctx_OrderTitle" xml:space="preserve">
+    <value>Globale Reihenfolge</value>
+  </data>
+  <data name="Web_Settings_Ctx_OrderHint" xml:space="preserve">
+    <value>Zum Umsortieren ziehen</value>
+  </data>
+  <data name="Web_Settings_Ctx_PreviewTitle" xml:space="preserve">
+    <value>Live-Vorschau</value>
+  </data>
+  <data name="Web_Settings_Ctx_PreviewFor" xml:space="preserve">
+    <value>Menü für {0}</value>
+  </data>
+  <data name="Web_Settings_Ctx_Empty" xml:space="preserve">
+    <value>Kein Eintrag in dieser Kategorie</value>
+  </data>
+  <data name="Web_Settings_Ctx_ToggleColumn" xml:space="preserve">
+    <value>Ganze Kategorie umschalten</value>
+  </data>
+  <data name="Web_Settings_Ctx_ToggleRow" xml:space="preserve">
+    <value>Für alle Kategorien umschalten</value>
+  </data>
+  <data name="Web_Settings_Ctx_Corner" xml:space="preserve">
+    <value>Aktion \ Kategorie</value>
+  </data>
+  <data name="Web_Settings_Ctx_ResetAll" xml:space="preserve">
+    <value>Alles auf Standard zurücksetzen</value>
+  </data>
+  <data name="Web_Settings_Ctx_AllShort" xml:space="preserve">
+    <value>alle</value>
+  </data>
+  <data name="Web_Settings_Ctx_Lead" xml:space="preserve">
+    <value>Lege fest, welche Aktionen im Rechtsklick-Menü erscheinen – je Dateikategorie und in welcher Reihenfolge.</value>
+  </data>
+  <data name="Web_Settings_Ctx_HelpTitle" xml:space="preserve">
+    <value>So funktioniert’s</value>
+  </data>
+  <data name="Web_Settings_Ctx_Help1" xml:space="preserve">
+    <value>Klick auf eine Zeile schaltet die Aktion für alle Kategorien gleichzeitig um.</value>
+  </data>
+  <data name="Web_Settings_Ctx_Help2" xml:space="preserve">
+    <value>Klick auf einen Spaltenkopf zeigt rechts die Vorschau dieser Kategorie.</value>
+  </data>
+  <data name="Web_Settings_Ctx_Help3" xml:space="preserve">
+    <value>Das Kästchen im Spaltenkopf schaltet die ganze Kategorie an oder aus.</value>
+  </data>
+  <data name="Web_Settings_Ctx_Help4" xml:space="preserve">
+    <value>Zieh die Einträge unter „Reihenfolge“, um die Abfolge zu ändern – jede Kategorie folgt ihr.</value>
+  </data>
   <data name="Web_Settings_PwPolicy_TooShort" xml:space="preserve">
     <value>Das Passwort muss mindestens {0} Zeichen lang sein.</value>
   </data>

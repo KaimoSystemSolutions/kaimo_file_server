@@ -273,6 +273,7 @@ public class SettingsViewModel
 
                 SelectedLanguage = await languageTask;
                 CtxConfig = await contextMenuTask;
+                RebuildContextEditorState();
                 PwPolicy = await passwordPolicyTask;
                 SessionRevalidationSeconds = await sessionSecurityTask;
                 LogLevel = await loggingTask;
@@ -1005,91 +1006,135 @@ public class SettingsViewModel
         return $"{size:0.#} {units[unit]}";
     }
 
-    // ── Context Menu (per-scope layout) ──
+    // ── Context Menu (matrix editor) ──
+    //
+    // The editor works in two separate concerns so that toggling membership never
+    // reorders anything (the old single-list editor conflated the two, which made
+    // rows jump on every click):
+    //   • membership — which command appears in which category (the matrix), held
+    //     in _members as "commandId::Scope" keys;
+    //   • order — one global command order (_order) that every category filters.
+    // On save each scope's persisted menu becomes  _order ∩ members(scope), so the
+    // renderer keeps consuming ContextMenuConfig.ForScope unchanged.
 
-    /// <summary>The globally configured, per-scope context-menu layout (working copy).</summary>
+    /// <summary>The persisted layout (source for load, target for save).</summary>
     public ContextMenuConfig CtxConfig { get; private set; } = ContextMenuConfig.Default();
 
-    /// <summary>The category currently being edited in the GUI.</summary>
-    public ContextMenuScope SelectedScope { get; private set; } = ContextMenuScope.Folder;
-
-    /// <summary>All editable categories.</summary>
+    /// <summary>All categories = the matrix columns.</summary>
     public static IReadOnlyList<ContextMenuScope> ContextScopes { get; } = Enum.GetValues<ContextMenuScope>();
 
-    /// <summary>Commands assigned to the selected scope, in order.</summary>
-    public IReadOnlyList<ContextCommand> AssignedCommands =>
-        WorkingList()
-            .Select(ContextCommandCatalog.ById)
-            .Where(c => c is not null)
-            .Select(c => c!)
-            .ToList();
+    /// <summary>The category shown in the live preview (does not affect editing).</summary>
+    public ContextMenuScope PreviewScope { get; private set; } = ContextMenuScope.Folder;
 
-    /// <summary>Valid commands for the selected scope that are not yet assigned.</summary>
-    public IReadOnlyList<ContextCommand> AvailableCommands
-    {
-        get
-        {
-            var assigned = WorkingList();
-            return ContextCommandCatalog.ForScope(SelectedScope)
-                .Where(c => !assigned.Contains(c.Id))
-                .ToList();
-        }
-    }
+    // "commandId::Scope" for every assigned cell.
+    private readonly HashSet<string> _members = new();
+    // The single global command order (superset of everything shown as matrix rows).
+    private List<string> _order = new();
+
+    private static string MKey(string commandId, ContextMenuScope scope) => $"{commandId}::{scope}";
 
     /// <summary>
-    /// All valid commands for the selected scope: assigned ones first (in their
-    /// configured order), then the remaining unassigned ones. Drives the single
-    /// checkbox list in the builder GUI.
+    /// Projects the persisted <see cref="CtxConfig"/> into the editor's membership +
+    /// order working state. Call after (re)loading or resetting CtxConfig.
     /// </summary>
-    public IReadOnlyList<ContextCommand> ScopeCommandsOrdered
+    public void RebuildContextEditorState()
     {
-        get
+        _members.Clear();
+        foreach (var scope in ContextScopes)
+            foreach (var id in CtxConfig.ForScope(scope))
+                if (ContextCommandCatalog.ById(id)?.IsValidFor(scope) == true)
+                    _members.Add(MKey(id, scope));
+
+        // Start from the stored (or default) order, then reconcile against the catalog
+        // so unknown ids are dropped and newly added commands still show up.
+        _order = new List<string>(CtxConfig.Order ?? ContextMenuConfig.DefaultOrder);
+        _order.RemoveAll(id => ContextCommandCatalog.ById(id) is null);
+        foreach (var c in ContextCommandCatalog.All)
+            if (!_order.Contains(c.Id))
+                _order.Add(c.Id);
+    }
+
+    /// <summary>Command rows for the matrix, in the global order.</summary>
+    public IReadOnlyList<ContextCommand> OrderedCommands =>
+        _order.Select(ContextCommandCatalog.ById).Where(c => c is not null).Select(c => c!).ToList();
+
+    /// <summary>True if <paramref name="commandId"/> may appear in <paramref name="scope"/>.</summary>
+    public bool IsValidCell(string commandId, ContextMenuScope scope)
+        => ContextCommandCatalog.ById(commandId)?.IsValidFor(scope) == true;
+
+    /// <summary>True if the cell is currently ticked.</summary>
+    public bool IsCellOn(string commandId, ContextMenuScope scope)
+        => _members.Contains(MKey(commandId, scope));
+
+    /// <summary>Toggle a single cell (no-op for invalid combinations).</summary>
+    public void ToggleCell(string commandId, ContextMenuScope scope)
+    {
+        if (!IsValidCell(commandId, scope)) return;
+        var key = MKey(commandId, scope);
+        if (!_members.Remove(key)) _members.Add(key);
+    }
+
+    /// <summary>Toggle a command across every category it is valid for (row action).</summary>
+    public void ToggleRow(string commandId)
+    {
+        var scopes = ContextScopes.Where(s => IsValidCell(commandId, s)).ToList();
+        var allOn = scopes.All(s => _members.Contains(MKey(commandId, s)));
+        foreach (var s in scopes)
         {
-            var assigned = AssignedCommands;
-            var assignedIds = assigned.Select(c => c.Id).ToHashSet();
-            var rest = ContextCommandCatalog.ForScope(SelectedScope)
-                .Where(c => !assignedIds.Contains(c.Id));
-            return assigned.Concat(rest).ToList();
+            var key = MKey(commandId, s);
+            if (allOn) _members.Remove(key); else _members.Add(key);
         }
     }
 
-    /// <summary>True if the command is currently part of the selected scope's menu.</summary>
-    public bool IsAssigned(string id) => WorkingList().Contains(id);
-
-    public void SelectScope(ContextMenuScope scope) => SelectedScope = scope;
-
-    /// <summary>Adds the command if absent, removes it if present.</summary>
-    public void ToggleCommand(string id)
+    /// <summary>Toggle every valid command for one category (column action).</summary>
+    public void ToggleColumn(ContextMenuScope scope)
     {
-        var list = WorkingList();
-        if (list.Contains(id)) list.Remove(id);
-        else list.Add(id);
+        var cmds = ContextCommandCatalog.ForScope(scope).Select(c => c.Id).ToList();
+        var allOn = cmds.All(id => _members.Contains(MKey(id, scope)));
+        foreach (var id in cmds)
+        {
+            var key = MKey(id, scope);
+            if (allOn) _members.Remove(key); else _members.Add(key);
+        }
     }
 
-    public void AddCommand(string id)
+    public void SelectPreviewScope(ContextMenuScope scope) => PreviewScope = scope;
+
+    /// <summary>Move <paramref name="commandId"/> in the global order to sit before
+    /// <paramref name="targetId"/> (drag-and-drop reorder).</summary>
+    public void ReorderCommand(string commandId, string targetId)
     {
-        var list = WorkingList();
-        if (!list.Contains(id)) list.Add(id);
+        if (commandId == targetId) return;
+        var from = _order.IndexOf(commandId);
+        var to = _order.IndexOf(targetId);
+        if (from < 0 || to < 0) return;
+        _order.RemoveAt(from);
+        if (from < to) to--;
+        _order.Insert(to, commandId);
     }
 
-    public void RemoveCommand(string id) => WorkingList().Remove(id);
-
-    public void MoveUp(string id)
+    public void MoveCommandUp(string commandId)
     {
-        var list = WorkingList();
-        var i = list.IndexOf(id);
-        if (i > 0) (list[i - 1], list[i]) = (list[i], list[i - 1]);
+        var i = _order.IndexOf(commandId);
+        if (i > 0) (_order[i - 1], _order[i]) = (_order[i], _order[i - 1]);
     }
 
-    public void MoveDown(string id)
+    public void MoveCommandDown(string commandId)
     {
-        var list = WorkingList();
-        var i = list.IndexOf(id);
-        if (i >= 0 && i < list.Count - 1) (list[i + 1], list[i]) = (list[i], list[i + 1]);
+        var i = _order.IndexOf(commandId);
+        if (i >= 0 && i < _order.Count - 1) (_order[i + 1], _order[i]) = (_order[i], _order[i + 1]);
     }
 
-    public void ResetScopeToDefault()
-        => CtxConfig.SetScope(SelectedScope, ContextMenuConfig.DefaultForScope(SelectedScope));
+    /// <summary>The commands that would render for <see cref="PreviewScope"/>, in order.</summary>
+    public IReadOnlyList<ContextCommand> PreviewCommands =>
+        _order.Where(id => _members.Contains(MKey(id, PreviewScope)) && IsValidCell(id, PreviewScope))
+              .Select(ContextCommandCatalog.ById).Where(c => c is not null).Select(c => c!).ToList();
+
+    public void ResetContextToDefault()
+    {
+        CtxConfig = ContextMenuConfig.Default();
+        RebuildContextEditorState();
+    }
 
     public async Task<bool> SaveContextMenuAsync()
     {
@@ -1100,6 +1145,16 @@ public class SettingsViewModel
         {
             ErrorMessage = Resources.Web_Settings_NoPermissionChange;
             return false;
+        }
+
+        // Fold the editor working state back into the persisted, per-scope format.
+        CtxConfig.Order = new List<string>(_order);
+        foreach (var scope in ContextScopes)
+        {
+            var ids = _order
+                .Where(id => _members.Contains(MKey(id, scope)) && IsValidCell(id, scope))
+                .ToList();
+            CtxConfig.Menus[scope.ToString()] = ids;
         }
 
         try
@@ -1115,18 +1170,6 @@ public class SettingsViewModel
             ErrorMessage = Resources.Web_Settings_CtxSaveFailed;
             return false;
         }
-    }
-
-    /// <summary>Mutable, guaranteed-present command list for the selected scope.</summary>
-    private List<string> WorkingList()
-    {
-        var key = SelectedScope.ToString();
-        if (!CtxConfig.Menus.TryGetValue(key, out var list) || list is null)
-        {
-            list = ContextMenuConfig.DefaultForScope(SelectedScope);
-            CtxConfig.Menus[key] = list;
-        }
-        return list;
     }
 
     /// <summary>Clears transient messages (call on tab switch).</summary>

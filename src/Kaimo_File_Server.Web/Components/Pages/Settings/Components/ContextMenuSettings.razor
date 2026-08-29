@@ -1,46 +1,244 @@
-
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject AssetProvider Icons
 
-<div class="detail-section">
+<div class="detail-section ctx-editor">
     <span class="detail-label">@Resources.Web_Settings_ContextMenu_Detail</span>
-    <p class="settings-description">@Resources.Web_Settings_ContextMenu_Desc</p>
-    <div class="settings-row settings-row-spaced">
-        <select class="edit-input context-scope" @bind="SelectedScope">
-            @foreach (var scope in SettingsViewModel.ContextScopes) { <option value="@scope">@ScopeName(scope)</option> }
-        </select>
+
+    <div class="ctx-intro">
+        <button class="ctx-help-btn @(_showHelp ? "ctx-help-btn--open" : "")"
+                title="@T("Web_Settings_Ctx_HelpTitle")"
+                @onclick="() => _showHelp = !_showHelp">
+            @Icon("info.svg", 17, 1.8f)
+        </button>
+        <p class="ctx-lead">@T("Web_Settings_Ctx_Lead")</p>
     </div>
-    <div class="ctx-list">
-        @foreach (var cmd in VM.ScopeCommandsOrdered)
-        {
-            var assigned = VM.IsAssigned(cmd.Id);
-            <div class="ctx-item @(assigned ? "" : "ctx-item--off")">
-                <label class="ctx-item-label">
-                    <input type="checkbox" checked="@assigned" @onchange="() => VM.ToggleCommand(cmd.Id)" />
-                    @Icons.SVG(cmd.Icon, new SvgOptions(Width: 14, Height: 14))
-                    <span>@cmd.DisplayLabel</span>
-                </label>
-                <span class="ctx-item-actions">
-                    <button class="btn-icon btn-icon--small" title="@Resources.Web_Settings_CtxMoveUp" disabled="@(!assigned)" @onclick="() => VM.MoveUp(cmd.Id)">↑</button>
-                    <button class="btn-icon btn-icon--small" title="@Resources.Web_Settings_CtxMoveDown" disabled="@(!assigned)" @onclick="() => VM.MoveDown(cmd.Id)">↓</button>
-                </span>
+
+    @if (_showHelp)
+    {
+        <div class="ctx-help-pop">
+            <div class="ctx-help-head">
+                <strong>@T("Web_Settings_Ctx_HelpTitle")</strong>
+                <button class="ctx-help-close" @onclick="() => _showHelp = false">×</button>
             </div>
-        }
+            <ul>
+                <li>@T("Web_Settings_Ctx_Help1")</li>
+                <li>@T("Web_Settings_Ctx_Help2")</li>
+                <li>@T("Web_Settings_Ctx_Help3")</li>
+                <li>@T("Web_Settings_Ctx_Help4")</li>
+            </ul>
+        </div>
+    }
+
+    @* ── 1 · Assignment matrix ── *@
+    <div class="ctx-panel">
+        <div class="ctx-panel-head">
+            <span class="ctx-step">1</span>
+            <div class="ctx-head-titles">
+                <span class="ctx-eyebrow">@T("Web_Settings_Ctx_Step1")</span>
+                <h3>@T("Web_Settings_Ctx_MembershipTitle")</h3>
+            </div>
+        </div>
+        <div class="ctx-matrix-scroll">
+            <table class="ctx-matrix">
+                <thead>
+                    <tr>
+                        <th class="ctx-corner">@T("Web_Settings_Ctx_Corner")</th>
+                        @foreach (var scope in SettingsViewModel.ContextScopes)
+                        {
+                            var s = scope;
+                            var validIds = ContextCommandCatalog.ForScope(s).Select(x => x.Id).ToList();
+                            var onCount = validIds.Count(id => VM.IsCellOn(id, s));
+                            var full = onCount > 0 && onCount == validIds.Count;
+                            var partial = onCount > 0 && onCount < validIds.Count;
+                            <th class="ctx-col @(s == VM.PreviewScope ? "ctx-col--sel" : "")"
+                                title="@ScopeName(s)"
+                                @onclick="() => VM.SelectPreviewScope(s)">
+                                <span class="ctx-col-ico">@Icon(ScopeIcon(s), 18)</span>
+                                <span class="ctx-col-nm">@ScopeName(s)</span>
+                                <button class="ctx-box ctx-col-toggle @(full ? "ctx-box--on" : "") @(partial ? "ctx-box--partial" : "")"
+                                        title="@T("Web_Settings_Ctx_ToggleColumn")"
+                                        @onclick="() => VM.ToggleColumn(s)" @onclick:stopPropagation="true">
+                                    <span class="ctx-check">@Icon("check.svg", 12, 2.5f)</span>
+                                </button>
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var cmd in VM.OrderedCommands)
+                    {
+                        var c = cmd;
+                        <tr class="@(c.IsDanger ? "ctx-danger" : "")" @key="c.Id">
+                            <th class="ctx-rowlabel @(c.IsDanger ? "ctx-danger" : "")"
+                                title="@T("Web_Settings_Ctx_ToggleRow")"
+                                @onclick="() => VM.ToggleRow(c.Id)">
+                                <div class="ctx-rowlabel-inner">
+                                    <span class="ctx-row-ico">@Icon(c.Icon, 15)</span>
+                                    <span class="ctx-row-lab">@c.DisplayLabel</span>
+                                    <span class="ctx-row-id">@c.Id</span>
+                                </div>
+                            </th>
+                            @foreach (var scope in SettingsViewModel.ContextScopes)
+                            {
+                                var s = scope;
+                                var colsel = s == VM.PreviewScope ? "ctx-cell--sel" : "";
+                                if (!VM.IsValidCell(c.Id, s))
+                                {
+                                    <td class="ctx-cell ctx-cell--invalid @colsel"><span class="ctx-dash">–</span></td>
+                                }
+                                else
+                                {
+                                    var on = VM.IsCellOn(c.Id, s);
+                                    <td class="ctx-cell @colsel">
+                                        <button class="ctx-box @(on ? "ctx-box--on" : "")"
+                                                aria-pressed="@(on ? "true" : "false")"
+                                                title="@ScopeName(s)"
+                                                @onclick="() => VM.ToggleCell(c.Id, s)">
+                                            <span class="ctx-check">@Icon("check.svg", 12, 2.5f)</span>
+                                        </button>
+                                    </td>
+                                }
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
+
+    @* ── 2 · Order + live preview ── *@
+    <div class="ctx-lower">
+        <div class="ctx-panel">
+            <div class="ctx-panel-head">
+                <span class="ctx-step">2</span>
+                <div class="ctx-head-titles">
+                    <span class="ctx-eyebrow">@T("Web_Settings_Ctx_Step2")</span>
+                    <h3>@T("Web_Settings_Ctx_OrderTitle")</h3>
+                </div>
+                <span class="ctx-hint">@T("Web_Settings_Ctx_OrderHint")</span>
+            </div>
+            <ul class="ctx-order">
+                @{ var pos = 0; }
+                @foreach (var cmd in VM.OrderedCommands)
+                {
+                    var c = cmd;
+                    var i = pos++;
+                    var cls = c.IsDanger ? "ctx-danger" : "";
+                    if (_dragId == c.Id) cls += " ctx-dragging";
+                    if (_dragOverId == c.Id && _dragId != c.Id) cls += " ctx-dropbefore";
+                    <li class="ctx-order-item @cls" draggable="true" @key="c.Id"
+                        @ondragstart="() => _dragId = c.Id"
+                        @ondragenter="() => _dragOverId = c.Id"
+                        @ondragend="EndDrag"
+                        @ondragover:preventDefault="true"
+                        @ondrop="() => OnDrop(c.Id)">
+                        <span class="ctx-grip" aria-hidden="true">
+                            <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
+                                <circle cx="2.5" cy="3" r="1.25" /><circle cx="7.5" cy="3" r="1.25" />
+                                <circle cx="2.5" cy="8" r="1.25" /><circle cx="7.5" cy="8" r="1.25" />
+                                <circle cx="2.5" cy="13" r="1.25" /><circle cx="7.5" cy="13" r="1.25" />
+                            </svg>
+                        </span>
+                        <span class="ctx-order-ico">@Icon(c.Icon, 15)</span>
+                        <span class="ctx-order-lab">@c.DisplayLabel</span>
+                        <span class="ctx-order-btns">
+                            <button class="btn-icon btn-icon--small" title="@Resources.Web_Settings_CtxMoveUp"
+                                    disabled="@(i == 0)" @onclick="() => VM.MoveCommandUp(c.Id)">↑</button>
+                            <button class="btn-icon btn-icon--small" title="@Resources.Web_Settings_CtxMoveDown"
+                                    disabled="@(i == VM.OrderedCommands.Count - 1)" @onclick="() => VM.MoveCommandDown(c.Id)">↓</button>
+                        </span>
+                    </li>
+                }
+            </ul>
+        </div>
+
+        <div class="ctx-panel ctx-preview-panel">
+            <div class="ctx-panel-head">
+                <h3>@T("Web_Settings_Ctx_PreviewTitle")</h3>
+            </div>
+            <div class="ctx-preview">
+                <p class="ctx-preview-cap">@string.Format(T("Web_Settings_Ctx_PreviewFor"), ScopeName(VM.PreviewScope))</p>
+                @{
+                    var items = VM.PreviewCommands;
+                    var general = items.Where(x => ContextCommandCatalog.GeneralIds.Contains(x.Id)).ToList();
+                    var main = items.Where(x => !ContextCommandCatalog.GeneralIds.Contains(x.Id)).ToList();
+                }
+                @if (items.Count == 0)
+                {
+                    <div class="ctx-preview-empty">@T("Web_Settings_Ctx_Empty")</div>
+                }
+                else
+                {
+                    <div class="ctx-menu">
+                        @foreach (var mi in main)
+                        {
+                            <div class="ctx-mi @(mi.IsDanger ? "ctx-danger" : "")">
+                                @Icon(mi.Icon, 15)
+                                <span>@mi.DisplayLabel</span>
+                            </div>
+                        }
+                        @if (main.Count > 0 && general.Count > 0)
+                        {
+                            <div class="ctx-msep"></div>
+                        }
+                        @foreach (var mi in general)
+                        {
+                            <div class="ctx-mi">
+                                @Icon(mi.Icon, 15)
+                                <span>@mi.DisplayLabel</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
     <div class="settings-row settings-actions">
         <button class="btn-primary" @onclick="Save">@Resources.Web_Settings_Button_Save</button>
-        <button class="btn-icon" title="@Resources.Web_Settings_CtxReset" @onclick="Reset">
-            @Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
-        </button>
+        <button class="btn-secondary" @onclick="Reset">@T("Web_Settings_Ctx_ResetAll")</button>
     </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
-    private ContextMenuScope SelectedScope { get => VM.SelectedScope; set { VM.SelectScope(value); VM.ClearMessages(); } }
+
+    private bool _showHelp;
+    private string? _dragId;
+    private string? _dragOverId;
+
+    // Icons are read synchronously from disk by AssetProvider (uncached in dev), so
+    // caching the rendered markup here keeps full re-renders on every click cheap.
+    private readonly Dictionary<string, MarkupString> _iconCache = new();
+    private MarkupString Icon(string name, int size, float stroke = 1.5f)
+    {
+        var key = $"{name}|{size}|{stroke}";
+        if (!_iconCache.TryGetValue(key, out var markup))
+        {
+            markup = Icons.SVG(name, new SvgOptions(Width: size, Height: size, StrokeWidth: stroke));
+            _iconCache[key] = markup;
+        }
+        return markup;
+    }
+
+    private void OnDrop(string targetId)
+    {
+        if (_dragId is not null) VM.ReorderCommand(_dragId, targetId);
+        EndDrag();
+    }
+
+    private void EndDrag()
+    {
+        _dragId = null;
+        _dragOverId = null;
+    }
+
     private async Task Save() { await VM.SaveContextMenuAsync(); StateHasChanged(); }
-    private void Reset() { VM.ResetScopeToDefault(); VM.ClearMessages(); StateHasChanged(); }
+    private void Reset() { VM.ResetContextToDefault(); VM.ClearMessages(); StateHasChanged(); }
+
+    private static string T(string key) => Resources.ResourceManager.GetString(key) ?? key;
+
     private static string ScopeName(ContextMenuScope scope) => scope switch
     {
         ContextMenuScope.Background => Resources.Web_Settings_CtxScope_Background,
@@ -54,5 +252,18 @@
         ContextMenuScope.MultiSelection => Resources.Web_Settings_CtxScope_Multi,
         _ => scope.ToString()
     };
-}
 
+    private static string ScopeIcon(ContextMenuScope scope) => scope switch
+    {
+        ContextMenuScope.Background => "folder.svg",
+        ContextMenuScope.Folder => "folder.svg",
+        ContextMenuScope.Archive => "file_zip.svg",
+        ContextMenuScope.Image => "file_image.svg",
+        ContextMenuScope.Video => "file_video.svg",
+        ContextMenuScope.Audio => "file_audio.svg",
+        ContextMenuScope.Document => "file_text.svg",
+        ContextMenuScope.OtherFile => "file.svg",
+        ContextMenuScope.MultiSelection => "file.svg",
+        _ => "file.svg"
+    };
+}
