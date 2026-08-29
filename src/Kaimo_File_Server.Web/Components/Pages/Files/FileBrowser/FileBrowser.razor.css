@@ -262,6 +262,80 @@
 }
 
 /* ══════════════════════════════════════════════════════════
+   Loading Skeleton
+   Mirrors the file table's grid so switching to the real rows causes no layout
+   shift, and the shimmer makes the wait feel shorter than a bare spinner.
+   ══════════════════════════════════════════════════════════ */
+
+.file-skeleton {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg-secondary);
+    overflow: hidden;
+    width: 100%;
+}
+
+.file-skeleton-row {
+    display: grid;
+    grid-template-columns: var(--grid-cols);
+}
+
+    .file-skeleton-row > div {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 41px;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border);
+        border-right: 1px solid var(--border);
+        overflow: hidden;
+    }
+
+        .file-skeleton-row > div:last-child {
+            border-right: none;
+        }
+
+/* Shimmering placeholder block. A single highlight sweeps left→right across every
+   block; the per-row delay (set inline) gives a gentle top-to-bottom cascade. */
+.skeleton-box {
+    display: block;
+    border-radius: 4px;
+    background: linear-gradient(
+        90deg,
+        var(--bg-tertiary) 25%,
+        var(--bg-hover) 50%,
+        var(--bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: file-skeleton-shimmer 1.4s ease-in-out infinite;
+    animation-delay: var(--skeleton-delay, 0ms);
+}
+
+.skeleton-bar {
+    height: 12px;
+}
+
+.skeleton-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    flex-shrink: 0;
+}
+
+@keyframes file-skeleton-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Respect a reduced-motion preference: keep the placeholder, drop the sweep. */
+@media (prefers-reduced-motion: reduce) {
+    .skeleton-box {
+        animation: none;
+    }
+}
+
+/* ══════════════════════════════════════════════════════════
    ACL Indicator (in name field, next to filename)
    ══════════════════════════════════════════════════════════ */
 
@@ -349,7 +423,8 @@
 
 /* < 1024px: hide "Last Access" → 4 columns */
 @media (max-width: 1024px) {
-    .file-table-wrap {
+    .file-table-wrap,
+    .file-skeleton {
         --grid-cols: 1fr 90px 140px 140px !important;
     }
 
@@ -360,7 +435,8 @@
 
 /* < 800px: also hide "Created" → 3 columns */
 @media (max-width: 800px) {
-    .file-table-wrap {
+    .file-table-wrap,
+    .file-skeleton {
         --grid-cols: 1fr 90px 140px !important;
     }
 
@@ -372,7 +448,8 @@
 
 /* < 600px: also hide "Modified" → 2 columns */
 @media (max-width: 600px) {
-    .file-table-wrap {
+    .file-table-wrap,
+    .file-skeleton {
         --grid-cols: 1fr 90px !important;
     }
 
@@ -385,7 +462,8 @@
 
 /* < 420px: also hide "Size" → name only */
 @media (max-width: 420px) {
-    .file-table-wrap {
+    .file-table-wrap,
+    .file-skeleton {
         --grid-cols: 1fr !important;
     }
 
@@ -596,7 +674,8 @@
 
     .page-command { min-height: 40px; }
 
-    .file-table-wrap {
+    .file-table-wrap,
+    .file-skeleton {
         margin-inline: -16px;
         width: calc(100% + 32px);
         border-right: 0;

@@ -84,6 +84,13 @@ public abstract class RemoteFileBrowserViewModelBase : IFileBrowserViewModel
     {
         IsLoading = true;
         ErrorMessage = null;
+
+        // Clear the previously loaded location so the breadcrumb never shows a
+        // stale share/path while the new target is still loading. Without this the
+        // last opened share keeps being displayed until CompleteLoad runs.
+        CurrentBrowserShare = null;
+        CurrentPath = "";
+
         NotifyStateChanged();
     }
 

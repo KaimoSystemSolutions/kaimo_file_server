@@ -2479,4 +2479,10 @@
   <data name="Web_DeviceAdmin_ConfirmYes" xml:space="preserve"><value>Ja, widerrufen</value></data>
   <data name="Web_DeviceAdmin_AlreadyRevoked" xml:space="preserve"><value>Dieses Gerät ist bereits widerrufen.</value></data>
   <data name="Web_DeviceAdmin_RevokeFailed" xml:space="preserve"><value>Das Gerät konnte nicht widerrufen werden.</value></data>
+  <data name="Web_Reconnect_Reconnecting" xml:space="preserve"><value>Verbindung verloren. Verbindung wird wiederhergestellt…</value></data>
+  <data name="Web_Reconnect_AttemptLabel" xml:space="preserve"><value>Versuch</value></data>
+  <data name="Web_Reconnect_Paused" xml:space="preserve"><value>Die Sitzung wurde vom Server pausiert.</value></data>
+  <data name="Web_Reconnect_Failed" xml:space="preserve"><value>Verbindung zum Server konnte nicht wiederhergestellt werden.</value></data>
+  <data name="Web_Reconnect_Rejected" xml:space="preserve"><value>Der Server hat die Verbindung abgelehnt.</value></data>
+  <data name="Web_Reconnect_Reload" xml:space="preserve"><value>Neu laden</value></data>
 </root>

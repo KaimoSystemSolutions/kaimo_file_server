@@ -26,9 +26,40 @@ public partial class FileBrowser
     [Parameter] public string OverviewRoute { get; set; } = "/files";
     [Parameter] public string? ShareRoute { get; set; }
 
+    /// <summary>
+    /// Human-friendly name of the share for the breadcrumb, used before the share has
+    /// finished loading (and its real name is known). Callers that address the share by
+    /// an opaque key — e.g. Cloud Access virtual shares, identified by a GUID — leave this
+    /// unset, so the breadcrumb shows a neutral placeholder while loading instead of the key.
+    /// </summary>
+    [Parameter] public string? ShareDisplayName { get; set; }
+
     private string CurrentShareRoute => string.IsNullOrWhiteSpace(ShareRoute)
         ? $"{OverviewRoute.TrimEnd('/')}/{Uri.EscapeDataString(ShareName)}"
         : ShareRoute.TrimEnd('/');
+
+    /// <summary>
+    /// The share name shown in the breadcrumb. Prefers the loaded share's real name; while
+    /// that is still unknown it falls back to a caller-supplied display name, then — only
+    /// when even that is missing — to a loading placeholder or the raw share key. This keeps
+    /// a previously opened share from lingering in the breadcrumb during a load.
+    /// </summary>
+    private string CurrentShareDisplayName =>
+        VM.CurrentBrowserShare?.Name
+        ?? ShareDisplayName
+        ?? (VM.IsLoading ? "…" : ShareName);
+
+    // ========== Loading skeleton ==========
+
+    /// <summary>Number of placeholder rows drawn while a directory is loading.</summary>
+    private const int SkeletonRowCount = 9;
+
+    /// <summary>
+    /// Varied widths for the skeleton name bars so the placeholder rows look like a
+    /// real, irregular file listing instead of a uniform block. Cycled per row.
+    /// </summary>
+    private static readonly string[] SkeletonNameWidths =
+        ["62%", "43%", "78%", "35%", "55%", "70%", "48%", "66%", "40%"];
 
     // ========== Column Resize (5 Spalten, ohne Actions) ==========
 

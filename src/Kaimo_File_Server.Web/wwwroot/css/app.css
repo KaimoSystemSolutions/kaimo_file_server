@@ -153,44 +153,118 @@ html, body, #app {
     -webkit-font-smoothing: antialiased;
 }
 
-/* Blazor creates this reconnect dialog when an Interactive Server circuit loses
-   its server connection. It is framework-owned, so theme it globally here. */
+/* Reconnect dialog shown when an Interactive Server circuit loses its connection.
+   App.razor provides an element with id #components-reconnect-modal, so blazor.web.js
+   drives this themed light-DOM markup (toggling the state classes below) instead of
+   its built-in dialog, which renders in a shadow root our theme cannot style. */
 #components-reconnect-modal {
-    background: var(--bg-secondary) !important;
-    color: var(--text-primary) !important;
-    border: 1px solid var(--border-strong) !important;
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+/* Blazor toggles these state classes on the element; any active state shows the overlay. */
+#components-reconnect-modal.components-reconnect-show,
+#components-reconnect-modal.components-reconnect-retrying,
+#components-reconnect-modal.components-reconnect-paused,
+#components-reconnect-modal.components-reconnect-failed,
+#components-reconnect-modal.components-reconnect-resume-failed,
+#components-reconnect-modal.components-reconnect-rejected {
+    display: flex;
+}
+
+.reconnect-dialog {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: min(22rem, 100%);
+    padding: 1.75rem 2rem;
+    text-align: center;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-strong);
     border-radius: 8px;
     box-shadow: var(--shadow-lg);
 }
 
-#components-reconnect-modal button {
-    background: var(--bg-tertiary) !important;
-    color: var(--text-primary) !important;
-    border: 1px solid var(--border) !important;
+.reconnect-spinner {
+    width: 34px;
+    height: 34px;
+    border: 3px solid var(--border-strong);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.reconnect-text {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+
+.reconnect-attempt {
+    color: var(--text-tertiary);
+    white-space: nowrap;
+}
+
+/* "Reconnecting" is the default state. The framework swaps classes for the others,
+   so reveal the matching message (and the reload button) purely via those classes. */
+.reconnect-text--paused,
+.reconnect-text--failed,
+.reconnect-text--rejected,
+.reconnect-reload {
+    display: none;
+}
+
+#components-reconnect-modal.components-reconnect-paused .reconnect-text--reconnecting,
+#components-reconnect-modal.components-reconnect-failed .reconnect-text--reconnecting,
+#components-reconnect-modal.components-reconnect-resume-failed .reconnect-text--reconnecting,
+#components-reconnect-modal.components-reconnect-rejected .reconnect-text--reconnecting,
+#components-reconnect-modal.components-reconnect-paused .reconnect-spinner,
+#components-reconnect-modal.components-reconnect-failed .reconnect-spinner,
+#components-reconnect-modal.components-reconnect-resume-failed .reconnect-spinner,
+#components-reconnect-modal.components-reconnect-rejected .reconnect-spinner {
+    display: none;
+}
+
+#components-reconnect-modal.components-reconnect-paused .reconnect-text--paused,
+#components-reconnect-modal.components-reconnect-failed .reconnect-text--failed,
+#components-reconnect-modal.components-reconnect-resume-failed .reconnect-text--failed,
+#components-reconnect-modal.components-reconnect-rejected .reconnect-text--rejected {
+    display: block;
+}
+
+#components-reconnect-modal.components-reconnect-paused .reconnect-reload,
+#components-reconnect-modal.components-reconnect-failed .reconnect-reload,
+#components-reconnect-modal.components-reconnect-resume-failed .reconnect-reload,
+#components-reconnect-modal.components-reconnect-rejected .reconnect-reload {
+    display: inline-flex;
+}
+
+.reconnect-reload {
+    align-items: center;
+    min-height: 34px;
+    padding: 0 16px;
+    color: #fff;
+    background: var(--accent);
+    border: 0;
     border-radius: 5px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
 }
 
-/* .components-reconnect-dialog is the visible child created by blazor.web.js. */
-#components-reconnect-modal .components-reconnect-dialog {
-    background-color: var(--bg-secondary) !important;
-    color: var(--text-primary) !important;
-    border: 1px solid var(--border-strong) !important;
-    border-radius: 8px;
-    box-shadow: var(--shadow-lg);
-}
-
-#components-reconnect-modal .components-reconnect-dialog p {
-    color: var(--text-primary) !important;
-}
-
-#components-reconnect-modal .components-reconnect-dialog button {
-    background: var(--bg-tertiary) !important;
-    color: var(--text-primary) !important;
-    border-color: var(--border) !important;
-}
-
-#components-reconnect-modal .components-rejoining-animation > div {
-    background: var(--accent) !important;
+.reconnect-reload:hover {
+    background: var(--accent-strong, var(--accent));
 }
 
 :where(button, a, input, select, textarea):focus-visible {

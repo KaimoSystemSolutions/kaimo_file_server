@@ -2502,4 +2502,10 @@
   <data name="Web_DeviceAdmin_ConfirmYes" xml:space="preserve"><value>Yes, revoke</value></data>
   <data name="Web_DeviceAdmin_AlreadyRevoked" xml:space="preserve"><value>This device is already revoked.</value></data>
   <data name="Web_DeviceAdmin_RevokeFailed" xml:space="preserve"><value>Could not revoke the device.</value></data>
+  <data name="Web_Reconnect_Reconnecting" xml:space="preserve"><value>Connection lost. Trying to reconnect…</value></data>
+  <data name="Web_Reconnect_AttemptLabel" xml:space="preserve"><value>Attempt</value></data>
+  <data name="Web_Reconnect_Paused" xml:space="preserve"><value>The session was paused by the server.</value></data>
+  <data name="Web_Reconnect_Failed" xml:space="preserve"><value>Could not reconnect to the server.</value></data>
+  <data name="Web_Reconnect_Rejected" xml:space="preserve"><value>The server rejected the connection.</value></data>
+  <data name="Web_Reconnect_Reload" xml:space="preserve"><value>Reload</value></data>
 </root>

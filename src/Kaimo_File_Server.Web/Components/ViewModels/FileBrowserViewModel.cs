@@ -153,6 +153,11 @@ public class FileBrowserViewModel : IFileBrowserViewModel
             CanManageSyncs = false;
             _fileService = null;
 
+            // Clear the previously loaded location up front so the breadcrumb does
+            // not keep showing the last opened share/path while the new target loads.
+            CurrentShare = null;
+            CurrentPath = "";
+
             CurrentShare = await _shareRepo.GetByNameAsync(shareName);
             if (CurrentShare is null)
             {

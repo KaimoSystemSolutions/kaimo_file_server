@@ -24,7 +24,7 @@
     <div class="breadcrumb-bar">
         <a class="breadcrumb-link" href="@OverviewRoute">@Resources.Web_Breadcrumb_Shares</a>
         <span class="breadcrumb-sep">/</span>
-        <a class="breadcrumb-link" href="@CurrentShareRoute">@(VM.CurrentBrowserShare?.Name ?? ShareName)</a>
+        <a class="breadcrumb-link" href="@CurrentShareRoute">@CurrentShareDisplayName</a>
         @foreach (var (name, fullPath) in VM.Breadcrumbs)
         {
             <span class="breadcrumb-sep">/</span>
@@ -233,8 +233,32 @@
 
 @if (VM.IsLoading)
 {
-    <div class="loading-state">
-        <div class="spinner"></div>
+    @* Skeleton placeholder that mirrors the file table's grid so the layout does not
+       jump when the real rows arrive, and the shimmer makes the wait feel shorter than
+       a bare spinner would. Uses the same --grid-cols variable as the real table so the
+       columns line up exactly, including at the responsive breakpoints. *@
+    <div class="file-skeleton" style="--grid-cols: @GridColumns" role="status" aria-busy="true"
+         aria-label="@Resources.Web_Common_Loading">
+        <div class="file-grid-header">
+            <div class="col-name"><span class="col-header-text">@Resources.Web_Folder_Name</span></div>
+            <div class="col-size"><span class="col-header-text">@Resources.Web_Folder_Size</span></div>
+            <div class="col-created"><span class="col-header-text">@Resources.Web_Folder_Created</span></div>
+            <div class="col-modified"><span class="col-header-text">@Resources.Web_Folder_Modified</span></div>
+            <div class="col-lastaccess"><span class="col-header-text">@Resources.Web_Folder_Last_Access</span></div>
+        </div>
+        @for (var i = 0; i < SkeletonRowCount; i++)
+        {
+            <div class="file-skeleton-row" style="--skeleton-delay: @($"{i * 90}ms")">
+                <div class="col-name">
+                    <span class="skeleton-box skeleton-icon"></span>
+                    <span class="skeleton-box skeleton-bar" style="width: @(SkeletonNameWidths[i % SkeletonNameWidths.Length])"></span>
+                </div>
+                <div class="col-size"><span class="skeleton-box skeleton-bar" style="width: 46px"></span></div>
+                <div class="col-created"><span class="skeleton-box skeleton-bar" style="width: 74%"></span></div>
+                <div class="col-modified"><span class="skeleton-box skeleton-bar" style="width: 74%"></span></div>
+                <div class="col-lastaccess"><span class="skeleton-box skeleton-bar" style="width: 60%"></span></div>
+            </div>
+        }
     </div>
 }
 else if (VM.ErrorMessage is not null)

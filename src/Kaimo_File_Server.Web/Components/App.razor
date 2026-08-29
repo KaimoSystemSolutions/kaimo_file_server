@@ -18,6 +18,26 @@
     </script>
 </head>
 <body>
+    @* Custom, theme-aware reconnect dialog. Because an element with this id exists,
+       blazor.web.js drives THIS markup (toggling the components-reconnect-* state
+       classes and filling the attempt/max spans) instead of its built-in dialog,
+       which renders in a shadow root our theme styles cannot reach. *@
+    <div id="components-reconnect-modal" class="components-reconnect-hide">
+        <div class="reconnect-dialog" role="alertdialog" aria-live="assertive">
+            <div class="reconnect-spinner" aria-hidden="true"></div>
+            <p class="reconnect-text reconnect-text--reconnecting">
+                @R("Web_Reconnect_Reconnecting")
+                <span class="reconnect-attempt">
+                    @R("Web_Reconnect_AttemptLabel")
+                    <span id="components-reconnect-current-attempt">1</span>/<span id="components-reconnect-max-retries"></span>
+                </span>
+            </p>
+            <p class="reconnect-text reconnect-text--paused">@R("Web_Reconnect_Paused")</p>
+            <p class="reconnect-text reconnect-text--failed">@R("Web_Reconnect_Failed")</p>
+            <p class="reconnect-text reconnect-text--rejected">@R("Web_Reconnect_Rejected")</p>
+            <button type="button" class="reconnect-reload" onclick="location.reload()">@R("Web_Reconnect_Reload")</button>
+        </div>
+    </div>
     <Routes @rendermode="new InteractiveServerRenderMode(prerender: false)" />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="js/columnResize.js"></script>
@@ -31,3 +51,10 @@
     <script src="js/schedulePaint.js?v=2"></script>
 </body>
 </html>
+
+@code {
+    // New resource keys are resolved at runtime (no strongly-typed Designer.cs entry),
+    // matching how the rest of the app looks up recently added strings.
+    private static string R(string key)
+        => Kaimo_File_Server.Core.Language.Resources.ResourceManager.GetString(key) ?? key;
+}
