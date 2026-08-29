@@ -102,7 +102,7 @@ public sealed class CloudAccessViewModel
             var connectionUsageIds = GetDepartmentIds(usageScope, allDepartments);
             var shareIds = GetDepartmentIds(shareScope, allDepartments);
             ManageableDepartments = allDepartments.Where(x => connectionManagementIds.Contains(x.Id))
-                .OrderBy(x => x.Name).ToList();
+                .OrderByGlobalFirst().ToList();
             var visibleConnectionIds = connectionManagementIds.Concat(connectionUsageIds).ToHashSet();
             Connections = (await _connections.GetAllAsync())
                 .Where(x => visibleConnectionIds.Contains(x.DepartmentId)).ToList();

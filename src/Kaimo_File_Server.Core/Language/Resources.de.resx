@@ -1737,6 +1737,12 @@
   <data name="Web_Admin_Placeholder_ShareId" xml:space="preserve">
     <value>GUID der Freigabe</value>
   </data>
+  <data name="Web_Admin_Label_Share" xml:space="preserve">
+    <value>Freigabe</value>
+  </data>
+  <data name="Web_Admin_ShareScopeHint" xml:space="preserve">
+    <value>Im Freigabe-Geltungsbereich wirken nur Berechtigungen, die auf eine Freigabe anwendbar sind; system- und abteilungsbezogene Berechtigungen der Rolle bleiben hier ohne Wirkung.</value>
+  </data>
   <data name="Web_Common_Select" xml:space="preserve">
     <value>— Auswählen —</value>
   </data>
@@ -2405,6 +2411,7 @@
   <data name="Web_ExternalStorage_ReadOnly" xml:space="preserve"><value>Schreibgeschützt</value></data>
   <data name="Web_ExternalStorage_InvalidCredentials" xml:space="preserve"><value>Geben Sie einen gültigen Benutzernamen und ein Kennwort für diese Verbindung ein.</value></data>
   <data name="Web_ExternalStorage_SmbSharePickerHelp" xml:space="preserve"><value>Verfügbare SMB-Freigaben werden nach dem Verbinden geladen und können beim Einrichten einer Synchronisierung ausgewählt werden.</value></data>
+  <data name="Web_ExternalStorage_DepartmentRequiredHint" xml:space="preserve"><value>Ein Department ist erforderlich: Es bestimmt, wer diese Connection sehen, nutzen und verwalten kann. Wähle Global, um sie abteilungsübergreifend verfügbar zu machen.</value></data>
   <data name="Web_ExternalStorage_RuntimeIdentity" xml:space="preserve"><value>Netzwerkidentität der Laufzeit</value></data>
   <data name="Web_ExternalStorage_Auth_NetworkIdentity" xml:space="preserve"><value>Netzwerkidentität</value></data>
   <data name="Web_ExternalStorage_Capability_DirectFileAccess" xml:space="preserve"><value>Direkter Protokollzugriff</value></data>

@@ -16,6 +16,10 @@
                             </div>
                             @if (!VM.SelectedRole.IsSystemRole)
                             {
+                                <div class="form-group" style="margin-top: 16px;">
+                                    <label>@Resources.Web_Admin_Label_RoleName</label>
+                                    <input type="text" class="edit-input" @bind="VM.EditRoleName" @bind:event="oninput" />
+                                </div>
                                 <div class="detail-section" style="margin-top: 16px;">
 <span class="detail-label">@Resources.Web_Admin_Label_Permissions</span>
                                     <div class="permission-presets">
@@ -68,7 +72,7 @@
                             }
                             <div class="detail-actions">
                                 <button class="btn-primary" @onclick="SaveRole" disabled="@VM.IsSaving">
-                                    @(VM.IsSaving ? "Speichert…" : "Speichern")
+                                    @(VM.IsSaving ? Resources.Web_Common_Saving : Resources.Web_Common_Save)
                                 </button>
 <button class="btn-secondary" @onclick="CancelEdit" disabled="@VM.IsSaving">@Resources.Web_Common_Cancel</button>
                             </div>
@@ -126,10 +130,6 @@
                                         }
                                     </span>
                                 </div>
-                                <div class="detail-field">
-                                    <span class="detail-field-label">ID</span>
-                                    <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">@VM.SelectedRole.Id</span>
-                                </div>
                             </div>
 
                             <div class="detail-section" style="margin-top: 16px;">
@@ -153,7 +153,7 @@
                                 {
                                     <div class="assignment-form">
                                         <div class="form-group">
-                                            <label>Zuweisen an</label>
+                                            <label>@Resources.Web_Admin_AssignTo</label>
                                             <div class="toggle-button-group">
                                                 <button class="toggle-btn @(!VM.NewAssignmentPrincipalIsGroup ? "toggle-btn--active" : "")"
 @onclick="() => { VM.NewAssignmentPrincipalIsGroup = false; VM.NewAssignmentPrincipalId = null; }">@Resources.Web_Admin_Label_User</button>
@@ -164,7 +164,7 @@
                                         <div class="form-group">
 <label>@(VM.NewAssignmentPrincipalIsGroup ? Resources.Web_Admin_Label_Group : Resources.Web_Admin_Label_User)</label>
                                             <select class="edit-input" @bind="SelectedPrincipalIdString">
-                                                <option value="">— Auswählen —</option>
+                                                <option value="">@Resources.Web_Common_Select</option>
                                                 @if (VM.NewAssignmentPrincipalIsGroup)
                                                 {
                                                     @foreach (var g in VM.AllGroups) { <option value="@g.Id">@g.Name</option> }
@@ -176,11 +176,11 @@
                                             </select>
                                         </div>
                                         <div class="form-group">
-                                            <label>Geltungsbereich</label>
+                                            <label>@Resources.Web_Admin_Label_Scope</label>
                                             <select class="edit-input" @bind="SelectedScopeTypeString">
-                                                <option value="Global">Global (systemweit)</option>
+                                                <option value="Global">@Resources.Web_Admin_Scope_Global</option>
 <option value="Department">@Resources.Web_Admin_Scope_Department</option>
-                                                <option value="Share">Freigabe</option>
+                                                <option value="Share">@Resources.Web_Admin_Scope_Share</option>
                                             </select>
                                         </div>
                                         @if (VM.NewAssignmentScopeType == ScopeType.Department)
@@ -188,7 +188,7 @@
                                             <div class="form-group">
 <label>@Resources.Web_Admin_Label_Department</label>
                                                 <select class="edit-input" @bind="SelectedScopeIdString">
-                                                    <option value="">— Auswählen —</option>
+                                                    <option value="">@Resources.Web_Common_Select</option>
                                                     @foreach (var dept in VM.AllDepartments)
                                                     {
                                                         <option value="@dept.Id">@dept.Name</option>
@@ -199,9 +199,22 @@
                                         else if (VM.NewAssignmentScopeType == ScopeType.Share)
                                         {
                                             <div class="form-group">
-                                                <label>Freigabe-ID</label>
-                                                <input type="text" class="edit-input" placeholder="GUID der Freigabe"
-                                                       @bind="ShareScopeIdInput" @bind:event="oninput" />
+                                                <label>@Resources.Web_Admin_Label_Share</label>
+                                                <select class="edit-input" @bind="SelectedScopeIdString">
+                                                    <option value="">@Resources.Web_Common_Select</option>
+                                                    @foreach (var share in VM.AllShares)
+                                                    {
+                                                        <option value="@share.Id">@share.Name</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="detail-info" style="margin-top: 4px;">
+                                                @Icons.SVG("circle_info.svg", new SvgOptions(
+                                                        Width: 14,
+                                                        Height: 14,
+                                                        Color: "var(--text-tertiary)"
+                                                    ))
+                                                <span>@Resources.Web_Admin_ShareScopeHint</span>
                                             </div>
                                         }
                                         @if (VM.ErrorMessage is not null)
@@ -210,7 +223,7 @@
                                         }
                                         <div class="create-form-actions" style="margin-top: 8px;">
                                             <button class="btn-primary" @onclick="CreateAssignment" disabled="@VM.IsSaving">
-                                                @(VM.IsSaving ? "Erstellt…" : "Zuweisen")
+                                                @(VM.IsSaving ? Resources.Web_Common_Saving : Resources.Web_Common_Assign)
                                             </button>
 <button class="btn-secondary" @onclick="() => VM.CancelAddAssignment()">@Resources.Web_Common_Cancel</button>
                                         </div>
@@ -229,7 +242,7 @@
                                                 </div>
                                                 @if (VM.CanManageRoles)
                                                 {
-                                                    <button class="btn-icon btn-icon--small" title="Entfernen"
+                                                    <button class="btn-icon btn-icon--small" title="@Resources.Web_Admin_RemoveAssignment"
                                                             @onclick="() => DeleteAssignment(a.AssignmentId)">
                                                         @Icons.SVG("cross.svg", new SvgOptions(
                                                                 Width: 14,
@@ -264,7 +277,7 @@
                                             <div style="display: flex; gap: 8px;">
                                                 <button class="btn-danger-outline" @onclick="ConfirmDeleteRole" disabled="@VM.IsSaving">
 
-                                                    @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
+                                                    @(VM.IsSaving ? Resources.Web_Common_Deleting : Resources.Web_Admin_DeleteRole)
                                                 </button>
 <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">@Resources.Web_Common_Cancel</button>
                                             </div>
@@ -285,7 +298,6 @@
     private string SelectedPrincipalIdString { get => VM.NewAssignmentPrincipalId?.ToString() ?? ""; set => VM.NewAssignmentPrincipalId = Guid.TryParse(value, out var id) ? id : null; }
     private string SelectedScopeTypeString { get => VM.NewAssignmentScopeType.ToString(); set { VM.NewAssignmentScopeType = Enum.TryParse<ScopeType>(value, out var st) ? st : ScopeType.Global; VM.NewAssignmentScopeId = null; } }
     private string SelectedScopeIdString { get => VM.NewAssignmentScopeId?.ToString() ?? ""; set => VM.NewAssignmentScopeId = Guid.TryParse(value, out var id) ? id : null; }
-    private string ShareScopeIdInput { get => VM.NewAssignmentScopeId?.ToString() ?? ""; set => VM.NewAssignmentScopeId = Guid.TryParse(value, out var id) ? id : null; }
     private async Task EditRole() { await VM.StartEditRoleAsync(); StateHasChanged(); }
     private async Task SaveRole() { await VM.SaveRoleAsync(); await OnChanged.InvokeAsync(); }
     private void CancelEdit() { VM.CancelEdit(); StateHasChanged(); }

@@ -49,6 +49,10 @@ else
                 <label><span>@R("Web_CloudAccess_Provider")</span><select class="edit-input" @bind="_provider" @bind:after="ProviderChanged">@foreach (var provider in CreatableProviders) { <option value="@provider.Id">@provider.DisplayName</option> }</select></label>
                 <label><span>@R("Web_CloudAccess_ConnectionName")</span><input class="edit-input" maxlength="200" @bind="_name" /></label>
                 <label><span>@R("Web_CloudAccess_Department")</span><select class="edit-input" @bind="_departmentId"><option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>@foreach (var department in VM.ManageableDepartments) { <option value="@department.Id">@department.Name</option> }</select></label>
+                @if (_departmentId == Guid.Empty)
+                {
+                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_DepartmentRequiredHint")</p>
+                }
                 @if (IsSmbProvider)
                 {
                     <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="192.168.1.10" @bind="_server" /></label>

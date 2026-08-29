@@ -472,9 +472,10 @@
     background: var(--bg-secondary);
 }
 
-/* The group picker sits near the bottom of the edit form. Open it upward so
-   the workspace boundary never clips the final options. */
-.entity-detail ::deep .user-group-select .multi-select-dropdown {
+/* The group and role pickers sit near the bottom of the edit form. Open them
+   upward so the workspace boundary never clips the final options. */
+.entity-detail ::deep .user-group-select .multi-select-dropdown,
+.entity-detail ::deep .user-role-select .multi-select-dropdown {
     top: auto;
     bottom: calc(100% + 4px);
 }

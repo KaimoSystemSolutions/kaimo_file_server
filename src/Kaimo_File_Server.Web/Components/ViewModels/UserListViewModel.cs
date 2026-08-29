@@ -151,6 +151,7 @@ public class UserListViewModel
     public List<CheckboxItem<User>> EditGroupMembers { get; private set; } = [];
 
     // -- Role-Edit --
+    public string EditRoleName { get; set; } = "";
     public ManagementPermission EditRolePermissions { get; set; } = ManagementPermission.None;
 
     // -- Create User --
@@ -184,6 +185,11 @@ public class UserListViewModel
     public bool NewAssignmentPrincipalIsGroup { get; set; }
     public List<User> AllUsers { get; private set; } = [];
     public List<Group> AllGroups { get; private set; } = [];
+
+    /// <summary>All shares, offered in the scope selector when assigning a role at Share scope.
+    /// A share's GUID is not something an operator knows by heart, so the picker lists shares
+    /// by name rather than asking for a raw identifier.</summary>
+    public List<ShareDefinition> AllShares { get; private set; } = [];
 
     // ══════════════════════════════════════════
     //  Computed
@@ -312,7 +318,7 @@ public class UserListViewModel
                 return;
             }
 
-            AllDepartments = (await _departmentRepo.GetAllAsync()).OrderBy(d => d.Name).ToList();
+            AllDepartments = (await _departmentRepo.GetAllAsync()).OrderByGlobalFirst().ToList();
 
             await ResolveActorPermissionsAsync();
 
@@ -415,7 +421,8 @@ public class UserListViewModel
 
     private async Task<List<Department>> LoadDepartmentsFromScopeResultAsync(AuthorizedScopeResult result)
     {
-        if (result.IsUnrestricted) return await _departmentRepo.GetAllAsync();
+        if (result.IsUnrestricted)
+            return (await _departmentRepo.GetAllAsync()).OrderByGlobalFirst().ToList();
         if (result.ScopeIds.Count == 0) return [];
         return await LoadDepartmentsByIdsAsync(result.ScopeIds.ToList());
     }
@@ -424,7 +431,7 @@ public class UserListViewModel
     {
         if (ids.Count == 0) return [];
         var all = await _departmentRepo.GetAllAsync();
-        return all.Where(d => ids.Contains(d.Id)).OrderBy(d => d.Name).ToList();
+        return all.Where(d => ids.Contains(d.Id)).OrderByGlobalFirst().ToList();
     }
 
     // ══════════════════════════════════════════
@@ -692,6 +699,7 @@ public class UserListViewModel
         IsEditing = true;
         ErrorMessage = null; SuccessMessage = null;
 
+        EditRoleName = SelectedRole.Name;
         EditRolePermissions = SelectedRole.ManagementPermissions;
     }
 
@@ -718,6 +726,12 @@ public class UserListViewModel
             return;
         }
 
+        if (!SelectedRole.IsSystemRole && string.IsNullOrWhiteSpace(EditRoleName))
+        {
+            ErrorMessage = Resources.Web_Role_NameRequired;
+            return;
+        }
+
         try
         {
             IsSaving = true;
@@ -725,8 +739,12 @@ public class UserListViewModel
 
             if (!SelectedRole.IsSystemRole)
             {
-                SelectedRole.ManagementPermissions = EditRolePermissions;
-                await _roleRepo.UpdateAsync(SelectedRole);
+                // Role.Name is init-only, so a rename is applied by persisting a fresh
+                // aggregate carrying the same identity, system flag and (edited) permissions.
+                var renamed = new Role(
+                    SelectedRole.Id, EditRoleName.Trim(),
+                    EditRolePermissions, SelectedRole.IsSystemRole);
+                await _roleRepo.UpdateAsync(renamed);
             }
 
             var refreshed = await _roleRepo.GetByIdAsync(SelectedRole.Id);
@@ -768,6 +786,7 @@ public class UserListViewModel
     {
         AllUsers = (await _userRepo.GetAllAsync()).OrderBy(u => u.Name).ToList();
         AllGroups = (await _groupRepo.GetAllAsync()).OrderBy(g => g.Name).ToList();
+        AllShares = (await _shareRepo.GetAllAsync()).OrderBy(s => s.Name).ToList();
     }
 
     public async Task CreateAssignmentAsync()
@@ -1166,6 +1185,7 @@ public class UserListViewModel
         var deptLookup = AllDepartments.ToDictionary(d => d.Id);
         var roles = await _roleRepo.GetAllAsync();
         var roleLookup = roles.ToDictionary(r => r.Id);
+        var shareLookup = (await _shareRepo.GetAllAsync()).ToDictionary(s => s.Id);
 
         var items = new List<ScopedAssignmentDisplayItem>();
 
@@ -1186,7 +1206,8 @@ public class UserListViewModel
                 ScopeType.Global => "Global",
                 ScopeType.Department => deptLookup.TryGetValue(a.ScopeId, out var dept)
                     ? dept.Name : a.ScopeId.ToString(),
-                ScopeType.Share => $"Share: {a.ScopeId}",
+                ScopeType.Share => shareLookup.TryGetValue(a.ScopeId, out var share)
+                    ? share.Name : a.ScopeId.ToString(),
                 _ => a.ScopeId.ToString()
             };
 

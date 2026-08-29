@@ -26,7 +26,7 @@
                             }
                             <div class="detail-actions">
                                 <button class="btn-primary" @onclick="SaveGroup" disabled="@VM.IsSaving">
-                                    @(VM.IsSaving ? "Speichert…" : "Speichern")
+                                    @(VM.IsSaving ? Resources.Web_Common_Saving : Resources.Web_Common_Save)
                                 </button>
 <button class="btn-secondary" @onclick="CancelEdit" disabled="@VM.IsSaving">@Resources.Web_Common_Cancel</button>
                             </div>
@@ -49,10 +49,6 @@
 @(VM.GroupMembers.Any() ? Format(VM.GroupMembers.Select(u => u.Name), 5) : Resources.Web_Common_NoMembers)
                                     </span>
                                 </div>
-                                <div class="detail-field">
-                                    <span class="detail-field-label">ID</span>
-                                    <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">@VM.SelectedGroup.Id</span>
-                                </div>
                             </div>
                             <div class="detail-actions">
                                 @if (VM.CanManageGroups)
@@ -67,7 +63,7 @@
 <p>@Resources.Web_Admin_ConfirmDeleteGroup</p>
                                             <div style="display: flex; gap: 8px;">
                                                 <button class="btn-danger-outline" @onclick="ConfirmDeleteGroup" disabled="@VM.IsSaving">
-                                                    @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
+                                                    @(VM.IsSaving ? Resources.Web_Common_Deleting : Resources.Web_Admin_DeleteGroup)
                                                 </button>
 <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">@Resources.Web_Common_Cancel</button>
                                             </div>

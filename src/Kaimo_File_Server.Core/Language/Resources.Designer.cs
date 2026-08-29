@@ -1067,7 +1067,25 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Admin_Label_ShareId", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Share ähnelt.
+        /// </summary>
+        public static string Web_Admin_Label_Share {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Share", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die den Freigabe-Geltungsbereich-Hinweis ähnelt.
+        /// </summary>
+        public static string Web_Admin_ShareScopeHint {
+            get {
+                return ResourceManager.GetString("Web_Admin_ShareScopeHint", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Status ähnelt.
         /// </summary>

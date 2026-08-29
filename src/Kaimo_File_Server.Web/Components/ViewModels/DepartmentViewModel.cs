@@ -183,7 +183,7 @@ public class DepartmentViewModel
         if (IsGlobalAdmin)
         {
             Departments = (await _departmentRepo.GetAllAsync())
-                .OrderBy(d => d.Name).ToList();
+                .OrderByGlobalFirst().ToList();
         }
         else
         {
@@ -192,12 +192,12 @@ public class DepartmentViewModel
 
             if (result.IsUnrestricted)
                 Departments = (await _departmentRepo.GetAllAsync())
-                    .OrderBy(d => d.Name).ToList();
+                    .OrderByGlobalFirst().ToList();
             else
             {
                 var all = await _departmentRepo.GetAllAsync();
                 Departments = all.Where(d => result.ScopeIds.Contains(d.Id))
-                    .OrderBy(d => d.Name).ToList();
+                    .OrderByGlobalFirst().ToList();
             }
         }
     }
@@ -299,7 +299,7 @@ public class DepartmentViewModel
         descendantIds.Add(Selected.Id);
         AvailableParents = allDepts
             .Where(d => !descendantIds.Contains(d.Id))
-            .OrderBy(d => d.Name).ToList();
+            .OrderByGlobalFirst().ToList();
 
         // Members (M:N — DepartmentUser)
         var allUsers = (await _userRepo.GetAllAsync()).OrderBy(u => u.Name).ToList();

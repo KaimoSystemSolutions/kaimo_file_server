@@ -1737,6 +1737,12 @@
   <data name="Web_Admin_Placeholder_ShareId" xml:space="preserve">
     <value>GUID of the share</value>
   </data>
+  <data name="Web_Admin_Label_Share" xml:space="preserve">
+    <value>Share</value>
+  </data>
+  <data name="Web_Admin_ShareScopeHint" xml:space="preserve">
+    <value>Only permissions that apply to a share take effect at share scope; system- and department-level permissions of the role are ignored here.</value>
+  </data>
   <data name="Web_Common_Select" xml:space="preserve">
     <value>— Select —</value>
   </data>
@@ -2428,6 +2434,7 @@
   <data name="Web_ExternalStorage_ReadOnly" xml:space="preserve"><value>Read only</value></data>
   <data name="Web_ExternalStorage_InvalidCredentials" xml:space="preserve"><value>Enter a valid username and password for this connection.</value></data>
   <data name="Web_ExternalStorage_SmbSharePickerHelp" xml:space="preserve"><value>Available SMB shares are loaded after connecting and can be selected when configuring a sync.</value></data>
+  <data name="Web_ExternalStorage_DepartmentRequiredHint" xml:space="preserve"><value>A department is required: it controls who can see, use, and manage this connection. Choose Global to make it available across all departments.</value></data>
   <data name="Web_ExternalStorage_RuntimeIdentity" xml:space="preserve"><value>Runtime network identity</value></data>
   <data name="Web_ExternalStorage_Auth_NetworkIdentity" xml:space="preserve"><value>Network identity</value></data>
   <data name="Web_ExternalStorage_Capability_DirectFileAccess" xml:space="preserve"><value>Direct protocol access</value></data>
