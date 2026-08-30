@@ -1,0 +1,172 @@
+@using System.Security.Cryptography
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+@inject IJSRuntime JS
+
+@*
+    Compact "Create hash" dialog for a single file. Opened from the file-browser
+    context menu via <see cref="Open" />. A dropdown selects the hash algorithm
+    (SHA-256 is the default, being the most common file checksum); the digest is
+    recomputed on every change and cached per algorithm so re-selecting one that was
+    already computed is instant. Hashing streams the file server-side (see
+    IFileBrowserViewModel.ComputeFileHashAsync), so it is only offered on local shares.
+*@
+@if (_show && _target is not null)
+{
+    <div class="modal-backdrop" @onclick="Close">
+        <div class="properties-dialog hash-dialog" @onclick:stopPropagation="true">
+
+            <div class="properties-header">
+                <span class="properties-header-icon">
+                    @Assets.SVG("hash.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)"))
+                </span>
+                <span class="properties-header-name" title="@_target.Name">@_target.Name</span>
+                <button class="btn-icon" title="@Resources.Web_Button_Close" @onclick="Close">
+                    @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                </button>
+            </div>
+
+            <div class="properties-body hash-body">
+                <label class="hash-field-label" for="hash-algo">@Resources.Web_Hash_Algorithm</label>
+                <select id="hash-algo" class="edit-input"
+                        value="@_algorithm.Name"
+                        @onchange="OnAlgorithmChanged">
+                    @foreach (var algo in Algorithms)
+                    {
+                        <option value="@algo.Name">@algo.Name</option>
+                    }
+                </select>
+
+                <label class="hash-field-label" for="hash-value">@Resources.Web_Hash_Value</label>
+                <div class="hash-value-row">
+                    <textarea id="hash-value" class="edit-input properties-mono hash-value" readonly rows="2"
+                              >@HashDisplay()</textarea>
+                    <button class="btn-secondary hash-copy" type="button"
+                            disabled="@(_hash is null)" @onclick="CopyAsync">
+                        @(_copied ? Resources.Web_Hash_Copied : Resources.Web_Hash_Copy)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IFileBrowserViewModel VM { get; set; } = default!;
+
+    // Offered algorithms — the common file-integrity checksums. SHA-256 is the default.
+    private static readonly HashAlgorithmName[] Algorithms =
+    {
+        HashAlgorithmName.SHA256, HashAlgorithmName.SHA1, HashAlgorithmName.SHA512,
+        HashAlgorithmName.MD5, HashAlgorithmName.SHA384,
+    };
+
+    private bool _show;
+    public bool IsOpen => _show;
+    private FileMetadata? _target;
+    private HashAlgorithmName _algorithm = HashAlgorithmName.SHA256;
+    private string? _hash;
+    private bool _computing;
+    private bool _error;
+    private bool _copied;
+
+    // Per-algorithm cache for the current file so re-selecting is instant.
+    private readonly Dictionary<string, string> _cache = new();
+    // Bumped on every open/change so a slow hash from a previous target/algorithm
+    // can't overwrite the current display when it finally returns.
+    private int _generation;
+
+    public async Task Open(FileMetadata target)
+    {
+        _target = target;
+        _algorithm = HashAlgorithmName.SHA256;
+        _cache.Clear();
+        _hash = null;
+        _error = false;
+        _copied = false;
+        _show = true;
+        await Compute();
+    }
+
+    public void Close()
+    {
+        _show = false;
+        _target = null;
+        _generation++;
+        StateHasChanged();
+    }
+
+    private async Task OnAlgorithmChanged(ChangeEventArgs e)
+    {
+        _algorithm = new HashAlgorithmName(e.Value?.ToString());
+        _copied = false;
+        await Compute();
+    }
+
+    private async Task Compute()
+    {
+        var target = _target;
+        if (target is null) return;
+
+        var generation = ++_generation;
+        var key = _algorithm.Name!;
+
+        if (_cache.TryGetValue(key, out var cached))
+        {
+            _hash = cached;
+            _error = false;
+            StateHasChanged();
+            return;
+        }
+
+        _hash = null;
+        _error = false;
+        _computing = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await VM.ComputeFileHashAsync(target, _algorithm);
+            if (generation != _generation) return; // superseded by a newer request
+
+            if (result is null)
+            {
+                _error = true;
+            }
+            else
+            {
+                _cache[key] = result;
+                _hash = result;
+            }
+        }
+        catch
+        {
+            if (generation == _generation) _error = true;
+        }
+        finally
+        {
+            if (generation == _generation)
+            {
+                _computing = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private string HashDisplay()
+    {
+        if (_computing) return Resources.Web_Hash_Computing;
+        if (_error) return Resources.Web_Hash_Error;
+        return _hash ?? "";
+    }
+
+    private async Task CopyAsync()
+    {
+        if (_hash is null) return;
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", _hash);
+        _copied = true;
+        StateHasChanged();
+    }
+}

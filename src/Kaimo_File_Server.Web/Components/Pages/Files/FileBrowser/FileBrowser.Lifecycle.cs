@@ -351,6 +351,10 @@ public partial class FileBrowser
     public async Task OpenPropertiesDialog(FileMetadata item)
         => await _propertiesDialogComponent.Open(item);
 
+    /// <summary>Opens the "create hash" dialog for a single file.</summary>
+    public async Task OpenHashDialog(FileMetadata item)
+        => await _hashDialogComponent.Open(item);
+
     /// <summary>After a restore the live file changed — reload the listing.</summary>
     private async Task OnVersionRestored()
     {

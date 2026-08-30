@@ -1989,6 +1989,27 @@
   <data name="Context_Menu_Properties" xml:space="preserve">
     <value>Properties</value>
   </data>
+  <data name="Context_Menu_CreateHash" xml:space="preserve">
+    <value>Create hash</value>
+  </data>
+  <data name="Web_Hash_Algorithm" xml:space="preserve">
+    <value>Algorithm</value>
+  </data>
+  <data name="Web_Hash_Value" xml:space="preserve">
+    <value>Hash value</value>
+  </data>
+  <data name="Web_Hash_Computing" xml:space="preserve">
+    <value>Computing…</value>
+  </data>
+  <data name="Web_Hash_Error" xml:space="preserve">
+    <value>Could not compute the hash.</value>
+  </data>
+  <data name="Web_Hash_Copied" xml:space="preserve">
+    <value>Copied</value>
+  </data>
+  <data name="Web_Hash_Copy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
   <data name="Web_Properties_Tab_General" xml:space="preserve">
     <value>General</value>
   </data>

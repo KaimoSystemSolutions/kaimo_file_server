@@ -16,6 +16,7 @@ using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Core.Language;
 using System.Diagnostics;
+using System.Security.Cryptography;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -700,6 +701,29 @@ public class FileBrowserViewModel : IFileBrowserViewModel
         var ticket = _downloadTickets.Issue(new FileDownloadTicket(
             CurrentShare.Id, userContext.User.Id, relative, file.Name));
         return "/api/files/download?ticket=" + Uri.EscapeDataString(ticket);
+    }
+
+    /// <summary>
+    /// Hashes a file's content with the requested algorithm, streaming it through the
+    /// hasher so files of any size stay off the heap. Returns the lowercase hex digest.
+    /// </summary>
+    public async Task<string?> ComputeFileHashAsync(
+        FileMetadata file, HashAlgorithmName algorithm, CancellationToken cancellationToken = default)
+    {
+        if (_fileService is null || CurrentShare is null || file.IsDirectory) return null;
+
+        var userContext = await GetCurrentUserContextAsync();
+        if (userContext is null) return null;
+
+        await using var stream = await _fileService.ReadFileAsync(ToShareRelative(file.Path), userContext);
+        using var hasher = IncrementalHash.CreateHash(algorithm);
+
+        var buffer = new byte[81920];
+        int read;
+        while ((read = await stream.ReadAsync(buffer, cancellationToken)) > 0)
+            hasher.AppendData(buffer, 0, read);
+
+        return Convert.ToHexString(hasher.GetHashAndReset()).ToLowerInvariant();
     }
 
     // ==================== Versioning ====================

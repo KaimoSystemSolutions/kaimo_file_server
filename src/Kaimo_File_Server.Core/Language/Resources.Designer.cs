@@ -149,6 +149,69 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Context_Menu_Properties", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Create hash ähnelt.
+        /// </summary>
+        public static string Context_Menu_CreateHash {
+            get {
+                return ResourceManager.GetString("Context_Menu_CreateHash", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Algorithm ähnelt.
+        /// </summary>
+        public static string Web_Hash_Algorithm {
+            get {
+                return ResourceManager.GetString("Web_Hash_Algorithm", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Hash value ähnelt.
+        /// </summary>
+        public static string Web_Hash_Value {
+            get {
+                return ResourceManager.GetString("Web_Hash_Value", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Computing… ähnelt.
+        /// </summary>
+        public static string Web_Hash_Computing {
+            get {
+                return ResourceManager.GetString("Web_Hash_Computing", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Could not compute the hash. ähnelt.
+        /// </summary>
+        public static string Web_Hash_Error {
+            get {
+                return ResourceManager.GetString("Web_Hash_Error", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Copied ähnelt.
+        /// </summary>
+        public static string Web_Hash_Copied {
+            get {
+                return ResourceManager.GetString("Web_Hash_Copied", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Copy ähnelt.
+        /// </summary>
+        public static string Web_Hash_Copy {
+            get {
+                return ResourceManager.GetString("Web_Hash_Copy", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Refresh ähnelt.

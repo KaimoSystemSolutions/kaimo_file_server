@@ -1738,6 +1738,43 @@ html, body, #app {
     color: var(--text-secondary) !important;
 }
 
+/* Create-hash dialog */
+.hash-dialog {
+    width: 460px;
+}
+
+.hash-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.hash-field-label {
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+.hash-field-label:not(:first-child) {
+    margin-top: 10px;
+}
+
+.hash-value-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.hash-value {
+    flex: 1;
+    resize: none;
+    word-break: break-all;
+    cursor: text;
+}
+
+.hash-copy {
+    flex-shrink: 0;
+}
+
 /* ══════════════════════════════════════════════════════════
    ACL Editor
    ══════════════════════════════════════════════════════════ */

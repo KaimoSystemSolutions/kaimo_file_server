@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Web.Helpers;
 
@@ -50,6 +51,15 @@ public interface IFileBrowserViewModel
     string ShareRelativeOf(FileMetadata item);
 
     Task<string?> GetDownloadUrlAsync(FileMetadata file)
+        => Task.FromResult<string?>(null);
+
+    /// <summary>
+    /// Streams the file through the given hash algorithm and returns the hex digest,
+    /// or null when the backend cannot read file content. Not size-capped — the file
+    /// is hashed in a streaming pass, never buffered whole.
+    /// </summary>
+    Task<string?> ComputeFileHashAsync(
+        FileMetadata file, HashAlgorithmName algorithm, CancellationToken cancellationToken = default)
         => Task.FromResult<string?>(null);
 
     Task LoadAclCountsAsync() => Task.CompletedTask;

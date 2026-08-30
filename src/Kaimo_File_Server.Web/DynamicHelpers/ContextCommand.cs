@@ -70,8 +70,8 @@ public static class ContextCommandCatalog
         new ContextCommand("download", () => Resources.Context_Menu_Download, "download.svg",
             ValidScopes: DownloadableFiles),
 
-        new ContextCommand("sync", () => "Sync", "arrow_right.svg",
-            ValidScopes: new [] { ContextMenuScope.Folder}),
+        new ContextCommand("hash", () => Resources.Context_Menu_CreateHash, "hash.svg",
+            ValidScopes: DownloadableFiles),
 
         new ContextCommand("extract", () => Resources.Context_Menu_Extract, "file_zip.svg",
             ValidScopes: new[] { ContextMenuScope.Archive, ContextMenuScope.MultiSelection }),

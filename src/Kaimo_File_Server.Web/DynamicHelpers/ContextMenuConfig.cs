@@ -27,7 +27,7 @@ public class ContextMenuConfig
     /// </summary>
     public static readonly IReadOnlyList<string> DefaultOrder = new[]
     {
-        "open", "download", "sync", "extract", "compress.zip", "compress.targz",
+        "open", "download", "hash", "extract", "compress.zip", "compress.targz",
         "rename", "versions", "delete", "permissions", "properties",
         "newfolder", "refresh",
     };
@@ -60,16 +60,16 @@ public class ContextMenuConfig
         ContextMenuScope.Background => new() { "newfolder", "refresh" },
 
         ContextMenuScope.Folder => new()
-            { "open", "sync", "compress.zip", "compress.targz", "rename", "versions", "delete", "permissions", "properties", "newfolder", "refresh" },
+            { "open", "compress.zip", "compress.targz", "rename", "versions", "delete", "permissions", "properties", "newfolder", "refresh" },
 
         ContextMenuScope.Archive => new()
-            { "open", "download", "extract", "rename", "versions", "delete", "permissions", "properties", "newfolder", "refresh" },
+            { "open", "download", "hash", "extract", "rename", "versions", "delete", "permissions", "properties", "newfolder", "refresh" },
 
         ContextMenuScope.MultiSelection => new()
             { "extract", "compress.zip", "compress.targz", "delete", "newfolder", "refresh" },
 
         // Image / Video / Audio / Document / OtherFile share the regular-file layout.
         _ => new()
-            { "open", "download", "compress.zip", "compress.targz", "rename", "versions", "delete", "permissions", "properties", "newfolder", "refresh" },
+            { "open", "download", "hash", "compress.zip", "compress.targz", "rename", "versions", "delete", "permissions", "properties", "newfolder", "refresh" },
     };
 }

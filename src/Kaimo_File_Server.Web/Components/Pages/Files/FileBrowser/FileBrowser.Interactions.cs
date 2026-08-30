@@ -41,6 +41,7 @@ public partial class FileBrowser
     private ContextMenu _contextMenuComponent = default!;
     private VersionDialog _versionDialogComponent = default!;
     private PropertiesDialog _propertiesDialogComponent = default!;
+    private HashDialog _hashDialogComponent = default!;
 
     private ElementReference _fileDropZone;
     private bool _jsInitialized = false;
@@ -171,7 +172,8 @@ public partial class FileBrowser
     {
         if (_showCreateFolder || _showDeleteConfirm || _showRenameDialog || _showCloudToLocal ||
             _filePreviewComponent?.IsOpen == true || _versionDialogComponent?.IsOpen == true ||
-            _propertiesDialogComponent?.IsOpen == true || _contextMenuComponent?.IsOpen == true)
+            _propertiesDialogComponent?.IsOpen == true || _hashDialogComponent?.IsOpen == true ||
+            _contextMenuComponent?.IsOpen == true)
         {
             return Task.CompletedTask;
         }

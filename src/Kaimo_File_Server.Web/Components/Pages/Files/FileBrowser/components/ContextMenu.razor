@@ -118,9 +118,10 @@
                 => FileBrowser.VM.Capabilities.CanExtract
                    && selected.All(f => !f.IsDirectory && FileHelper.IsArchive(f.Name)),
             "extract" => FileBrowser.VM.Capabilities.CanExtract,
-                
-            "sync" when scope == ContextMenuScope.Folder => FileBrowser.CanManageSyncs(),
-            
+
+            // Hashing streams the file server-side — only local shares can read content.
+            "hash" => FileBrowser.VM.CurrentShare is not null,
+
             _ => true,
         };
 
@@ -135,6 +136,9 @@
 
         "download"
             => async () => {  CloseContextMenu(); await FileBrowser.DownloadFileAsync(target!); },
+
+        "hash"
+            => async () => {  CloseContextMenu(); await FileBrowser.OpenHashDialog(target!); },
 
 
         "extract" when scope == ContextMenuScope.MultiSelection
@@ -166,10 +170,7 @@
             => async () => { foreach (var item in selected) await ContextDelete(item); },
         "delete"
             => async () => { await ContextDelete(target!); },
-        
-        "sync" when scope == ContextMenuScope.Folder && FileBrowser.CanManageSyncs()
-            => async () => { CloseContextMenu(); await FileBrowser.OpenSyncDialog(selected.Single()); },
-        
+
         "permissions" => () => { ContextAcl(target!); return Task.CompletedTask; },
 
         "properties" => async () => { CloseContextMenu(); await FileBrowser.OpenPropertiesDialog(target!); },
