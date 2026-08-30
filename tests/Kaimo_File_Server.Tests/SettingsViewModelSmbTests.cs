@@ -330,6 +330,15 @@ public class SettingsViewModelSmbTests
                 .ReturnsAsync(true);
             Config.Setup(c => c.GetAsync(SmbProtocolSettings.ConfigKey, It.IsAny<SmbProtocolSettings>()))
                 .ReturnsAsync(storedProtocol);
+            // The CanManageSettings branch of LoadAsync reads these; unstubbed they
+            // return null and blow up before RefreshSystemInfo runs. Echo the fallback,
+            // matching the real repo when no value is stored.
+            Config.Setup(c => c.GetAsync(
+                    Kaimo_File_Server.Web.DynamicHelpers.ContextMenuConfig.ConfigKey,
+                    It.IsAny<Kaimo_File_Server.Web.DynamicHelpers.ContextMenuConfig>()))
+                .ReturnsAsync((string _, Kaimo_File_Server.Web.DynamicHelpers.ContextMenuConfig fb) => fb);
+            Config.Setup(c => c.GetAsync(PasswordPolicy.ConfigKey, It.IsAny<PasswordPolicy>()))
+                .ReturnsAsync((string _, PasswordPolicy fb) => fb);
             Config.Setup(c => c.GetFreshAsync(It.IsAny<string>(), It.IsAny<string>()))
                 .ReturnsAsync("Running");
             Config.Setup(c => c.SetAsync(SmbProtocolSettings.ConfigKey, It.IsAny<SmbProtocolSettings>()))
