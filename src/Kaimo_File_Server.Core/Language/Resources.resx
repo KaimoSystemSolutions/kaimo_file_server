@@ -273,6 +273,12 @@
   <data name="Web_Rename_Placeholder" xml:space="preserve">
     <value>New name…</value>
   </data>
+  <data name="Web_Common_Renaming" xml:space="preserve">
+    <value>Renaming…</value>
+  </data>
+  <data name="Web_Rename_Success" xml:space="preserve">
+    <value>Renamed</value>
+  </data>
   <data name="Web_Acl_ShareRoot" xml:space="preserve">
     <value>(Share Root)</value>
   </data>

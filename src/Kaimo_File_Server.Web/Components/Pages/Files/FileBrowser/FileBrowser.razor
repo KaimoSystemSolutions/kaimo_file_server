@@ -137,6 +137,7 @@
 @* -- Dialog: Create new folder -- *@
 @if (_showCreateFolder)
 {
+    var createFolderError = LiveNameError(_newFolderName, null);
     <div class="modal-backdrop" @onkeydown="OnCreateFolderKeyDown" tabindex="0">
         <div class="modal-dialog" @onclick:stopPropagation="true">
             <h3 class="modal-title">@Resources.Web_CreateFolder_Title</h3>
@@ -144,14 +145,14 @@
                    @bind="_newFolderName" @bind:event="oninput"
                    @onkeydown="OnCreateFolderKeyDown"
                    @onkeydown:stopPropagation="true"/>
-            @if (_createFolderError is not null)
+            @if (createFolderError is not null)
             {
-                <div class="modal-error">@_createFolderError</div>
+                <div class="modal-error">@createFolderError</div>
             }
             <div class="modal-actions">
                 <button class="btn btn-secondary" @onclick="CancelCreateFolder">@Resources.Web_Button_Cancel</button>
                 <button class="btn btn-primary" @onclick="ConfirmCreateFolder"
-                        disabled="@string.IsNullOrWhiteSpace(_newFolderName)">
+                        disabled="@(createFolderError is not null || string.IsNullOrWhiteSpace(_newFolderName))">
                     @Resources.Web_Button_Create
                 </button>
             </div>
@@ -160,6 +161,8 @@
 }
 
 @* -- Dialog: confirm deletion -- *@
+
+
 @if (_showDeleteConfirm)
 {
     <div class="modal-backdrop" @onclick="CancelDelete" @onkeydown="OnDeleteKeyDown" tabindex="0"
@@ -199,6 +202,7 @@
         </div>
     </div>
 }
+
 
 @if (_showCloudToLocal)
 {
@@ -485,21 +489,24 @@ else
 @* -- Dialog: Rename -- *@
 @if (_showRenameDialog)
 {
-    <div class="modal-backdrop" @onclick="CancelRename">
+    var renameError = LiveNameError(_renameNewName, _renameTarget);
+    <div class="modal-backdrop" @onclick="CancelRename" @onkeydown="OnRenameKeyDown" tabindex="0"
+         @ref="_renameModalRef">
         <div class="modal-dialog" @onclick:stopPropagation="true">
             <h3 class="modal-title">@Resources.Web_Action_Rename</h3>
             <input id="rename-input" class="modal-input" type="text"
                    placeholder="@Resources.Web_Rename_Placeholder"
                    @bind="_renameNewName" @bind:event="oninput"
-                   @onkeydown="OnRenameKeyDown"/>
-            @if (_renameError is not null)
+                   @onkeydown="OnRenameKeyDown"
+                   @onkeydown:stopPropagation="true"/>
+            @if (renameError is not null)
             {
-                <div class="modal-error">@_renameError</div>
+                <div class="modal-error">@renameError</div>
             }
             <div class="modal-actions">
                 <button class="btn btn-secondary" @onclick="CancelRename">@Resources.Web_Button_Cancel</button>
                 <button class="btn btn-primary" @onclick="ConfirmRename"
-                        disabled="@string.IsNullOrWhiteSpace(_renameNewName)">
+                        disabled="@(renameError is not null || string.IsNullOrWhiteSpace(_renameNewName))">
                     @Resources.Web_Action_Rename
                 </button>
             </div>

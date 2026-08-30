@@ -26,7 +26,6 @@ public partial class FileBrowser
     private string _aclFolderPath = "";
     private bool _showCreateFolder;
     private string _newFolderName = "";
-    private string? _createFolderError;
     private bool _showDeleteConfirm;
     private List<FileMetadata> _deleteTargets = new();
     private string? _deleteError;
@@ -34,9 +33,9 @@ public partial class FileBrowser
     private bool _showRenameDialog;
     private FileMetadata? _renameTarget;
     private string _renameNewName = "";
-    private string? _renameError;
 
     private ElementReference _deleteModalRef;
+    private ElementReference _renameModalRef;
 
     private FilePreview _filePreviewComponent = default!;
     private ContextMenu _contextMenuComponent = default!;
@@ -204,12 +203,15 @@ public partial class FileBrowser
         var item = _selectedItems.First();
         _renameTarget = item;
         _renameNewName = item.Name;
-        _renameError = null;
         _showRenameDialog = true;
 
-        // Wait one frame so the input is actually in the DOM
-        await Task.Delay(50);
-        await JS.InvokeVoidAsync("selectFileName", "#rename-input");
+        // Focus the dialog backdrop (not the text field) so Enter/Escape work
+        // immediately. The backdrop carries the @onkeydown handler; without a
+        // focused element that has it, the keys do nothing. Same as the delete
+        // dialog above.
+        StateHasChanged();
+        await Task.Yield(); // let Blazor render the modal first
+        await _renameModalRef.FocusAsync();
     }
 
     internal async Task PutIntoClipboard(bool deleteOnPaste)

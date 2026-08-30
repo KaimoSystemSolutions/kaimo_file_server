@@ -1697,7 +1697,25 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Common_Creating", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Renaming… ähnelt.
+        /// </summary>
+        public static string Web_Common_Renaming {
+            get {
+                return ResourceManager.GetString("Web_Common_Renaming", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Renamed ähnelt.
+        /// </summary>
+        public static string Web_Rename_Success {
+            get {
+                return ResourceManager.GetString("Web_Rename_Success", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Custom ähnelt.
         /// </summary>

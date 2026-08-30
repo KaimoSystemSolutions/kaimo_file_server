@@ -30,7 +30,6 @@ public partial class FileBrowser
         _sortColumn = null;
         _sortDirection = 0;
         _showCreateFolder = false;
-        _createFolderError = null;
 
         _contextMenuComponent?.CloseContextMenu();
 
@@ -118,7 +117,6 @@ public partial class FileBrowser
     internal void ShowCreateFolderDialog()
     {
         _newFolderName = "";
-        _createFolderError = null;
         _showCreateFolder = true;
     }
 
@@ -136,10 +134,10 @@ public partial class FileBrowser
     private async Task ConfirmCreateFolder()
     {
         if (string.IsNullOrWhiteSpace(_newFolderName)) return;
+        if (LiveNameError(_newFolderName, null) is not null) return;
         var folderName = _newFolderName.Trim();
 
         _showCreateFolder = false;
-        _createFolderError = null;
         await RenderClosedDialogAsync();
 
         var toastId = Toast.Show(Resources.Web_Common_Creating, ToastType.Progress);
@@ -287,22 +285,57 @@ public partial class FileBrowser
     private async Task ConfirmRename()
     {
         if (_renameTarget is null || string.IsNullOrWhiteSpace(_renameNewName)) return;
-        var result = await VM.RenameAsync(_renameTarget, _renameNewName.Trim());
+        if (LiveNameError(_renameNewName, _renameTarget) is not null) return;
 
-        if (!result.Success)
-            _renameError = result.Error;
+        var target = _renameTarget;
+        var newName = _renameNewName.Trim();
 
         _selectedItems.Clear();
         _showRenameDialog = false;
         _renameTarget = null;
+        await RenderClosedDialogAsync();
 
+        var toastId = Toast.Show(Resources.Web_Common_Renaming, ToastType.Progress);
+        var result = await VM.RenameAsync(target, newName);
+        if (!result.Success)
+        {
+            Toast.Update(toastId, result.Error ?? Resources.Web_Error_RenameFailed, type: ToastType.Error);
+            await VM.LoadShareAsync(ShareName, SubPath ?? "");
+            return;
+        }
+
+        Toast.Update(toastId, Resources.Web_Rename_Success, type: ToastType.Success);
         await VM.LoadShareAsync(ShareName, SubPath ?? "");
         await LoadAclCounts();
 
         // put renamed item into the new selection
-        var newItem = FindShareItem(_renameNewName);
+        var newItem = FindShareItem(newName);
         if (newItem is not null)
             _selectedItems.Add(newItem);
+    }
+
+    /// <summary>
+    /// Live validation for the create-folder and rename dialogs. Returns a
+    /// localized error message, or <c>null</c> when the name is acceptable.
+    /// An empty box is treated as "not yet invalid" so the user is not nagged
+    /// before typing anything.
+    /// </summary>
+    private string? LiveNameError(string? name, FileMetadata? exclude)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+
+        var trimmed = name.Trim();
+
+        var errors = WindowsFileNameHelper.GetValidationErrors(trimmed);
+        if (errors.Count > 0)
+            return errors[0];
+
+        var exists = VM.Items.Any(i =>
+            i.Name.Equals(trimmed, StringComparison.OrdinalIgnoreCase)
+            && (exclude is null || !i.Path.Equals(exclude.Path, StringComparison.OrdinalIgnoreCase)));
+
+        return exists ? Resources.Web_Error_ItemExists : null;
     }
 
     public void TriggerReRender()

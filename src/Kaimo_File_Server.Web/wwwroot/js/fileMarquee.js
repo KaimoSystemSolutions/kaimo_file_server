@@ -244,6 +244,10 @@ window.fileMarquee = (() => {
         // was clicked last. The component decides whether an open dialog owns it.
         document.addEventListener('keydown', event => {
             if (event.key !== 'Escape' || event.repeat) return;
+            // When a modal owns the Escape (focus is inside it), the dialog's own
+            // Cancel handles it. Skipping here avoids a race where the dialog
+            // closes and this page-level handler then wipes the file selection.
+            if (event.target.closest?.('.modal-backdrop')) return;
             void dotNetRef.invokeMethodAsync('ClearSelectionOnEscape');
         }, options);
 
