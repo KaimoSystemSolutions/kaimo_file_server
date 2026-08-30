@@ -42,6 +42,24 @@ public partial class FileBrowser
         }
     }
 
+    // ========== Download ==========
+
+    /// <summary>
+    /// Streams a file straight to the browser instead of opening it in the preview.
+    /// Works for files of any size, including those too large to preview inline.
+    /// </summary>
+    public async Task DownloadFileAsync(FileMetadata file)
+    {
+        var url = await VM.GetDownloadUrlAsync(file);
+        if (string.IsNullOrEmpty(url))
+        {
+            Toast.Show(Resources.Web_Error_AccessDenied, ToastType.Error);
+            return;
+        }
+
+        await JS.InvokeVoidAsync("filePreview.downloadFromUrl", url, file.Name);
+    }
+
     // ========== Unzip ==========
 
     public async Task UnzipFile(FileMetadata file)

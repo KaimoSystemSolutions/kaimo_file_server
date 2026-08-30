@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 using Kaimo_File_Server.Web.Helpers;
+using Kaimo_File_Server.Web.Services;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Core.Language;
@@ -41,6 +42,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<FileBrowserViewModel> _logger;
     private readonly IUserRepository _userRepo;
+    private readonly FileDownloadTicketStore _downloadTickets;
 
     private readonly ISearchService _searchService;
 
@@ -55,7 +57,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel
         AuthenticationStateProvider authState,
         ILogger<FileBrowserViewModel> logger,
         ISearchService searchService,
-        IUserRepository userRepo)
+        IUserRepository userRepo,
+        FileDownloadTicketStore downloadTickets)
     {
         _fileServiceFactory = fileServiceFactory;
         _shareRepo = shareRepo;
@@ -66,6 +69,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel
         _logger = logger;
         _searchService = searchService;
         _userRepo = userRepo;
+        _downloadTickets = downloadTickets;
     }
 
     // -- State --
@@ -675,6 +679,28 @@ public class FileBrowserViewModel : IFileBrowserViewModel
 
     /// <summary>Maximum file size that can be previewed inline; larger files download instead.</summary>
     public long GetMaxPreviewSizeBytes() => MaxPreviewSizeBytes;
+
+    /// <summary>
+    /// Issues a one-time URL that streams the file straight to the browser via
+    /// <c>FileDownloadController</c>, so a download never buffers the file into the
+    /// preview first — and files above the inline-preview cap can still be downloaded.
+    /// Returns null when no file is addressable or the user is not authenticated;
+    /// the controller re-checks ACL access before streaming.
+    /// </summary>
+    public async Task<string?> GetDownloadUrlAsync(FileMetadata file)
+    {
+        if (_fileService is null || CurrentShare is null || file.IsDirectory) return null;
+
+        var userContext = await GetCurrentUserContextAsync();
+        if (userContext is null) return null;
+
+        if (!ShareRelativePath.TryNormalizeStrict(ToShareRelative(file.Path), out var relative, allowRoot: false))
+            return null;
+
+        var ticket = _downloadTickets.Issue(new FileDownloadTicket(
+            CurrentShare.Id, userContext.User.Id, relative, file.Name));
+        return "/api/files/download?ticket=" + Uri.EscapeDataString(ticket);
+    }
 
     // ==================== Versioning ====================
 

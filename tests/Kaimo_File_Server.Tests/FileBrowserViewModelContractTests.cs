@@ -53,12 +53,13 @@ public sealed class FileBrowserViewModelContractTests
         var source = new BrowserShareInfo(Guid.NewGuid(), "Local", BrowserShareKind.Local);
         var item = new FileMetadata { Name = "report.txt", Path = "report.txt" };
 
-        clipboard.Set(source, [item], deleteOnPaste: true);
+        clipboard.Set(source, [item], deleteOnPaste: true, startPath: "reports");
         clipboard.SetToastId("clipboard-toast");
 
         Assert.Equal(source, clipboard.Source);
         Assert.Single(clipboard.Items);
         Assert.True(clipboard.DeleteOnPaste);
+        Assert.Equal("reports", clipboard.StartPath);
         Assert.Equal("clipboard-toast", clipboard.ToastId);
 
         clipboard.Clear();
@@ -66,6 +67,7 @@ public sealed class FileBrowserViewModelContractTests
         Assert.Null(clipboard.Source);
         Assert.Empty(clipboard.Items);
         Assert.False(clipboard.DeleteOnPaste);
+        Assert.Null(clipboard.StartPath);
         Assert.Null(clipboard.ToastId);
     }
 

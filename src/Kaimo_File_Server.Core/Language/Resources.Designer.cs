@@ -86,6 +86,15 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Context_Menu_Delete", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Download ähnelt.
+        /// </summary>
+        public static string Context_Menu_Download {
+            get {
+                return ResourceManager.GetString("Context_Menu_Download", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Extract ähnelt.

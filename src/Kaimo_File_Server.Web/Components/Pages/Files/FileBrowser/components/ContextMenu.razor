@@ -133,7 +133,10 @@
         "open"
             => async () => {  CloseContextMenu(); await FilePreviewComponent.OpenFilePreview(target!); },
 
-        
+        "download"
+            => async () => {  CloseContextMenu(); await FileBrowser.DownloadFileAsync(target!); },
+
+
         "extract" when scope == ContextMenuScope.MultiSelection
             => async () =>
             {

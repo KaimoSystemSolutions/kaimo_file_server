@@ -227,7 +227,7 @@ public partial class FileBrowser
         foreach (var item in _selectedItems)
             _clipboard.Add(item);
         if (_clipboardSourceShare is not null)
-            BrowserClipboard.Set(_clipboardSourceShare, _clipboard, deleteOnPaste);
+            BrowserClipboard.Set(_clipboardSourceShare, _clipboard, deleteOnPaste, _clipboardStartPath);
         
         var msg = _clipboard.Count == 1
             ? string.Format(T(deleteOnPaste ? "Web_Transfer_CuttingOne" : "Web_Transfer_CopyingOne"), _clipboard.First().Name)
@@ -247,6 +247,7 @@ public partial class FileBrowser
             _clipboard = BrowserClipboard.Items.ToHashSet();
             _clipboardSourceShare = BrowserClipboard.Source;
             _deleteOnPaste = BrowserClipboard.DeleteOnPaste;
+            _clipboardStartPath = BrowserClipboard.StartPath;
             _clipboardToastID = BrowserClipboard.ToastId;
         }
         if (!VM.Capabilities.CanCopy || _clipboard.Count < 1 || _clipboardSourceShare is null || VM.CurrentBrowserShare is null)
@@ -256,12 +257,27 @@ public partial class FileBrowser
         // authorization for both backends and never cuts a virtual source.
         if (_clipboardSourceShare.Id != VM.CurrentBrowserShare.Id || _clipboardSourceShare.Kind != VM.CurrentBrowserShare.Kind)
         {
-            using var job = StartTransferJob();
-            RemoveClipboardToast();
-            var toastId = Toast.Show(T("Web_Transfer_Progress"), ToastType.Progress,
-                onDismiss: () => { job.Cancel(); return Task.CompletedTask; });
+            await PasteAcrossSharesAsync();
+            return;
+        }
+
+        await PasteWithinShareAsync();
+    }
+
+    /// <summary>
+    /// Paste across a share boundary via the transfer service. Wrapped so an
+    /// unexpected throw never escapes to the circuit or strands the progress toast.
+    /// </summary>
+    private async Task PasteAcrossSharesAsync()
+    {
+        using var job = StartTransferJob();
+        RemoveClipboardToast();
+        var toastId = Toast.Show(T("Web_Transfer_Progress"), ToastType.Progress,
+            onDismiss: () => { job.Cancel(); return Task.CompletedTask; });
+        try
+        {
             var result = await CrossShareTransfer.TransferAsync(
-                _clipboardSourceShare, _clipboard.ToList(), VM.CurrentBrowserShare,
+                _clipboardSourceShare!, _clipboard.ToList(), VM.CurrentBrowserShare!,
                 VM.CurrentPath, _deleteOnPaste, job.CancellationToken,
                 (name, progress) =>
                 {
@@ -269,7 +285,6 @@ public partial class FileBrowser
                     job.Update(detail, progress);
                     Toast.Update(toastId, detail, progress, ToastType.Progress);
                 });
-            Toast.Remove(toastId);
             if (result.Success)
             {
                 Toast.Show(_deleteOnPaste ? T("Web_Transfer_CutSuccess") : T("Web_Transfer_CopySuccess"), ToastType.Success);
@@ -280,59 +295,155 @@ public partial class FileBrowser
             {
                 Toast.Show(result.Error ?? T("Web_Transfer_Error_Failed"), ToastType.Error);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            Toast.Show(T("Web_Transfer_Error_Cancelled"), ToastType.Info);
+        }
+        catch (Exception)
+        {
+            Toast.Show(T("Web_Transfer_Error_Failed"), ToastType.Error);
+        }
+        finally
+        {
+            Toast.Remove(toastId);
+        }
+    }
+
+    /// <summary>
+    /// Paste inside the same share: copy the collected tree item by item, then (for a
+    /// cut) delete the originals. Each item is isolated so one failure never aborts the
+    /// batch, the progress toast is always removed, and originals are only deleted when
+    /// every copy succeeded — a partially failed cut must never lose data.
+    /// </summary>
+    private async Task PasteWithinShareAsync()
+    {
+        // The source directory is required to map each item into the target. It can be
+        // absent after a circuit was recreated without a full clipboard restore.
+        if (_clipboardStartPath is null)
+        {
+            Toast.Show(T("Web_Transfer_Error_Failed"), ToastType.Error);
             return;
         }
 
         using var localJob = StartTransferJob();
         var cancellationToken = localJob.CancellationToken;
-        
+
         RemoveClipboardToast();
         _clipboardToastID = Toast.Show(T("Web_Transfer_Progress"), ToastType.Progress,
             onDismiss: () => { localJob.Cancel(); return Task.CompletedTask; });
 
-        // collect all items and sub items
-        List<FileMetadata> itemsToCopy = new();
-        
-        foreach (FileMetadata file in _clipboard)
-            await listItemsRecursivley(itemsToCopy, file);
-        
-        int filesPatedCount = 0;
-        
-        foreach (FileMetadata file in itemsToCopy)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            string oldLocalPath = file.Path.Substring(_clipboardStartPath!.Length);
-            string newPath = VM.CurrentPath + "/" + oldLocalPath;
-            
-            if (file.IsDirectory)
-            {
-                await VM.CreateFolderAtAsync(newPath);
-                continue;
-            }
-            
-            await VM.CopyAsync(file, newPath, cancellationToken);
+        var itemsToCopy = new List<FileMetadata>();
+        int copied = 0;
+        var failed = new List<string>();
+        bool cancelled = false;
 
-            var progress = (int)(++filesPatedCount * 100f / itemsToCopy.Count);
-            var detail = string.Format(T("Web_Transfer_ProgressItem"), file.Name);
-            localJob.Update(detail, progress);
-            Toast.Update(_clipboardToastID, detail, progress, ToastType.Progress);
-            StateHasChanged();
+        try
+        {
+            foreach (FileMetadata file in _clipboard)
+                await listItemsRecursivley(itemsToCopy, file);
+
+            foreach (FileMetadata file in itemsToCopy)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var newPath = ResolvePastePath(file);
+                // null: item is not under the recorded source root. Equal path: pasting
+                // into the source folder would overwrite the item with itself.
+                if (newPath is null || string.Equals(newPath, file.Path, StringComparison.Ordinal))
+                {
+                    failed.Add(file.Name);
+                    continue;
+                }
+
+                try
+                {
+                    if (file.IsDirectory)
+                        await VM.CreateFolderAtAsync(newPath);
+                    else
+                        await VM.CopyAsync(file, newPath, cancellationToken);
+                    copied++;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    failed.Add(file.Name);
+                }
+
+                var progress = (int)(copied * 100f / Math.Max(1, itemsToCopy.Count));
+                var detail = string.Format(T("Web_Transfer_ProgressItem"), file.Name);
+                localJob.Update(detail, progress);
+                Toast.Update(_clipboardToastID, detail, progress, ToastType.Progress);
+                StateHasChanged();
+            }
+
+            // Delete originals only for a cut where every copy succeeded. Reverse order
+            // so the innermost items go first and each folder is empty when removed.
+            if (_deleteOnPaste && failed.Count == 0)
+            {
+                for (int i = itemsToCopy.Count - 1; i >= 0; i--)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await VM.DeleteAsync(itemsToCopy[i]);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            cancelled = true;
+        }
+        catch (Exception)
+        {
+            Toast.Show(T("Web_Transfer_Error_Failed"), ToastType.Error);
+        }
+        finally
+        {
+            RemoveClipboardToast();
             await VM.LoadShareAsync(ShareName, SubPath ?? "");
+            StateHasChanged();
         }
 
-        // has to reverse the order, so the most inner objects are deleted first.
-        // this way, we delete folders once they are already empty
-        itemsToCopy.Reverse();
-        
-        if(_deleteOnPaste)
-            foreach (FileMetadata file in itemsToCopy)
-                await VM.DeleteAsync(file);
-        
-        Toast.Remove(_clipboardToastID);
+        if (cancelled)
+        {
+            Toast.Show(T("Web_Transfer_Error_Cancelled"), ToastType.Info);
+        }
+        else if (failed.Count == 0)
+        {
+            Toast.Show(_deleteOnPaste ? T("Web_Transfer_CutSuccess") : T("Web_Transfer_CopySuccess"), ToastType.Success);
+            await ClearClipboard();
+        }
+        else if (copied > 0)
+        {
+            Toast.Show(string.Format(T("Web_Transfer_PartialFailure"), copied, itemsToCopy.Count),
+                ToastType.Error, tooltip: string.Join(Environment.NewLine, failed));
+        }
+        else
+        {
+            Toast.Show(T("Web_Transfer_Error_Failed"), ToastType.Error);
+        }
+    }
 
-        string verb = _deleteOnPaste ? "cut" : "copied";
-        string msg = $"Successfully {verb} {_clipboard.Count} files";
-        Toast.Show(msg, ToastType.Success);
+    /// <summary>
+    /// Maps a clipboard item's share-relative path into the current directory, preserving
+    /// its position beneath the folder it was cut/copied from. Returns null when the item
+    /// does not sit under that recorded source folder (a stale or malformed clipboard).
+    /// </summary>
+    private string? ResolvePastePath(FileMetadata file)
+    {
+        var root = _clipboardStartPath!.Trim('/');
+        string relative;
+        if (root.Length == 0)
+            relative = file.Path.TrimStart('/');
+        else if (file.Path.StartsWith(root + "/", StringComparison.Ordinal))
+            relative = file.Path.Substring(root.Length + 1);
+        else
+            return null;
+
+        var target = VM.CurrentPath.Trim('/');
+        return target.Length == 0 ? relative : target + "/" + relative;
     }
 
     private async Task listItemsRecursivley(List<FileMetadata> itemList, FileMetadata item)

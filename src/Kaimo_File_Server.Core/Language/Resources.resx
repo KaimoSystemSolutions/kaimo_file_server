@@ -192,6 +192,9 @@
   <data name="Context_Menu_Delete" xml:space="preserve">
     <value>Delete</value>
   </data>
+  <data name="Context_Menu_Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
   <data name="Web_Folder_Empty" xml:space="preserve">
     <value>This folder is empty.</value>
   </data>
@@ -2350,6 +2353,7 @@
   <data name="Web_Transfer_Error_AccessDenied" xml:space="preserve"><value>You do not have permission to transfer these items.</value></data>
   <data name="Web_Transfer_Error_Cancelled" xml:space="preserve"><value>The transfer was cancelled.</value></data>
   <data name="Web_Transfer_Error_Failed" xml:space="preserve"><value>The items could not be transferred.</value></data>
+  <data name="Web_Transfer_PartialFailure" xml:space="preserve"><value>Transferred {0} of {1} items; the rest could not be transferred.</value></data>
   <data name="Web_Transfer_CopySuccess" xml:space="preserve"><value>Items copied successfully.</value></data>
   <data name="Web_Transfer_CutSuccess" xml:space="preserve"><value>Items moved successfully.</value></data>
   <data name="Web_Transfer_Copy" xml:space="preserve"><value>Copy</value></data>

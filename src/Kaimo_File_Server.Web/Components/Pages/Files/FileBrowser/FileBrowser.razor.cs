@@ -163,8 +163,11 @@ public partial class FileBrowser
     // Materialized because Virtualize needs an indexable collection.
     private List<FileMetadata> SortedEntries => SortedDirectories.Concat(SortedFiles).ToList();
 
+    // Only the recycle-bin root itself (a top-level ".RECYCLE_BIN") gets the trash icon.
+    // Folders nested inside it are ordinary directories and keep the folder icon.
     private static bool IsRecycleBinEntry(FileMetadata entry) =>
         entry.IsDirectory &&
+        ShareRelativePath.GetDepth(entry.Path) == 1 &&
         ShareEntryPolicy.Classify(entry.Path).Kind ==
             ShareEntryKind.RecycleBin;
 

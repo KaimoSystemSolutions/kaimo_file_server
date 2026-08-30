@@ -52,6 +52,13 @@ public static class ContextCommandCatalog
     private static readonly ContextMenuScope[] SingleAndMulti =
         AllSingle.Append(ContextMenuScope.MultiSelection).ToArray();
 
+    // Single files only — a directory can't be streamed as one download.
+    private static readonly ContextMenuScope[] DownloadableFiles =
+    {
+        ContextMenuScope.Archive, ContextMenuScope.Image, ContextMenuScope.Video,
+        ContextMenuScope.Audio, ContextMenuScope.Document, ContextMenuScope.OtherFile,
+    };
+
     private static readonly ContextMenuScope[] EveryScope =
         Enum.GetValues<ContextMenuScope>();
 
@@ -59,7 +66,10 @@ public static class ContextCommandCatalog
     {
         new ContextCommand("open", () => Resources.Context_Menu_Open, "arrow_right.svg",
             ValidScopes: AllSingle),
-        
+
+        new ContextCommand("download", () => Resources.Context_Menu_Download, "download.svg",
+            ValidScopes: DownloadableFiles),
+
         new ContextCommand("sync", () => "Sync", "arrow_right.svg",
             ValidScopes: new [] { ContextMenuScope.Folder}),
 

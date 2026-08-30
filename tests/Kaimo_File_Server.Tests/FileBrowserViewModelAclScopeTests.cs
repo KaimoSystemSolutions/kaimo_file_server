@@ -9,6 +9,7 @@ using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components.ViewModels;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -64,7 +65,8 @@ public class FileBrowserViewModelAclScopeTests
         _sut = new FileBrowserViewModel(
             _fileServiceFactory.Object, _shareRepo.Object, _dbFactory.Object,
             _userContextFactory.Object, _mgmtAuth.Object, _authState.Object,
-            NullLogger<FileBrowserViewModel>.Instance, _searchService.Object, _userRepo.Object);
+            NullLogger<FileBrowserViewModel>.Instance, _searchService.Object, _userRepo.Object,
+            new FileDownloadTicketStore());
     }
 
     private void Authorize(bool allowed) =>

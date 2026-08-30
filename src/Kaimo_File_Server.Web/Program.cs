@@ -184,6 +184,7 @@ builder.Services.AddHostedService<LegacyCloudSyncMigrationHostedService>();
 builder.Services.AddScoped<OneDriveStorageConnectionFactory>();
 builder.Services.AddScoped<CredentialRewrapService>();
 builder.Services.AddSingleton<CloudAccessDownloadTicketStore>();
+builder.Services.AddSingleton<FileDownloadTicketStore>();
 builder.Services.AddSingleton<ICloudAccessSettingsStore, CloudAccessSettingsStore>();
 builder.Services.AddSingleton<CloudAccessDirectoryCache>();
 builder.Services.AddScoped<CloudAccessAuthorizationService>();

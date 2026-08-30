@@ -194,6 +194,12 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Context_Menu_Delete", resourceCulture);
             }
         }
+
+        internal static string Context_Menu_Download {
+            get {
+                return ResourceManager.GetString("Context_Menu_Download", resourceCulture);
+            }
+        }
         
         internal static string Web_Folder_Empty {
             get {

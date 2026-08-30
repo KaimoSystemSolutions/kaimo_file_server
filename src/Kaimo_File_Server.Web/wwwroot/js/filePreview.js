@@ -51,6 +51,18 @@ window.filePreview = {
         document.body.removeChild(a);
         // Give the browser a tick to start the download before revoking.
         setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+
+    // Streams a download straight from a server URL (the response carries
+    // Content-Disposition: attachment), without loading the file into memory first.
+    downloadFromUrl: function (url, fileName) {
+        const a = document.createElement('a');
+        a.href = url;
+        if (fileName) a.download = fileName;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     }
 };
 
