@@ -2256,6 +2256,16 @@
   <data name="Web_CloudSync_Device_Waiting" xml:space="preserve"><value>Waiting for Microsoft authorization…</value></data>
   <data name="Web_CloudSync_Device_Expired" xml:space="preserve"><value>The cloud authorization request has expired. Please start again.</value></data>
   <data name="Web_CloudSync_Device_Failed" xml:space="preserve"><value>Microsoft authorization failed. Please return to Cloud Sync and try again.</value></data>
+  <data name="Web_CloudAccess_Dropbox_Title" xml:space="preserve"><value>Connect Dropbox</value></data>
+  <data name="Web_CloudAccess_Dropbox_Instructions" xml:space="preserve"><value>Open Dropbox, approve access, then paste the authorization code Dropbox shows into the field below.</value></data>
+  <data name="Web_CloudAccess_Dropbox_Open" xml:space="preserve"><value>Open Dropbox sign-in</value></data>
+  <data name="Web_CloudAccess_Dropbox_CodeLabel" xml:space="preserve"><value>Authorization code</value></data>
+  <data name="Web_CloudAccess_Dropbox_Submit" xml:space="preserve"><value>Connect</value></data>
+  <data name="Web_CloudAccess_Dropbox_Waiting" xml:space="preserve"><value>Verifying with Dropbox…</value></data>
+  <data name="Web_CloudAccess_Dropbox_Expired" xml:space="preserve"><value>The Dropbox authorization request has expired. Please start again.</value></data>
+  <data name="Web_CloudAccess_Dropbox_Failed" xml:space="preserve"><value>Dropbox authorization failed. Please return to External Storage and try again.</value></data>
+  <data name="Web_CloudAccess_Dropbox_CodeRequired" xml:space="preserve"><value>Enter the authorization code from Dropbox.</value></data>
+  <data name="Web_CloudAccess_Dropbox_NotConfigured" xml:space="preserve"><value>Dropbox is not configured. Set a Dropbox application key before connecting.</value></data>
   <data name="Web_CloudSync_Cancelled" xml:space="preserve"><value>Synchronization was cancelled.</value></data>
   <data name="Web_Jobs_Title" xml:space="preserve"><value>Running jobs</value></data>
   <data name="Web_Jobs_Count" xml:space="preserve"><value>{0} active</value></data>
@@ -2325,7 +2335,7 @@
   <data name="Web_CloudAccess_ConnectionMissing" xml:space="preserve"><value>The connection no longer exists.</value></data>
   <data name="Web_CloudAccess_DepartmentDenied" xml:space="preserve"><value>You are not permitted to manage Cloud Access in this department.</value></data>
   <data name="Web_CloudAccess_LoadFailed" xml:space="preserve"><value>Cloud Access could not be loaded.</value></data>
-  <data name="Web_CloudAccess_FolderPickerTitle" xml:space="preserve"><value>Select OneDrive folder</value></data>
+  <data name="Web_CloudAccess_FolderPickerTitle" xml:space="preserve"><value>Select remote folder</value></data>
   <data name="Web_CloudAccess_User" xml:space="preserve"><value>User</value></data>
   <data name="Web_CloudAccess_Group" xml:space="preserve"><value>Group</value></data>
   <data name="Web_CloudAccess_NotAuthorized" xml:space="preserve"><value>Not authorized</value></data>

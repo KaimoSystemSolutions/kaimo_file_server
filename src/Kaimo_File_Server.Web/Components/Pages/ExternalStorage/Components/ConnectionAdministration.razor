@@ -282,11 +282,19 @@ else
     private IEnumerable<IStorageConnectionProvider> CreatableProviders => ProviderCatalog.Providers
         .Where(provider => provider.AuthorizationModes.Any(mode => mode is StorageAuthorizationMode.DeviceCode
             or StorageAuthorizationMode.UsernamePassword or StorageAuthorizationMode.NetworkIdentity
-            or StorageAuthorizationMode.HostMount or StorageAuthorizationMode.SshKey))
+            or StorageAuthorizationMode.HostMount or StorageAuthorizationMode.SshKey)
+            || IsZeroConfigDelegated(provider))
         .OrderBy(provider => provider.DisplayName, StringComparer.CurrentCultureIgnoreCase);
     private IStorageConnectionProvider? SelectedProvider => ProviderCatalog.TryGet(_provider, out var provider) ? provider : null;
+    // A provider whose only authorization mode is delegated authorization code is
+    // driven interactively with just a public app key (Dropbox). Providers that
+    // also require operator-supplied secrets (Google) declare additional modes.
+    private static bool IsZeroConfigDelegated(IStorageConnectionProvider provider)
+        => provider.AuthorizationModes.Count == 1
+           && provider.AuthorizationModes.Contains(StorageAuthorizationMode.DelegatedAuthorizationCode);
     private bool SelectedProviderUsesInteractiveAuthorization =>
-        SelectedProvider?.AuthorizationModes.Contains(StorageAuthorizationMode.DeviceCode) == true;
+        SelectedProvider?.AuthorizationModes.Contains(StorageAuthorizationMode.DeviceCode) == true
+        || (SelectedProvider is not null && IsZeroConfigDelegated(SelectedProvider));
     private bool IsSmbProvider => string.Equals(_provider, "smb", StringComparison.OrdinalIgnoreCase);
     private bool IsRsyncSshProvider => string.Equals(_provider, "rsync-ssh", StringComparison.OrdinalIgnoreCase);
     private bool IsSftpProvider => string.Equals(_provider, "sftp", StringComparison.OrdinalIgnoreCase);
@@ -329,7 +337,9 @@ else
     {
         if (SelectedProviderUsesInteractiveAuthorization)
         {
-            string uri = await VM.CreateOneDriveConnectionAsync(_name, _departmentId);
+            string uri = SelectedProvider!.AuthorizationModes.Contains(StorageAuthorizationMode.DeviceCode)
+                ? await VM.CreateOneDriveConnectionAsync(_name, _departmentId)
+                : await VM.CreateDropboxConnectionAsync(_name, _departmentId);
             Nav.NavigateTo(uri, forceLoad: true);
         }
         else
@@ -452,6 +462,7 @@ else
         "webdav" => "connection_webdav.svg",
         "onedrive" => "connection_onedrive.svg",
         "google" or "googledrive" => "connection_google.svg",
+        "dropbox" => "connection_dropbox.svg",
         _ => "cloud-download.svg"
     };
     private static string ProviderColor(string id) => id.ToLowerInvariant() switch
@@ -462,13 +473,17 @@ else
         "webdav" => "var(--provider-webdav, #2e8b57)",
         "onedrive" => "var(--provider-onedrive, #0078d4)",
         "google" or "googledrive" => "var(--provider-google, #e67c35)",
+        "dropbox" => "var(--provider-dropbox, #0061ff)",
         _ => "var(--text-secondary)"
     };
     private bool Supports(StorageConnection connection, StorageProviderCapabilities capability)
         => ProviderCatalog.TryGet(connection.ProviderId, out var provider) && provider.Capabilities.HasFlag(capability);
     private bool SupportsAuthorization(StorageConnection connection)
-        => connection.AuthorizationMode == StorageAuthorizationMode.DeviceCode
-           && Supports(connection, StorageProviderCapabilities.DelegatedAuthorization);
+        => Supports(connection, StorageProviderCapabilities.DelegatedAuthorization)
+           && (connection.AuthorizationMode == StorageAuthorizationMode.DeviceCode
+               || (connection.AuthorizationMode == StorageAuthorizationMode.DelegatedAuthorizationCode
+                   && ProviderCatalog.TryGet(connection.ProviderId, out var provider)
+                   && IsZeroConfigDelegated(provider)));
     private string CapabilityNames(StorageConnection connection)
     {
         if (!ProviderCatalog.TryGet(connection.ProviderId, out var provider))

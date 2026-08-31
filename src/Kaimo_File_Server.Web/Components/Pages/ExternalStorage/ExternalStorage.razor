@@ -18,6 +18,11 @@
     </div>
 </div>
 
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="error-banner">@Error</div>
+}
+
 @if (_activeTab == ExternalStorageTab.Syncs)
 {
     <SyncAdministration InitialConnectionId="Connection" />
@@ -36,10 +41,22 @@ else
     [Parameter]
     public Guid? Connection { get; set; }
 
+    [SupplyParameterFromQuery(Name = "error")]
+    [Parameter]
+    public string? Error { get; set; }
+
+    [SupplyParameterFromQuery(Name = "connected")]
+    [Parameter]
+    public Guid? Connected { get; set; }
+
     private ExternalStorageTab _activeTab = ExternalStorageTab.Syncs;
 
     protected override void OnParametersSet()
+        // A returning authorization redirect (error or a freshly connected account)
+        // always concerns a connection, so open the Connections tab in that case.
         => _activeTab = string.Equals(Tab, "connections", StringComparison.OrdinalIgnoreCase)
+                        || !string.IsNullOrWhiteSpace(Error)
+                        || Connected is not null
             ? ExternalStorageTab.Connections
             : ExternalStorageTab.Syncs;
 

@@ -144,6 +144,30 @@ public sealed class CloudAccessViewModel
     }
 
     /// <summary>
+    /// Creates a pending Dropbox connection and returns the authorization page URL.
+    /// Dropbox uses PKCE with only a public application key; no secret is stored.
+    /// </summary>
+    public async Task<string> CreateDropboxConnectionAsync(string name, Guid departmentId)
+    {
+        await EnsureCanManageConnectionDepartmentAsync(departmentId);
+        if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 200)
+            throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
+        var connection = new StorageConnection
+        {
+            DepartmentId = departmentId,
+            CreatedByUserId = _actor!.User.Id,
+            ProviderId = "dropbox",
+            Name = name.Trim(),
+            AuthorizationMode = StorageAuthorizationMode.DelegatedAuthorizationCode,
+            State = StorageConnectionState.PendingAuthorization
+        };
+        await _connections.SaveAsync(connection);
+        var ticket = await _tickets.IssueAsync(
+            connection.Id, string.Empty, "dropbox-access", _actor.User.Id, connection.DepartmentId);
+        return $"/api/cloud-access/dropbox/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
+    }
+
+    /// <summary>
     /// Creates a provider-configured protocol connection. Passwords are stored
     /// only in the context-bound credential vault and never in SettingsJson.
     /// </summary>
@@ -233,12 +257,21 @@ public sealed class CloudAccessViewModel
         var connection = await GetManagedConnectionAsync(connectionId);
         var provider = _providerCatalog?.GetRequired(connection.ProviderId);
         if (provider is not null
-            && (!provider.Capabilities.HasFlag(StorageProviderCapabilities.DelegatedAuthorization)
-                || connection.AuthorizationMode != StorageAuthorizationMode.DeviceCode))
+            && !provider.Capabilities.HasFlag(StorageProviderCapabilities.DelegatedAuthorization))
             throw new NotSupportedException(R("Web_ExternalStorage_AuthorizeUnsupported"));
+
+        // Each interactive provider owns its own authorization page and ticket
+        // purpose. Device code (OneDrive) and PKCE code paste (Dropbox) differ.
+        var (endpoint, purpose) = connection.AuthorizationMode switch
+        {
+            StorageAuthorizationMode.DeviceCode => ("onedrive", "onedrive-access"),
+            StorageAuthorizationMode.DelegatedAuthorizationCode when connection.ProviderId == "dropbox"
+                => ("dropbox", "dropbox-access"),
+            _ => throw new NotSupportedException(R("Web_ExternalStorage_AuthorizeUnsupported"))
+        };
         var ticket = await _tickets.IssueAsync(
-            connection.Id, string.Empty, "onedrive-access", _actor!.User.Id, connection.DepartmentId);
-        return $"/api/cloud-access/onedrive/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
+            connection.Id, string.Empty, purpose, _actor!.User.Id, connection.DepartmentId);
+        return $"/api/cloud-access/{endpoint}/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
     }
 
     /// <summary>Updates the display name of a managed provider connection.</summary>

@@ -54,12 +54,27 @@ public static partial class ProviderErrorSanitizer
         try
         {
             using var document = JsonDocument.Parse(body);
-            if (!document.RootElement.TryGetProperty("error", out var error)) return null;
-            if (error.ValueKind == JsonValueKind.String) return error.GetString();
-            if (error.ValueKind == JsonValueKind.Object
-                && error.TryGetProperty("code", out var code)
-                && code.ValueKind == JsonValueKind.String)
-                return code.GetString();
+            var root = document.RootElement;
+            if (root.TryGetProperty("error", out var error))
+            {
+                if (error.ValueKind == JsonValueKind.String) return error.GetString();
+                if (error.ValueKind == JsonValueKind.Object)
+                {
+                    if (error.TryGetProperty("code", out var code)
+                        && code.ValueKind == JsonValueKind.String)
+                        return code.GetString();
+                    // Dropbox API v2 tags the error kind here, e.g. {".tag":"path"}.
+                    if (error.TryGetProperty(".tag", out var tag)
+                        && tag.ValueKind == JsonValueKind.String)
+                        return tag.GetString();
+                }
+            }
+
+            // Dropbox summarizes the failure as a stable, non-sensitive category
+            // string such as "path/not_found/" or "missing_scope/..".
+            if (root.TryGetProperty("error_summary", out var summary)
+                && summary.ValueKind == JsonValueKind.String)
+                return summary.GetString();
         }
         catch (JsonException)
         {

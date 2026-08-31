@@ -2259,6 +2259,16 @@
   <data name="Web_CloudSync_Device_Waiting" xml:space="preserve"><value>Microsoft-Autorisierung wird abgewartet…</value></data>
   <data name="Web_CloudSync_Device_Expired" xml:space="preserve"><value>Die Cloud-Autorisierungsanfrage ist abgelaufen. Bitte erneut starten.</value></data>
   <data name="Web_CloudSync_Device_Failed" xml:space="preserve"><value>Die Microsoft-Autorisierung ist fehlgeschlagen. Bitte zur Cloud-Synchronisierung zurückkehren und erneut versuchen.</value></data>
+  <data name="Web_CloudAccess_Dropbox_Title" xml:space="preserve"><value>Dropbox verbinden</value></data>
+  <data name="Web_CloudAccess_Dropbox_Instructions" xml:space="preserve"><value>Dropbox öffnen, Zugriff bestätigen und anschließend den von Dropbox angezeigten Autorisierungscode in das Feld unten einfügen.</value></data>
+  <data name="Web_CloudAccess_Dropbox_Open" xml:space="preserve"><value>Dropbox-Anmeldung öffnen</value></data>
+  <data name="Web_CloudAccess_Dropbox_CodeLabel" xml:space="preserve"><value>Autorisierungscode</value></data>
+  <data name="Web_CloudAccess_Dropbox_Submit" xml:space="preserve"><value>Verbinden</value></data>
+  <data name="Web_CloudAccess_Dropbox_Waiting" xml:space="preserve"><value>Überprüfung mit Dropbox…</value></data>
+  <data name="Web_CloudAccess_Dropbox_Expired" xml:space="preserve"><value>Die Dropbox-Autorisierungsanfrage ist abgelaufen. Bitte erneut starten.</value></data>
+  <data name="Web_CloudAccess_Dropbox_Failed" xml:space="preserve"><value>Die Dropbox-Autorisierung ist fehlgeschlagen. Bitte zu Externer Speicher zurückkehren und erneut versuchen.</value></data>
+  <data name="Web_CloudAccess_Dropbox_CodeRequired" xml:space="preserve"><value>Bitte den Autorisierungscode von Dropbox eingeben.</value></data>
+  <data name="Web_CloudAccess_Dropbox_NotConfigured" xml:space="preserve"><value>Dropbox ist nicht konfiguriert. Bitte vor dem Verbinden einen Dropbox-App-Schlüssel festlegen.</value></data>
   <data name="Web_CloudSync_Cancelled" xml:space="preserve"><value>Die Synchronisierung wurde abgebrochen.</value></data>
   <data name="Web_Jobs_Title" xml:space="preserve"><value>Laufende Jobs</value></data>
   <data name="Web_Jobs_Count" xml:space="preserve"><value>{0} aktiv</value></data>
@@ -2328,7 +2338,7 @@
   <data name="Web_CloudAccess_ConnectionMissing" xml:space="preserve"><value>Die Verbindung existiert nicht mehr.</value></data>
   <data name="Web_CloudAccess_DepartmentDenied" xml:space="preserve"><value>Keine Berechtigung für Cloud-Zugriff in dieser Abteilung.</value></data>
   <data name="Web_CloudAccess_LoadFailed" xml:space="preserve"><value>Cloud-Zugriff konnte nicht geladen werden.</value></data>
-  <data name="Web_CloudAccess_FolderPickerTitle" xml:space="preserve"><value>OneDrive-Ordner auswählen</value></data>
+  <data name="Web_CloudAccess_FolderPickerTitle" xml:space="preserve"><value>Entfernten Ordner auswählen</value></data>
   <data name="Web_CloudAccess_User" xml:space="preserve"><value>Benutzer</value></data>
   <data name="Web_CloudAccess_Group" xml:space="preserve"><value>Gruppe</value></data>
   <data name="Web_CloudAccess_NotAuthorized" xml:space="preserve"><value>Nicht autorisiert</value></data>

@@ -188,6 +188,19 @@ through the optimized-sync contract; it requires an explicit pull or push direct
 virtual shares. rsync over SSH and SFTP share one pinned-SSH trust model (client key plus SHA-256 host-key pinning).
 See [`package-7-protocol-providers.md`](package-7-protocol-providers.md) for settings, security, and rollout details.
 
+### Dropbox provider — implemented
+
+- [x] Add `DropboxConnection` (Dropbox HTTP API v2) behind the neutral `ICloudConnection` contract.
+- [x] Register `DropboxProvider` as an `ICloudProvider` so syncs use it through the existing engine.
+- [x] Register the `LegacyCloudStorageConnectionProvider` adapter for `dropbox` so browsing, virtual shares, and downloads work provider-neutrally.
+- [x] Add PKCE (no-redirect) authorization via `DropboxAuthorizationService` and `CloudAccessDropboxController`; only a public app key is required.
+- [x] Surface Dropbox as an interactive connection in the unified administration UI without regressing device-code or secret-configured providers.
+- [x] Add English and German resource keys for the Dropbox authorization page.
+
+Dropbox reuses the connection-first model, so a single Dropbox connection backs both syncs and virtual shares.
+The public app key is resolved from `ExternalStorage:Dropbox:AppKey` or the shipped default. See
+[`dropbox-connection.md`](dropbox-connection.md) for setup and security details.
+
 ### Package 8 — planned
 
 - Complete multi-instance hardening, key rotation, migration cleanup, and operational acceptance tests.

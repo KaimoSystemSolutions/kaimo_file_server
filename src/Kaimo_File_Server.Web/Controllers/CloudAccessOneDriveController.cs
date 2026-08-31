@@ -80,11 +80,12 @@ public sealed class CloudAccessOneDriveController(
         var connection = await connections.GetAsync(connectionId);
         if (connection is null || !string.Equals(connection.ProviderId, "onedrive", StringComparison.OrdinalIgnoreCase))
             return NotFound("Cloud Access connection not found.");
-        var actorId = await GetActorIdAsync();
-        if (actorId is null)
-            return Unauthorized();
+        // The single-use ticket is the authorization proof: it is issued only after
+        // the ManageConnections check and is bound to this connection and department.
+        // The Blazor localStorage JWT is not present on this full-page navigation, so
+        // the session is intentionally not required here (see the download endpoint).
         if (!await tickets.IsValidAsync(
-                ticket, connectionId, string.Empty, "onedrive-access", actorId, connection.DepartmentId))
+                ticket, connectionId, string.Empty, "onedrive-access", null, connection.DepartmentId))
             return BadRequest("The Cloud Access authorization request is invalid or has expired.");
         try
         {
@@ -94,7 +95,7 @@ public sealed class CloudAccessOneDriveController(
         catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
         {
             logger.LogWarning(exception, "Unable to start OneDrive authorization for Cloud Access connection {ConnectionId}", connectionId);
-            return Redirect($"/cloud-access?error={Uri.EscapeDataString(exception.Message)}");
+            return Redirect(ConnectionsPage(error: exception.Message));
         }
     }
 
@@ -108,14 +109,12 @@ public sealed class CloudAccessOneDriveController(
         if (result.State == OneDriveDevicePollState.Failed)
             return Ok(new { state = "failed", message = result.ErrorMessage });
         var record = await connections.GetAsync(result.ShareId);
-        var actorId = await GetActorIdAsync();
         if (record is null)
             return Ok(new { state = "failed", message = R("Web_CloudAccess_ConnectionMissing") });
         if (result.AuthorizationTicket is null || result.RefreshToken is null || result.Scope is null
-            || actorId is null
             || !await tickets.TryConsumeAsync(
                 result.AuthorizationTicket, result.ShareId, string.Empty, "onedrive-access",
-                actorId, record.DepartmentId))
+                null, record.DepartmentId))
             return Ok(new { state = "failed", message = R("Web_CloudSync_Device_Expired") });
 
         var credentials = new Dictionary<string, string>
@@ -134,7 +133,7 @@ public sealed class CloudAccessOneDriveController(
                 account?.Email,
                 StorageConnectionState.Ready,
                 null);
-            return Ok(new { state = "complete", redirect = $"/cloud-access?connected={record.Id}" });
+            return Ok(new { state = "complete", redirect = ConnectionsPage(connected: record.Id) });
         }
         catch (Exception exception)
         {
@@ -178,10 +177,14 @@ public sealed class CloudAccessOneDriveController(
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 
-    private async Task<Guid?> GetActorIdAsync()
+    /// <summary>Builds a return URL to the External Storage → Connections tab.</summary>
+    private static string ConnectionsPage(string? error = null, Guid? connected = null)
     {
-        var username = User.Identity?.Name;
-        if (string.IsNullOrWhiteSpace(username)) return null;
-        return (await userContextFactory.CreateByUsernameAsync(username))?.User.Id;
+        var url = "/external-storage?tab=connections";
+        if (connected is Guid id)
+            url += $"&connected={id}";
+        if (!string.IsNullOrEmpty(error))
+            url += $"&error={Uri.EscapeDataString(error)}";
+        return url;
     }
 }

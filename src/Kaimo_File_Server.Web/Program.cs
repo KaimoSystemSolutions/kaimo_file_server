@@ -97,6 +97,10 @@ builder.Services.AddHttpClient(nameof(OneDriveDeviceAuthorizationService), clien
     client.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddHttpClient("CloudAccessOneDrive", client =>
     client.Timeout = Timeout.InfiniteTimeSpan);
+builder.Services.AddHttpClient(nameof(DropboxAuthorizationService), client =>
+    client.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddHttpClient("CloudAccessDropbox", client =>
+    client.Timeout = Timeout.InfiniteTimeSpan);
 
 // -- JWT --
 builder.Services.AddSingleton<JwtTokenService>();
@@ -137,6 +141,7 @@ builder.Services.AddScoped<FileSelectionCoordinator>();
 builder.Services.AddSingleton<AssetProvider>();
 builder.Services.AddSingleton<ICloudAuthorizationTicketStore, CloudAuthorizationTicketStore>();
 builder.Services.AddSingleton<IOneDriveDeviceAuthorizationService, OneDriveDeviceAuthorizationService>();
+builder.Services.AddSingleton<IDropboxAuthorizationService, DropboxAuthorizationService>();
 builder.Services.AddSingleton<GoogleOAuthService>();
 builder.Services.AddSingleton<ICredentialVault, DataProtectionCredentialVault>();
 builder.Services.AddExternalStorageProviders(applicationDataPath);
@@ -174,6 +179,23 @@ builder.Services.AddScoped<IStorageConnectionProvider>(services =>
         {
             StorageAuthorizationMode.DelegatedAuthorizationCode,
             StorageAuthorizationMode.ServiceAccount
+        },
+        services.GetRequiredService<ICredentialVault>(),
+        services.GetRequiredService<IStorageConnectionRepository>(),
+        services.GetRequiredService<ICloudProviderFactory>()));
+builder.Services.AddScoped<IStorageConnectionProvider>(services =>
+    new LegacyCloudStorageConnectionProvider(
+        "dropbox",
+        "Dropbox",
+        StorageProviderCapabilities.Browse
+        | StorageProviderCapabilities.Read
+        | StorageProviderCapabilities.Write
+        | StorageProviderCapabilities.CreateDirectory
+        | StorageProviderCapabilities.Sync
+        | StorageProviderCapabilities.DelegatedAuthorization,
+        new HashSet<StorageAuthorizationMode>
+        {
+            StorageAuthorizationMode.DelegatedAuthorizationCode
         },
         services.GetRequiredService<ICredentialVault>(),
         services.GetRequiredService<IStorageConnectionRepository>(),
