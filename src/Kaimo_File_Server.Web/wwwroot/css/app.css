@@ -1119,6 +1119,45 @@ html, body, #app {
     cursor: pointer;
 }
 
+    .pw-rule input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        margin: 0;
+        flex-shrink: 0;
+    }
+
+/* -- Styled file picker (replaces the browser-default file input) -- */
+
+.file-picker {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+    .file-picker input[type="file"] {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        overflow: hidden;
+    }
+
+    .file-picker:hover .file-picker-btn {
+        background: var(--bg-hover);
+        border-color: var(--border-light);
+    }
+
+.file-picker-name {
+    font-size: 12px;
+    color: var(--text-secondary);
+    word-break: break-all;
+}
+
+    .file-picker-name.is-muted {
+        color: var(--text-tertiary);
+    }
+
 /* -- Settings: stat hero (big headline value on info tabs) -- */
 
 .stat-hero {

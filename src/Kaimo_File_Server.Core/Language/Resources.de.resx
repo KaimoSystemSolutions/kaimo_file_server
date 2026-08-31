@@ -1488,6 +1488,147 @@
   <data name="Web_Settings_Button_Save" xml:space="preserve">
     <value>Speichern</value>
   </data>
+  <data name="Web_Settings_Pw_Title" xml:space="preserve">
+    <value>Passwort-Anforderungen</value>
+  </data>
+  <data name="Web_Settings_Pw_Desc" xml:space="preserve">
+    <value>Diese Regeln gelten global beim Anlegen und Ändern von Benutzerpasswörtern.</value>
+  </data>
+  <data name="Web_Settings_Pw_MinLength" xml:space="preserve">
+    <value>Mindestlänge</value>
+  </data>
+  <data name="Web_Settings_Pw_RequireUppercase" xml:space="preserve">
+    <value>Großbuchstabe erforderlich (A–Z)</value>
+  </data>
+  <data name="Web_Settings_Pw_RequireLowercase" xml:space="preserve">
+    <value>Kleinbuchstabe erforderlich (a–z)</value>
+  </data>
+  <data name="Web_Settings_Pw_RequireDigit" xml:space="preserve">
+    <value>Ziffer erforderlich (0–9)</value>
+  </data>
+  <data name="Web_Settings_Pw_RequireSpecial" xml:space="preserve">
+    <value>Sonderzeichen erforderlich (z. B. ! ? # $)</value>
+  </data>
+  <data name="Web_Settings_Session_Title" xml:space="preserve">
+    <value>Sitzungssicherheit</value>
+  </data>
+  <data name="Web_Settings_Session_Desc" xml:space="preserve">
+    <value>Wie oft eine aktive Sitzung prüft, ob das Konto noch aktiv ist. Wird ein Benutzer deaktiviert, verliert er seine Sitzung innerhalb dieses Intervalls.</value>
+  </data>
+  <data name="Web_Settings_Session_Interval" xml:space="preserve">
+    <value>Prüfintervall (Sekunden)</value>
+  </data>
+  <data name="Web_Settings_Session_Allowed" xml:space="preserve">
+    <value>Erlaubt: {0}–{1} Sekunden.</value>
+  </data>
+  <data name="Web_Settings_Cert_Title" xml:space="preserve">
+    <value>HTTPS-Zertifikat</value>
+  </data>
+  <data name="Web_Settings_Cert_Desc" xml:space="preserve">
+    <value>Der Server erzeugt automatisch ein selbstsigniertes Zertifikat und erneuert es vor Ablauf. Lade die öffentliche Zertifikatsdatei herunter, um sie auf den Clients als vertrauenswürdig zu hinterlegen – oder ersetze sie durch ein eigenes Zertifikat.</value>
+  </data>
+  <data name="Web_Settings_Cert_Subject" xml:space="preserve">
+    <value>Antragsteller (CN)</value>
+  </data>
+  <data name="Web_Settings_Cert_Type" xml:space="preserve">
+    <value>Typ</value>
+  </data>
+  <data name="Web_Settings_Cert_SelfSigned" xml:space="preserve">
+    <value>Selbstsigniert</value>
+  </data>
+  <data name="Web_Settings_Cert_Custom" xml:space="preserve">
+    <value>Eigenes Zertifikat</value>
+  </data>
+  <data name="Web_Settings_Cert_AutoRenew" xml:space="preserve">
+    <value>automatische Erneuerung</value>
+  </data>
+  <data name="Web_Settings_Cert_NoRenew" xml:space="preserve">
+    <value>keine Erneuerung</value>
+  </data>
+  <data name="Web_Settings_Cert_Issued" xml:space="preserve">
+    <value>Ausgestellt</value>
+  </data>
+  <data name="Web_Settings_Cert_Expires" xml:space="preserve">
+    <value>Läuft ab</value>
+  </data>
+  <data name="Web_Settings_Cert_DaysRemaining" xml:space="preserve">
+    <value>noch {0} Tage</value>
+  </data>
+  <data name="Web_Settings_Cert_DaysExpired" xml:space="preserve">
+    <value>seit {0} Tagen abgelaufen</value>
+  </data>
+  <data name="Web_Settings_Cert_Thumbprint" xml:space="preserve">
+    <value>Fingerabdruck (SHA-1)</value>
+  </data>
+  <data name="Web_Settings_Cert_Sans" xml:space="preserve">
+    <value>Alternative Namen (SAN)</value>
+  </data>
+  <data name="Web_Settings_Cert_DownloadCrt" xml:space="preserve">
+    <value>.crt herunterladen</value>
+  </data>
+  <data name="Web_Settings_Cert_DownloadPem" xml:space="preserve">
+    <value>Als PEM herunterladen</value>
+  </data>
+  <data name="Web_Settings_Cert_Refresh" xml:space="preserve">
+    <value>Aktualisieren</value>
+  </data>
+  <data name="Web_Settings_Cert_None" xml:space="preserve">
+    <value>Es ist noch kein Zertifikat geladen.</value>
+  </data>
+  <data name="Web_Settings_Cert_AutoTitle" xml:space="preserve">
+    <value>Automatisches Zertifikat</value>
+  </data>
+  <data name="Web_Settings_Cert_AutoDesc" xml:space="preserve">
+    <value>Gültigkeitsdauer des selbstsigniert erzeugten Zertifikats. Es wird rechtzeitig vor Ablauf automatisch erneuert – ohne Neustart.</value>
+  </data>
+  <data name="Web_Settings_Cert_Lifetime" xml:space="preserve">
+    <value>Laufzeit</value>
+  </data>
+  <data name="Web_Settings_Cert_Lifetime1M" xml:space="preserve">
+    <value>1 Monat (30 Tage)</value>
+  </data>
+  <data name="Web_Settings_Cert_Lifetime3M" xml:space="preserve">
+    <value>3 Monate (90 Tage)</value>
+  </data>
+  <data name="Web_Settings_Cert_CommonName" xml:space="preserve">
+    <value>Common Name (optional)</value>
+  </data>
+  <data name="Web_Settings_Cert_CommonNamePlaceholder" xml:space="preserve">
+    <value>Standard: Hostname</value>
+  </data>
+  <data name="Web_Settings_Cert_AdditionalNames" xml:space="preserve">
+    <value>Zusätzliche Namen/IPs</value>
+  </data>
+  <data name="Web_Settings_Cert_SaveRegenerate" xml:space="preserve">
+    <value>Speichern &amp; neu erzeugen</value>
+  </data>
+  <data name="Web_Settings_Cert_RegenerateNow" xml:space="preserve">
+    <value>Jetzt neu erzeugen</value>
+  </data>
+  <data name="Web_Settings_Cert_UploadTitle" xml:space="preserve">
+    <value>Eigenes Zertifikat hochladen</value>
+  </data>
+  <data name="Web_Settings_Cert_UploadDesc" xml:space="preserve">
+    <value>Ersetze das automatische Zertifikat durch ein eigenes — das Format wird automatisch erkannt. Es muss der &lt;strong&gt;private Schlüssel&lt;/strong&gt; dabei sein. Du hast drei Möglichkeiten: eine &lt;strong&gt;.pfx/.p12&lt;/strong&gt;, eine &lt;strong&gt;kombinierte PEM&lt;/strong&gt; (Zertifikat + Schlüssel in einer Datei), oder &lt;strong&gt;Zertifikat und Schlüssel als zwei getrennte Dateien&lt;/strong&gt;. Die automatische Erneuerung wird dafür pausiert.</value>
+  </data>
+  <data name="Web_Settings_Cert_FileCert" xml:space="preserve">
+    <value>Zertifikat (.pfx/.p12/.pem/.crt/.cer)</value>
+  </data>
+  <data name="Web_Settings_Cert_FileKey" xml:space="preserve">
+    <value>Privater Schlüssel (optional, .key/.pem)</value>
+  </data>
+  <data name="Web_Settings_Cert_Password" xml:space="preserve">
+    <value>Passwort</value>
+  </data>
+  <data name="Web_Settings_Cert_Apply" xml:space="preserve">
+    <value>Zertifikat übernehmen</value>
+  </data>
+  <data name="Web_Settings_Cert_ChooseFile" xml:space="preserve">
+    <value>Datei wählen…</value>
+  </data>
+  <data name="Web_Settings_Cert_NoFile" xml:space="preserve">
+    <value>Keine Datei ausgewählt</value>
+  </data>
   <data name="Web_Login_PageTitle" xml:space="preserve">
     <value>Kaimo Files – Anmelden</value>
   </data>
