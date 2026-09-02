@@ -1,30 +1,111 @@
-# Quick deployment
+# 🐢 Kaimo File Server — Deployment
 
-This Compose file pulls the published Kaimo images and does not require the
-source repository or a local image build.
+Run a complete Kaimo File Server stack from the published container images. This
+Compose file pulls the released images from the registry, so it needs **neither
+the source repository nor a local image build**.
 
-1. Copy `.env.example` to `.env`.
-2. Set random values for `POSTGRES_PASSWORD`, `JWT_SECRET`, and
-   `NT_HASH_ENCRYPTION_KEY`. Use at least 32 random characters for both keys.
-3. Start the stack with `docker compose up -d`.
+## 📦 What you get
 
-## Secrets
+| Service | Description | Exposed on host |
+| --- | --- | --- |
+| `web` | Web UI and REST/sync API | `8081` (HTTP), `8443` (HTTPS) |
+| `samba` | Native SMB file access | `445` |
+| `host` | Background worker; owns the database schema | — |
+| `smb-bridge` | Authorization and configuration control plane for Samba | — |
+| `db` | PostgreSQL database | internal only |
+| `elasticsearch` | Full-text file search | internal only |
+| `pki-init` | One-shot generator for the internal mTLS control-plane PKI | — |
 
-- `JWT_SECRET` signs login tokens. It must be at least 32 characters long.
-  Changing it invalidates all existing login sessions.
-- `NT_HASH_ENCRYPTION_KEY` encrypts the SMB password hashes stored in the
-  database. Keep it permanently: changing or losing it makes existing hashes
-  unreadable, so the affected SMB passwords must be set again.
+Only `web` and `samba` are reachable from the host. The database and
+Elasticsearch stay on the internal Compose network.
 
-Do not enter ordinary passwords or example values. Generate a separate random
-value for each key, for example by running `openssl rand -hex 32` twice, and
-store the values only in `.env` (never commit that file).
+## 🚀 Quick start
 
-The web UI is available on `http://localhost:8081` and
-`https://localhost:8443`; SMB listens on port `445`. Persistent data is stored
-below `./data`. All database settings and values shared by multiple services,
-such as the time zone and image tag, are configured in `.env`. One-off settings
-such as published ports are kept directly in `docker-compose.yml`.
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+2. Generate a separate random value for each secret and put them in `.env`
+   (`POSTGRES_PASSWORD`, `JWT_SECRET`, `NT_HASH_ENCRYPTION_KEY`,
+   `SEED_ADMIN_PASSWORD`). Use at least 32 random characters for the two keys:
+   ```bash
+   openssl rand -hex 32
+   ```
+3. Start the stack:
+   ```bash
+   docker compose up -d
+   ```
+
+The web UI is then available at `http://localhost:8081` and
+`https://localhost:8443`; SMB listens on port `445`. Sign in with user
+`admin` and the `SEED_ADMIN_PASSWORD` you set.
+
+## 🔐 Secrets
+
+Generate a separate random value for each of these and store them **only** in
+`.env` — never commit that file, and do not use ordinary passwords or the
+example placeholders.
+
+| Secret | Purpose | If changed / lost |
+| --- | --- | --- |
+| `JWT_SECRET` | Signs login tokens (min. 32 characters). | All existing login sessions are invalidated. |
+| `NT_HASH_ENCRYPTION_KEY` | Encrypts the SMB password hashes stored in the database. | Existing hashes become unreadable; affected SMB passwords must be set again. **Keep this key permanently.** |
+| `POSTGRES_PASSWORD` | Database password. | The database can no longer be opened with the old value. |
+| `SEED_ADMIN_PASSWORD` | Password for the first administrator, created only in an empty database. | No effect after the admin exists — change it in the web UI instead. |
+
+## 💾 Data & persistence
+
+All persistent state lives under `./data` by default and survives
+`docker compose down`:
+
+| Path | Contents |
+| --- | --- |
+| `./data/postgres` | PostgreSQL database |
+| `./data/elasticsearch` | Search index |
+| `./data/storage/pool01` | File storage pool |
+| `./data/kaimo-system` | Application data and snapshot cache |
+| `./data/logs` | Archived service logs |
+| `./data/backups` | Database backups |
+| `./data/smb-control-plane` | Generated mTLS control-plane certificates |
+
+Each location can be redirected with a `LOCATION_*` variable in `.env`.
+
+## 🔍 Search (Elasticsearch)
+
+File search is served by Elasticsearch. The stack starts without it —
+if Elasticsearch is unavailable the server automatically falls back to
+filename-only search — so startup is never blocked on it.
+
+On most Linux hosts Elasticsearch needs a raised virtual-memory map limit.
+If the container keeps restarting, set it on the host:
+
+```bash
+sudo sysctl -w vm.max_map_count=262144
+echo "vm.max_map_count=262144" | sudo tee /etc/sysctl.d/99-kaimo.conf
+```
+
+Heap size is capped at 512 MB via `ELASTIC_JAVA_OPTS`; raise it in `.env` for
+larger deployments.
+
+## ⚙️ Configuration
+
+Values shared by multiple services (database settings, time zone, image tag,
+data locations) are set in `.env`. One-off settings such as published ports are
+kept directly in `docker-compose.yml`. A value placed only in `.env` is passed
+to a container only when `docker-compose.yml` references it.
 
 Additional service-specific overrides are documented in
 [`OPTIONAL_ENVIRONMENT_VARIABLES.md`](OPTIONAL_ENVIRONMENT_VARIABLES.md).
+
+## 🔧 Operating the stack
+
+```bash
+docker compose pull        # fetch the latest images
+docker compose up -d       # start / update the stack
+docker compose ps          # show service status
+docker compose logs -f web # follow a service's logs
+docker compose down        # stop the stack (data is kept)
+```
+
+To move to a newer release, set `KAIMO_IMAGE_TAG` in `.env`, then run
+`docker compose pull && docker compose up -d`.

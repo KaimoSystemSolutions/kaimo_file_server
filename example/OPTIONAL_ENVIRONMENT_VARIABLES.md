@@ -32,6 +32,7 @@ These variables can be added to `host`, `smb-bridge`, or `web`.
 | `LogArchive__RetentionDays` | `14` | Number of days archived logs are retained. |
 | `LogArchive__MaxBytesPerSource` | `262144000` | Maximum archived-log size per service. |
 | `Seed__AdminPassword` | Randomly generated | Password used only when the first administrator is created in an empty database. Set the same value on all three services because any of them may initialize the database first. |
+| `Elasticsearch__Url` | `http://elasticsearch:9200` | Address of the Elasticsearch service used for file search. Change it only when pointing at an Elasticsearch instance outside this Compose stack. |
 
 ## Web only
 

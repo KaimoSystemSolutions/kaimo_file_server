@@ -158,6 +158,28 @@ services:
       - default
       - database
 
+  # Full-text file search. The app tolerates Elasticsearch being unavailable
+  # (it falls back to filename search), so startup is not gated on it. Not
+  # published on the host; reachable only inside the Compose network.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-9.4.2}
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: ${ELASTIC_JAVA_OPTS:--Xms512m -Xmx512m}
+    volumes:
+      - ${LOCATION_ES:-./data/elasticsearch}:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsSL 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      - default
+
 networks:
   smb-control:
     internal: true
