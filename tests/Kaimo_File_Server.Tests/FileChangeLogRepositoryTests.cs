@@ -147,4 +147,26 @@ public sealed class FileChangeLogRepositoryTests : DatabaseTestBase
         Assert.Single(remaining);
         Assert.Equal("fresh.txt", remaining[0].Path);
     }
+
+    [Fact]
+    public async Task GetOldestSeqAsync_TracksTheRetainedPrefix_AfterPruning()
+    {
+        var repo = Repo();
+        var share = Guid.NewGuid();
+
+        Assert.Equal(0, await repo.GetOldestSeqAsync()); // empty log
+
+        var old = Entry(share, FileChangeType.Created, "old.txt");
+        old.CreatedAtUtc = DateTime.UtcNow.AddDays(-10);
+        var fresh = Entry(share, FileChangeType.Created, "fresh.txt");
+        await repo.AppendAsync(old);
+        await repo.AppendAsync(fresh);
+
+        Assert.Equal(old.Seq, await repo.GetOldestSeqAsync());
+
+        // Pruning the low-seq prefix advances the oldest retained seq — this is the value the
+        // changes feed compares a client cursor against to detect a retention gap.
+        await repo.PruneOlderThanAsync(DateTime.UtcNow.AddDays(-1));
+        Assert.Equal(fresh.Seq, await repo.GetOldestSeqAsync());
+    }
 }

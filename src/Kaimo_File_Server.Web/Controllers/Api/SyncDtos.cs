@@ -74,5 +74,10 @@ public sealed record FileChangeDto(
 /// fully filtered by ACLs), so the cursor always advances. <see cref="Truncated"/> is <c>true</c>
 /// when more entries remain past the requested limit — call again immediately with the new
 /// <see cref="Seq"/>.
+/// <see cref="Reset"/> is <c>true</c> when the requested <c>since</c> cursor precedes the oldest
+/// retained log entry (the client was offline longer than the change-log retention window): the
+/// incremental feed has a gap, so the client must discard its cursor and re-bootstrap via a full
+/// <c>delta</c> instead of trusting this page.
 /// </summary>
-public sealed record ChangesFeedDto(IReadOnlyList<FileChangeDto> Changes, long Seq, bool Truncated);
+public sealed record ChangesFeedDto(
+    IReadOnlyList<FileChangeDto> Changes, long Seq, bool Truncated, bool Reset);

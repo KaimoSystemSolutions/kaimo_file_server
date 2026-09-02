@@ -33,5 +33,12 @@ namespace Kaimo_File_Server.Core.Repositories
 
         /// <summary>Deletes entries appended before <paramref name="cutoffUtc"/>; returns the count removed.</summary>
         Task<int> PruneOlderThanAsync(DateTime cutoffUtc, CancellationToken ct = default);
+
+        /// <summary>
+        /// The lowest <c>Seq</c> still retained across the whole log, or <c>0</c> when the log is
+        /// empty. Because pruning removes a low-<c>Seq</c> prefix, a client whose cursor precedes this
+        /// value has a gap and must re-bootstrap via a full <c>delta</c>.
+        /// </summary>
+        Task<long> GetOldestSeqAsync(CancellationToken ct = default);
     }
 }

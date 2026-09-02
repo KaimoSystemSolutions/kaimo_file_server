@@ -159,6 +159,25 @@ public sealed class ClientSyncApiTests
         Assert.False(device.IsActive);
     }
 
+    // ─────────────────── Change-feed retention gap (reset) ───────────────────
+
+    [Theory]
+    // since + 1 >= oldestSeq → the next needed entry is still retained → no reset.
+    [InlineData(99, 100, false)]  // boundary: since+1 == oldest, safe
+    [InlineData(100, 100, false)] // cursor at/after oldest, safe
+    [InlineData(500, 100, false)] // well ahead, safe
+    // A real gap: entries (since, oldest) were pruned → reset.
+    [InlineData(98, 100, true)]   // boundary: since+1 < oldest, one pruned entry
+    [InlineData(0, 100, true)]    // since=0 against a pruned log can't reconstruct → reset
+    // An empty log never resets, whatever the cursor.
+    [InlineData(0, 0, false)]
+    [InlineData(42, 0, false)]
+    public void Cursor_is_stale_only_when_it_precedes_the_retained_prefix(
+        long since, long oldestSeq, bool expected)
+    {
+        Assert.Equal(expected, SyncApiController.IsCursorStale(since, oldestSeq));
+    }
+
     // ─────────────────── ItemTag (conditional-op validator) ───────────────────
 
     private static FileMetadata Meta(long size, DateTime modified, bool dir = false) =>

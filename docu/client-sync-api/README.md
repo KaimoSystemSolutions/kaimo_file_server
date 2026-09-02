@@ -288,7 +288,8 @@ changes included, which the coarse token alone cannot see:
       "changeType": "Modified", "isDirectory": false, "size": 5678, "modifiedAtUtc": "…" }
   ],
   "seq": 4213,
-  "truncated": false
+  "truncated": false,
+  "reset": false
 }
 ```
 - `changeType` is one of `Created`, `Modified`, `Deleted`, `Renamed`, or
@@ -303,6 +304,18 @@ changes included, which the coarse token alone cannot see:
   empty or was entirely hidden by ACLs, so you never re-request the same range.
 - `truncated: true` means more entries remain past `limit` — call again immediately
   with the new `seq`. `limit` defaults to 1000 (max 5000).
+- `reset: true` means your `since` cursor is older than the retained change log (the
+  device was offline longer than the server's change-log retention window, default
+  90 days). The incremental page then has a gap — **discard the cursor and re-bootstrap
+  with a full `delta`** rather than trusting `changes`. Normal, regularly-syncing
+  clients never see this.
+
+The change log is pruned on a schedule so it cannot grow without bound; the window is
+configurable via `ClientSync:ChangeLogRetentionDays` (idempotency receipts via
+`ClientSync:RequestReceiptRetentionDays`, default 30; expired refresh tokens via
+`ClientSync:RefreshTokenRetentionDays`, default 7 days past expiry). The window is set
+comfortably above any realistic offline period, and `reset` is the safety net when a
+client exceeds it.
 
 Entries are ACL-filtered like a listing: a live item you may not list is omitted;
 deletes and rename-sources (whose ACL is already gone) are included because they

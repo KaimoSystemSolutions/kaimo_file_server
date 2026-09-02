@@ -245,10 +245,24 @@ public sealed class SyncApiController : ApiControllerBase
             ? page[^1].Seq
             : await _changeLog.GetHeadSeqAsync(shareId, root, ct);
 
+        // Detect a cursor that predates the retained log: retention pruning drops a low-seq prefix,
+        // so a client offline longer than the window would silently miss the pruned mutations. Tell
+        // it to re-bootstrap via delta instead of trusting an incomplete incremental page.
+        bool reset = IsCursorStale(since, await _changeLog.GetOldestSeqAsync(ct));
+
         var dto = new ChangesFeedDto(
-            visible.Select(FileChangeDto.From).ToList(), nextSeq, truncated);
+            visible.Select(FileChangeDto.From).ToList(), nextSeq, truncated, reset);
         return Ok(dto);
     }
+
+    /// <summary>
+    /// Whether an incremental cursor has a retention gap: the client last saw <paramref name="since"/>
+    /// and wants everything after it, but the oldest entry still retained is <paramref name="oldestSeq"/>.
+    /// Safe only when the next needed sequence (<c>since + 1</c>) is still present, i.e.
+    /// <c>since + 1 &gt;= oldestSeq</c>. An empty log (<paramref name="oldestSeq"/> == 0) never resets.
+    /// </summary>
+    public static bool IsCursorStale(long since, long oldestSeq)
+        => oldestSeq > 0 && since + 1 < oldestSeq;
 
     /// <summary>
     /// Drops change entries whose live target the caller may not list. Entries whose item no longer

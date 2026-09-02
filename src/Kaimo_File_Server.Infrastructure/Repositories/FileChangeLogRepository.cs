@@ -59,6 +59,13 @@ public sealed class FileChangeLogRepository : IFileChangeLogRepository
             .ExecuteDeleteAsync(ct);
     }
 
+    public async Task<long> GetOldestSeqAsync(CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        // MinAsync over an empty set throws; the nullable projection returns null instead.
+        return await db.FileChangeLog.AsNoTracking().MinAsync(e => (long?)e.Seq, ct) ?? 0L;
+    }
+
     /// <summary>
     /// Restricts a change-log query to a subtree: the root itself plus everything strictly beneath
     /// it, matched on either <c>Path</c> or <c>OldPath</c> so a rename leaving the subtree is still

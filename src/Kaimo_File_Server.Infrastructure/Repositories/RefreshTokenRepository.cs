@@ -66,4 +66,12 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
             .Where(t => t.UserId == userId && t.RevokedAtUtc == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAtUtc, whenUtc));
     }
+
+    public async Task<int> PruneExpiredBeforeAsync(DateTime cutoffUtc)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.RefreshTokens
+            .Where(t => t.ExpiresAtUtc < cutoffUtc)
+            .ExecuteDeleteAsync();
+    }
 }

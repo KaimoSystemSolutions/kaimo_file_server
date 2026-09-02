@@ -203,6 +203,9 @@ builder.Services.AddScoped<IStorageConnectionProvider>(services =>
 builder.Services.AddScoped<ILegacyCloudSyncMigrationService, LegacyCloudSyncMigrationService>();
 builder.Services.AddScoped<ICloudSyncExecutionService, CloudSyncExecutionService>();
 builder.Services.AddHostedService<LegacyCloudSyncMigrationHostedService>();
+// Prunes the append-only client-sync tables (change log, request receipts, expired refresh tokens)
+// so they cannot grow without bound.
+builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.ClientSyncRetentionService>();
 builder.Services.AddScoped<OneDriveStorageConnectionFactory>();
 builder.Services.AddScoped<CredentialRewrapService>();
 builder.Services.AddSingleton<CloudAccessDownloadTicketStore>();

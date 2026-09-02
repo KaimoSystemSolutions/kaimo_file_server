@@ -33,5 +33,13 @@ namespace Kaimo_File_Server.Core.Repositories
 
         /// <summary>Revokes every active token for a user (global sign-out).</summary>
         Task RevokeAllForUserAsync(Guid userId, DateTime whenUtc);
+
+        /// <summary>
+        /// Deletes tokens that expired before <paramref name="cutoffUtc"/>; returns the count removed.
+        /// Keyed on <see cref="RefreshToken.ExpiresAtUtc"/>, never on revocation, so the reuse-detection
+        /// window (a rotated-then-replayed token) is preserved right up to expiry — an expired token is
+        /// already rejected by expiry, so removing it loses nothing.
+        /// </summary>
+        Task<int> PruneExpiredBeforeAsync(DateTime cutoffUtc);
     }
 }
