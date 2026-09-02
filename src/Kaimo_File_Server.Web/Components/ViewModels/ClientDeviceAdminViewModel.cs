@@ -197,6 +197,38 @@ public sealed class ClientDeviceAdminViewModel
         }
     }
 
+    /// <summary>
+    /// Permanently deletes an already-revoked device and everything hanging off it (refresh
+    /// tokens, sync selections, receipts cascade in the database). Only revoked devices may be
+    /// deleted — an active one must be revoked first so its tokens are invalidated. Re-checks the
+    /// permission so a stale page cannot mutate. Returns true on success; caller should reload.
+    /// </summary>
+    public async Task<bool> DeleteDeviceAsync(Guid deviceId)
+    {
+        if (_actor is null
+            || !await _mgmtAuth.HasAnyPermissionAsync(_actor, ManagementPermission.ManageClientDevices))
+            return false;
+
+        var device = await _devices.GetByIdAsync(deviceId);
+        if (device is null || device.IsActive)
+            return false;
+
+        try
+        {
+            var deleted = await _devices.DeleteAsync(device.Id);
+            if (deleted)
+                _logger.LogInformation(
+                    "Client device {DeviceId} ({DisplayName}) deleted by {Actor}",
+                    device.Id, device.DisplayName, _actor.User.Username);
+            return deleted;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to delete client device {DeviceId}", deviceId);
+            return false;
+        }
+    }
+
     /// <summary>Owner display name for a device's user id.</summary>
     public string OwnerName(Guid userId)
         => _ownerNames.TryGetValue(userId, out var name) ? name : userId.ToString();

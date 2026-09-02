@@ -3687,6 +3687,18 @@
   <data name="Web_DeviceAdmin_RevokeFailed" xml:space="preserve">
     <value>Could not revoke the device.</value>
   </data>
+  <data name="Web_DeviceAdmin_Delete" xml:space="preserve">
+    <value>Delete permanently</value>
+  </data>
+  <data name="Web_DeviceAdmin_ConfirmDelete" xml:space="preserve">
+    <value>Delete this device from the database? This cannot be undone.</value>
+  </data>
+  <data name="Web_DeviceAdmin_ConfirmDeleteYes" xml:space="preserve">
+    <value>Yes, delete</value>
+  </data>
+  <data name="Web_DeviceAdmin_DeleteFailed" xml:space="preserve">
+    <value>Could not delete the device.</value>
+  </data>
   <data name="Web_Reconnect_Reconnecting" xml:space="preserve">
     <value>Connection lost. Trying to reconnect…</value>
   </data>

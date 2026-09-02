@@ -3618,6 +3618,18 @@
   <data name="Web_DeviceAdmin_RevokeFailed" xml:space="preserve">
     <value>Das Gerät konnte nicht widerrufen werden.</value>
   </data>
+  <data name="Web_DeviceAdmin_Delete" xml:space="preserve">
+    <value>Endgültig löschen</value>
+  </data>
+  <data name="Web_DeviceAdmin_ConfirmDelete" xml:space="preserve">
+    <value>Dieses Gerät aus der Datenbank löschen? Dies kann nicht rückgängig gemacht werden.</value>
+  </data>
+  <data name="Web_DeviceAdmin_ConfirmDeleteYes" xml:space="preserve">
+    <value>Ja, löschen</value>
+  </data>
+  <data name="Web_DeviceAdmin_DeleteFailed" xml:space="preserve">
+    <value>Das Gerät konnte nicht gelöscht werden.</value>
+  </data>
   <data name="Web_Reconnect_Reconnecting" xml:space="preserve">
     <value>Verbindung verloren. Verbindung wird wiederhergestellt…</value>
   </data>

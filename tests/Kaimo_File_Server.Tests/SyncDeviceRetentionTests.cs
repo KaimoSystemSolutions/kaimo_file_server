@@ -98,4 +98,36 @@ public sealed class SyncDeviceRetentionTests : DatabaseTestBase
         // The refresh token was removed by the ON DELETE CASCADE foreign key.
         Assert.False(await db2.RefreshTokens.AnyAsync(t => t.DeviceId == stale.Id));
     }
+
+    [Fact]
+    public async Task Delete_RemovesSingleDevice_AndCascadesRefreshTokens()
+    {
+        var user = SeedUser("carol");
+        var target = SeedDevice(user.Id, lastSeenUtc: Now, revokedAtUtc: Now);
+        var other = SeedDevice(user.Id, lastSeenUtc: Now);
+
+        using (var db = NewContext())
+        {
+            db.RefreshTokens.Add(new RefreshToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                DeviceId = target.Id,
+                TokenHash = new string('b', 64),
+                CreatedAtUtc = Now,
+                ExpiresAtUtc = Now.AddDays(30),
+            });
+            db.SaveChanges();
+        }
+
+        var deleted = await Repo().DeleteAsync(target.Id);
+
+        Assert.True(deleted);
+        await using var db2 = NewContext();
+        Assert.False(await db2.SyncDevices.AnyAsync(d => d.Id == target.Id));
+        Assert.False(await db2.RefreshTokens.AnyAsync(t => t.DeviceId == target.Id));
+        Assert.True(await db2.SyncDevices.AnyAsync(d => d.Id == other.Id));
+
+        Assert.False(await Repo().DeleteAsync(Guid.NewGuid()));
+    }
 }

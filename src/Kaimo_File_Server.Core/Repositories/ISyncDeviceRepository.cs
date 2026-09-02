@@ -30,6 +30,14 @@ namespace Kaimo_File_Server.Core.Repositories
         Task TouchLastSeenAsync(Guid deviceId, DateTime whenUtc);
 
         /// <summary>
+        /// Permanently removes a single device registration by id. Its refresh tokens, sync
+        /// selections and idempotency receipts are removed by their ON DELETE CASCADE foreign
+        /// keys. Returns <c>true</c> if a device was deleted. Callers must enforce the
+        /// <see cref="Core.Security.ManagementPermission.ManageClientDevices"/> permission.
+        /// </summary>
+        Task<bool> DeleteAsync(Guid deviceId);
+
+        /// <summary>
         /// Permanently removes device registrations that can no longer have access, so the
         /// management surface is not cluttered with dead entries indefinitely. A device is
         /// retired when either:

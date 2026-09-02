@@ -47,7 +47,11 @@ These rules are fixed and must be preserved by all clients and by the server:
    carries a `device_id` claim that the server re-checks against the device's active
    state on each request, a revoked device's *access* token stops working at once —
    not only when it expires — and it can no longer refresh. The device must sign in
-   again to obtain a fresh registration.
+   again to obtain a fresh registration. Once a device is revoked, the operator can
+   also **delete** it outright instead of waiting for the retention prune; deleting
+   cascades to its refresh tokens, sync selections, and idempotency receipts
+   (`ISyncDeviceRepository.DeleteAsync`). Only revoked devices may be deleted — an
+   active one must be revoked first so its tokens are invalidated.
 6. **Retired registrations are pruned automatically.** So the admin list does not grow
    without bound, a registration that can no longer reach the server is deleted when
    the operator opens **Settings → Client devices**. A device is retired once it has
