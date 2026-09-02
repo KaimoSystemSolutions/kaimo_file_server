@@ -146,7 +146,8 @@
                 }
                 else
                 {
-                    <Virtualize TItem="LogArchiveEntry" Items="Viewer.Entries" Context="entry" ItemSize="32">
+                    @foreach (var entry in Viewer.Entries)
+                    {
                         <details class="log-row @(HasDetails(entry) ? "log-row--expandable" : "log-row--static")" role="row">
                             <summary class="log-row-summary">
                                 <time title="@entry.TimestampUtc.ToString("O")">@entry.TimestampUtc.ToLocalTime().ToString("HH:mm:ss.fff")<span class="log-date">@entry.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd")</span></time>
@@ -186,7 +187,7 @@
                                 </div>
                             }
                         </details>
-                    </Virtualize>
+                    }
                 }
             </div>
         </div>
@@ -294,7 +295,7 @@
                 // that work every few seconds; live polling resumes when it is cleared.
                 if (!Viewer.IsLivePaused && string.IsNullOrWhiteSpace(Viewer.SearchText))
                 {
-                    await Viewer.RefreshAsync(cancellationToken);
+                    await Viewer.LiveRefreshAsync(cancellationToken);
                     await InvokeAsync(StateHasChanged);
                 }
             }

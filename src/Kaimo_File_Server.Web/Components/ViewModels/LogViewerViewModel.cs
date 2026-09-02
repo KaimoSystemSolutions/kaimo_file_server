@@ -82,10 +82,28 @@ public sealed class LogViewerViewModel(
         return true;
     }
 
-    public async Task RefreshAsync(CancellationToken cancellationToken = default)
+    // Live polling skips a tick when a query is already running; a user
+    // action (filter change, exclusion, manual refresh) must not be dropped,
+    // so it waits its turn instead.
+    public Task RefreshAsync(CancellationToken cancellationToken = default)
+        => RefreshCoreAsync(waitForGate: true, cancellationToken);
+
+    public Task LiveRefreshAsync(CancellationToken cancellationToken = default)
+        => RefreshCoreAsync(waitForGate: false, cancellationToken);
+
+    private async Task RefreshCoreAsync(bool waitForGate, CancellationToken cancellationToken)
     {
-        if (!IsAuthorized || !await _queryGate.WaitAsync(0, cancellationToken))
+        if (!IsAuthorized)
             return;
+        if (waitForGate)
+        {
+            try { await _queryGate.WaitAsync(cancellationToken); }
+            catch (OperationCanceledException) { return; }
+        }
+        else if (!await _queryGate.WaitAsync(0, cancellationToken))
+        {
+            return;
+        }
         try
         {
             IsLoading = true;

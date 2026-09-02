@@ -191,18 +191,25 @@
 }
 
 .log-row {
-    border-bottom: 1px solid var(--border-light);
     font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
     font-size: 12px;
+    /* Native off-screen skipping — keeps a 1,000-row list cheap without a
+       JS virtualizer (whose scroll estimation caused the list to jump). */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 32px;
 }
 
+/* Fixed 32px collapsed rows keep the list uniform; box-sizing keeps the
+   divider border inside that height so it matches contain-intrinsic-size. */
 .log-row-summary {
     display: grid;
     grid-template-columns: var(--log-grid);
     align-items: center;
     gap: 0 12px;
+    box-sizing: border-box;
     height: 32px;
     padding: 0 14px;
+    border-bottom: 1px solid var(--border-light);
     list-style: none;
     white-space: nowrap;
     cursor: pointer;
