@@ -4287,6 +4287,30 @@ namespace Kaimo_File_Server.Core.Language {
             }
         }
 
+        public static string Web_Settings_LogViewer_ColTime {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_ColTime", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_ColLevel {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_ColLevel", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_ColSource {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_ColSource", resourceCulture);
+            }
+        }
+
+        public static string Web_Settings_LogViewer_ColMessage {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_ColMessage", resourceCulture);
+            }
+        }
+
         public static string Web_Settings_LogViewer_Details {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Details", resourceCulture);

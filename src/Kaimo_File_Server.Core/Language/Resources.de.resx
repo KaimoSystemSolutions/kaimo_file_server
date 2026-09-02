@@ -1458,6 +1458,18 @@
   <data name="Web_Settings_LogViewer_Empty" xml:space="preserve">
     <value>Keine passenden Protokolleinträge.</value>
   </data>
+  <data name="Web_Settings_LogViewer_ColTime" xml:space="preserve">
+    <value>Zeit</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ColLevel" xml:space="preserve">
+    <value>Stufe</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ColSource" xml:space="preserve">
+    <value>Dienst</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ColMessage" xml:space="preserve">
+    <value>Meldung</value>
+  </data>
   <data name="Web_Settings_LogViewer_Details" xml:space="preserve">
     <value>Details</value>
   </data>

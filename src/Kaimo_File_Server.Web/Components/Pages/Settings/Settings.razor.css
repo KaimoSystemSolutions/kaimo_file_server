@@ -271,6 +271,12 @@
     border-bottom: 0;
 }
 
+/* The log viewer is a full console; let it use the whole content width
+   instead of the narrow reading measure applied to form sections. */
+.settings-content ::deep .log-viewer-section {
+    max-width: none;
+}
+
 .settings-content ::deep .detail-label,
 .settings-content ::deep h3,
 .settings-content ::deep h4 {

@@ -1458,6 +1458,18 @@
   <data name="Web_Settings_LogViewer_Empty" xml:space="preserve">
     <value>No matching log entries.</value>
   </data>
+  <data name="Web_Settings_LogViewer_ColTime" xml:space="preserve">
+    <value>Time</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ColLevel" xml:space="preserve">
+    <value>Level</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ColSource" xml:space="preserve">
+    <value>Service</value>
+  </data>
+  <data name="Web_Settings_LogViewer_ColMessage" xml:space="preserve">
+    <value>Message</value>
+  </data>
   <data name="Web_Settings_LogViewer_Details" xml:space="preserve">
     <value>Details</value>
   </data>

@@ -130,55 +130,65 @@
             }
         </div>
 
-        <div class="log-list" role="log" aria-live="polite">
-            @if (Viewer.Entries.Count == 0 && !Viewer.IsLoading)
-            {
-                <div class="log-empty">@Resources.Web_Settings_LogViewer_Empty</div>
-            }
-            else
-            {
-                <Virtualize TItem="LogArchiveEntry" Items="Viewer.Entries" Context="entry" ItemSize="52">
-                    <div class="log-row">
-                        <div class="log-row-summary">
-                            <time title="@entry.TimestampUtc.ToString("O")">@entry.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff")</time>
-                            <span class="log-level log-level-@entry.Level.ToString().ToLowerInvariant()">@LevelLabel(entry.Level)</span>
-                            <span class="log-source" title="@entry.Instance">@entry.Service</span>
-                            <span class="log-category" title="@entry.Category">@ShortCategory(entry.Category)</span>
-                            <span class="log-message">@entry.Message</span>
-                        </div>
-                        @if (HasDetails(entry))
-                        {
-                            <details class="log-details">
-                                <summary>@Resources.Web_Settings_LogViewer_Details</summary>
-                                @if (!string.IsNullOrEmpty(entry.Exception))
-                                {
-                                    <pre>@entry.Exception</pre>
-                                }
-                                <dl>
-                                    <dt>UTC</dt><dd>@entry.TimestampUtc.ToString("O")</dd>
-                                    <dt>@Resources.Web_Settings_LogViewer_Instance</dt><dd>@entry.Instance</dd>
-                                    <dt>@Resources.Web_Settings_LogViewer_Category</dt><dd>@entry.Category</dd>
-                                    @if (entry.EventId != 0 || entry.EventName is not null)
+        <div class="log-table" role="table" aria-label="@Resources.Web_Settings_LogViewer_Title">
+            <div class="log-table-head" role="row">
+                <span role="columnheader">@Resources.Web_Settings_LogViewer_ColTime</span>
+                <span role="columnheader">@Resources.Web_Settings_LogViewer_ColLevel</span>
+                <span role="columnheader">@Resources.Web_Settings_LogViewer_ColSource</span>
+                <span role="columnheader">@Resources.Web_Settings_LogViewer_Category</span>
+                <span role="columnheader">@Resources.Web_Settings_LogViewer_ColMessage</span>
+                <span role="columnheader" class="log-col-caret"></span>
+            </div>
+            <div class="log-list" role="rowgroup" aria-live="polite">
+                @if (Viewer.Entries.Count == 0 && !Viewer.IsLoading)
+                {
+                    <div class="log-empty">@Resources.Web_Settings_LogViewer_Empty</div>
+                }
+                else
+                {
+                    <Virtualize TItem="LogArchiveEntry" Items="Viewer.Entries" Context="entry" ItemSize="32">
+                        <details class="log-row @(HasDetails(entry) ? "log-row--expandable" : "log-row--static")" role="row">
+                            <summary class="log-row-summary">
+                                <time title="@entry.TimestampUtc.ToString("O")">@entry.TimestampUtc.ToLocalTime().ToString("HH:mm:ss.fff")<span class="log-date">@entry.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd")</span></time>
+                                <span class="log-level log-level-@entry.Level.ToString().ToLowerInvariant()">@LevelLabel(entry.Level)</span>
+                                <span class="log-source" title="@entry.Instance">@entry.Service</span>
+                                <span class="log-category" title="@entry.Category">@ShortCategory(entry.Category)</span>
+                                <span class="log-message" title="@entry.Message">@entry.Message</span>
+                                <span class="log-caret" aria-hidden="true"></span>
+                            </summary>
+                            @if (HasDetails(entry))
+                            {
+                                <div class="log-row-detail">
+                                    @if (!string.IsNullOrEmpty(entry.Exception))
                                     {
-                                        <dt>@Resources.Web_Settings_LogViewer_Event</dt><dd>@entry.EventId @entry.EventName</dd>
+                                        <pre>@entry.Exception</pre>
                                     }
-                                    @if (entry.TraceId is not null)
-                                    {
-                                        <dt>@Resources.Web_Settings_LogViewer_Trace</dt><dd>@entry.TraceId</dd>
-                                    }
-                                    @if (entry.Properties is not null)
-                                    {
-                                        @foreach (var property in entry.Properties)
+                                    <dl>
+                                        <dt>UTC</dt><dd>@entry.TimestampUtc.ToString("O")</dd>
+                                        <dt>@Resources.Web_Settings_LogViewer_Instance</dt><dd>@entry.Instance</dd>
+                                        <dt>@Resources.Web_Settings_LogViewer_Category</dt><dd>@entry.Category</dd>
+                                        @if (entry.EventId != 0 || entry.EventName is not null)
                                         {
-                                            <dt>@property.Key</dt><dd>@property.Value</dd>
+                                            <dt>@Resources.Web_Settings_LogViewer_Event</dt><dd>@entry.EventId @entry.EventName</dd>
                                         }
-                                    }
-                                </dl>
-                            </details>
-                        }
-                    </div>
-                </Virtualize>
-            }
+                                        @if (entry.TraceId is not null)
+                                        {
+                                            <dt>@Resources.Web_Settings_LogViewer_Trace</dt><dd>@entry.TraceId</dd>
+                                        }
+                                        @if (entry.Properties is not null)
+                                        {
+                                            @foreach (var property in entry.Properties)
+                                            {
+                                                <dt>@property.Key</dt><dd>@property.Value</dd>
+                                            }
+                                        }
+                                    </dl>
+                                </div>
+                            }
+                        </details>
+                    </Virtualize>
+                }
+            </div>
         </div>
     }
 </div>
