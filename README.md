@@ -1,21 +1,21 @@
-# Kaimo File Server
+# 🐢 Kaimo File Server
 
 The Kaimo File Server is a selfhosted, feature-rich fileserver designed for granular access control, 
 external storage integration, synchronization and custom storage management.
 
 🚧 Kaimo File Server is still under developement.
 
-## Features
+## ✨ Features
 
-### Storage
+### 📁 Storage
 - Custom storage pools (for example for fast and slow storage)
 - Multiple storage pools for different shares
 - Virtual shares to access external storage
 
-### Synchronization
+### 🔄 Synchronization
 - Sync files between local and external storage
 
-### External storage
+### ☁︎ External storage
 - SMB
 - RSYNC
 - WebDAV
@@ -23,16 +23,16 @@ external storage integration, synchronization and custom storage management.
 - OneDrive
 - Dropbox
 
-### Access Control
+### 👥 Access Control
 - Per-share and per-folder ACLs
 - User and group permissions
 - Custom roles
 - Departments and scoped access
 
-### Search
+### 🔍 Search
 - Elasticsearch-powered file search
 
-### Coming: Syncing to your local device via
+### 🔄 Coming: Syncing to your local device via
 - Windows
 - Linux
 - MacOS
