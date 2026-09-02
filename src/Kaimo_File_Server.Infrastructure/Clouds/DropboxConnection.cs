@@ -376,8 +376,14 @@ public sealed class DropboxConnection : ICloudConnection, IAsyncDisposable
                 }),
                 tokenTimeout.Token);
             using var json = await ParseSuccessAsync(response, tokenTimeout.Token);
-            var accessToken = json.RootElement.GetProperty("access_token").GetString()
-                              ?? throw new InvalidOperationException("Dropbox did not return an access token.");
+            // A blank or absent access token would otherwise be sent as an empty
+            // "Authorization: Bearer" header, which Dropbox rejects with an opaque
+            // HTTP 400. Fail here with a clear cause instead.
+            var accessToken = json.RootElement.TryGetProperty("access_token", out var accessTokenElement)
+                ? accessTokenElement.GetString()
+                : null;
+            if (string.IsNullOrWhiteSpace(accessToken))
+                throw new InvalidOperationException("Dropbox did not return an access token.");
             var expiresIn = json.RootElement.TryGetProperty("expires_in", out var expiry)
                 ? expiry.GetInt32()
                 : 14400;

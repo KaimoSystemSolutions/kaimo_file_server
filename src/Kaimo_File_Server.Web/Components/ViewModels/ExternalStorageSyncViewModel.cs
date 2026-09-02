@@ -242,10 +242,23 @@ public sealed class ExternalStorageSyncViewModel(
         if (localShareId != Guid.Empty)
             ValidateDepartmentMatch(await GetBrowsableShareAsync(localShareId), storageConnection);
 
-        var items = await directoryTargets.ListDirectoriesAsync(storageConnection, path);
-        return items
-            .Select(item => new CloudDirectoryItem(item.Name, NormalizeRemotePath(item.Path)))
-            .ToArray();
+        try
+        {
+            var items = await directoryTargets.ListDirectoriesAsync(storageConnection, path);
+            return items
+                .Select(item => new CloudDirectoryItem(item.Name, NormalizeRemotePath(item.Path)))
+                .ToArray();
+        }
+        catch (Exception exception)
+        {
+            // The picker shows a localized generic message, so the sanitized
+            // provider cause is logged here to keep the failure diagnosable.
+            logger.LogWarning(
+                exception,
+                "Remote directory browse failed for connection {ConnectionId} at path {RemotePath}",
+                connectionId, path);
+            throw;
+        }
     }
 
     /// <summary>

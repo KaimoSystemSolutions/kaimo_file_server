@@ -83,6 +83,11 @@ public sealed class CloudAccessDropboxController(
             await using var connection = new DropboxConnection(
                 credentials, httpClientFactory.CreateClient("CloudAccessDropbox"), identity);
             var account = await connection.GetAccountInfoAsync();
+            // Verify the granted token can actually browse (files.metadata.read),
+            // not merely read the account (account_info.read). A scope-deficient
+            // token would otherwise connect successfully and only fail later, with
+            // an opaque provider error, when a remote folder is selected.
+            await connection.ListAsync("/");
             await connections.UpdateRuntimeAsync(
                 record.Id,
                 credentialVault.ProtectConnectionCredentials(record, credentials),
@@ -91,6 +96,22 @@ public sealed class CloudAccessDropboxController(
                 StorageConnectionState.Ready,
                 null);
             return Ok(new { state = "complete", redirect = ConnectionsPage(connected: record.Id) });
+        }
+        catch (ProviderRequestException exception)
+            when (exception.ErrorCode.Contains("scope", StringComparison.OrdinalIgnoreCase))
+        {
+            // The account was reachable but the grant is missing a browse scope.
+            // Re-authorization (after enabling the scopes on the Dropbox app) is the
+            // only remedy, so the connection is flagged accordingly rather than Ready.
+            logger.LogWarning(
+                exception, "Dropbox connection {ConnectionId} is missing required scopes", record.Id);
+            await connections.UpdateRuntimeAsync(
+                record.Id,
+                credentialVault.ProtectConnectionCredentials(record, credentials),
+                null, null,
+                StorageConnectionState.NeedsReauthorization,
+                R("Web_CloudAccess_Dropbox_MissingScope"));
+            return Ok(new { state = "failed", message = R("Web_CloudAccess_Dropbox_MissingScope") });
         }
         catch (Exception exception)
         {

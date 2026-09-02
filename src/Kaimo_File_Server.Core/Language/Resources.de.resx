@@ -2422,6 +2422,7 @@
   <data name="Web_CloudAccess_Dropbox_Failed" xml:space="preserve"><value>Die Dropbox-Autorisierung ist fehlgeschlagen. Bitte zu Externer Speicher zurückkehren und erneut versuchen.</value></data>
   <data name="Web_CloudAccess_Dropbox_CodeRequired" xml:space="preserve"><value>Bitte den Autorisierungscode von Dropbox eingeben.</value></data>
   <data name="Web_CloudAccess_Dropbox_NotConfigured" xml:space="preserve"><value>Dropbox ist nicht konfiguriert. Bitte vor dem Verbinden einen Dropbox-App-Schlüssel festlegen.</value></data>
+  <data name="Web_CloudAccess_Dropbox_MissingScope" xml:space="preserve"><value>Dropbox wurde verbunden, aber der Autorisierung fehlen die Berechtigungen zum Durchsuchen von Ordnern. Bitte die Scopes files.metadata.read, files.content.read und files.content.write in der Dropbox-App aktivieren und diese Verbindung anschließend erneut autorisieren.</value></data>
   <data name="Web_CloudSync_Cancelled" xml:space="preserve"><value>Die Synchronisierung wurde abgebrochen.</value></data>
   <data name="Web_Jobs_Title" xml:space="preserve"><value>Laufende Jobs</value></data>
   <data name="Web_Jobs_Count" xml:space="preserve"><value>{0} aktiv</value></data>

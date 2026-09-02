@@ -70,8 +70,11 @@ clear "Dropbox is not configured" message; all other providers are unaffected.
 3. Choose **Connect**. Kaimo opens the Dropbox authorization page.
 4. Select **Open Dropbox sign-in**, approve access, and copy the code Dropbox
    shows.
-5. Paste the code into Kaimo and choose **Connect**. Kaimo verifies the account
-   and marks the connection **Ready**.
+5. Paste the code into Kaimo and choose **Connect**. Kaimo verifies both the
+   account (`account_info.read`) and browse access (`files.metadata.read`, via a
+   root folder listing) before marking the connection **Ready**. A grant that can
+   read the account but not browse is flagged **Needs reauthorization** with a
+   clear message instead of appearing usable and failing later.
 
 ## Using the connection
 
@@ -86,6 +89,34 @@ clear "Dropbox is not configured" message; all other providers are unaffected.
 Reauthorization uses the same connection ID and preserves every referencing sync
 and virtual share.
 
+## Troubleshooting
+
+**Connecting fails, or browsing fails with `provider code 'missing_scope'`.** The
+granted token is missing a scope the operation needs — typically
+`files.metadata.read` for browsing. Connecting can succeed while browsing cannot,
+because connecting only needs `account_info.read`. A token is granted only the
+scopes the Dropbox app actually has enabled, so:
+
+1. In the [Dropbox App Console](https://www.dropbox.com/developers/apps), open the
+   app for the key in use and enable all four scopes on its **Permissions** tab
+   (`account_info.read`, `files.metadata.read`, `files.content.read`,
+   `files.content.write`), then **Submit**.
+2. **Re-authorize** the Kaimo connection. Existing tokens keep the scopes they were
+   granted with; only a fresh authorization picks up newly enabled scopes.
+
+**Browsing a remote folder fails with `provider code 'http_400'`.** Dropbox
+returns HTTP 400 with a plaintext body — rather than a structured JSON error —
+for transport/route-level failures. The most common cause is an empty
+`Authorization: Bearer` value, which Dropbox reports as
+`Invalid authorization value in HTTP header/URL parameter`. Kaimo now guards the
+access-token exchange so a blank token fails with a clear
+"Dropbox did not return an access token" message instead of reaching Dropbox,
+and it appends Dropbox's redacted framing message to the sanitized error so the
+real cause is visible. If the message persists, re-authorize the connection (the
+refresh-token exchange may have stopped returning a usable access token) and
+confirm the app key in use still belongs to a Dropbox app with the four scopes
+listed above.
+
 ## Security notes
 
 - The refresh token is stored only in the context-bound credential vault,
@@ -94,7 +125,12 @@ and virtual share.
   browser sees only an opaque session id persisted as a SHA-256 hash, and the
   one-time authorization ticket is bound to the initiating user and department.
 - Dropbox provider error bodies are reduced to allow-listed, non-sensitive codes
-  before they can reach the UI, health state, exceptions, or logs.
+  before they can reach the UI, health state, exceptions, or logs. Structured
+  Dropbox errors still expose nothing but their code. A transport/route-level
+  failure carries no structured code (its body is a short framing message such as
+  `Invalid authorization value in HTTP header/URL parameter`); that message is
+  redacted for secrets, length-bounded, and appended to the sanitized error so an
+  otherwise opaque `http_400` stays diagnosable.
 - Dropbox refresh tokens are long-lived and are not rotated on refresh, so the
   connection has no rotated-credential persistence path. Access tokens are held
   in memory only.

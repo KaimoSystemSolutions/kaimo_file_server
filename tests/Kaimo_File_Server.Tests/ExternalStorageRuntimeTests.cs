@@ -128,5 +128,37 @@ public sealed class ProviderErrorSanitizerTests
         Assert.Equal("invalid_grant", error.Code);
         Assert.Equal(ProviderErrorCategory.Authentication, error.Category);
         Assert.DoesNotContain(secret, exception.ToString(), StringComparison.Ordinal);
+        // Structured provider errors expose nothing but their code.
+        Assert.Null(error.Detail);
+    }
+
+    [Fact]
+    public void FromResponse_KeepsRedactedDetailForRouteLevelBody()
+    {
+        // Dropbox returns a plaintext (non-JSON) body for transport/route-level
+        // failures such as an empty Authorization header. Without the detail this
+        // collapses to a bare "http_400" that hides the real cause.
+        const string message =
+            "Error in call to API function \"files/list_folder\": " +
+            "Invalid authorization value in HTTP header/URL parameter";
+        var error = ProviderErrorSanitizer.FromResponse(HttpStatusCode.BadRequest, message);
+        var exception = new ProviderRequestException("dropbox", error);
+
+        Assert.Equal("http_400", error.Code);
+        Assert.Equal(message, error.Detail);
+        Assert.Contains("Invalid authorization value", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FromResponse_RedactsSecretsInRouteLevelDetail()
+    {
+        const string token = "sl.SuperSecretAccessTokenValue";
+        var error = ProviderErrorSanitizer.FromResponse(
+            HttpStatusCode.BadRequest, $"unexpected framing error near Bearer {token}");
+        var exception = new ProviderRequestException("dropbox", error);
+
+        Assert.Equal("http_400", error.Code);
+        Assert.NotNull(error.Detail);
+        Assert.DoesNotContain(token, exception.ToString(), StringComparison.Ordinal);
     }
 }

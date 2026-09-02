@@ -16,10 +16,17 @@ public enum ProviderErrorCategory
 }
 
 /// <summary>A provider failure stripped of response bodies, tokens, codes, and other authorization material.</summary>
+/// <param name="Detail">
+/// A redacted, length-bounded framing message kept only when the provider
+/// returned no structured error code (a transport/route-level failure). It turns
+/// an otherwise opaque <c>http_NNN</c> code into an actionable message and never
+/// carries a structured error body, so no authorization material is exposed.
+/// </param>
 public sealed record SanitizedProviderError(
     string Code,
     ProviderErrorCategory Category,
-    HttpStatusCode? StatusCode);
+    HttpStatusCode? StatusCode,
+    string? Detail = null);
 
 /// <summary>
 /// Central boundary for provider failures and diagnostic text. It extracts only
@@ -28,13 +35,21 @@ public sealed record SanitizedProviderError(
 public static partial class ProviderErrorSanitizer
 {
     private const int MaximumCodeLength = 100;
+    private const int MaximumDetailLength = 200;
 
     /// <summary>Creates a safe provider error without retaining the raw response body.</summary>
     public static SanitizedProviderError FromResponse(HttpStatusCode statusCode, string? responseBody)
     {
-        var code = TryReadErrorCode(responseBody) ?? $"http_{(int)statusCode}";
-        code = SafeCode(code);
-        return new SanitizedProviderError(code, Categorize(code, statusCode), statusCode);
+        var providerCode = TryReadErrorCode(responseBody);
+        var code = SafeCode(providerCode ?? $"http_{(int)statusCode}");
+        // A response with no structured provider code is a transport/route-level
+        // failure whose body is a short, non-sensitive framing message (for
+        // example "Invalid authorization value in HTTP header/URL parameter"). It
+        // is the only hint at the real cause, so a redacted, length-bounded
+        // snippet is preserved. Structured provider errors keep exposing nothing
+        // beyond their code, so no error body ever reaches a caller.
+        var detail = providerCode is null ? RedactedDetail(responseBody) : null;
+        return new SanitizedProviderError(code, Categorize(code, statusCode), statusCode, detail);
     }
 
     /// <summary>Redacts common OAuth, authorization, password, and key material from diagnostic text.</summary>
@@ -81,6 +96,33 @@ public static partial class ProviderErrorSanitizer
             // Invalid provider bodies deliberately collapse to the HTTP status.
         }
         return null;
+    }
+
+    /// <summary>
+    /// Redacts secrets from a route-level framing message and bounds its length so
+    /// it can safely explain an otherwise opaque HTTP status code. Only non-JSON
+    /// plaintext bodies are surfaced; a structured JSON body is never exposed, so
+    /// the "codes only" posture holds for every provider error document.
+    /// </summary>
+    private static string? RedactedDetail(string? body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return null;
+        try
+        {
+            using var _ = JsonDocument.Parse(body);
+            return null; // A parseable body may carry structured fields; keep it hidden.
+        }
+        catch (JsonException)
+        {
+            // Not JSON: a transport/route-level framing message, safe to surface.
+        }
+        var redacted = Redact(body).Trim();
+        if (redacted.Length == 0)
+            return null;
+        return redacted.Length <= MaximumDetailLength
+            ? redacted
+            : redacted[..MaximumDetailLength] + "…";
     }
 
     private static string SafeCode(string value)
@@ -130,7 +172,9 @@ public sealed class ProviderRequestException : HttpRequestException
 {
     public ProviderRequestException(string providerId, SanitizedProviderError error)
         : base(
-            $"{providerId} request failed with provider code '{error.Code}'.",
+            error.Detail is { Length: > 0 } detail
+                ? $"{providerId} request failed with provider code '{error.Code}': {detail}"
+                : $"{providerId} request failed with provider code '{error.Code}'.",
             null,
             error.StatusCode)
     {

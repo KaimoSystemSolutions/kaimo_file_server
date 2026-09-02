@@ -102,6 +102,45 @@ public sealed class DropboxConnectionTests
         Assert.DoesNotContain(secret, exception.ToString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ListAsync_BlankAccessTokenFailsClearlyInsteadOfEmptyBearer()
+    {
+        // A blank access token must never reach Dropbox as an empty
+        // "Authorization: Bearer" header, which Dropbox rejects with an opaque 400.
+        var handler = new StubHandler(request => Task.FromResult(
+            request.RequestUri!.AbsolutePath == "/oauth2/token"
+                ? Json(HttpStatusCode.OK, """{"access_token":"","expires_in":14400}""")
+                : throw new InvalidOperationException("Dropbox must not be called without a token.")));
+        using var http = new HttpClient(handler);
+        await using var connection = new DropboxConnection(CreateData(), http, Identity);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => connection.ListAsync("/"));
+
+        Assert.Contains("access token", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ListAsync_MissingScopeSurfacesScopedProviderCode()
+    {
+        // A token with account_info.read but not files.metadata.read fails browsing
+        // with Dropbox's missing_scope error. The connect-time probe flags the
+        // connection for re-authorization based on the sanitized code carrying "scope".
+        const string body =
+            """{"error_summary":"missing_scope/.","error":{".tag":"missing_scope","required_scope":"files.metadata.read"}}""";
+        var handler = new StubHandler(request => Task.FromResult(
+            request.RequestUri!.AbsolutePath == "/oauth2/token"
+                ? Json(HttpStatusCode.OK, """{"access_token":"t","expires_in":14400}""")
+                : Json(HttpStatusCode.Unauthorized, body)));
+        using var http = new HttpClient(handler);
+        await using var connection = new DropboxConnection(CreateData(), http, Identity);
+
+        var exception = await Assert.ThrowsAsync<ProviderRequestException>(
+            () => connection.ListAsync("/"));
+
+        Assert.Contains("scope", exception.ErrorCode, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static Dictionary<string, string> CreateData()
         => new()
         {
