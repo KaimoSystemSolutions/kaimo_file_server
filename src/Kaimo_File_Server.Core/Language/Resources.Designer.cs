@@ -79,6 +79,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Create hash ähnelt.
+        /// </summary>
+        public static string Context_Menu_CreateHash {
+            get {
+                return ResourceManager.GetString("Context_Menu_CreateHash", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Delete ähnelt.
         /// </summary>
         public static string Context_Menu_Delete {
@@ -86,7 +95,7 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Context_Menu_Delete", resourceCulture);
             }
         }
-
+        
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Download ähnelt.
         /// </summary>
@@ -147,69 +156,6 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Context_Menu_Properties {
             get {
                 return ResourceManager.GetString("Context_Menu_Properties", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Create hash ähnelt.
-        /// </summary>
-        public static string Context_Menu_CreateHash {
-            get {
-                return ResourceManager.GetString("Context_Menu_CreateHash", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Algorithm ähnelt.
-        /// </summary>
-        public static string Web_Hash_Algorithm {
-            get {
-                return ResourceManager.GetString("Web_Hash_Algorithm", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Hash value ähnelt.
-        /// </summary>
-        public static string Web_Hash_Value {
-            get {
-                return ResourceManager.GetString("Web_Hash_Value", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Computing… ähnelt.
-        /// </summary>
-        public static string Web_Hash_Computing {
-            get {
-                return ResourceManager.GetString("Web_Hash_Computing", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Could not compute the hash. ähnelt.
-        /// </summary>
-        public static string Web_Hash_Error {
-            get {
-                return ResourceManager.GetString("Web_Hash_Error", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Copied ähnelt.
-        /// </summary>
-        public static string Web_Hash_Copied {
-            get {
-                return ResourceManager.GetString("Web_Hash_Copied", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Copy ähnelt.
-        /// </summary>
-        public static string Web_Hash_Copy {
-            get {
-                return ResourceManager.GetString("Web_Hash_Copy", resourceCulture);
             }
         }
         
@@ -907,11 +853,29 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Delegated ähnelt.
+        /// </summary>
+        public static string Web_Admin_Delegated {
+            get {
+                return ResourceManager.GetString("Web_Admin_Delegated", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Delegated assignments ähnelt.
         /// </summary>
         public static string Web_Admin_DelegatedAssignments {
             get {
                 return ResourceManager.GetString("Web_Admin_DelegatedAssignments", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Limited to a department or share ähnelt.
+        /// </summary>
+        public static string Web_Admin_DelegatedRoles_Hint {
+            get {
+                return ResourceManager.GetString("Web_Admin_DelegatedRoles_Hint", resourceCulture);
             }
         }
         
@@ -966,6 +930,24 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Admin_EditUser {
             get {
                 return ResourceManager.GetString("Web_Admin_EditUser", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Global roles ähnelt.
+        /// </summary>
+        public static string Web_Admin_GlobalRoles {
+            get {
+                return ResourceManager.GetString("Web_Admin_GlobalRoles", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Applies throughout the system ähnelt.
+        /// </summary>
+        public static string Web_Admin_GlobalRoles_Hint {
+            get {
+                return ResourceManager.GetString("Web_Admin_GlobalRoles_Hint", resourceCulture);
             }
         }
         
@@ -1132,15 +1114,6 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Share ID ähnelt.
-        /// </summary>
-        public static string Web_Admin_Label_ShareId {
-            get {
-                return ResourceManager.GetString("Web_Admin_Label_ShareId", resourceCulture);
-            }
-        }
-
-        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Share ähnelt.
         /// </summary>
         public static string Web_Admin_Label_Share {
@@ -1148,16 +1121,16 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Admin_Label_Share", resourceCulture);
             }
         }
-
+        
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die den Freigabe-Geltungsbereich-Hinweis ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Share ID ähnelt.
         /// </summary>
-        public static string Web_Admin_ShareScopeHint {
+        public static string Web_Admin_Label_ShareId {
             get {
-                return ResourceManager.GetString("Web_Admin_ShareScopeHint", resourceCulture);
+                return ResourceManager.GetString("Web_Admin_Label_ShareId", resourceCulture);
             }
         }
-
+        
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Status ähnelt.
         /// </summary>
@@ -1245,6 +1218,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Admin_NoDelegatedAssignments {
             get {
                 return ResourceManager.GetString("Web_Admin_NoDelegatedAssignments", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No delegated roles ähnelt.
+        /// </summary>
+        public static string Web_Admin_NoDelegatedRoles {
+            get {
+                return ResourceManager.GetString("Web_Admin_NoDelegatedRoles", resourceCulture);
             }
         }
         
@@ -1420,6 +1402,24 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Global roles apply throughout the system. Delegated roles only apply within the displayed department or share. The same role can appear in both sections because its scope is different. ähnelt.
+        /// </summary>
+        public static string Web_Admin_RoleScopes_Info {
+            get {
+                return ResourceManager.GetString("Web_Admin_RoleScopes_Info", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die About global and delegated roles ähnelt.
+        /// </summary>
+        public static string Web_Admin_RoleScopes_InfoLabel {
+            get {
+                return ResourceManager.GetString("Web_Admin_RoleScopes_InfoLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Department ähnelt.
         /// </summary>
         public static string Web_Admin_Scope_Department {
@@ -1454,69 +1454,6 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Admin_ScopedAssignments", resourceCulture);
             }
         }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Global roles ähnelt.
-        /// </summary>
-        public static string Web_Admin_GlobalRoles {
-            get {
-                return ResourceManager.GetString("Web_Admin_GlobalRoles", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Applies throughout the system ähnelt.
-        /// </summary>
-        public static string Web_Admin_GlobalRoles_Hint {
-            get {
-                return ResourceManager.GetString("Web_Admin_GlobalRoles_Hint", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Limited to a department or share ähnelt.
-        /// </summary>
-        public static string Web_Admin_DelegatedRoles_Hint {
-            get {
-                return ResourceManager.GetString("Web_Admin_DelegatedRoles_Hint", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Delegated ähnelt.
-        /// </summary>
-        public static string Web_Admin_Delegated {
-            get {
-                return ResourceManager.GetString("Web_Admin_Delegated", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die No delegated roles ähnelt.
-        /// </summary>
-        public static string Web_Admin_NoDelegatedRoles {
-            get {
-                return ResourceManager.GetString("Web_Admin_NoDelegatedRoles", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die About global and delegated roles ähnelt.
-        /// </summary>
-        public static string Web_Admin_RoleScopes_InfoLabel {
-            get {
-                return ResourceManager.GetString("Web_Admin_RoleScopes_InfoLabel", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht die Erklärung für globale und delegierte Rollen.
-        /// </summary>
-        public static string Web_Admin_RoleScopes_Info {
-            get {
-                return ResourceManager.GetString("Web_Admin_RoleScopes_Info", resourceCulture);
-            }
-        }
         
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Department ähnelt.
@@ -1542,6 +1479,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Admin_ScopeType_Share {
             get {
                 return ResourceManager.GetString("Web_Admin_ScopeType_Share", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Only permissions that apply to a share take effect at share scope; system- and department-level permissions of the role are ignored here. ähnelt.
+        /// </summary>
+        public static string Web_Admin_ShareScopeHint {
+            get {
+                return ResourceManager.GetString("Web_Admin_ShareScopeHint", resourceCulture);
             }
         }
         
@@ -1708,6 +1654,1833 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Access ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Access {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Access", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Add or remove users and groups, then save the access list. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_AccessEditHelp {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_AccessEditHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Selected users and groups can access the complete virtual share. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_AccessHelp {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_AccessHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Access mode ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_AccessMode {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_AccessMode", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Account ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Account {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Account", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Add connection ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_AddConnection {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_AddConnection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Add ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_AddPrincipal {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_AddPrincipal", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Create virtual share ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_AddShare {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_AddShare", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Authorize ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Authorize {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Authorize", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Browse… ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Browse {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Browse", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cancel ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Cancel {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Cancel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Connect ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Connect {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Connect", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Connection ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Connection {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Connection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select a provider and assign the connection to a department. Credentials remain encrypted on the server. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_ConnectionHelp {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_ConnectionHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The connection no longer exists. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_ConnectionMissing {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_ConnectionMissing", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Connection name ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_ConnectionName {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_ConnectionName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The OneDrive connection is not ready. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_ConnectionNotReady {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_ConnectionNotReady", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select a ready connection. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_ConnectionRequired {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_ConnectionRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Connections ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Connections {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Connections", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Copy ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Copy {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Copy", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The selected remote items are streamed directly to the local share. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_CopyDescription {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_CopyDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Copying… ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_CopyProgress {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_CopyProgress", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The remote items were copied to the local share. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_CopySuccess {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_CopySuccess", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Copy to local share ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_CopyToLocal {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_CopyToLocal", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select a connected account and expose one of its remote folders in the web file browser. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_CreateShareHelp {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_CreateShareHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Delete connection &apos;{0}&apos; and all of its virtual shares? ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_DeleteConnectionConfirm {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_DeleteConnectionConfirm", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Department ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Department {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Department", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die You are not permitted to manage Cloud Access in this department. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_DepartmentDenied {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_DepartmentDenied", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select a virtual share to view its settings. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_DetailHint {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_DetailHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Authorization code ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Dropbox_CodeLabel {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Dropbox_CodeLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enter the authorization code from Dropbox. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Dropbox_CodeRequired {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Dropbox_CodeRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The Dropbox authorization request has expired. Please start again. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Dropbox_Expired {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Dropbox_Expired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Dropbox authorization failed. Please return to External Storage and try again. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Dropbox_Failed {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Dropbox_Failed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Open Dropbox, approve access, then paste the authorization code Dropbox shows into the field below. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Dropbox_Instructions {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Dropbox_Instructions", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Dropbox was connected, but the authorization is missing the permissions required to browse folders. Enable the files.metadata.read, files.content.read, and files.content.write scopes on the Dropbox app, then re-authorize this connection. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Dropbox_MissingScope {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Dropbox_MissingScope", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Dropbox is not configured. Set a Dropbox application key before connecting. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Dropbox_NotConfigured {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Dropbox_NotConfigured", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Open Dropbox sign-in ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Dropbox_Open {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Dropbox_Open", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Connect ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Dropbox_Submit {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Dropbox_Submit", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Connect Dropbox ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Dropbox_Title {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Dropbox_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Verifying with Dropbox… ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Dropbox_Waiting {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Dropbox_Waiting", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Edit ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Edit {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Edit", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Edit connection ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_EditConnection {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_EditConnection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Edit virtual share ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_EditShare {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_EditShare", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Access to the virtual share was denied. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_AccessDenied {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_AccessDenied", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This virtual share cannot be opened because its storage connection &quot;{0}&quot; is disabled. Please ask an administrator to re-enable the connection. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_ConnectionDisabled {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_ConnectionDisabled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This virtual share cannot be opened because its storage connection &quot;{0}&quot; still needs to be authorized. Please ask an administrator to sign in to the connection again. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_ConnectionNeedsAuthorization {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_ConnectionNeedsAuthorization", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This virtual share cannot be opened because its storage connection &quot;{0}&quot; is currently unavailable. Please try again later or contact an administrator. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_ConnectionUnavailable {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_ConnectionUnavailable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The copy operation was cancelled. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_CopyCancelled {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_CopyCancelled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The remote files could not be copied to the local share. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_CopyFailed {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_CopyFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The folder could not be created. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_CreateFolder {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_CreateFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The item could not be deleted. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_Delete {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_Delete", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The local target path is invalid. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_InvalidLocalPath {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_InvalidLocalPath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The requested path is invalid. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_InvalidPath {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_InvalidPath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The virtual share is invalid. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_InvalidShare {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_InvalidShare", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The virtual share could not be loaded. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_LoadShare {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_LoadShare", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The local target share is unavailable. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_LocalUnavailable {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_LocalUnavailable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die You do not have write access to the local target. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_LocalWriteDenied {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_LocalWriteDenied", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The item could not be moved. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_Move {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_Move", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No writable local share is available. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_NoLocalTarget {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_NoLocalTarget", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select at least one item. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_NoSelection {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_NoSelection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This virtual share is read only. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_ReadOnly {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_ReadOnly", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The item could not be copied. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_RemoteCopy {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_RemoteCopy", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The item could not be renamed. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_Rename {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_Rename", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Sign-in is required. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_SignInRequired {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_SignInRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The file could not be uploaded. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Error_Upload {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Error_Upload", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select remote folder ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_FolderPickerTitle {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_FolderPickerTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select a remote folder. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_FolderRequired {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_FolderRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Go to Connections ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_GoToConnections {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_GoToConnections", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Group ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Group {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Group", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enter a valid connection name. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_InvalidConnectionName {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_InvalidConnectionName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The remote path is invalid. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_InvalidRemotePath {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_InvalidRemotePath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enter a valid share name. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_InvalidShareName {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_InvalidShareName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cloud Access could not be loaded. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_LoadFailed {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_LoadFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Loading Cloud Access… ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Loading {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Loading", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No cloud connections have been configured. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_NoConnections {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_NoConnections", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die You are not permitted to manage Cloud Access. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_NoPermission {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_NoPermission", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No connections are available. Create and authorize a connection before creating a virtual share. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_NoReadyConnections {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_NoReadyConnections", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No virtual shares have been created. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_NoShares {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_NoShares", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Not authorized ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_NotAuthorized {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_NotAuthorized", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Open share ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Open {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Open", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die User or group ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Principal {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Principal", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select a user or group ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_PrincipalPlaceholder {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_PrincipalPlaceholder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cloud provider ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Provider {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Provider", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select a provider ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Provider_Select {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Provider_Select", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Read only ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_ReadOnly {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_ReadOnly", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Read and write ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_ReadWrite {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_ReadWrite", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Authorize again ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Reauthorize {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Reauthorize", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Remote ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Remote {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Remote", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Remote folder ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_RemoteFolder {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_RemoteFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Remove ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_RemovePrincipal {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_RemovePrincipal", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Rename ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Rename {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Rename", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Save changes ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Save {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Save", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Save access ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_SaveAccess {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_SaveAccess", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Please select ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Select {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Select", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The virtual share no longer exists. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_ShareMissing {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_ShareMissing", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Share name ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_ShareName {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_ShareName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die A local or virtual share with this name already exists. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_ShareNameExists {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_ShareNameExists", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Virtual shares ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Shares {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Shares", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Disabled ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_StatusDisabled {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_StatusDisabled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Error ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_StatusError {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_StatusError", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Authorization pending ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_StatusPending {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_StatusPending", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Ready ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_StatusReady {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_StatusReady", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Expose remote folders as virtual shares available only in the web file browser. ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Subtitle {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Subtitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Access ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_TabAccess {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_TabAccess", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die General ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_TabGeneral {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_TabGeneral", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Target folder (optional) ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_TargetFolder {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_TargetFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die e.g. Import/OneDrive ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_TargetFolderPlaceholder {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_TargetFolderPlaceholder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Target share ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_TargetShare {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_TargetShare", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cloud Access ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_Title {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die User ähnelt.
+        /// </summary>
+        public static string Web_CloudAccess_User {
+            get {
+                return ResourceManager.GetString("Web_CloudAccess_User", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Advanced settings ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Advanced {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Advanced", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Advanced limits cannot be negative. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Advanced_Error_Negative {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Advanced_Error_Negative", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Excluded file extensions ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Advanced_ExcludedExtensions {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Advanced_ExcludedExtensions", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Separate extensions with commas, spaces, or new lines. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Advanced_ExcludedExtensions_Help {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Advanced_ExcludedExtensions_Help", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Optional file filters and bandwidth limits for this sync. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Advanced_Help {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Advanced_Help", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Maximum download rate (KB/s) ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Advanced_MaxDownload {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Advanced_MaxDownload", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Maximum file size (MB) ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Advanced_MaxFileSize {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Advanced_MaxFileSize", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Maximum upload rate (KB/s) ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Advanced_MaxUpload {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Advanced_MaxUpload", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Synchronize deletions ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Advanced_SyncDeletions {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Advanced_SyncDeletions", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die When a file or folder is deleted on one side, delete it on the other side too instead of restoring it. Takes effect from the second run after enabling. If the share has a recycle bin, locally deleted items are moved there and stay recoverable. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Advanced_SyncDeletions_Help {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Advanced_SyncDeletions_Help", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enter 0 or leave empty for no limit. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Advanced_Unlimited_Help {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Advanced_Unlimited_Help", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Browse… ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Browse {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Browse", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Synchronization was cancelled. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Cancelled {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Cancelled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Synchronization completed. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Complete {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Complete", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Authorize and connect ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Connect {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Connect", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The cloud provider was connected successfully. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Connected {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Connected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Add cloud sync ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Create {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Create", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Choose a local folder and provider. You can select the remote folder after authorization. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Create_Help {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Create_Help", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Connect a folder ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Create_Title {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Create_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Description ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Description {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The cloud authorization request has expired. Please start again. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Device_Expired {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Device_Expired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Microsoft authorization failed. Please return to Cloud Sync and try again. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Device_Failed {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Device_Failed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Open the Microsoft sign-in page, enter this code, and approve access to your OneDrive. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Device_Instructions {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Device_Instructions", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Open Microsoft sign-in ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Device_OpenMicrosoft {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Device_OpenMicrosoft", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Connect Microsoft OneDrive ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Device_Title {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Device_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Waiting for Microsoft authorization… ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Device_Waiting {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Device_Waiting", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This folder contains no subfolders. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Directory_Empty {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Directory_Empty", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This folder could not be opened. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Directory_Error {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Directory_Error", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Loading folders… ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Directory_Loading {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Directory_Loading", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select local folder ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Directory_LocalTitle {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Directory_LocalTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Parent folder ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Directory_Parent {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Directory_Parent", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select remote folder ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Directory_RemoteTitle {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Directory_RemoteTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select this folder ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Directory_Select {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Directory_Select", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No cloud syncs have been configured yet. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Empty {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Empty", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This folder is already being synchronized or modified. Please try again later. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Error_Busy {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Error_Busy", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This folder overlaps an existing cloud sync. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Error_Conflict {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Error_Conflict", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The cloud syncs could not be loaded. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Error_Load {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Error_Load", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select an existing local folder. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Error_LocalFolder {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Error_LocalFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This cloud sync no longer exists. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Error_Missing {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Error_Missing", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die You are not authorized for this action. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Error_NotAuthorized {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Error_NotAuthorized", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select an available cloud provider. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Error_ProviderRequired {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Error_ProviderRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The cloud sync failed. Check the server log. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Error_Run {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Error_Run", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The cloud sync settings could not be saved. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Error_Save {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Error_Save", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select a share you may manage. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Error_ShareRequired {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Error_ShareRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Last sync ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_LastSync {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_LastSync", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Loading cloud syncs… ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Loading {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Loading", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Local folder ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_LocalFolder {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_LocalFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Sync mode ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Mode {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Mode", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Pull (cloud → local) ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Mode_Pull {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Mode_Pull", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Push (local → cloud) ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Mode_Push {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Mode_Push", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Two-way ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Mode_TwoWay {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Mode_TwoWay", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Name ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Name {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Name", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Never ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Never {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Never", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Synchronizing… ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Progress {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Progress", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cloud provider ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Provider {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Provider", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Remote folder ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_RemoteFolder {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_RemoteFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cloud sync removed. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Removed {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Removed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Sync now ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Run {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Run", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Save settings ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Save {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Save", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cloud sync settings saved. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Saved {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Saved", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Automatic sync ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Clear ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Clear {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Clear", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Every hour on {0}: {1} ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Day_Paint {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Day_Paint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Toggle every hour on {0} ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Day_Toggle {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Day_Toggle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select at least one hour before enabling the timer. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Error_Empty {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Error_Empty", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enter an interval between 1 and 86400 seconds. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Error_Interval {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Error_Interval", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Weekly hourly sync schedule ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Grid {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Grid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select the hourly windows in which this folder should synchronize. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Help {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Help", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0}:00 on every day: {1} ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Hour_Paint {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Hour_Paint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Toggle {0}:00 for every day ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Hour_Toggle {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Hour_Toggle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Check interval ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Interval {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Interval", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Controls how often the server checks whether a selected synchronization window is active. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Interval_Help {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Interval_Help", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Deselect ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Paint_Deselect {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Paint_Deselect", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Click or hold the mouse button and drag from the start cell to span a rectangle across several windows. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Paint_Help {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Paint_Help", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Edit mode ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Paint_Mode {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Paint_Mode", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Paint_Select {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Paint_Select", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die seconds ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Seconds {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Seconds", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} hourly windows selected · server local time ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Selected {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Selected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0}, {1}:00–{2}:00: inactive ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Slot_Off {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Slot_Off", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0}, {1}:00–{2}:00: active ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Slot_On {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Slot_On", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enable or disable automatic sync ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Schedule_Toggle {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Schedule_Toggle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select a cloud sync to view its settings. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Select {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Select", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Share ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Share {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Share", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Configured syncs: {0} ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_SharePanel_Count {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_SharePanel_Count", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Manage this share&apos;s local and remote folder mappings in the central cloud-sync workspace. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_SharePanel_Help {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_SharePanel_Help", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Open cloud-sync management ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_SharePanel_Open {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_SharePanel_Open", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Manage local and remote folder synchronization across all cloud providers. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Subtitle {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Subtitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Advanced ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Tab_Advanced {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Tab_Advanced", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die General ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Tab_General {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Tab_General", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Timing ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Tab_Schedule {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Tab_Schedule", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cloud Sync ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Title {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Remove cloud sync ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Unsync {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Unsync", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Remove this configuration and revoke its cloud connection? ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Unsync_Confirm {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Unsync_Confirm", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Active ähnelt.
         /// </summary>
         public static string Web_Common_Active {
@@ -1760,25 +3533,7 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Common_Creating", resourceCulture);
             }
         }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Renaming… ähnelt.
-        /// </summary>
-        public static string Web_Common_Renaming {
-            get {
-                return ResourceManager.GetString("Web_Common_Renaming", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Renamed ähnelt.
-        /// </summary>
-        public static string Web_Rename_Success {
-            get {
-                return ResourceManager.GetString("Web_Rename_Success", resourceCulture);
-            }
-        }
-
+        
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Custom ähnelt.
         /// </summary>
@@ -1839,6 +3594,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Common_Name {
             get {
                 return ResourceManager.GetString("Web_Common_Name", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No ähnelt.
+        /// </summary>
+        public static string Web_Common_No {
+            get {
+                return ResourceManager.GetString("Web_Common_No", resourceCulture);
             }
         }
         
@@ -1933,6 +3697,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Renaming… ähnelt.
+        /// </summary>
+        public static string Web_Common_Renaming {
+            get {
+                return ResourceManager.GetString("Web_Common_Renaming", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Save ähnelt.
         /// </summary>
         public static string Web_Common_Save {
@@ -1965,6 +3738,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Common_System {
             get {
                 return ResourceManager.GetString("Web_Common_System", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Yes ähnelt.
+        /// </summary>
+        public static string Web_Common_Yes {
+            get {
+                return ResourceManager.GetString("Web_Common_Yes", resourceCulture);
             }
         }
         
@@ -2563,6 +4345,249 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This device is already revoked. ähnelt.
+        /// </summary>
+        public static string Web_DeviceAdmin_AlreadyRevoked {
+            get {
+                return ResourceManager.GetString("Web_DeviceAdmin_AlreadyRevoked", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Revoke this device? Its tokens stop working immediately. ähnelt.
+        /// </summary>
+        public static string Web_DeviceAdmin_ConfirmRevoke {
+            get {
+                return ResourceManager.GetString("Web_DeviceAdmin_ConfirmRevoke", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Yes, revoke ähnelt.
+        /// </summary>
+        public static string Web_DeviceAdmin_ConfirmYes {
+            get {
+                return ResourceManager.GetString("Web_DeviceAdmin_ConfirmYes", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die You do not have permission to manage client devices. ähnelt.
+        /// </summary>
+        public static string Web_DeviceAdmin_Forbidden {
+            get {
+                return ResourceManager.GetString("Web_DeviceAdmin_Forbidden", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Could not load client devices. ähnelt.
+        /// </summary>
+        public static string Web_DeviceAdmin_LoadFailed {
+            get {
+                return ResourceManager.GetString("Web_DeviceAdmin_LoadFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No client devices are registered yet. ähnelt.
+        /// </summary>
+        public static string Web_DeviceAdmin_None {
+            get {
+                return ResourceManager.GetString("Web_DeviceAdmin_None", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Owner ähnelt.
+        /// </summary>
+        public static string Web_DeviceAdmin_Owner {
+            get {
+                return ResourceManager.GetString("Web_DeviceAdmin_Owner", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Registered ähnelt.
+        /// </summary>
+        public static string Web_DeviceAdmin_Registered {
+            get {
+                return ResourceManager.GetString("Web_DeviceAdmin_Registered", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Registrations are tidied up automatically: revoked devices are removed {0} days after revocation, and devices not seen for {1} days are dropped once their sign-in has long since expired. ähnelt.
+        /// </summary>
+        public static string Web_DeviceAdmin_Retention {
+            get {
+                return ResourceManager.GetString("Web_DeviceAdmin_Retention", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Revoke device ähnelt.
+        /// </summary>
+        public static string Web_DeviceAdmin_Revoke {
+            get {
+                return ResourceManager.GetString("Web_DeviceAdmin_Revoke", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Revoked on ähnelt.
+        /// </summary>
+        public static string Web_DeviceAdmin_RevokedOn {
+            get {
+                return ResourceManager.GetString("Web_DeviceAdmin_RevokedOn", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Could not revoke the device. ähnelt.
+        /// </summary>
+        public static string Web_DeviceAdmin_RevokeFailed {
+            get {
+                return ResourceManager.GetString("Web_DeviceAdmin_RevokeFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Every user&apos;s connected apps and instances. Revoke a device to invalidate its tokens and drop its sync selections — useful for stale or unused devices. ähnelt.
+        /// </summary>
+        public static string Web_DeviceAdmin_Subtitle {
+            get {
+                return ResourceManager.GetString("Web_DeviceAdmin_Subtitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Synced folders ähnelt.
+        /// </summary>
+        public static string Web_DeviceAdmin_SyncedFolders {
+            get {
+                return ResourceManager.GetString("Web_DeviceAdmin_SyncedFolders", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die active ähnelt.
+        /// </summary>
+        public static string Web_Devices_Active {
+            get {
+                return ResourceManager.GetString("Web_Devices_Active", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Direction ähnelt.
+        /// </summary>
+        public static string Web_Devices_Col_Direction {
+            get {
+                return ResourceManager.GetString("Web_Devices_Col_Direction", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enabled ähnelt.
+        /// </summary>
+        public static string Web_Devices_Col_Enabled {
+            get {
+                return ResourceManager.GetString("Web_Devices_Col_Enabled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Local folder ähnelt.
+        /// </summary>
+        public static string Web_Devices_Col_LocalFolder {
+            get {
+                return ResourceManager.GetString("Web_Devices_Col_LocalFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Remote folder ähnelt.
+        /// </summary>
+        public static string Web_Devices_Col_RemoteFolder {
+            get {
+                return ResourceManager.GetString("Web_Devices_Col_RemoteFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Share ähnelt.
+        /// </summary>
+        public static string Web_Devices_Col_Share {
+            get {
+                return ResourceManager.GetString("Web_Devices_Col_Share", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Last seen ähnelt.
+        /// </summary>
+        public static string Web_Devices_LastSeen {
+            get {
+                return ResourceManager.GetString("Web_Devices_LastSeen", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Download only ähnelt.
+        /// </summary>
+        public static string Web_Devices_Mode_Pull {
+            get {
+                return ResourceManager.GetString("Web_Devices_Mode_Pull", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Upload only ähnelt.
+        /// </summary>
+        public static string Web_Devices_Mode_Push {
+            get {
+                return ResourceManager.GetString("Web_Devices_Mode_Push", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Both directions ähnelt.
+        /// </summary>
+        public static string Web_Devices_Mode_TwoWay {
+            get {
+                return ResourceManager.GetString("Web_Devices_Mode_TwoWay", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No synced folders yet. ähnelt.
+        /// </summary>
+        public static string Web_Devices_NoFolders {
+            get {
+                return ResourceManager.GetString("Web_Devices_NoFolders", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Platform ähnelt.
+        /// </summary>
+        public static string Web_Devices_Platform {
+            get {
+                return ResourceManager.GetString("Web_Devices_Platform", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die revoked ähnelt.
+        /// </summary>
+        public static string Web_Devices_Revoked {
+            get {
+                return ResourceManager.GetString("Web_Devices_Revoked", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Access denied. ähnelt.
         /// </summary>
         public static string Web_Error_AccessDenied {
@@ -3022,6 +5047,1446 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Attention required ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_AttentionRequired {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_AttentionRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Mount attestation file ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_AttestationPath {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_AttestationPath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Application credential ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Auth_ApplicationCredential {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Auth_ApplicationCredential", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Delegated authorization code ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Auth_DelegatedAuthorizationCode {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Auth_DelegatedAuthorizationCode", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Device code ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Auth_DeviceCode {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Auth_DeviceCode", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Host mount ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Auth_HostMount {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Auth_HostMount", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Network identity ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Auth_NetworkIdentity {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Auth_NetworkIdentity", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Service account ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Auth_ServiceAccount {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Auth_ServiceAccount", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die SSH key ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Auth_SshKey {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Auth_SshKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Username and password ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Auth_UsernamePassword {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Auth_UsernamePassword", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Authorization mode ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_AuthorizationMode {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_AuthorizationMode", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This connection does not support interactive authorization. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_AuthorizeUnsupported {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_AuthorizeUnsupported", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This provider does not support remote browsing. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_BrowseUnsupported {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_BrowseUnsupported", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Capabilities ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capabilities {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capabilities", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Capabilities and usage ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_CapabilitiesAndUsage {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_CapabilitiesAndUsage", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Application authorization ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_ApplicationAuthorization {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_ApplicationAuthorization", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Browse ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_Browse {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_Browse", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Create folders ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_CreateDirectory {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_CreateDirectory", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Delegated authorization ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_DelegatedAuthorization {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_DelegatedAuthorization", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Delete ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_Delete {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_Delete", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Direct protocol access ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_DirectFileAccess {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_DirectFileAccess", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Move ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_Move {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_Move", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Optimized synchronization ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_OptimizedSync {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_OptimizedSync", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Read ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_Read {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_Read", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Rename ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_Rename {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_Rename", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Operator-managed mount ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_RequiresHostMount {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_RequiresHostMount", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Server-side copy ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_ServerSideCopy {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_ServerSideCopy", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Stable item IDs ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_StableItemIds {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_StableItemIds", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Synchronization ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_Sync {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_Sync", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Change tracking ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_WatchChanges {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_WatchChanges", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Write ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Capability_Write {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Capability_Write", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Connection ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Connection {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Connection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Protocol settings (JSON) ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ConnectionSettings {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ConnectionSettings", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enter only the documented provider settings. Secrets must be stored through the credential vault or referenced by an absolute secret-file path. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ConnectionSettingsHelp {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ConnectionSettingsHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Authorize a provider once, inspect its health, and reuse it safely. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ConnectionsHelp {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ConnectionsHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Copy public key ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_CopyPublicKey {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_CopyPublicKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Create virtual share ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_CreateShareFromConnection {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_CreateShareFromConnection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Create sync ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_CreateSync {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_CreateSync", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Create sync ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_CreateSyncFromConnection {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_CreateSyncFromConnection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The connection and local share must belong to the same department. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_DepartmentMismatch {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_DepartmentMismatch", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die A department is required: it controls who can see, use, and manage this connection. Choose Global to make it available across all departments. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_DepartmentRequiredHint {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_DepartmentRequiredHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Description ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Description {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Disable ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Disable {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Disable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Disabled ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Disabled {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Disabled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Domain (optional) ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Domain {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Domain", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Edit sync ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_EditSync {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_EditSync", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enable ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Enable {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Enable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enabled ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Enabled {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Enabled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Excluded extensions ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ExcludedExtensions {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ExcludedExtensions", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Expected server identity ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ExpectedServerIdentity {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ExpectedServerIdentity", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Health ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Health {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Health", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Healthy ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Healthy {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Healthy", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Identity and authorization ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Identity {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Identity", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Minimum interval (seconds) ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Interval {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Interval", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enter a valid username and password for this connection. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_InvalidCredentials {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_InvalidCredentials", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The description is too long. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_InvalidDescription {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_InvalidDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enter a name of at most 200 characters. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_InvalidName {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_InvalidName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select a valid SSH private key no larger than 1 MiB. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_InvalidPrivateKey {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_InvalidPrivateKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enter valid protocol settings of at most 64 KiB. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_InvalidSettings {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_InvalidSettings", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Known-hosts secret file ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_KnownHostsSecretReference {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_KnownHostsSecretReference", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Last run ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_LastRun {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_LastRun", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Last verified ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_LastVerified {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_LastVerified", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die External storage could not be loaded. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_LoadFailed {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_LoadFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Loading external storage… ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Loading {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Loading", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Local folder ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_LocalPath {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_LocalPath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Local share ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_LocalShare {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_LocalShare", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Download limit (KB/s) ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_MaxDownloadRate {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_MaxDownloadRate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Maximum file size (MB) ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_MaxFileSize {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_MaxFileSize", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Upload limit (KB/s) ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_MaxUploadRate {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_MaxUploadRate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Minimum SMB version ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_MinimumDialect {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_MinimumDialect", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Direction ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Mode {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Mode", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Local mount path ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_MountPath {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_MountPath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Name ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Name {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Name", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No connection selected ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_NoConnectionSelected {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_NoConnectionSelected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select a connection from the list to view its details, test connectivity, or manage its settings. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_NoConnectionSelectedHint {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_NoConnectionSelectedHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die None ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_None {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_None", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No syncs are configured. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_NoSyncs {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_NoSyncs", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Not authorized ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_NotAuthorized {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_NotAuthorized", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The operation failed. Check the server log. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_OperationFailed {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_OperationFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Password ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Password {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Password", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This local folder already has a sync. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_PathInUse {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_PathInUse", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Port ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Port {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Port", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Private-key secret file ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_PrivateKeySecretReference {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_PrivateKeySecretReference", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Configured ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ProfileConfigured {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ProfileConfigured", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Provider profile ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ProfileHealth {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ProfileHealth", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Legacy / unassigned ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ProfileLegacy {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ProfileLegacy", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Protected ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Protected {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Protected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This provider cannot be configured through this workflow. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ProviderUnsupported {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ProviderUnsupported", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Read only ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ReadOnly {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ReadOnly", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This connection supports pull synchronization only. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ReadOnlyPullRequired {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ReadOnlyPullRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The remote folders could not be loaded. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_RemoteBrowseFailed {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_RemoteBrowseFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The remote storage server denied this operation. Check the permissions of the account configured for this connection. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_RemoteOperationDenied {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_RemoteOperationDenied", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Remote folder ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_RemotePath {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_RemotePath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The remote storage server denied read access. Check the permissions of the account configured for this connection. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_RemoteReadDenied {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_RemoteReadDenied", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Remote root ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_RemoteRoot {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_RemoteRoot", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The remote storage server denied write access. Check the share and file-system permissions of the account configured for this connection. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_RemoteWriteDenied {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_RemoteWriteDenied", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Rsync connections require an explicit pull or push direction; two-way synchronization is not supported. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_RsyncDirectionRequired {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_RsyncDirectionRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Use absolute paths to read-only secret files. The pinned SHA-256 fingerprint must match the selected host entry in the known-hosts file. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_RsyncSshHelp {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_RsyncSshHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Run now ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_RunNow {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_RunNow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Runtime network identity ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_RuntimeIdentity {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_RuntimeIdentity", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Run automatically ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ScheduleEnabled {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ScheduleEnabled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Effective scopes ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Scopes {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Scopes", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die External secret files ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SecretFileReferences {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SecretFileReferences", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Credential storage ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SecretHealth {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SecretHealth", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select… ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Select {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Select", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select a connection to inspect its details. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SelectConnection {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SelectConnection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select Edit on a synchronization to open its settings. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SelectSyncHint {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SelectSyncHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Server / IP address ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Server {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Server", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The local share no longer exists. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_ShareMissing {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_ShareMissing", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die SMB share ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SmbShare {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SmbShare", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Available SMB shares are loaded after connecting and can be selected when configuring a sync. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SmbSharePickerHelp {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SmbSharePickerHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Use external secret files ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshAdvancedMode {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshAdvancedMode", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die I verified this fingerprint through a trusted channel. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshConfirmFingerprint {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshConfirmFingerprint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Retrieve host key ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshFetchHostKey {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshFetchHostKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Generated key is ready ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshGeneratedKeyReady {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshGeneratedKeyReady", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Generate Ed25519 key ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshGenerateKey {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshGenerateKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die SSH host-key fingerprint (SHA-256) ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshHostFingerprint {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshHostFingerprint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Available host key ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshHostKey {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshHostKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No usable SSH host key was returned. Check the server and port. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshHostKeyNotFound {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshHostKeyNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Verify the SSH server ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshHostVerification {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshHostVerification", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Retrieve the public host key, compare its fingerprint through an independent trusted channel, and confirm it below. Retrieval alone does not establish trust. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshHostVerificationHelp {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshHostVerificationHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Guided SSH setup ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshKeySetup {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshKeySetup", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Upload or generate a key, install the public key on the remote account, and explicitly verify the server identity. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshKeySetupHelp {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshKeySetupHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Prepare the client key ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshPrivateKey {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshPrivateKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Upload an unencrypted OpenSSH private key or generate a new Ed25519 key. The private key is encrypted in the connection vault. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshPrivateKeyHelp {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshPrivateKeyHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Public key to install on the server ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshPublicKey {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshPublicKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The SSH setup step could not be completed. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshSetupError {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshSetupError", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The SSH setup request timed out. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshSetupError_helper_timeout {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshSetupError_helper_timeout", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The required OpenSSH setup tool is unavailable on the server. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshSetupError_helper_unavailable {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshSetupError_helper_unavailable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No SSH host key could be retrieved. Check the endpoint and firewall. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshSetupError_host_key_discovery_failed {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshSetupError_host_key_discovery_failed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The selected SSH host key is invalid. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshSetupError_host_key_invalid {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshSetupError_host_key_invalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The server could not generate an SSH key. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshSetupError_key_generation_failed {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshSetupError_key_generation_failed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The private key is invalid, unsupported, or protected by a passphrase. Use an unencrypted OpenSSH key. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshSetupError_private_key_invalid {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshSetupError_private_key_invalid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Complete the SSH key and host-verification steps first. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SshSetupIncomplete {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SshSetupIncomplete", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die State ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_State {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_State", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Degraded ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_State_Degraded {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_State_Degraded", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Disabled ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_State_Disabled {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_State_Disabled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Reauthorization required ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_State_NeedsReauthorization {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_State_NeedsReauthorization", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Pending authorization ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_State_PendingAuthorization {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_State_PendingAuthorization", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Pending configuration ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_State_PendingConfiguration {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_State_PendingConfiguration", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Ready ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_State_Ready {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_State_Ready", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Manage reusable provider connections and the syncs that use them. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Subtitle {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Subtitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The sync no longer exists. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SyncMissing {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SyncMissing", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Synchronize local folders through reusable, protected connections. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SyncsHelp {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SyncsHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The sync is busy or unavailable. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SyncUnavailable {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SyncUnavailable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This provider does not support synchronization. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_SyncUnsupported {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_SyncUnsupported", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Connections ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Tab_Connections {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Tab_Connections", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Syncs ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Tab_Syncs {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Tab_Syncs", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Tenant / organization ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Tenant {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Tenant", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Test ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Test {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Test", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Connection test failed ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_TestFailed {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_TestFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Connection successful ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_TestSuccessful {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_TestSuccessful", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Testing is not available for this provider yet. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_TestUnsupported {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_TestUnsupported", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die External Storage ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Title {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Usage ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Usage {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Usage", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} sync(s), {1} virtual share(s) ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_UsageFormat {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_UsageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Username ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_Username {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_Username", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This provider cannot be used for virtual shares. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_VirtualShareUnsupported {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_VirtualShareUnsupported", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enter the full WebDAV endpoint URL. Credentials are stored encrypted in the connection vault. HTTPS is strongly recommended. ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_WebDavHelp {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_WebDavHelp", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Server URL ähnelt.
+        /// </summary>
+        public static string Web_ExternalStorage_WebDavServerUrl {
+            get {
+                return ResourceManager.GetString("Web_ExternalStorage_WebDavServerUrl", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die File is loading... ähnelt.
         /// </summary>
         public static string Web_File_Loading {
@@ -3121,6 +6586,96 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die “{0}” now conflicts with the synchronized folder “{1}”. Nothing was connected. ähnelt.
+        /// </summary>
+        public static string Web_GoogleOAuth_CallbackConflict {
+            get {
+                return ResourceManager.GetString("Web_GoogleOAuth_CallbackConflict", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Google authorization was cancelled or denied. ähnelt.
+        /// </summary>
+        public static string Web_GoogleOAuth_ConsentDenied {
+            get {
+                return ResourceManager.GetString("Web_GoogleOAuth_ConsentDenied", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Google authorization could not be completed. No credentials were stored. ähnelt.
+        /// </summary>
+        public static string Web_GoogleOAuth_ExchangeFailed {
+            get {
+                return ResourceManager.GetString("Web_GoogleOAuth_ExchangeFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This folder is already synchronized. ähnelt.
+        /// </summary>
+        public static string Web_GoogleOAuth_FolderAlreadySynced {
+            get {
+                return ResourceManager.GetString("Web_GoogleOAuth_FolderAlreadySynced", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This folder conflicts with the synchronized folder “{0}”. ähnelt.
+        /// </summary>
+        public static string Web_GoogleOAuth_FolderConflict {
+            get {
+                return ResourceManager.GetString("Web_GoogleOAuth_FolderConflict", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Google returned an invalid authorization callback. ähnelt.
+        /// </summary>
+        public static string Web_GoogleOAuth_InvalidCallback {
+            get {
+                return ResourceManager.GetString("Web_GoogleOAuth_InvalidCallback", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The selected Google Drive access profile is invalid. ähnelt.
+        /// </summary>
+        public static string Web_GoogleOAuth_InvalidScopeProfile {
+            get {
+                return ResourceManager.GetString("Web_GoogleOAuth_InvalidScopeProfile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The Google authorization request is invalid or has expired. ähnelt.
+        /// </summary>
+        public static string Web_GoogleOAuth_InvalidTransaction {
+            get {
+                return ResourceManager.GetString("Web_GoogleOAuth_InvalidTransaction", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Google authorization is not configured for this installation. ähnelt.
+        /// </summary>
+        public static string Web_GoogleOAuth_NotConfigured {
+            get {
+                return ResourceManager.GetString("Web_GoogleOAuth_NotConfigured", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The share no longer exists. ähnelt.
+        /// </summary>
+        public static string Web_GoogleOAuth_ShareNotFound {
+            get {
+                return ResourceManager.GetString("Web_GoogleOAuth_ShareNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Group created. ähnelt.
         /// </summary>
         public static string Web_Group_Created {
@@ -3144,6 +6699,132 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Group_NameRequired {
             get {
                 return ResourceManager.GetString("Web_Group_NameRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Algorithm ähnelt.
+        /// </summary>
+        public static string Web_Hash_Algorithm {
+            get {
+                return ResourceManager.GetString("Web_Hash_Algorithm", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Computing… ähnelt.
+        /// </summary>
+        public static string Web_Hash_Computing {
+            get {
+                return ResourceManager.GetString("Web_Hash_Computing", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Copied ähnelt.
+        /// </summary>
+        public static string Web_Hash_Copied {
+            get {
+                return ResourceManager.GetString("Web_Hash_Copied", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Copy ähnelt.
+        /// </summary>
+        public static string Web_Hash_Copy {
+            get {
+                return ResourceManager.GetString("Web_Hash_Copy", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Could not compute the hash. ähnelt.
+        /// </summary>
+        public static string Web_Hash_Error {
+            get {
+                return ResourceManager.GetString("Web_Hash_Error", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Hash value ähnelt.
+        /// </summary>
+        public static string Web_Hash_Value {
+            get {
+                return ResourceManager.GetString("Web_Hash_Value", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cancel job ähnelt.
+        /// </summary>
+        public static string Web_Jobs_Cancel {
+            get {
+                return ResourceManager.GetString("Web_Jobs_Cancel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cancelling… ähnelt.
+        /// </summary>
+        public static string Web_Jobs_Cancelling {
+            get {
+                return ResourceManager.GetString("Web_Jobs_Cancelling", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cloud sync: {0} ähnelt.
+        /// </summary>
+        public static string Web_Jobs_CloudSync_Title {
+            get {
+                return ResourceManager.GetString("Web_Jobs_CloudSync_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} active ähnelt.
+        /// </summary>
+        public static string Web_Jobs_Count {
+            get {
+                return ResourceManager.GetString("Web_Jobs_Count", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No jobs are currently running. ähnelt.
+        /// </summary>
+        public static string Web_Jobs_Empty {
+            get {
+                return ResourceManager.GetString("Web_Jobs_Empty", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0}: {1} ähnelt.
+        /// </summary>
+        public static string Web_Jobs_FileTransfer_Title {
+            get {
+                return ResourceManager.GetString("Web_Jobs_FileTransfer_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Running jobs ähnelt.
+        /// </summary>
+        public static string Web_Jobs_Title {
+            get {
+                return ResourceManager.GetString("Web_Jobs_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Upload: {0} ähnelt.
+        /// </summary>
+        public static string Web_Jobs_Upload_Title {
+            get {
+                return ResourceManager.GetString("Web_Jobs_Upload_Title", resourceCulture);
             }
         }
         
@@ -3346,11 +7027,29 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cloud Sync ähnelt.
+        /// </summary>
+        public static string Web_Nav_CloudSync {
+            get {
+                return ResourceManager.GetString("Web_Nav_CloudSync", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Departments ähnelt.
         /// </summary>
         public static string Web_Nav_Departments {
             get {
                 return ResourceManager.GetString("Web_Nav_Departments", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Client devices ähnelt.
+        /// </summary>
+        public static string Web_Nav_DeviceAdmin {
+            get {
+                return ResourceManager.GetString("Web_Nav_DeviceAdmin", resourceCulture);
             }
         }
         
@@ -3533,22 +7232,13 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Perm_ManageAcls", resourceCulture);
             }
         }
-
-        public static string Web_Perm_ManageCloudAccess {
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Manage database backups ähnelt.
+        /// </summary>
+        public static string Web_Perm_ManageBackups {
             get {
-                return ResourceManager.GetString("Web_Perm_ManageCloudAccess", resourceCulture);
-            }
-        }
-
-        public static string Web_Perm_ManageConnections {
-            get {
-                return ResourceManager.GetString("Web_Perm_ManageConnections", resourceCulture);
-            }
-        }
-
-        public static string Web_Perm_UseConnections {
-            get {
-                return ResourceManager.GetString("Web_Perm_UseConnections", resourceCulture);
+                return ResourceManager.GetString("Web_Perm_ManageBackups", resourceCulture);
             }
         }
         
@@ -3560,22 +7250,25 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Perm_ManageCertificates", resourceCulture);
             }
         }
-
-        public static string Web_Perm_ViewSystemLogs {
-            get {
-                return ResourceManager.GetString("Web_Perm_ViewSystemLogs", resourceCulture);
-            }
-        }
-
+        
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Manage database backups ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Manage virtual shares ähnelt.
         /// </summary>
-        public static string Web_Perm_ManageBackups {
+        public static string Web_Perm_ManageCloudAccess {
             get {
-                return ResourceManager.GetString("Web_Perm_ManageBackups", resourceCulture);
+                return ResourceManager.GetString("Web_Perm_ManageCloudAccess", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Manage storage connections ähnelt.
+        /// </summary>
+        public static string Web_Perm_ManageConnections {
+            get {
+                return ResourceManager.GetString("Web_Perm_ManageConnections", resourceCulture);
+            }
+        }
+        
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Manage data services ähnelt.
         /// </summary>
@@ -3613,11 +7306,29 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Use storage connections ähnelt.
+        /// </summary>
+        public static string Web_Perm_UseConnections {
+            get {
+                return ResourceManager.GetString("Web_Perm_UseConnections", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die View department ähnelt.
         /// </summary>
         public static string Web_Perm_ViewDepartment {
             get {
                 return ResourceManager.GetString("Web_Perm_ViewDepartment", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die View and download system logs ähnelt.
+        /// </summary>
+        public static string Web_Perm_ViewSystemLogs {
+            get {
+                return ResourceManager.GetString("Web_Perm_ViewSystemLogs", resourceCulture);
             }
         }
         
@@ -3636,6 +7347,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_PermGroup_DeptMgmt {
             get {
                 return ResourceManager.GetString("Web_PermGroup_DeptMgmt", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die External Storage ähnelt.
+        /// </summary>
+        public static string Web_PermGroup_ExternalStorage {
+            get {
+                return ResourceManager.GetString("Web_PermGroup_ExternalStorage", resourceCulture);
             }
         }
         
@@ -3811,6 +7531,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Unavailable ähnelt.
+        /// </summary>
+        public static string Web_Properties_SizeUnavailable {
+            get {
+                return ResourceManager.GetString("Web_Properties_SizeUnavailable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die General ähnelt.
         /// </summary>
         public static string Web_Properties_Tab_General {
@@ -3865,6 +7594,60 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Attempt ähnelt.
+        /// </summary>
+        public static string Web_Reconnect_AttemptLabel {
+            get {
+                return ResourceManager.GetString("Web_Reconnect_AttemptLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Could not reconnect to the server. ähnelt.
+        /// </summary>
+        public static string Web_Reconnect_Failed {
+            get {
+                return ResourceManager.GetString("Web_Reconnect_Failed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The session was paused by the server. ähnelt.
+        /// </summary>
+        public static string Web_Reconnect_Paused {
+            get {
+                return ResourceManager.GetString("Web_Reconnect_Paused", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Connection lost. Trying to reconnect… ähnelt.
+        /// </summary>
+        public static string Web_Reconnect_Reconnecting {
+            get {
+                return ResourceManager.GetString("Web_Reconnect_Reconnecting", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The server rejected the connection. ähnelt.
+        /// </summary>
+        public static string Web_Reconnect_Rejected {
+            get {
+                return ResourceManager.GetString("Web_Reconnect_Rejected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Reload ähnelt.
+        /// </summary>
+        public static string Web_Reconnect_Reload {
+            get {
+                return ResourceManager.GetString("Web_Reconnect_Reload", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Please enter a new name. ähnelt.
         /// </summary>
         public static string Web_Rename_NameRequired {
@@ -3879,6 +7662,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Rename_Placeholder {
             get {
                 return ResourceManager.GetString("Web_Rename_Placeholder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Renamed ähnelt.
+        /// </summary>
+        public static string Web_Rename_Success {
+            get {
+                return ResourceManager.GetString("Web_Rename_Success", resourceCulture);
             }
         }
         
@@ -4000,11 +7792,614 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Created ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_Col_Created {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_Col_Created", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Size ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_Col_Size {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_Col_Size", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Type ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_Col_Type {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_Col_Type", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Backup created successfully. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_Created {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_Created", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Backup could not be created. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_CreateFailed {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_CreateFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Create backup now ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_CreateNow {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_CreateNow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Creating backup… ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_Creating {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_Creating", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Download ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_Download {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_Download", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Enable scheduled backups ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_Enabled {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_Enabled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Existing backups ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_ExistingTitle {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_ExistingTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Please enter a valid start and end time (HH:mm). ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_InvalidWindow {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_InvalidWindow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Create a backup right now. It is stored in the backup folder alongside the automatic ones. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_ManualDescription {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_ManualDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Manual backup ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_ManualTitle {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_ManualTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No backups yet. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_None {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_None", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Keep last (backups) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_RetentionCount {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_RetentionCount", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Delete after (days) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_RetentionDays {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_RetentionDays", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Backup settings saved. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_Saved {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_Saved", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Backup settings could not be saved. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_SaveFailed {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_SaveFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Automatically create one database backup per day within the configured time window. If the server was off during the window, the backup runs on the next start that still falls inside it. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_ScheduleDescription {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_ScheduleDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Scheduled backups ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_ScheduleTitle {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_ScheduleTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Manual ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_Trigger_Manual {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_Trigger_Manual", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Before migration ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_Trigger_PreMigration {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_Trigger_PreMigration", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Scheduled ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_Trigger_Scheduled {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_Trigger_Scheduled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Window end ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_WindowEnd {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_WindowEnd", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Window start ähnelt.
+        /// </summary>
+        public static string Web_Settings_Backup_WindowStart {
+            get {
+                return ResourceManager.GetString("Web_Settings_Backup_WindowStart", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Save ähnelt.
         /// </summary>
         public static string Web_Settings_Button_Save {
             get {
                 return ResourceManager.GetString("Web_Settings_Button_Save", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Additional names/IPs ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_AdditionalNames {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_AdditionalNames", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Apply certificate ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Apply {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Apply", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Validity period of the self-signed certificate. It is renewed automatically in good time before it expires — without a restart. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_AutoDesc {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_AutoDesc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die automatic renewal ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_AutoRenew {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_AutoRenew", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Automatic certificate ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_AutoTitle {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_AutoTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Choose file… ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_ChooseFile {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_ChooseFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Common name (optional) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_CommonName {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_CommonName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Default: hostname ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_CommonNamePlaceholder {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_CommonNamePlaceholder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Custom certificate ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Custom {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Custom", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die expired {0} days ago ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_DaysExpired {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_DaysExpired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} days remaining ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_DaysRemaining {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_DaysRemaining", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The server automatically creates a self-signed certificate and renews it before it expires. Download the public certificate file to trust it on your clients — or replace it with your own certificate. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Desc {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Desc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Download .crt ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_DownloadCrt {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_DownloadCrt", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Download as PEM ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_DownloadPem {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_DownloadPem", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Expires ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Expires {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Expires", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Certificate (.pfx/.p12/.pem/.crt/.cer) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_FileCert {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_FileCert", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Private key (optional, .key/.pem) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_FileKey {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_FileKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Issued ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Issued {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Issued", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Validity ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Lifetime {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Lifetime", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die 1 month (30 days) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Lifetime1M {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Lifetime1M", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die 3 months (90 days) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Lifetime3M {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Lifetime3M", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No file selected ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_NoFile {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_NoFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No certificate has been loaded yet. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_None {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_None", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die no renewal ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_NoRenew {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_NoRenew", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Password ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Password {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Password", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Refresh ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Refresh {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Refresh", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Regenerate now ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_RegenerateNow {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_RegenerateNow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Subject alternative names (SAN) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Sans {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Sans", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Save &amp; regenerate ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_SaveRegenerate {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_SaveRegenerate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Self-signed ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_SelfSigned {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_SelfSigned", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Subject (CN) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Subject {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Subject", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Fingerprint (SHA-1) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Thumbprint {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Thumbprint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die HTTPS certificate ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Title {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Type ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_Type {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_Type", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Replace the automatic certificate with your own — the format is detected automatically. The &lt;strong&gt;private key&lt;/strong&gt; must be included. You have three options: a &lt;strong&gt;.pfx/.p12&lt;/strong&gt;, a &lt;strong&gt;combined PEM&lt;/strong&gt; (certificate + key in one file), or &lt;strong&gt;certificate and key as two separate files&lt;/strong&gt;. Automatic renewal is paused while your own certificate is in use. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_UploadDesc {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_UploadDesc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Upload your own certificate ähnelt.
+        /// </summary>
+        public static string Web_Settings_Cert_UploadTitle {
+            get {
+                return ResourceManager.GetString("Web_Settings_Cert_UploadTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Controls how long remote directory listings are reused. File contents, credentials, and access decisions are never cached. Changes apply immediately. ähnelt.
+        /// </summary>
+        public static string Web_Settings_CloudAccess_CacheDescription {
+            get {
+                return ResourceManager.GetString("Web_Settings_CloudAccess_CacheDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Allowed range: {0}–{1} seconds. The default is 20 seconds. ähnelt.
+        /// </summary>
+        public static string Web_Settings_CloudAccess_CacheRange {
+            get {
+                return ResourceManager.GetString("Web_Settings_CloudAccess_CacheRange", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cloud Access cache settings saved. ähnelt.
+        /// </summary>
+        public static string Web_Settings_CloudAccess_CacheSaved {
+            get {
+                return ResourceManager.GetString("Web_Settings_CloudAccess_CacheSaved", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cloud Access cache settings could not be saved. ähnelt.
+        /// </summary>
+        public static string Web_Settings_CloudAccess_CacheSaveFailed {
+            get {
+                return ResourceManager.GetString("Web_Settings_CloudAccess_CacheSaveFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cache duration (seconds) ähnelt.
+        /// </summary>
+        public static string Web_Settings_CloudAccess_CacheSeconds {
+            get {
+                return ResourceManager.GetString("Web_Settings_CloudAccess_CacheSeconds", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Directory metadata cache ähnelt.
+        /// </summary>
+        public static string Web_Settings_CloudAccess_CacheTitle {
+            get {
+                return ResourceManager.GetString("Web_Settings_CloudAccess_CacheTitle", resourceCulture);
             }
         }
         
@@ -4023,6 +8418,195 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Settings_ContextMenu_Detail {
             get {
                 return ResourceManager.GetString("Web_Settings_ContextMenu_Detail", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die all ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_AllShort {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_AllShort", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Action \ Category ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_Corner {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_Corner", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No entry in this category ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_Empty {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_Empty", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Click a row to toggle that action for every category at once. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_Help1 {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_Help1", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Click a column header to preview that category&apos;s menu on the right. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_Help2 {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_Help2", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The box in a column header turns the whole category on or off. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_Help3 {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_Help3", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Drag the entries under “Order” to change the sequence — every category follows it. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_Help4 {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_Help4", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die How it works ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_HelpTitle {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_HelpTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Click a row to set an action for every category at once. Click a column header to preview that category; the small “all” under the header toggles the whole column. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_Intro {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_Intro", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Choose which actions appear in the right-click menu — per file category and in which order. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_Lead {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_Lead", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Invalid combinations are locked ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_MembershipHint {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_MembershipHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Which action in which category ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_MembershipTitle {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_MembershipTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Drag to reorder ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_OrderHint {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_OrderHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Global order ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_OrderTitle {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_OrderTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Menu for {0} ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_PreviewFor {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_PreviewFor", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Live preview ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_PreviewTitle {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_PreviewTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Reset all to default ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_ResetAll {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_ResetAll", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Assignment ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_Step1 {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_Step1", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Order ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_Step2 {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_Step2", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Toggle whole category ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_ToggleColumn {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_ToggleColumn", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Toggle for all categories ähnelt.
+        /// </summary>
+        public static string Web_Settings_Ctx_ToggleRow {
+            get {
+                return ResourceManager.GetString("Web_Settings_Ctx_ToggleRow", resourceCulture);
             }
         }
         
@@ -4268,229 +8852,334 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Settings_Logging_Saved", resourceCulture);
             }
         }
-
-        public static string Web_PermGroup_ExternalStorage {
-            get {
-                return ResourceManager.GetString("Web_PermGroup_ExternalStorage", resourceCulture);
-            }
-        }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Category ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Category {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Category", resourceCulture);
             }
         }
-
-        public static string Web_Settings_LogViewer_Description {
-            get {
-                return ResourceManager.GetString("Web_Settings_LogViewer_Description", resourceCulture);
-            }
-        }
-
-        public static string Web_Settings_LogViewer_ColTime {
-            get {
-                return ResourceManager.GetString("Web_Settings_LogViewer_ColTime", resourceCulture);
-            }
-        }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Level ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_ColLevel {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_ColLevel", resourceCulture);
             }
         }
-
-        public static string Web_Settings_LogViewer_ColSource {
-            get {
-                return ResourceManager.GetString("Web_Settings_LogViewer_ColSource", resourceCulture);
-            }
-        }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Message ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_ColMessage {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_ColMessage", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Service ähnelt.
+        /// </summary>
+        public static string Web_Settings_LogViewer_ColSource {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_ColSource", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Time ähnelt.
+        /// </summary>
+        public static string Web_Settings_LogViewer_ColTime {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_ColTime", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The archive retains log entries from Information through Critical regardless of the output level above. Up to the newest 1,000 matching entries are displayed. ähnelt.
+        /// </summary>
+        public static string Web_Settings_LogViewer_Description {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Details ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Details {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Details", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Download ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Download {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Download", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Download date (UTC) ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_DownloadDateUtc {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_DownloadDateUtc", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No matching log entries. ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Empty {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Empty", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Event ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Event {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Event", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Add ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_ExcludeAdd {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_ExcludeAdd", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Messages beginning with one of these texts are hidden for this session. You can add up to {0} entries. ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_ExcludeHint {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_ExcludeHint", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Message starts with… ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_ExcludePlaceholder {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_ExcludePlaceholder", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Temporarily exclude message prefixes ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_ExcludePrefixes {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_ExcludePrefixes", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Remove exclusion ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_ExcludeRemove {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_ExcludeRemove", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die More entries match; the display is limited to 1,000 entries. ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_HasMore {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_HasMore", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Instance ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Instance {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Instance", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Critical ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_LevelCritical {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_LevelCritical", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Error ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_LevelError {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_LevelError", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Information ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_LevelInformation {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_LevelInformation", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Warning ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_LevelWarning {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_LevelWarning", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Live ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Live {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Live", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Automatically refresh every three seconds ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_LiveTitle {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_LiveTitle", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Minimum level ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_MinimumLevel {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_MinimumLevel", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No log sources are available yet. ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_NoSources {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_NoSources", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Live refresh paused ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Paused {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Paused", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The system logs could not be read. ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_ReadFailed {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_ReadFailed", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Refresh ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Refresh {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Refresh", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Matches: {0} ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_ResultCount {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_ResultCount", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Search ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Search {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Search", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Message, category, exception… ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_SearchPlaceholder {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_SearchPlaceholder", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Services ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Sources {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Sources", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Stored system logs ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Title {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Title", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Trace ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Trace {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Trace", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die You do not have permission to view system logs. ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Unauthorized {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Unauthorized", resourceCulture);
             }
         }
-
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Refreshing… ähnelt.
+        /// </summary>
         public static string Web_Settings_LogViewer_Updating {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Updating", resourceCulture);
@@ -4512,6 +9201,69 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Settings_NoPermissionDataServices {
             get {
                 return ResourceManager.GetString("Web_Settings_NoPermissionDataServices", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die These rules apply globally when creating and changing user passwords. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Pw_Desc {
+            get {
+                return ResourceManager.GetString("Web_Settings_Pw_Desc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Minimum length ähnelt.
+        /// </summary>
+        public static string Web_Settings_Pw_MinLength {
+            get {
+                return ResourceManager.GetString("Web_Settings_Pw_MinLength", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Require a digit (0–9) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Pw_RequireDigit {
+            get {
+                return ResourceManager.GetString("Web_Settings_Pw_RequireDigit", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Require a lowercase letter (a–z) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Pw_RequireLowercase {
+            get {
+                return ResourceManager.GetString("Web_Settings_Pw_RequireLowercase", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Require a special character (e.g. ! ? # $) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Pw_RequireSpecial {
+            get {
+                return ResourceManager.GetString("Web_Settings_Pw_RequireSpecial", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Require an uppercase letter (A–Z) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Pw_RequireUppercase {
+            get {
+                return ResourceManager.GetString("Web_Settings_Pw_RequireUppercase", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Password requirements ähnelt.
+        /// </summary>
+        public static string Web_Settings_Pw_Title {
+            get {
+                return ResourceManager.GetString("Web_Settings_Pw_Title", resourceCulture);
             }
         }
         
@@ -4579,6 +9331,42 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Allowed: {0}–{1} seconds. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Session_Allowed {
+            get {
+                return ResourceManager.GetString("Web_Settings_Session_Allowed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die How often an active session checks whether the account is still active. When a user is disabled, their session ends within this interval. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Session_Desc {
+            get {
+                return ResourceManager.GetString("Web_Settings_Session_Desc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Check interval (seconds) ähnelt.
+        /// </summary>
+        public static string Web_Settings_Session_Interval {
+            get {
+                return ResourceManager.GetString("Web_Settings_Session_Interval", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Session security ähnelt.
+        /// </summary>
+        public static string Web_Settings_Session_Title {
+            get {
+                return ResourceManager.GetString("Web_Settings_Session_Title", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die SMB is being disabled. The change is applied by the service within a few seconds. ähnelt.
         /// </summary>
         public static string Web_Settings_SmbDisabled {
@@ -4597,11 +9385,155 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Custom name ähnelt.
+        /// </summary>
+        public static string Web_Settings_Storage_CustomNameLabel {
+            get {
+                return ResourceManager.GetString("Web_Settings_Storage_CustomNameLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Utilization of the configured storage pools. The existing pool and directory structure is displayed as-is. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Storage_Description {
+            get {
+                return ResourceManager.GetString("Web_Settings_Storage_Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Storage-Pools ähnelt.
+        /// </summary>
+        public static string Web_Settings_Storage_DetailLabel {
+            get {
+                return ResourceManager.GetString("Web_Settings_Storage_DetailLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Drive ähnelt.
+        /// </summary>
+        public static string Web_Settings_Storage_Drive {
+            get {
+                return ResourceManager.GetString("Web_Settings_Storage_Drive", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die free ähnelt.
+        /// </summary>
+        public static string Web_Settings_Storage_Free {
+            get {
+                return ResourceManager.GetString("Web_Settings_Storage_Free", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Memory information is not available for this pool. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Storage_InformationNotAvailable {
+            get {
+                return ResourceManager.GetString("Web_Settings_Storage_InformationNotAvailable", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No storage pools were found, or storage information is not available. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Storage_NoStoragePoolsFound {
+            get {
+                return ResourceManager.GetString("Web_Settings_Storage_NoStoragePoolsFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Assign a friendly name shown when creating or moving shares; the underlying mount path is never changed. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Storage_PoolNameHint {
+            get {
+                return ResourceManager.GetString("Web_Settings_Storage_PoolNameHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Storage pool names saved. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Storage_PoolNamesSaved {
+            get {
+                return ResourceManager.GetString("Web_Settings_Storage_PoolNamesSaved", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Storage pool names could not be saved. ähnelt.
+        /// </summary>
+        public static string Web_Settings_Storage_PoolNamesSaveFailed {
+            get {
+                return ResourceManager.GetString("Web_Settings_Storage_PoolNamesSaveFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die total ähnelt.
+        /// </summary>
+        public static string Web_Settings_Storage_Total {
+            get {
+                return ResourceManager.GetString("Web_Settings_Storage_Total", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Update ähnelt.
+        /// </summary>
+        public static string Web_Settings_Storage_Update {
+            get {
+                return ResourceManager.GetString("Web_Settings_Storage_Update", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die used ähnelt.
+        /// </summary>
+        public static string Web_Settings_Storage_Used {
+            get {
+                return ResourceManager.GetString("Web_Settings_Storage_Used", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Utilization of ähnelt.
+        /// </summary>
+        public static string Web_Settings_Storage_Utilization {
+            get {
+                return ResourceManager.GetString("Web_Settings_Storage_Utilization", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Backup ähnelt.
+        /// </summary>
+        public static string Web_Settings_Tab_Backup {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_Backup", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Certificate ähnelt.
         /// </summary>
         public static string Web_Settings_Tab_Certificate {
             get {
                 return ResourceManager.GetString("Web_Settings_Tab_Certificate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cloud Access ähnelt.
+        /// </summary>
+        public static string Web_Settings_Tab_CloudAccess {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_CloudAccess", resourceCulture);
             }
         }
         
@@ -4912,6 +9844,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The cloud connection was added successfully. ähnelt.
+        /// </summary>
+        public static string Web_ShareList_CloudConnected {
+            get {
+                return ResourceManager.GetString("Web_ShareList_CloudConnected", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die e.g. projects, backup, media ähnelt.
         /// </summary>
         public static string Web_ShareList_CreatePlaceholder {
@@ -5074,6 +10015,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select a share to view its details and settings. ähnelt.
+        /// </summary>
+        public static string Web_ShareList_SelectHint {
+            get {
+                return ResourceManager.GetString("Web_ShareList_SelectHint", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Active ähnelt.
         /// </summary>
         public static string Web_ShareList_Status_Active {
@@ -5106,6 +10056,15 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_ShareList_Tab_ACL {
             get {
                 return ResourceManager.GetString("Web_ShareList_Tab_ACL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cloud ähnelt.
+        /// </summary>
+        public static string Web_ShareList_Tab_Cloud {
+            get {
+                return ResourceManager.GetString("Web_ShareList_Tab_Cloud", resourceCulture);
             }
         }
         
@@ -5191,6 +10150,78 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Local Shares ähnelt.
+        /// </summary>
+        public static string Web_Shares_LocalShares {
+            get {
+                return ResourceManager.GetString("Web_Shares_LocalShares", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Virtual Shares ähnelt.
+        /// </summary>
+        public static string Web_Shares_VirtualShares {
+            get {
+                return ResourceManager.GetString("Web_Shares_VirtualShares", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The connection is still used by a sync or virtual share and cannot be deleted. ähnelt.
+        /// </summary>
+        public static string Web_StorageConnection_DeleteInUse {
+            get {
+                return ResourceManager.GetString("Web_StorageConnection_DeleteInUse", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die You may not manage storage connections in this department. ähnelt.
+        /// </summary>
+        public static string Web_StorageConnection_ManageDenied {
+            get {
+                return ResourceManager.GetString("Web_StorageConnection_ManageDenied", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Degraded ähnelt.
+        /// </summary>
+        public static string Web_StorageConnection_StatusDegraded {
+            get {
+                return ResourceManager.GetString("Web_StorageConnection_StatusDegraded", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Reauthorization required ähnelt.
+        /// </summary>
+        public static string Web_StorageConnection_StatusNeedsReauthorization {
+            get {
+                return ResourceManager.GetString("Web_StorageConnection_StatusNeedsReauthorization", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Configuration pending ähnelt.
+        /// </summary>
+        public static string Web_StorageConnection_StatusPendingConfiguration {
+            get {
+                return ResourceManager.GetString("Web_StorageConnection_StatusPendingConfiguration", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die You may not use storage connections in this department. ähnelt.
+        /// </summary>
+        public static string Web_StorageConnection_UseDenied {
+            get {
+                return ResourceManager.GetString("Web_StorageConnection_UseDenied", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die {0} groups ähnelt.
         /// </summary>
         public static string Web_Tab_GroupsCount {
@@ -5214,6 +10245,204 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Tab_UsersCount {
             get {
                 return ResourceManager.GetString("Web_Tab_UsersCount", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Copy ähnelt.
+        /// </summary>
+        public static string Web_Transfer_Copy {
+            get {
+                return ResourceManager.GetString("Web_Transfer_Copy", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Copying {0} items ähnelt.
+        /// </summary>
+        public static string Web_Transfer_CopyingMany {
+            get {
+                return ResourceManager.GetString("Web_Transfer_CopyingMany", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Copying: {0} ähnelt.
+        /// </summary>
+        public static string Web_Transfer_CopyingOne {
+            get {
+                return ResourceManager.GetString("Web_Transfer_CopyingOne", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Items copied successfully. ähnelt.
+        /// </summary>
+        public static string Web_Transfer_CopySuccess {
+            get {
+                return ResourceManager.GetString("Web_Transfer_CopySuccess", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cut ähnelt.
+        /// </summary>
+        public static string Web_Transfer_Cut {
+            get {
+                return ResourceManager.GetString("Web_Transfer_Cut", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Items moved successfully. ähnelt.
+        /// </summary>
+        public static string Web_Transfer_CutSuccess {
+            get {
+                return ResourceManager.GetString("Web_Transfer_CutSuccess", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cutting {0} items ähnelt.
+        /// </summary>
+        public static string Web_Transfer_CuttingMany {
+            get {
+                return ResourceManager.GetString("Web_Transfer_CuttingMany", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cutting: {0} ähnelt.
+        /// </summary>
+        public static string Web_Transfer_CuttingOne {
+            get {
+                return ResourceManager.GetString("Web_Transfer_CuttingOne", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die You do not have permission to transfer these items. ähnelt.
+        /// </summary>
+        public static string Web_Transfer_Error_AccessDenied {
+            get {
+                return ResourceManager.GetString("Web_Transfer_Error_AccessDenied", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The transfer was cancelled. ähnelt.
+        /// </summary>
+        public static string Web_Transfer_Error_Cancelled {
+            get {
+                return ResourceManager.GetString("Web_Transfer_Error_Cancelled", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The items could not be transferred. ähnelt.
+        /// </summary>
+        public static string Web_Transfer_Error_Failed {
+            get {
+                return ResourceManager.GetString("Web_Transfer_Error_Failed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The target folder is invalid. ähnelt.
+        /// </summary>
+        public static string Web_Transfer_Error_InvalidPath {
+            get {
+                return ResourceManager.GetString("Web_Transfer_Error_InvalidPath", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Select at least one item. ähnelt.
+        /// </summary>
+        public static string Web_Transfer_Error_NoSelection {
+            get {
+                return ResourceManager.GetString("Web_Transfer_Error_NoSelection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Items from a virtual share can only be copied. ähnelt.
+        /// </summary>
+        public static string Web_Transfer_Error_RemoteCut {
+            get {
+                return ResourceManager.GetString("Web_Transfer_Error_RemoteCut", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Sign-in is required. ähnelt.
+        /// </summary>
+        public static string Web_Transfer_Error_SignInRequired {
+            get {
+                return ResourceManager.GetString("Web_Transfer_Error_SignInRequired", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} items ähnelt.
+        /// </summary>
+        public static string Web_Transfer_Items {
+            get {
+                return ResourceManager.GetString("Web_Transfer_Items", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Copy ähnelt.
+        /// </summary>
+        public static string Web_Transfer_JobCopy {
+            get {
+                return ResourceManager.GetString("Web_Transfer_JobCopy", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Move ähnelt.
+        /// </summary>
+        public static string Web_Transfer_JobCut {
+            get {
+                return ResourceManager.GetString("Web_Transfer_JobCut", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Transferred {0} of {1} items; the rest could not be transferred. ähnelt.
+        /// </summary>
+        public static string Web_Transfer_PartialFailure {
+            get {
+                return ResourceManager.GetString("Web_Transfer_PartialFailure", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Paste ähnelt.
+        /// </summary>
+        public static string Web_Transfer_Paste {
+            get {
+                return ResourceManager.GetString("Web_Transfer_Paste", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Preparing transfer… ähnelt.
+        /// </summary>
+        public static string Web_Transfer_Progress {
+            get {
+                return ResourceManager.GetString("Web_Transfer_Progress", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Transferring: {0} ähnelt.
+        /// </summary>
+        public static string Web_Transfer_ProgressItem {
+            get {
+                return ResourceManager.GetString("Web_Transfer_ProgressItem", resourceCulture);
             }
         }
         
@@ -5515,6 +10744,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Back to versions ähnelt.
+        /// </summary>
+        public static string Web_Version_BackToVersions {
+            get {
+                return ResourceManager.GetString("Web_Version_BackToVersions", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Download ähnelt.
         /// </summary>
         public static string Web_Version_Download {
@@ -5567,16 +10805,7 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Version_FolderBack", resourceCulture);
             }
         }
-
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Back to versions ähnelt.
-        /// </summary>
-        public static string Web_Version_BackToVersions {
-            get {
-                return ResourceManager.GetString("Web_Version_BackToVersions", resourceCulture);
-            }
-        }
-
+        
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die No files existed at that point in time. ähnelt.
         /// </summary>

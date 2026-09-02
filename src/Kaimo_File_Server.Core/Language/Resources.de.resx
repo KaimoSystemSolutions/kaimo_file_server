@@ -1500,6 +1500,18 @@
   <data name="Web_Settings_Button_Save" xml:space="preserve">
     <value>Speichern</value>
   </data>
+  <data name="Web_Settings_Storage_CustomNameLabel" xml:space="preserve">
+    <value>Eigener Name</value>
+  </data>
+  <data name="Web_Settings_Storage_PoolNameHint" xml:space="preserve">
+    <value>Vergeben Sie einen sprechenden Namen, der beim Erstellen oder Verschieben von Freigaben angezeigt wird; der zugrunde liegende Einhängepfad wird dabei nicht verändert.</value>
+  </data>
+  <data name="Web_Settings_Storage_PoolNamesSaved" xml:space="preserve">
+    <value>Speicher-Pool-Namen gespeichert.</value>
+  </data>
+  <data name="Web_Settings_Storage_PoolNamesSaveFailed" xml:space="preserve">
+    <value>Speicher-Pool-Namen konnten nicht gespeichert werden.</value>
+  </data>
   <data name="Web_Settings_Pw_Title" xml:space="preserve">
     <value>Passwort-Anforderungen</value>
   </data>
@@ -2262,9 +2274,6 @@
   <data name="Web_Move_BatchPartialFailure" xml:space="preserve">
     <value>{0} von {1} Elementen verschoben. Bei einigen Elementen ist ein Fehler aufgetreten.</value>
   </data>
-  <data name="Web_Transfer_PartialFailure" xml:space="preserve">
-    <value>{0} von {1} Elementen übertragen. Die übrigen konnten nicht übertragen werden.</value>
-  </data>
   <data name="Web_ShareList_Label_StoragePool" xml:space="preserve">
     <value>Speicherpool</value>
   </data>
@@ -2319,439 +2328,1342 @@
   <data name="Web_ShareList_Card_Disabled" xml:space="preserve">
     <value>Deaktiviert</value>
   </data>
-  <data name="Web_Nav_CloudSync" xml:space="preserve"><value>Cloud-Synchronisierung</value></data>
-  <data name="Web_CloudSync_Title" xml:space="preserve"><value>Cloud-Synchronisierung</value></data>
-  <data name="Web_CloudSync_Subtitle" xml:space="preserve"><value>Lokale und entfernte Ordnersynchronisierungen für alle Cloud-Anbieter verwalten.</value></data>
-  <data name="Web_CloudSync_Create" xml:space="preserve"><value>Cloud-Synchronisierung hinzufügen</value></data>
-  <data name="Web_CloudSync_Create_Title" xml:space="preserve"><value>Ordner verbinden</value></data>
-  <data name="Web_CloudSync_Create_Help" xml:space="preserve"><value>Lokalen Ordner und Anbieter auswählen. Der entfernte Ordner kann nach der Autorisierung gewählt werden.</value></data>
-  <data name="Web_CloudSync_Loading" xml:space="preserve"><value>Cloud-Synchronisierungen werden geladen…</value></data>
-  <data name="Web_CloudSync_Empty" xml:space="preserve"><value>Es wurden noch keine Cloud-Synchronisierungen eingerichtet.</value></data>
-  <data name="Web_CloudSync_Select" xml:space="preserve"><value>Eine Cloud-Synchronisierung auswählen, um ihre Einstellungen anzuzeigen.</value></data>
-  <data name="Web_CloudSync_Share" xml:space="preserve"><value>Share</value></data>
-  <data name="Web_CloudSync_Provider" xml:space="preserve"><value>Cloud-Anbieter</value></data>
-  <data name="Web_CloudSync_LocalFolder" xml:space="preserve"><value>Lokaler Ordner</value></data>
-  <data name="Web_CloudSync_RemoteFolder" xml:space="preserve"><value>Entfernter Ordner</value></data>
-  <data name="Web_CloudSync_Browse" xml:space="preserve"><value>Durchsuchen…</value></data>
-  <data name="Web_CloudSync_Connect" xml:space="preserve"><value>Autorisieren und verbinden</value></data>
-  <data name="Web_CloudSync_Mode" xml:space="preserve"><value>Synchronisierungsmodus</value></data>
-  <data name="Web_CloudSync_Mode_TwoWay" xml:space="preserve"><value>Beidseitig</value></data>
-  <data name="Web_CloudSync_Mode_Pull" xml:space="preserve"><value>Abrufen (Cloud → lokal)</value></data>
-  <data name="Web_CloudSync_Mode_Push" xml:space="preserve"><value>Hochladen (lokal → Cloud)</value></data>
-  <data name="Web_CloudSync_LastSync" xml:space="preserve"><value>Letzte Synchronisierung</value></data>
-  <data name="Web_CloudSync_Never" xml:space="preserve"><value>Nie</value></data>
-  <data name="Web_CloudSync_Name" xml:space="preserve"><value>Name</value></data>
-  <data name="Web_CloudSync_Tab_General" xml:space="preserve"><value>Allgemein</value></data>
-  <data name="Web_CloudSync_Tab_Schedule" xml:space="preserve"><value>Zeiteinstellungen</value></data>
-  <data name="Web_CloudSync_Tab_Advanced" xml:space="preserve"><value>Erweitert</value></data>
-  <data name="Web_CloudSync_Description" xml:space="preserve"><value>Beschreibung</value></data>
-  <data name="Web_CloudSync_Advanced" xml:space="preserve"><value>Erweiterte Einstellungen</value></data>
-  <data name="Web_CloudSync_Advanced_Help" xml:space="preserve"><value>Optionale Dateifilter und Bandbreitenlimits für diese Synchronisierung.</value></data>
-  <data name="Web_CloudSync_Advanced_MaxFileSize" xml:space="preserve"><value>Maximale Dateigröße (MB)</value></data>
-  <data name="Web_CloudSync_Advanced_ExcludedExtensions" xml:space="preserve"><value>Ausgeschlossene Dateiendungen</value></data>
-  <data name="Web_CloudSync_Advanced_ExcludedExtensions_Help" xml:space="preserve"><value>Dateiendungen mit Kommas, Leerzeichen oder Zeilenumbrüchen trennen.</value></data>
-  <data name="Web_CloudSync_Advanced_MaxUpload" xml:space="preserve"><value>Maximale Uploadrate (KB/s)</value></data>
-  <data name="Web_CloudSync_Advanced_MaxDownload" xml:space="preserve"><value>Maximale Downloadrate (KB/s)</value></data>
-  <data name="Web_CloudSync_Advanced_Error_Negative" xml:space="preserve"><value>Erweiterte Limits dürfen nicht negativ sein.</value></data>
-  <data name="Web_CloudSync_Advanced_Unlimited_Help" xml:space="preserve"><value>0 eingeben oder leer lassen für kein Limit.</value></data>
-  <data name="Web_CloudSync_Advanced_SyncDeletions" xml:space="preserve"><value>Löschungen synchronisieren</value></data>
-  <data name="Web_CloudSync_Advanced_SyncDeletions_Help" xml:space="preserve"><value>Wird eine Datei oder ein Ordner auf einer Seite gelöscht, wird sie auch auf der anderen Seite gelöscht, statt wiederhergestellt zu werden. Wirksam ab dem zweiten Lauf nach dem Aktivieren. Hat der Share einen Papierkorb, werden lokal gelöschte Elemente dorthin verschoben und bleiben wiederherstellbar.</value></data>
-  <data name="Web_CloudSync_Schedule" xml:space="preserve"><value>Automatische Synchronisierung</value></data>
-  <data name="Web_CloudSync_Schedule_Help" xml:space="preserve"><value>Wähle die stündlichen Zeitfenster aus, in denen dieser Ordner synchronisiert werden soll.</value></data>
-  <data name="Web_CloudSync_Schedule_Toggle" xml:space="preserve"><value>Automatische Synchronisierung ein- oder ausschalten</value></data>
-  <data name="Web_CloudSync_Schedule_Interval" xml:space="preserve"><value>Prüfintervall</value></data>
-  <data name="Web_CloudSync_Schedule_Interval_Help" xml:space="preserve"><value>Legt fest, wie oft der Server prüft, ob ein ausgewähltes Synchronisierungsfenster aktiv ist.</value></data>
-  <data name="Web_CloudSync_Schedule_Seconds" xml:space="preserve"><value>Sekunden</value></data>
-  <data name="Web_CloudSync_Schedule_Paint_Mode" xml:space="preserve"><value>Bearbeitungsmodus</value></data>
-  <data name="Web_CloudSync_Schedule_Paint_Select" xml:space="preserve"><value>Auswählen</value></data>
-  <data name="Web_CloudSync_Schedule_Paint_Deselect" xml:space="preserve"><value>Abwählen</value></data>
-  <data name="Web_CloudSync_Schedule_Paint_Help" xml:space="preserve"><value>Klicken oder mit gedrückter Maustaste vom Startfeld aus ein Rechteck über mehrere Zeitfenster aufziehen.</value></data>
-  <data name="Web_CloudSync_Schedule_Day_Paint" xml:space="preserve"><value>Alle Stunden am {0}: {1}</value></data>
-  <data name="Web_CloudSync_Schedule_Hour_Paint" xml:space="preserve"><value>{0}:00 an allen Tagen: {1}</value></data>
-  <data name="Web_CloudSync_Schedule_Grid" xml:space="preserve"><value>Wöchentlicher stündlicher Synchronisierungsplan</value></data>
-  <data name="Web_CloudSync_Schedule_Hour_Toggle" xml:space="preserve"><value>{0}:00 für alle Tage umschalten</value></data>
-  <data name="Web_CloudSync_Schedule_Day_Toggle" xml:space="preserve"><value>Alle Stunden am {0} umschalten</value></data>
-  <data name="Web_CloudSync_Schedule_Slot_On" xml:space="preserve"><value>{0}, {1}:00–{2}:00: aktiv</value></data>
-  <data name="Web_CloudSync_Schedule_Slot_Off" xml:space="preserve"><value>{0}, {1}:00–{2}:00: inaktiv</value></data>
-  <data name="Web_CloudSync_Schedule_Selected" xml:space="preserve"><value>{0} Stundenblöcke ausgewählt · lokale Serverzeit</value></data>
-  <data name="Web_CloudSync_Schedule_Clear" xml:space="preserve"><value>Leeren</value></data>
-  <data name="Web_CloudSync_Schedule_Error_Empty" xml:space="preserve"><value>Bitte mindestens einen Stundenblock auswählen, bevor der Timer aktiviert wird.</value></data>
-  <data name="Web_CloudSync_Schedule_Error_Interval" xml:space="preserve"><value>Bitte ein Intervall zwischen 1 und 86400 Sekunden eingeben.</value></data>
-  <data name="Web_CloudSync_Save" xml:space="preserve"><value>Einstellungen speichern</value></data>
-  <data name="Web_CloudSync_Run" xml:space="preserve"><value>Jetzt synchronisieren</value></data>
-  <data name="Web_CloudSync_Unsync" xml:space="preserve"><value>Cloud-Synchronisierung entfernen</value></data>
-  <data name="Web_CloudSync_Unsync_Confirm" xml:space="preserve"><value>Diese Konfiguration entfernen und ihre Cloud-Verbindung widerrufen?</value></data>
-  <data name="Web_CloudSync_Connected" xml:space="preserve"><value>Der Cloud-Anbieter wurde erfolgreich verbunden.</value></data>
-  <data name="Web_CloudSync_Saved" xml:space="preserve"><value>Cloud-Synchronisierungseinstellungen wurden gespeichert.</value></data>
-  <data name="Web_CloudSync_Removed" xml:space="preserve"><value>Cloud-Synchronisierung wurde entfernt.</value></data>
-  <data name="Web_CloudSync_Progress" xml:space="preserve"><value>Synchronisierung läuft…</value></data>
-  <data name="Web_CloudSync_Complete" xml:space="preserve"><value>Synchronisierung abgeschlossen.</value></data>
-  <data name="Web_CloudSync_Directory_LocalTitle" xml:space="preserve"><value>Lokalen Ordner auswählen</value></data>
-  <data name="Web_CloudSync_Directory_RemoteTitle" xml:space="preserve"><value>Entfernten Ordner auswählen</value></data>
-  <data name="Web_CloudSync_Directory_Parent" xml:space="preserve"><value>Übergeordneter Ordner</value></data>
-  <data name="Web_CloudSync_Directory_Select" xml:space="preserve"><value>Diesen Ordner auswählen</value></data>
-  <data name="Web_CloudSync_Directory_Loading" xml:space="preserve"><value>Ordner werden geladen…</value></data>
-  <data name="Web_CloudSync_Directory_Empty" xml:space="preserve"><value>Dieser Ordner enthält keine Unterordner.</value></data>
-  <data name="Web_CloudSync_Directory_Error" xml:space="preserve"><value>Dieser Ordner konnte nicht geöffnet werden.</value></data>
-  <data name="Web_CloudSync_Error_Load" xml:space="preserve"><value>Die Cloud-Synchronisierungen konnten nicht geladen werden.</value></data>
-  <data name="Web_CloudSync_Error_ShareRequired" xml:space="preserve"><value>Bitte einen verwaltbaren Share auswählen.</value></data>
-  <data name="Web_CloudSync_Error_ProviderRequired" xml:space="preserve"><value>Bitte einen verfügbaren Cloud-Anbieter auswählen.</value></data>
-  <data name="Web_CloudSync_Error_Conflict" xml:space="preserve"><value>Dieser Ordner überschneidet sich mit einer bestehenden Cloud-Synchronisierung.</value></data>
-  <data name="Web_CloudSync_Error_NotAuthorized" xml:space="preserve"><value>Für diese Aktion besteht keine Berechtigung.</value></data>
-  <data name="Web_CloudSync_Error_Missing" xml:space="preserve"><value>Diese Cloud-Synchronisierung existiert nicht mehr.</value></data>
-  <data name="Web_CloudSync_Error_Save" xml:space="preserve"><value>Die Cloud-Synchronisierungseinstellungen konnten nicht gespeichert werden.</value></data>
-  <data name="Web_CloudSync_Error_Run" xml:space="preserve"><value>Die Cloud-Synchronisierung ist fehlgeschlagen. Bitte das Serverprotokoll prüfen.</value></data>
-  <data name="Web_CloudSync_Error_Busy" xml:space="preserve"><value>Dieser Ordner wird bereits synchronisiert oder geändert. Bitte später erneut versuchen.</value></data>
-  <data name="Web_CloudSync_Error_LocalFolder" xml:space="preserve"><value>Bitte einen vorhandenen lokalen Ordner auswählen.</value></data>
-  <data name="Web_CloudSync_SharePanel_Help" xml:space="preserve"><value>Die lokalen und entfernten Ordnerzuordnungen dieses Shares zentral in der Cloud-Synchronisierung verwalten.</value></data>
-  <data name="Web_CloudSync_SharePanel_Count" xml:space="preserve"><value>Eingerichtete Synchronisierungen: {0}</value></data>
-  <data name="Web_CloudSync_SharePanel_Open" xml:space="preserve"><value>Cloud-Synchronisierung öffnen</value></data>
-  <data name="Web_CloudSync_Device_Title" xml:space="preserve"><value>Microsoft OneDrive verbinden</value></data>
-  <data name="Web_CloudSync_Device_Instructions" xml:space="preserve"><value>Öffne die Microsoft-Anmeldeseite, gib diesen Code ein und erlaube den Zugriff auf dein OneDrive.</value></data>
-  <data name="Web_CloudSync_Device_OpenMicrosoft" xml:space="preserve"><value>Microsoft-Anmeldung öffnen</value></data>
-  <data name="Web_CloudSync_Device_Waiting" xml:space="preserve"><value>Microsoft-Autorisierung wird abgewartet…</value></data>
-  <data name="Web_CloudSync_Device_Expired" xml:space="preserve"><value>Die Cloud-Autorisierungsanfrage ist abgelaufen. Bitte erneut starten.</value></data>
-  <data name="Web_CloudSync_Device_Failed" xml:space="preserve"><value>Die Microsoft-Autorisierung ist fehlgeschlagen. Bitte zur Cloud-Synchronisierung zurückkehren und erneut versuchen.</value></data>
-  <data name="Web_CloudAccess_Dropbox_Title" xml:space="preserve"><value>Dropbox verbinden</value></data>
-  <data name="Web_CloudAccess_Dropbox_Instructions" xml:space="preserve"><value>Dropbox öffnen, Zugriff bestätigen und anschließend den von Dropbox angezeigten Autorisierungscode in das Feld unten einfügen.</value></data>
-  <data name="Web_CloudAccess_Dropbox_Open" xml:space="preserve"><value>Dropbox-Anmeldung öffnen</value></data>
-  <data name="Web_CloudAccess_Dropbox_CodeLabel" xml:space="preserve"><value>Autorisierungscode</value></data>
-  <data name="Web_CloudAccess_Dropbox_Submit" xml:space="preserve"><value>Verbinden</value></data>
-  <data name="Web_CloudAccess_Dropbox_Waiting" xml:space="preserve"><value>Überprüfung mit Dropbox…</value></data>
-  <data name="Web_CloudAccess_Dropbox_Expired" xml:space="preserve"><value>Die Dropbox-Autorisierungsanfrage ist abgelaufen. Bitte erneut starten.</value></data>
-  <data name="Web_CloudAccess_Dropbox_Failed" xml:space="preserve"><value>Die Dropbox-Autorisierung ist fehlgeschlagen. Bitte zu Externer Speicher zurückkehren und erneut versuchen.</value></data>
-  <data name="Web_CloudAccess_Dropbox_CodeRequired" xml:space="preserve"><value>Bitte den Autorisierungscode von Dropbox eingeben.</value></data>
-  <data name="Web_CloudAccess_Dropbox_NotConfigured" xml:space="preserve"><value>Dropbox ist nicht konfiguriert. Bitte vor dem Verbinden einen Dropbox-App-Schlüssel festlegen.</value></data>
-  <data name="Web_CloudAccess_Dropbox_MissingScope" xml:space="preserve"><value>Dropbox wurde verbunden, aber der Autorisierung fehlen die Berechtigungen zum Durchsuchen von Ordnern. Bitte die Scopes files.metadata.read, files.content.read und files.content.write in der Dropbox-App aktivieren und diese Verbindung anschließend erneut autorisieren.</value></data>
-  <data name="Web_CloudSync_Cancelled" xml:space="preserve"><value>Die Synchronisierung wurde abgebrochen.</value></data>
-  <data name="Web_Jobs_Title" xml:space="preserve"><value>Laufende Jobs</value></data>
-  <data name="Web_Jobs_Count" xml:space="preserve"><value>{0} aktiv</value></data>
-  <data name="Web_Jobs_Empty" xml:space="preserve"><value>Aktuell laufen keine Jobs.</value></data>
-  <data name="Web_Jobs_Cancel" xml:space="preserve"><value>Job abbrechen</value></data>
-  <data name="Web_Jobs_Cancelling" xml:space="preserve"><value>Wird abgebrochen…</value></data>
-  <data name="Web_Jobs_CloudSync_Title" xml:space="preserve"><value>Cloud-Synchronisierung: {0}</value></data>
-  <data name="Web_Jobs_Upload_Title" xml:space="preserve"><value>Upload: {0}</value></data>
-  <data name="Web_CloudAccess_Title" xml:space="preserve"><value>Cloud-Zugriff</value></data>
-  <data name="Web_CloudAccess_Subtitle" xml:space="preserve"><value>Entfernte Ordner als virtuelle, nur im Web-Dateibrowser sichtbare Shares bereitstellen.</value></data>
-  <data name="Web_CloudAccess_Loading" xml:space="preserve"><value>Cloud-Zugriff wird geladen…</value></data>
-  <data name="Web_CloudAccess_NoPermission" xml:space="preserve"><value>Keine Berechtigung zum Verwalten des Cloud-Zugriffs.</value></data>
-  <data name="Web_CloudAccess_AddConnection" xml:space="preserve"><value>Verbindung hinzufügen</value></data>
-  <data name="Web_CloudAccess_AddShare" xml:space="preserve"><value>Virtuellen Share erstellen</value></data>
-  <data name="Web_CloudAccess_Provider" xml:space="preserve"><value>Cloud-Anbieter</value></data>
-  <data name="Web_CloudAccess_Provider_Select" xml:space="preserve"><value>Anbieter auswählen</value></data>
-  <data name="Web_CloudAccess_ConnectionName" xml:space="preserve"><value>Verbindungsname</value></data>
-  <data name="Web_CloudAccess_Department" xml:space="preserve"><value>Abteilung</value></data>
-  <data name="Web_CloudAccess_Select" xml:space="preserve"><value>Bitte auswählen</value></data>
-  <data name="Web_CloudAccess_Connect" xml:space="preserve"><value>Verbinden</value></data>
-  <data name="Web_CloudAccess_Edit" xml:space="preserve"><value>Bearbeiten</value></data>
-  <data name="Web_CloudAccess_Rename" xml:space="preserve"><value>Umbenennen</value></data>
-  <data name="Web_CloudAccess_Save" xml:space="preserve"><value>Änderungen speichern</value></data>
-  <data name="Web_CloudAccess_Cancel" xml:space="preserve"><value>Abbrechen</value></data>
-  <data name="Web_CloudAccess_EditConnection" xml:space="preserve"><value>Verbindung bearbeiten</value></data>
-  <data name="Web_CloudAccess_EditShare" xml:space="preserve"><value>Virtuellen Share bearbeiten</value></data>
-  <data name="Web_CloudAccess_ConnectionHelp" xml:space="preserve"><value>Anbieter auswählen und die Verbindung einer Abteilung zuweisen. Zugangsdaten bleiben verschlüsselt auf dem Server.</value></data>
-  <data name="Web_CloudAccess_Connections" xml:space="preserve"><value>Verbindungen</value></data>
-  <data name="Web_CloudAccess_NoConnections" xml:space="preserve"><value>Noch keine Cloud-Verbindung eingerichtet.</value></data>
-  <data name="Web_CloudAccess_Authorize" xml:space="preserve"><value>Autorisieren</value></data>
-  <data name="Web_CloudAccess_Reauthorize" xml:space="preserve"><value>Neu autorisieren</value></data>
-  <data name="Web_CloudAccess_DeleteConnectionConfirm" xml:space="preserve"><value>Verbindung „{0}“ und alle zugehörigen virtuellen Shares löschen?</value></data>
-  <data name="Web_CloudAccess_Shares" xml:space="preserve"><value>Virtuelle Shares</value></data>
-  <data name="Web_CloudAccess_NoShares" xml:space="preserve"><value>Noch keine virtuellen Shares vorhanden.</value></data>
-  <data name="Web_CloudAccess_NoReadyConnections" xml:space="preserve"><value>Keine Verbindungen verfügbar. Erstelle und autorisiere zuerst eine Verbindung, bevor du einen virtuellen Share anlegst.</value></data>
-  <data name="Web_CloudAccess_GoToConnections" xml:space="preserve"><value>Zu den Verbindungen</value></data>
-  <data name="Web_CloudAccess_CreateShareHelp" xml:space="preserve"><value>Eine verbundene Cloud auswählen und einen ihrer entfernten Ordner im Web-Dateibrowser bereitstellen.</value></data>
-  <data name="Web_CloudAccess_Connection" xml:space="preserve"><value>Verbindung</value></data>
-  <data name="Web_CloudAccess_ShareName" xml:space="preserve"><value>Share-Name</value></data>
-  <data name="Web_CloudAccess_RemoteFolder" xml:space="preserve"><value>Entfernter Ordner</value></data>
-  <data name="Web_CloudAccess_Browse" xml:space="preserve"><value>Durchsuchen…</value></data>
-  <data name="Web_CloudAccess_AccessMode" xml:space="preserve"><value>Zugriffsmodus</value></data>
-  <data name="Web_CloudAccess_ReadOnly" xml:space="preserve"><value>Nur Lesen</value></data>
-  <data name="Web_CloudAccess_ReadWrite" xml:space="preserve"><value>Lesen und Schreiben</value></data>
-  <data name="Web_CloudAccess_Access" xml:space="preserve"><value>Zugriff</value></data>
-  <data name="Web_CloudAccess_AccessHelp" xml:space="preserve"><value>Ausgewählte Benutzer und Gruppen können auf den gesamten virtuellen Share zugreifen.</value></data>
-  <data name="Web_CloudAccess_AccessEditHelp" xml:space="preserve"><value>Benutzer und Gruppen hinzufügen oder entfernen und anschließend die Zugriffsliste speichern.</value></data>
-  <data name="Web_CloudAccess_Principal" xml:space="preserve"><value>Benutzer oder Gruppe</value></data>
-  <data name="Web_CloudAccess_PrincipalPlaceholder" xml:space="preserve"><value>Benutzer oder Gruppe auswählen</value></data>
-  <data name="Web_CloudAccess_AddPrincipal" xml:space="preserve"><value>Hinzufügen</value></data>
-  <data name="Web_CloudAccess_RemovePrincipal" xml:space="preserve"><value>Entfernen</value></data>
-  <data name="Web_CloudAccess_Open" xml:space="preserve"><value>Share öffnen</value></data>
-  <data name="Web_CloudAccess_TabGeneral" xml:space="preserve"><value>Allgemein</value></data>
-  <data name="Web_CloudAccess_TabAccess" xml:space="preserve"><value>Zugriff</value></data>
-  <data name="Web_CloudAccess_DetailHint" xml:space="preserve"><value>Virtuellen Share auswählen, um Einstellungen anzuzeigen.</value></data>
-  <data name="Web_CloudAccess_Account" xml:space="preserve"><value>Konto</value></data>
-  <data name="Web_CloudAccess_SaveAccess" xml:space="preserve"><value>Zugriff speichern</value></data>
-  <data name="Web_CloudAccess_ShareNameExists" xml:space="preserve"><value>Ein lokaler oder virtueller Share mit diesem Namen existiert bereits.</value></data>
-  <data name="Web_CloudAccess_InvalidConnectionName" xml:space="preserve"><value>Bitte einen gültigen Verbindungsnamen eingeben.</value></data>
-  <data name="Web_CloudAccess_InvalidShareName" xml:space="preserve"><value>Bitte einen gültigen Share-Namen eingeben.</value></data>
-  <data name="Web_CloudAccess_ConnectionRequired" xml:space="preserve"><value>Bitte eine bereite Verbindung auswählen.</value></data>
-  <data name="Web_CloudAccess_FolderRequired" xml:space="preserve"><value>Bitte einen entfernten Ordner auswählen.</value></data>
-  <data name="Web_CloudAccess_ConnectionNotReady" xml:space="preserve"><value>Die OneDrive-Verbindung ist nicht bereit.</value></data>
-  <data name="Web_CloudAccess_InvalidRemotePath" xml:space="preserve"><value>Der entfernte Pfad ist ungültig.</value></data>
-  <data name="Web_CloudAccess_ShareMissing" xml:space="preserve"><value>Der virtuelle Share existiert nicht mehr.</value></data>
-  <data name="Web_CloudAccess_ConnectionMissing" xml:space="preserve"><value>Die Verbindung existiert nicht mehr.</value></data>
-  <data name="Web_CloudAccess_DepartmentDenied" xml:space="preserve"><value>Keine Berechtigung für Cloud-Zugriff in dieser Abteilung.</value></data>
-  <data name="Web_CloudAccess_LoadFailed" xml:space="preserve"><value>Cloud-Zugriff konnte nicht geladen werden.</value></data>
-  <data name="Web_CloudAccess_FolderPickerTitle" xml:space="preserve"><value>Entfernten Ordner auswählen</value></data>
-  <data name="Web_CloudAccess_User" xml:space="preserve"><value>Benutzer</value></data>
-  <data name="Web_CloudAccess_Group" xml:space="preserve"><value>Gruppe</value></data>
-  <data name="Web_CloudAccess_NotAuthorized" xml:space="preserve"><value>Nicht autorisiert</value></data>
-  <data name="Web_CloudAccess_CopyToLocal" xml:space="preserve"><value>In lokalen Share kopieren</value></data>
-  <data name="Web_CloudAccess_CopyDescription" xml:space="preserve"><value>Die ausgewählten entfernten Elemente werden direkt in den lokalen Share gestreamt.</value></data>
-  <data name="Web_CloudAccess_TargetShare" xml:space="preserve"><value>Ziel-Share</value></data>
-  <data name="Web_CloudAccess_TargetFolder" xml:space="preserve"><value>Zielordner (optional)</value></data>
-  <data name="Web_CloudAccess_TargetFolderPlaceholder" xml:space="preserve"><value>z. B. Import/OneDrive</value></data>
-  <data name="Web_CloudAccess_Copy" xml:space="preserve"><value>Kopieren</value></data>
-  <data name="Web_CloudAccess_CopyProgress" xml:space="preserve"><value>Wird kopiert…</value></data>
-  <data name="Web_CloudAccess_Remote" xml:space="preserve"><value>Entfernt</value></data>
-  <data name="Web_CloudAccess_StatusReady" xml:space="preserve"><value>Bereit</value></data>
-  <data name="Web_CloudAccess_StatusPending" xml:space="preserve"><value>Autorisierung ausstehend</value></data>
-  <data name="Web_CloudAccess_StatusError" xml:space="preserve"><value>Fehler</value></data>
-  <data name="Web_CloudAccess_StatusDisabled" xml:space="preserve"><value>Deaktiviert</value></data>
-  <data name="Web_StorageConnection_StatusPendingConfiguration" xml:space="preserve"><value>Konfiguration ausstehend</value></data>
-  <data name="Web_StorageConnection_StatusDegraded" xml:space="preserve"><value>Eingeschränkt</value></data>
-  <data name="Web_StorageConnection_StatusNeedsReauthorization" xml:space="preserve"><value>Erneute Autorisierung erforderlich</value></data>
-  <data name="Web_StorageConnection_DeleteInUse" xml:space="preserve"><value>Die Verbindung wird noch von einer Synchronisierung oder einem virtuellen Share verwendet und kann nicht gelöscht werden.</value></data>
-  <data name="Web_StorageConnection_ManageDenied" xml:space="preserve"><value>Sie dürfen Speicherverbindungen in dieser Abteilung nicht verwalten.</value></data>
-  <data name="Web_StorageConnection_UseDenied" xml:space="preserve"><value>Sie dürfen Speicherverbindungen in dieser Abteilung nicht verwenden.</value></data>
-  <data name="Web_CloudAccess_Error_NoSelection" xml:space="preserve"><value>Bitte mindestens ein Element auswählen.</value></data>
-  <data name="Web_CloudAccess_Error_SignInRequired" xml:space="preserve"><value>Eine Anmeldung ist erforderlich.</value></data>
-  <data name="Web_CloudAccess_Error_AccessDenied" xml:space="preserve"><value>Der Zugriff auf den virtuellen Share wurde verweigert.</value></data>
-  <data name="Web_CloudAccess_Error_InvalidLocalPath" xml:space="preserve"><value>Der lokale Zielpfad ist ungültig.</value></data>
-  <data name="Web_CloudAccess_Error_LocalUnavailable" xml:space="preserve"><value>Der lokale Ziel-Share ist nicht verfügbar.</value></data>
-  <data name="Web_CloudAccess_Error_LocalWriteDenied" xml:space="preserve"><value>Keine Schreibberechtigung im lokalen Ziel.</value></data>
-  <data name="Web_CloudAccess_Error_CopyCancelled" xml:space="preserve"><value>Der Kopiervorgang wurde abgebrochen.</value></data>
-  <data name="Web_CloudAccess_Error_CopyFailed" xml:space="preserve"><value>Die entfernten Dateien konnten nicht in den lokalen Share kopiert werden.</value></data>
-  <data name="Web_CloudAccess_Error_NoLocalTarget" xml:space="preserve"><value>Kein beschreibbarer lokaler Share verfügbar.</value></data>
-  <data name="Web_CloudAccess_CopySuccess" xml:space="preserve"><value>Die entfernten Elemente wurden in den lokalen Share kopiert.</value></data>
-  <data name="Web_CloudAccess_Error_InvalidShare" xml:space="preserve"><value>Der virtuelle Share ist ungültig.</value></data>
-  <data name="Web_CloudAccess_Error_InvalidPath" xml:space="preserve"><value>Der angeforderte Pfad ist ungültig.</value></data>
-  <data name="Web_CloudAccess_Error_LoadShare" xml:space="preserve"><value>Der virtuelle Share konnte nicht geladen werden.</value></data>
-  <data name="Web_CloudAccess_Error_ConnectionDisabled" xml:space="preserve"><value>Dieser virtuelle Share kann nicht geöffnet werden, da seine Speicherverbindung „{0}“ deaktiviert ist. Bitte lassen Sie die Verbindung von einem Administrator wieder aktivieren.</value></data>
-  <data name="Web_CloudAccess_Error_ConnectionNeedsAuthorization" xml:space="preserve"><value>Dieser virtuelle Share kann nicht geöffnet werden, da seine Speicherverbindung „{0}“ noch autorisiert werden muss. Bitte lassen Sie einen Administrator die Verbindung erneut anmelden.</value></data>
-  <data name="Web_CloudAccess_Error_ConnectionUnavailable" xml:space="preserve"><value>Dieser virtuelle Share kann nicht geöffnet werden, da seine Speicherverbindung „{0}“ derzeit nicht verfügbar ist. Bitte versuchen Sie es später erneut oder wenden Sie sich an einen Administrator.</value></data>
-  <data name="Web_CloudAccess_Error_CreateFolder" xml:space="preserve"><value>Der Ordner konnte nicht erstellt werden.</value></data>
-  <data name="Web_CloudAccess_Error_Delete" xml:space="preserve"><value>Das Element konnte nicht gelöscht werden.</value></data>
-  <data name="Web_CloudAccess_Error_Rename" xml:space="preserve"><value>Das Element konnte nicht umbenannt werden.</value></data>
-  <data name="Web_CloudAccess_Error_Move" xml:space="preserve"><value>Das Element konnte nicht verschoben werden.</value></data>
-  <data name="Web_CloudAccess_Error_RemoteCopy" xml:space="preserve"><value>Das Element konnte nicht kopiert werden.</value></data>
-  <data name="Web_CloudAccess_Error_Upload" xml:space="preserve"><value>Die Datei konnte nicht hochgeladen werden.</value></data>
-  <data name="Web_ExternalStorage_RemoteReadDenied" xml:space="preserve"><value>Der entfernte Speicherserver hat den Lesezugriff verweigert. Prüfen Sie die Berechtigungen des für diese Verbindung hinterlegten Kontos.</value></data>
-  <data name="Web_ExternalStorage_RemoteWriteDenied" xml:space="preserve"><value>Der entfernte Speicherserver hat den Schreibzugriff verweigert. Prüfen Sie die Freigabe- und Dateisystemrechte des für diese Verbindung hinterlegten Kontos.</value></data>
-  <data name="Web_ExternalStorage_RemoteOperationDenied" xml:space="preserve"><value>Der entfernte Speicherserver hat diesen Vorgang verweigert. Prüfen Sie die Berechtigungen des für diese Verbindung hinterlegten Kontos.</value></data>
-  <data name="Web_CloudAccess_Error_ReadOnly" xml:space="preserve"><value>Dieser virtuelle Share ist schreibgeschützt.</value></data>
-  <data name="Web_Settings_Tab_CloudAccess" xml:space="preserve"><value>Cloud-Zugriff</value></data>
-  <data name="Web_Settings_CloudAccess_CacheTitle" xml:space="preserve"><value>Verzeichnis-Metadaten-Cache</value></data>
-  <data name="Web_Settings_CloudAccess_CacheDescription" xml:space="preserve"><value>Legt fest, wie lange entfernte Verzeichnislisten wiederverwendet werden. Dateiinhalte, Zugangsdaten und Zugriffsentscheidungen werden niemals gecacht. Änderungen gelten sofort.</value></data>
-  <data name="Web_Settings_CloudAccess_CacheSeconds" xml:space="preserve"><value>Cache-Dauer (Sekunden)</value></data>
-  <data name="Web_Settings_CloudAccess_CacheRange" xml:space="preserve"><value>Erlaubter Bereich: {0}–{1} Sekunden. Der Standardwert beträgt 20 Sekunden.</value></data>
-  <data name="Web_Settings_CloudAccess_CacheSaved" xml:space="preserve"><value>Cloud-Zugriff-Cache-Einstellungen gespeichert.</value></data>
-  <data name="Web_Settings_CloudAccess_CacheSaveFailed" xml:space="preserve"><value>Cloud-Zugriff-Cache-Einstellungen konnten nicht gespeichert werden.</value></data>
-  <data name="Web_GoogleOAuth_ShareNotFound" xml:space="preserve"><value>Der Share existiert nicht mehr.</value></data>
-  <data name="Web_GoogleOAuth_InvalidTransaction" xml:space="preserve"><value>Die Google-Autorisierungsanfrage ist ungültig oder abgelaufen.</value></data>
-  <data name="Web_GoogleOAuth_FolderAlreadySynced" xml:space="preserve"><value>Dieser Ordner wird bereits synchronisiert.</value></data>
-  <data name="Web_GoogleOAuth_FolderConflict" xml:space="preserve"><value>Dieser Ordner überschneidet sich mit dem synchronisierten Ordner „{0}“.</value></data>
-  <data name="Web_GoogleOAuth_NotConfigured" xml:space="preserve"><value>Die Google-Autorisierung ist für diese Installation nicht konfiguriert.</value></data>
-  <data name="Web_GoogleOAuth_InvalidScopeProfile" xml:space="preserve"><value>Das ausgewählte Google-Drive-Zugriffsprofil ist ungültig.</value></data>
-  <data name="Web_GoogleOAuth_ConsentDenied" xml:space="preserve"><value>Die Google-Autorisierung wurde abgebrochen oder abgelehnt.</value></data>
-  <data name="Web_GoogleOAuth_InvalidCallback" xml:space="preserve"><value>Google hat einen ungültigen Autorisierungsrückruf gesendet.</value></data>
-  <data name="Web_GoogleOAuth_ExchangeFailed" xml:space="preserve"><value>Die Google-Autorisierung konnte nicht abgeschlossen werden. Es wurden keine Zugangsdaten gespeichert.</value></data>
-  <data name="Web_GoogleOAuth_CallbackConflict" xml:space="preserve"><value>„{0}“ überschneidet sich jetzt mit dem synchronisierten Ordner „{1}“. Es wurde keine Verbindung hergestellt.</value></data>
-  <data name="Web_ExternalStorage_Title" xml:space="preserve"><value>Externer Speicher</value></data>
-  <data name="Web_ExternalStorage_Subtitle" xml:space="preserve"><value>Wiederverwendbare Anbieter-Verbindungen und die zugehörigen Synchronisierungen verwalten.</value></data>
-  <data name="Web_ExternalStorage_Tab_Syncs" xml:space="preserve"><value>Synchronisierungen</value></data>
-  <data name="Web_ExternalStorage_Tab_Connections" xml:space="preserve"><value>Verbindungen</value></data>
-  <data name="Web_ExternalStorage_Loading" xml:space="preserve"><value>Externer Speicher wird geladen…</value></data>
-  <data name="Web_ExternalStorage_LoadFailed" xml:space="preserve"><value>Der externe Speicher konnte nicht geladen werden.</value></data>
-  <data name="Web_ExternalStorage_SyncsHelp" xml:space="preserve"><value>Lokale Ordner über wiederverwendbare, geschützte Verbindungen synchronisieren.</value></data>
-  <data name="Web_ExternalStorage_ConnectionsHelp" xml:space="preserve"><value>Einen Anbieter einmal autorisieren, den Zustand prüfen und die Verbindung sicher wiederverwenden.</value></data>
-  <data name="Web_ExternalStorage_CreateSync" xml:space="preserve"><value>Synchronisierung erstellen</value></data>
-  <data name="Web_ExternalStorage_EditSync" xml:space="preserve"><value>Synchronisierung bearbeiten</value></data>
-  <data name="Web_ExternalStorage_CreateSyncFromConnection" xml:space="preserve"><value>Synchronisierung erstellen</value></data>
-  <data name="Web_ExternalStorage_CreateShareFromConnection" xml:space="preserve"><value>Virtuelle Freigabe erstellen</value></data>
-  <data name="Web_ExternalStorage_NoSyncs" xml:space="preserve"><value>Es sind keine Synchronisierungen konfiguriert.</value></data>
-  <data name="Web_ExternalStorage_Name" xml:space="preserve"><value>Name</value></data>
-  <data name="Web_ExternalStorage_Description" xml:space="preserve"><value>Beschreibung</value></data>
-  <data name="Web_ExternalStorage_Connection" xml:space="preserve"><value>Verbindung</value></data>
-  <data name="Web_ExternalStorage_LocalShare" xml:space="preserve"><value>Lokale Freigabe</value></data>
-  <data name="Web_ExternalStorage_LocalPath" xml:space="preserve"><value>Lokaler Ordner</value></data>
-  <data name="Web_ExternalStorage_RemotePath" xml:space="preserve"><value>Entfernter Ordner</value></data>
-  <data name="Web_ExternalStorage_Mode" xml:space="preserve"><value>Richtung</value></data>
-  <data name="Web_ExternalStorage_Select" xml:space="preserve"><value>Auswählen…</value></data>
-  <data name="Web_ExternalStorage_Enabled" xml:space="preserve"><value>Aktiviert</value></data>
-  <data name="Web_ExternalStorage_Disabled" xml:space="preserve"><value>Deaktiviert</value></data>
-  <data name="Web_ExternalStorage_Enable" xml:space="preserve"><value>Aktivieren</value></data>
-  <data name="Web_ExternalStorage_Disable" xml:space="preserve"><value>Deaktivieren</value></data>
-  <data name="Web_ExternalStorage_ScheduleEnabled" xml:space="preserve"><value>Automatisch ausführen</value></data>
-  <data name="Web_ExternalStorage_Interval" xml:space="preserve"><value>Mindestintervall (Sekunden)</value></data>
-  <data name="Web_ExternalStorage_ExcludedExtensions" xml:space="preserve"><value>Ausgeschlossene Dateiendungen</value></data>
-  <data name="Web_ExternalStorage_MaxFileSize" xml:space="preserve"><value>Maximale Dateigröße (MB)</value></data>
-  <data name="Web_ExternalStorage_MaxUploadRate" xml:space="preserve"><value>Upload-Limit (KB/s)</value></data>
-  <data name="Web_ExternalStorage_MaxDownloadRate" xml:space="preserve"><value>Download-Limit (KB/s)</value></data>
-  <data name="Web_ExternalStorage_LastRun" xml:space="preserve"><value>Letzte Ausführung</value></data>
-  <data name="Web_ExternalStorage_Health" xml:space="preserve"><value>Zustand</value></data>
-  <data name="Web_ExternalStorage_Healthy" xml:space="preserve"><value>Fehlerfrei</value></data>
-  <data name="Web_ExternalStorage_AttentionRequired" xml:space="preserve"><value>Aktion erforderlich</value></data>
-  <data name="Web_ExternalStorage_RunNow" xml:space="preserve"><value>Jetzt ausführen</value></data>
-  <data name="Web_ExternalStorage_OperationFailed" xml:space="preserve"><value>Der Vorgang ist fehlgeschlagen. Prüfen Sie das Serverprotokoll.</value></data>
-  <data name="Web_ExternalStorage_SyncMissing" xml:space="preserve"><value>Die Synchronisierung ist nicht mehr vorhanden.</value></data>
-  <data name="Web_ExternalStorage_SyncUnavailable" xml:space="preserve"><value>Die Synchronisierung ist belegt oder nicht verfügbar.</value></data>
-  <data name="Web_ExternalStorage_ShareMissing" xml:space="preserve"><value>Die lokale Freigabe ist nicht mehr vorhanden.</value></data>
-  <data name="Web_ExternalStorage_InvalidName" xml:space="preserve"><value>Geben Sie einen Namen mit höchstens 200 Zeichen ein.</value></data>
-  <data name="Web_ExternalStorage_InvalidDescription" xml:space="preserve"><value>Die Beschreibung ist zu lang.</value></data>
-  <data name="Web_ExternalStorage_PathInUse" xml:space="preserve"><value>Für diesen lokalen Ordner ist bereits eine Synchronisierung eingerichtet.</value></data>
-  <data name="Web_ExternalStorage_DepartmentMismatch" xml:space="preserve"><value>Verbindung und lokale Freigabe müssen zur selben Abteilung gehören.</value></data>
-  <data name="Web_ExternalStorage_SelectConnection" xml:space="preserve"><value>Wählen Sie eine Verbindung aus, um Details anzuzeigen.</value></data>
-  <data name="Web_ExternalStorage_AuthorizationMode" xml:space="preserve"><value>Autorisierungsmodus</value></data>
-  <data name="Web_ExternalStorage_Tenant" xml:space="preserve"><value>Mandant / Organisation</value></data>
-  <data name="Web_ExternalStorage_Scopes" xml:space="preserve"><value>Effektive Berechtigungsbereiche</value></data>
-  <data name="Web_ExternalStorage_State" xml:space="preserve"><value>Status</value></data>
-  <data name="Web_ExternalStorage_LastVerified" xml:space="preserve"><value>Zuletzt geprüft</value></data>
-  <data name="Web_ExternalStorage_ProfileHealth" xml:space="preserve"><value>Anbieterprofil</value></data>
-  <data name="Web_ExternalStorage_SecretHealth" xml:space="preserve"><value>Anmeldedatenspeicher</value></data>
-  <data name="Web_ExternalStorage_Usage" xml:space="preserve"><value>Verwendung</value></data>
-  <data name="Web_ExternalStorage_UsageFormat" xml:space="preserve"><value>{0} Synchronisierung(en), {1} virtuelle Freigabe(n)</value></data>
-  <data name="Web_ExternalStorage_ProfileLegacy" xml:space="preserve"><value>Legacy / nicht zugewiesen</value></data>
-  <data name="Web_ExternalStorage_ProfileConfigured" xml:space="preserve"><value>Konfiguriert</value></data>
-  <data name="Web_ExternalStorage_Protected" xml:space="preserve"><value>Geschützt</value></data>
-  <data name="Web_ExternalStorage_NotAuthorized" xml:space="preserve"><value>Nicht autorisiert</value></data>
-  <data name="Web_ExternalStorage_Test" xml:space="preserve"><value>Testen</value></data>
-  <data name="Web_ExternalStorage_TestUnsupported" xml:space="preserve"><value>Für diesen Anbieter ist noch kein Verbindungstest verfügbar.</value></data>
-  <data name="Web_ExternalStorage_State_PendingAuthorization" xml:space="preserve"><value>Autorisierung ausstehend</value></data>
-  <data name="Web_ExternalStorage_State_Ready" xml:space="preserve"><value>Bereit</value></data>
-  <data name="Web_ExternalStorage_State_Degraded" xml:space="preserve"><value>Beeinträchtigt</value></data>
-  <data name="Web_ExternalStorage_State_Disabled" xml:space="preserve"><value>Deaktiviert</value></data>
-  <data name="Web_ExternalStorage_State_PendingConfiguration" xml:space="preserve"><value>Konfiguration ausstehend</value></data>
-  <data name="Web_ExternalStorage_State_NeedsReauthorization" xml:space="preserve"><value>Erneute Autorisierung erforderlich</value></data>
-  <data name="Web_ExternalStorage_Auth_DeviceCode" xml:space="preserve"><value>Gerätecode</value></data>
-  <data name="Web_ExternalStorage_Auth_DelegatedAuthorizationCode" xml:space="preserve"><value>Delegierter Autorisierungscode</value></data>
-  <data name="Web_ExternalStorage_Auth_ApplicationCredential" xml:space="preserve"><value>Anwendungsanmeldedaten</value></data>
-  <data name="Web_ExternalStorage_Auth_ServiceAccount" xml:space="preserve"><value>Dienstkonto</value></data>
-  <data name="Web_ExternalStorage_Auth_UsernamePassword" xml:space="preserve"><value>Benutzername und Kennwort</value></data>
-  <data name="Web_ExternalStorage_Auth_SshKey" xml:space="preserve"><value>SSH-Schlüssel</value></data>
-  <data name="Web_ExternalStorage_Auth_HostMount" xml:space="preserve"><value>Host-Einhängung</value></data>
-  <data name="Web_Shares_LocalShares" xml:space="preserve"><value>Lokale Freigaben</value></data>
-  <data name="Web_Shares_VirtualShares" xml:space="preserve"><value>Virtuelle Freigaben</value></data>
-  <data name="Web_ExternalStorage_RemoteBrowseFailed" xml:space="preserve"><value>Die entfernten Ordner konnten nicht geladen werden.</value></data>
-  <data name="Web_ShareList_Tab_Cloud" xml:space="preserve"><value>Cloud</value></data>
-  <data name="Web_ShareList_SelectHint" xml:space="preserve"><value>Wählen Sie eine Freigabe aus, um Details und Einstellungen anzuzeigen.</value></data>
-  <data name="Web_ShareList_CloudConnected" xml:space="preserve"><value>Die Cloud-Verbindung wurde erfolgreich hinzugefügt.</value></data>
-  <data name="Web_ExternalStorage_Capabilities" xml:space="preserve"><value>Funktionen</value></data>
-  <data name="Web_ExternalStorage_None" xml:space="preserve"><value>Keine</value></data>
-  <data name="Web_ExternalStorage_BrowseUnsupported" xml:space="preserve"><value>Dieser Anbieter unterstützt kein Durchsuchen entfernter Ordner.</value></data>
-  <data name="Web_ExternalStorage_SyncUnsupported" xml:space="preserve"><value>Dieser Anbieter unterstützt keine Synchronisierung.</value></data>
-  <data name="Web_ExternalStorage_ReadOnlyPullRequired" xml:space="preserve"><value>Diese Verbindung unterstützt ausschließlich abrufende Synchronisierungen.</value></data>
-  <data name="Web_ExternalStorage_RsyncDirectionRequired" xml:space="preserve"><value>Rsync-Verbindungen benötigen eine eindeutige Abruf- oder Übertragungsrichtung; bidirektionale Synchronisierung wird nicht unterstützt.</value></data>
-  <data name="Web_ExternalStorage_VirtualShareUnsupported" xml:space="preserve"><value>Dieser Anbieter kann nicht für virtuelle Freigaben verwendet werden.</value></data>
-  <data name="Web_ExternalStorage_AuthorizeUnsupported" xml:space="preserve"><value>Diese Verbindung unterstützt keine interaktive Autorisierung.</value></data>
-  <data name="Web_ExternalStorage_Capability_Browse" xml:space="preserve"><value>Durchsuchen</value></data>
-  <data name="Web_ExternalStorage_Capability_Read" xml:space="preserve"><value>Lesen</value></data>
-  <data name="Web_ExternalStorage_Capability_Write" xml:space="preserve"><value>Schreiben</value></data>
-  <data name="Web_ExternalStorage_Capability_CreateDirectory" xml:space="preserve"><value>Ordner erstellen</value></data>
-  <data name="Web_ExternalStorage_Capability_Delete" xml:space="preserve"><value>Löschen</value></data>
-  <data name="Web_ExternalStorage_Capability_Rename" xml:space="preserve"><value>Umbenennen</value></data>
-  <data name="Web_ExternalStorage_Capability_Move" xml:space="preserve"><value>Verschieben</value></data>
-  <data name="Web_ExternalStorage_Capability_ServerSideCopy" xml:space="preserve"><value>Serverseitig kopieren</value></data>
-  <data name="Web_ExternalStorage_Capability_Sync" xml:space="preserve"><value>Synchronisierung</value></data>
-  <data name="Web_ExternalStorage_Capability_StableItemIds" xml:space="preserve"><value>Stabile Element-IDs</value></data>
-  <data name="Web_ExternalStorage_Capability_WatchChanges" xml:space="preserve"><value>Änderungsverfolgung</value></data>
-  <data name="Web_ExternalStorage_Capability_DelegatedAuthorization" xml:space="preserve"><value>Delegierte Autorisierung</value></data>
-  <data name="Web_ExternalStorage_Capability_ApplicationAuthorization" xml:space="preserve"><value>Anwendungsautorisierung</value></data>
-  <data name="Web_ExternalStorage_Capability_RequiresHostMount" xml:space="preserve"><value>Vom Betreiber verwaltete Einhängung</value></data>
-  <data name="Web_ExternalStorage_Capability_OptimizedSync" xml:space="preserve"><value>Optimierte Synchronisierung</value></data>
-  <data name="Web_ExternalStorage_ConnectionSettings" xml:space="preserve"><value>Protokolleinstellungen (JSON)</value></data>
-  <data name="Web_ExternalStorage_ConnectionSettingsHelp" xml:space="preserve"><value>Geben Sie nur die dokumentierten Anbietereinstellungen ein. Secrets müssen im Zugangsdaten-Tresor gespeichert oder über einen absoluten Secret-Dateipfad referenziert werden.</value></data>
-  <data name="Web_ExternalStorage_Server" xml:space="preserve"><value>Server / IP-Adresse</value></data>
-  <data name="Web_ExternalStorage_Port" xml:space="preserve"><value>Port</value></data>
-  <data name="Web_ExternalStorage_Domain" xml:space="preserve"><value>Domäne (optional)</value></data>
-  <data name="Web_ExternalStorage_SmbShare" xml:space="preserve"><value>SMB-Freigabe</value></data>
-  <data name="Web_ExternalStorage_Username" xml:space="preserve"><value>Benutzername</value></data>
-  <data name="Web_ExternalStorage_Password" xml:space="preserve"><value>Kennwort</value></data>
-  <data name="Web_ExternalStorage_ExpectedServerIdentity" xml:space="preserve"><value>Erwartete Serveridentität</value></data>
-  <data name="Web_ExternalStorage_MountPath" xml:space="preserve"><value>Lokaler Einhängepfad</value></data>
-  <data name="Web_ExternalStorage_AttestationPath" xml:space="preserve"><value>Datei mit Einhängenachweis</value></data>
-  <data name="Web_ExternalStorage_MinimumDialect" xml:space="preserve"><value>Minimale SMB-Version</value></data>
-  <data name="Web_ExternalStorage_ReadOnly" xml:space="preserve"><value>Schreibgeschützt</value></data>
-  <data name="Web_ExternalStorage_InvalidCredentials" xml:space="preserve"><value>Geben Sie einen gültigen Benutzernamen und ein Kennwort für diese Verbindung ein.</value></data>
-  <data name="Web_ExternalStorage_SmbSharePickerHelp" xml:space="preserve"><value>Verfügbare SMB-Freigaben werden nach dem Verbinden geladen und können beim Einrichten einer Synchronisierung ausgewählt werden.</value></data>
-  <data name="Web_ExternalStorage_DepartmentRequiredHint" xml:space="preserve"><value>Ein Department ist erforderlich: Es bestimmt, wer diese Connection sehen, nutzen und verwalten kann. Wähle Global, um sie abteilungsübergreifend verfügbar zu machen.</value></data>
-  <data name="Web_ExternalStorage_RuntimeIdentity" xml:space="preserve"><value>Netzwerkidentität der Laufzeit</value></data>
-  <data name="Web_ExternalStorage_Auth_NetworkIdentity" xml:space="preserve"><value>Netzwerkidentität</value></data>
-  <data name="Web_ExternalStorage_Capability_DirectFileAccess" xml:space="preserve"><value>Direkter Protokollzugriff</value></data>
-  <data name="Web_ExternalStorage_InvalidSettings" xml:space="preserve"><value>Geben Sie gültige Protokolleinstellungen mit höchstens 64 KiB ein.</value></data>
-  <data name="Web_ExternalStorage_ProviderUnsupported" xml:space="preserve"><value>Dieser Anbieter kann über diesen Ablauf nicht konfiguriert werden.</value></data>
-  <data name="Web_ExternalStorage_Identity" xml:space="preserve"><value>Identität und Autorisierung</value></data>
-  <data name="Web_ExternalStorage_CapabilitiesAndUsage" xml:space="preserve"><value>Funktionen und Verwendung</value></data>
-  <data name="Web_ExternalStorage_SelectSyncHint" xml:space="preserve"><value>Wählen Sie bei einer Synchronisierung „Bearbeiten“, um ihre Einstellungen zu öffnen.</value></data>
-  <data name="Web_ExternalStorage_RemoteRoot" xml:space="preserve"><value>Entfernter Stammordner</value></data>
-  <data name="Web_ExternalStorage_SshHostFingerprint" xml:space="preserve"><value>SSH-Hostschlüssel-Fingerabdruck (SHA-256)</value></data>
-  <data name="Web_ExternalStorage_PrivateKeySecretReference" xml:space="preserve"><value>Secret-Datei mit privatem Schlüssel</value></data>
-  <data name="Web_ExternalStorage_KnownHostsSecretReference" xml:space="preserve"><value>Secret-Datei mit bekannten Hosts</value></data>
-  <data name="Web_ExternalStorage_RsyncSshHelp" xml:space="preserve"><value>Verwenden Sie absolute Pfade zu schreibgeschützten Secret-Dateien. Der festgelegte SHA-256-Fingerabdruck muss zum ausgewählten Hosteintrag in der Known-Hosts-Datei passen.</value></data>
-  <data name="Web_ExternalStorage_SecretFileReferences" xml:space="preserve"><value>Externe Secret-Dateien</value></data>
-  <data name="Web_ExternalStorage_SshKeySetup" xml:space="preserve"><value>Geführte SSH-Einrichtung</value></data>
-  <data name="Web_ExternalStorage_SshKeySetupHelp" xml:space="preserve"><value>Laden oder erzeugen Sie einen Schlüssel, hinterlegen Sie den öffentlichen Schlüssel beim entfernten Konto und prüfen Sie ausdrücklich die Serveridentität.</value></data>
-  <data name="Web_ExternalStorage_SshAdvancedMode" xml:space="preserve"><value>Externe Secret-Dateien verwenden</value></data>
-  <data name="Web_ExternalStorage_SshPrivateKey" xml:space="preserve"><value>Client-Schlüssel vorbereiten</value></data>
-  <data name="Web_ExternalStorage_SshPrivateKeyHelp" xml:space="preserve"><value>Laden Sie einen unverschlüsselten privaten OpenSSH-Schlüssel hoch oder erzeugen Sie einen neuen Ed25519-Schlüssel. Der private Schlüssel wird verschlüsselt im Verbindungs-Tresor gespeichert.</value></data>
-  <data name="Web_ExternalStorage_SshGenerateKey" xml:space="preserve"><value>Ed25519-Schlüssel erzeugen</value></data>
-  <data name="Web_ExternalStorage_SshGeneratedKeyReady" xml:space="preserve"><value>Erzeugter Schlüssel ist bereit</value></data>
-  <data name="Web_ExternalStorage_SshPublicKey" xml:space="preserve"><value>Öffentlicher Schlüssel für den Server</value></data>
-  <data name="Web_ExternalStorage_CopyPublicKey" xml:space="preserve"><value>Öffentlichen Schlüssel kopieren</value></data>
-  <data name="Web_ExternalStorage_SshHostVerification" xml:space="preserve"><value>SSH-Server überprüfen</value></data>
-  <data name="Web_ExternalStorage_SshHostVerificationHelp" xml:space="preserve"><value>Rufen Sie den öffentlichen Hostschlüssel ab, vergleichen Sie dessen Fingerabdruck über einen unabhängigen vertrauenswürdigen Kanal und bestätigen Sie ihn anschließend. Der Abruf allein stellt kein Vertrauen her.</value></data>
-  <data name="Web_ExternalStorage_SshFetchHostKey" xml:space="preserve"><value>Hostschlüssel abrufen</value></data>
-  <data name="Web_ExternalStorage_SshHostKey" xml:space="preserve"><value>Verfügbarer Hostschlüssel</value></data>
-  <data name="Web_ExternalStorage_SshConfirmFingerprint" xml:space="preserve"><value>Ich habe diesen Fingerabdruck über einen vertrauenswürdigen Kanal geprüft.</value></data>
-  <data name="Web_ExternalStorage_SshHostKeyNotFound" xml:space="preserve"><value>Es wurde kein verwendbarer SSH-Hostschlüssel zurückgegeben. Prüfen Sie Server und Port.</value></data>
-  <data name="Web_ExternalStorage_SshSetupIncomplete" xml:space="preserve"><value>Schließen Sie zuerst die Schlüssel- und Hostprüfungs-Schritte ab.</value></data>
-  <data name="Web_ExternalStorage_InvalidPrivateKey" xml:space="preserve"><value>Wählen Sie einen gültigen privaten SSH-Schlüssel mit höchstens 1 MiB aus.</value></data>
-  <data name="Web_ExternalStorage_SshSetupError" xml:space="preserve"><value>Der SSH-Einrichtungsschritt konnte nicht abgeschlossen werden.</value></data>
-  <data name="Web_ExternalStorage_SshSetupError_private_key_invalid" xml:space="preserve"><value>Der private Schlüssel ist ungültig, nicht unterstützt oder mit einer Passphrase geschützt. Verwenden Sie einen unverschlüsselten OpenSSH-Schlüssel.</value></data>
-  <data name="Web_ExternalStorage_SshSetupError_key_generation_failed" xml:space="preserve"><value>Der Server konnte keinen SSH-Schlüssel erzeugen.</value></data>
-  <data name="Web_ExternalStorage_SshSetupError_host_key_discovery_failed" xml:space="preserve"><value>Es konnte kein SSH-Hostschlüssel abgerufen werden. Prüfen Sie Endpunkt und Firewall.</value></data>
-  <data name="Web_ExternalStorage_SshSetupError_host_key_invalid" xml:space="preserve"><value>Der ausgewählte SSH-Hostschlüssel ist ungültig.</value></data>
-  <data name="Web_ExternalStorage_SshSetupError_helper_unavailable" xml:space="preserve"><value>Das benötigte OpenSSH-Einrichtungswerkzeug ist auf dem Server nicht verfügbar.</value></data>
-  <data name="Web_ExternalStorage_SshSetupError_helper_timeout" xml:space="preserve"><value>Die SSH-Einrichtungsanfrage hat das Zeitlimit überschritten.</value></data>
-  <data name="Web_ExternalStorage_TestSuccessful" xml:space="preserve"><value>Verbindung erfolgreich</value></data>
-  <data name="Web_ExternalStorage_TestFailed" xml:space="preserve"><value>Verbindungstest fehlgeschlagen</value></data>
-  <data name="Web_ExternalStorage_NoConnectionSelected" xml:space="preserve"><value>Keine Verbindung ausgewählt</value></data>
-  <data name="Web_ExternalStorage_NoConnectionSelectedHint" xml:space="preserve"><value>Wählen Sie eine Verbindung aus der Liste, um Details anzuzeigen, die Konnektivität zu testen oder Einstellungen zu verwalten.</value></data>
-  <data name="Web_ExternalStorage_WebDavServerUrl" xml:space="preserve"><value>Server-URL</value></data>
-  <data name="Web_ExternalStorage_WebDavHelp" xml:space="preserve"><value>Geben Sie die vollständige WebDAV-Endpunkt-URL ein. Zugangsdaten werden verschlüsselt im Verbindungs-Tresor gespeichert. HTTPS wird dringend empfohlen.</value></data>
-  <data name="Web_Devices_LastSeen" xml:space="preserve"><value>Zuletzt gesehen</value></data>
-  <data name="Web_Devices_Revoked" xml:space="preserve"><value>widerrufen</value></data>
-  <data name="Web_Devices_Active" xml:space="preserve"><value>aktiv</value></data>
-  <data name="Web_Devices_Platform" xml:space="preserve"><value>Plattform</value></data>
-  <data name="Web_Devices_NoFolders" xml:space="preserve"><value>Noch keine synchronisierten Ordner.</value></data>
-  <data name="Web_Devices_Col_Share" xml:space="preserve"><value>Freigabe</value></data>
-  <data name="Web_Devices_Col_RemoteFolder" xml:space="preserve"><value>Remote-Ordner</value></data>
-  <data name="Web_Devices_Col_LocalFolder" xml:space="preserve"><value>Lokaler Ordner</value></data>
-  <data name="Web_Devices_Col_Direction" xml:space="preserve"><value>Richtung</value></data>
-  <data name="Web_Devices_Col_Enabled" xml:space="preserve"><value>Aktiv</value></data>
-  <data name="Web_Devices_Mode_Pull" xml:space="preserve"><value>Nur herunterladen</value></data>
-  <data name="Web_Devices_Mode_Push" xml:space="preserve"><value>Nur hochladen</value></data>
-  <data name="Web_Devices_Mode_TwoWay" xml:space="preserve"><value>Beide Richtungen</value></data>
-  <data name="Web_Common_Yes" xml:space="preserve"><value>Ja</value></data>
-  <data name="Web_Common_No" xml:space="preserve"><value>Nein</value></data>
-  <data name="Web_Nav_DeviceAdmin" xml:space="preserve"><value>Client-Geräte</value></data>
-  <data name="Web_DeviceAdmin_Subtitle" xml:space="preserve"><value>Die verbundenen Apps und Instanzen aller Benutzer. Ein Gerät zu widerrufen macht dessen Tokens ungültig und entfernt seine Sync-Auswahl — nützlich für veraltete oder ungenutzte Geräte.</value></data>
-  <data name="Web_DeviceAdmin_Retention" xml:space="preserve"><value>Registrierungen werden automatisch aufgeräumt: Widerrufene Geräte werden {0} Tage nach dem Widerruf entfernt, und seit {1} Tagen nicht mehr gesehene Geräte werden entfernt, sobald ihre Anmeldung längst abgelaufen ist.</value></data>
-  <data name="Web_DeviceAdmin_Forbidden" xml:space="preserve"><value>Sie haben keine Berechtigung, Client-Geräte zu verwalten.</value></data>
-  <data name="Web_DeviceAdmin_LoadFailed" xml:space="preserve"><value>Client-Geräte konnten nicht geladen werden.</value></data>
-  <data name="Web_DeviceAdmin_None" xml:space="preserve"><value>Es sind noch keine Client-Geräte registriert.</value></data>
-  <data name="Web_DeviceAdmin_Owner" xml:space="preserve"><value>Besitzer</value></data>
-  <data name="Web_DeviceAdmin_Registered" xml:space="preserve"><value>Registriert</value></data>
-  <data name="Web_DeviceAdmin_RevokedOn" xml:space="preserve"><value>Widerrufen am</value></data>
-  <data name="Web_DeviceAdmin_SyncedFolders" xml:space="preserve"><value>Synchronisierte Ordner</value></data>
-  <data name="Web_DeviceAdmin_Revoke" xml:space="preserve"><value>Gerät widerrufen</value></data>
-  <data name="Web_DeviceAdmin_ConfirmRevoke" xml:space="preserve"><value>Dieses Gerät widerrufen? Seine Tokens funktionieren sofort nicht mehr.</value></data>
-  <data name="Web_DeviceAdmin_ConfirmYes" xml:space="preserve"><value>Ja, widerrufen</value></data>
-  <data name="Web_DeviceAdmin_AlreadyRevoked" xml:space="preserve"><value>Dieses Gerät ist bereits widerrufen.</value></data>
-  <data name="Web_DeviceAdmin_RevokeFailed" xml:space="preserve"><value>Das Gerät konnte nicht widerrufen werden.</value></data>
-  <data name="Web_Reconnect_Reconnecting" xml:space="preserve"><value>Verbindung verloren. Verbindung wird wiederhergestellt…</value></data>
-  <data name="Web_Reconnect_AttemptLabel" xml:space="preserve"><value>Versuch</value></data>
-  <data name="Web_Reconnect_Paused" xml:space="preserve"><value>Die Sitzung wurde vom Server pausiert.</value></data>
-  <data name="Web_Reconnect_Failed" xml:space="preserve"><value>Verbindung zum Server konnte nicht wiederhergestellt werden.</value></data>
-  <data name="Web_Reconnect_Rejected" xml:space="preserve"><value>Der Server hat die Verbindung abgelehnt.</value></data>
-  <data name="Web_Reconnect_Reload" xml:space="preserve"><value>Neu laden</value></data>
+  <data name="Web_Nav_CloudSync" xml:space="preserve">
+    <value>Cloud-Synchronisierung</value>
+  </data>
+  <data name="Web_CloudSync_Title" xml:space="preserve">
+    <value>Cloud-Synchronisierung</value>
+  </data>
+  <data name="Web_CloudSync_Subtitle" xml:space="preserve">
+    <value>Lokale und entfernte Ordnersynchronisierungen für alle Cloud-Anbieter verwalten.</value>
+  </data>
+  <data name="Web_CloudSync_Create" xml:space="preserve">
+    <value>Cloud-Synchronisierung hinzufügen</value>
+  </data>
+  <data name="Web_CloudSync_Create_Title" xml:space="preserve">
+    <value>Ordner verbinden</value>
+  </data>
+  <data name="Web_CloudSync_Create_Help" xml:space="preserve">
+    <value>Lokalen Ordner und Anbieter auswählen. Der entfernte Ordner kann nach der Autorisierung gewählt werden.</value>
+  </data>
+  <data name="Web_CloudSync_Loading" xml:space="preserve">
+    <value>Cloud-Synchronisierungen werden geladen…</value>
+  </data>
+  <data name="Web_CloudSync_Empty" xml:space="preserve">
+    <value>Es wurden noch keine Cloud-Synchronisierungen eingerichtet.</value>
+  </data>
+  <data name="Web_CloudSync_Select" xml:space="preserve">
+    <value>Eine Cloud-Synchronisierung auswählen, um ihre Einstellungen anzuzeigen.</value>
+  </data>
+  <data name="Web_CloudSync_Share" xml:space="preserve">
+    <value>Share</value>
+  </data>
+  <data name="Web_CloudSync_Provider" xml:space="preserve">
+    <value>Cloud-Anbieter</value>
+  </data>
+  <data name="Web_CloudSync_LocalFolder" xml:space="preserve">
+    <value>Lokaler Ordner</value>
+  </data>
+  <data name="Web_CloudSync_RemoteFolder" xml:space="preserve">
+    <value>Entfernter Ordner</value>
+  </data>
+  <data name="Web_CloudSync_Browse" xml:space="preserve">
+    <value>Durchsuchen…</value>
+  </data>
+  <data name="Web_CloudSync_Connect" xml:space="preserve">
+    <value>Autorisieren und verbinden</value>
+  </data>
+  <data name="Web_CloudSync_Mode" xml:space="preserve">
+    <value>Synchronisierungsmodus</value>
+  </data>
+  <data name="Web_CloudSync_Mode_TwoWay" xml:space="preserve">
+    <value>Beidseitig</value>
+  </data>
+  <data name="Web_CloudSync_Mode_Pull" xml:space="preserve">
+    <value>Abrufen (Cloud → lokal)</value>
+  </data>
+  <data name="Web_CloudSync_Mode_Push" xml:space="preserve">
+    <value>Hochladen (lokal → Cloud)</value>
+  </data>
+  <data name="Web_CloudSync_LastSync" xml:space="preserve">
+    <value>Letzte Synchronisierung</value>
+  </data>
+  <data name="Web_CloudSync_Never" xml:space="preserve">
+    <value>Nie</value>
+  </data>
+  <data name="Web_CloudSync_Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Web_CloudSync_Tab_General" xml:space="preserve">
+    <value>Allgemein</value>
+  </data>
+  <data name="Web_CloudSync_Tab_Schedule" xml:space="preserve">
+    <value>Zeiteinstellungen</value>
+  </data>
+  <data name="Web_CloudSync_Tab_Advanced" xml:space="preserve">
+    <value>Erweitert</value>
+  </data>
+  <data name="Web_CloudSync_Description" xml:space="preserve">
+    <value>Beschreibung</value>
+  </data>
+  <data name="Web_CloudSync_Advanced" xml:space="preserve">
+    <value>Erweiterte Einstellungen</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_Help" xml:space="preserve">
+    <value>Optionale Dateifilter und Bandbreitenlimits für diese Synchronisierung.</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_MaxFileSize" xml:space="preserve">
+    <value>Maximale Dateigröße (MB)</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_ExcludedExtensions" xml:space="preserve">
+    <value>Ausgeschlossene Dateiendungen</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_ExcludedExtensions_Help" xml:space="preserve">
+    <value>Dateiendungen mit Kommas, Leerzeichen oder Zeilenumbrüchen trennen.</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_MaxUpload" xml:space="preserve">
+    <value>Maximale Uploadrate (KB/s)</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_MaxDownload" xml:space="preserve">
+    <value>Maximale Downloadrate (KB/s)</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_Error_Negative" xml:space="preserve">
+    <value>Erweiterte Limits dürfen nicht negativ sein.</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_Unlimited_Help" xml:space="preserve">
+    <value>0 eingeben oder leer lassen für kein Limit.</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_SyncDeletions" xml:space="preserve">
+    <value>Löschungen synchronisieren</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_SyncDeletions_Help" xml:space="preserve">
+    <value>Wird eine Datei oder ein Ordner auf einer Seite gelöscht, wird sie auch auf der anderen Seite gelöscht, statt wiederhergestellt zu werden. Wirksam ab dem zweiten Lauf nach dem Aktivieren. Hat der Share einen Papierkorb, werden lokal gelöschte Elemente dorthin verschoben und bleiben wiederherstellbar.</value>
+  </data>
+  <data name="Web_CloudSync_Schedule" xml:space="preserve">
+    <value>Automatische Synchronisierung</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Help" xml:space="preserve">
+    <value>Wähle die stündlichen Zeitfenster aus, in denen dieser Ordner synchronisiert werden soll.</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Toggle" xml:space="preserve">
+    <value>Automatische Synchronisierung ein- oder ausschalten</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Interval" xml:space="preserve">
+    <value>Prüfintervall</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Interval_Help" xml:space="preserve">
+    <value>Legt fest, wie oft der Server prüft, ob ein ausgewähltes Synchronisierungsfenster aktiv ist.</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Seconds" xml:space="preserve">
+    <value>Sekunden</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Paint_Mode" xml:space="preserve">
+    <value>Bearbeitungsmodus</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Paint_Select" xml:space="preserve">
+    <value>Auswählen</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Paint_Deselect" xml:space="preserve">
+    <value>Abwählen</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Paint_Help" xml:space="preserve">
+    <value>Klicken oder mit gedrückter Maustaste vom Startfeld aus ein Rechteck über mehrere Zeitfenster aufziehen.</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Day_Paint" xml:space="preserve">
+    <value>Alle Stunden am {0}: {1}</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Hour_Paint" xml:space="preserve">
+    <value>{0}:00 an allen Tagen: {1}</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Grid" xml:space="preserve">
+    <value>Wöchentlicher stündlicher Synchronisierungsplan</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Hour_Toggle" xml:space="preserve">
+    <value>{0}:00 für alle Tage umschalten</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Day_Toggle" xml:space="preserve">
+    <value>Alle Stunden am {0} umschalten</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Slot_On" xml:space="preserve">
+    <value>{0}, {1}:00–{2}:00: aktiv</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Slot_Off" xml:space="preserve">
+    <value>{0}, {1}:00–{2}:00: inaktiv</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Selected" xml:space="preserve">
+    <value>{0} Stundenblöcke ausgewählt · lokale Serverzeit</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Clear" xml:space="preserve">
+    <value>Leeren</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Error_Empty" xml:space="preserve">
+    <value>Bitte mindestens einen Stundenblock auswählen, bevor der Timer aktiviert wird.</value>
+  </data>
+  <data name="Web_CloudSync_Schedule_Error_Interval" xml:space="preserve">
+    <value>Bitte ein Intervall zwischen 1 und 86400 Sekunden eingeben.</value>
+  </data>
+  <data name="Web_CloudSync_Save" xml:space="preserve">
+    <value>Einstellungen speichern</value>
+  </data>
+  <data name="Web_CloudSync_Run" xml:space="preserve">
+    <value>Jetzt synchronisieren</value>
+  </data>
+  <data name="Web_CloudSync_Unsync" xml:space="preserve">
+    <value>Cloud-Synchronisierung entfernen</value>
+  </data>
+  <data name="Web_CloudSync_Unsync_Confirm" xml:space="preserve">
+    <value>Diese Konfiguration entfernen und ihre Cloud-Verbindung widerrufen?</value>
+  </data>
+  <data name="Web_CloudSync_Connected" xml:space="preserve">
+    <value>Der Cloud-Anbieter wurde erfolgreich verbunden.</value>
+  </data>
+  <data name="Web_CloudSync_Saved" xml:space="preserve">
+    <value>Cloud-Synchronisierungseinstellungen wurden gespeichert.</value>
+  </data>
+  <data name="Web_CloudSync_Removed" xml:space="preserve">
+    <value>Cloud-Synchronisierung wurde entfernt.</value>
+  </data>
+  <data name="Web_CloudSync_Progress" xml:space="preserve">
+    <value>Synchronisierung läuft…</value>
+  </data>
+  <data name="Web_CloudSync_Complete" xml:space="preserve">
+    <value>Synchronisierung abgeschlossen.</value>
+  </data>
+  <data name="Web_CloudSync_Directory_LocalTitle" xml:space="preserve">
+    <value>Lokalen Ordner auswählen</value>
+  </data>
+  <data name="Web_CloudSync_Directory_RemoteTitle" xml:space="preserve">
+    <value>Entfernten Ordner auswählen</value>
+  </data>
+  <data name="Web_CloudSync_Directory_Parent" xml:space="preserve">
+    <value>Übergeordneter Ordner</value>
+  </data>
+  <data name="Web_CloudSync_Directory_Select" xml:space="preserve">
+    <value>Diesen Ordner auswählen</value>
+  </data>
+  <data name="Web_CloudSync_Directory_Loading" xml:space="preserve">
+    <value>Ordner werden geladen…</value>
+  </data>
+  <data name="Web_CloudSync_Directory_Empty" xml:space="preserve">
+    <value>Dieser Ordner enthält keine Unterordner.</value>
+  </data>
+  <data name="Web_CloudSync_Directory_Error" xml:space="preserve">
+    <value>Dieser Ordner konnte nicht geöffnet werden.</value>
+  </data>
+  <data name="Web_CloudSync_Error_Load" xml:space="preserve">
+    <value>Die Cloud-Synchronisierungen konnten nicht geladen werden.</value>
+  </data>
+  <data name="Web_CloudSync_Error_ShareRequired" xml:space="preserve">
+    <value>Bitte einen verwaltbaren Share auswählen.</value>
+  </data>
+  <data name="Web_CloudSync_Error_ProviderRequired" xml:space="preserve">
+    <value>Bitte einen verfügbaren Cloud-Anbieter auswählen.</value>
+  </data>
+  <data name="Web_CloudSync_Error_Conflict" xml:space="preserve">
+    <value>Dieser Ordner überschneidet sich mit einer bestehenden Cloud-Synchronisierung.</value>
+  </data>
+  <data name="Web_CloudSync_Error_NotAuthorized" xml:space="preserve">
+    <value>Für diese Aktion besteht keine Berechtigung.</value>
+  </data>
+  <data name="Web_CloudSync_Error_Missing" xml:space="preserve">
+    <value>Diese Cloud-Synchronisierung existiert nicht mehr.</value>
+  </data>
+  <data name="Web_CloudSync_Error_Save" xml:space="preserve">
+    <value>Die Cloud-Synchronisierungseinstellungen konnten nicht gespeichert werden.</value>
+  </data>
+  <data name="Web_CloudSync_Error_Run" xml:space="preserve">
+    <value>Die Cloud-Synchronisierung ist fehlgeschlagen. Bitte das Serverprotokoll prüfen.</value>
+  </data>
+  <data name="Web_CloudSync_Error_Busy" xml:space="preserve">
+    <value>Dieser Ordner wird bereits synchronisiert oder geändert. Bitte später erneut versuchen.</value>
+  </data>
+  <data name="Web_CloudSync_Error_LocalFolder" xml:space="preserve">
+    <value>Bitte einen vorhandenen lokalen Ordner auswählen.</value>
+  </data>
+  <data name="Web_CloudSync_SharePanel_Help" xml:space="preserve">
+    <value>Die lokalen und entfernten Ordnerzuordnungen dieses Shares zentral in der Cloud-Synchronisierung verwalten.</value>
+  </data>
+  <data name="Web_CloudSync_SharePanel_Count" xml:space="preserve">
+    <value>Eingerichtete Synchronisierungen: {0}</value>
+  </data>
+  <data name="Web_CloudSync_SharePanel_Open" xml:space="preserve">
+    <value>Cloud-Synchronisierung öffnen</value>
+  </data>
+  <data name="Web_CloudSync_Device_Title" xml:space="preserve">
+    <value>Microsoft OneDrive verbinden</value>
+  </data>
+  <data name="Web_CloudSync_Device_Instructions" xml:space="preserve">
+    <value>Öffne die Microsoft-Anmeldeseite, gib diesen Code ein und erlaube den Zugriff auf dein OneDrive.</value>
+  </data>
+  <data name="Web_CloudSync_Device_OpenMicrosoft" xml:space="preserve">
+    <value>Microsoft-Anmeldung öffnen</value>
+  </data>
+  <data name="Web_CloudSync_Device_Waiting" xml:space="preserve">
+    <value>Microsoft-Autorisierung wird abgewartet…</value>
+  </data>
+  <data name="Web_CloudSync_Device_Expired" xml:space="preserve">
+    <value>Die Cloud-Autorisierungsanfrage ist abgelaufen. Bitte erneut starten.</value>
+  </data>
+  <data name="Web_CloudSync_Device_Failed" xml:space="preserve">
+    <value>Die Microsoft-Autorisierung ist fehlgeschlagen. Bitte zur Cloud-Synchronisierung zurückkehren und erneut versuchen.</value>
+  </data>
+  <data name="Web_CloudAccess_Dropbox_Title" xml:space="preserve">
+    <value>Dropbox verbinden</value>
+  </data>
+  <data name="Web_CloudAccess_Dropbox_Instructions" xml:space="preserve">
+    <value>Dropbox öffnen, Zugriff bestätigen und anschließend den von Dropbox angezeigten Autorisierungscode in das Feld unten einfügen.</value>
+  </data>
+  <data name="Web_CloudAccess_Dropbox_Open" xml:space="preserve">
+    <value>Dropbox-Anmeldung öffnen</value>
+  </data>
+  <data name="Web_CloudAccess_Dropbox_CodeLabel" xml:space="preserve">
+    <value>Autorisierungscode</value>
+  </data>
+  <data name="Web_CloudAccess_Dropbox_Submit" xml:space="preserve">
+    <value>Verbinden</value>
+  </data>
+  <data name="Web_CloudAccess_Dropbox_Waiting" xml:space="preserve">
+    <value>Überprüfung mit Dropbox…</value>
+  </data>
+  <data name="Web_CloudAccess_Dropbox_Expired" xml:space="preserve">
+    <value>Die Dropbox-Autorisierungsanfrage ist abgelaufen. Bitte erneut starten.</value>
+  </data>
+  <data name="Web_CloudAccess_Dropbox_Failed" xml:space="preserve">
+    <value>Die Dropbox-Autorisierung ist fehlgeschlagen. Bitte zu Externer Speicher zurückkehren und erneut versuchen.</value>
+  </data>
+  <data name="Web_CloudAccess_Dropbox_CodeRequired" xml:space="preserve">
+    <value>Bitte den Autorisierungscode von Dropbox eingeben.</value>
+  </data>
+  <data name="Web_CloudAccess_Dropbox_NotConfigured" xml:space="preserve">
+    <value>Dropbox ist nicht konfiguriert. Bitte vor dem Verbinden einen Dropbox-App-Schlüssel festlegen.</value>
+  </data>
+  <data name="Web_CloudAccess_Dropbox_MissingScope" xml:space="preserve">
+    <value>Dropbox wurde verbunden, aber der Autorisierung fehlen die Berechtigungen zum Durchsuchen von Ordnern. Bitte die Scopes files.metadata.read, files.content.read und files.content.write in der Dropbox-App aktivieren und diese Verbindung anschließend erneut autorisieren.</value>
+  </data>
+  <data name="Web_CloudSync_Cancelled" xml:space="preserve">
+    <value>Die Synchronisierung wurde abgebrochen.</value>
+  </data>
+  <data name="Web_Jobs_Title" xml:space="preserve">
+    <value>Laufende Jobs</value>
+  </data>
+  <data name="Web_Jobs_Count" xml:space="preserve">
+    <value>{0} aktiv</value>
+  </data>
+  <data name="Web_Jobs_Empty" xml:space="preserve">
+    <value>Aktuell laufen keine Jobs.</value>
+  </data>
+  <data name="Web_Jobs_Cancel" xml:space="preserve">
+    <value>Job abbrechen</value>
+  </data>
+  <data name="Web_Jobs_Cancelling" xml:space="preserve">
+    <value>Wird abgebrochen…</value>
+  </data>
+  <data name="Web_Jobs_CloudSync_Title" xml:space="preserve">
+    <value>Cloud-Synchronisierung: {0}</value>
+  </data>
+  <data name="Web_Jobs_Upload_Title" xml:space="preserve">
+    <value>Upload: {0}</value>
+  </data>
+  <data name="Web_CloudAccess_Title" xml:space="preserve">
+    <value>Cloud-Zugriff</value>
+  </data>
+  <data name="Web_CloudAccess_Subtitle" xml:space="preserve">
+    <value>Entfernte Ordner als virtuelle, nur im Web-Dateibrowser sichtbare Shares bereitstellen.</value>
+  </data>
+  <data name="Web_CloudAccess_Loading" xml:space="preserve">
+    <value>Cloud-Zugriff wird geladen…</value>
+  </data>
+  <data name="Web_CloudAccess_NoPermission" xml:space="preserve">
+    <value>Keine Berechtigung zum Verwalten des Cloud-Zugriffs.</value>
+  </data>
+  <data name="Web_CloudAccess_AddConnection" xml:space="preserve">
+    <value>Verbindung hinzufügen</value>
+  </data>
+  <data name="Web_CloudAccess_AddShare" xml:space="preserve">
+    <value>Virtuellen Share erstellen</value>
+  </data>
+  <data name="Web_CloudAccess_Provider" xml:space="preserve">
+    <value>Cloud-Anbieter</value>
+  </data>
+  <data name="Web_CloudAccess_Provider_Select" xml:space="preserve">
+    <value>Anbieter auswählen</value>
+  </data>
+  <data name="Web_CloudAccess_ConnectionName" xml:space="preserve">
+    <value>Verbindungsname</value>
+  </data>
+  <data name="Web_CloudAccess_Department" xml:space="preserve">
+    <value>Abteilung</value>
+  </data>
+  <data name="Web_CloudAccess_Select" xml:space="preserve">
+    <value>Bitte auswählen</value>
+  </data>
+  <data name="Web_CloudAccess_Connect" xml:space="preserve">
+    <value>Verbinden</value>
+  </data>
+  <data name="Web_CloudAccess_Edit" xml:space="preserve">
+    <value>Bearbeiten</value>
+  </data>
+  <data name="Web_CloudAccess_Rename" xml:space="preserve">
+    <value>Umbenennen</value>
+  </data>
+  <data name="Web_CloudAccess_Save" xml:space="preserve">
+    <value>Änderungen speichern</value>
+  </data>
+  <data name="Web_CloudAccess_Cancel" xml:space="preserve">
+    <value>Abbrechen</value>
+  </data>
+  <data name="Web_CloudAccess_EditConnection" xml:space="preserve">
+    <value>Verbindung bearbeiten</value>
+  </data>
+  <data name="Web_CloudAccess_EditShare" xml:space="preserve">
+    <value>Virtuellen Share bearbeiten</value>
+  </data>
+  <data name="Web_CloudAccess_ConnectionHelp" xml:space="preserve">
+    <value>Anbieter auswählen und die Verbindung einer Abteilung zuweisen. Zugangsdaten bleiben verschlüsselt auf dem Server.</value>
+  </data>
+  <data name="Web_CloudAccess_Connections" xml:space="preserve">
+    <value>Verbindungen</value>
+  </data>
+  <data name="Web_CloudAccess_NoConnections" xml:space="preserve">
+    <value>Noch keine Cloud-Verbindung eingerichtet.</value>
+  </data>
+  <data name="Web_CloudAccess_Authorize" xml:space="preserve">
+    <value>Autorisieren</value>
+  </data>
+  <data name="Web_CloudAccess_Reauthorize" xml:space="preserve">
+    <value>Neu autorisieren</value>
+  </data>
+  <data name="Web_CloudAccess_DeleteConnectionConfirm" xml:space="preserve">
+    <value>Verbindung „{0}“ und alle zugehörigen virtuellen Shares löschen?</value>
+  </data>
+  <data name="Web_CloudAccess_Shares" xml:space="preserve">
+    <value>Virtuelle Shares</value>
+  </data>
+  <data name="Web_CloudAccess_NoShares" xml:space="preserve">
+    <value>Noch keine virtuellen Shares vorhanden.</value>
+  </data>
+  <data name="Web_CloudAccess_NoReadyConnections" xml:space="preserve">
+    <value>Keine Verbindungen verfügbar. Erstelle und autorisiere zuerst eine Verbindung, bevor du einen virtuellen Share anlegst.</value>
+  </data>
+  <data name="Web_CloudAccess_GoToConnections" xml:space="preserve">
+    <value>Zu den Verbindungen</value>
+  </data>
+  <data name="Web_CloudAccess_CreateShareHelp" xml:space="preserve">
+    <value>Eine verbundene Cloud auswählen und einen ihrer entfernten Ordner im Web-Dateibrowser bereitstellen.</value>
+  </data>
+  <data name="Web_CloudAccess_Connection" xml:space="preserve">
+    <value>Verbindung</value>
+  </data>
+  <data name="Web_CloudAccess_ShareName" xml:space="preserve">
+    <value>Share-Name</value>
+  </data>
+  <data name="Web_CloudAccess_RemoteFolder" xml:space="preserve">
+    <value>Entfernter Ordner</value>
+  </data>
+  <data name="Web_CloudAccess_Browse" xml:space="preserve">
+    <value>Durchsuchen…</value>
+  </data>
+  <data name="Web_CloudAccess_AccessMode" xml:space="preserve">
+    <value>Zugriffsmodus</value>
+  </data>
+  <data name="Web_CloudAccess_ReadOnly" xml:space="preserve">
+    <value>Nur Lesen</value>
+  </data>
+  <data name="Web_CloudAccess_ReadWrite" xml:space="preserve">
+    <value>Lesen und Schreiben</value>
+  </data>
+  <data name="Web_CloudAccess_Access" xml:space="preserve">
+    <value>Zugriff</value>
+  </data>
+  <data name="Web_CloudAccess_AccessHelp" xml:space="preserve">
+    <value>Ausgewählte Benutzer und Gruppen können auf den gesamten virtuellen Share zugreifen.</value>
+  </data>
+  <data name="Web_CloudAccess_AccessEditHelp" xml:space="preserve">
+    <value>Benutzer und Gruppen hinzufügen oder entfernen und anschließend die Zugriffsliste speichern.</value>
+  </data>
+  <data name="Web_CloudAccess_Principal" xml:space="preserve">
+    <value>Benutzer oder Gruppe</value>
+  </data>
+  <data name="Web_CloudAccess_PrincipalPlaceholder" xml:space="preserve">
+    <value>Benutzer oder Gruppe auswählen</value>
+  </data>
+  <data name="Web_CloudAccess_AddPrincipal" xml:space="preserve">
+    <value>Hinzufügen</value>
+  </data>
+  <data name="Web_CloudAccess_RemovePrincipal" xml:space="preserve">
+    <value>Entfernen</value>
+  </data>
+  <data name="Web_CloudAccess_Open" xml:space="preserve">
+    <value>Share öffnen</value>
+  </data>
+  <data name="Web_CloudAccess_TabGeneral" xml:space="preserve">
+    <value>Allgemein</value>
+  </data>
+  <data name="Web_CloudAccess_TabAccess" xml:space="preserve">
+    <value>Zugriff</value>
+  </data>
+  <data name="Web_CloudAccess_DetailHint" xml:space="preserve">
+    <value>Virtuellen Share auswählen, um Einstellungen anzuzeigen.</value>
+  </data>
+  <data name="Web_CloudAccess_Account" xml:space="preserve">
+    <value>Konto</value>
+  </data>
+  <data name="Web_CloudAccess_SaveAccess" xml:space="preserve">
+    <value>Zugriff speichern</value>
+  </data>
+  <data name="Web_CloudAccess_ShareNameExists" xml:space="preserve">
+    <value>Ein lokaler oder virtueller Share mit diesem Namen existiert bereits.</value>
+  </data>
+  <data name="Web_CloudAccess_InvalidConnectionName" xml:space="preserve">
+    <value>Bitte einen gültigen Verbindungsnamen eingeben.</value>
+  </data>
+  <data name="Web_CloudAccess_InvalidShareName" xml:space="preserve">
+    <value>Bitte einen gültigen Share-Namen eingeben.</value>
+  </data>
+  <data name="Web_CloudAccess_ConnectionRequired" xml:space="preserve">
+    <value>Bitte eine bereite Verbindung auswählen.</value>
+  </data>
+  <data name="Web_CloudAccess_FolderRequired" xml:space="preserve">
+    <value>Bitte einen entfernten Ordner auswählen.</value>
+  </data>
+  <data name="Web_CloudAccess_ConnectionNotReady" xml:space="preserve">
+    <value>Die OneDrive-Verbindung ist nicht bereit.</value>
+  </data>
+  <data name="Web_CloudAccess_InvalidRemotePath" xml:space="preserve">
+    <value>Der entfernte Pfad ist ungültig.</value>
+  </data>
+  <data name="Web_CloudAccess_ShareMissing" xml:space="preserve">
+    <value>Der virtuelle Share existiert nicht mehr.</value>
+  </data>
+  <data name="Web_CloudAccess_ConnectionMissing" xml:space="preserve">
+    <value>Die Verbindung existiert nicht mehr.</value>
+  </data>
+  <data name="Web_CloudAccess_DepartmentDenied" xml:space="preserve">
+    <value>Keine Berechtigung für Cloud-Zugriff in dieser Abteilung.</value>
+  </data>
+  <data name="Web_CloudAccess_LoadFailed" xml:space="preserve">
+    <value>Cloud-Zugriff konnte nicht geladen werden.</value>
+  </data>
+  <data name="Web_CloudAccess_FolderPickerTitle" xml:space="preserve">
+    <value>Entfernten Ordner auswählen</value>
+  </data>
+  <data name="Web_CloudAccess_User" xml:space="preserve">
+    <value>Benutzer</value>
+  </data>
+  <data name="Web_CloudAccess_Group" xml:space="preserve">
+    <value>Gruppe</value>
+  </data>
+  <data name="Web_CloudAccess_NotAuthorized" xml:space="preserve">
+    <value>Nicht autorisiert</value>
+  </data>
+  <data name="Web_CloudAccess_CopyToLocal" xml:space="preserve">
+    <value>In lokalen Share kopieren</value>
+  </data>
+  <data name="Web_CloudAccess_CopyDescription" xml:space="preserve">
+    <value>Die ausgewählten entfernten Elemente werden direkt in den lokalen Share gestreamt.</value>
+  </data>
+  <data name="Web_CloudAccess_TargetShare" xml:space="preserve">
+    <value>Ziel-Share</value>
+  </data>
+  <data name="Web_CloudAccess_TargetFolder" xml:space="preserve">
+    <value>Zielordner (optional)</value>
+  </data>
+  <data name="Web_CloudAccess_TargetFolderPlaceholder" xml:space="preserve">
+    <value>z. B. Import/OneDrive</value>
+  </data>
+  <data name="Web_CloudAccess_Copy" xml:space="preserve">
+    <value>Kopieren</value>
+  </data>
+  <data name="Web_CloudAccess_CopyProgress" xml:space="preserve">
+    <value>Wird kopiert…</value>
+  </data>
+  <data name="Web_CloudAccess_Remote" xml:space="preserve">
+    <value>Entfernt</value>
+  </data>
+  <data name="Web_CloudAccess_StatusReady" xml:space="preserve">
+    <value>Bereit</value>
+  </data>
+  <data name="Web_CloudAccess_StatusPending" xml:space="preserve">
+    <value>Autorisierung ausstehend</value>
+  </data>
+  <data name="Web_CloudAccess_StatusError" xml:space="preserve">
+    <value>Fehler</value>
+  </data>
+  <data name="Web_CloudAccess_StatusDisabled" xml:space="preserve">
+    <value>Deaktiviert</value>
+  </data>
+  <data name="Web_StorageConnection_StatusPendingConfiguration" xml:space="preserve">
+    <value>Konfiguration ausstehend</value>
+  </data>
+  <data name="Web_StorageConnection_StatusDegraded" xml:space="preserve">
+    <value>Eingeschränkt</value>
+  </data>
+  <data name="Web_StorageConnection_StatusNeedsReauthorization" xml:space="preserve">
+    <value>Erneute Autorisierung erforderlich</value>
+  </data>
+  <data name="Web_StorageConnection_DeleteInUse" xml:space="preserve">
+    <value>Die Verbindung wird noch von einer Synchronisierung oder einem virtuellen Share verwendet und kann nicht gelöscht werden.</value>
+  </data>
+  <data name="Web_StorageConnection_ManageDenied" xml:space="preserve">
+    <value>Sie dürfen Speicherverbindungen in dieser Abteilung nicht verwalten.</value>
+  </data>
+  <data name="Web_StorageConnection_UseDenied" xml:space="preserve">
+    <value>Sie dürfen Speicherverbindungen in dieser Abteilung nicht verwenden.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_NoSelection" xml:space="preserve">
+    <value>Bitte mindestens ein Element auswählen.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_SignInRequired" xml:space="preserve">
+    <value>Eine Anmeldung ist erforderlich.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_AccessDenied" xml:space="preserve">
+    <value>Der Zugriff auf den virtuellen Share wurde verweigert.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_InvalidLocalPath" xml:space="preserve">
+    <value>Der lokale Zielpfad ist ungültig.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_LocalUnavailable" xml:space="preserve">
+    <value>Der lokale Ziel-Share ist nicht verfügbar.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_LocalWriteDenied" xml:space="preserve">
+    <value>Keine Schreibberechtigung im lokalen Ziel.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_CopyCancelled" xml:space="preserve">
+    <value>Der Kopiervorgang wurde abgebrochen.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_CopyFailed" xml:space="preserve">
+    <value>Die entfernten Dateien konnten nicht in den lokalen Share kopiert werden.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_NoLocalTarget" xml:space="preserve">
+    <value>Kein beschreibbarer lokaler Share verfügbar.</value>
+  </data>
+  <data name="Web_CloudAccess_CopySuccess" xml:space="preserve">
+    <value>Die entfernten Elemente wurden in den lokalen Share kopiert.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_InvalidShare" xml:space="preserve">
+    <value>Der virtuelle Share ist ungültig.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_InvalidPath" xml:space="preserve">
+    <value>Der angeforderte Pfad ist ungültig.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_LoadShare" xml:space="preserve">
+    <value>Der virtuelle Share konnte nicht geladen werden.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_ConnectionDisabled" xml:space="preserve">
+    <value>Dieser virtuelle Share kann nicht geöffnet werden, da seine Speicherverbindung „{0}“ deaktiviert ist. Bitte lassen Sie die Verbindung von einem Administrator wieder aktivieren.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_ConnectionNeedsAuthorization" xml:space="preserve">
+    <value>Dieser virtuelle Share kann nicht geöffnet werden, da seine Speicherverbindung „{0}“ noch autorisiert werden muss. Bitte lassen Sie einen Administrator die Verbindung erneut anmelden.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_ConnectionUnavailable" xml:space="preserve">
+    <value>Dieser virtuelle Share kann nicht geöffnet werden, da seine Speicherverbindung „{0}“ derzeit nicht verfügbar ist. Bitte versuchen Sie es später erneut oder wenden Sie sich an einen Administrator.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_CreateFolder" xml:space="preserve">
+    <value>Der Ordner konnte nicht erstellt werden.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_Delete" xml:space="preserve">
+    <value>Das Element konnte nicht gelöscht werden.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_Rename" xml:space="preserve">
+    <value>Das Element konnte nicht umbenannt werden.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_Move" xml:space="preserve">
+    <value>Das Element konnte nicht verschoben werden.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_RemoteCopy" xml:space="preserve">
+    <value>Das Element konnte nicht kopiert werden.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_Upload" xml:space="preserve">
+    <value>Die Datei konnte nicht hochgeladen werden.</value>
+  </data>
+  <data name="Web_ExternalStorage_RemoteReadDenied" xml:space="preserve">
+    <value>Der entfernte Speicherserver hat den Lesezugriff verweigert. Prüfen Sie die Berechtigungen des für diese Verbindung hinterlegten Kontos.</value>
+  </data>
+  <data name="Web_ExternalStorage_RemoteWriteDenied" xml:space="preserve">
+    <value>Der entfernte Speicherserver hat den Schreibzugriff verweigert. Prüfen Sie die Freigabe- und Dateisystemrechte des für diese Verbindung hinterlegten Kontos.</value>
+  </data>
+  <data name="Web_ExternalStorage_RemoteOperationDenied" xml:space="preserve">
+    <value>Der entfernte Speicherserver hat diesen Vorgang verweigert. Prüfen Sie die Berechtigungen des für diese Verbindung hinterlegten Kontos.</value>
+  </data>
+  <data name="Web_CloudAccess_Error_ReadOnly" xml:space="preserve">
+    <value>Dieser virtuelle Share ist schreibgeschützt.</value>
+  </data>
+  <data name="Web_Transfer_PartialFailure" xml:space="preserve">
+    <value>{0} von {1} Elementen übertragen. Die übrigen konnten nicht übertragen werden.</value>
+  </data>
+  <data name="Web_Settings_Tab_CloudAccess" xml:space="preserve">
+    <value>Cloud-Zugriff</value>
+  </data>
+  <data name="Web_Settings_CloudAccess_CacheTitle" xml:space="preserve">
+    <value>Verzeichnis-Metadaten-Cache</value>
+  </data>
+  <data name="Web_Settings_CloudAccess_CacheDescription" xml:space="preserve">
+    <value>Legt fest, wie lange entfernte Verzeichnislisten wiederverwendet werden. Dateiinhalte, Zugangsdaten und Zugriffsentscheidungen werden niemals gecacht. Änderungen gelten sofort.</value>
+  </data>
+  <data name="Web_Settings_CloudAccess_CacheSeconds" xml:space="preserve">
+    <value>Cache-Dauer (Sekunden)</value>
+  </data>
+  <data name="Web_Settings_CloudAccess_CacheRange" xml:space="preserve">
+    <value>Erlaubter Bereich: {0}–{1} Sekunden. Der Standardwert beträgt 20 Sekunden.</value>
+  </data>
+  <data name="Web_Settings_CloudAccess_CacheSaved" xml:space="preserve">
+    <value>Cloud-Zugriff-Cache-Einstellungen gespeichert.</value>
+  </data>
+  <data name="Web_Settings_CloudAccess_CacheSaveFailed" xml:space="preserve">
+    <value>Cloud-Zugriff-Cache-Einstellungen konnten nicht gespeichert werden.</value>
+  </data>
+  <data name="Web_GoogleOAuth_ShareNotFound" xml:space="preserve">
+    <value>Der Share existiert nicht mehr.</value>
+  </data>
+  <data name="Web_GoogleOAuth_InvalidTransaction" xml:space="preserve">
+    <value>Die Google-Autorisierungsanfrage ist ungültig oder abgelaufen.</value>
+  </data>
+  <data name="Web_GoogleOAuth_FolderAlreadySynced" xml:space="preserve">
+    <value>Dieser Ordner wird bereits synchronisiert.</value>
+  </data>
+  <data name="Web_GoogleOAuth_FolderConflict" xml:space="preserve">
+    <value>Dieser Ordner überschneidet sich mit dem synchronisierten Ordner „{0}“.</value>
+  </data>
+  <data name="Web_GoogleOAuth_NotConfigured" xml:space="preserve">
+    <value>Die Google-Autorisierung ist für diese Installation nicht konfiguriert.</value>
+  </data>
+  <data name="Web_GoogleOAuth_InvalidScopeProfile" xml:space="preserve">
+    <value>Das ausgewählte Google-Drive-Zugriffsprofil ist ungültig.</value>
+  </data>
+  <data name="Web_GoogleOAuth_ConsentDenied" xml:space="preserve">
+    <value>Die Google-Autorisierung wurde abgebrochen oder abgelehnt.</value>
+  </data>
+  <data name="Web_GoogleOAuth_InvalidCallback" xml:space="preserve">
+    <value>Google hat einen ungültigen Autorisierungsrückruf gesendet.</value>
+  </data>
+  <data name="Web_GoogleOAuth_ExchangeFailed" xml:space="preserve">
+    <value>Die Google-Autorisierung konnte nicht abgeschlossen werden. Es wurden keine Zugangsdaten gespeichert.</value>
+  </data>
+  <data name="Web_GoogleOAuth_CallbackConflict" xml:space="preserve">
+    <value>„{0}“ überschneidet sich jetzt mit dem synchronisierten Ordner „{1}“. Es wurde keine Verbindung hergestellt.</value>
+  </data>
+  <data name="Web_ExternalStorage_Title" xml:space="preserve">
+    <value>Externer Speicher</value>
+  </data>
+  <data name="Web_ExternalStorage_Subtitle" xml:space="preserve">
+    <value>Wiederverwendbare Anbieter-Verbindungen und die zugehörigen Synchronisierungen verwalten.</value>
+  </data>
+  <data name="Web_ExternalStorage_Tab_Syncs" xml:space="preserve">
+    <value>Synchronisierungen</value>
+  </data>
+  <data name="Web_ExternalStorage_Tab_Connections" xml:space="preserve">
+    <value>Verbindungen</value>
+  </data>
+  <data name="Web_ExternalStorage_Loading" xml:space="preserve">
+    <value>Externer Speicher wird geladen…</value>
+  </data>
+  <data name="Web_ExternalStorage_LoadFailed" xml:space="preserve">
+    <value>Der externe Speicher konnte nicht geladen werden.</value>
+  </data>
+  <data name="Web_ExternalStorage_SyncsHelp" xml:space="preserve">
+    <value>Lokale Ordner über wiederverwendbare, geschützte Verbindungen synchronisieren.</value>
+  </data>
+  <data name="Web_ExternalStorage_ConnectionsHelp" xml:space="preserve">
+    <value>Einen Anbieter einmal autorisieren, den Zustand prüfen und die Verbindung sicher wiederverwenden.</value>
+  </data>
+  <data name="Web_ExternalStorage_CreateSync" xml:space="preserve">
+    <value>Synchronisierung erstellen</value>
+  </data>
+  <data name="Web_ExternalStorage_EditSync" xml:space="preserve">
+    <value>Synchronisierung bearbeiten</value>
+  </data>
+  <data name="Web_ExternalStorage_CreateSyncFromConnection" xml:space="preserve">
+    <value>Synchronisierung erstellen</value>
+  </data>
+  <data name="Web_ExternalStorage_CreateShareFromConnection" xml:space="preserve">
+    <value>Virtuelle Freigabe erstellen</value>
+  </data>
+  <data name="Web_ExternalStorage_NoSyncs" xml:space="preserve">
+    <value>Es sind keine Synchronisierungen konfiguriert.</value>
+  </data>
+  <data name="Web_ExternalStorage_Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Web_ExternalStorage_Description" xml:space="preserve">
+    <value>Beschreibung</value>
+  </data>
+  <data name="Web_ExternalStorage_Connection" xml:space="preserve">
+    <value>Verbindung</value>
+  </data>
+  <data name="Web_ExternalStorage_LocalShare" xml:space="preserve">
+    <value>Lokale Freigabe</value>
+  </data>
+  <data name="Web_ExternalStorage_LocalPath" xml:space="preserve">
+    <value>Lokaler Ordner</value>
+  </data>
+  <data name="Web_ExternalStorage_RemotePath" xml:space="preserve">
+    <value>Entfernter Ordner</value>
+  </data>
+  <data name="Web_ExternalStorage_Mode" xml:space="preserve">
+    <value>Richtung</value>
+  </data>
+  <data name="Web_ExternalStorage_Select" xml:space="preserve">
+    <value>Auswählen…</value>
+  </data>
+  <data name="Web_ExternalStorage_Enabled" xml:space="preserve">
+    <value>Aktiviert</value>
+  </data>
+  <data name="Web_ExternalStorage_Disabled" xml:space="preserve">
+    <value>Deaktiviert</value>
+  </data>
+  <data name="Web_ExternalStorage_Enable" xml:space="preserve">
+    <value>Aktivieren</value>
+  </data>
+  <data name="Web_ExternalStorage_Disable" xml:space="preserve">
+    <value>Deaktivieren</value>
+  </data>
+  <data name="Web_ExternalStorage_ScheduleEnabled" xml:space="preserve">
+    <value>Automatisch ausführen</value>
+  </data>
+  <data name="Web_ExternalStorage_Interval" xml:space="preserve">
+    <value>Mindestintervall (Sekunden)</value>
+  </data>
+  <data name="Web_ExternalStorage_ExcludedExtensions" xml:space="preserve">
+    <value>Ausgeschlossene Dateiendungen</value>
+  </data>
+  <data name="Web_ExternalStorage_MaxFileSize" xml:space="preserve">
+    <value>Maximale Dateigröße (MB)</value>
+  </data>
+  <data name="Web_ExternalStorage_MaxUploadRate" xml:space="preserve">
+    <value>Upload-Limit (KB/s)</value>
+  </data>
+  <data name="Web_ExternalStorage_MaxDownloadRate" xml:space="preserve">
+    <value>Download-Limit (KB/s)</value>
+  </data>
+  <data name="Web_ExternalStorage_LastRun" xml:space="preserve">
+    <value>Letzte Ausführung</value>
+  </data>
+  <data name="Web_ExternalStorage_Health" xml:space="preserve">
+    <value>Zustand</value>
+  </data>
+  <data name="Web_ExternalStorage_Healthy" xml:space="preserve">
+    <value>Fehlerfrei</value>
+  </data>
+  <data name="Web_ExternalStorage_AttentionRequired" xml:space="preserve">
+    <value>Aktion erforderlich</value>
+  </data>
+  <data name="Web_ExternalStorage_RunNow" xml:space="preserve">
+    <value>Jetzt ausführen</value>
+  </data>
+  <data name="Web_ExternalStorage_OperationFailed" xml:space="preserve">
+    <value>Der Vorgang ist fehlgeschlagen. Prüfen Sie das Serverprotokoll.</value>
+  </data>
+  <data name="Web_ExternalStorage_SyncMissing" xml:space="preserve">
+    <value>Die Synchronisierung ist nicht mehr vorhanden.</value>
+  </data>
+  <data name="Web_ExternalStorage_SyncUnavailable" xml:space="preserve">
+    <value>Die Synchronisierung ist belegt oder nicht verfügbar.</value>
+  </data>
+  <data name="Web_ExternalStorage_ShareMissing" xml:space="preserve">
+    <value>Die lokale Freigabe ist nicht mehr vorhanden.</value>
+  </data>
+  <data name="Web_ExternalStorage_InvalidName" xml:space="preserve">
+    <value>Geben Sie einen Namen mit höchstens 200 Zeichen ein.</value>
+  </data>
+  <data name="Web_ExternalStorage_InvalidDescription" xml:space="preserve">
+    <value>Die Beschreibung ist zu lang.</value>
+  </data>
+  <data name="Web_ExternalStorage_PathInUse" xml:space="preserve">
+    <value>Für diesen lokalen Ordner ist bereits eine Synchronisierung eingerichtet.</value>
+  </data>
+  <data name="Web_ExternalStorage_DepartmentMismatch" xml:space="preserve">
+    <value>Verbindung und lokale Freigabe müssen zur selben Abteilung gehören.</value>
+  </data>
+  <data name="Web_ExternalStorage_SelectConnection" xml:space="preserve">
+    <value>Wählen Sie eine Verbindung aus, um Details anzuzeigen.</value>
+  </data>
+  <data name="Web_ExternalStorage_AuthorizationMode" xml:space="preserve">
+    <value>Autorisierungsmodus</value>
+  </data>
+  <data name="Web_ExternalStorage_Tenant" xml:space="preserve">
+    <value>Mandant / Organisation</value>
+  </data>
+  <data name="Web_ExternalStorage_Scopes" xml:space="preserve">
+    <value>Effektive Berechtigungsbereiche</value>
+  </data>
+  <data name="Web_ExternalStorage_State" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="Web_ExternalStorage_LastVerified" xml:space="preserve">
+    <value>Zuletzt geprüft</value>
+  </data>
+  <data name="Web_ExternalStorage_ProfileHealth" xml:space="preserve">
+    <value>Anbieterprofil</value>
+  </data>
+  <data name="Web_ExternalStorage_SecretHealth" xml:space="preserve">
+    <value>Anmeldedatenspeicher</value>
+  </data>
+  <data name="Web_ExternalStorage_Usage" xml:space="preserve">
+    <value>Verwendung</value>
+  </data>
+  <data name="Web_ExternalStorage_UsageFormat" xml:space="preserve">
+    <value>{0} Synchronisierung(en), {1} virtuelle Freigabe(n)</value>
+  </data>
+  <data name="Web_ExternalStorage_ProfileLegacy" xml:space="preserve">
+    <value>Legacy / nicht zugewiesen</value>
+  </data>
+  <data name="Web_ExternalStorage_ProfileConfigured" xml:space="preserve">
+    <value>Konfiguriert</value>
+  </data>
+  <data name="Web_ExternalStorage_Protected" xml:space="preserve">
+    <value>Geschützt</value>
+  </data>
+  <data name="Web_ExternalStorage_NotAuthorized" xml:space="preserve">
+    <value>Nicht autorisiert</value>
+  </data>
+  <data name="Web_ExternalStorage_Test" xml:space="preserve">
+    <value>Testen</value>
+  </data>
+  <data name="Web_ExternalStorage_TestUnsupported" xml:space="preserve">
+    <value>Für diesen Anbieter ist noch kein Verbindungstest verfügbar.</value>
+  </data>
+  <data name="Web_ExternalStorage_State_PendingAuthorization" xml:space="preserve">
+    <value>Autorisierung ausstehend</value>
+  </data>
+  <data name="Web_ExternalStorage_State_Ready" xml:space="preserve">
+    <value>Bereit</value>
+  </data>
+  <data name="Web_ExternalStorage_State_Degraded" xml:space="preserve">
+    <value>Beeinträchtigt</value>
+  </data>
+  <data name="Web_ExternalStorage_State_Disabled" xml:space="preserve">
+    <value>Deaktiviert</value>
+  </data>
+  <data name="Web_ExternalStorage_State_PendingConfiguration" xml:space="preserve">
+    <value>Konfiguration ausstehend</value>
+  </data>
+  <data name="Web_ExternalStorage_State_NeedsReauthorization" xml:space="preserve">
+    <value>Erneute Autorisierung erforderlich</value>
+  </data>
+  <data name="Web_ExternalStorage_Auth_DeviceCode" xml:space="preserve">
+    <value>Gerätecode</value>
+  </data>
+  <data name="Web_ExternalStorage_Auth_DelegatedAuthorizationCode" xml:space="preserve">
+    <value>Delegierter Autorisierungscode</value>
+  </data>
+  <data name="Web_ExternalStorage_Auth_ApplicationCredential" xml:space="preserve">
+    <value>Anwendungsanmeldedaten</value>
+  </data>
+  <data name="Web_ExternalStorage_Auth_ServiceAccount" xml:space="preserve">
+    <value>Dienstkonto</value>
+  </data>
+  <data name="Web_ExternalStorage_Auth_UsernamePassword" xml:space="preserve">
+    <value>Benutzername und Kennwort</value>
+  </data>
+  <data name="Web_ExternalStorage_Auth_SshKey" xml:space="preserve">
+    <value>SSH-Schlüssel</value>
+  </data>
+  <data name="Web_ExternalStorage_Auth_HostMount" xml:space="preserve">
+    <value>Host-Einhängung</value>
+  </data>
+  <data name="Web_Shares_LocalShares" xml:space="preserve">
+    <value>Lokale Freigaben</value>
+  </data>
+  <data name="Web_Shares_VirtualShares" xml:space="preserve">
+    <value>Virtuelle Freigaben</value>
+  </data>
+  <data name="Web_ExternalStorage_RemoteBrowseFailed" xml:space="preserve">
+    <value>Die entfernten Ordner konnten nicht geladen werden.</value>
+  </data>
+  <data name="Web_ShareList_Tab_Cloud" xml:space="preserve">
+    <value>Cloud</value>
+  </data>
+  <data name="Web_ShareList_SelectHint" xml:space="preserve">
+    <value>Wählen Sie eine Freigabe aus, um Details und Einstellungen anzuzeigen.</value>
+  </data>
+  <data name="Web_ShareList_CloudConnected" xml:space="preserve">
+    <value>Die Cloud-Verbindung wurde erfolgreich hinzugefügt.</value>
+  </data>
+  <data name="Web_ExternalStorage_Capabilities" xml:space="preserve">
+    <value>Funktionen</value>
+  </data>
+  <data name="Web_ExternalStorage_None" xml:space="preserve">
+    <value>Keine</value>
+  </data>
+  <data name="Web_ExternalStorage_BrowseUnsupported" xml:space="preserve">
+    <value>Dieser Anbieter unterstützt kein Durchsuchen entfernter Ordner.</value>
+  </data>
+  <data name="Web_ExternalStorage_SyncUnsupported" xml:space="preserve">
+    <value>Dieser Anbieter unterstützt keine Synchronisierung.</value>
+  </data>
+  <data name="Web_ExternalStorage_ReadOnlyPullRequired" xml:space="preserve">
+    <value>Diese Verbindung unterstützt ausschließlich abrufende Synchronisierungen.</value>
+  </data>
+  <data name="Web_ExternalStorage_RsyncDirectionRequired" xml:space="preserve">
+    <value>Rsync-Verbindungen benötigen eine eindeutige Abruf- oder Übertragungsrichtung; bidirektionale Synchronisierung wird nicht unterstützt.</value>
+  </data>
+  <data name="Web_ExternalStorage_VirtualShareUnsupported" xml:space="preserve">
+    <value>Dieser Anbieter kann nicht für virtuelle Freigaben verwendet werden.</value>
+  </data>
+  <data name="Web_ExternalStorage_AuthorizeUnsupported" xml:space="preserve">
+    <value>Diese Verbindung unterstützt keine interaktive Autorisierung.</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_Browse" xml:space="preserve">
+    <value>Durchsuchen</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_Read" xml:space="preserve">
+    <value>Lesen</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_Write" xml:space="preserve">
+    <value>Schreiben</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_CreateDirectory" xml:space="preserve">
+    <value>Ordner erstellen</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_Delete" xml:space="preserve">
+    <value>Löschen</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_Rename" xml:space="preserve">
+    <value>Umbenennen</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_Move" xml:space="preserve">
+    <value>Verschieben</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_ServerSideCopy" xml:space="preserve">
+    <value>Serverseitig kopieren</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_Sync" xml:space="preserve">
+    <value>Synchronisierung</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_StableItemIds" xml:space="preserve">
+    <value>Stabile Element-IDs</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_WatchChanges" xml:space="preserve">
+    <value>Änderungsverfolgung</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_DelegatedAuthorization" xml:space="preserve">
+    <value>Delegierte Autorisierung</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_ApplicationAuthorization" xml:space="preserve">
+    <value>Anwendungsautorisierung</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_RequiresHostMount" xml:space="preserve">
+    <value>Vom Betreiber verwaltete Einhängung</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_OptimizedSync" xml:space="preserve">
+    <value>Optimierte Synchronisierung</value>
+  </data>
+  <data name="Web_ExternalStorage_ConnectionSettings" xml:space="preserve">
+    <value>Protokolleinstellungen (JSON)</value>
+  </data>
+  <data name="Web_ExternalStorage_ConnectionSettingsHelp" xml:space="preserve">
+    <value>Geben Sie nur die dokumentierten Anbietereinstellungen ein. Secrets müssen im Zugangsdaten-Tresor gespeichert oder über einen absoluten Secret-Dateipfad referenziert werden.</value>
+  </data>
+  <data name="Web_ExternalStorage_Server" xml:space="preserve">
+    <value>Server / IP-Adresse</value>
+  </data>
+  <data name="Web_ExternalStorage_Port" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="Web_ExternalStorage_Domain" xml:space="preserve">
+    <value>Domäne (optional)</value>
+  </data>
+  <data name="Web_ExternalStorage_SmbShare" xml:space="preserve">
+    <value>SMB-Freigabe</value>
+  </data>
+  <data name="Web_ExternalStorage_Username" xml:space="preserve">
+    <value>Benutzername</value>
+  </data>
+  <data name="Web_ExternalStorage_Password" xml:space="preserve">
+    <value>Kennwort</value>
+  </data>
+  <data name="Web_ExternalStorage_ExpectedServerIdentity" xml:space="preserve">
+    <value>Erwartete Serveridentität</value>
+  </data>
+  <data name="Web_ExternalStorage_MountPath" xml:space="preserve">
+    <value>Lokaler Einhängepfad</value>
+  </data>
+  <data name="Web_ExternalStorage_AttestationPath" xml:space="preserve">
+    <value>Datei mit Einhängenachweis</value>
+  </data>
+  <data name="Web_ExternalStorage_MinimumDialect" xml:space="preserve">
+    <value>Minimale SMB-Version</value>
+  </data>
+  <data name="Web_ExternalStorage_ReadOnly" xml:space="preserve">
+    <value>Schreibgeschützt</value>
+  </data>
+  <data name="Web_ExternalStorage_InvalidCredentials" xml:space="preserve">
+    <value>Geben Sie einen gültigen Benutzernamen und ein Kennwort für diese Verbindung ein.</value>
+  </data>
+  <data name="Web_ExternalStorage_SmbSharePickerHelp" xml:space="preserve">
+    <value>Verfügbare SMB-Freigaben werden nach dem Verbinden geladen und können beim Einrichten einer Synchronisierung ausgewählt werden.</value>
+  </data>
+  <data name="Web_ExternalStorage_DepartmentRequiredHint" xml:space="preserve">
+    <value>Ein Department ist erforderlich: Es bestimmt, wer diese Connection sehen, nutzen und verwalten kann. Wähle Global, um sie abteilungsübergreifend verfügbar zu machen.</value>
+  </data>
+  <data name="Web_ExternalStorage_RuntimeIdentity" xml:space="preserve">
+    <value>Netzwerkidentität der Laufzeit</value>
+  </data>
+  <data name="Web_ExternalStorage_Auth_NetworkIdentity" xml:space="preserve">
+    <value>Netzwerkidentität</value>
+  </data>
+  <data name="Web_ExternalStorage_Capability_DirectFileAccess" xml:space="preserve">
+    <value>Direkter Protokollzugriff</value>
+  </data>
+  <data name="Web_ExternalStorage_InvalidSettings" xml:space="preserve">
+    <value>Geben Sie gültige Protokolleinstellungen mit höchstens 64 KiB ein.</value>
+  </data>
+  <data name="Web_ExternalStorage_ProviderUnsupported" xml:space="preserve">
+    <value>Dieser Anbieter kann über diesen Ablauf nicht konfiguriert werden.</value>
+  </data>
+  <data name="Web_ExternalStorage_Identity" xml:space="preserve">
+    <value>Identität und Autorisierung</value>
+  </data>
+  <data name="Web_ExternalStorage_CapabilitiesAndUsage" xml:space="preserve">
+    <value>Funktionen und Verwendung</value>
+  </data>
+  <data name="Web_ExternalStorage_SelectSyncHint" xml:space="preserve">
+    <value>Wählen Sie bei einer Synchronisierung „Bearbeiten“, um ihre Einstellungen zu öffnen.</value>
+  </data>
+  <data name="Web_ExternalStorage_RemoteRoot" xml:space="preserve">
+    <value>Entfernter Stammordner</value>
+  </data>
+  <data name="Web_ExternalStorage_SshHostFingerprint" xml:space="preserve">
+    <value>SSH-Hostschlüssel-Fingerabdruck (SHA-256)</value>
+  </data>
+  <data name="Web_ExternalStorage_PrivateKeySecretReference" xml:space="preserve">
+    <value>Secret-Datei mit privatem Schlüssel</value>
+  </data>
+  <data name="Web_ExternalStorage_KnownHostsSecretReference" xml:space="preserve">
+    <value>Secret-Datei mit bekannten Hosts</value>
+  </data>
+  <data name="Web_ExternalStorage_RsyncSshHelp" xml:space="preserve">
+    <value>Verwenden Sie absolute Pfade zu schreibgeschützten Secret-Dateien. Der festgelegte SHA-256-Fingerabdruck muss zum ausgewählten Hosteintrag in der Known-Hosts-Datei passen.</value>
+  </data>
+  <data name="Web_ExternalStorage_SecretFileReferences" xml:space="preserve">
+    <value>Externe Secret-Dateien</value>
+  </data>
+  <data name="Web_ExternalStorage_SshKeySetup" xml:space="preserve">
+    <value>Geführte SSH-Einrichtung</value>
+  </data>
+  <data name="Web_ExternalStorage_SshKeySetupHelp" xml:space="preserve">
+    <value>Laden oder erzeugen Sie einen Schlüssel, hinterlegen Sie den öffentlichen Schlüssel beim entfernten Konto und prüfen Sie ausdrücklich die Serveridentität.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshAdvancedMode" xml:space="preserve">
+    <value>Externe Secret-Dateien verwenden</value>
+  </data>
+  <data name="Web_ExternalStorage_SshPrivateKey" xml:space="preserve">
+    <value>Client-Schlüssel vorbereiten</value>
+  </data>
+  <data name="Web_ExternalStorage_SshPrivateKeyHelp" xml:space="preserve">
+    <value>Laden Sie einen unverschlüsselten privaten OpenSSH-Schlüssel hoch oder erzeugen Sie einen neuen Ed25519-Schlüssel. Der private Schlüssel wird verschlüsselt im Verbindungs-Tresor gespeichert.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshGenerateKey" xml:space="preserve">
+    <value>Ed25519-Schlüssel erzeugen</value>
+  </data>
+  <data name="Web_ExternalStorage_SshGeneratedKeyReady" xml:space="preserve">
+    <value>Erzeugter Schlüssel ist bereit</value>
+  </data>
+  <data name="Web_ExternalStorage_SshPublicKey" xml:space="preserve">
+    <value>Öffentlicher Schlüssel für den Server</value>
+  </data>
+  <data name="Web_ExternalStorage_CopyPublicKey" xml:space="preserve">
+    <value>Öffentlichen Schlüssel kopieren</value>
+  </data>
+  <data name="Web_ExternalStorage_SshHostVerification" xml:space="preserve">
+    <value>SSH-Server überprüfen</value>
+  </data>
+  <data name="Web_ExternalStorage_SshHostVerificationHelp" xml:space="preserve">
+    <value>Rufen Sie den öffentlichen Hostschlüssel ab, vergleichen Sie dessen Fingerabdruck über einen unabhängigen vertrauenswürdigen Kanal und bestätigen Sie ihn anschließend. Der Abruf allein stellt kein Vertrauen her.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshFetchHostKey" xml:space="preserve">
+    <value>Hostschlüssel abrufen</value>
+  </data>
+  <data name="Web_ExternalStorage_SshHostKey" xml:space="preserve">
+    <value>Verfügbarer Hostschlüssel</value>
+  </data>
+  <data name="Web_ExternalStorage_SshConfirmFingerprint" xml:space="preserve">
+    <value>Ich habe diesen Fingerabdruck über einen vertrauenswürdigen Kanal geprüft.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshHostKeyNotFound" xml:space="preserve">
+    <value>Es wurde kein verwendbarer SSH-Hostschlüssel zurückgegeben. Prüfen Sie Server und Port.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshSetupIncomplete" xml:space="preserve">
+    <value>Schließen Sie zuerst die Schlüssel- und Hostprüfungs-Schritte ab.</value>
+  </data>
+  <data name="Web_ExternalStorage_InvalidPrivateKey" xml:space="preserve">
+    <value>Wählen Sie einen gültigen privaten SSH-Schlüssel mit höchstens 1 MiB aus.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshSetupError" xml:space="preserve">
+    <value>Der SSH-Einrichtungsschritt konnte nicht abgeschlossen werden.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshSetupError_private_key_invalid" xml:space="preserve">
+    <value>Der private Schlüssel ist ungültig, nicht unterstützt oder mit einer Passphrase geschützt. Verwenden Sie einen unverschlüsselten OpenSSH-Schlüssel.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshSetupError_key_generation_failed" xml:space="preserve">
+    <value>Der Server konnte keinen SSH-Schlüssel erzeugen.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshSetupError_host_key_discovery_failed" xml:space="preserve">
+    <value>Es konnte kein SSH-Hostschlüssel abgerufen werden. Prüfen Sie Endpunkt und Firewall.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshSetupError_host_key_invalid" xml:space="preserve">
+    <value>Der ausgewählte SSH-Hostschlüssel ist ungültig.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshSetupError_helper_unavailable" xml:space="preserve">
+    <value>Das benötigte OpenSSH-Einrichtungswerkzeug ist auf dem Server nicht verfügbar.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshSetupError_helper_timeout" xml:space="preserve">
+    <value>Die SSH-Einrichtungsanfrage hat das Zeitlimit überschritten.</value>
+  </data>
+  <data name="Web_ExternalStorage_TestSuccessful" xml:space="preserve">
+    <value>Verbindung erfolgreich</value>
+  </data>
+  <data name="Web_ExternalStorage_TestFailed" xml:space="preserve">
+    <value>Verbindungstest fehlgeschlagen</value>
+  </data>
+  <data name="Web_ExternalStorage_NoConnectionSelected" xml:space="preserve">
+    <value>Keine Verbindung ausgewählt</value>
+  </data>
+  <data name="Web_ExternalStorage_NoConnectionSelectedHint" xml:space="preserve">
+    <value>Wählen Sie eine Verbindung aus der Liste, um Details anzuzeigen, die Konnektivität zu testen oder Einstellungen zu verwalten.</value>
+  </data>
+  <data name="Web_ExternalStorage_WebDavServerUrl" xml:space="preserve">
+    <value>Server-URL</value>
+  </data>
+  <data name="Web_ExternalStorage_WebDavHelp" xml:space="preserve">
+    <value>Geben Sie die vollständige WebDAV-Endpunkt-URL ein. Zugangsdaten werden verschlüsselt im Verbindungs-Tresor gespeichert. HTTPS wird dringend empfohlen.</value>
+  </data>
+  <data name="Web_Devices_LastSeen" xml:space="preserve">
+    <value>Zuletzt gesehen</value>
+  </data>
+  <data name="Web_Devices_Revoked" xml:space="preserve">
+    <value>widerrufen</value>
+  </data>
+  <data name="Web_Devices_Active" xml:space="preserve">
+    <value>aktiv</value>
+  </data>
+  <data name="Web_Devices_Platform" xml:space="preserve">
+    <value>Plattform</value>
+  </data>
+  <data name="Web_Devices_NoFolders" xml:space="preserve">
+    <value>Noch keine synchronisierten Ordner.</value>
+  </data>
+  <data name="Web_Devices_Col_Share" xml:space="preserve">
+    <value>Freigabe</value>
+  </data>
+  <data name="Web_Devices_Col_RemoteFolder" xml:space="preserve">
+    <value>Remote-Ordner</value>
+  </data>
+  <data name="Web_Devices_Col_LocalFolder" xml:space="preserve">
+    <value>Lokaler Ordner</value>
+  </data>
+  <data name="Web_Devices_Col_Direction" xml:space="preserve">
+    <value>Richtung</value>
+  </data>
+  <data name="Web_Devices_Col_Enabled" xml:space="preserve">
+    <value>Aktiv</value>
+  </data>
+  <data name="Web_Devices_Mode_Pull" xml:space="preserve">
+    <value>Nur herunterladen</value>
+  </data>
+  <data name="Web_Devices_Mode_Push" xml:space="preserve">
+    <value>Nur hochladen</value>
+  </data>
+  <data name="Web_Devices_Mode_TwoWay" xml:space="preserve">
+    <value>Beide Richtungen</value>
+  </data>
+  <data name="Web_Common_Yes" xml:space="preserve">
+    <value>Ja</value>
+  </data>
+  <data name="Web_Common_No" xml:space="preserve">
+    <value>Nein</value>
+  </data>
+  <data name="Web_Nav_DeviceAdmin" xml:space="preserve">
+    <value>Client-Geräte</value>
+  </data>
+  <data name="Web_DeviceAdmin_Subtitle" xml:space="preserve">
+    <value>Die verbundenen Apps und Instanzen aller Benutzer. Ein Gerät zu widerrufen macht dessen Tokens ungültig und entfernt seine Sync-Auswahl — nützlich für veraltete oder ungenutzte Geräte.</value>
+  </data>
+  <data name="Web_DeviceAdmin_Retention" xml:space="preserve">
+    <value>Registrierungen werden automatisch aufgeräumt: Widerrufene Geräte werden {0} Tage nach dem Widerruf entfernt, und seit {1} Tagen nicht mehr gesehene Geräte werden entfernt, sobald ihre Anmeldung längst abgelaufen ist.</value>
+  </data>
+  <data name="Web_DeviceAdmin_Forbidden" xml:space="preserve">
+    <value>Sie haben keine Berechtigung, Client-Geräte zu verwalten.</value>
+  </data>
+  <data name="Web_DeviceAdmin_LoadFailed" xml:space="preserve">
+    <value>Client-Geräte konnten nicht geladen werden.</value>
+  </data>
+  <data name="Web_DeviceAdmin_None" xml:space="preserve">
+    <value>Es sind noch keine Client-Geräte registriert.</value>
+  </data>
+  <data name="Web_DeviceAdmin_Owner" xml:space="preserve">
+    <value>Besitzer</value>
+  </data>
+  <data name="Web_DeviceAdmin_Registered" xml:space="preserve">
+    <value>Registriert</value>
+  </data>
+  <data name="Web_DeviceAdmin_RevokedOn" xml:space="preserve">
+    <value>Widerrufen am</value>
+  </data>
+  <data name="Web_DeviceAdmin_SyncedFolders" xml:space="preserve">
+    <value>Synchronisierte Ordner</value>
+  </data>
+  <data name="Web_DeviceAdmin_Revoke" xml:space="preserve">
+    <value>Gerät widerrufen</value>
+  </data>
+  <data name="Web_DeviceAdmin_ConfirmRevoke" xml:space="preserve">
+    <value>Dieses Gerät widerrufen? Seine Tokens funktionieren sofort nicht mehr.</value>
+  </data>
+  <data name="Web_DeviceAdmin_ConfirmYes" xml:space="preserve">
+    <value>Ja, widerrufen</value>
+  </data>
+  <data name="Web_DeviceAdmin_AlreadyRevoked" xml:space="preserve">
+    <value>Dieses Gerät ist bereits widerrufen.</value>
+  </data>
+  <data name="Web_DeviceAdmin_RevokeFailed" xml:space="preserve">
+    <value>Das Gerät konnte nicht widerrufen werden.</value>
+  </data>
+  <data name="Web_Reconnect_Reconnecting" xml:space="preserve">
+    <value>Verbindung verloren. Verbindung wird wiederhergestellt…</value>
+  </data>
+  <data name="Web_Reconnect_AttemptLabel" xml:space="preserve">
+    <value>Versuch</value>
+  </data>
+  <data name="Web_Reconnect_Paused" xml:space="preserve">
+    <value>Die Sitzung wurde vom Server pausiert.</value>
+  </data>
+  <data name="Web_Reconnect_Failed" xml:space="preserve">
+    <value>Verbindung zum Server konnte nicht wiederhergestellt werden.</value>
+  </data>
+  <data name="Web_Reconnect_Rejected" xml:space="preserve">
+    <value>Der Server hat die Verbindung abgelehnt.</value>
+  </data>
+  <data name="Web_Reconnect_Reload" xml:space="preserve">
+    <value>Neu laden</value>
+  </data>
+  <data name="Web_Settings_Storage_DetailLabel" xml:space="preserve">
+    <value>Speicher-Pools</value>
+  </data>
+  <data name="Web_Settings_Storage_Description" xml:space="preserve">
+    <value>Auslastung der konfigurierten Speicher-Pools. Die bestehende Pool- und Verzeichnisstruktur wird unverändert angezeigt.</value>
+  </data>
+  <data name="Web_Settings_Storage_Utilization" xml:space="preserve">
+    <value>Auslastung von</value>
+  </data>
+  <data name="Web_Settings_Storage_Drive" xml:space="preserve">
+    <value>Laufwerk</value>
+  </data>
+  <data name="Web_Settings_Storage_InformationNotAvailable" xml:space="preserve">
+    <value>Speicherinformationen sind für diesen Pool nicht verfügbar.</value>
+  </data>
+  <data name="Web_Settings_Storage_Used" xml:space="preserve">
+    <value>belegt</value>
+  </data>
+  <data name="Web_Settings_Storage_Free" xml:space="preserve">
+    <value>frei</value>
+  </data>
+  <data name="Web_Settings_Storage_Total" xml:space="preserve">
+    <value>gesamt</value>
+  </data>
+  <data name="Web_Settings_Storage_NoStoragePoolsFound" xml:space="preserve">
+    <value>Keine Speicher-Pools gefunden oder Speicherinformationen sind nicht verfügbar.</value>
+  </data>
+  <data name="Web_Settings_Storage_Update" xml:space="preserve">
+    <value>Aktualisieren</value>
+  </data>
 </root>

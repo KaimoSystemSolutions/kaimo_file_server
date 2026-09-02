@@ -1,20 +1,30 @@
 
 @using System.Globalization
+@using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject AssetProvider Icons
 
 <div class="detail-section">
-    <span class="detail-label">Speicher-Pools</span>
-    <p class="settings-description">Auslastung der konfigurierten Speicher-Pools. Die bestehende Pool- und Verzeichnisstruktur wird unverändert angezeigt.</p>
+    <span class="detail-label">@Resources.Web_Settings_Storage_DetailLabel</span>
+    <p class="settings-description">@Resources.Web_Settings_Storage_Description @Resources.Web_Settings_Storage_PoolNameHint</p>
     @if (VM.StorageUsages.Count > 0)
     {
         <div class="storage-pool-list">
             @foreach (var pool in VM.StorageUsages)
             {
                 <article class="storage-pool-card">
+                    <div class="storage-pool-rename form-group">
+                        <label>@Resources.Web_Settings_Storage_CustomNameLabel</label>
+                        <input class="edit-input"
+                               type="text"
+                               maxlength="64"
+                               placeholder="@SettingsViewModel.PoolDerivedName(pool.StoragePath)"
+                               @bind="VM.PoolNames[SettingsViewModel.PoolNameKey(pool.StoragePath)]" />
+                    </div>
+                    <br />
                     <div class="storage-pool-header">
                         <div>
-                            <span class="storage-pool-name">@PoolName(pool.StoragePath)</span>
+                            <span class="storage-pool-name">@VM.ResolvePoolName(pool.StoragePath)</span>
                             <span class="storage-pool-path" title="@pool.StoragePath">@pool.StoragePath</span>
                         </div>
                         @if (pool.Available)
@@ -25,36 +35,40 @@
 
                     @if (pool.Available)
                     {
-                        <div class="usage-bar" role="progressbar" aria-label="Auslastung von @PoolName(pool.StoragePath)" aria-valuenow="@Pct(pool.UsedPercent)" aria-valuemin="0" aria-valuemax="100">
+                        <div class="usage-bar" role="progressbar" aria-label="@Resources.Web_Settings_Storage_Utilization @VM.ResolvePoolName(pool.StoragePath)" aria-valuenow="@Pct(pool.UsedPercent)" aria-valuemin="0" aria-valuemax="100">
                             <div class="usage-bar-fill @(pool.UsedPercent >= 90 ? "is-critical" : "")" style="width: @Pct(pool.UsedPercent)%;"></div>
                         </div>
                         <div class="storage-pool-stats">
-                            <span><strong>@VM.FormatBytes(pool.UsedBytes)</strong> belegt</span>
-                            <span><strong>@VM.FormatBytes(pool.FreeBytes)</strong> frei</span>
-                            <span><strong>@VM.FormatBytes(pool.TotalBytes)</strong> gesamt</span>
-                            <span>Laufwerk <strong>@pool.DriveName</strong></span>
+                            <span><strong>@VM.FormatBytes(pool.UsedBytes)</strong> @Resources.Web_Settings_Storage_Used</span>
+                            <span><strong>@VM.FormatBytes(pool.FreeBytes)</strong> @Resources.Web_Settings_Storage_Free</span>
+                            <span><strong>@VM.FormatBytes(pool.TotalBytes)</strong> @Resources.Web_Settings_Storage_Total</span>
+                            <span>@Resources.Web_Settings_Storage_Drive <strong>@pool.DriveName</strong></span>
                         </div>
                     }
                     else
                     {
-                        <p class="settings-empty">Speicherinformationen sind für diesen Pool nicht verfügbar.</p>
+                        <p class="settings-empty">@Resources.Web_Settings_Storage_InformationNotAvailable</p>
                     }
                 </article>
             }
         </div>
     }
-    else { <p class="settings-empty">Keine Speicher-Pools gefunden oder Speicherinformationen sind nicht verfügbar.</p> }
-    <div class="settings-actions"><button class="btn-icon" title="Aktualisieren" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button></div>
+    else
+    {
+        <p class="settings-empty">@Resources.Web_Settings_Storage_NoStoragePoolsFound</p>
+    }
+    <div class="settings-actions">
+        @if (VM.StorageUsages.Count > 0)
+        {
+            <button class="btn-primary" @onclick="SaveNames">@Resources.Web_Settings_Button_Save</button>
+        }
+        <button class="btn-icon" title="@Resources.Web_Settings_Storage_Update" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button>
+    </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
     private static string Pct(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
-    private static string PoolName(string path)
-    {
-        var trimmed = path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return Path.GetFileName(trimmed) is { Length: > 0 } name ? name : path;
-    }
     private void Refresh() { VM.RefreshStorageInfo(); StateHasChanged(); }
+    private async Task SaveNames() { await VM.SavePoolNamesAsync(); StateHasChanged(); }
 }
-

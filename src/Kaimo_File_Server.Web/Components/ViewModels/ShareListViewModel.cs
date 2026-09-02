@@ -6,6 +6,8 @@ using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Storage;
+using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Search;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
@@ -35,6 +37,12 @@ public partial class ShareListViewModel
     private readonly IFileVersionService? _versionService;
     private readonly ISearchService? _searchService;
     private readonly ICloudSyncOperationCoordinator? _cloudSyncOperations;
+    private readonly IConfigRepository? _config;
+
+    // Admin-assigned pool labels (normalized path → friendly name), refreshed in
+    // LoadAsync. Empty until loaded, which falls back to path-derived names.
+    private IReadOnlyDictionary<string, string> _customPoolNames =
+        new Dictionary<string, string>();
 
     public ShareListViewModel(
         IShareRepository shareRepo,
@@ -51,7 +59,8 @@ public partial class ShareListViewModel
         IReadOnlyList<string> storagePools,
         IFileVersionService? versionService = null,
         ISearchService? searchService = null,
-        ICloudSyncOperationCoordinator? cloudSyncOperations = null)
+        ICloudSyncOperationCoordinator? cloudSyncOperations = null,
+        IConfigRepository? config = null)
     {
         _shareRepo = shareRepo;
         _userRepo = userRepo;
@@ -66,12 +75,29 @@ public partial class ShareListViewModel
         _logger = logger;
         _storagePools = storagePools;
         StoragePools = storagePools
-            .Select(path => new StoragePoolItem(GetPoolDisplayName(path), path))
+            .Select(path => new StoragePoolItem(StoragePoolNaming.DerivedName(path), path))
             .ToList();
         NewSharePoolPath = storagePools.FirstOrDefault() ?? string.Empty;
         _versionService = versionService;
         _searchService = searchService;
         _cloudSyncOperations = cloudSyncOperations;
+        _config = config;
+    }
+
+    /// <summary>
+    /// Reloads the admin-assigned pool labels and rebuilds <see cref="StoragePools"/>
+    /// so the create/move dropdowns and share cards show the friendly names.
+    /// </summary>
+    private async Task RefreshPoolNamesAsync()
+    {
+        if (_config is null) return;
+
+        _customPoolNames = await _config.GetAsync(
+            StoragePoolNaming.ConfigKey, new Dictionary<string, string>());
+        StoragePools = _storagePools
+            .Select(path => new StoragePoolItem(
+                StoragePoolNaming.Resolve(_customPoolNames, path), path))
+            .ToList();
     }
 
     // -- State --
@@ -98,7 +124,7 @@ public partial class ShareListViewModel
     public bool IsRenaming { get; private set; }
     public bool IsMovingPool { get; private set; }
 
-    public IReadOnlyList<StoragePoolItem> StoragePools { get; }
+    public IReadOnlyList<StoragePoolItem> StoragePools { get; private set; }
 
     // -- Access --
 
@@ -156,6 +182,8 @@ public partial class ShareListViewModel
         {
             IsLoading = true;
             ErrorMessage = null;
+
+            await RefreshPoolNamesAsync();
 
             var state = await _authState.GetAuthenticationStateAsync();
             CurrentUserName = state.User.FindFirst("display_name")?.Value
@@ -274,12 +302,6 @@ public partial class ShareListViewModel
 
     private static string BuildSharePath(string poolPath, string name)
         => Path.Combine(poolPath, name);
-
-    private static string GetPoolDisplayName(string poolPath)
-    {
-        var normalized = Path.TrimEndingDirectorySeparator(Path.GetFullPath(poolPath));
-        return Path.GetFileName(normalized);
-    }
 
     public string? GetPoolNameForShare(ShareDefinition share)
     {
