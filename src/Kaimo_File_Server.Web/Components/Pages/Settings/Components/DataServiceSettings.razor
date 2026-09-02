@@ -4,35 +4,35 @@
 @inject AssetProvider Icons
 
 <div class="detail-section">
-    <span class="detail-label">Datendienste</span>
-    <p class="settings-description">Aktiviert oder deaktiviert die Freigabe-Protokolle. Änderungen werden vom Dienst innerhalb weniger Sekunden übernommen – ein Neustart ist nicht nötig.</p>
+    <span class="detail-label">@R("Web_Settings_Data_Title")</span>
+    <p class="settings-description">@R("Web_Settings_Data_Description")</p>
     <div class="service-row">
         <div class="service-info"><span class="service-name">SMB / CIFS</span><span class="service-status service-status--@VM.SmbStatus.ToLowerInvariant()">@StatusLabel(VM.SmbStatus)</span></div>
-        <label class="toggle-switch" title="SMB aktivieren/deaktivieren"><input type="checkbox" @bind="VM.SmbEnabled" /><span class="toggle-slider"></span></label>
+        <label class="toggle-switch" title="@R("Web_Settings_Data_SmbToggle")"><input type="checkbox" @bind="VM.SmbEnabled" /><span class="toggle-slider"></span></label>
     </div>
     <div class="settings-row settings-actions">
         <button class="btn-primary" @onclick="SaveServices">@Resources.Web_Settings_Button_Save</button>
-        <button class="btn-icon" title="Status aktualisieren" @onclick="Refresh"><span>@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</span></button>
+        <button class="btn-icon" title="@R("Web_Settings_Data_RefreshStatus")" @onclick="Refresh"><span>@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</span></button>
     </div>
 </div>
 
 <div class="detail-section">
-    <span class="detail-label">SMB-Protokoll &amp; Sicherheit</span>
-    <p class="settings-description">Legt fest, welche SMB-Dialekte ausgehandelt werden und ob Signierung bzw. Verschlüsselung erzwungen werden. SMB 1 ist aus Sicherheitsgründen dauerhaft deaktiviert. Änderungen werden beim nächsten Neustart des SMB-Dienstes wirksam.</p>
-    <div class="settings-row settings-row-spaced"><label class="settings-field-label">Mindestversion</label><select class="edit-input settings-select-small" @bind="VM.SmbProtocol.MinVersion">@foreach (var (version, label) in SettingsViewModel.SmbVersions) { <option value="@version">@label</option> }</select></div>
-    <div class="settings-row settings-row-spaced"><label class="settings-field-label">Maximalversion</label><select class="edit-input settings-select-small" @bind="VM.SmbProtocol.MaxVersion">@foreach (var (version, label) in SettingsViewModel.SmbVersions) { <option value="@version">@label</option> }</select></div>
-    <label class="pw-rule"><input type="checkbox" @bind="VM.SmbProtocol.RequireSigning" /><span>Signierung erzwingen (empfohlen)</span></label>
-    <label class="pw-rule"><input type="checkbox" @bind="VM.SmbProtocol.RequireEncryption" /><span>Verschlüsselung erzwingen (nur SMB 3.0+; schließt SMB 2.x-Clients aus)</span></label>
-    <label class="pw-rule"><input type="checkbox" @bind="VM.SmbProtocol.EnableWsDiscovery" /><span>Im Netzwerk sichtbar machen (WS-Discovery – erscheint in der Windows-Netzwerkumgebung)</span></label>
-    <label class="pw-rule"><input type="checkbox" @bind="VM.SmbProtocol.EnableAuditLog" /><span>Sicherheits-Audit-Protokoll aktivieren (Anmeldungen, Freigabezugriffe, Dateioperationen)</span></label>
+    <span class="detail-label">@R("Web_Settings_Data_ProtocolTitle")</span>
+    <p class="settings-description">@R("Web_Settings_Data_ProtocolDescription")</p>
+    <div class="settings-row settings-row-spaced"><label class="settings-field-label">@R("Web_Settings_Data_MinVersion")</label><select class="edit-input settings-select-small" @bind="VM.SmbProtocol.MinVersion">@foreach (var (version, label) in SettingsViewModel.SmbVersions) { <option value="@version">@label</option> }</select></div>
+    <div class="settings-row settings-row-spaced"><label class="settings-field-label">@R("Web_Settings_Data_MaxVersion")</label><select class="edit-input settings-select-small" @bind="VM.SmbProtocol.MaxVersion">@foreach (var (version, label) in SettingsViewModel.SmbVersions) { <option value="@version">@label</option> }</select></div>
+    <label class="pw-rule"><input type="checkbox" @bind="VM.SmbProtocol.RequireSigning" /><span>@R("Web_Settings_Data_RequireSigning")</span></label>
+    <label class="pw-rule"><input type="checkbox" @bind="VM.SmbProtocol.RequireEncryption" /><span>@R("Web_Settings_Data_RequireEncryption")</span></label>
+    <label class="pw-rule"><input type="checkbox" @bind="VM.SmbProtocol.EnableWsDiscovery" /><span>@R("Web_Settings_Data_WsDiscovery")</span></label>
+    <label class="pw-rule"><input type="checkbox" @bind="VM.SmbProtocol.EnableAuditLog" /><span>@R("Web_Settings_Data_AuditLog")</span></label>
     <div class="settings-actions"><button class="btn-primary" @onclick="SaveProtocol">@Resources.Web_Settings_Button_Save</button></div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
     private async Task SaveServices() { await VM.SaveDataServicesAsync(); StateHasChanged(); }
     private async Task SaveProtocol() { await VM.SaveSmbProtocolAsync(); StateHasChanged(); }
     private async Task Refresh() { await VM.RefreshDataServiceStatusAsync(); StateHasChanged(); }
-    private static string StatusLabel(string status) => status switch { "Running" => "Läuft", "Stopped" => "Gestoppt", "Starting" => "Startet…", "Stopping" => "Stoppt…", "Faulted" => "Fehler", _ => "Unbekannt" };
+    private static string StatusLabel(string status) => status switch { "Running" => R("Web_Settings_Data_StatusRunning"), "Stopped" => R("Web_Settings_Data_StatusStopped"), "Starting" => R("Web_Settings_Data_StatusStarting"), "Stopping" => R("Web_Settings_Data_StatusStopping"), "Faulted" => R("Web_Settings_Data_StatusFaulted"), _ => R("Web_Settings_Data_StatusUnknown") };
 }
-

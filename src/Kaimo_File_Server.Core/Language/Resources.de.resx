@@ -3666,4 +3666,181 @@
   <data name="Web_Settings_Storage_Update" xml:space="preserve">
     <value>Aktualisieren</value>
   </data>
+  <data name="Web_Common_Enabled" xml:space="preserve">
+    <value>Aktiviert</value>
+  </data>
+  <data name="Web_Settings_Net_Title" xml:space="preserve">
+    <value>IP-Adressen</value>
+  </data>
+  <data name="Web_Settings_Net_Description" xml:space="preserve">
+    <value>Adressen, unter denen dieser Server erreichbar ist.</value>
+  </data>
+  <data name="Web_Settings_Net_ResolvingGlobal" xml:space="preserve">
+    <value>globale IP wird ermittelt</value>
+  </data>
+  <data name="Web_Settings_Net_GlobalPublic" xml:space="preserve">
+    <value>globale (öffentliche) IP</value>
+  </data>
+  <data name="Web_Settings_Net_GlobalUnavailable" xml:space="preserve">
+    <value>globale IP nicht verfügbar</value>
+  </data>
+  <data name="Web_Settings_Net_Hostname" xml:space="preserve">
+    <value>Hostname</value>
+  </data>
+  <data name="Web_Settings_Net_GlobalIp" xml:space="preserve">
+    <value>Globale IP</value>
+  </data>
+  <data name="Web_Settings_Net_Resolving" xml:space="preserve">
+    <value>wird ermittelt…</value>
+  </data>
+  <data name="Web_Settings_Net_NotAvailable" xml:space="preserve">
+    <value>nicht verfügbar</value>
+  </data>
+  <data name="Web_Settings_Net_LocalAddresses" xml:space="preserve">
+    <value>Lokale Adressen</value>
+  </data>
+  <data name="Web_Settings_Net_NoLocalAddresses" xml:space="preserve">
+    <value>Keine lokalen Netzwerkadressen gefunden.</value>
+  </data>
+  <data name="Web_Settings_Net_Refresh" xml:space="preserve">
+    <value>Aktualisieren</value>
+  </data>
+  <data name="Web_Settings_Mem_Title" xml:space="preserve">
+    <value>Aktuelle RAM-Auslastung</value>
+  </data>
+  <data name="Web_Settings_Mem_Description" xml:space="preserve">
+    <value>Speicherverbrauch des laufenden Kaimo-Files-Prozesses. Der .NET-Heap ist der Snapshot nach der letzten Garbage Collection; beim Aktualisieren wird keine GC erzwungen.</value>
+  </data>
+  <data name="Web_Settings_Mem_WorkingSet" xml:space="preserve">
+    <value>Arbeitsspeicher · {0} % von {1}</value>
+  </data>
+  <data name="Web_Settings_Mem_PrivateBytes" xml:space="preserve">
+    <value>Privater Speicher</value>
+  </data>
+  <data name="Web_Settings_Mem_ManagedHeap" xml:space="preserve">
+    <value>.NET-Heap (letzter GC)</value>
+  </data>
+  <data name="Web_Settings_Mem_Available" xml:space="preserve">
+    <value>Verfügbar</value>
+  </data>
+  <data name="Web_Settings_Mem_NotAvailable" xml:space="preserve">
+    <value>Speicherinformationen sind nicht verfügbar.</value>
+  </data>
+  <data name="Web_Settings_Mem_Refresh" xml:space="preserve">
+    <value>Aktualisieren</value>
+  </data>
+  <data name="Web_Settings_Search_Title" xml:space="preserve">
+    <value>Volltext-Suche (Elasticsearch)</value>
+  </data>
+  <data name="Web_Settings_Search_Description" xml:space="preserve">
+    <value>Ist Elasticsearch aktiviert und erreichbar, werden Dateiinhalte indexiert und durchsuchbar. Andernfalls – oder wenn der Container nicht gestartet wurde – wird automatisch eine einfache Suche nach Dateinamen verwendet.</value>
+  </data>
+  <data name="Web_Settings_Search_CheckingStatus" xml:space="preserve">
+    <value>Prüfe Elasticsearch-Status…</value>
+  </data>
+  <data name="Web_Settings_Search_Toggle" xml:space="preserve">
+    <value>Elasticsearch aktivieren/deaktivieren</value>
+  </data>
+  <data name="Web_Settings_Search_Desired" xml:space="preserve">
+    <value>Gewünscht</value>
+  </data>
+  <data name="Web_Settings_Search_ContainerReachable" xml:space="preserve">
+    <value>Container erreichbar</value>
+  </data>
+  <data name="Web_Settings_Search_ActiveMode" xml:space="preserve">
+    <value>Aktiver Modus</value>
+  </data>
+  <data name="Web_Settings_Search_ModeFulltext" xml:space="preserve">
+    <value>Elasticsearch (Volltext)</value>
+  </data>
+  <data name="Web_Settings_Search_ModeFilename" xml:space="preserve">
+    <value>Dateinamen-Suche</value>
+  </data>
+  <data name="Web_Settings_Search_RefreshStatus" xml:space="preserve">
+    <value>Status aktualisieren</value>
+  </data>
+  <data name="Web_Settings_Search_ReindexTitle" xml:space="preserve">
+    <value>Manuelle Indexierung</value>
+  </data>
+  <data name="Web_Settings_Search_ReindexDescription" xml:space="preserve">
+    <value>Indexiert alle Dateien neu – z. B. wenn Dateien auf anderem Wege hinzugekommen sind oder Elasticsearch zuvor deaktiviert war. Bereits indexierte, unveränderte Dateien werden übersprungen.</value>
+  </data>
+  <data name="Web_Settings_Search_Indexing" xml:space="preserve">
+    <value>Indexiere… {0} / {1} ({2} %)</value>
+  </data>
+  <data name="Web_Settings_Search_LastRunDone" xml:space="preserve">
+    <value>Letzter Lauf abgeschlossen: {0} / {1} Dateien.</value>
+  </data>
+  <data name="Web_Settings_Search_LastRunError" xml:space="preserve">
+    <value>Letzter Lauf mit Fehler beendet: {0}</value>
+  </data>
+  <data name="Web_Settings_Search_StartReindex" xml:space="preserve">
+    <value>Indexierung starten</value>
+  </data>
+  <data name="Web_Settings_Search_RefreshProgress" xml:space="preserve">
+    <value>Fortschritt aktualisieren</value>
+  </data>
+  <data name="Web_Settings_Search_StatusActive" xml:space="preserve">
+    <value>Aktiv</value>
+  </data>
+  <data name="Web_Settings_Search_StatusUnreachable" xml:space="preserve">
+    <value>Nicht erreichbar</value>
+  </data>
+  <data name="Web_Settings_Search_StatusFilenameMode" xml:space="preserve">
+    <value>Dateinamen-Modus</value>
+  </data>
+  <data name="Web_Settings_Data_Title" xml:space="preserve">
+    <value>Datendienste</value>
+  </data>
+  <data name="Web_Settings_Data_Description" xml:space="preserve">
+    <value>Aktiviert oder deaktiviert die Freigabe-Protokolle. Änderungen werden vom Dienst innerhalb weniger Sekunden übernommen – ein Neustart ist nicht nötig.</value>
+  </data>
+  <data name="Web_Settings_Data_SmbToggle" xml:space="preserve">
+    <value>SMB aktivieren/deaktivieren</value>
+  </data>
+  <data name="Web_Settings_Data_RefreshStatus" xml:space="preserve">
+    <value>Status aktualisieren</value>
+  </data>
+  <data name="Web_Settings_Data_ProtocolTitle" xml:space="preserve">
+    <value>SMB-Protokoll &amp; Sicherheit</value>
+  </data>
+  <data name="Web_Settings_Data_ProtocolDescription" xml:space="preserve">
+    <value>Legt fest, welche SMB-Dialekte ausgehandelt werden und ob Signierung bzw. Verschlüsselung erzwungen werden. SMB 1 ist aus Sicherheitsgründen dauerhaft deaktiviert. Änderungen werden beim nächsten Neustart des SMB-Dienstes wirksam.</value>
+  </data>
+  <data name="Web_Settings_Data_MinVersion" xml:space="preserve">
+    <value>Mindestversion</value>
+  </data>
+  <data name="Web_Settings_Data_MaxVersion" xml:space="preserve">
+    <value>Maximalversion</value>
+  </data>
+  <data name="Web_Settings_Data_RequireSigning" xml:space="preserve">
+    <value>Signierung erzwingen (empfohlen)</value>
+  </data>
+  <data name="Web_Settings_Data_RequireEncryption" xml:space="preserve">
+    <value>Verschlüsselung erzwingen (nur SMB 3.0+; schließt SMB 2.x-Clients aus)</value>
+  </data>
+  <data name="Web_Settings_Data_WsDiscovery" xml:space="preserve">
+    <value>Im Netzwerk sichtbar machen (WS-Discovery – erscheint in der Windows-Netzwerkumgebung)</value>
+  </data>
+  <data name="Web_Settings_Data_AuditLog" xml:space="preserve">
+    <value>Sicherheits-Audit-Protokoll aktivieren (Anmeldungen, Freigabezugriffe, Dateioperationen)</value>
+  </data>
+  <data name="Web_Settings_Data_StatusRunning" xml:space="preserve">
+    <value>Läuft</value>
+  </data>
+  <data name="Web_Settings_Data_StatusStopped" xml:space="preserve">
+    <value>Gestoppt</value>
+  </data>
+  <data name="Web_Settings_Data_StatusStarting" xml:space="preserve">
+    <value>Startet…</value>
+  </data>
+  <data name="Web_Settings_Data_StatusStopping" xml:space="preserve">
+    <value>Stoppt…</value>
+  </data>
+  <data name="Web_Settings_Data_StatusFaulted" xml:space="preserve">
+    <value>Fehler</value>
+  </data>
+  <data name="Web_Settings_Data_StatusUnknown" xml:space="preserve">
+    <value>Unbekannt</value>
+  </data>
 </root>

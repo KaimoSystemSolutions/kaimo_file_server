@@ -4,49 +4,50 @@
 @inject AssetProvider Icons
 
 <div class="detail-section">
-    <span class="detail-label">Volltext-Suche (Elasticsearch)</span>
-    <p class="settings-description">Ist Elasticsearch aktiviert und erreichbar, werden Dateiinhalte indexiert und durchsuchbar. Andernfalls – oder wenn der Container nicht gestartet wurde – wird automatisch eine einfache Suche nach Dateinamen verwendet.</p>
+    <span class="detail-label">@R("Web_Settings_Search_Title")</span>
+    <p class="settings-description">@R("Web_Settings_Search_Description")</p>
     @if (VM.SearchStateLoading)
     {
-        <div class="loading-state"><div class="spinner"></div><p>Prüfe Elasticsearch-Status…</p></div>
+        <div class="loading-state"><div class="spinner"></div><p>@R("Web_Settings_Search_CheckingStatus")</p></div>
     }
     else
     {
     <div class="service-row">
         <div class="service-info"><span class="service-name">Elasticsearch</span><span class="service-status service-status--@(VM.SearchEsEffective ? "running" : "stopped")">@SearchStatusLabel()</span></div>
-        <label class="toggle-switch" title="Elasticsearch aktivieren/deaktivieren"><input type="checkbox" @bind="VM.SearchEsEnabled" /><span class="toggle-slider"></span></label>
+        <label class="toggle-switch" title="@R("Web_Settings_Search_Toggle")"><input type="checkbox" @bind="VM.SearchEsEnabled" /><span class="toggle-slider"></span></label>
     </div>
     <div class="info-card">
-        <div class="info-row"><span class="info-key">Gewünscht</span><span class="info-val">@(VM.SearchEsEnabled ? "Aktiviert" : "Deaktiviert")</span></div>
-        <div class="info-row"><span class="info-key">Container erreichbar</span><span class="info-val @(VM.SearchEsReachable ? "" : "is-muted")">@(VM.SearchEsReachable ? "Ja" : "Nein")</span></div>
-        <div class="info-row"><span class="info-key">Aktiver Modus</span><span class="info-val">@(VM.SearchEsEffective ? "Elasticsearch (Volltext)" : "Dateinamen-Suche")</span></div>
+        <div class="info-row"><span class="info-key">@R("Web_Settings_Search_Desired")</span><span class="info-val">@(VM.SearchEsEnabled ? R("Web_Common_Enabled") : R("Web_Common_Disabled"))</span></div>
+        <div class="info-row"><span class="info-key">@R("Web_Settings_Search_ContainerReachable")</span><span class="info-val @(VM.SearchEsReachable ? "" : "is-muted")">@(VM.SearchEsReachable ? R("Web_Common_Yes") : R("Web_Common_No"))</span></div>
+        <div class="info-row"><span class="info-key">@R("Web_Settings_Search_ActiveMode")</span><span class="info-val">@(VM.SearchEsEffective ? R("Web_Settings_Search_ModeFulltext") : R("Web_Settings_Search_ModeFilename"))</span></div>
     </div>
     <div class="settings-row settings-actions">
         <button class="btn-primary" @onclick="Save">@Resources.Web_Settings_Button_Save</button>
-        <button class="btn-icon" title="Status aktualisieren" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button>
+        <button class="btn-icon" title="@R("Web_Settings_Search_RefreshStatus")" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button>
     </div>
-    <span class="detail-label settings-subheading">Manuelle Indexierung</span>
-    <p class="settings-description">Indexiert alle Dateien neu – z. B. wenn Dateien auf anderem Wege hinzugekommen sind oder Elasticsearch zuvor deaktiviert war. Bereits indexierte, unveränderte Dateien werden übersprungen.</p>
+    <span class="detail-label settings-subheading">@R("Web_Settings_Search_ReindexTitle")</span>
+    <p class="settings-description">@R("Web_Settings_Search_ReindexDescription")</p>
     @if (VM.ReindexProgress.Running)
     {
         <div class="usage-bar"><div class="usage-bar-fill" style="width: @VM.ReindexProgress.Percent%;"></div></div>
-        <p class="settings-hint">Indexiere… @VM.ReindexProgress.Done / @VM.ReindexProgress.Total (@VM.ReindexProgress.Percent %)</p>
+        <p class="settings-hint">@string.Format(R("Web_Settings_Search_Indexing"), VM.ReindexProgress.Done, VM.ReindexProgress.Total, VM.ReindexProgress.Percent)</p>
     }
     else if (VM.ReindexProgress.FinishedAt is not null)
     {
-        <p class="settings-hint">@(VM.ReindexProgress.Error is null ? $"Letzter Lauf abgeschlossen: {VM.ReindexProgress.Done} / {VM.ReindexProgress.Total} Dateien." : $"Letzter Lauf mit Fehler beendet: {VM.ReindexProgress.Error}")</p>
+        <p class="settings-hint">@(VM.ReindexProgress.Error is null ? string.Format(R("Web_Settings_Search_LastRunDone"), VM.ReindexProgress.Done, VM.ReindexProgress.Total) : string.Format(R("Web_Settings_Search_LastRunError"), VM.ReindexProgress.Error))</p>
     }
     <div class="settings-row settings-actions">
-        <button class="btn-primary" disabled="@(!VM.SearchEsEffective || VM.ReindexProgress.Running)" @onclick="StartReindex">Indexierung starten</button>
-        <button class="btn-icon" title="Fortschritt aktualisieren" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button>
+        <button class="btn-primary" disabled="@(!VM.SearchEsEffective || VM.ReindexProgress.Running)" @onclick="StartReindex">@R("Web_Settings_Search_StartReindex")</button>
+        <button class="btn-icon" title="@R("Web_Settings_Search_RefreshProgress")" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button>
     </div>
     }
 </div>
 
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
     private async Task Save() { await VM.SaveSearchAsync(); StateHasChanged(); }
     private async Task Refresh() { await VM.LoadSearchStateAsync(); StateHasChanged(); }
     private async Task StartReindex() { await VM.StartReindexAsync(); StateHasChanged(); }
-    private string SearchStatusLabel() => VM.SearchEsEffective ? "Aktiv" : VM.SearchEsEnabled && !VM.SearchEsReachable ? "Nicht erreichbar" : "Dateinamen-Modus";
+    private string SearchStatusLabel() => VM.SearchEsEffective ? R("Web_Settings_Search_StatusActive") : VM.SearchEsEnabled && !VM.SearchEsReachable ? R("Web_Settings_Search_StatusUnreachable") : R("Web_Settings_Search_StatusFilenameMode");
 }

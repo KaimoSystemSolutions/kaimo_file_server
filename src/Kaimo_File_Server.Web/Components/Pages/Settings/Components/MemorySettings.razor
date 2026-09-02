@@ -1,28 +1,29 @@
 
 @using System.Globalization
+@using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject AssetProvider Icons
 
 <div class="detail-section">
-    <span class="detail-label">Aktuelle RAM-Auslastung</span>
-    <p class="settings-description">Speicherverbrauch des laufenden Kaimo-Files-Prozesses. Der .NET-Heap ist der Snapshot nach der letzten Garbage Collection; beim Aktualisieren wird keine GC erzwungen.</p>
+    <span class="detail-label">@R("Web_Settings_Mem_Title")</span>
+    <p class="settings-description">@R("Web_Settings_Mem_Description")</p>
     @if (VM.MemoryUsage is { } m)
     {
-        <div class="stat-hero"><span class="stat-hero-value">@VM.FormatBytes(m.WorkingSetBytes)</span><span class="stat-hero-unit">Arbeitsspeicher · @Pct(m.WorkingSetPercent) % von @VM.FormatBytes(m.TotalAvailableBytes)</span></div>
+        <div class="stat-hero"><span class="stat-hero-value">@VM.FormatBytes(m.WorkingSetBytes)</span><span class="stat-hero-unit">@string.Format(R("Web_Settings_Mem_WorkingSet"), Pct(m.WorkingSetPercent), VM.FormatBytes(m.TotalAvailableBytes))</span></div>
         <div class="usage-bar"><div class="usage-bar-fill @(m.WorkingSetPercent >= 90 ? "is-critical" : "")" style="width: @Pct(m.WorkingSetPercent)%;"></div></div>
         <div class="info-card">
-            <div class="info-row"><span class="info-key">Privater Speicher</span><span class="info-val">@VM.FormatBytes(m.PrivateBytes)</span></div>
-            <div class="info-row"><span class="info-key">.NET-Heap (letzter GC)</span><span class="info-val">@VM.FormatBytes(m.ManagedHeapBytes)</span></div>
-            <div class="info-row"><span class="info-key">Verfügbar</span><span class="info-val">@VM.FormatBytes(m.TotalAvailableBytes)</span></div>
+            <div class="info-row"><span class="info-key">@R("Web_Settings_Mem_PrivateBytes")</span><span class="info-val">@VM.FormatBytes(m.PrivateBytes)</span></div>
+            <div class="info-row"><span class="info-key">@R("Web_Settings_Mem_ManagedHeap")</span><span class="info-val">@VM.FormatBytes(m.ManagedHeapBytes)</span></div>
+            <div class="info-row"><span class="info-key">@R("Web_Settings_Mem_Available")</span><span class="info-val">@VM.FormatBytes(m.TotalAvailableBytes)</span></div>
         </div>
     }
-    else { <p class="settings-empty">Speicherinformationen sind nicht verfügbar.</p> }
-    <div class="settings-actions"><button class="btn-icon" title="Aktualisieren" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button></div>
+    else { <p class="settings-empty">@R("Web_Settings_Mem_NotAvailable")</p> }
+    <div class="settings-actions"><button class="btn-icon" title="@R("Web_Settings_Mem_Refresh")" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button></div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
     private static string Pct(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
     private void Refresh() { VM.RefreshMemoryInfo(); StateHasChanged(); }
 }
-
