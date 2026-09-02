@@ -378,6 +378,7 @@ public class SettingsViewModelSmbTests
                 new StubAuthProvider("admin"),
                 systemInfo ?? Mock.Of<ISystemInfoService>(),
                 SearchAdmin.Object,
+                Mock.Of<IShareRepository>(),
                 Mock.Of<IHttpsCertificateProvider>(),
                 loggingStore.Object,
                 new Kaimo_File_Server.Infrastructure.Logging.LoggingLevelConfigurationSource(),

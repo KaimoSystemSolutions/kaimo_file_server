@@ -49,6 +49,10 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
     private readonly SemaphoreSlim _stateLock = new(1, 1);
     private SearchEngineState? _cachedState;
     private DateTime _stateExpiresUtc = DateTime.MinValue;
+    // Edge-trigger for the "ES enabled but unreachable" warning: log once when it
+    // goes down, then stay quiet until it recovers, so a persistently down cluster
+    // doesn't spam a warning on every probe.
+    private bool _esDownLogged;
 
     private readonly SemaphoreSlim _initLock = new(1, 1);
     private bool _esInitialized;
@@ -102,6 +106,23 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
             bool reachable = await PingAsync(ct);
 
             var state = new SearchEngineState(enabled, reachable, enabled && reachable);
+
+            // Make an ES outage visible in Settings > Logging. The unreachable case
+            // was previously only logged at Debug (invisible at the default Warning
+            // level), so search silently fell back to filename mode with no trace.
+            if (enabled && !reachable)
+            {
+                if (!_esDownLogged)
+                {
+                    _logger.LogWarning(LogEvents.SearchElasticUnreachable, LogMessages.SearchElasticUnreachable);
+                    _esDownLogged = true;
+                }
+            }
+            else
+            {
+                _esDownLogged = false;
+            }
+
             _cachedState = state;
             _stateExpiresUtc = DateTime.UtcNow.Add(StateTtl);
             return state;
@@ -288,7 +309,7 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
         InvalidateState();
     }
 
-    public async Task<bool> TryStartReindexAsync(CancellationToken ct = default)
+    public async Task<bool> TryStartReindexAsync(string? shareName = null, CancellationToken ct = default)
     {
         // Reindexing only makes sense against a live, enabled Elasticsearch.
         if (!(await ResolveStateAsync(forceFresh: true, ct)).Effective)
@@ -302,10 +323,11 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
             _reindexProgress = new ReindexProgress
             {
                 Running = true,
-                StartedAt = DateTime.UtcNow
+                StartedAt = DateTime.UtcNow,
+                ShareName = shareName
             };
 
-            _reindexTask = Task.Run(RunReindexAsync);
+            _reindexTask = Task.Run(() => RunReindexAsync(shareName));
             return true;
         }
     }
@@ -316,7 +338,7 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
             return _reindexProgress;
     }
 
-    private async Task RunReindexAsync()
+    private async Task RunReindexAsync(string? shareName = null)
     {
         var started = DateTime.UtcNow;
         try
@@ -332,12 +354,13 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
                         Running = true,
                         Done = p.done,
                         Total = p.total,
-                        StartedAt = started
+                        StartedAt = started,
+                        ShareName = shareName
                     };
                 }
             });
 
-            await _es.ReindexAllAsync(progress, CancellationToken.None);
+            await _es.ReindexAllAsync(progress, CancellationToken.None, shareName);
 
             lock (_reindexGate)
             {
@@ -347,7 +370,8 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
                     Done = _reindexProgress.Done,
                     Total = _reindexProgress.Total,
                     StartedAt = started,
-                    FinishedAt = DateTime.UtcNow
+                    FinishedAt = DateTime.UtcNow,
+                    ShareName = shareName
                 };
             }
         }
@@ -363,7 +387,8 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
                     Total = _reindexProgress.Total,
                     StartedAt = started,
                     FinishedAt = DateTime.UtcNow,
-                    Error = ex.Message
+                    Error = ex.Message,
+                    ShareName = shareName
                 };
             }
         }

@@ -46,6 +46,9 @@ public sealed class ReindexProgress
     public DateTime? FinishedAt { get; init; }
     public string? Error { get; init; }
 
+    /// <summary>Share this run is scoped to; null/empty means all shares.</summary>
+    public string? ShareName { get; init; }
+
     public int Percent => Total > 0 ? (int)(100L * Done / Total) : 0;
 
     public static ReindexProgress Idle => new();
@@ -65,11 +68,12 @@ public interface ISearchAdminService
     Task SetElasticEnabledAsync(bool enabled, CancellationToken ct = default);
 
     /// <summary>
-    /// Kicks off a full reindex in the background. Returns false if Elasticsearch
-    /// is not currently active (disabled or unreachable) or a reindex is already
-    /// running.
+    /// Kicks off a reindex in the background. When <paramref name="shareName"/> is
+    /// null or empty, every enabled share is reindexed; otherwise only that share.
+    /// Returns false if Elasticsearch is not currently active (disabled or
+    /// unreachable) or a reindex is already running.
     /// </summary>
-    Task<bool> TryStartReindexAsync(CancellationToken ct = default);
+    Task<bool> TryStartReindexAsync(string? shareName = null, CancellationToken ct = default);
 
     /// <summary>Current/last reindex progress (in-memory, process-local).</summary>
     ReindexProgress GetReindexProgress();

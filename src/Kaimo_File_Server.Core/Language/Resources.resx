@@ -3846,6 +3846,9 @@
   <data name="Web_Settings_Search_StartReindex" xml:space="preserve">
     <value>Start indexing</value>
   </data>
+  <data name="Web_Settings_Search_ReindexAllShares" xml:space="preserve">
+    <value>All shares</value>
+  </data>
   <data name="Web_Settings_Search_RefreshProgress" xml:space="preserve">
     <value>Refresh progress</value>
   </data>

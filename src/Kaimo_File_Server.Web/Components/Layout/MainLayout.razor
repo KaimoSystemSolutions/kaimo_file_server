@@ -146,7 +146,7 @@
                     </div>
                 }
             </div>
-            <JobMenu />
+            <JobMenu CanSeeReindex="_canManageSettings" />
         </div>
         @Body
         
@@ -168,6 +168,7 @@
 
     private bool _canManageSyncs;
     private bool _canManageCloudAccess;
+    private bool _canManageSettings;
     private UserContext? _currentUser;
     
     [Inject] private IJSRuntime JS { get; set; } = default!;
@@ -335,6 +336,9 @@
                                             _currentUser, ManagementPermission.UseConnections)
                                         || await ManagementAuthService.HasAnyPermissionAsync(
                                             _currentUser, ManagementPermission.ManageCloudAccess));
+            _canManageSettings = _currentUser != null
+                                 && await ManagementAuthService.HasAnyPermissionAsync(
+                                        _currentUser, ManagementPermission.ManageSystemSettings);
         }
     }
 

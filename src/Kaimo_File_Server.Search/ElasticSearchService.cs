@@ -710,7 +710,8 @@ public class ElasticSearchService : ISearchService
     /// Hidden/system folders (".versions", ".dp-keys", recycle bin, …) are skipped.
     /// </summary>
     public async Task ReindexAllAsync(
-        IProgress<(int done, int total)>? progress, CancellationToken ct = default)
+        IProgress<(int done, int total)>? progress, CancellationToken ct = default,
+        string? shareName = null)
     {
         // Ensure the index exists with the correct (n-gram) mapping before writing.
         await InitializeAsync(ct);
@@ -727,7 +728,12 @@ public class ElasticSearchService : ISearchService
             .GetRequiredService<IShareRepository>()
             .GetAllEnabledAsync();
 
-        var existingShares = shares.Where(s => Directory.Exists(s.Path)).ToList();
+        var existingShares = shares
+            .Where(s => Directory.Exists(s.Path))
+            // Optional single-share scope: null/empty means reindex every share.
+            .Where(s => string.IsNullOrEmpty(shareName)
+                        || string.Equals(s.Name, shareName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
         var files = existingShares
             .SelectMany(share => Directory.EnumerateFiles(share.Path, "*", options)
                 .Where(path => !IsHiddenRelative(share.Path, path))

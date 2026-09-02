@@ -25,6 +25,7 @@ public class SettingsViewModel
     private readonly AuthenticationStateProvider _authState;
     private readonly ISystemInfoService _sysInfo;
     private readonly ISearchAdminService _searchAdmin;
+    private readonly IShareRepository _shareRepo;
     private readonly IHttpsCertificateProvider _certProvider;
     private readonly ILoggingConfigStore _loggingStore;
     private readonly LoggingLevelConfigurationSource _loggingSource;
@@ -41,6 +42,7 @@ public class SettingsViewModel
         AuthenticationStateProvider authState,
         ISystemInfoService sysInfo,
         ISearchAdminService searchAdmin,
+        IShareRepository shareRepo,
         IHttpsCertificateProvider certProvider,
         ILoggingConfigStore loggingStore,
         LoggingLevelConfigurationSource loggingSource,
@@ -56,6 +58,7 @@ public class SettingsViewModel
         _authState = authState;
         _sysInfo = sysInfo;
         _searchAdmin = searchAdmin;
+        _shareRepo = shareRepo;
         _certProvider = certProvider;
         _loggingStore = loggingStore;
         _loggingSource = loggingSource;
@@ -147,6 +150,12 @@ public class SettingsViewModel
 
     /// <summary>Progress of the last/running manual reindex.</summary>
     public ReindexProgress ReindexProgress { get; private set; } = ReindexProgress.Idle;
+
+    /// <summary>Enabled share names available for a scoped reindex.</summary>
+    public List<string> ReindexShares { get; private set; } = new();
+
+    /// <summary>Selected share for the next reindex; empty = all shares.</summary>
+    public string ReindexSelectedShare { get; set; } = string.Empty;
 
     // ── Logging (global log level) ──
 
@@ -707,6 +716,14 @@ public class SettingsViewModel
             SearchEsReachable = state.Reachable;
             SearchEsEffective = state.Effective;
             ReindexProgress = _searchAdmin.GetReindexProgress();
+
+            ReindexShares = (await _shareRepo.GetAllEnabledAsync())
+                .Select(s => s.Name)
+                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            // Drop a stale selection if that share is gone.
+            if (!ReindexShares.Contains(ReindexSelectedShare))
+                ReindexSelectedShare = string.Empty;
         }
         catch (Exception ex)
         {
@@ -756,7 +773,8 @@ public class SettingsViewModel
         }
     }
 
-    /// <summary>Triggers a manual full reindex of all files on disk.</summary>
+    /// <summary>Triggers a manual reindex — of all files on disk, or just the
+    /// files in <see cref="ReindexSelectedShare"/> when one is selected.</summary>
     public async Task StartReindexAsync()
     {
         ErrorMessage = null;
@@ -770,11 +788,14 @@ public class SettingsViewModel
 
         try
         {
-            var started = await _searchAdmin.TryStartReindexAsync();
+            var share = string.IsNullOrEmpty(ReindexSelectedShare) ? null : ReindexSelectedShare;
+            var started = await _searchAdmin.TryStartReindexAsync(share);
             ReindexProgress = _searchAdmin.GetReindexProgress();
 
             if (started)
-                SuccessMessage = "Indexierung gestartet. Der Fortschritt wird unten angezeigt.";
+                SuccessMessage = share is null
+                    ? "Indexierung gestartet. Der Fortschritt wird unten angezeigt."
+                    : $"Indexierung für Share '{share}' gestartet. Der Fortschritt wird unten angezeigt.";
             else if (ReindexProgress.Running)
                 ErrorMessage = "Es läuft bereits eine Indexierung.";
             else

@@ -37,6 +37,10 @@
         <p class="settings-hint">@(VM.ReindexProgress.Error is null ? string.Format(R("Web_Settings_Search_LastRunDone"), VM.ReindexProgress.Done, VM.ReindexProgress.Total) : string.Format(R("Web_Settings_Search_LastRunError"), VM.ReindexProgress.Error))</p>
     }
     <div class="settings-row settings-actions">
+        <select class="edit-input settings-select" @bind="VM.ReindexSelectedShare" disabled="@VM.ReindexProgress.Running">
+            <option value="">@R("Web_Settings_Search_ReindexAllShares")</option>
+            @foreach (var share in VM.ReindexShares) { <option value="@share">@share</option> }
+        </select>
         <button class="btn-primary" disabled="@(!VM.SearchEsEffective || VM.ReindexProgress.Running)" @onclick="StartReindex">@R("Web_Settings_Search_StartReindex")</button>
         <button class="btn-icon" title="@R("Web_Settings_Search_RefreshProgress")" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button>
     </div>

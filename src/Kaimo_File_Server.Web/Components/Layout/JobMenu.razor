@@ -1,7 +1,9 @@
 @using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Search
 @using Kaimo_File_Server.Web.DynamicHelpers
 @implements IDisposable
 @inject JobService JobService
+@inject ISearchAdminService SearchAdmin
 @inherits AppComponentBase
 
 <div class="job-menu">
@@ -13,9 +15,9 @@
             @onclick="Toggle">
         @Assets.SVG("upload.svg", new SvgOptions(Width: 18, Height: 18, StrokeWidth: 2))
         <span>@Text("Web_Jobs_Title", "Running jobs")</span>
-        @if (JobService.Jobs.Count > 0)
+        @if (TotalCount > 0)
         {
-            <span class="job-menu-count">@JobService.Jobs.Count</span>
+            <span class="job-menu-count">@TotalCount</span>
         }
     </button>
 
@@ -24,16 +26,41 @@
         <section class="job-menu-panel" aria-live="polite">
             <header class="job-menu-header">
                 <strong>@Text("Web_Jobs_Title", "Running jobs")</strong>
-                <span>@string.Format(Text("Web_Jobs_Count", "{0} active"), JobService.Jobs.Count)</span>
+                <span>@string.Format(Text("Web_Jobs_Count", "{0} active"), TotalCount)</span>
             </header>
 
-            @if (JobService.Jobs.Count == 0)
+            @if (TotalCount == 0)
             {
                 <div class="job-menu-empty">@Text("Web_Jobs_Empty", "No jobs are currently running.")</div>
             }
             else
             {
                 <div class="job-menu-list">
+                    @if (ReindexRunning)
+                    {
+                        @* Process-wide reindex (started by any admin), read-only for
+                           anyone with system-settings rights. Not cancellable here. *@
+                        <article class="job-menu-item">
+                            <div class="job-menu-item-heading">
+                                <div>
+                                    <strong>@($"{Text("Web_Settings_Search_ReindexTitle", "Manual indexing")} · {ReindexScopeLabel}")</strong>
+                                    <small>@string.Format(
+                                        Text("Web_Settings_Search_Indexing", "Indexing… {0} / {1} ({2} %)"),
+                                        _reindex.Done, _reindex.Total, _reindex.Percent)</small>
+                                </div>
+                            </div>
+                            <div class="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@_reindex.Percent">
+                                <div class="job-progress-fill" style="width: @(_reindex.Percent)%"></div>
+                            </div>
+                            <div class="job-menu-meta">
+                                <span>@(_reindex.Percent)%</span>
+                                @if (_reindex.StartedAt is not null)
+                                {
+                                    <span>@_reindex.StartedAt.Value.ToLocalTime().ToString("t")</span>
+                                }
+                            </div>
+                        </article>
+                    }
                     @foreach (var job in JobService.Jobs)
                     {
                         <article class="job-menu-item">
@@ -69,11 +96,52 @@
 </div>
 
 @code {
-    private bool _isOpen;
+    /// <summary>
+    /// Whether this session may see the server-wide Elasticsearch reindex progress.
+    /// Set by the layout from the ManageSystemSettings permission.
+    /// </summary>
+    [Parameter] public bool CanSeeReindex { get; set; }
 
-    // Keep the global menu synchronized with progress reports that may arrive
-    // from provider HTTP callbacks rather than the Blazor renderer thread.
-    protected override void OnInitialized() => JobService.OnChanged += HandleChanged;
+    private bool _isOpen;
+    private ReindexProgress _reindex = ReindexProgress.Idle;
+    private (bool Running, int Done, int Total) _reindexSig;
+
+    // The reindex reports progress into an in-memory record, not through an event,
+    // so a light timer polls it. GetReindexProgress is a cheap in-memory read; we
+    // only re-render when the visible numbers actually change.
+    private System.Timers.Timer? _pollTimer;
+
+    private bool ReindexRunning => CanSeeReindex && _reindex.Running;
+
+    // Scope shown on the reindex row: the share name, or the localized "all shares".
+    private string ReindexScopeLabel => string.IsNullOrEmpty(_reindex.ShareName)
+        ? Text("Web_Settings_Search_ReindexAllShares", "All shares")
+        : _reindex.ShareName!;
+    private int TotalCount => JobService.Jobs.Count + (ReindexRunning ? 1 : 0);
+
+    protected override void OnInitialized()
+    {
+        JobService.OnChanged += HandleChanged;
+        _reindex = SearchAdmin.GetReindexProgress();
+        _reindexSig = (_reindex.Running, _reindex.Done, _reindex.Total);
+
+        _pollTimer = new System.Timers.Timer(1500) { AutoReset = true };
+        _pollTimer.Elapsed += PollReindex;
+        _pollTimer.Start();
+    }
+
+    private void PollReindex(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        if (!CanSeeReindex) return;
+
+        var p = SearchAdmin.GetReindexProgress();
+        var sig = (p.Running, p.Done, p.Total);
+        if (sig == _reindexSig) return;
+
+        _reindex = p;
+        _reindexSig = sig;
+        _ = InvokeAsync(StateHasChanged);
+    }
 
     // Opening an empty menu is intentional: it gives the user an explicit view
     // that no work is running instead of making the control disappear.
@@ -88,7 +156,15 @@
 
     // A scoped job service can outlive this layout instance during navigation,
     // therefore event handlers must always be detached explicitly.
-    public void Dispose() => JobService.OnChanged -= HandleChanged;
+    public void Dispose()
+    {
+        JobService.OnChanged -= HandleChanged;
+        if (_pollTimer is not null)
+        {
+            _pollTimer.Elapsed -= PollReindex;
+            _pollTimer.Dispose();
+        }
+    }
 
     private static string Text(string key, string fallback)
         => Resources.ResourceManager.GetString(key) ?? fallback;
