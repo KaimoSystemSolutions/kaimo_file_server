@@ -28,7 +28,11 @@
         </div>
     </div>
 
-    @if (!Viewer.IsAuthorized)
+    @if (!_initialized)
+    {
+        <div class="log-result-summary">@Resources.Web_Settings_LogViewer_Updating</div>
+    }
+    else if (!Viewer.IsAuthorized)
     {
         <div class="error-banner">@Resources.Web_Settings_LogViewer_Unauthorized</div>
     }
@@ -199,12 +203,19 @@
     private CancellationTokenSource? _searchDelay;
     private Task? _refreshLoop;
     private string _excludedPrefixDraft = "";
+    private bool _initialized;
 
-    protected override async Task OnInitializedAsync()
+    // Load logs after the first render so selecting the Logging tab paints
+    // immediately instead of blocking on the (possibly slow) initial query.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!firstRender)
+            return;
         await Viewer.InitializeAsync(_lifetime.Token);
+        _initialized = true;
         if (Viewer.IsAuthorized)
             _refreshLoop = RunRefreshLoopAsync(_lifetime.Token);
+        StateHasChanged();
     }
 
     private async Task RefreshAsync()
