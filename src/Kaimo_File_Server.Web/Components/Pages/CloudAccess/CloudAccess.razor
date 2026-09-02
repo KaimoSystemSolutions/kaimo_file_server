@@ -226,10 +226,10 @@ else
                 <div class="vs-table-header" aria-hidden="true">
                     <span>@Resources.Web_ShareList_Label_Name</span>
                     <span>@Resources.Web_ShareList_Label_Status</span>
-                    <span>@R("Web_CloudAccess_AccessMode")</span>
                     @if (_showVirtualShareDetails)
                     {
                         <span>@R("Web_CloudAccess_Connection")</span>
+                        <span>@R("Web_CloudAccess_RemoteFolder")</span>
                     }
                 </div>
                 <div class="vs-table-body">
@@ -251,15 +251,13 @@ else
                                 <StatusBadge Tone="@(isUsable ? StatusTone.Positive : StatusTone.Negative)"
                                              Label="@ShareStatusText(share, connection)" />
                             </span>
-                            <span class="vs-table-cell">
-                                <span class="vs-access-mode">
-                                    @(share.IsReadOnly ? R("Web_CloudAccess_ReadOnly") : R("Web_CloudAccess_ReadWrite"))
-                                </span>
-                            </span>
                             @if (_showVirtualShareDetails)
                             {
                                 <span class="vs-table-cell vs-connection" title="@(connection?.Name)">
                                     @(connection?.Name ?? "—")
+                                </span>
+                                <span class="vs-table-cell vs-connection" title="@share.RemoteRootPath">
+                                    @share.RemoteRootPath
                                 </span>
                             }
                         </button>
@@ -659,7 +657,6 @@ else
 
     private async Task DeleteShareAsync(CloudAccessShare share)
     {
-        if (!await JS.InvokeAsync<bool>("confirm", string.Format(R("Web_CloudAccess_DeleteShareConfirm"), share.Name))) return;
         await RunAsync(() => VM.DeleteShareAsync(share.Id));
         if (_selectedShare?.Id == share.Id) _selectedShare = null;
     }

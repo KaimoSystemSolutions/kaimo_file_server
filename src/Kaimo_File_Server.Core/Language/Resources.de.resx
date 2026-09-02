@@ -2475,7 +2475,6 @@
   <data name="Web_CloudAccess_AddPrincipal" xml:space="preserve"><value>Hinzufügen</value></data>
   <data name="Web_CloudAccess_RemovePrincipal" xml:space="preserve"><value>Entfernen</value></data>
   <data name="Web_CloudAccess_Open" xml:space="preserve"><value>Share öffnen</value></data>
-  <data name="Web_CloudAccess_DeleteShareConfirm" xml:space="preserve"><value>Virtuellen Share „{0}“ löschen? Die entfernten Dateien bleiben unverändert.</value></data>
   <data name="Web_CloudAccess_TabGeneral" xml:space="preserve"><value>Allgemein</value></data>
   <data name="Web_CloudAccess_TabAccess" xml:space="preserve"><value>Zugriff</value></data>
   <data name="Web_CloudAccess_DetailHint" xml:space="preserve"><value>Virtuellen Share auswählen, um Einstellungen anzuzeigen.</value></data>

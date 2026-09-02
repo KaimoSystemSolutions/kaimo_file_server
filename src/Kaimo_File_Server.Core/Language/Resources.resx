@@ -2472,7 +2472,6 @@
   <data name="Web_CloudAccess_AddPrincipal" xml:space="preserve"><value>Add</value></data>
   <data name="Web_CloudAccess_RemovePrincipal" xml:space="preserve"><value>Remove</value></data>
   <data name="Web_CloudAccess_Open" xml:space="preserve"><value>Open share</value></data>
-  <data name="Web_CloudAccess_DeleteShareConfirm" xml:space="preserve"><value>Delete virtual share '{0}'? Remote files remain unchanged.</value></data>
   <data name="Web_CloudAccess_TabGeneral" xml:space="preserve"><value>General</value></data>
   <data name="Web_CloudAccess_TabAccess" xml:space="preserve"><value>Access</value></data>
   <data name="Web_CloudAccess_DetailHint" xml:space="preserve"><value>Select a virtual share to view its settings.</value></data>

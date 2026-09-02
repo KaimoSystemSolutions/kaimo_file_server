@@ -33,6 +33,7 @@ public sealed class CloudAccessShareBrowserViewModel(
                 .Select(x => new CloudAccessShareListItem(
                     x.Id, x.Name, connections[x.ConnectionId].ProviderId,
                     ProviderDisplayName(connections[x.ConnectionId].ProviderId),
+                    connections[x.ConnectionId].Name,
                     x.RemoteRootPath, x.IsReadOnly))
                 .OrderBy(x => x.Name).ToList();
         }
@@ -49,4 +50,4 @@ public sealed class CloudAccessShareBrowserViewModel(
 }
 
 public sealed record CloudAccessShareListItem(
-    Guid Id, string Name, string Provider, string ProviderDisplayName, string RemotePath, bool IsReadOnly);
+    Guid Id, string Name, string Provider, string ProviderDisplayName, string ConnectionName, string RemotePath, bool IsReadOnly);
