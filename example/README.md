@@ -31,7 +31,13 @@ Elasticsearch stay on the internal Compose network.
    ```bash
    openssl rand -hex 32
    ```
-3. Start the stack:
+3. Prepare the data directories (see [Data directory permissions](#-data-directory-permissions)):
+   ```bash
+   mkdir -p data/storage/pool01 data/kaimo-system data/logs data/backups data/elasticsearch
+   sudo chown -R 1654:1654 data/storage data/kaimo-system data/logs data/backups
+   sudo chown -R 1000:1000 data/elasticsearch
+   ```
+4. Start the stack:
    ```bash
    docker compose up -d
    ```
@@ -69,6 +75,28 @@ All persistent state lives under `./data` by default and survives
 | `./data/smb-control-plane` | Generated mTLS control-plane certificates |
 
 Each location can be redirected with a `LOCATION_*` variable in `.env`.
+
+### 🔑 Data directory permissions
+
+Docker creates missing bind-mount directories as `root:root`, but the services
+run as **non-root** users and cannot write to root-owned directories. Create and
+own the directories on the host **before the first `docker compose up`**:
+
+```bash
+mkdir -p data/storage/pool01 data/kaimo-system data/logs data/backups data/elasticsearch
+# App (host/web/smb-bridge) and Samba share UID/GID 1654 (the ".NET app" user
+# and the shared "kaimo" storage group).
+sudo chown -R 1654:1654 data/storage data/kaimo-system data/logs data/backups
+# Elasticsearch runs as UID 1000 and does not fix ownership itself.
+sudo chown -R 1000:1000 data/elasticsearch
+```
+
+`data/postgres` and `data/smb-control-plane` need no manual `chown`: PostgreSQL
+adjusts its own data directory on startup, and `pki-init` runs as `root`.
+
+If you redirect a location with a `LOCATION_*` variable, apply the matching
+ownership to that path instead. On Windows/WSL bind mounts (drvfs/9p) POSIX
+ownership is not enforced — the `chown` is a no-op there and can be skipped.
 
 ## 🔍 Search (Elasticsearch)
 
