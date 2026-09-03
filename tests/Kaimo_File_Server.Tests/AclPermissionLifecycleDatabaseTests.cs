@@ -231,6 +231,8 @@ public class AclPermissionLifecycleDatabaseTests : DatabaseTestBase
 
         return new AclEditorViewModel(
             AclRepo(), FileMetadataRepo(), UserRepo(), GroupRepo(), RoleRepo(),
+            ShareRepo(), DepartmentRepo(),
+            new DepartmentPermissionService(DepartmentRepo(), ShareRepo(), GroupRepo()),
             auth.Object,
             UserContextFactoryFor((actor.Username, ctx)).Object,
             AuthStateFor(actor.Username),

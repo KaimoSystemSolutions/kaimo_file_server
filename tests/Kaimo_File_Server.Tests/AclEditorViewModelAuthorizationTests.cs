@@ -26,6 +26,9 @@ public class AclEditorViewModelAuthorizationTests
     private readonly Mock<IUserRepository> _userRepo = new();
     private readonly Mock<IGroupRepository> _groupRepo = new();
     private readonly Mock<IRoleRepository> _roleRepo = new();
+    private readonly Mock<IShareRepository> _shareRepo = new();
+    private readonly Mock<IDepartmentRepository> _departmentRepo = new();
+    private readonly Mock<IDepartmentPermissionService> _deptPermissions = new();
     private readonly Mock<IManagementAuthService> _mgmtAuth = new();
     private readonly Mock<IUserContextFactory> _userContextFactory = new();
     private readonly Mock<AuthenticationStateProvider> _authState = new();
@@ -65,7 +68,8 @@ public class AclEditorViewModelAuthorizationTests
 
         _sut = new AclEditorViewModel(
             _aclRepo.Object, _metaRepo.Object, _userRepo.Object,
-            _groupRepo.Object, _roleRepo.Object, _mgmtAuth.Object,
+            _groupRepo.Object, _roleRepo.Object, _shareRepo.Object,
+            _departmentRepo.Object, _deptPermissions.Object, _mgmtAuth.Object,
             _userContextFactory.Object, _authState.Object,
             NullLogger<AclEditorViewModel>.Instance);
     }
