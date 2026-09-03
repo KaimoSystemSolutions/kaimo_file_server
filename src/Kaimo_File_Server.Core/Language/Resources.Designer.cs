@@ -455,6 +455,42 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Acl_InheritedFrom", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Department default ähnelt.
+        /// </summary>
+        public static string Web_Acl_DepartmentDefault {
+            get {
+                return ResourceManager.GetString("Web_Acl_DepartmentDefault", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Department ähnelt.
+        /// </summary>
+        public static string Web_Acl_DepartmentBadge {
+            get {
+                return ResourceManager.GetString("Web_Acl_DepartmentBadge", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Baseline access for all members of {0} ähnelt.
+        /// </summary>
+        public static string Web_Acl_DepartmentAppliesToAll {
+            get {
+                return ResourceManager.GetString("Web_Acl_DepartmentAppliesToAll", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Inherited from department {0} ähnelt.
+        /// </summary>
+        public static string Web_Acl_DepartmentInheritedFrom {
+            get {
+                return ResourceManager.GetString("Web_Acl_DepartmentInheritedFrom", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Loading Permissions… ähnelt.

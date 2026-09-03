@@ -540,6 +540,18 @@
   <data name="Web_Acl_InheritedFrom" xml:space="preserve">
     <value>Geerbt von {0}</value>
   </data>
+  <data name="Web_Acl_DepartmentDefault" xml:space="preserve">
+    <value>Abteilungsstandard</value>
+  </data>
+  <data name="Web_Acl_DepartmentBadge" xml:space="preserve">
+    <value>Abteilung</value>
+  </data>
+  <data name="Web_Acl_DepartmentAppliesToAll" xml:space="preserve">
+    <value>Basiszugriff für alle Mitglieder von {0}</value>
+  </data>
+  <data name="Web_Acl_DepartmentInheritedFrom" xml:space="preserve">
+    <value>Geerbt von Abteilung {0}</value>
+  </data>
   <data name="Web_Acl_Edit" xml:space="preserve">
     <value>Bearbeiten</value>
   </data>

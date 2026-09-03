@@ -14,6 +14,9 @@ public class AclEditorViewModel
     private readonly IUserRepository _userRepo;
     private readonly IGroupRepository _groupRepo;
     private readonly IRoleRepository _roleRepo;
+    private readonly IShareRepository _shareRepo;
+    private readonly IDepartmentRepository _departmentRepo;
+    private readonly IDepartmentPermissionService _deptPermissions;
     private readonly IManagementAuthService _mgmtAuth;
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authState;
@@ -25,6 +28,9 @@ public class AclEditorViewModel
         IUserRepository userRepo,
         IGroupRepository groupRepo,
         IRoleRepository roleRepo,
+        IShareRepository shareRepo,
+        IDepartmentRepository departmentRepo,
+        IDepartmentPermissionService deptPermissions,
         IManagementAuthService mgmtAuth,
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authState,
@@ -35,6 +41,9 @@ public class AclEditorViewModel
         _userRepo = userRepo;
         _groupRepo = groupRepo;
         _roleRepo = roleRepo;
+        _shareRepo = shareRepo;
+        _departmentRepo = departmentRepo;
+        _deptPermissions = deptPermissions;
         _mgmtAuth = mgmtAuth;
         _userContextFactory = userContextFactory;
         _authState = authState;
@@ -76,6 +85,15 @@ public class AclEditorViewModel
 
     /// <summary>ACLs inherited from parent paths (read-only)</summary>
     public List<InheritedAclEntry> InheritedEntries { get; private set; } = [];
+
+    /// <summary>
+    /// The share's department default permission (read-only), or null if the
+    /// share's department (and its ancestors) define no default. This is a
+    /// share-wide baseline that grants the listed permissions to every member
+    /// of the department — it is NOT a path-inherited ACL entry and has lower
+    /// precedence than any explicit Allow/Deny, so it is shown separately.
+    /// </summary>
+    public DepartmentDefaultInfo? DepartmentDefault { get; private set; }
 
     public List<User> AllUsers { get; private set; } = [];
     public List<Group> AllGroups { get; private set; } = [];
@@ -134,6 +152,9 @@ public class AclEditorViewModel
 
             // Load ACLs inherited from parent paths
             InheritedEntries = await LoadInheritedAclsAsync(shareId, isDirectory);
+
+            // Resolve the share's department default (share-wide baseline)
+            DepartmentDefault = await LoadDepartmentDefaultAsync(shareId);
 
             AllUsers = (await _userRepo.GetAllAsync()).ToList();
             AllGroups = (await _groupRepo.GetAllAsync()).ToList();
@@ -205,6 +226,34 @@ public class AclEditorViewModel
             return true;
 
         return false;
+    }
+
+    /// <summary>
+    /// Resolves the department default that applies to this share, for display only.
+    /// Mirrors the "virtual allow" layer in <see cref="AclService"/>: the value comes
+    /// from the share's own department, walking up the department hierarchy for
+    /// inheritance. Returns null when no department in the chain defines a default.
+    /// This is deliberately membership-independent — the admin view shows the baseline
+    /// that applies to department members, not to the admin currently viewing it.
+    /// </summary>
+    private async Task<DepartmentDefaultInfo?> LoadDepartmentDefaultAsync(Guid shareId)
+    {
+        var share = await _shareRepo.GetByIdAsync(shareId);
+        if (share is null)
+            return null;
+
+        var info = await _deptPermissions.GetPermissionInfoAsync(share.DepartmentId);
+        if (info.HasNoDefault || info.EffectivePermission == 0)
+            return null;
+
+        var dept = await _departmentRepo.GetByIdAsync(share.DepartmentId);
+
+        return new DepartmentDefaultInfo
+        {
+            DepartmentName = dept?.Name ?? "",
+            Permissions = (FilePermission)info.EffectivePermission,
+            InheritedFromDepartmentName = info.IsOwnPermission ? null : info.InheritedFromDepartmentName
+        };
     }
 
     // ------------------ Add/Edit/Delete bleiben gleich ------------------
@@ -404,4 +453,24 @@ public class InheritedAclEntry
 {
     public AccessEntry Entry { get; set; } = null!;
     public string SourcePath { get; set; } = "";
+}
+
+/// <summary>
+/// The share's department default permission, resolved for read-only display.
+/// Applies share-wide to all members of the department, distinct from the
+/// per-principal, path-based ACL entries.
+/// </summary>
+public class DepartmentDefaultInfo
+{
+    /// <summary>The department that owns the share.</summary>
+    public string DepartmentName { get; init; } = "";
+
+    /// <summary>The effective baseline permissions granted to department members.</summary>
+    public FilePermission Permissions { get; init; }
+
+    /// <summary>
+    /// Name of the ancestor department the default is inherited from, or null when
+    /// the owning department defines the default itself.
+    /// </summary>
+    public string? InheritedFromDepartmentName { get; init; }
 }

@@ -1873,6 +1873,23 @@ html, body, #app {
     border-left: 2px solid var(--text-tertiary);
 }
 
+.acl-entry--department {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-subtle);
+}
+
+.badge--department {
+    background: var(--accent-subtle);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+}
+
+.acl-department-note {
+    font-size: 11px;
+    font-style: italic;
+    color: var(--text-tertiary);
+}
+
 .acl-entry-header {
     display: flex;
     align-items: center;

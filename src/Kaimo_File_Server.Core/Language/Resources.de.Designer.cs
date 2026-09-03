@@ -878,6 +878,30 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Acl_InheritedFrom", resourceCulture);
             }
         }
+
+        internal static string Web_Acl_DepartmentDefault {
+            get {
+                return ResourceManager.GetString("Web_Acl_DepartmentDefault", resourceCulture);
+            }
+        }
+
+        internal static string Web_Acl_DepartmentBadge {
+            get {
+                return ResourceManager.GetString("Web_Acl_DepartmentBadge", resourceCulture);
+            }
+        }
+
+        internal static string Web_Acl_DepartmentAppliesToAll {
+            get {
+                return ResourceManager.GetString("Web_Acl_DepartmentAppliesToAll", resourceCulture);
+            }
+        }
+
+        internal static string Web_Acl_DepartmentInheritedFrom {
+            get {
+                return ResourceManager.GetString("Web_Acl_DepartmentInheritedFrom", resourceCulture);
+            }
+        }
         
         internal static string Web_Acl_Edit {
             get {

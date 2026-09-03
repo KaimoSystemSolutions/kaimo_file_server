@@ -32,6 +32,40 @@
 
     @if (_loaded)
     {
+        @* -- Department default (readonly, share-wide baseline) -- *@
+        @if (VM.DepartmentDefault is not null)
+        {
+            <div class="acl-inherited-section">
+                <span class="detail-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    @Resources.Web_Acl_DepartmentDefault
+                </span>
+                <div class="acl-list">
+                    <div class="acl-entry acl-entry--department">
+                        <div class="acl-entry-header">
+                            <div class="acl-entry-principal">
+                                @Assets.SVG("building.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--accent)", StrokeWidth: 2, CssClass: "acl-icon"))
+                                <span class="acl-entry-name">@VM.DepartmentDefault.DepartmentName</span>
+                                <span class="acl-entry-type-badge badge--department">@Resources.Web_Acl_DepartmentBadge</span>
+                            </div>
+                        </div>
+                        <div class="acl-entry-details">
+                            <span class="acl-detail-label">@Resources.Web_Action_Permissions:</span>
+                            <span class="acl-detail-value">@FormatPermissions(VM.DepartmentDefault.Permissions)</span>
+                        </div>
+                        <div class="acl-entry-details">
+                            <span class="acl-detail-value acl-department-note">
+                                @string.Format(Resources.Web_Acl_DepartmentAppliesToAll, VM.DepartmentDefault.DepartmentName)
+                                @if (VM.DepartmentDefault.InheritedFromDepartmentName is not null)
+                                {
+                                    <text> · @string.Format(Resources.Web_Acl_DepartmentInheritedFrom, VM.DepartmentDefault.InheritedFromDepartmentName)</text>
+                                }
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
         @* -- Inherited ACLs (readonly) -- *@
         @if (VM.InheritedEntries.Any())
         {
@@ -75,7 +109,7 @@
         }
 
         @* -- Direct ACLs (editable) -- *@
-        @if (VM.InheritedEntries.Any() || VM.Entries.Any())
+        @if (VM.DepartmentDefault is not null || VM.InheritedEntries.Any() || VM.Entries.Any())
         {
             <span class="detail-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 12px; display: block;">
                 @Resources.Web_Acl_Directly
