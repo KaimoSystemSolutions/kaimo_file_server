@@ -1941,6 +1941,9 @@
   <data name="Web_Admin_EditRole" xml:space="preserve">
     <value>Rolle bearbeiten</value>
   </data>
+  <data name="Web_Admin_EditGroup" xml:space="preserve">
+    <value>Gruppe bearbeiten</value>
+  </data>
   <data name="Web_Admin_DirectMembers" xml:space="preserve">
     <value>Direkte Mitglieder</value>
   </data>

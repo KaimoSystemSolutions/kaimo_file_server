@@ -148,6 +148,7 @@ public class UserListViewModel
     public string ConfirmPassword { get; set; } = "";
 
     // -- Group-Edit --
+    public string EditGroupName { get; set; } = "";
     public List<CheckboxItem<User>> EditGroupMembers { get; private set; } = [];
 
     // -- Role-Edit --
@@ -644,6 +645,8 @@ public class UserListViewModel
         IsEditing = true;
         ErrorMessage = null; SuccessMessage = null;
 
+        EditGroupName = SelectedGroup.Name;
+
         var allUsers = (await _userRepo.GetAllAsync()).OrderBy(u => u.Name).ToList();
         var members = await _groupRepo.GetMembersAsync(SelectedGroup.Id);
         var memberIds = members.Select(u => u.Id).ToHashSet();
@@ -661,10 +664,29 @@ public class UserListViewModel
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(EditGroupName))
+        {
+            ErrorMessage = Resources.Web_Group_NameRequired;
+            return;
+        }
+
         try
         {
             IsSaving = true;
             ErrorMessage = null;
+
+            // Group.Name is init-only, so a rename is applied by persisting a fresh
+            // aggregate carrying the same identity and department (mirrors role rename).
+            if (EditGroupName.Trim() != SelectedGroup.Name)
+            {
+                var renamed = new Group(SelectedGroup.Id, EditGroupName.Trim(), SelectedGroup.DepartmentId);
+                await _groupRepo.UpdateAsync(renamed);
+                SelectedGroup = renamed;
+
+                var idx = AllGroups.FindIndex(g => g.Id == renamed.Id);
+                if (idx >= 0) AllGroups[idx] = renamed;
+                AllGroups = AllGroups.OrderBy(g => g.Name).ToList();
+            }
 
             var selectedUserIds = EditGroupMembers.Where(m => m.IsChecked).Select(m => m.Item.Id).ToList();
             await _groupRepo.SetMembersAsync(SelectedGroup.Id, selectedUserIds);

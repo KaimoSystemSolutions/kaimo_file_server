@@ -10,8 +10,12 @@
                         @if (VM.IsEditing)
                         {
                             <div class="detail-header">
-<h3>@Resources.Web_Admin_ManageMembers</h3>
+<h3>@Resources.Web_Admin_EditGroup</h3>
                                 <span class="detail-subtitle">@VM.SelectedGroup.Name</span>
+                            </div>
+                            <div class="detail-section">
+<span class="detail-label">@Resources.Web_Admin_Label_GroupName</span>
+                                <input type="text" class="edit-input" @bind="VM.EditGroupName" @bind:event="oninput" />
                             </div>
                             <div class="detail-section">
 <span class="detail-label">@Resources.Web_Admin_Label_Users</span>
@@ -53,7 +57,7 @@
                             <div class="detail-actions">
                                 @if (VM.CanManageGroups)
                                 {
-<button class="btn-secondary" @onclick="EditGroup">@Resources.Web_Admin_ManageMembers</button>
+<button class="btn-secondary" @onclick="EditGroup">@Resources.Web_Common_Edit</button>
                                 }
                                 @if (VM.CanDeleteGroups)
                                 {

@@ -293,6 +293,25 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
         Assert.True(await db.UserGroups.AnyAsync(ug => ug.GroupId == group.Id && ug.UserId == alice.Id));
     }
 
+    [Fact]
+    public async Task SaveGroupAsync_PersistsRename()
+    {
+        var actor = SeedUser("admin");
+        var group = SeedGroup("Team");
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.SwitchTabAsync(AdminTab.Groups);
+        await sut.LoadAsync();
+        await sut.SwitchTabAsync(AdminTab.Groups);
+        await sut.SelectGroupAsync(sut.Groups.Single(g => g.Id == group.Id));
+        await sut.StartEditGroupAsync();
+
+        sut.EditGroupName = "Renamed Team";
+        await sut.SaveGroupAsync();
+
+        await using var db = NewContext();
+        Assert.Equal("Renamed Team", (await db.Groups.FindAsync(group.Id))!.Name);
+    }
+
     // ═══════════════════ Save role ═══════════════════
 
     [Fact]

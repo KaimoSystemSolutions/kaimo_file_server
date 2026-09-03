@@ -959,7 +959,16 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Admin_EditRole", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Edit group ähnelt.
+        /// </summary>
+        public static string Web_Admin_EditGroup {
+            get {
+                return ResourceManager.GetString("Web_Admin_EditGroup", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Edit user ähnelt.
         /// </summary>

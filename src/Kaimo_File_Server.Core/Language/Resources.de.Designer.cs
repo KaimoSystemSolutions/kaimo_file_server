@@ -2996,7 +2996,13 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Admin_EditRole", resourceCulture);
             }
         }
-        
+
+        internal static string Web_Admin_EditGroup {
+            get {
+                return ResourceManager.GetString("Web_Admin_EditGroup", resourceCulture);
+            }
+        }
+
         internal static string Web_Admin_DirectMembers {
             get {
                 return ResourceManager.GetString("Web_Admin_DirectMembers", resourceCulture);
