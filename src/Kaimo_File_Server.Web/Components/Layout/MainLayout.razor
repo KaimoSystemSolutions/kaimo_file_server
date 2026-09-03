@@ -14,6 +14,7 @@
 @inject ISearchService SearchService
 @inject IUserContextFactory UserContextFactory
 @inject IManagementAuthService ManagementAuthService
+@inject DemoModeOptions Demo
 
 
 <div class="app-shell" data-theme="@Theme.Current">
@@ -148,10 +149,27 @@
             </div>
             <JobMenu CanSeeReindex="_canManageSettings" />
         </div>
+        @if (Demo.ReadOnly)
+        {
+            <div class="demo-readonly-notice" role="status">
+                @Assets.SVG("info.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                <span>@Text("Web_Demo_ReadOnlyNotice", "Read-only demo — your changes are not saved.")</span>
+            </div>
+        }
         @Body
         
     </main>
     <ToastContainer />
+
+    @if (Demo.ReadOnly)
+    {
+        <div class="demo-banner">
+            <span>@Text("Web_Demo_FeedbackText", "This is a read-only demo.")</span>
+            <a href="https://feedback-kaimo.familie-hanisch.de/" target="_blank" rel="noopener noreferrer">
+                @Text("Web_Demo_FeedbackLink", "Submit feedback")
+            </a>
+        </div>
+    }
 </div>
 
 @code {

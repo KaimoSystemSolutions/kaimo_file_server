@@ -29,6 +29,24 @@ public sealed record BrowserCapabilities
     public bool HasSearchIntegration { get; init; }
     public bool ShowDirectorySizes { get; init; }
 
+    /// <summary>
+    /// Same backend with every write/mutation action removed (read-only demo mode).
+    /// View features — ACLs, versions, properties, search, downloads — stay on so the
+    /// demo can still show everything; only actions that would change data are dropped.
+    /// </summary>
+    public BrowserCapabilities AsReadOnly() => this with
+    {
+        CanUpload = false,
+        CanCreateDirectory = false,
+        CanRename = false,
+        CanDelete = false,
+        CanMove = false,
+        CanCopy = false,
+        CanCut = false,
+        CanArchive = false,
+        CanExtract = false,
+    };
+
     public static BrowserCapabilities Local { get; } = new()
     {
         CanOpen = true,

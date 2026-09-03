@@ -3858,4 +3858,13 @@
   <data name="Web_Settings_Data_StatusUnknown" xml:space="preserve">
     <value>Unbekannt</value>
   </data>
+  <data name="Web_Demo_FeedbackText" xml:space="preserve">
+    <value>Dies ist eine schreibgeschützte Demo.</value>
+  </data>
+  <data name="Web_Demo_FeedbackLink" xml:space="preserve">
+    <value>Feedback einreichen</value>
+  </data>
+  <data name="Web_Demo_ReadOnlyNotice" xml:space="preserve">
+    <value>Schreibgeschützte Demo – Änderungen werden nicht gespeichert.</value>
+  </data>
 </root>

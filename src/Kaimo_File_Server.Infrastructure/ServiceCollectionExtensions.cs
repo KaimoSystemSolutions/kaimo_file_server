@@ -39,9 +39,22 @@ namespace Kaimo_File_Server.Infrastructure
             var connectionString = configuration.GetConnectionString("Default")
                 ?? "Host=kaimo_file_server_db;Database=kaimo_file_server;Username=kaimo_test_user;Password=change_me";
 
+            // Read-only demo mode: set KAIMO_DEMO_READONLY=true on a PUBLIC-facing
+            // process (Web/SmbBridge) to turn it into a look-but-don't-touch demo.
+            // Leave it UNSET on the Host so seeding, migrations and background jobs
+            // (backups, data-service reconcile) keep writing normally.
+            var readOnlyDemo = configuration.GetValue<bool>("KAIMO_DEMO_READONLY");
+            // Presentation flag (hide write actions, show feedback banner). The hard
+            // write blocking is done by the interceptor + ACL guard below.
+            services.AddSingleton(new DemoModeOptions { ReadOnly = readOnlyDemo });
+
             // -- EF Core --
             services.AddDbContextFactory<ApplicationDbContext>(options =>
-                options.UseNpgsql(connectionString));
+            {
+                options.UseNpgsql(connectionString);
+                if (readOnlyDemo)
+                    options.AddInterceptors(new Persistence.ReadOnlyDemoSaveInterceptor());
+            });
 
             // -- Repositories --
             services.AddScoped<IUserRepository, UserRepository>();
@@ -72,7 +85,17 @@ namespace Kaimo_File_Server.Infrastructure
             // NT hash encryption at rest (fails closed if NtHash:EncryptionKey is missing).
             services.AddSingleton<INtHashProtector, Security.AesGcmNtHashProtector>();
             services.AddScoped<IUserContextFactory, UserContextFactory>();
-            services.AddScoped<IAclService, AclService>();
+            if (readOnlyDemo)
+            {
+                // Wrap the real ACL service so every write-carrying permission is denied.
+                services.AddScoped<AclService>();
+                services.AddScoped<IAclService>(sp =>
+                    new ReadOnlyDemoAclService(sp.GetRequiredService<AclService>()));
+            }
+            else
+            {
+                services.AddScoped<IAclService, AclService>();
+            }
             services.AddScoped<IAuthenticationLookup, AuthenticationLookup>();
             services.AddScoped<IManagementAuthService, ManagementAuthService>();
             services.AddSingleton<ICloudSyncPathUpdater, CloudSyncPathUpdater>();

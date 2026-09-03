@@ -44,6 +44,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel
     private readonly ILogger<FileBrowserViewModel> _logger;
     private readonly IUserRepository _userRepo;
     private readonly FileDownloadTicketStore _downloadTickets;
+    private readonly DemoModeOptions _demo;
 
     private readonly ISearchService _searchService;
 
@@ -59,7 +60,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel
         ILogger<FileBrowserViewModel> logger,
         ISearchService searchService,
         IUserRepository userRepo,
-        FileDownloadTicketStore downloadTickets)
+        FileDownloadTicketStore downloadTickets,
+        DemoModeOptions demo)
     {
         _fileServiceFactory = fileServiceFactory;
         _shareRepo = shareRepo;
@@ -71,13 +73,15 @@ public class FileBrowserViewModel : IFileBrowserViewModel
         _searchService = searchService;
         _userRepo = userRepo;
         _downloadTickets = downloadTickets;
+        _demo = demo;
     }
 
     // -- State --
 
     public event Action? OnStateChanged;
 
-    public BrowserCapabilities Capabilities => BrowserCapabilities.Local;
+    public BrowserCapabilities Capabilities =>
+        _demo.ReadOnly ? BrowserCapabilities.Local.AsReadOnly() : BrowserCapabilities.Local;
 
     public BrowserShareInfo? CurrentBrowserShare => CurrentShare is null
         ? null

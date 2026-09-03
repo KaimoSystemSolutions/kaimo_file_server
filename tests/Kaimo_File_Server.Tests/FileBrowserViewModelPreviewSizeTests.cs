@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Infrastructure.Persistence;
@@ -62,7 +63,7 @@ public class FileBrowserViewModelPreviewSizeTests
             _fileServiceFactory.Object, _shareRepo.Object, _dbFactory.Object,
             _userContextFactory.Object, _mgmtAuth.Object, _authState.Object,
             NullLogger<FileBrowserViewModel>.Instance, _searchService.Object, _userRepo.Object,
-            new FileDownloadTicketStore());
+            new FileDownloadTicketStore(), new DemoModeOptions());
     }
 
     private static FileMetadata Dir(string name) =>

@@ -3927,4 +3927,13 @@
   <data name="Web_Settings_Data_StatusUnknown" xml:space="preserve">
     <value>Unknown</value>
   </data>
+  <data name="Web_Demo_FeedbackText" xml:space="preserve">
+    <value>This is a read-only demo.</value>
+  </data>
+  <data name="Web_Demo_FeedbackLink" xml:space="preserve">
+    <value>Submit feedback</value>
+  </data>
+  <data name="Web_Demo_ReadOnlyNotice" xml:space="preserve">
+    <value>Read-only demo — your changes are not saved.</value>
+  </data>
 </root>

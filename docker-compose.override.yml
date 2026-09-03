@@ -19,6 +19,7 @@ services:
   kaimo_file_server.web:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
+      #KAIMO_DEMO_READONLY: "true"
       Seed__DemoData: "true"
       #Seed__AdminPassword: admin12345
       Jwt__Secret: ${JWT_SECRET:-DevOnly-LocalDevelopment-DoNotUseInProduction-JwtSecret}
