@@ -186,11 +186,10 @@
                         <div class="acl-type-tabs">
                             <button class="acl-type-tab @(VM.NewPrincipalType == "user" ? "active" : "")" @onclick='() => SetPrincipalType("user")'>@Resources.Web_Acl_Button_User</button>
                             <button class="acl-type-tab @(VM.NewPrincipalType == "group" ? "active" : "")" @onclick='() => SetPrincipalType("group")'>@Resources.Web_Acl_Button_Group</button>
-                            <button class="acl-type-tab @(VM.NewPrincipalType == "role" ? "active" : "")" @onclick='() => SetPrincipalType("role")'>@Resources.Web_Acl_Button_Role</button>
                         </div>
                     </div>
                     <div class="acl-form-row">
-                        <span class="detail-label">@(VM.NewPrincipalType == "user" ? Resources.Web_Acl_Button_User : VM.NewPrincipalType == "group" ? Resources.Web_Acl_Button_Group : Resources.Web_Acl_Button_Role)</span>
+                        <span class="detail-label">@(VM.NewPrincipalType == "user" ? Resources.Web_Acl_Button_User : Resources.Web_Acl_Button_Group)</span>
                         <select class="edit-input" @onchange="OnPrincipalSelected">
                             <option value="">— @Resources.Web_Acl_SelectPlaceholder —</option>
                             @if (VM.NewPrincipalType == "user")
@@ -200,18 +199,11 @@
                                     <option value="@u.Id">@(u.Name ?? u.Username)</option>
                                 }
                             }
-                            else if (VM.NewPrincipalType == "group")
+                            else
                             {
                                 @foreach (var g in VM.AllGroups)
                                 {
                                     <option value="@g.Id">@g.Name</option>
-                                }
-                            }
-                            else
-                            {
-                                @foreach (var r in VM.AllRoles)
-                                {
-                                    <option value="@r.Id">@r.Name</option>
                                 }
                             }
                         </select>

@@ -510,9 +510,6 @@
   <data name="Web_Acl_Button_Group" xml:space="preserve">
     <value>Gruppe</value>
   </data>
-  <data name="Web_Acl_Button_Role" xml:space="preserve">
-    <value>Rolle</value>
-  </data>
   <data name="Web_Acl_Action" xml:space="preserve">
     <value>Aktion</value>
   </data>

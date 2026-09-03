@@ -259,15 +259,6 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Role ähnelt.
-        /// </summary>
-        public static string Web_Acl_Button_Role {
-            get {
-                return ResourceManager.GetString("Web_Acl_Button_Role", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Save ähnelt.
         /// </summary>
         public static string Web_Acl_Button_Save {

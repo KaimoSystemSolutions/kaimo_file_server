@@ -97,6 +97,15 @@ public class AclEditorViewModel
 
     public List<User> AllUsers { get; private set; } = [];
     public List<Group> AllGroups { get; private set; } = [];
+
+    /// <summary>
+    /// Roles are intentionally NOT offered as a principal when creating ACL entries:
+    /// file access is expressed through users and groups, while roles carry
+    /// administrative (management) permissions — a separation the editor keeps clear.
+    /// This list is still loaded so that any pre-existing role-based entries continue
+    /// to resolve to a readable name and icon; <see cref="AclService"/> also still
+    /// evaluates them, so no access silently changes.
+    /// </summary>
     public List<Role> AllRoles { get; private set; } = [];
 
     // ------------------ New Entry State ------------------

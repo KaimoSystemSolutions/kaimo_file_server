@@ -819,12 +819,6 @@ namespace Kaimo_File_Server.Core.Language {
             }
         }
         
-        internal static string Web_Acl_Button_Role {
-            get {
-                return ResourceManager.GetString("Web_Acl_Button_Role", resourceCulture);
-            }
-        }
-        
         internal static string Web_Acl_Action {
             get {
                 return ResourceManager.GetString("Web_Acl_Action", resourceCulture);
