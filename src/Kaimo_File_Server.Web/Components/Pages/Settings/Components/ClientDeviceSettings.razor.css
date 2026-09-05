@@ -9,7 +9,7 @@
 
 .client-devices__empty {
     border: 1px dashed var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     padding: 24px;
     text-align: center;
     color: var(--text-tertiary);
@@ -26,7 +26,7 @@
 
 .device-card {
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: var(--radius-surface);
     background: var(--bg-secondary);
     padding: 16px 18px;
     margin-top: 16px;

@@ -1,9 +1,9 @@
 .storage-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
-.storage-toolbar h2 { margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 21px; letter-spacing: -.025em; }
+.storage-toolbar h2 { margin: 0; font-family: var(--font-heading); font-size: 21px; letter-spacing: -.025em; }
 .storage-toolbar .subtitle { max-width: 680px; margin-top: 2px; color: var(--text-secondary); font-size: 12.5px; line-height: 1.45; }
 .storage-toolbar > button { min-height: 34px; flex: 0 0 auto; width: auto; padding-inline: 13px; }
 
-.sync-workspace { display: grid; grid-template-columns: minmax(360px, 1fr) minmax(390px, 480px); min-height: min(640px, calc(100vh - 230px)); overflow: hidden; border: 1px solid var(--border); border-radius: 7px; background: var(--bg-secondary); }
+.sync-workspace { display: grid; grid-template-columns: minmax(360px, 1fr) minmax(390px, 480px); min-height: min(640px, calc(100vh - 230px)); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-surface); background: var(--bg-secondary); }
 .sync-list-pane { min-width: 0; overflow: hidden auto; background: var(--bg-secondary); }
 .sync-list { min-width: 0; }
 .sync-list-header, .sync-row { box-sizing: border-box; display: grid; grid-template-columns: minmax(180px, 1fr) minmax(120px, auto) minmax(120px, auto); width: 100%; align-items: center; gap: 14px; }
@@ -14,7 +14,7 @@
 .sync-row--selected { background: var(--accent-subtle); box-shadow: inset 3px 0 0 var(--accent); }
 .sync-row--selected:hover { background: var(--accent-selected); }
 .sync-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.sync-provider-icon { display: flex; flex: 0 0 30px; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 6px; background: color-mix(in srgb, currentColor 8%, var(--bg-tertiary)); }
+.sync-provider-icon { display: flex; flex: 0 0 30px; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: var(--radius-control); background: color-mix(in srgb, currentColor 8%, var(--bg-tertiary)); }
 .sync-name-text { min-width: 0; }
 .sync-name-text strong, .sync-name-text small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sync-name-text strong { color: var(--text-primary); font-size: 13.5px; font-weight: 650; }
@@ -25,7 +25,7 @@
 
 .storage-editor { min-width: 0; padding: 17px 18px 20px; border-left: 1px solid var(--border); background: var(--bg-tertiary); }
 .storage-editor-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; margin-bottom: 13px; }
-.storage-editor-heading h3 { overflow: hidden; margin: 0; text-overflow: ellipsis; white-space: nowrap; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 18px; letter-spacing: -.015em; }
+.storage-editor-heading h3 { overflow: hidden; margin: 0; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-heading); font-size: 18px; letter-spacing: -.015em; }
 .storage-editor-heading span { color: var(--text-tertiary); font-size: 12px; }
 .storage-enabled { display: inline-flex; flex: 0 0 auto; align-items: center; gap: .45rem; color: var(--text-secondary); font-size: 12px; }
 /* Full-bleed framing comes from the shared .detail-tabs--panel variant;
@@ -49,8 +49,8 @@
 .sync-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
 .sync-detail-title { min-width: 0; }
 .sync-title-row { display: flex; align-items: center; gap: 9px; min-width: 0; }
-.sync-detail-icon { display: flex; flex: 0 0 34px; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 7px; background: color-mix(in srgb, currentColor 10%, var(--bg-secondary)); }
-.sync-detail-title h3 { overflow: hidden; margin: 0; color: var(--text-primary); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: -.015em; text-overflow: ellipsis; white-space: nowrap; }
+.sync-detail-icon { display: flex; flex: 0 0 34px; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: var(--radius-surface); background: color-mix(in srgb, currentColor 10%, var(--bg-secondary)); }
+.sync-detail-title h3 { overflow: hidden; margin: 0; color: var(--text-primary); font-family: var(--font-heading); font-size: 18px; font-weight: 700; letter-spacing: -.015em; text-overflow: ellipsis; white-space: nowrap; }
 .sync-detail-title .detail-subtitle { display: block; margin-top: 1px; color: var(--text-tertiary); font-size: 12px; }
 .sync-detail-header ::deep .sync-state { flex: 0 0 auto; }
 .sync-detail-grid { display: flex; flex-direction: column; border-top: 1px solid var(--border); }

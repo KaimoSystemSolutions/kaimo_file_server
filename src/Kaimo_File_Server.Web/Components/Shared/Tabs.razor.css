@@ -31,7 +31,7 @@
 
     .detail-tabs::-webkit-scrollbar-thumb {
         background: var(--border-light);
-        border-radius: 2px;
+        border-radius: var(--radius-control);
     }
 
 .detail-tabs ::deep .detail-tab {
@@ -128,7 +128,7 @@
         justify-content: flex-start;
         padding: 8px 10px;
         border: 1px solid transparent;
-        border-radius: 5px;
+        border-radius: var(--radius-control);
         background: transparent;
         color: var(--text-secondary);
         font-size: 12.5px;

@@ -1,4 +1,4 @@
-﻿/* ══════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════
    FileBrowser.razor.css – Scoped Styles
    File Table Grid, Column Sorting, ACL Indicators, Responsive
    ══════════════════════════════════════════════════════════ */
@@ -14,7 +14,7 @@
     flex-direction: column;
     position: relative;
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     background: var(--bg-secondary);
     overflow: hidden;
     width: 100%;
@@ -176,7 +176,7 @@
     .col-resize-handle:active {
         background: var(--accent);
         opacity: 0.5;
-        border-radius: 3px;
+        border-radius: var(--radius-control);
     }
 
 /* --- Selection --- */
@@ -271,7 +271,7 @@
     display: flex;
     flex-direction: column;
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     background: var(--bg-secondary);
     overflow: hidden;
     width: 100%;
@@ -301,7 +301,7 @@
    block; the per-row delay (set inline) gives a gentle top-to-bottom cascade. */
 .skeleton-box {
     display: block;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     background: linear-gradient(
         90deg,
         var(--bg-tertiary) 25%,
@@ -319,7 +319,7 @@
 .skeleton-icon {
     width: 20px;
     height: 20px;
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     flex-shrink: 0;
 }
 
@@ -347,7 +347,7 @@
     padding: 1px 6px 1px 4px;
     background: var(--accent-subtle);
     border: 1px solid var(--accent-border);
-    border-radius: 10px;
+    border-radius: var(--radius-surface);
     cursor: pointer;
     transition: all 0.15s;
     flex-shrink: 0;
@@ -379,7 +379,7 @@
 
 .file-dragged-over {
     border: 2px dashed var(--accent) !important;
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
 }
 
 .file-dragged-over::after {
@@ -389,7 +389,7 @@
     background: var(--accent-subtle);
     backdrop-filter: blur(2px);
     z-index: 10;
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -520,7 +520,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
 }
 
 .preview-header {
@@ -640,7 +640,7 @@
     margin-bottom: 10px;
     padding: 5px 8px 5px 12px;
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     background: var(--bg-tertiary);
     box-shadow: none;
 }
@@ -653,7 +653,7 @@
 .toolbar-btn {
     min-height: 30px;
     border: 1px solid transparent;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
 }
 
 .toolbar-btn:hover:not(:disabled) {

@@ -2,7 +2,7 @@
     min-width: 0;
     overflow: hidden;
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     background: var(--bg-secondary);
 }
 

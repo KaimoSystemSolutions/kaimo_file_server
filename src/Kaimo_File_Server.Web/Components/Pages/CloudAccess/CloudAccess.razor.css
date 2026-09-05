@@ -12,7 +12,7 @@
 }
 
 .vs-page-header h1 {
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: var(--font-heading);
     font-size: 21px;
     font-weight: 700;
     letter-spacing: -0.025em;
@@ -73,7 +73,7 @@
     margin-bottom: 14px;
     padding: 12px 14px;
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     background: var(--bg-sunken);
     color: var(--text-secondary);
     font-size: 12.5px;
@@ -95,7 +95,7 @@
     min-height: min(640px, calc(100vh - 180px));
     overflow: hidden;
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     background: var(--bg-secondary);
 }
 
@@ -228,7 +228,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: var(--font-heading);
     font-size: 18px;
     font-weight: 700;
     letter-spacing: -0.015em;
@@ -279,7 +279,7 @@
     margin: 1rem 0;
     padding: 1.25rem;
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-modal);
     background: var(--surface);
 }
 
@@ -345,7 +345,7 @@
 .cloud-access-detail-pane {
     min-width: 0;
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-modal);
     background: var(--surface);
     overflow: hidden;
 }
@@ -423,7 +423,7 @@
     gap: .75rem;
     padding: .55rem .65rem;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
 }
 
 .cloud-access-connection-grid {
@@ -440,7 +440,7 @@
     gap: 1rem;
     padding: .85rem;
     border: 1px solid var(--border);
-    border-radius: 9px;
+    border-radius: var(--radius-surface);
 }
 
 .cloud-access-connection-card > div:first-child {

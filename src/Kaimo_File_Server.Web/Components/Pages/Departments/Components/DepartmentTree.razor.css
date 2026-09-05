@@ -11,7 +11,7 @@
     overflow: hidden;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
 }
 
 /* -- Row -- */
@@ -112,7 +112,7 @@
     padding: 0;
     cursor: pointer;
     color: var(--text-secondary);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     transition: transform 0.08s linear;
     transform: rotate(0deg);
 }
@@ -172,7 +172,7 @@
     height: 22px;
     padding: 0 7px;
     margin-left: 10px;
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     background: var(--bg-tertiary);
     border: 1px solid var(--border-strong);
     color: var(--text-primary);

@@ -35,7 +35,7 @@
     align-items: center;
     gap: 0.6rem;
     padding: 0.5rem 0.6rem;
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     border: 1px solid transparent;
     background: transparent;
     color: var(--text-primary);
@@ -79,7 +79,7 @@
     font-weight: 600;
     color: var(--accent);
     background: var(--accent-subtle);
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     padding: 2px 6px;
     min-width: 62px;
     text-align: center;

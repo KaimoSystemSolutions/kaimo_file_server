@@ -1,4 +1,4 @@
-﻿/* ══════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════
    UserList.razor.css – Scoped styles for /users page
    ══════════════════════════════════════════════════════════ */
 
@@ -6,7 +6,7 @@
 
 ::deep .user-list-container {
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     overflow: hidden;
     background: var(--bg-secondary);
     max-height: 600px;
@@ -130,7 +130,7 @@
     cursor: pointer;
     inset: 0;
     background: var(--bg-active);
-    border-radius: 11px;
+    border-radius: var(--radius-surface);
     transition: background 0.2s;
 }
 
@@ -187,7 +187,7 @@
     padding: 5px 10px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-light);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     min-height: 28px;
 }
 
@@ -205,7 +205,7 @@
     margin-top: 4px;
     padding: 12px 14px;
     background: var(--bg-tertiary);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     border: 1px solid var(--border);
 }
 
@@ -251,7 +251,7 @@
 }
 
 .entity-page-header h1 {
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: var(--font-heading);
     font-size: 21px;
     font-weight: 700;
     letter-spacing: -0.025em;
@@ -313,7 +313,7 @@
     min-height: min(650px, calc(100vh - 220px));
     overflow: hidden;
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     background: var(--bg-secondary);
 }
 
@@ -345,7 +345,7 @@
 }
 
 .entity-detail ::deep .detail-header h3 {
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: var(--font-heading);
     font-size: 18px;
     font-weight: 700;
     letter-spacing: -0.015em;
@@ -354,7 +354,7 @@
 .entity-detail ::deep .detail-field-value {
     min-height: 32px;
     padding: 6px 9px;
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     background: var(--bg-secondary);
 }
 
@@ -410,7 +410,7 @@
     margin: -7px;
     padding: 7px;
     border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--border));
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     background: color-mix(in srgb, var(--accent-subtle) 28%, var(--bg-tertiary));
     box-shadow: inset 3px 0 0 var(--accent);
 }
@@ -421,7 +421,7 @@
     gap: 10px;
     margin: 0 0 16px;
     padding: 10px 11px;
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     background: var(--accent-subtle);
     color: var(--accent);
 }
@@ -528,7 +528,7 @@
 .entity-detail ::deep .user-profile-identity strong {
     overflow: hidden;
     color: var(--text-primary);
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: var(--font-heading);
     font-size: 16px;
     font-weight: 700;
     letter-spacing: -0.015em;
@@ -630,7 +630,7 @@
     width: min(300px, calc(100vw - 54px));
     padding: 10px 12px;
     border: 1px solid var(--border-strong);
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     background: var(--bg-secondary);
     box-shadow: var(--shadow);
     color: var(--text-secondary);
@@ -656,7 +656,7 @@
 .entity-detail ::deep .user-role-scope-card {
     overflow: hidden;
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     background: var(--bg-secondary);
 }
 
@@ -689,7 +689,7 @@
     width: 28px;
     height: 28px;
     place-items: center;
-    border-radius: 6px;
+    border-radius: var(--radius-control);
 }
 
 .entity-detail ::deep .user-role-scope-card--global .user-role-scope-icon {

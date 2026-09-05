@@ -3,6 +3,31 @@
    Dark/Light Theme, Synology-inspired File Server UI
    ══════════════════════════════════════════════════════════ */
 
+/* -- Design Tokens (theme-independent) --
+   Central knobs for the overall look. Radius base = "crisp" (2/3/4px).
+   Switch the whole UI to fully square by setting all three radii to 0,
+   or to "mixed" with control 4px + surface 1px. */
+
+:root {
+    --radius-control: 2px;   /* buttons, inputs, selects, chips, badges, nav items */
+    --radius-surface: 3px;   /* cards, panels, table wrappers, dropdowns, menus */
+    --radius-modal: 4px;     /* modal dialogs */
+    /* 50% (avatars/dots) stays literal. */
+
+    /* Spacing scale (4px base) — applied to the shared primitives. */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+
+    /* Typography — Inter for body/UI, Plus Jakarta Sans for headings/labels. */
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --font-heading: 'Plus Jakarta Sans', var(--font-body);
+    --label-spacing: 0.08em;
+}
+
 /* -- Theme Variables -- */
 
 [data-theme="dark"] {
@@ -130,8 +155,15 @@
 
 @font-face {
     font-family: 'Plus Jakarta Sans';
-    src: url('fonts/PlusJakartaSans-VariableFont_wght.ttf') format('truetype');
+    src: url('../fonts/PlusJakartaSans-VariableFont_wght.ttf') format('truetype');
     font-weight: 100 800;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Inter';
+    src: url('../fonts/Inter-VariableFont.ttf') format('truetype');
+    font-weight: 100 900;
     font-display: swap;
 }
 
@@ -145,12 +177,35 @@
 
 html, body, #app {
     height: 100%;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-family: var(--font-body);
     font-size: 14px;
     line-height: 1.5;
     color: var(--text-primary);
     background: var(--bg-primary);
     -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+}
+
+/* Micro-label treatment — the uppercase section/column/group labels get the
+   heading font and consistent tracking for a deliberate, designed feel.
+   (Form field labels are intentionally excluded to stay legible in dense forms.) */
+.file-list-header,
+.detail-label,
+.permission-group-label,
+.ui-label {
+    font-family: var(--font-heading);
+    letter-spacing: var(--label-spacing);
+    text-transform: uppercase;
+}
+
+.ui-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
 }
 
 /* Reconnect dialog shown when an Interactive Server circuit loses its connection.
@@ -191,7 +246,7 @@ html, body, #app {
     color: var(--text-primary);
     background: var(--bg-secondary);
     border: 1px solid var(--border-strong);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     box-shadow: var(--shadow-lg);
 }
 
@@ -257,7 +312,7 @@ html, body, #app {
     color: #fff;
     background: var(--accent);
     border: 0;
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -288,7 +343,7 @@ html, body, #app {
     height: 34px;
     border: 1px solid var(--border);
     background: var(--bg-secondary);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -360,7 +415,7 @@ html, body, #app {
 .btn {
     padding: 8px 16px;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -377,7 +432,7 @@ html, body, #app {
     background: var(--accent);
     color: var(--text-on-accent);
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -398,7 +453,7 @@ html, body, #app {
     background: var(--bg-tertiary);
     color: var(--text-primary);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -420,7 +475,7 @@ html, body, #app {
     background: var(--danger);
     color: #fff;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -441,7 +496,7 @@ html, body, #app {
     background: var(--danger-subtle);
     color: var(--danger);
     border: 1px solid var(--danger);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -469,7 +524,7 @@ html, body, #app {
     padding: 10px 14px;
     background: var(--danger-subtle);
     color: var(--danger);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     font-size: 13px;
     font-weight: 500;
     border: 1px solid rgba(248, 113, 113, 0.25);
@@ -480,7 +535,7 @@ html, body, #app {
     padding: 10px 14px;
     background: var(--success-subtle);
     color: var(--success);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     font-size: 13px;
     font-weight: 500;
     border: 1px solid rgba(74, 222, 128, 0.25);
@@ -545,7 +600,7 @@ html, body, #app {
     padding: 9px 10px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 9px;
+    border-radius: var(--radius-surface);
     cursor: pointer;
     transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
@@ -561,7 +616,6 @@ html, body, #app {
 .share-card:hover {
     border-color: var(--accent);
     background: var(--accent-subtle);
-    box-shadow: var(--shadow);
 }
 
 .share-card--storage-unavailable {
@@ -651,7 +705,7 @@ html, body, #app {
     padding: 14px 16px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     margin-bottom: 16px;
 }
 
@@ -661,7 +715,7 @@ html, body, #app {
         padding: 8px 12px;
         background: var(--bg-tertiary);
         border: 1px solid var(--border);
-        border-radius: 6px;
+        border-radius: var(--radius-control);
         color: var(--text-primary);
         font-size: 13px;
         outline: none;
@@ -676,7 +730,7 @@ html, body, #app {
 
 .file-list {
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     overflow: hidden;
     background: var(--bg-secondary);
     display: flex;
@@ -841,7 +895,7 @@ html, body, #app {
         padding: 9px 12px;
         background: var(--bg-primary);
         border: 1px solid var(--border-strong, var(--border));
-        border-radius: 6px;
+        border-radius: var(--radius-control);
         color: var(--text-primary);
         font-size: 14px;
         outline: none;
@@ -869,7 +923,7 @@ html, body, #app {
     gap: 4px;
     padding: 4px;
     background: var(--bg-tertiary);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     margin-bottom: 20px;
 }
 
@@ -885,7 +939,7 @@ html, body, #app {
     color: var(--text-tertiary);
     font-size: 13px;
     font-weight: 500;
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     cursor: pointer;
     transition: all 0.15s;
 }
@@ -899,7 +953,6 @@ html, body, #app {
         background: var(--bg-secondary);
         color: var(--accent);
         font-weight: 600;
-        box-shadow: var(--shadow);
     }
 
 /* -- Admin Content (List + Detail) -- */
@@ -919,7 +972,7 @@ html, body, #app {
     width: 450px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     padding: 20px;
     align-self: flex-start;
     position: sticky;
@@ -1050,7 +1103,7 @@ html, body, #app {
     margin-top: 14px;
     padding: 10px 14px;
     background: var(--bg-tertiary);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     border: 1px dashed var(--border);
 }
 
@@ -1076,7 +1129,7 @@ html, body, #app {
 .detail-share-icon {
     width: 40px;
     height: 40px;
-    border-radius: 10px;
+    border-radius: var(--radius-surface);
     background: var(--accent-subtle);
     display: flex;
     align-items: center;
@@ -1186,7 +1239,7 @@ html, body, #app {
 .info-card {
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: var(--radius-surface);
     padding: 2px 14px;
     margin-top: 4px;
 }
@@ -1231,7 +1284,7 @@ html, body, #app {
     font-weight: 700;
     color: var(--accent);
     background: var(--accent-subtle);
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     padding: 2px 7px;
 }
 
@@ -1240,7 +1293,7 @@ html, body, #app {
 .usage-bar {
     width: 100%;
     height: 12px;
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
     overflow: hidden;
@@ -1249,7 +1302,7 @@ html, body, #app {
 .usage-bar-fill {
     height: 100%;
     background: var(--accent);
-    border-radius: 7px 0 0 7px;
+    border-radius: var(--radius-surface) 0 0 var(--radius-surface);
     transition: width 0.35s ease;
 }
 
@@ -1262,7 +1315,7 @@ html, body, #app {
 .detail-card {
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: var(--radius-surface);
     padding: 4px 0;
     margin-bottom: 12px;
 }
@@ -1313,7 +1366,7 @@ html, body, #app {
     font-size: 12px;
     background: var(--bg-secondary);
     padding: 8px 12px;
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     border: 1px solid var(--border);
     display: block;
     word-break: break-all;
@@ -1368,7 +1421,7 @@ html, body, #app {
     padding: 9px 12px;
     background: var(--bg-primary);
     border: 1px solid var(--border-strong, var(--border));
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     cursor: pointer;
     transition: border-color 0.15s;
 }
@@ -1415,7 +1468,7 @@ html, body, #app {
     right: 0;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     box-shadow: var(--shadow-lg);
     z-index: 10;
     max-height: 200px;
@@ -1428,7 +1481,7 @@ html, body, #app {
     align-items: center;
     gap: 8px;
     padding: 7px 10px;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     cursor: pointer;
     font-size: 13px;
     color: var(--text-primary);
@@ -1472,10 +1525,10 @@ html, body, #app {
 .create-form-card {
     background: var(--bg-secondary);
     border: 2px solid var(--accent);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     padding: 20px;
     margin-bottom: 20px;
-    box-shadow: 0 0 0 3px var(--accent-subtle), var(--shadow);
+    box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 
     .create-form-card h3 {
@@ -1503,7 +1556,7 @@ html, body, #app {
     padding: 12px 14px;
     background: var(--danger-subtle);
     border: 1px solid var(--danger);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
 }
 
     .confirm-delete p {
@@ -1532,7 +1585,7 @@ html, body, #app {
 .modal-dialog {
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-modal);
     padding: 24px;
     min-width: 340px;
     max-width: 480px;
@@ -1563,7 +1616,7 @@ html, body, #app {
     width: 100%;
     padding: 9px 12px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     font-size: 13px;
     background: var(--bg-tertiary);
     color: var(--text-primary);
@@ -1581,7 +1634,7 @@ html, body, #app {
     margin-top: 8px;
     padding: 6px 10px;
     background: var(--danger-subtle);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     color: var(--danger);
     font-size: 12px;
 }
@@ -1609,7 +1662,7 @@ html, body, #app {
     min-width: 180px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: var(--radius-surface);
     padding: 4px;
     box-shadow: var(--shadow-lg);
     animation: scaleIn 0.12s ease-out;
@@ -1643,7 +1696,7 @@ html, body, #app {
     font-size: 13px;
     color: var(--text-primary);
     cursor: pointer;
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     transition: background 0.1s;
     text-align: left;
 }
@@ -1679,7 +1732,7 @@ html, body, #app {
     max-height: calc(100vh - 64px);
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-modal);
     box-shadow: var(--shadow-lg);
     animation: scaleIn 0.15s ease-out;
     overflow: hidden;
@@ -1821,7 +1874,7 @@ html, body, #app {
 .acl-panel {
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     padding: 16px;
     margin-bottom: 16px;
 }
@@ -1845,7 +1898,7 @@ html, body, #app {
 
 .acl-entry {
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     padding: 10px 12px;
     background: var(--bg-tertiary);
     transition: background 0.1s;
@@ -1920,7 +1973,7 @@ html, body, #app {
     text-transform: uppercase;
     letter-spacing: 0.04em;
     padding: 1px 6px;
-    border-radius: 3px;
+    border-radius: var(--radius-control);
     flex-shrink: 0;
 }
 
@@ -1977,7 +2030,7 @@ html, body, #app {
     margin-top: 12px;
     padding: 14px;
     border: 2px solid var(--accent);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     background: var(--bg-secondary);
     box-shadow: 0 0 0 3px var(--accent-subtle);
 }
@@ -2016,7 +2069,7 @@ html, body, #app {
     display: flex;
     gap: 2px;
     background: var(--bg-tertiary);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     padding: 2px;
 }
 
@@ -2028,7 +2081,7 @@ html, body, #app {
     color: var(--text-tertiary);
     font-size: 12px;
     font-weight: 600;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     cursor: pointer;
     transition: all 0.15s;
     text-align: center;
@@ -2042,7 +2095,6 @@ html, body, #app {
     .acl-type-tab.active {
         background: var(--bg-secondary);
         color: var(--accent);
-        box-shadow: var(--shadow);
     }
 
 .acl-tab--allow.active {
@@ -2068,7 +2120,7 @@ html, body, #app {
     color: var(--text-secondary);
     font-size: 11px;
     font-weight: 600;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     cursor: pointer;
     transition: all 0.15s;
 }
@@ -2181,7 +2233,7 @@ html, body, #app {
 
 ::-webkit-scrollbar-thumb {
     background: var(--border);
-    border-radius: 3px;
+    border-radius: var(--radius-control);
 }
 
     ::-webkit-scrollbar-thumb:hover {
@@ -2237,7 +2289,7 @@ html, body, #app {
     min-width: 22px;
     height: 22px;
     padding: 0 7px;
-    border-radius: 11px;
+    border-radius: var(--radius-surface);
     background: var(--accent);
     color: #fff;
     font-size: 0.8rem;
@@ -2250,7 +2302,7 @@ html, body, #app {
     height: 22px;
     padding: 0 6px;
     font-size: 0.75rem;
-    border-radius: 11px;
+    border-radius: var(--radius-surface);
 }
 
 /* -- File List Header -- */
@@ -2289,8 +2341,7 @@ html, body, #app {
     margin-bottom: 16px;
     background: var(--accent-subtle);
     border: 1px solid var(--accent);
-    border-radius: 8px;
-    box-shadow: var(--shadow);
+    border-radius: var(--radius-surface);
     animation: fadeIn 0.15s ease-out;
 }
 
@@ -2329,7 +2380,7 @@ html, body, #app {
     gap: 6px;
     padding: 8px 12px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     background: var(--bg-secondary);
     color: var(--text-primary);
     font-size: 12px;
@@ -2430,7 +2481,7 @@ html, body, #app {
 .file-list-header .file-cell.col-drop-target {
     box-shadow: inset 3px 0 0 0 var(--accent);
     background: var(--accent-subtle);
-    border-radius: 2px;
+    border-radius: var(--radius-control);
 }
 
 .drag-handle {
@@ -2448,7 +2499,7 @@ html, body, #app {
 
 .user-list-container {
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     overflow: hidden;
     background: var(--bg-secondary);
     display: flex;
@@ -2565,7 +2616,7 @@ html, body, #app {
     padding: 5px 10px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border-light);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     min-height: 28px;
 }
 
@@ -2620,7 +2671,7 @@ html, body, #app {
     cursor: pointer;
     inset: 0;
     background: var(--bg-active);
-    border-radius: 11px;
+    border-radius: var(--radius-surface);
     transition: background 0.2s;
 }
 
@@ -2662,7 +2713,7 @@ html, body, #app {
     color: var(--text-secondary);
     font-size: 11px;
     font-weight: 600;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     cursor: pointer;
     transition: all 0.15s;
 }
@@ -2694,7 +2745,7 @@ html, body, #app {
 .permission-group {
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     padding: 10px 14px;
 }
 
@@ -2755,7 +2806,7 @@ html, body, #app {
     color: var(--accent);
     font-size: 11px;
     font-weight: 600;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     border: 1px solid rgba(127, 172, 245, 0.2);
     white-space: nowrap;
 }
@@ -2783,7 +2834,7 @@ html, body, #app {
     padding: 8px 10px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     transition: background 0.1s;
 }
 
@@ -2832,7 +2883,7 @@ html, body, #app {
     display: flex;
     gap: 2px;
     background: var(--bg-tertiary);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     padding: 2px;
     border: 1px solid var(--border);
 }
@@ -2845,7 +2896,7 @@ html, body, #app {
     color: var(--text-tertiary);
     font-size: 12px;
     font-weight: 600;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     cursor: pointer;
     transition: all 0.15s;
     text-align: center;
@@ -2859,7 +2910,6 @@ html, body, #app {
 .toggle-btn--active {
     background: var(--bg-secondary);
     color: var(--accent);
-    box-shadow: var(--shadow);
 }
 
     .toggle-btn--active:hover {
@@ -2875,7 +2925,7 @@ html, body, #app {
     margin-top: 8px;
     padding: 14px;
     border: 2px solid var(--accent);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     background: var(--bg-secondary);
     box-shadow: 0 0 0 3px var(--accent-subtle);
     display: flex;
@@ -2894,7 +2944,7 @@ html, body, #app {
         padding: 9px 12px;
         background: var(--bg-primary);
         border: 1px solid var(--border-strong, var(--border));
-        border-radius: 6px;
+        border-radius: var(--radius-control);
         color: var(--text-primary);
         font-size: 14px;
         outline: none;
@@ -2922,7 +2972,7 @@ html, body, #app {
 
 .file-dragged-over {
     border: 2px dashed var(--accent) !important;
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
 }
 
 .file-dragged-over::after {
@@ -2932,7 +2982,7 @@ html, body, #app {
     background: var(--accent-subtle);
     backdrop-filter: blur(2px);
     z-index: 10;
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2975,7 +3025,7 @@ html, body, #app {
     width: 100%;
     height: 4px;
     background: var(--border, #333);
-    border-radius: 2px;
+    border-radius: var(--radius-control);
     overflow: hidden;
     order: 99; /* push to bottom row */
 }
@@ -2983,7 +3033,7 @@ html, body, #app {
 .toast-progress-bar-fill {
     height: 100%;
     background: #60a5fa;
-    border-radius: 2px;
+    border-radius: var(--radius-control);
     transition: width 0.15s ease;
 }
 
@@ -3003,7 +3053,7 @@ html, body, #app {
     align-items: center;
     gap: 0.625rem;
     padding: 0.75rem 1rem;
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     background: var(--surface, #1e1e2e);
     border: 1px solid var(--border, #333);
     color: var(--text-primary, #e0e0e0);
@@ -3035,7 +3085,7 @@ html, body, #app {
     color: var(--text-tertiary, #888);
     cursor: pointer;
     padding: 2px;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     display: flex;
 }
 
@@ -3077,7 +3127,7 @@ html, body, #app {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
 }
 .preview-header {
     display: flex;
@@ -3280,7 +3330,7 @@ html, body, #app {
     display: inline-block;
     padding: 2px 8px;
     font-size: 11px;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     background: var(--surface-secondary, rgba(128, 128, 128, 0.1));
     color: var(--text-secondary);
     border: 1px solid var(--border-subtle, rgba(128, 128, 128, 0.15));
@@ -3344,7 +3394,7 @@ html, body, #app {
     gap: 10px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     padding: 8px 14px;
     flex: 1;
     min-width: 0;
@@ -3357,7 +3407,7 @@ html, body, #app {
 }
 
 .search-bar.has-results:focus-within {
-    border-radius: 8px 8px 0 0;
+    border-radius: var(--radius-surface) var(--radius-surface) 0 0;
 }
 
 .search-bar svg {
@@ -3391,7 +3441,7 @@ html, body, #app {
     color: var(--text-secondary);
     cursor: pointer;
     padding: 2px 6px;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     font-size: 0.8rem;
     line-height: 1;
     transition: background 0.15s ease, color 0.15s ease;
@@ -3435,7 +3485,7 @@ html, body, #app {
     background: var(--bg-secondary);
     border: 1px solid var(--accent);
     border-top: 1px solid var(--border);
-    border-radius: 0 0 8px 8px;
+    border-radius: 0 0 var(--radius-surface) var(--radius-surface);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
     max-height: 360px;
     overflow-y: auto;
@@ -3528,7 +3578,7 @@ html, body, #app {
 .search-result-snippet mark {
     background: rgba(var(--accent-rgb), 0.25);
     color: var(--text-primary);
-    border-radius: 2px;
+    border-radius: var(--radius-control);
     padding: 0 2px;
 }
 
@@ -3555,7 +3605,7 @@ html, body, #app {
     gap: 7px;
     padding: 8px 11px;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-surface);
     background: var(--bg-secondary);
     color: var(--text-secondary);
     font: inherit;
@@ -3576,7 +3626,7 @@ html, body, #app {
     align-items: center;
     justify-content: center;
     padding: 0 5px;
-    border-radius: 10px;
+    border-radius: var(--radius-surface);
     background: var(--accent);
     color: #fff;
     font-size: 11px;
@@ -3590,7 +3640,7 @@ html, body, #app {
     width: min(390px, calc(100vw - 32px));
     overflow: hidden;
     border: 1px solid var(--border-strong);
-    border-radius: 9px;
+    border-radius: var(--radius-surface);
     background: var(--bg-secondary);
     box-shadow: var(--shadow-lg);
 }
@@ -3673,7 +3723,7 @@ html, body, #app {
     align-items: center;
     justify-content: center;
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     background: transparent;
     color: var(--text-secondary);
     cursor: pointer;
@@ -3694,7 +3744,7 @@ html, body, #app {
     height: 5px;
     overflow: hidden;
     margin: 10px 0 6px;
-    border-radius: 3px;
+    border-radius: var(--radius-control);
     background: var(--bg-sunken);
 }
 
@@ -3716,7 +3766,7 @@ html, body, #app {
    ══════════════════════════════════════════════════════════ */
 
 .page-header h1 {
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: var(--font-heading);
     font-size: 21px;
     font-weight: 700;
     letter-spacing: -0.025em;
@@ -3729,7 +3779,7 @@ html, body, #app {
 .btn-danger-outline,
 .btn-icon,
 .btn-icon--small {
-    border-radius: 5px;
+    border-radius: var(--radius-control);
 }
 
 .btn-icon:hover,
@@ -3766,7 +3816,7 @@ html, body, #app {
 textarea {
     min-height: 36px;
     border: 1px solid var(--border-strong);
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     background-color: var(--bg-secondary);
     color: var(--text-primary);
     font-size: 13px;
@@ -3821,7 +3871,7 @@ input[type="radio"] {
 
 .error-banner,
 .success-banner {
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     font-weight: 550;
 }
 
@@ -3833,7 +3883,7 @@ input[type="radio"] {
 .empty-state {
     min-height: 220px;
     border: 1px dashed var(--border-strong);
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     background: var(--bg-sunken);
 }
 
@@ -3845,7 +3895,7 @@ input[type="radio"] {
 .create-share-form,
 .create-form-card {
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     background: var(--bg-tertiary);
     box-shadow: none;
 }
@@ -3855,12 +3905,12 @@ input[type="radio"] {
 }
 
 .admin-detail {
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     box-shadow: none;
 }
 
 .detail-header h3 {
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: var(--font-heading);
     font-size: 18px;
     font-weight: 700;
     letter-spacing: -0.015em;
@@ -3874,7 +3924,7 @@ input[type="radio"] {
 .detail-card,
 .info-card {
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     background: var(--bg-tertiary);
 }
 
@@ -3884,7 +3934,7 @@ input[type="radio"] {
 
 .multi-select-dropdown {
     border-color: var(--border-strong);
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     background: var(--bg-secondary);
     box-shadow: var(--shadow-lg);
 }
@@ -3911,7 +3961,7 @@ input[type="radio"] {
 .properties-dialog,
 .preview-dialog {
     border: 1px solid var(--border-strong);
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     background: var(--bg-secondary);
     box-shadow: var(--shadow-lg);
 }
@@ -3919,19 +3969,19 @@ input[type="radio"] {
 .modal-title,
 .properties-header-name,
 .preview-title {
-    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-family: var(--font-heading);
     letter-spacing: -0.015em;
 }
 
 .context-menu {
     border-color: var(--border-strong);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     background: var(--bg-secondary);
     box-shadow: var(--shadow-lg);
 }
 
 .context-menu-item {
-    border-radius: 4px;
+    border-radius: var(--radius-control);
 }
 
 .context-menu-item:hover {
@@ -3949,14 +3999,14 @@ input[type="radio"] {
 
 .acl-panel {
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     background: var(--bg-tertiary);
     box-shadow: none;
 }
 
 .acl-entry {
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     background: var(--bg-secondary);
     box-shadow: none;
 }
@@ -3975,7 +4025,7 @@ input[type="radio"] {
 
 .acl-add-form {
     border-color: var(--border-strong);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     background: var(--bg-secondary);
     box-shadow: none;
 }
@@ -3983,12 +4033,12 @@ input[type="radio"] {
 .acl-type-tabs {
     padding: 2px;
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     background: var(--bg-tertiary);
 }
 
 .acl-type-tab {
-    border-radius: 4px;
+    border-radius: var(--radius-control);
 }
 
 .acl-type-tab.active {
@@ -4019,7 +4069,7 @@ input[type="radio"] {
 .preset-chip,
 .permission-tag,
 .info-badge {
-    border-radius: 4px;
+    border-radius: var(--radius-control);
 }
 
 .acl-shortcut--active,
@@ -4033,7 +4083,7 @@ input[type="radio"] {
     min-height: 34px;
     padding: 6px 9px;
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     background: var(--bg-secondary);
 }
 
@@ -4047,7 +4097,7 @@ input[type="radio"] {
 
 .toast {
     border-color: var(--border-strong);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     background: var(--bg-tertiary);
     box-shadow: var(--shadow-lg);
 }
@@ -4125,7 +4175,7 @@ input[type="radio"] {
     min-width: 0;
     overflow: hidden;
     border: 1px solid var(--border);
-    border-radius: 7px;
+    border-radius: var(--radius-surface);
     background: var(--bg-secondary);
 }
 
@@ -4258,7 +4308,7 @@ input[type="radio"] {
     margin-bottom: 16px;
     padding: 10px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     background: var(--bg-tertiary);
 }
 
@@ -4362,7 +4412,7 @@ input[type="radio"] {
     gap: 2px;
     padding: 2px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-control);
     background: var(--bg-sunken);
 }
 
@@ -4373,7 +4423,7 @@ input[type="radio"] {
     gap: 5px;
     padding: 4px 9px;
     border: 1px solid transparent;
-    border-radius: 4px;
+    border-radius: var(--radius-control);
     background: transparent;
     color: var(--text-tertiary);
     font: inherit;
@@ -4481,7 +4531,7 @@ input[type="radio"] {
     min-height: 17px;
     padding: 0;
     border: 1px solid var(--border-strong);
-    border-radius: 3px;
+    border-radius: var(--radius-control);
     background: var(--bg-sunken);
     cursor: pointer;
     touch-action: none;
@@ -4514,7 +4564,7 @@ input[type="radio"] {
 
 .cloud-schedule-scroll--paint-select .cloud-schedule-slot--range-preview {
     border-color: var(--accent);
-    border-radius: 2px;
+    border-radius: var(--radius-control);
     background: color-mix(in srgb, var(--accent) 48%, var(--bg-sunken));
     box-shadow: inset 0 0 0 1px color-mix(in srgb, white 22%, transparent);
     transform: none;
@@ -4522,7 +4572,7 @@ input[type="radio"] {
 
 .cloud-schedule-scroll--paint-deselect .cloud-schedule-slot--range-preview {
     border-color: var(--danger);
-    border-radius: 2px;
+    border-radius: var(--radius-control);
     background: color-mix(in srgb, var(--danger) 42%, var(--bg-sunken));
     box-shadow: inset 0 0 0 1px color-mix(in srgb, white 18%, transparent);
     transform: none;
@@ -4596,7 +4646,7 @@ input[type="radio"] {
     overflow: hidden;
     padding: 8px 10px;
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     background: var(--bg-sunken);
     color: var(--text-secondary);
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
@@ -4614,7 +4664,7 @@ input[type="radio"] {
     max-height: 340px;
     overflow-y: auto;
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     background: var(--bg-sunken);
 }
 
