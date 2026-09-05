@@ -27,8 +27,7 @@
         if (VM.SelectedShare is null)
             return;
 
-        Navigation.NavigateTo(
-            $"/sync?targetShare={Uri.EscapeDataString(VM.SelectedShare.Id.ToString())}&targetPath=");
+        Navigation.NavigateTo("/external-storage?tab=syncs");
     }
 
     private static string Text(string key, string fallback)

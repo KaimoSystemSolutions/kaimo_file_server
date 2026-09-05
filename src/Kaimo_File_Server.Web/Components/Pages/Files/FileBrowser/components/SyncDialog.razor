@@ -2,15 +2,15 @@
 
 @code {
     /// <summary>
-    /// Opens the central cloud-sync workspace with the current folder preselected.
+    /// Opens the central external-storage workspace on the Syncs tab.
     /// Keeping this compatibility component means file-browser callers do not
-    /// need to know how the cloud administration page is routed.
+    /// need to know how the storage administration page is routed. The
+    /// share/folder parameters are retained for source compatibility with
+    /// existing callers even though the unified page selects the sync manually.
     /// </summary>
     public Task Open(Guid shareId, string folderPath)
     {
-        Navigation.NavigateTo(
-            $"/sync?targetShare={Uri.EscapeDataString(shareId.ToString())}" +
-            $"&targetPath={Uri.EscapeDataString(folderPath ?? string.Empty)}");
+        Navigation.NavigateTo("/external-storage?tab=syncs");
         return Task.CompletedTask;
     }
 }
