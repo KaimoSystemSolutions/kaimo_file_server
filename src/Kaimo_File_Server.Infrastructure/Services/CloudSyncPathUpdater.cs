@@ -25,9 +25,23 @@ public sealed class CloudSyncPathUpdater(
             return;
 
         await using var db = await dbFactory.CreateDbContextAsync();
-        var share = await db.ShareDefinitions.FindAsync(shareId);
+
+        // Keep BOTH the legacy CloudSettings.Folders map and the first-class
+        // SyncDefinition rows aligned. A share may have only first-class syncs, so
+        // neither update may short-circuit the other.
+        bool changed = UpdateLegacyFolders(
+            await db.ShareDefinitions.FindAsync(shareId), oldPath, newPath);
+        changed |= await UpdateSyncDefinitionsAsync(db, shareId, oldPath, newPath);
+
+        if (changed)
+            await db.SaveChangesAsync();
+    }
+
+    private static bool UpdateLegacyFolders(
+        ShareDefinition? share, string oldPath, string newPath)
+    {
         if (share?.CloudSettings?.Folders is not { Count: > 0 } folders)
-            return;
+            return false;
 
         var affected = folders.Keys
             .Where(path => IsSameOrDescendant(oldPath, path))
@@ -40,7 +54,7 @@ public sealed class CloudSyncPathUpdater(
             .ToList();
 
         if (affected.Count == 0)
-            return;
+            return false;
 
         var affectedKeys = affected
             .Select(item => item.OldPath)
@@ -68,7 +82,59 @@ public sealed class CloudSyncPathUpdater(
 
         // Assign a new value so EF detects the converted JSON property change.
         share.CloudSettings = new CloudSettings(updated);
-        await db.SaveChangesAsync();
+        return true;
+    }
+
+    private static async Task<bool> UpdateSyncDefinitionsAsync(
+        ApplicationDbContext db, Guid shareId, string oldPath, string newPath)
+    {
+        // Ignore tombstones left by the first-class editor; they are bookkeeping,
+        // not live syncs, and never need to follow a filesystem rename.
+        var definitions = await db.SyncDefinitions
+            .Where(definition => definition.LocalShareId == shareId
+                && definition.MigrationSource != SyncDefinition.DeletedByFirstClassEditorSource)
+            .ToListAsync();
+
+        var affected = definitions
+            .Where(definition => IsSameOrDescendant(
+                oldPath, ShareRelativePath.Normalize(definition.LocalPath)))
+            .Select(definition => new
+            {
+                Definition = definition,
+                NewPath = ReplacePrefix(
+                    oldPath, newPath, ShareRelativePath.Normalize(definition.LocalPath))
+            })
+            .ToList();
+
+        if (affected.Count == 0)
+            return false;
+
+        var movedIds = affected.Select(item => item.Definition.Id).ToHashSet();
+        foreach (var item in affected)
+        {
+            // Guard the unique (LocalShareId, LocalPath) index against colliding
+            // with a definition that is not itself being moved.
+            bool conflicts = definitions.Any(other =>
+                !movedIds.Contains(other.Id) &&
+                string.Equals(
+                    ShareRelativePath.Normalize(other.LocalPath), item.NewPath,
+                    StringComparison.OrdinalIgnoreCase));
+            if (conflicts)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot move cloud-sync path " +
+                    $"'{ShareRelativePath.Normalize(item.Definition.LocalPath)}' to " +
+                    $"'{item.NewPath}' because that path is already configured.");
+            }
+        }
+
+        foreach (var item in affected)
+        {
+            item.Definition.LocalPath = item.NewPath;
+            item.Definition.UpdatedAtUtc = DateTime.UtcNow;
+        }
+
+        return true;
     }
 
     private static bool IsSameOrDescendant(string ancestor, string candidate)
