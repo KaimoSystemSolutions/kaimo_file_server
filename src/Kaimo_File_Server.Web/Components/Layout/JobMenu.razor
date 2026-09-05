@@ -1,8 +1,10 @@
 @using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Infrastructure.Clouds
 @using Kaimo_File_Server.Search
 @using Kaimo_File_Server.Web.DynamicHelpers
 @implements IDisposable
 @inject JobService JobService
+@inject ICloudSyncJobRunner SyncJobRunner
 @inject ISearchAdminService SearchAdmin
 @inherits AppComponentBase
 
@@ -89,6 +91,37 @@
                             </div>
                         </article>
                     }
+                    @* Server-side cloud syncs (manual + scheduled) run off the UI
+                       circuit in the singleton runner, so they survive navigation
+                       and appear for every session. *@
+                    @foreach (var job in SyncJobRunner.Jobs)
+                    {
+                        <article class="job-menu-item">
+                            <div class="job-menu-item-heading">
+                                <div>
+                                    <strong>@job.Title</strong>
+                                    <small>@job.Detail</small>
+                                </div>
+                                <button class="job-cancel"
+                                        type="button"
+                                        disabled="@job.IsCancellationRequested"
+                                        title="@Text("Web_Jobs_Cancel", "Cancel job")"
+                                        aria-label="@Text("Web_Jobs_Cancel", "Cancel job")"
+                                        @onclick="() => SyncJobRunner.Cancel(job.Id)">
+                                    @Assets.SVG("close.svg", new SvgOptions(Width: 13, Height: 13, StrokeWidth: 2))
+                                </button>
+                            </div>
+                            <div class="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@job.Progress">
+                                <div class="job-progress-fill" style="width: @(job.Progress)%"></div>
+                            </div>
+                            <div class="job-menu-meta">
+                                <span>@(job.IsCancellationRequested
+                                    ? Text("Web_Jobs_Cancelling", "Cancelling…")
+                                    : $"{job.Progress}%")</span>
+                                <span>@job.StartedAt.ToLocalTime().ToString("t")</span>
+                            </div>
+                        </article>
+                    }
                 </div>
             }
         </section>
@@ -117,11 +150,12 @@
     private string ReindexScopeLabel => string.IsNullOrEmpty(_reindex.ShareName)
         ? Text("Web_Settings_Search_ReindexAllShares", "All shares")
         : _reindex.ShareName!;
-    private int TotalCount => JobService.Jobs.Count + (ReindexRunning ? 1 : 0);
+    private int TotalCount => JobService.Jobs.Count + SyncJobRunner.Jobs.Count + (ReindexRunning ? 1 : 0);
 
     protected override void OnInitialized()
     {
         JobService.OnChanged += HandleChanged;
+        SyncJobRunner.OnChanged += HandleChanged;
         _reindex = SearchAdmin.GetReindexProgress();
         _reindexSig = (_reindex.Running, _reindex.Done, _reindex.Total);
 
@@ -159,6 +193,7 @@
     public void Dispose()
     {
         JobService.OnChanged -= HandleChanged;
+        SyncJobRunner.OnChanged -= HandleChanged;
         if (_pollTimer is not null)
         {
             _pollTimer.Elapsed -= PollReindex;

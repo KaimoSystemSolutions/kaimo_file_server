@@ -1,3 +1,4 @@
+using System.Net;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
@@ -157,16 +158,10 @@ public sealed class CloudSyncExecutionService(
             }
             catch (Exception exception)
             {
-                string errorCode = exception switch
-                {
-                    RemoteStorageAccessDeniedException => "remote_access_denied",
-                    ProviderRequestException providerError => providerError.ErrorCode,
-                    _ => "sync_failed"
-                };
                 await syncDefinitions.MarkFailedAsync(
                     definition.Id,
                     DateTime.UtcNow,
-                    errorCode,
+                    ClassifyError(exception),
                     cancellationToken);
                 throw;
             }
@@ -265,10 +260,10 @@ public sealed class CloudSyncExecutionService(
         {
             throw;
         }
-        catch
+        catch (Exception exception)
         {
             await syncDefinitions.MarkFailedAsync(
-                definition.Id, DateTime.UtcNow, "sync_failed", cancellationToken);
+                definition.Id, DateTime.UtcNow, ClassifyError(exception), cancellationToken);
             throw;
         }
         finally
@@ -285,6 +280,28 @@ public sealed class CloudSyncExecutionService(
             completedAtUtc,
             new Dictionary<string, string>());
     }
+
+    /// <summary>
+    /// Maps a sync failure to a stable, explicit error code persisted as
+    /// <c>LastErrorCode</c> and rendered as a localized message. It distinguishes
+    /// the causes the operator most needs to tell apart — a removed local folder,
+    /// a removed remote folder, a broken connection, and denied access — instead
+    /// of collapsing everything into a single opaque "sync_failed".
+    /// </summary>
+    internal static string ClassifyError(Exception exception) => exception switch
+    {
+        SyncDirectoryMissingException { Endpoint: SyncEndpoint.Local } => "local_path_missing",
+        SyncDirectoryMissingException => "remote_path_missing",
+        DirectoryNotFoundException => "local_path_missing",
+        RemoteStorageAccessDeniedException => "remote_access_denied",
+        ProviderRequestException { StatusCode: HttpStatusCode.NotFound } => "remote_path_missing",
+        ProviderRequestException providerError => providerError.ErrorCode,
+        HttpRequestException => "connection_failed",
+        System.Net.Sockets.SocketException => "connection_failed",
+        TimeoutException => "connection_failed",
+        IOException => "connection_failed",
+        _ => "sync_failed"
+    };
 
     private static string NormalizeRemotePath(string? path)
     {

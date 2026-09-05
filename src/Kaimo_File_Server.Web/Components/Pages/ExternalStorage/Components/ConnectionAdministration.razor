@@ -163,7 +163,7 @@ else
                     </div>
                     @if (!string.IsNullOrWhiteSpace(_selected.LastErrorCode))
                     {
-                        <div class="error-banner">@R("Web_ExternalStorage_AttentionRequired") (@_selected.LastErrorCode)</div>
+                        <div class="error-banner">@ErrorMessage(_selected.LastErrorCode)</div>
                     }
                     <div class="detail-actions connection-actions">
                         @if (VM.CanManageConnections)
@@ -450,6 +450,14 @@ else
     };
     private static string FormatDate(DateTime? value) => value?.ToLocalTime().ToString("g") ?? R("Web_CloudSync_Never");
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+
+    // Explicit, localized message for a persisted connection error code, with a
+    // generic "attention required (code)" fallback for unmapped provider codes.
+    private static string ErrorMessage(string code)
+        => Resources.ResourceManager.GetString($"Web_ExternalStorage_ErrorCode_{code}")
+           ?? string.Format(
+               Resources.ResourceManager.GetString("Web_ExternalStorage_ErrorCode_Unknown")
+               ?? "Attention required ({0})", code);
 
     private RsyncSshHostKeyCandidate? SelectedHostKey => _hostKeyCandidates.FirstOrDefault(
         candidate => candidate.FingerprintSha256 == _selectedHostFingerprint);

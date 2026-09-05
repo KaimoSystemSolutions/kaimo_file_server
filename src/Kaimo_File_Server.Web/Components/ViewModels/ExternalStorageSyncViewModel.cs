@@ -27,7 +27,7 @@ public sealed class ExternalStorageSyncViewModel(
     IUserContextFactory userContextFactory,
     AuthenticationStateProvider authenticationState,
     IFileServiceFactory fileServices,
-    ICloudSyncExecutionService executionService,
+    ICloudSyncJobRunner syncJobRunner,
     IStorageConnectionProviderCatalog providerCatalog,
     IStorageDirectoryTargetResolver directoryTargets,
     ICloudSyncOperationCoordinator syncOperations,
@@ -201,27 +201,31 @@ public sealed class ExternalStorageSyncViewModel(
         await LoadAsync();
     }
 
-    public async Task RunAsync(Guid id, Action<string?, int>? reportProgress = null)
+    /// <summary>
+    /// Queues a manual sync as a background job and returns immediately. The sync
+    /// runs off the UI circuit (so a long or hanging sync never freezes the web
+    /// UI) and shows up in the Running Jobs menu; the caller reloads the list when
+    /// the job reports completion via <see cref="ICloudSyncJobRunner.OnChanged"/>.
+    /// </summary>
+    public async Task<Guid> RunAsync(Guid id)
     {
         await EnsureActorAsync();
         var definition = await syncDefinitions.GetAsync(id)
                          ?? throw new InvalidOperationException(Text(
                              "Web_ExternalStorage_SyncMissing", "The sync no longer exists."));
         await GetAuthorizedShareAsync(definition.LocalShareId, ManagementPermission.SyncManually);
-        IsBusy = true;
-        try
-        {
-            var result = await executionService.RunAsync(
-                definition.LocalShareId, definition.LocalPath, _actor!, reportProgress);
-            if (result != CloudSyncExecutionResult.Completed)
-                throw new InvalidOperationException(Text(
-                    "Web_ExternalStorage_SyncUnavailable", "The sync is busy or unavailable."));
-            await LoadAsync();
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+
+        string title = string.Format(
+            Text("Web_Jobs_CloudSync_Title", "Cloud sync: {0}"),
+            string.IsNullOrWhiteSpace(definition.DisplayName)
+                ? definition.LocalPath
+                : definition.DisplayName);
+        return syncJobRunner.Enqueue(
+            definition.LocalShareId,
+            definition.LocalPath,
+            _actor!.User.Id,
+            title,
+            $"{definition.LocalPath} ↔ {definition.RemotePath}");
     }
 
     /// <summary>

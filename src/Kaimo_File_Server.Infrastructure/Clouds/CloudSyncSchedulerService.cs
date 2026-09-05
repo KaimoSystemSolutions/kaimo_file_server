@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,6 +57,7 @@ public sealed class CloudSyncSchedulerService(
     IServiceScopeFactory scopeFactory,
     TimeProvider timeProvider,
     CloudSyncSchedulerSignal signal,
+    ICloudSyncJobRunner jobRunner,
     ILogger<CloudSyncSchedulerService> logger) : BackgroundService
 {
     private static readonly TimeSpan IdleInterval = TimeSpan.FromSeconds(
@@ -87,7 +89,6 @@ public sealed class CloudSyncSchedulerService(
         using var scope = scopeFactory.CreateScope();
         var syncDefinitions = scope.ServiceProvider.GetRequiredService<ISyncDefinitionRepository>();
         var legacyMigration = scope.ServiceProvider.GetRequiredService<ILegacyCloudSyncMigrationService>();
-        var execution = scope.ServiceProvider.GetRequiredService<ICloudSyncExecutionService>();
         var users = scope.ServiceProvider.GetRequiredService<IUserContextFactory>();
         var actors = new Dictionary<Guid, UserContext?>();
 
@@ -145,31 +146,19 @@ public sealed class CloudSyncSchedulerService(
                     continue;
                 }
 
-                try
-                {
-                    CloudSyncExecutionResult result = await execution.RunAsync(
-                        definition.LocalShareId,
-                        localPath,
-                        actor,
-                        cancellationToken: cancellationToken);
-                    if (result == CloudSyncExecutionResult.Completed)
-                    {
-                        logger.LogInformation(
-                            "Scheduled cloud sync completed for {ShareId}/{LocalPath}.",
-                            definition.LocalShareId, localPath);
-                    }
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(
-                        ex,
-                        "Scheduled cloud sync failed for {ShareId}/{LocalPath}.",
-                        definition.LocalShareId, localPath);
-                }
+                // Hand execution to the shared background runner so scheduled and
+                // manual syncs run through the same off-thread path and both show
+                // up in the Running Jobs menu. The runner dedupes an already
+                // queued/running sync for this share+path.
+                string title = string.Format(
+                    Resources.ResourceManager.GetString("Web_Jobs_CloudSync_Title") ?? "Cloud sync: {0}",
+                    string.IsNullOrWhiteSpace(definition.DisplayName) ? localPath : definition.DisplayName);
+                jobRunner.Enqueue(
+                    definition.LocalShareId,
+                    localPath,
+                    runAsUserId.Value,
+                    title,
+                    $"{localPath} ↔ {definition.RemotePath}");
         }
 
         foreach (ScheduleKey staleKey in _lastEvaluations.Keys

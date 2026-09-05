@@ -2,6 +2,7 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Core.Services.DataServices
 @using Kaimo_File_Server.Core.Services.ExternalStorage
+@using Kaimo_File_Server.Infrastructure.Clouds
 @using Kaimo_File_Server.Web.Components.Pages.CloudSync.Components
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
@@ -9,6 +10,7 @@
 @using System.Globalization
 @implements IAsyncDisposable
 @inject ExternalStorageSyncViewModel VM
+@inject ICloudSyncJobRunner SyncJobRunner
 @inject IJSRuntime JS
 @inherits AppComponentBase
 
@@ -230,7 +232,7 @@ else
                 <button class="btn-secondary" type="button" disabled="@(_busy || !selected.Definition.Enabled)" @onclick="() => RunAsync(selected)">@R("Web_ExternalStorage_RunNow")</button>
                 @if (_runSucceeded)
                 {
-                    <span class="sync-run-success"><span class="sync-run-health"></span>@R("Web_ExternalStorage_SyncSuccessful")</span>
+                    <span class="sync-run-success"><span class="sync-run-health"></span>@R("Web_ExternalStorage_SyncStarted")</span>
                 }
             </div>
             <div class="sync-detail-grid">
@@ -247,7 +249,7 @@ else
                 <section class="sync-detail-group">
                     <h4>@R("Web_ExternalStorage_Health")</h4>
                     <dl>
-                        <dt>@R("Web_ExternalStorage_State")</dt><dd>@SyncState(selected)</dd>
+                        <dt>@R("Web_ExternalStorage_State")</dt><dd><StatusBadge Tone="@SyncStateTone(selected)" Label="@SyncState(selected)" /></dd>
                         <dt>@R("Web_CloudSync_Schedule")</dt><dd>@(selected.Definition.Schedule.IsEnabled ? R("Web_ExternalStorage_ScheduleEnabled") : R("Web_ExternalStorage_Disabled"))</dd>
                         <dt>@R("Web_ExternalStorage_LastRun")</dt><dd>@FormatDate(selected.Runtime?.LastRunAtUtc)</dd>
                     </dl>
@@ -262,7 +264,7 @@ else
             </div>
             @if (!string.IsNullOrWhiteSpace(selected.Runtime?.LastErrorCode))
             {
-                <div class="error-banner">@R("Web_ExternalStorage_AttentionRequired") (@selected.Runtime!.LastErrorCode)</div>
+                <div class="error-banner">@ErrorMessage(selected.Runtime!.LastErrorCode)</div>
             }
             <div class="detail-actions sync-summary-actions">
                 <button class="btn-secondary sync-edit-action" type="button" disabled="@_busy" @onclick="() => StartEdit(selected)">@R("Web_CloudAccess_Edit")</button>
@@ -545,8 +547,38 @@ else
         => !item.Definition.Enabled ? StatusTone.Neutral
             : string.IsNullOrWhiteSpace(item.Runtime?.LastErrorCode) ? StatusTone.Positive : StatusTone.Warning;
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+
+    // Turns a persisted error code into an explicit, localized message. Falls back
+    // to a generic "attention required (code)" so an unmapped provider code is
+    // still legible for support instead of shown raw.
+    private static string ErrorMessage(string code)
+        => Resources.ResourceManager.GetString($"Web_ExternalStorage_ErrorCode_{code}")
+           ?? string.Format(
+               Resources.ResourceManager.GetString("Web_ExternalStorage_ErrorCode_Unknown")
+               ?? "Attention required ({0})", code);
+
+    protected override void OnInitialized()
+        => SyncJobRunner.OnChanged += HandleSyncJobsChanged;
+
+    // Reload the list when a background sync finishes so the row and detail health
+    // (and any new error message) reflect the outcome without a manual page reload.
+    private int _lastSyncJobCount;
+    private void HandleSyncJobsChanged()
+    {
+        int count = SyncJobRunner.Jobs.Count;
+        bool finished = count < _lastSyncJobCount;
+        _lastSyncJobCount = count;
+        _ = InvokeAsync(async () =>
+        {
+            if (finished)
+                await VM.LoadAsync();
+            StateHasChanged();
+        });
+    }
+
     public async ValueTask DisposeAsync()
     {
+        SyncJobRunner.OnChanged -= HandleSyncJobsChanged;
         if (_scheduleGrid.Context is not null)
         {
             try { await JS.InvokeVoidAsync("schedulePaint.dispose", _scheduleGrid); }

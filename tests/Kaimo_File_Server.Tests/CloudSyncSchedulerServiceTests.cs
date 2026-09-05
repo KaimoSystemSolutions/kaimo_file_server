@@ -82,35 +82,28 @@ public sealed class CloudSyncSchedulerServiceTests
         var users = new Mock<IUserContextFactory>();
         users.Setup(factory => factory.CreateByUserIdAsync(actor.User.Id))
             .ReturnsAsync(actor);
-        var execution = new Mock<ICloudSyncExecutionService>();
-        execution.Setup(service => service.RunAsync(
-                shareId,
-                "projects",
-                actor,
-                null,
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CloudSyncExecutionResult.Completed);
+        var jobRunner = new Mock<ICloudSyncJobRunner>();
 
         var services = new ServiceCollection();
         services.AddSingleton(definitions.Object);
         services.AddSingleton(migration.Object);
         services.AddSingleton(users.Object);
-        services.AddSingleton(execution.Object);
         await using ServiceProvider provider = services.BuildServiceProvider();
         var sut = new CloudSyncSchedulerService(
             provider.GetRequiredService<IServiceScopeFactory>(),
             time,
             new CloudSyncSchedulerSignal(),
+            jobRunner.Object,
             NullLogger<CloudSyncSchedulerService>.Instance);
 
         await sut.CheckNowAsync();
 
-        execution.Verify(service => service.RunAsync(
+        jobRunner.Verify(runner => runner.Enqueue(
             shareId,
             "projects",
-            actor,
-            null,
-            It.IsAny<CancellationToken>()), Times.Once);
+            actor.User.Id,
+            It.IsAny<string>(),
+            It.IsAny<string>()), Times.Once);
     }
 
     [Fact]
@@ -141,32 +134,31 @@ public sealed class CloudSyncSchedulerServiceTests
         var migration = new Mock<ILegacyCloudSyncMigrationService>();
         var users = new Mock<IUserContextFactory>();
         users.Setup(factory => factory.CreateByUserIdAsync(actor.User.Id)).ReturnsAsync(actor);
-        var execution = new Mock<ICloudSyncExecutionService>();
-        execution.Setup(service => service.RunAsync(
-                shareId, "projects", actor, null, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(CloudSyncExecutionResult.Completed);
+        var jobRunner = new Mock<ICloudSyncJobRunner>();
         var services = new ServiceCollection();
         services.AddSingleton(definitions.Object);
         services.AddSingleton(migration.Object);
         services.AddSingleton(users.Object);
-        services.AddSingleton(execution.Object);
         await using ServiceProvider provider = services.BuildServiceProvider();
         var sut = new CloudSyncSchedulerService(
             provider.GetRequiredService<IServiceScopeFactory>(),
             time,
             new CloudSyncSchedulerSignal(),
+            jobRunner.Object,
             NullLogger<CloudSyncSchedulerService>.Instance);
 
         Assert.Equal(TimeSpan.FromSeconds(15), await sut.CheckNowAsync());
         time.Advance(TimeSpan.FromSeconds(14));
         Assert.Equal(TimeSpan.FromSeconds(1), await sut.CheckNowAsync());
-        execution.Verify(service => service.RunAsync(
-            shareId, "projects", actor, null, It.IsAny<CancellationToken>()), Times.Once);
+        jobRunner.Verify(runner => runner.Enqueue(
+            shareId, "projects", actor.User.Id,
+            It.IsAny<string>(), It.IsAny<string>()), Times.Once);
 
         time.Advance(TimeSpan.FromSeconds(1));
         await sut.CheckNowAsync();
-        execution.Verify(service => service.RunAsync(
-            shareId, "projects", actor, null, It.IsAny<CancellationToken>()), Times.Exactly(2));
+        jobRunner.Verify(runner => runner.Enqueue(
+            shareId, "projects", actor.User.Id,
+            It.IsAny<string>(), It.IsAny<string>()), Times.Exactly(2));
     }
 
     [Fact]

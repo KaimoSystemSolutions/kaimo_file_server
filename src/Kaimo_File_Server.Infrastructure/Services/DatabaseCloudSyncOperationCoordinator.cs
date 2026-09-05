@@ -23,6 +23,14 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
         TimeSpan.FromMinutes(5);
     private static readonly TimeSpan RenewalInterval =
         TimeSpan.FromMinutes(1);
+    // Absolute ceiling on a renewable lease regardless of its heartbeat. If a sync
+    // is abandoned while its renewal loop keeps running (for example a disconnected
+    // circuit that never disposes the lease), the lease still expires after this so
+    // a wedged share recovers on its own instead of staying "busy or unavailable"
+    // until a full server restart.
+    // ponytail: 6h absolute cap; make it a config setting only if a real sync legitimately runs longer.
+    private static readonly TimeSpan MaxLeaseLifetime =
+        TimeSpan.FromHours(6);
 
     public async Task<ICloudSyncOperationLease?> TryBeginSyncAsync(
         Guid shareId,
@@ -68,6 +76,7 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
             throw new ArgumentOutOfRangeException(nameof(lifetime));
 
         Guid leaseId = Guid.NewGuid();
+        DateTimeOffset now = timeProvider.GetUtcNow();
         return await TryAcquireAsync(
             shareId,
             new LeasePayload(
@@ -75,7 +84,8 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
                 LeaseKind.ExternalPathMutation,
                 ShareRelativePath.Normalize(oldPath),
                 ShareRelativePath.Normalize(newPath),
-                timeProvider.GetUtcNow().Add(lifetime)),
+                now.Add(lifetime),
+                now),
             cancellationToken);
     }
 
@@ -112,6 +122,7 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
         CancellationToken cancellationToken)
     {
         Guid leaseId = Guid.NewGuid();
+        DateTimeOffset now = timeProvider.GetUtcNow();
         bool acquired = await TryAcquireAsync(
             shareId,
             new LeasePayload(
@@ -119,7 +130,8 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
                 kind,
                 oldPath,
                 newPath,
-                timeProvider.GetUtcNow().Add(RenewableLeaseLifetime)),
+                now.Add(RenewableLeaseLifetime),
+                now),
             cancellationToken);
         return acquired
             ? new DatabaseLease(this, shareId, leaseId)
@@ -141,12 +153,22 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
             var setting = await db.ConfigSettings.SingleOrDefaultAsync(
                 entry => entry.Key == key, cancellationToken);
             DateTimeOffset now = timeProvider.GetUtcNow();
-            if (setting is not null &&
-                TryParse(setting.Value, out var existing) &&
-                existing.ExpiresAt > now)
+            LeasePayload? existing =
+                setting is not null && TryParse(setting.Value, out var parsed)
+                    ? parsed
+                    : null;
+            // A lease past its absolute lifetime is treated as expired even if a
+            // leaked renewal loop keeps pushing ExpiresAt forward — this is what
+            // lets a wedged share recover on its own without a restart. A payload
+            // written before CreatedAt existed (default) keeps the old behavior.
+            bool leaseAlive = existing is not null &&
+                existing.ExpiresAt > now &&
+                !(existing.CreatedAt != default &&
+                  now >= existing.CreatedAt.Add(MaxLeaseLifetime));
+            if (leaseAlive)
             {
                 bool renewsSameExternalReservation =
-                    existing.Kind == LeaseKind.ExternalPathMutation &&
+                    existing!.Kind == LeaseKind.ExternalPathMutation &&
                     requested.Kind == LeaseKind.ExternalPathMutation &&
                     string.Equals(
                         existing.OldPath, requested.OldPath,
@@ -206,9 +228,19 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
             return;
 
         DateTimeOffset now = timeProvider.GetUtcNow();
+        // Never renew past the absolute cap, so a leaked heartbeat cannot keep a
+        // lease alive forever; once the cap passes the lease is left to expire.
+        DateTimeOffset renewedExpiry = now.Add(RenewableLeaseLifetime);
+        if (payload.CreatedAt != default)
+        {
+            DateTimeOffset cap = payload.CreatedAt.Add(MaxLeaseLifetime);
+            if (renewedExpiry > cap)
+                renewedExpiry = cap;
+        }
+
         setting.Value = JsonSerializer.Serialize(payload with
         {
-            ExpiresAt = now.Add(RenewableLeaseLifetime)
+            ExpiresAt = renewedExpiry
         });
         setting.UpdatedAt = now.UtcDateTime;
         await db.SaveChangesAsync(cancellationToken);
@@ -246,7 +278,10 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
         }
     }
 
-    private static string GetKey(Guid shareId) => $"{KeyPrefix}{shareId:N}";
+    internal static string GetKey(Guid shareId) => $"{KeyPrefix}{shareId:N}";
+
+    /// <summary>The absolute lifetime cap, exposed for coordinator tests.</summary>
+    internal static TimeSpan LeaseLifetimeCap => MaxLeaseLifetime;
 
     private sealed class DatabaseLease : ICloudSyncOperationLease
     {
@@ -299,7 +334,7 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
         }
     }
 
-    private enum LeaseKind
+    internal enum LeaseKind
     {
         Sync,
         PathMutation,
@@ -307,10 +342,11 @@ public sealed class DatabaseCloudSyncOperationCoordinator(
         ExternalPathMutation
     }
 
-    private sealed record LeasePayload(
+    internal sealed record LeasePayload(
         Guid LeaseId,
         LeaseKind Kind,
         string OldPath,
         string? NewPath,
-        DateTimeOffset ExpiresAt);
+        DateTimeOffset ExpiresAt,
+        DateTimeOffset CreatedAt = default);
 }

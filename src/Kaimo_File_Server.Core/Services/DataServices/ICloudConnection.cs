@@ -100,11 +100,15 @@ public interface ICloudConnection
         cancellationToken.ThrowIfCancellationRequested();
         long totalBytes = mode switch
         {
-            SyncMode.Push => await fileService.GetDirectorySizeAsync(localPath, user),
-            SyncMode.Pull => await GetDirectorySizeAsync(remotePath, cancellationToken),
+            SyncMode.Push => await Guard(SyncEndpoint.Local,
+                () => fileService.GetDirectorySizeAsync(localPath, user)),
+            SyncMode.Pull => await Guard(SyncEndpoint.Remote,
+                () => GetDirectorySizeAsync(remotePath, cancellationToken)),
             SyncMode.TwoWay => Math.Max(
-                await fileService.GetDirectorySizeAsync(localPath, user),
-                await GetDirectorySizeAsync(remotePath, cancellationToken)),
+                await Guard(SyncEndpoint.Local,
+                    () => fileService.GetDirectorySizeAsync(localPath, user)),
+                await Guard(SyncEndpoint.Remote,
+                    () => GetDirectorySizeAsync(remotePath, cancellationToken))),
             _ => 0
         };
 
@@ -144,7 +148,25 @@ public interface ICloudConnection
 
         return newManifest;
     }
-    
+
+    /// <summary>
+    /// Tags a "directory no longer exists" failure with the endpoint it came from
+    /// so the health surface can report a specific cause (local vs remote folder
+    /// removed) instead of a generic sync failure. Other exceptions propagate
+    /// unchanged.
+    /// </summary>
+    private static async Task<T> Guard<T>(SyncEndpoint endpoint, Func<Task<T>> call)
+    {
+        try
+        {
+            return await call();
+        }
+        catch (DirectoryNotFoundException exception)
+        {
+            throw new SyncDirectoryMissingException(endpoint, exception);
+        }
+    }
+
     /// <summary>
     /// Compares timestamps with a small tolerance because cloud providers often
     /// round modification times differently from the local file system.
@@ -187,10 +209,12 @@ public interface ICloudConnection
         )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var remoteItems = (await ListAsync(remoteDir, cancellationToken))
+        var remoteItems = (await Guard(SyncEndpoint.Remote,
+                () => ListAsync(remoteDir, cancellationToken)))
             .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
 
-        var localItems = (await fileService.ListAsync(localDir, user))
+        var localItems = (await Guard(SyncEndpoint.Local,
+                () => fileService.ListAsync(localDir, user)))
             .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -508,5 +532,27 @@ public interface ICloudConnection
             Report(text, percent);
         }
     }
-    
+
+}
+
+/// <summary>Which side of a sync a directory-missing failure came from.</summary>
+public enum SyncEndpoint
+{
+    Local,
+    Remote
+}
+
+/// <summary>
+/// A sync endpoint directory no longer exists. Carries which side failed so the
+/// health surface can show an explicit "local folder removed" / "remote folder
+/// removed" message instead of a generic sync failure.
+/// </summary>
+public sealed class SyncDirectoryMissingException(SyncEndpoint endpoint, Exception? innerException = null)
+    : Exception(
+        endpoint == SyncEndpoint.Local
+            ? "The local sync directory no longer exists."
+            : "The remote sync directory no longer exists.",
+        innerException)
+{
+    public SyncEndpoint Endpoint { get; } = endpoint;
 }

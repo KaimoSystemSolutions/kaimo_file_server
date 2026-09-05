@@ -3159,6 +3159,48 @@
   <data name="Web_ExternalStorage_AttentionRequired" xml:space="preserve">
     <value>Aktion erforderlich</value>
   </data>
+  <data name="Web_ExternalStorage_SyncStarted" xml:space="preserve">
+    <value>Synchronisierung gestartet</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_Unknown" xml:space="preserve">
+    <value>Aktion erforderlich ({0})</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_local_path_missing" xml:space="preserve">
+    <value>Der lokale Ordner ist nicht mehr vorhanden oder nicht zugänglich.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_remote_path_missing" xml:space="preserve">
+    <value>Der Remote-Ordner ist nicht mehr vorhanden oder nicht zugänglich.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_connection_failed" xml:space="preserve">
+    <value>Die Verbindung zum Speicheranbieter ist fehlgeschlagen.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_remote_access_denied" xml:space="preserve">
+    <value>Der Zugriff auf den Remote-Speicher wurde verweigert.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_sync_failed" xml:space="preserve">
+    <value>Die Synchronisierung ist fehlgeschlagen. Prüfen Sie das Serverprotokoll.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_invalid_grant" xml:space="preserve">
+    <value>Die Autorisierung ist abgelaufen. Verbinden Sie die Speicherverbindung erneut.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_invalid_token" xml:space="preserve">
+    <value>Das Zugriffstoken ist nicht mehr gültig. Verbinden Sie die Speicherverbindung erneut.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_interaction_required" xml:space="preserve">
+    <value>Eine erneute Anmeldung ist erforderlich. Verbinden Sie die Speicherverbindung erneut.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_access_denied" xml:space="preserve">
+    <value>Der Zugriff wurde vom Speicheranbieter verweigert.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_authorization_declined" xml:space="preserve">
+    <value>Die Autorisierungsanfrage wurde abgelehnt.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_slow_down" xml:space="preserve">
+    <value>Der Anbieter drosselt die Anfragen. Versuchen Sie es später erneut.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_temporarily_unavailable" xml:space="preserve">
+    <value>Der Speicheranbieter ist vorübergehend nicht verfügbar. Versuchen Sie es später erneut.</value>
+  </data>
   <data name="Web_ExternalStorage_RunNow" xml:space="preserve">
     <value>Jetzt ausführen</value>
   </data>

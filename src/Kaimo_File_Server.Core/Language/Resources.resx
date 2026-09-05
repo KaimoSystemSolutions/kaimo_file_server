@@ -3228,6 +3228,48 @@
   <data name="Web_ExternalStorage_AttentionRequired" xml:space="preserve">
     <value>Attention required</value>
   </data>
+  <data name="Web_ExternalStorage_SyncStarted" xml:space="preserve">
+    <value>Sync started</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_Unknown" xml:space="preserve">
+    <value>Attention required ({0})</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_local_path_missing" xml:space="preserve">
+    <value>The local folder no longer exists or cannot be accessed.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_remote_path_missing" xml:space="preserve">
+    <value>The remote folder no longer exists or cannot be accessed.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_connection_failed" xml:space="preserve">
+    <value>The connection to the storage provider failed.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_remote_access_denied" xml:space="preserve">
+    <value>Access to the remote storage was denied.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_sync_failed" xml:space="preserve">
+    <value>The sync failed. Check the server log for details.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_invalid_grant" xml:space="preserve">
+    <value>Authorization expired. Reconnect the storage connection.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_invalid_token" xml:space="preserve">
+    <value>The access token is no longer valid. Reconnect the storage connection.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_interaction_required" xml:space="preserve">
+    <value>Additional sign-in is required. Reconnect the storage connection.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_access_denied" xml:space="preserve">
+    <value>Access was denied by the storage provider.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_authorization_declined" xml:space="preserve">
+    <value>The authorization request was declined.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_slow_down" xml:space="preserve">
+    <value>The provider is rate-limiting requests. Try again later.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_temporarily_unavailable" xml:space="preserve">
+    <value>The storage provider is temporarily unavailable. Try again later.</value>
+  </data>
   <data name="Web_ExternalStorage_RunNow" xml:space="preserve">
     <value>Run now</value>
   </data>

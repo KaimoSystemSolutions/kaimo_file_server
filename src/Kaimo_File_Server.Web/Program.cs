@@ -291,6 +291,11 @@ builder.Services.AddSingleton<IHttpsCertificateProvider>(
     sp => sp.GetRequiredService<HttpsCertificateProvider>());
 
 builder.Services.AddSingleton<CloudSyncSchedulerSignal>();
+// One instance is both the job registry the UI reads and the background worker
+// that drains the queue, so manual and scheduled syncs share the same runner.
+builder.Services.AddSingleton<ICloudSyncJobRunner, CloudSyncJobRunner>();
+builder.Services.AddHostedService(sp =>
+    (CloudSyncJobRunner)sp.GetRequiredService<ICloudSyncJobRunner>());
 builder.Services.AddHostedService<CertificateRenewalService>();
 builder.Services.AddHostedService<CloudSyncSchedulerService>();
 
