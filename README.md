@@ -41,7 +41,7 @@ external storage integration, synchronization and custom storage management.
 
 ## How to run it
 
-Under /example you find more infos about it
+Under [/example](/example) you find more infos about it
 
 
 ## Why I built this
