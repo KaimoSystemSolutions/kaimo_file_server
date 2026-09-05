@@ -263,6 +263,50 @@
     width: auto;
 }
 
+/* The inline editor lives inside the detail aside (like the sync editor), so it
+   drops the standalone card framing and matches SyncAdministration's flat look:
+   no border/accent bar, full-bleed tabs, left-aligned actions. The create form
+   keeps the card styling above. Scoped under .connection-detail to override the
+   base .connection-editor rules. */
+.connection-editor--inline {
+    overflow: visible;
+    margin-bottom: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.connection-editor--inline .connection-editor-heading {
+    margin-bottom: 13px;
+    padding: 0;
+    background: transparent;
+}
+
+.connection-editor--inline .connection-editor-heading h3 { font-size: 18px; }
+
+.connection-editor--inline .connection-editor-heading p {
+    margin: 1px 0 0;
+    color: var(--text-tertiary);
+    font-size: 12px;
+}
+
+.connection-detail .connection-editor--inline ::deep .detail-tabs--panel {
+    margin: 0 -18px;
+    padding: 0 10px;
+}
+
+.connection-detail .connection-editor--inline .connection-tab-panel { padding: 17px 0 4px; }
+
+.connection-detail .connection-editor--inline .connection-form { gap: 12px; }
+.connection-detail .connection-editor--inline .connection-form label { gap: 5px; }
+
+.connection-detail .connection-editor--inline .detail-actions {
+    justify-content: flex-start;
+    margin: 14px 0 0;
+    padding: 0;
+}
+
 .connection-layout {
     display: grid;
     grid-template-columns: minmax(420px, 1fr) minmax(380px, 440px);
@@ -542,6 +586,9 @@
     overflow-wrap: anywhere;
 }
 
+.connection-detail-actions-top { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-bottom: 13px; }
+.connection-detail-actions-top > button { min-height: 32px; flex: 0 0 auto; width: auto; }
+
 .connection-actions {
     flex-direction: row;
     align-items: center;
@@ -549,6 +596,8 @@
     flex-wrap: wrap;
     gap: 7px;
     margin-top: 16px;
+    border-top: 0;
+    padding-top: 0;
 }
 
 .connection-actions > button {

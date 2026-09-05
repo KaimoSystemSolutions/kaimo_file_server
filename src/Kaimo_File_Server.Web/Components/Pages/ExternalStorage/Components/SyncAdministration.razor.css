@@ -60,7 +60,11 @@
 .sync-detail-group dt { color: var(--text-tertiary); font-size: 11.5px; }
 .sync-detail-group dd { min-width: 0; margin: 0; color: var(--text-primary); font-size: 12.5px; line-height: 1.4; overflow-wrap: anywhere; }
 .sync-detail-description { margin: 0; color: var(--text-primary); font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; }
-.sync-summary-actions { flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
+.sync-detail-actions-top { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-bottom: 13px; }
+.sync-detail-actions-top > button { min-height: 32px; flex: 0 0 auto; width: auto; }
+.sync-run-success { display: inline-flex; width: fit-content; align-items: center; gap: 7px; padding: 5px 8px; border: 1px solid color-mix(in srgb, var(--success) 38%, var(--border)); border-radius: var(--radius-control); background: var(--success-subtle); color: var(--success); font-size: 11.5px; font-weight: 650; }
+.sync-run-health { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: currentColor; }
+.sync-summary-actions { flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 7px; margin-top: 16px; border-top: 0; padding-top: 0; }
 .sync-summary-actions > button { min-height: 32px; flex: 0 0 auto; width: auto; }
 .sync-detail-pane .error-banner { margin-top: 14px; }
 

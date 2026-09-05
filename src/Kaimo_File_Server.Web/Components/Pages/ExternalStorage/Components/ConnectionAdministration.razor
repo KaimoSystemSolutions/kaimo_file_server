@@ -115,9 +115,24 @@ else
                                 <h3>@_selected.Name</h3>
                             </div>
                             <span class="detail-subtitle">@ProviderName(_selected.ProviderId)</span>
-                            <StatusBadge Tone="@StateTone(_selected.State)" Class="connection-state" Label="@StateName(_selected.State)" />
                         </div>
+                        <StatusBadge Tone="@StateTone(_selected.State)" Class="connection-state" Label="@StateName(_selected.State)" />
                     </div>
+
+                    @if (VM.CanManageConnections)
+                    {
+                        <div class="connection-detail-actions-top">
+                            <button class="btn-secondary" type="button" disabled="@_busy" @onclick="TestAsync">@R("Web_ExternalStorage_Test")</button>
+                            @if (_testSucceeded)
+                            {
+                                <span class="connection-test-success"><span class="connection-health"></span>@R("Web_ExternalStorage_TestSuccessful")</span>
+                            }
+                            else if (_testFailed)
+                            {
+                                <span class="connection-test-failed">@R("Web_ExternalStorage_TestFailed")</span>
+                            }
+                        </div>
+                    }
 
                     <div class="connection-detail-grid">
                         <section class="connection-detail-group">
@@ -153,15 +168,6 @@ else
                     <div class="detail-actions connection-actions">
                         @if (VM.CanManageConnections)
                         {
-                            <button class="btn-secondary" type="button" disabled="@_busy" @onclick="TestAsync">@R("Web_ExternalStorage_Test")</button>
-                            @if (_testSucceeded)
-                            {
-                                <span class="connection-test-success"><span class="connection-health"></span>@R("Web_ExternalStorage_TestSuccessful")</span>
-                            }
-                            else if (_testFailed)
-                            {
-                                <span class="connection-test-failed">@R("Web_ExternalStorage_TestFailed")</span>
-                            }
                             @if (SupportsAuthorization(_selected))
                             {
                                 <button class="btn-secondary" type="button" disabled="@_busy" @onclick="AuthorizeAsync">@(_selected.State == StorageConnectionState.Ready ? R("Web_CloudAccess_Reauthorize") : R("Web_CloudAccess_Authorize"))</button>

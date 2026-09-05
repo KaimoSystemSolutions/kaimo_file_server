@@ -226,6 +226,13 @@ else
                 </div>
                 <StatusBadge Tone="@SyncStateTone(selected)" Class="sync-state" Label="@SyncState(selected)" />
             </div>
+            <div class="sync-detail-actions-top">
+                <button class="btn-secondary" type="button" disabled="@(_busy || !selected.Definition.Enabled)" @onclick="() => RunAsync(selected)">@R("Web_ExternalStorage_RunNow")</button>
+                @if (_runSucceeded)
+                {
+                    <span class="sync-run-success"><span class="sync-run-health"></span>@R("Web_ExternalStorage_SyncSuccessful")</span>
+                }
+            </div>
             <div class="sync-detail-grid">
                 <section class="sync-detail-group">
                     <h4>@R("Web_ExternalStorage_Tab_Syncs")</h4>
@@ -258,7 +265,6 @@ else
                 <div class="error-banner">@R("Web_ExternalStorage_AttentionRequired") (@selected.Runtime!.LastErrorCode)</div>
             }
             <div class="detail-actions sync-summary-actions">
-                <button class="btn-secondary" type="button" disabled="@(_busy || !selected.Definition.Enabled)" @onclick="() => RunAsync(selected)">@R("Web_ExternalStorage_RunNow")</button>
                 <button class="btn-secondary sync-edit-action" type="button" disabled="@_busy" @onclick="() => StartEdit(selected)">@R("Web_CloudAccess_Edit")</button>
                 <button class="btn-danger-outline" type="button" disabled="@_busy" @onclick="() => DeleteAsync(selected)">@R("Web_Action_Delete")</button>
             </div>
@@ -292,6 +298,7 @@ else
     [Parameter] public Guid? InitialConnectionId { get; set; }
     private bool _editing;
     private bool _busy;
+    private bool _runSucceeded;
     private Guid? _editingId;
     private Guid? _selectedId;
     private string? _error;
@@ -349,6 +356,7 @@ else
         _editing = false;
         _editingId = null;
         _error = null;
+        _runSucceeded = false;
     }
 
     private void ConnectionChanged()
@@ -403,7 +411,12 @@ else
             if (_editingId == item.Definition.Id) CancelEdit();
         }
     }
-    private async Task RunAsync(ExternalStorageSyncListItem item) => await ActAsync(() => VM.RunAsync(item.Definition.Id));
+    private async Task RunAsync(ExternalStorageSyncListItem item)
+    {
+        _runSucceeded = false;
+        await ActAsync(() => VM.RunAsync(item.Definition.Id));
+        _runSucceeded = _error is null;
+    }
     private async Task ActAsync(Func<Task> action)
     {
         _busy = true; _error = null;

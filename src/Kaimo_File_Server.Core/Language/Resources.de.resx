@@ -3162,6 +3162,9 @@
   <data name="Web_ExternalStorage_RunNow" xml:space="preserve">
     <value>Jetzt ausführen</value>
   </data>
+  <data name="Web_ExternalStorage_SyncSuccessful" xml:space="preserve">
+    <value>Synchronisierung erfolgreich</value>
+  </data>
   <data name="Web_ExternalStorage_OperationFailed" xml:space="preserve">
     <value>Der Vorgang ist fehlgeschlagen. Prüfen Sie das Serverprotokoll.</value>
   </data>
