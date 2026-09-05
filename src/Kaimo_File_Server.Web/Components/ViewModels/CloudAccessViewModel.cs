@@ -287,6 +287,95 @@ public sealed class CloudAccessViewModel
         await LoadAsync();
     }
 
+    /// <summary>
+    /// Updates a configured protocol connection in place: display name, connection
+    /// settings, and — for username/password providers — the stored credentials.
+    /// Leaving the password empty preserves the existing one so the operator can
+    /// adjust the username, domain, or settings without re-entering it. The
+    /// provider, department, and any SSH key material stay unchanged.
+    /// </summary>
+    public async Task UpdateConfiguredConnectionAsync(
+        Guid connectionId,
+        string name,
+        string settingsJson,
+        string? username = null,
+        string? password = null,
+        string? domain = null)
+    {
+        var connection = await GetManagedConnectionAsync(connectionId);
+        if (_providerCatalog is null)
+            throw new NotSupportedException(R("Web_ExternalStorage_ProviderUnsupported"));
+        var provider = _providerCatalog.GetRequired(connection.ProviderId);
+        if (connection.AuthorizationMode is not (StorageAuthorizationMode.HostMount
+            or StorageAuthorizationMode.SshKey
+            or StorageAuthorizationMode.UsernamePassword
+            or StorageAuthorizationMode.NetworkIdentity))
+            throw new NotSupportedException(R("Web_ExternalStorage_ProviderUnsupported"));
+        var normalizedName = name.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedName) || normalizedName.Length > 200)
+            throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
+        if (string.IsNullOrWhiteSpace(settingsJson) || settingsJson.Length > 64 * 1024)
+            throw new ArgumentException(R("Web_ExternalStorage_InvalidSettings"));
+
+        connection.Name = normalizedName;
+        connection.SettingsJson = settingsJson;
+
+        if (connection.AuthorizationMode == StorageAuthorizationMode.UsernamePassword)
+        {
+            if (_credentialVault is null)
+                throw new ArgumentException(R("Web_ExternalStorage_InvalidCredentials"));
+            var existing = string.IsNullOrWhiteSpace(connection.EncryptedCredentialPayload)
+                ? new Dictionary<string, string>(StringComparer.Ordinal)
+                : _credentialVault.UnprotectConnectionCredentials(connection);
+            var resolvedUsername = string.IsNullOrWhiteSpace(username)
+                ? existing.GetValueOrDefault("username") ?? string.Empty
+                : username.Trim();
+            var resolvedPassword = string.IsNullOrEmpty(password)
+                ? existing.GetValueOrDefault("password") ?? string.Empty
+                : password;
+            if (string.IsNullOrWhiteSpace(resolvedUsername) || string.IsNullOrEmpty(resolvedPassword))
+                throw new ArgumentException(R("Web_ExternalStorage_InvalidCredentials"));
+            var credentials = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["username"] = resolvedUsername,
+                ["password"] = resolvedPassword
+            };
+            if (!string.IsNullOrWhiteSpace(domain))
+                credentials["domain"] = domain.Trim();
+            connection.EncryptedCredentialPayload = _credentialVault.ProtectConnectionCredentials(connection, credentials);
+            connection.AccountDisplayName = resolvedUsername;
+            connection.CredentialUpdatedAtUtc = DateTime.UtcNow;
+        }
+
+        var health = await provider.TestAsync(connection);
+        connection.State = MapUnhealthyState(connection, health);
+        connection.LastVerifiedAtUtc = health.CheckedAtUtc;
+        connection.LastErrorCode = health.IsHealthy ? null : health.Code;
+        await _connections.SaveAsync(connection);
+        await LoadAsync();
+    }
+
+    /// <summary>
+    /// Returns the stored username and domain for prefilling the connection edit
+    /// form. The password is never returned; leaving it blank on save keeps it.
+    /// </summary>
+    public async Task<(string? Username, string? Domain)> GetConnectionCredentialFieldsAsync(Guid connectionId)
+    {
+        var connection = await GetManagedConnectionAsync(connectionId);
+        if (_credentialVault is null || string.IsNullOrWhiteSpace(connection.EncryptedCredentialPayload))
+            return (connection.AccountDisplayName, null);
+        try
+        {
+            var credentials = _credentialVault.UnprotectConnectionCredentials(connection);
+            return (credentials.GetValueOrDefault("username") ?? connection.AccountDisplayName,
+                    credentials.GetValueOrDefault("domain"));
+        }
+        catch
+        {
+            return (connection.AccountDisplayName, null);
+        }
+    }
+
     /// <summary>Disables or re-enables a connection without removing its consumers.</summary>
     public async Task SetConnectionEnabledAsync(Guid connectionId, bool enabled)
     {

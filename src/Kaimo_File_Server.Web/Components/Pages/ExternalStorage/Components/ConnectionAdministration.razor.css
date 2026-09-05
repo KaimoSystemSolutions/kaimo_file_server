@@ -40,9 +40,32 @@
 }
 
 .connection-editor-heading {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 1rem;
     padding: 14px 16px 12px;
-    border-bottom: 1px solid var(--border);
     background: var(--accent-subtle);
+}
+
+.connection-enabled {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: .45rem;
+    color: var(--text-secondary);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* Tab strip sits flush under the heading; the shared --panel variant frames it. */
+.connection-editor ::deep .detail-tabs--panel {
+    margin: 0;
+    padding-inline: 8px;
+}
+
+.connection-tab-panel {
+    padding: 18px 16px 4px;
 }
 
 .connection-editor-heading h3 {
@@ -60,14 +83,14 @@
 
 .connection-form {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 13px;
-    padding: 16px;
+    grid-template-columns: 1fr;
+    gap: 15px;
+    padding: 0;
 }
 
 .connection-form label {
     display: grid;
-    gap: 5px;
+    gap: 7px;
     color: var(--text-secondary);
     font-size: 12px;
 }
@@ -230,8 +253,9 @@
     align-items: center;
     justify-content: flex-end;
     flex-wrap: wrap;
-    margin: 0;
-    padding: 0 16px 16px;
+    gap: 8px;
+    margin: 20px 0 0;
+    padding: 0 16px 18px;
 }
 
 .connection-editor .detail-actions > button {

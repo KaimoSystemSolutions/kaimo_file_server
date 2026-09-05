@@ -214,6 +214,77 @@ public sealed class CloudAccessViewModelTests
         Assert.Equal(Convert.ToBase64String(privateKey), protectedCredentials?["privateKeyBase64"]);
     }
 
+    [Fact]
+    public async Task UpdateConfiguredConnectionAsync_KeepsStoredPassword_WhenPasswordBlank()
+    {
+        var departmentId = Guid.NewGuid();
+        var user = new User(Guid.NewGuid(), "Alice", "alice", "hash", "nt");
+        var actor = new UserContext(user, [], [], []);
+        var connection = new StorageConnection
+        {
+            DepartmentId = departmentId,
+            ProviderId = "smb",
+            Name = "Old name",
+            AuthorizationMode = StorageAuthorizationMode.UsernamePassword,
+            SettingsJson = "{\"Server\":\"old\"}",
+            EncryptedCredentialPayload = "existing-payload",
+            AccountDisplayName = "olduser"
+        };
+        var cloudRepository = new Mock<ICloudAccessRepository>();
+        cloudRepository.Setup(x => x.GetSharesAsync(default)).ReturnsAsync([]);
+        var connectionRepository = new Mock<IStorageConnectionRepository>();
+        connectionRepository.Setup(x => x.GetAsync(connection.Id, default)).ReturnsAsync(connection);
+        connectionRepository.Setup(x => x.GetAllAsync(default)).ReturnsAsync([connection]);
+        connectionRepository.Setup(x => x.GetUsageAsync(It.IsAny<Guid>(), default))
+            .ReturnsAsync(new StorageConnectionUsage(0, 0));
+        var management = new Mock<IManagementAuthService>();
+        management.Setup(x => x.CanManageDepartmentAsync(actor, departmentId, ManagementPermission.ManageConnections))
+            .ReturnsAsync(true);
+        management.Setup(x => x.GetAuthorizedDepartmentIdsAsync(actor, It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(AuthorizedScopeResult.Unrestricted());
+        var userContexts = new Mock<IUserContextFactory>();
+        userContexts.Setup(x => x.CreateByUsernameAsync("alice")).ReturnsAsync(actor);
+        var authentication = new Mock<AuthenticationStateProvider>();
+        authentication.Setup(x => x.GetAuthenticationStateAsync()).ReturnsAsync(new AuthenticationState(
+            new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "alice")], "test"))));
+        var departments = new Mock<IDepartmentRepository>();
+        departments.Setup(x => x.GetAllAsync()).ReturnsAsync([new Department("Finance") { Id = departmentId }]);
+        IReadOnlyDictionary<string, string>? protectedCredentials = null;
+        var vault = new Mock<ICredentialVault>();
+        vault.Setup(x => x.Unprotect<Dictionary<string, string>>(
+                "existing-payload", It.IsAny<CredentialContext>()))
+            .Returns(new Dictionary<string, string> { ["username"] = "olduser", ["password"] = "secret" });
+        vault.Setup(x => x.Protect(
+                It.IsAny<IReadOnlyDictionary<string, string>>(), It.IsAny<CredentialContext>()))
+            .Callback<IReadOnlyDictionary<string, string>, CredentialContext>((credentials, _) =>
+                protectedCredentials = credentials)
+            .Returns("reprotected");
+        var provider = new Mock<IStorageConnectionProvider>();
+        provider.SetupGet(x => x.Id).Returns("smb");
+        provider.SetupGet(x => x.AuthorizationModes).Returns(new HashSet<StorageAuthorizationMode>
+            { StorageAuthorizationMode.UsernamePassword });
+        provider.Setup(x => x.TestAsync(It.IsAny<StorageConnection>(), default))
+            .ReturnsAsync(new StorageConnectionHealthResult(
+                StorageConnectionHealthState.Healthy, "ok", DateTime.UtcNow));
+        var viewModel = new CloudAccessViewModel(
+            cloudRepository.Object, connectionRepository.Object, Mock.Of<ICloudAuthorizationTicketStore>(),
+            management.Object, userContexts.Object, authentication.Object, departments.Object,
+            Mock.Of<IUserRepository>(), Mock.Of<IGroupRepository>(), Mock.Of<IShareRepository>(),
+            ConnectionFactory(connectionRepository.Object, vault.Object),
+            NullLogger<CloudAccessViewModel>.Instance,
+            new StorageConnectionProviderCatalog([provider.Object]), vault.Object);
+
+        await viewModel.UpdateConfiguredConnectionAsync(
+            connection.Id, "  New name  ", "{\"Server\":\"new\"}", username: "newuser", password: "");
+
+        Assert.Equal("New name", connection.Name);
+        Assert.Equal("{\"Server\":\"new\"}", connection.SettingsJson);
+        Assert.Equal("newuser", connection.AccountDisplayName);
+        Assert.Equal("reprotected", connection.EncryptedCredentialPayload);
+        Assert.Equal("newuser", protectedCredentials?["username"]);
+        Assert.Equal("secret", protectedCredentials?["password"]);
+    }
+
     private static OneDriveStorageConnectionFactory ConnectionFactory(
         IStorageConnectionRepository repository,
         ICredentialVault vault)

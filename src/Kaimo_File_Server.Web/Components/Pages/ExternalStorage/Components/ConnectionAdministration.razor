@@ -34,7 +34,7 @@ else
         <div><h2>@R("Web_ExternalStorage_Tab_Connections")</h2><p class="subtitle">@R("Web_ExternalStorage_ConnectionsHelp")</p></div>
         @if (VM.CanManageConnections)
         {
-            <button class="btn-primary" type="button" @onclick="() => _creating = !_creating">@R("Web_CloudAccess_AddConnection")</button>
+            <button class="btn-primary" type="button" @onclick="ToggleCreateAsync">@R("Web_CloudAccess_AddConnection")</button>
         }
     </div>
 
@@ -42,85 +42,13 @@ else
     {
         <section class="connection-editor">
             <div class="connection-editor-heading">
-                <h3>@R("Web_CloudAccess_AddConnection")</h3>
-                <p>@R("Web_ExternalStorage_ConnectionsHelp")</p>
+                <div>
+                    <h3>@R("Web_CloudAccess_AddConnection")</h3>
+                    <p>@R("Web_ExternalStorage_ConnectionsHelp")</p>
+                </div>
             </div>
-            <div class="connection-form">
-                <label><span>@R("Web_CloudAccess_Provider")</span><select class="edit-input" @bind="_provider" @bind:after="ProviderChanged">@foreach (var provider in CreatableProviders) { <option value="@provider.Id">@provider.DisplayName</option> }</select></label>
-                <label><span>@R("Web_CloudAccess_ConnectionName")</span><input class="edit-input" maxlength="200" @bind="_name" /></label>
-                <label><span>@R("Web_CloudAccess_Department")</span><select class="edit-input" @bind="_departmentId"><option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>@foreach (var department in VM.ManageableDepartments) { <option value="@department.Id">@department.Name</option> }</select></label>
-                @if (_departmentId == Guid.Empty)
-                {
-                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_DepartmentRequiredHint")</p>
-                }
-                @if (IsSmbProvider)
-                {
-                    <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="192.168.1.10" @bind="_server" /></label>
-                    <label><span>@R("Web_ExternalStorage_Port")</span><input class="edit-input" type="number" min="1" max="65535" @bind="_port" /></label>
-                    <label><span>@R("Web_ExternalStorage_Username")</span><input class="edit-input" maxlength="256" autocomplete="username" @bind="_username" /></label>
-                    <label><span>@R("Web_ExternalStorage_Password")</span><input class="edit-input" type="password" maxlength="4096" autocomplete="new-password" @bind="_password" /></label>
-                    <label><span>@R("Web_ExternalStorage_Domain")</span><input class="edit-input" maxlength="256" placeholder="WORKGROUP" @bind="_domain" /></label>
-                    <label><span>@R("Web_ExternalStorage_MinimumDialect")</span><select class="edit-input" @bind="_minimumDialect"><option value="3.0">SMB 3.0</option><option value="3.02">SMB 3.0.2</option><option value="3.1.1">SMB 3.1.1</option></select></label>
-                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_SmbSharePickerHelp")</p>
-                }
-                else if (IsWebDavProvider)
-                {
-                    <label><span>@R("Web_ExternalStorage_WebDavServerUrl")</span><input class="edit-input" maxlength="2048" placeholder="https://cloud.example.com/remote.php/dav/files/user/" @bind="_serverUrl" /></label>
-                    <label><span>@R("Web_ExternalStorage_Username")</span><input class="edit-input" maxlength="256" autocomplete="username" @bind="_username" /></label>
-                    <label><span>@R("Web_ExternalStorage_Password")</span><input class="edit-input" type="password" maxlength="4096" autocomplete="new-password" @bind="_password" /></label>
-                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_WebDavHelp")</p>
-                }
-                else if (UsesPinnedSshSetup)
-                {
-                    <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="backup.example.com" @bind="_server" @bind:after="SshEndpointChangedAsync" /></label>
-                    <label><span>@R("Web_ExternalStorage_Port")</span><input class="edit-input" type="number" min="1" max="65535" @bind="_port" @bind:after="SshEndpointChangedAsync" /></label>
-                    <label><span>@R("Web_ExternalStorage_Username")</span><input class="edit-input" maxlength="64" autocomplete="username" @bind="_username" /></label>
-                    <label><span>@R("Web_ExternalStorage_RemoteRoot")</span><input class="edit-input" maxlength="4096" placeholder="/srv/backups" @bind="_remoteRoot" /></label>
-                    <section class="storage-wide ssh-setup-card">
-                        <div class="ssh-setup-heading"><div><strong>@R("Web_ExternalStorage_SshKeySetup")</strong><small>@R("Web_ExternalStorage_SshKeySetupHelp")</small></div><label class="storage-check"><input type="checkbox" @bind="_advancedSshSetup" @bind:after="SshModeChangedAsync" /> <span>@R("Web_ExternalStorage_SshAdvancedMode")</span></label></div>
-                        @if (!_advancedSshSetup)
-                        {
-                            <div class="ssh-setup-section">
-                                <span class="ssh-step">1</span><div class="ssh-step-content"><strong>@R("Web_ExternalStorage_SshPrivateKey")</strong><small>@R("Web_ExternalStorage_SshPrivateKeyHelp")</small>
-                                    <div class="ssh-actions"><InputFile OnChange="UploadSshPrivateKeyAsync" accept=".key,.pem,.openssh" /><button class="btn-secondary" type="button" disabled="@_sshSetupBusy" @onclick="GenerateSshPrivateKeyAsync">@R("Web_ExternalStorage_SshGenerateKey")</button></div>
-                                    @if (_sshPrivateKey is not null)
-                                    {
-                                        <div class="ssh-ready-line"><span class="connection-health"></span>@(_sshPrivateKeyName ?? R("Web_ExternalStorage_SshGeneratedKeyReady"))</div>
-                                        <label><span>@R("Web_ExternalStorage_SshPublicKey")</span><textarea class="edit-input ssh-public-key" readonly rows="3">@_sshPublicKey</textarea></label>
-                                        <button class="btn-secondary ssh-copy" type="button" @onclick="CopyPublicKeyAsync">@R("Web_ExternalStorage_CopyPublicKey")</button>
-                                    }
-                                </div>
-                            </div>
-                            <div class="ssh-setup-section">
-                                <span class="ssh-step">2</span><div class="ssh-step-content"><strong>@R("Web_ExternalStorage_SshHostVerification")</strong><small>@R("Web_ExternalStorage_SshHostVerificationHelp")</small>
-                                    <button class="btn-secondary" type="button" disabled="@(_sshSetupBusy || string.IsNullOrWhiteSpace(_server) || _port is < 1 or > 65535)" @onclick="DiscoverHostKeysAsync">@R("Web_ExternalStorage_SshFetchHostKey")</button>
-                                    @if (_hostKeyCandidates.Count > 0)
-                                    {
-                                        <label><span>@R("Web_ExternalStorage_SshHostKey")</span><select class="edit-input" @bind="_selectedHostFingerprint" @bind:after="HostKeySelectionChanged">
-                                            @foreach (var candidate in _hostKeyCandidates) { <option value="@candidate.FingerprintSha256">@candidate.Algorithm — @candidate.FingerprintSha256</option> }
-                                        </select></label>
-                                        <div class="ssh-fingerprint">@SelectedHostKey?.FingerprintSha256</div>
-                                        <label class="storage-check ssh-confirm"><input type="checkbox" @bind="_hostKeyConfirmed" /> <span>@R("Web_ExternalStorage_SshConfirmFingerprint")</span></label>
-                                    }
-                                </div>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="ssh-advanced-grid">
-                                <label><span>@R("Web_ExternalStorage_SshHostFingerprint")</span><input class="edit-input" maxlength="100" placeholder="SHA256:…" @bind="_sshHostFingerprint" /></label>
-                                <label><span>@R("Web_ExternalStorage_PrivateKeySecretReference")</span><input class="edit-input" maxlength="4096" placeholder="/run/secrets/kaimo_rsync_key" @bind="_privateKeySecretReference" /></label>
-                                <label><span>@R("Web_ExternalStorage_KnownHostsSecretReference")</span><input class="edit-input" maxlength="4096" placeholder="/run/secrets/kaimo_known_hosts" @bind="_knownHostsSecretReference" /></label>
-                            </div>
-                        }
-                    </section>
-                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_RsyncSshHelp")</p>
-                }
-                else if (!SelectedProviderUsesInteractiveAuthorization)
-                {
-                    <label class="storage-wide"><span>@R("Web_ExternalStorage_ConnectionSettings")</span><textarea class="edit-input" rows="10" maxlength="65536" @bind="_settingsJson"></textarea><small>@R("Web_ExternalStorage_ConnectionSettingsHelp")</small></label>
-                }
-            </div>
+            @ConnectionTabStrip
+            <div class="connection-tab-panel"><div class="connection-form">@ConnectionFormFields</div></div>
             <div class="detail-actions"><button class="btn-secondary" type="button" @onclick="CancelCreateAsync">@R("Web_Button_Cancel")</button><button class="btn-primary" type="button" disabled="@(_busy || _sshSetupBusy || !CanCreate)" @onclick="CreateAsync">@R("Web_CloudAccess_Connect")</button></div>
         </section>
     }
@@ -162,39 +90,35 @@ else
                         <p>@R("Web_ExternalStorage_NoConnectionSelectedHint")</p>
                     </div>
                 }
+                else if (_editing)
+                {
+                    <section class="connection-editor connection-editor--inline">
+                        <div class="connection-editor-heading">
+                            <div>
+                                <h3>@R("Web_CloudAccess_EditConnection")</h3>
+                                <p>@_selected.Name · @ProviderName(_selected.ProviderId)</p>
+                            </div>
+                            <label class="connection-enabled"><input type="checkbox" @bind="_editEnabled" /> <span>@R("Web_ExternalStorage_Enabled")</span></label>
+                        </div>
+                        @ConnectionTabStrip
+                        <div class="connection-tab-panel"><div class="connection-form">@ConnectionFormFields</div></div>
+                        <div class="detail-actions"><button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelEdit">@R("Web_Button_Cancel")</button><button class="btn-primary" type="button" disabled="@(_busy || _sshSetupBusy || !CanSaveEdit)" @onclick="SaveEditAsync">@R("Web_CloudAccess_Save")</button></div>
+                    </section>
+                }
                 else
                 {
                     var usage = Usage(_selected.Id);
                     <div class="detail-header connection-detail-header">
                         <div class="connection-detail-title">
-                            @if (_renaming)
-                            {
-                                <div class="connection-rename-card">
-                                    <label class="connection-rename-label">@R("Web_CloudAccess_ConnectionName")</label>
-                                    <div class="connection-rename-row">
-                                        <input class="edit-input connection-rename-input" maxlength="200" @bind="_renameValue" @bind:event="oninput" aria-label="@R("Web_CloudAccess_ConnectionName")" @onkeydown="RenameKeyDownAsync" />
-                                    </div>
-                                    <div class="connection-rename-actions">
-                                        <button class="btn-primary" type="button" disabled="@(_busy || string.IsNullOrWhiteSpace(_renameValue))" @onclick="SaveRenameAsync">@R("Web_CloudAccess_Save")</button>
-                                        <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelRename">@R("Web_Button_Cancel")</button>
-                                    </div>
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="connection-title-row">
-                                    <span class="connection-detail-icon" style="color: @ProviderColor(_selected.ProviderId)">@Assets.SVG(ProviderIcon(_selected.ProviderId), new SvgOptions(Width: 22, Height: 22))</span>
-                                    <h3>@_selected.Name</h3>
-                                    @if (VM.CanManageConnections)
-                                    {
-                                        <button class="connection-rename-trigger" type="button" disabled="@_busy" @onclick="StartRename" title="@R("Web_CloudAccess_Rename")">@Assets.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 1.75f))</button>
-                                    }
-                                </div>
-                                <span class="detail-subtitle">@ProviderName(_selected.ProviderId)</span>
-                            }
+                            <div class="connection-title-row">
+                                <span class="connection-detail-icon" style="color: @ProviderColor(_selected.ProviderId)">@Assets.SVG(ProviderIcon(_selected.ProviderId), new SvgOptions(Width: 22, Height: 22))</span>
+                                <h3>@_selected.Name</h3>
+                            </div>
+                            <span class="detail-subtitle">@ProviderName(_selected.ProviderId)</span>
+                            <StatusBadge Tone="@StateTone(_selected.State)" Class="connection-state" Label="@StateName(_selected.State)" />
                         </div>
-                        <StatusBadge Tone="@StateTone(_selected.State)" Class="connection-state" Label="@StateName(_selected.State)" />
                     </div>
+
                     <div class="connection-detail-grid">
                         <section class="connection-detail-group">
                             <h4>@R("Web_ExternalStorage_Identity")</h4>
@@ -230,13 +154,19 @@ else
                         @if (VM.CanManageConnections)
                         {
                             <button class="btn-secondary" type="button" disabled="@_busy" @onclick="TestAsync">@R("Web_ExternalStorage_Test")</button>
-                            @if (_testSucceeded) { <span class="connection-test-success"><span class="connection-health"></span>@R("Web_ExternalStorage_TestSuccessful")</span> }
-                            else if (_testFailed) { <span class="connection-test-failed">@R("Web_ExternalStorage_TestFailed")</span> }
+                            @if (_testSucceeded)
+                            {
+                                <span class="connection-test-success"><span class="connection-health"></span>@R("Web_ExternalStorage_TestSuccessful")</span>
+                            }
+                            else if (_testFailed)
+                            {
+                                <span class="connection-test-failed">@R("Web_ExternalStorage_TestFailed")</span>
+                            }
                             @if (SupportsAuthorization(_selected))
                             {
                                 <button class="btn-secondary" type="button" disabled="@_busy" @onclick="AuthorizeAsync">@(_selected.State == StorageConnectionState.Ready ? R("Web_CloudAccess_Reauthorize") : R("Web_CloudAccess_Authorize"))</button>
                             }
-                            <button class="btn-secondary" type="button" disabled="@_busy" @onclick="ToggleEnabledAsync">@(_selected.State == StorageConnectionState.Disabled ? R("Web_ExternalStorage_Enable") : R("Web_ExternalStorage_Disable"))</button>
+                            <button class="btn-secondary connection-edit-action" type="button" disabled="@_busy" @onclick="StartEditAsync">@R("Web_CloudAccess_Edit")</button>
                             <button class="btn-danger-outline" type="button" disabled="@(_busy || usage.TotalCount > 0)" @onclick="DeleteAsync">@R("Web_Action_Delete")</button>
                         }
                     </div>
@@ -277,8 +207,12 @@ else
     private bool _testFailed;
     private Guid _departmentId;
     private string? _error;
-    private bool _renaming;
-    private string _renameValue = string.Empty;
+    private bool _editing;
+    private bool _editEnabled = true;
+    private enum ConnectionTab { General, Connection, Security }
+    private ConnectionTab _activeConnectionTab = ConnectionTab.General;
+    private bool ShowConnectionTab => !SelectedProviderUsesInteractiveAuthorization;
+    private bool ShowSecurityTab => IsSmbProvider || IsWebDavProvider || UsesPinnedSshSetup;
     private IEnumerable<IStorageConnectionProvider> CreatableProviders => ProviderCatalog.Providers
         .Where(provider => provider.AuthorizationModes.Any(mode => mode is StorageAuthorizationMode.DeviceCode
             or StorageAuthorizationMode.UsernamePassword or StorageAuthorizationMode.NetworkIdentity
@@ -386,7 +320,6 @@ else
         }
         finally { _busy = false; }
     }
-    private async Task ToggleEnabledAsync() => await ActAsync(() => VM.SetConnectionEnabledAsync(_selected!.Id, _selected.State == StorageConnectionState.Disabled));
     private async Task DeleteAsync() => await ActAsync(() => VM.DeleteConnectionAsync(_selected!.Id));
     private async Task ProviderChanged()
     {
@@ -395,6 +328,8 @@ else
         _port = IsSmbProvider ? 445 : UsesPinnedSshSetup ? 22 : _port;
         _remoteRoot = "/";
         _serverUrl = string.Empty;
+        // The available tabs depend on the provider; keep the selection valid.
+        _activeConnectionTab = ConnectionTab.General;
     }
     private async Task ActAsync(Func<Task> action)
     {
@@ -628,38 +563,300 @@ else
         _advancedSshSetup = false;
     }
 
+    // Tab strip shared by the create form and the in-place editor. Providers
+    // driven by interactive authorization (OneDrive, Dropbox) expose only the
+    // General tab; the connection and security tabs appear when relevant.
+    private RenderFragment ConnectionTabStrip => @<text>
+        <Tabs class="detail-tabs--panel connection-tabs" aria-label="@R("Web_CloudAccess_EditConnection")">
+            <Tab Active="@(_activeConnectionTab == ConnectionTab.General)" Label="@R("Web_ExternalStorage_ConnTab_General")"
+                 OnClick="() => _activeConnectionTab = ConnectionTab.General" />
+            @if (ShowConnectionTab)
+            {
+                <Tab Active="@(_activeConnectionTab == ConnectionTab.Connection)" Label="@R("Web_ExternalStorage_ConnTab_Connection")"
+                     OnClick="() => _activeConnectionTab = ConnectionTab.Connection" />
+            }
+            @if (ShowSecurityTab)
+            {
+                <Tab Active="@(_activeConnectionTab == ConnectionTab.Security)" Label="@R("Web_ExternalStorage_ConnTab_Security")"
+                     OnClick="() => _activeConnectionTab = ConnectionTab.Security" />
+            }
+        </Tabs>
+    </text>;
+
+    // Fields of the active tab. In edit mode the provider and department are
+    // fixed (shown read-only) and the password may be left blank to keep the
+    // stored credential.
+    private RenderFragment ConnectionFormFields => @<text>
+        @if (_activeConnectionTab == ConnectionTab.General)
+        {
+            <label><span>@R("Web_CloudAccess_Provider")</span>
+                @if (_editing)
+                {
+                    <input class="edit-input" value="@ProviderName(_provider)" disabled />
+                }
+                else
+                {
+                    <select class="edit-input" @bind="_provider" @bind:after="ProviderChanged">@foreach (var provider in CreatableProviders) { <option value="@provider.Id">@provider.DisplayName</option> }</select>
+                }
+            </label>
+            <label><span>@R("Web_CloudAccess_ConnectionName")</span><input class="edit-input" maxlength="200" @bind="_name" /></label>
+            <label><span>@R("Web_CloudAccess_Department")</span>
+                @if (_editing)
+                {
+                    <input class="edit-input" value="@DepartmentName(_departmentId)" disabled />
+                }
+                else
+                {
+                    <select class="edit-input" @bind="_departmentId"><option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>@foreach (var department in VM.ManageableDepartments) { <option value="@department.Id">@department.Name</option> }</select>
+                }
+            </label>
+            @if (!_editing && _departmentId == Guid.Empty)
+            {
+                <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_DepartmentRequiredHint")</p>
+            }
+        }
+        else if (_activeConnectionTab == ConnectionTab.Connection)
+        {
+            @if (IsSmbProvider)
+            {
+                <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="192.168.1.10" @bind="_server" /></label>
+                <label><span>@R("Web_ExternalStorage_Port")</span><input class="edit-input" type="number" min="1" max="65535" @bind="_port" /></label>
+                <label><span>@R("Web_ExternalStorage_Domain")</span><input class="edit-input" maxlength="256" placeholder="WORKGROUP" @bind="_domain" /></label>
+                <label><span>@R("Web_ExternalStorage_MinimumDialect")</span><select class="edit-input" @bind="_minimumDialect"><option value="3.0">SMB 3.0</option><option value="3.02">SMB 3.0.2</option><option value="3.1.1">SMB 3.1.1</option></select></label>
+                <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_SmbSharePickerHelp")</p>
+            }
+            else if (IsWebDavProvider)
+            {
+                <label class="storage-wide"><span>@R("Web_ExternalStorage_WebDavServerUrl")</span><input class="edit-input" maxlength="2048" placeholder="https://cloud.example.com/remote.php/dav/files/user/" @bind="_serverUrl" /></label>
+                <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_WebDavHelp")</p>
+            }
+            else if (UsesPinnedSshSetup)
+            {
+                <label><span>@R("Web_ExternalStorage_Server")</span><input class="edit-input" maxlength="253" placeholder="backup.example.com" @bind="_server" @bind:after="SshEndpointChangedAsync" /></label>
+                <label><span>@R("Web_ExternalStorage_Port")</span><input class="edit-input" type="number" min="1" max="65535" @bind="_port" @bind:after="SshEndpointChangedAsync" /></label>
+                <label class="storage-wide"><span>@R("Web_ExternalStorage_RemoteRoot")</span><input class="edit-input" maxlength="4096" placeholder="/srv/backups" @bind="_remoteRoot" /></label>
+                <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_RsyncSshHelp")</p>
+            }
+            else
+            {
+                <label class="storage-wide"><span>@R("Web_ExternalStorage_ConnectionSettings")</span><textarea class="edit-input" rows="10" maxlength="65536" @bind="_settingsJson"></textarea><small>@R("Web_ExternalStorage_ConnectionSettingsHelp")</small></label>
+            }
+        }
+        else
+        {
+            @if (IsSmbProvider || IsWebDavProvider)
+            {
+                <label><span>@R("Web_ExternalStorage_Username")</span><input class="edit-input" maxlength="256" autocomplete="username" @bind="_username" /></label>
+                <label><span>@R("Web_ExternalStorage_Password")</span><input class="edit-input" type="password" maxlength="4096" autocomplete="new-password" @bind="_password" /></label>
+                @if (_editing)
+                {
+                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_PasswordKeepHint")</p>
+                }
+            }
+            else if (UsesPinnedSshSetup)
+            {
+                <label><span>@R("Web_ExternalStorage_Username")</span><input class="edit-input" maxlength="64" autocomplete="username" @bind="_username" /></label>
+                @if (_editing)
+                {
+                    <label><span>@R("Web_ExternalStorage_SshHostFingerprint")</span><input class="edit-input" maxlength="100" placeholder="SHA256:…" @bind="_sshHostFingerprint" /></label>
+                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_SshKeyEditHint")</p>
+                }
+                else
+                {
+                    <section class="storage-wide ssh-setup-card">
+                        <div class="ssh-setup-heading"><div><strong>@R("Web_ExternalStorage_SshKeySetup")</strong><small>@R("Web_ExternalStorage_SshKeySetupHelp")</small></div><label class="storage-check"><input type="checkbox" @bind="_advancedSshSetup" @bind:after="SshModeChangedAsync" /> <span>@R("Web_ExternalStorage_SshAdvancedMode")</span></label></div>
+                        @if (!_advancedSshSetup)
+                        {
+                            <div class="ssh-setup-section">
+                                <span class="ssh-step">1</span><div class="ssh-step-content"><strong>@R("Web_ExternalStorage_SshPrivateKey")</strong><small>@R("Web_ExternalStorage_SshPrivateKeyHelp")</small>
+                                    <div class="ssh-actions"><InputFile OnChange="UploadSshPrivateKeyAsync" accept=".key,.pem,.openssh" /><button class="btn-secondary" type="button" disabled="@_sshSetupBusy" @onclick="GenerateSshPrivateKeyAsync">@R("Web_ExternalStorage_SshGenerateKey")</button></div>
+                                    @if (_sshPrivateKey is not null)
+                                    {
+                                        <div class="ssh-ready-line"><span class="connection-health"></span>@(_sshPrivateKeyName ?? R("Web_ExternalStorage_SshGeneratedKeyReady"))</div>
+                                        <label><span>@R("Web_ExternalStorage_SshPublicKey")</span><textarea class="edit-input ssh-public-key" readonly rows="3">@_sshPublicKey</textarea></label>
+                                        <button class="btn-secondary ssh-copy" type="button" @onclick="CopyPublicKeyAsync">@R("Web_ExternalStorage_CopyPublicKey")</button>
+                                    }
+                                </div>
+                            </div>
+                            <div class="ssh-setup-section">
+                                <span class="ssh-step">2</span><div class="ssh-step-content"><strong>@R("Web_ExternalStorage_SshHostVerification")</strong><small>@R("Web_ExternalStorage_SshHostVerificationHelp")</small>
+                                    <button class="btn-secondary" type="button" disabled="@(_sshSetupBusy || string.IsNullOrWhiteSpace(_server) || _port is < 1 or > 65535)" @onclick="DiscoverHostKeysAsync">@R("Web_ExternalStorage_SshFetchHostKey")</button>
+                                    @if (_hostKeyCandidates.Count > 0)
+                                    {
+                                        <label><span>@R("Web_ExternalStorage_SshHostKey")</span><select class="edit-input" @bind="_selectedHostFingerprint" @bind:after="HostKeySelectionChanged">
+                                            @foreach (var candidate in _hostKeyCandidates) { <option value="@candidate.FingerprintSha256">@candidate.Algorithm — @candidate.FingerprintSha256</option> }
+                                        </select></label>
+                                        <div class="ssh-fingerprint">@SelectedHostKey?.FingerprintSha256</div>
+                                        <label class="storage-check ssh-confirm"><input type="checkbox" @bind="_hostKeyConfirmed" /> <span>@R("Web_ExternalStorage_SshConfirmFingerprint")</span></label>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="ssh-advanced-grid">
+                                <label><span>@R("Web_ExternalStorage_SshHostFingerprint")</span><input class="edit-input" maxlength="100" placeholder="SHA256:…" @bind="_sshHostFingerprint" /></label>
+                                <label><span>@R("Web_ExternalStorage_PrivateKeySecretReference")</span><input class="edit-input" maxlength="4096" placeholder="/run/secrets/kaimo_rsync_key" @bind="_privateKeySecretReference" /></label>
+                                <label><span>@R("Web_ExternalStorage_KnownHostsSecretReference")</span><input class="edit-input" maxlength="4096" placeholder="/run/secrets/kaimo_known_hosts" @bind="_knownHostsSecretReference" /></label>
+                            </div>
+                        }
+                    </section>
+                }
+            }
+        }
+    </text>;
+
     private void SelectConnection(StorageConnection connection)
     {
         _selected = connection;
         _testSucceeded = _testFailed = false;
-        _renaming = false;
+        _editing = false;
     }
 
-    private void StartRename()
+    // A connection whose provider is driven by interactive authorization
+    // (OneDrive, Dropbox) exposes no configurable settings, so its editor is
+    // limited to the display name and it is saved through UpdateConnectionAsync.
+    private bool EditsNameOnly => SelectedProviderUsesInteractiveAuthorization;
+
+    private async Task ToggleCreateAsync()
     {
-        _renameValue = _selected?.Name ?? string.Empty;
-        _renaming = true;
+        bool opening = !_creating;
+        await CancelCreateAsync();
+        if (opening)
+        {
+            _editing = false;
+            _provider = "onedrive";
+            _activeConnectionTab = ConnectionTab.General;
+        }
+        _creating = opening;
     }
 
-    private void CancelRename() => _renaming = false;
-
-    private async Task RenameKeyDownAsync(KeyboardEventArgs args)
+    private async Task StartEditAsync()
     {
-        if (args.Key == "Enter" && !string.IsNullOrWhiteSpace(_renameValue) && !_busy)
-            await SaveRenameAsync();
-        else if (args.Key == "Escape")
-            CancelRename();
+        if (_selected is null)
+            return;
+        _creating = false;
+        _error = null;
+        _testSucceeded = _testFailed = false;
+        _activeConnectionTab = ConnectionTab.General;
+        _editEnabled = _selected.State != StorageConnectionState.Disabled;
+        _provider = _selected.ProviderId;
+        _departmentId = _selected.DepartmentId;
+        _name = _selected.Name;
+        _password = _username = _domain = _server = _serverUrl = string.Empty;
+        _remoteRoot = "/";
+        _port = IsSmbProvider ? 445 : UsesPinnedSshSetup ? 22 : _port;
+        _minimumDialect = "3.1.1";
+        _sshHostFingerprint = _privateKeySecretReference = _knownHostsSecretReference = string.Empty;
+        _settingsJson = _selected.SettingsJson ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(_selected.SettingsJson))
+        {
+            try
+            {
+                using var document = System.Text.Json.JsonDocument.Parse(_selected.SettingsJson);
+                var root = document.RootElement;
+                if (IsSmbProvider)
+                {
+                    _server = ReadJsonString(root, "Server") ?? string.Empty;
+                    _port = ReadJsonInt(root, "Port") ?? 445;
+                    _domain = ReadJsonString(root, "Domain") ?? string.Empty;
+                    _minimumDialect = ReadJsonString(root, "MinimumDialect") ?? "3.1.1";
+                }
+                else if (IsWebDavProvider)
+                {
+                    _serverUrl = ReadJsonString(root, "ServerUrl") ?? string.Empty;
+                }
+                else if (UsesPinnedSshSetup)
+                {
+                    _server = ReadJsonString(root, "Host") ?? string.Empty;
+                    _port = ReadJsonInt(root, "Port") ?? 22;
+                    _username = ReadJsonString(root, "Username") ?? string.Empty;
+                    _remoteRoot = ReadJsonString(root, "RemoteRoot") ?? "/";
+                    _sshHostFingerprint = ReadJsonString(root, "ExpectedHostKeySha256") ?? string.Empty;
+                    _privateKeySecretReference = ReadJsonString(root, "PrivateKeySecretReference") ?? string.Empty;
+                    _knownHostsSecretReference = ReadJsonString(root, "KnownHostsSecretReference") ?? string.Empty;
+                }
+            }
+            catch (System.Text.Json.JsonException) { }
+        }
+
+        // Username and domain for username/password providers live in the
+        // credential vault, not in the settings JSON. The password is never
+        // returned; leaving the field blank keeps the stored one.
+        if (IsSmbProvider || IsWebDavProvider)
+        {
+            var (username, domain) = await VM.GetConnectionCredentialFieldsAsync(_selected.Id);
+            _username = username ?? string.Empty;
+            _domain = domain ?? string.Empty;
+        }
+
+        _editing = true;
     }
 
-    private async Task SaveRenameAsync()
+    private void CancelEdit()
+    {
+        _editing = false;
+        _password = string.Empty;
+    }
+
+    private async Task SaveEditAsync()
     {
         if (_selected is null)
             return;
         var connectionId = _selected.Id;
-        await ActAsync(() => VM.UpdateConnectionAsync(connectionId, _renameValue));
+        bool usesUsernamePassword = IsSmbProvider || IsWebDavProvider;
+        string? settingsJson = EditsNameOnly ? null : BuildSettingsJson();
+        await ActAsync(async () =>
+        {
+            if (EditsNameOnly)
+                await VM.UpdateConnectionAsync(connectionId, _name);
+            else
+                await VM.UpdateConfiguredConnectionAsync(
+                    connectionId, _name, settingsJson!,
+                    usesUsernamePassword ? _username : null,
+                    usesUsernamePassword && !string.IsNullOrEmpty(_password) ? _password : null,
+                    IsSmbProvider ? _domain : null);
+            // Reconcile the enabled toggle with the (re)computed state.
+            var current = VM.Connections.FirstOrDefault(connection => connection.Id == connectionId);
+            bool isDisabled = current?.State == StorageConnectionState.Disabled;
+            if (_editEnabled && isDisabled)
+                await VM.SetConnectionEnabledAsync(connectionId, true);
+            else if (!_editEnabled && !isDisabled)
+                await VM.SetConnectionEnabledAsync(connectionId, false);
+        });
         if (_error is null)
-            _renaming = false;
+        {
+            _editing = false;
+            _password = string.Empty;
+        }
     }
+
+    private bool CanSaveEdit => !string.IsNullOrWhiteSpace(_name)
+        && (EditsNameOnly
+            || (IsSmbProvider
+                ? !string.IsNullOrWhiteSpace(_server) && _port is >= 1 and <= 65535 && !string.IsNullOrWhiteSpace(_username)
+                : IsWebDavProvider
+                    ? !string.IsNullOrWhiteSpace(_serverUrl) && !string.IsNullOrWhiteSpace(_username)
+                    : UsesPinnedSshSetup
+                        ? !string.IsNullOrWhiteSpace(_server) && _port is >= 1 and <= 65535
+                          && !string.IsNullOrWhiteSpace(_username) && !string.IsNullOrWhiteSpace(_remoteRoot)
+                        : !string.IsNullOrWhiteSpace(_settingsJson)));
+
+    private string DepartmentName(Guid id)
+        => VM.ManageableDepartments.FirstOrDefault(department => department.Id == id)?.Name ?? "—";
+
+    private static string? ReadJsonString(System.Text.Json.JsonElement root, string name)
+        => root.TryGetProperty(name, out var value) && value.ValueKind == System.Text.Json.JsonValueKind.String
+            ? value.GetString()
+            : null;
+
+    private static int? ReadJsonInt(System.Text.Json.JsonElement root, string name)
+        => root.TryGetProperty(name, out var value)
+           && value.ValueKind == System.Text.Json.JsonValueKind.Number
+           && value.TryGetInt32(out var number)
+            ? number
+            : null;
 
     private static string SetupError(Exception exception)
         => exception is ProtocolConfigurationException configuration

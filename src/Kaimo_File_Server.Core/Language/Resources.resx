@@ -3435,6 +3435,21 @@
   <data name="Web_ExternalStorage_ConnectionSettingsHelp" xml:space="preserve">
     <value>Enter only the documented provider settings. Secrets must be stored through the credential vault or referenced by an absolute secret-file path.</value>
   </data>
+  <data name="Web_ExternalStorage_PasswordKeepHint" xml:space="preserve">
+    <value>Leave blank to keep the current password.</value>
+  </data>
+  <data name="Web_ExternalStorage_SshKeyEditHint" xml:space="preserve">
+    <value>The SSH key and host verification stay as configured. Recreate the connection to replace the key.</value>
+  </data>
+  <data name="Web_ExternalStorage_ConnTab_General" xml:space="preserve">
+    <value>General</value>
+  </data>
+  <data name="Web_ExternalStorage_ConnTab_Connection" xml:space="preserve">
+    <value>Connection details</value>
+  </data>
+  <data name="Web_ExternalStorage_ConnTab_Security" xml:space="preserve">
+    <value>Security</value>
+  </data>
   <data name="Web_ExternalStorage_Server" xml:space="preserve">
     <value>Server / IP address</value>
   </data>
