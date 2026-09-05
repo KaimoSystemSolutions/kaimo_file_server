@@ -5,6 +5,7 @@ using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -45,6 +46,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel
     private readonly IUserRepository _userRepo;
     private readonly FileDownloadTicketStore _downloadTickets;
     private readonly DemoModeOptions _demo;
+    private readonly ISyncDefinitionRepository _syncRepo;
 
     private readonly ISearchService _searchService;
 
@@ -61,7 +63,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel
         ISearchService searchService,
         IUserRepository userRepo,
         FileDownloadTicketStore downloadTickets,
-        DemoModeOptions demo)
+        DemoModeOptions demo,
+        ISyncDefinitionRepository syncRepo)
     {
         _fileServiceFactory = fileServiceFactory;
         _shareRepo = shareRepo;
@@ -74,6 +77,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel
         _userRepo = userRepo;
         _downloadTickets = downloadTickets;
         _demo = demo;
+        _syncRepo = syncRepo;
     }
 
     // -- State --
@@ -99,6 +103,12 @@ public class FileBrowserViewModel : IFileBrowserViewModel
     private static readonly TimeSpan SizeUpdateThrottle = TimeSpan.FromMilliseconds(150);
     public Dictionary<string, int> AclCounts { get; private set; } = new();
     public ShareDefinition? CurrentShare { get; private set; }
+
+    // Sync local destinations for the loaded share, ordered most-specific (longest
+    // LocalPath) first so a nested sync wins over an ancestor one. Loaded per share,
+    // not per directory, and reused across in-place directory refreshes.
+    private List<(string LocalPath, SyncMode Mode, string Name)> _shareSyncs = [];
+
     public List<FileMetadata> Items { get; private set; } = [];
     public string CurrentPath { get; private set; } = "";
     public bool IsLoading { get; private set; }
@@ -160,6 +170,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel
             ErrorMessage = null;
             CanManageAcls = false;
             CanManageSyncs = false;
+            _shareSyncs = [];
             _fileService = null;
 
             // Clear the previously loaded location up front so the breadcrumb does
@@ -218,7 +229,9 @@ public class FileBrowserViewModel : IFileBrowserViewModel
                 userContext, CurrentShare.Id, ManagementPermission.ManageShareAcls);
 
             CanManageSyncs = await _mgmtAuth.HasAnyPermissionAsync(userContext, ManagementPermission.SyncAdmin);
-            
+
+            await LoadShareSyncsAsync(CurrentShare.Id);
+
             _logger.LogDebug("Loading path: '{CurrentPath}' (share={ShareName}, user={User})",
                 CurrentPath, shareName, userContext.User.Username);
 
@@ -900,6 +913,46 @@ public class FileBrowserViewModel : IFileBrowserViewModel
 
     /// <summary>Public accessor for the share-relative path of a browsed item.</summary>
     public string ShareRelativeOf(FileMetadata item) => ToShareRelative(item.Path);
+
+    // Loads the enabled sync local destinations for the loaded share. Sync config is
+    // small (a handful of rows), so an in-memory filter over the admin projection is
+    // cheaper than a dedicated query and keeps the repository surface unchanged.
+    private async Task LoadShareSyncsAsync(Guid shareId)
+    {
+        var all = await _syncRepo.GetAllAsync();
+        _shareSyncs = all
+            .Select(entry => entry.Definition)
+            .Where(sync => sync.Enabled && sync.LocalShareId == shareId)
+            .Select(sync => (
+                LocalPath: ShareRelativePath.Normalize(sync.LocalPath),
+                sync.Mode,
+                Name: string.IsNullOrWhiteSpace(sync.DisplayName)
+                    ? (sync.LocalPath.Length == 0 ? CurrentShare?.Name ?? "" : sync.LocalPath)
+                    : sync.DisplayName))
+            .OrderByDescending(sync => sync.LocalPath.Length)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Returns the sync marker for an entry that is, or lives beneath, a sync's local
+    /// destination folder. The most specific (nearest) sync wins when several apply.
+    /// </summary>
+    public SyncFolderMarker? GetSyncMarker(FileMetadata entry)
+    {
+        if (_shareSyncs.Count == 0)
+            return null;
+
+        var rel = ShareRelativePath.Normalize(ShareRelativeOf(entry));
+        foreach (var sync in _shareSyncs)
+        {
+            if (sync.LocalPath.Length == 0
+                || rel == sync.LocalPath
+                || rel.StartsWith(sync.LocalPath + "/", StringComparison.Ordinal))
+                return new SyncFolderMarker(sync.Mode, sync.Name);
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// Looks up the persisted metadata record (stable <see cref="FileMetadata.Id"/> and

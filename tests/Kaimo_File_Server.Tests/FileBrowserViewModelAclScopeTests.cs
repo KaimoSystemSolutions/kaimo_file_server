@@ -36,6 +36,7 @@ public class FileBrowserViewModelAclScopeTests
     private readonly Mock<AuthenticationStateProvider> _authState = new();
     private readonly Mock<ISearchService> _searchService = new();
     private readonly Mock<IUserRepository> _userRepo = new();
+    private readonly Mock<ISyncDefinitionRepository> _syncRepo = new();
 
     private readonly ShareDefinition _share = new("share", "/data/share", isEnabled: true);
     private readonly FileBrowserViewModel _sut;
@@ -62,11 +63,15 @@ public class FileBrowserViewModelAclScopeTests
             .Setup(f => f.CreateByUsernameAsync("alice"))
             .ReturnsAsync(new UserContext(user, [], [], []));
 
+        _syncRepo
+            .Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<SyncDefinitionAdminEntry>());
+
         _sut = new FileBrowserViewModel(
             _fileServiceFactory.Object, _shareRepo.Object, _dbFactory.Object,
             _userContextFactory.Object, _mgmtAuth.Object, _authState.Object,
             NullLogger<FileBrowserViewModel>.Instance, _searchService.Object, _userRepo.Object,
-            new FileDownloadTicketStore(), new DemoModeOptions());
+            new FileDownloadTicketStore(), new DemoModeOptions(), _syncRepo.Object);
     }
 
     private void Authorize(bool allowed) =>

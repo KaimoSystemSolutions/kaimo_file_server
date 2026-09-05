@@ -380,6 +380,7 @@ else
                 var isSelected = _selectedItems.Contains(entry);
                 var aclPath = entry.IsDirectory ? GetDirAclPath(entry) : GetFileAclPath(entry);
                 var aclCount = CanManageAcls() ? GetAclCount(aclPath) : 0;
+                var syncMarker = VM.GetSyncMarker(entry);
             }
             <div
                 class="file-grid-row @(entry.IsDirectory ? "file-row-dir" : "") @(isSelected ? "file-row--selected" : "")"
@@ -412,6 +413,13 @@ else
                         @Assets.SVG(FileHelper.GetIcon(entry.Name), new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)", CssClass: "file-icon"))
                     }
                     <span>@entry.Name</span>
+                    @if (syncMarker is not null)
+                    {
+                        <span class="sync-indicator"
+                              title="@string.Format(Resources.Web_Sync_FolderTooltip, syncMarker.SyncName)">
+                            @Assets.SVG(SyncIcon(syncMarker.Mode), new SvgOptions(Width: 14, Height: 14, Color: "var(--info)", StrokeWidth: 2, CssClass: "sync-indicator-icon"))
+                        </span>
+                    }
                     @if (aclCount > 0)
                     {
                         <span class="acl-indicator"

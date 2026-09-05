@@ -291,6 +291,9 @@
   <data name="Web_Acl_RulesPlural" xml:space="preserve">
     <value>{0} Berechtigungsregeln</value>
   </data>
+  <data name="Web_Sync_FolderTooltip" xml:space="preserve">
+    <value>Synchronisierter Ordner von „{0}"</value>
+  </data>
   <data name="Web_Upload_Progress" xml:space="preserve">
     <value>Lade „{0}" hoch…</value>
   </data>

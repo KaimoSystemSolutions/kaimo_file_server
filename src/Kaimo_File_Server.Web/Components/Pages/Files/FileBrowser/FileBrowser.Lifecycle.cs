@@ -383,6 +383,14 @@ public partial class FileBrowser
     private string GetDirAclPath(FileMetadata dir)
         => VM.ShareRelativeOf(dir);
 
+    /// <summary>Emblem icon for a sync's transfer direction.</summary>
+    private static string SyncIcon(Core.Services.DataServices.SyncMode mode) => mode switch
+    {
+        Core.Services.DataServices.SyncMode.Pull => "sync-pull.svg",
+        Core.Services.DataServices.SyncMode.Push => "sync-push.svg",
+        _ => "sync-twoway.svg"
+    };
+
     private string GetFileAclPath(FileMetadata file)
         => VM.ShareRelativeOf(file);
 

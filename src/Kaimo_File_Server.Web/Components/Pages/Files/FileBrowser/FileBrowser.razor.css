@@ -373,6 +373,21 @@
 
 [data-theme="light"] .acl-indicator { border-color: var(--accent-border); }
 
+/* Sync emblem: marks an entry that is (or lives beneath) a sync's local destination. */
+.sync-indicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+    cursor: default;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+.sync-indicator-icon {
+    color: var(--info);
+    flex-shrink: 0;
+}
+
 /* ══════════════════════════════════════════════════════════
    File Upload Drag-Over
    ══════════════════════════════════════════════════════════ */

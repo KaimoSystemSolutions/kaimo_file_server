@@ -718,6 +718,15 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Synchronized folder of "{0}" ähnelt.
+        /// </summary>
+        public static string Web_Sync_FolderTooltip {
+            get {
+                return ResourceManager.GetString("Web_Sync_FolderTooltip", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Please select at least one permission. ähnelt.
         /// </summary>
         public static string Web_Acl_SelectAtLeastOnePermission {

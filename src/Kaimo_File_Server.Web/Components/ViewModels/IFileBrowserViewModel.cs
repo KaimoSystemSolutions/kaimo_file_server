@@ -1,8 +1,15 @@
 using System.Security.Cryptography;
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Web.Helpers;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
+
+/// <summary>
+/// Marks a browsed entry that lives at (or beneath) the local destination folder of
+/// a sync. Drives the sync emblem and its tooltip in the file browser.
+/// </summary>
+public sealed record SyncFolderMarker(SyncMode Mode, string SyncName);
 
 /// <summary>
 /// Contract consumed by the reusable file-browser UI. Core browsing operations are
@@ -26,6 +33,13 @@ public interface IFileBrowserViewModel
     string? ErrorMessage { get; }
     bool CanManageAcls => false;
     bool CanManageSyncs => false;
+
+    /// <summary>
+    /// Returns the sync marker for an entry when it is, or lives beneath, the local
+    /// destination folder of a sync; <c>null</c> otherwise. Backends without local
+    /// syncs (Cloud Access, remote) keep the safe default.
+    /// </summary>
+    SyncFolderMarker? GetSyncMarker(FileMetadata entry) => null;
     IEnumerable<FileMetadata> Directories { get; }
     IEnumerable<FileMetadata> Files { get; }
     bool HasParent { get; }
