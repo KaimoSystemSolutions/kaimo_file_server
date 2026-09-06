@@ -12,19 +12,29 @@
         <div class="storage-pool-list">
             @foreach (var pool in VM.StorageUsages)
             {
+                var poolKey = SettingsViewModel.PoolNameKey(pool.StoragePath);
                 <article class="storage-pool-card">
-                    <div class="storage-pool-rename form-group">
-                        <label>@Resources.Web_Settings_Storage_CustomNameLabel</label>
-                        <input class="edit-input"
-                               type="text"
-                               maxlength="64"
-                               placeholder="@SettingsViewModel.PoolDerivedName(pool.StoragePath)"
-                               @bind="VM.PoolNames[SettingsViewModel.PoolNameKey(pool.StoragePath)]" />
-                    </div>
-                    <br />
                     <div class="storage-pool-header">
                         <div>
-                            <span class="storage-pool-name">@VM.ResolvePoolName(pool.StoragePath)</span>
+                            @if (_editingKey == poolKey)
+                            {
+                                <div class="storage-pool-name-edit">
+                                    <input class="edit-input"
+                                           type="text"
+                                           maxlength="64"
+                                           placeholder="@SettingsViewModel.PoolDerivedName(pool.StoragePath)"
+                                           @bind="VM.PoolNames[poolKey]" />
+                                    <button class="btn-icon" title="@Resources.Web_Common_Save" @onclick="() => SaveName(poolKey)">@Icons.SVG("check.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button>
+                                    <button class="btn-icon" title="@Resources.Web_Common_Cancel" @onclick="CancelEdit">@Icons.SVG("close.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="storage-pool-name-row">
+                                    <span class="storage-pool-name">@VM.ResolvePoolName(pool.StoragePath)</span>
+                                    <button class="btn-icon" title="@Resources.Web_Common_Edit" @onclick="() => StartEdit(poolKey)">@Icons.SVG("edit.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))</button>
+                                </div>
+                            }
                             <span class="storage-pool-path" title="@pool.StoragePath">@pool.StoragePath</span>
                         </div>
                         @if (pool.Available)
@@ -58,10 +68,6 @@
         <p class="settings-empty">@Resources.Web_Settings_Storage_NoStoragePoolsFound</p>
     }
     <div class="settings-actions">
-        @if (VM.StorageUsages.Count > 0)
-        {
-            <button class="btn-primary" @onclick="SaveNames">@Resources.Web_Settings_Button_Save</button>
-        }
         <button class="btn-icon" title="@Resources.Web_Settings_Storage_Update" @onclick="Refresh">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button>
     </div>
 </div>
@@ -70,5 +76,28 @@
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
     private static string Pct(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
     private void Refresh() { VM.RefreshStorageInfo(); StateHasChanged(); }
-    private async Task SaveNames() { await VM.SavePoolNamesAsync(); StateHasChanged(); }
+
+    // Per-pool inline rename: only one pool edits at a time.
+    private string? _editingKey;
+    private string _originalName = "";
+
+    private void StartEdit(string poolKey)
+    {
+        _editingKey = poolKey;
+        _originalName = VM.PoolNames.TryGetValue(poolKey, out var v) ? v : "";
+    }
+
+    private void CancelEdit()
+    {
+        if (_editingKey is not null)
+            VM.PoolNames[_editingKey] = _originalName;
+        _editingKey = null;
+    }
+
+    private async Task SaveName(string poolKey)
+    {
+        _editingKey = null;
+        await VM.SavePoolNamesAsync();
+        StateHasChanged();
+    }
 }
