@@ -64,7 +64,7 @@ else
                 <div class="col-share-path">@share.Path</div>
                 @if (ShowDepartmentColumn)
                 {
-                    <div class="col-department">@VM.GetDepartmentName(share)</div>
+                    @DepartmentCell(VM.GetDepartment(share))
                 }
                 <div class="col-size">@(VM.GetShareSize(share) is { } size ? FormatHelper.FormatFileSize(size) : "…")</div>
             </button>
@@ -79,7 +79,7 @@ else
                 <div class="col-share-path">@(string.IsNullOrWhiteSpace(share.ConnectionName) ? share.ProviderDisplayName : share.ConnectionName) · @share.RemotePath</div>
                 @if (ShowDepartmentColumn)
                 {
-                    <div class="col-department">@share.DepartmentName</div>
+                    @DepartmentCell(share.Department)
                 }
                 <div class="col-size">@(share.IsReadOnly ? Text("Web_CloudAccess_ReadOnly") : Text("Web_CloudAccess_Remote"))</div>
             </button>
@@ -92,6 +92,22 @@ else
     // either grants it, so an actor with only remote shares still sees it.
     private bool ShowDepartmentColumn
         => VM.CanViewDepartmentColumn || RemoteVM.CanViewDepartmentColumn;
+
+    // The department cell: a chip framed in the department's color, or a plain
+    // placeholder when the department is unknown.
+    private RenderFragment DepartmentCell(DepartmentDisplay? department) =>
+        @<div class="col-department">
+            @if (department is not null)
+            {
+                <span class="dept-chip"
+                      style="border-color:@department.Color; color:@department.Color; background:@department.Soft;"
+                      title="@department.Name">@department.Name</span>
+            }
+            else
+            {
+                <span class="dept-muted">—</span>
+            }
+        </div>;
 
     protected override void OnInitialized() => VM.OnStateChanged += OnVmStateChanged;
 

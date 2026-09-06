@@ -114,6 +114,26 @@
     background: var(--bg-hover);
 }
 
+/* Department chip: the department color as a frame (and faint fill) around the
+   name so it stands out; border-color/color/background come inline per row. */
+.dept-chip {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 2px 9px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.dept-muted {
+    color: var(--text-tertiary);
+}
+
 @media (max-width: 620px) {
     .file-page-header {
         align-items: flex-start;

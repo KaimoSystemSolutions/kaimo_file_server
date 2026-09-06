@@ -1,8 +1,10 @@
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
+using Kaimo_File_Server.Web.DynamicHelpers;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 
@@ -42,10 +44,9 @@ public sealed class CloudAccessShareBrowserViewModel(
             // share homed outside the actor's manage scope still shows its name.
             CanViewDepartmentColumn = await managementAuth.HasAnyPermissionAsync(
                 actor, ManagementPermission.ViewDepartment | ManagementPermission.EditDepartment);
-            var departmentNames = CanViewDepartmentColumn
-                ? (await departmentRepository.GetAllAsync())
-                    .ToDictionary(department => department.Id, department => department.Name)
-                : new Dictionary<Guid, string>();
+            var departments = CanViewDepartmentColumn
+                ? (await departmentRepository.GetAllAsync()).ToDictionary(department => department.Id)
+                : new Dictionary<Guid, Department>();
 
             var visible = await authorization.GetVisibleSharesAsync(actor);
             var connections = (await connectionsRepository.GetAllAsync()).ToDictionary(x => x.Id);
@@ -56,7 +57,7 @@ public sealed class CloudAccessShareBrowserViewModel(
                     ProviderDisplayName(connections[x.ConnectionId].ProviderId),
                     connections[x.ConnectionId].Name,
                     x.RemoteRootPath, x.IsReadOnly,
-                    DepartmentName(departmentNames, x.DepartmentId)))
+                    ResolveDepartment(departments, x.DepartmentId)))
                 .OrderBy(x => x.Name).ToList();
         }
         catch (Exception exception)
@@ -70,11 +71,17 @@ public sealed class CloudAccessShareBrowserViewModel(
     private string ProviderDisplayName(string providerId)
         => providerCatalog.TryGet(providerId, out var provider) ? provider.DisplayName : providerId;
 
-    private static string DepartmentName(IReadOnlyDictionary<Guid, string> names, Guid departmentId)
-        => names.TryGetValue(departmentId, out var name) && !string.IsNullOrWhiteSpace(name)
-            ? name
-            : "—";
+    private static DepartmentDisplay? ResolveDepartment(
+        IReadOnlyDictionary<Guid, Department> departments, Guid departmentId)
+    {
+        if (!departments.TryGetValue(departmentId, out var department))
+            return null;
+
+        var (color, soft) = DepartmentPalette.For(department.Id, department.Color);
+        return new DepartmentDisplay(
+            string.IsNullOrWhiteSpace(department.Name) ? "—" : department.Name, color, soft);
+    }
 }
 
 public sealed record CloudAccessShareListItem(
-    Guid Id, string Name, string Provider, string ProviderDisplayName, string ConnectionName, string RemotePath, bool IsReadOnly, string DepartmentName);
+    Guid Id, string Name, string Provider, string ProviderDisplayName, string ConnectionName, string RemotePath, bool IsReadOnly, DepartmentDisplay? Department);

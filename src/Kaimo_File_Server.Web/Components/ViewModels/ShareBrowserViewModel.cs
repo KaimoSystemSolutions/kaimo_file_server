@@ -1,9 +1,11 @@
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Web.DynamicHelpers;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Collections.Concurrent;
 using System.Security.Claims;
@@ -11,6 +13,9 @@ using System.Text.RegularExpressions;
 using Kaimo_File_Server.Core.Language;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
+
+/// <summary>Department name plus its palette colors, for the department column chip.</summary>
+public sealed record DepartmentDisplay(string Name, string Color, string Soft);
 
 public partial class ShareBrowserViewModel
 {
@@ -43,10 +48,10 @@ public partial class ShareBrowserViewModel
         _departmentRepo = departmentRepo;
     }
 
-    // DepartmentId → display name, populated in LoadAsync only when the actor may
-    // see the department column. Empty otherwise, so lookups fall back to "—".
-    private IReadOnlyDictionary<Guid, string> _departmentNames =
-        new Dictionary<Guid, string>();
+    // DepartmentId → department, populated in LoadAsync only when the actor may see
+    // the department column. Empty otherwise, so lookups fall back to null.
+    private IReadOnlyDictionary<Guid, Department> _departments =
+        new Dictionary<Guid, Department>();
 
     /// <summary>
     /// Whether the actor may see the department column in the share overview. Gated
@@ -56,14 +61,19 @@ public partial class ShareBrowserViewModel
     public bool CanViewDepartmentColumn { get; private set; }
 
     /// <summary>
-    /// Display name of the department a share belongs to, for the department column.
-    /// Falls back to "—" when the column is hidden or the department is unknown.
+    /// The department a share belongs to, with its palette colors for the column
+    /// chip. Returns <c>null</c> when the column is hidden or the department is
+    /// unknown, so the caller can render a plain placeholder instead of a chip.
     /// </summary>
-    public string GetDepartmentName(ShareDefinition share)
-        => _departmentNames.TryGetValue(share.DepartmentId, out var name)
-            && !string.IsNullOrWhiteSpace(name)
-                ? name
-                : "—";
+    public DepartmentDisplay? GetDepartment(ShareDefinition share)
+    {
+        if (!_departments.TryGetValue(share.DepartmentId, out var department))
+            return null;
+
+        var (color, soft) = DepartmentPalette.For(department.Id, department.Color);
+        return new DepartmentDisplay(
+            string.IsNullOrWhiteSpace(department.Name) ? "—" : department.Name, color, soft);
+    }
 
     // -- State --
 
@@ -116,21 +126,21 @@ public partial class ShareBrowserViewModel
                 IsAdmin = false;
                 CanManageShares = false;
                 CanViewDepartmentColumn = false;
-                _departmentNames = new Dictionary<Guid, string>();
+                _departments = new Dictionary<Guid, Department>();
                 Shares = [];
                 return;
             }
 
             // Department column: visible only to actors holding department view or
-            // edit rights (any scope). Names are loaded once so the list renders them
-            // without a per-row lookup.
+            // edit rights (any scope). Departments are loaded once so the list renders
+            // name + color without a per-row lookup.
             CanViewDepartmentColumn = _departmentRepo is not null
                 && await _mgmtAuth.HasAnyPermissionAsync(actor,
                     ManagementPermission.ViewDepartment | ManagementPermission.EditDepartment);
-            _departmentNames = CanViewDepartmentColumn
+            _departments = CanViewDepartmentColumn
                 ? (await _departmentRepo!.GetAllAsync())
-                    .ToDictionary(department => department.Id, department => department.Name)
-                : new Dictionary<Guid, string>();
+                    .ToDictionary(department => department.Id)
+                : new Dictionary<Guid, Department>();
 
             // Management scope (any share-management right). Global → unrestricted,
             // otherwise limited to the actor's department(s) + descendants.
