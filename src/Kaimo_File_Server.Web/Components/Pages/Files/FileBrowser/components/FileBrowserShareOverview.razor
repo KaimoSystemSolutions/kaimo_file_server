@@ -44,10 +44,14 @@ else if (!VM.Shares.Any() && !RemoteVM.Shares.Any())
 }
 else
 {
-    <div class="file-table-wrap share-overview-table">
+    <div class="file-table-wrap share-overview-table @(ShowDepartmentColumn ? "share-overview-table--with-dept" : "")">
         <div class="file-grid-header">
             <div class="col-name">@Resources.Web_Folder_Name</div>
             <div class="col-share-path">@Resources.Web_ShareList_Label_Path</div>
+            @if (ShowDepartmentColumn)
+            {
+                <div class="col-department">@Resources.Web_Admin_Label_Department</div>
+            }
             <div class="col-size">@Resources.Web_Folder_Size</div>
         </div>
         @foreach (var share in VM.Shares)
@@ -58,6 +62,10 @@ else
                     <span>@share.Name</span>
                 </div>
                 <div class="col-share-path">@share.Path</div>
+                @if (ShowDepartmentColumn)
+                {
+                    <div class="col-department">@VM.GetDepartmentName(share)</div>
+                }
                 <div class="col-size">@(VM.GetShareSize(share) is { } size ? FormatHelper.FormatFileSize(size) : "…")</div>
             </button>
         }
@@ -69,6 +77,10 @@ else
                     <span>@share.Name</span>
                 </div>
                 <div class="col-share-path">@(string.IsNullOrWhiteSpace(share.ConnectionName) ? share.ProviderDisplayName : share.ConnectionName) · @share.RemotePath</div>
+                @if (ShowDepartmentColumn)
+                {
+                    <div class="col-department">@share.DepartmentName</div>
+                }
                 <div class="col-size">@(share.IsReadOnly ? Text("Web_CloudAccess_ReadOnly") : Text("Web_CloudAccess_Remote"))</div>
             </button>
         }
@@ -76,6 +88,11 @@ else
 }
 
 @code {
+    // Either view model resolves the same actor/permission; show the column if
+    // either grants it, so an actor with only remote shares still sees it.
+    private bool ShowDepartmentColumn
+        => VM.CanViewDepartmentColumn || RemoteVM.CanViewDepartmentColumn;
+
     protected override void OnInitialized() => VM.OnStateChanged += OnVmStateChanged;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

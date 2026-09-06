@@ -21,6 +21,7 @@ public partial class ShareBrowserViewModel
     private readonly AuthenticationStateProvider _authState;
     private readonly ILogger<ShareBrowserViewModel> _logger;
     private readonly IFileServiceFactory _fileServiceFactory;
+    private readonly IDepartmentRepository? _departmentRepo;
 
     public ShareBrowserViewModel(
         IShareRepository shareRepo,
@@ -29,7 +30,8 @@ public partial class ShareBrowserViewModel
         IUserContextFactory userContextFactory,
         AuthenticationStateProvider authState,
         ILogger<ShareBrowserViewModel> logger,
-        IFileServiceFactory fileServiceFactory)
+        IFileServiceFactory fileServiceFactory,
+        IDepartmentRepository? departmentRepo = null)
     {
         _shareRepo = shareRepo;
         _aclService = aclService;
@@ -38,7 +40,30 @@ public partial class ShareBrowserViewModel
         _authState = authState;
         _logger = logger;
         _fileServiceFactory = fileServiceFactory;
+        _departmentRepo = departmentRepo;
     }
+
+    // DepartmentId → display name, populated in LoadAsync only when the actor may
+    // see the department column. Empty otherwise, so lookups fall back to "—".
+    private IReadOnlyDictionary<Guid, string> _departmentNames =
+        new Dictionary<Guid, string>();
+
+    /// <summary>
+    /// Whether the actor may see the department column in the share overview. Gated
+    /// by the department view/edit management rights (any scope); irrelevant to
+    /// normal users, useful for admins to see where each share is homed.
+    /// </summary>
+    public bool CanViewDepartmentColumn { get; private set; }
+
+    /// <summary>
+    /// Display name of the department a share belongs to, for the department column.
+    /// Falls back to "—" when the column is hidden or the department is unknown.
+    /// </summary>
+    public string GetDepartmentName(ShareDefinition share)
+        => _departmentNames.TryGetValue(share.DepartmentId, out var name)
+            && !string.IsNullOrWhiteSpace(name)
+                ? name
+                : "—";
 
     // -- State --
 
@@ -90,9 +115,22 @@ public partial class ShareBrowserViewModel
             {
                 IsAdmin = false;
                 CanManageShares = false;
+                CanViewDepartmentColumn = false;
+                _departmentNames = new Dictionary<Guid, string>();
                 Shares = [];
                 return;
             }
+
+            // Department column: visible only to actors holding department view or
+            // edit rights (any scope). Names are loaded once so the list renders them
+            // without a per-row lookup.
+            CanViewDepartmentColumn = _departmentRepo is not null
+                && await _mgmtAuth.HasAnyPermissionAsync(actor,
+                    ManagementPermission.ViewDepartment | ManagementPermission.EditDepartment);
+            _departmentNames = CanViewDepartmentColumn
+                ? (await _departmentRepo!.GetAllAsync())
+                    .ToDictionary(department => department.Id, department => department.Name)
+                : new Dictionary<Guid, string>();
 
             // Management scope (any share-management right). Global → unrestricted,
             // otherwise limited to the actor's department(s) + descendants.

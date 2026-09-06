@@ -42,6 +42,10 @@
     background: var(--bg-secondary);
 }
 
+.share-overview-table--with-dept {
+    --grid-cols: minmax(180px, 1fr) minmax(200px, 1fr) minmax(120px, 0.8fr) 100px;
+}
+
 .file-grid-header,
 .file-grid-row {
     display: grid;
@@ -125,7 +129,8 @@
         min-height: 40px;
     }
 
-    .share-overview-table {
+    .share-overview-table,
+    .share-overview-table--with-dept {
         --grid-cols: 1fr 90px;
         margin-inline: -16px;
         width: calc(100% + 32px);
@@ -134,7 +139,8 @@
         border-radius: 0;
     }
 
-    .col-share-path {
+    .col-share-path,
+    .col-department {
         display: none;
     }
 }
