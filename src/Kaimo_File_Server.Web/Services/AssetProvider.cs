@@ -92,9 +92,12 @@ public class AssetProvider
             return cached;
         
         var fullPath = Path.Combine(_env.WebRootPath, relativePath);
-        
-        // remove every tag that isn't part of the drawing
-        var svgPaths = string.Join('\n', File.ReadAllLines(fullPath)
+
+        // Normalize so every element sits on its own line regardless of how the
+        // file was formatted (Inkscape spreads attributes across many lines),
+        // then keep only the drawing elements.
+        var flattened = Regex.Replace(File.ReadAllText(fullPath), @"\s+", " ").Replace("<", "\n<");
+        var svgPaths = string.Join('\n', flattened.Split('\n')
             .Where(l => RELEVANT_SVG_TAGS.Any(tag => l.TrimStart().StartsWith("<" + tag))));
 
         _pathsCache[relativePath] = svgPaths;
