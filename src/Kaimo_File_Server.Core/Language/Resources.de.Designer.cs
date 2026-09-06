@@ -3273,6 +3273,24 @@ namespace Kaimo_File_Server.Core.Language {
             }
         }
         
+        internal static string Web_Dept_Label_Color {
+            get {
+                return ResourceManager.GetString("Web_Dept_Label_Color", resourceCulture);
+            }
+        }
+
+        internal static string Web_Dept_CustomColor {
+            get {
+                return ResourceManager.GetString("Web_Dept_CustomColor", resourceCulture);
+            }
+        }
+
+        internal static string Web_Dept_ColorHint {
+            get {
+                return ResourceManager.GetString("Web_Dept_ColorHint", resourceCulture);
+            }
+        }
+
         internal static string Web_Dept_Label_InheritsFrom {
             get {
                 return ResourceManager.GetString("Web_Dept_Label_InheritsFrom", resourceCulture);

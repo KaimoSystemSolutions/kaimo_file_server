@@ -134,6 +134,21 @@ else
                                    @bind="VM.EditDescription" @bind:event="oninput" />
                         </div>
                         <div class="form-group">
+                            <label>@Resources.Web_Dept_Label_Color</label>
+                            <div class="toggle-row">
+                                <span class="toggle-label-text">@Resources.Web_Dept_CustomColor</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" @bind="VM.EditUseCustomColor" />
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            @if (VM.EditUseCustomColor)
+                            {
+                                <input type="color" class="edit-input" @bind="VM.EditColor" />
+                            }
+                            <span class="form-hint">@Resources.Web_Dept_ColorHint</span>
+                        </div>
+                        <div class="form-group">
                             <label>@Resources.Web_Dept_Label_InheritsFrom</label>
                             <PrincipalPickerField Mode="SelectionMode.Single"
                                                   Items="VM.AvailableParents.ToDepartmentItems()"

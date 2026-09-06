@@ -2124,6 +2124,15 @@
   <data name="Web_Dept_EditDepartment" xml:space="preserve">
     <value>Abteilung bearbeiten</value>
   </data>
+  <data name="Web_Dept_Label_Color" xml:space="preserve">
+    <value>Farbe</value>
+  </data>
+  <data name="Web_Dept_CustomColor" xml:space="preserve">
+    <value>Eigene Farbe verwenden</value>
+  </data>
+  <data name="Web_Dept_ColorHint" xml:space="preserve">
+    <value>Ist die Option deaktiviert, wird automatisch eine Farbe aus der Abteilung abgeleitet, damit sie optisch unterscheidbar bleibt.</value>
+  </data>
   <data name="Web_Dept_Label_InheritsFrom" xml:space="preserve">
     <value>Erbt von (Elternabteilung)</value>
   </data>

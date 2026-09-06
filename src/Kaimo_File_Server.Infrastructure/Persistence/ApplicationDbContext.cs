@@ -439,6 +439,8 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                     .HasColumnName("default_file_permission")
                     .IsRequired(false);
 
+                entity.Property(e => e.Color).HasMaxLength(9).IsRequired(false);
+
                 entity.HasIndex(e => e.ParentDepartmentId);
             });
 

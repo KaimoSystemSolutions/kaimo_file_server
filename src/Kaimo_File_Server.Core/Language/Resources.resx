@@ -2124,6 +2124,15 @@
   <data name="Web_Dept_EditDepartment" xml:space="preserve">
     <value>Edit department</value>
   </data>
+  <data name="Web_Dept_Label_Color" xml:space="preserve">
+    <value>Color</value>
+  </data>
+  <data name="Web_Dept_CustomColor" xml:space="preserve">
+    <value>Use custom color</value>
+  </data>
+  <data name="Web_Dept_ColorHint" xml:space="preserve">
+    <value>When disabled, an automatic color is derived from the department so it stays visually distinguishable.</value>
+  </data>
   <data name="Web_Dept_Label_InheritsFrom" xml:space="preserve">
     <value>Inherits from (parent department)</value>
   </data>

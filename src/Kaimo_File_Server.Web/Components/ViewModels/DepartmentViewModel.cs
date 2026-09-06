@@ -5,6 +5,7 @@ using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Web.DynamicHelpers;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
 using Kaimo_File_Server.Core.Language;
@@ -86,6 +87,10 @@ public class DepartmentViewModel
     public Guid? EditParentId { get; set; }
     public bool EditHasOwnPermission { get; set; }
     public FilePermission EditDefaultPermission { get; set; } = FilePermission.None;
+    /// <summary>When false the department uses its automatic color (<see cref="Department.Color"/> = null).</summary>
+    public bool EditUseCustomColor { get; set; }
+    /// <summary>Current picker value; only persisted when <see cref="EditUseCustomColor"/> is true.</summary>
+    public string EditColor { get; set; } = "";
     public List<CheckboxItem<User>> EditMembers { get; private set; } = [];
     public List<CheckboxItem<Group>> EditGroups { get; private set; } = [];
     public List<CheckboxItem<ShareDefinition>> EditShares { get; private set; } = [];
@@ -293,6 +298,10 @@ public class DepartmentViewModel
             ? (FilePermission)Selected.DefaultFilePermission.Value
             : FilePermission.None;
 
+        // Seed the picker with the current automatic color so enabling the toggle starts sensibly.
+        EditUseCustomColor = Selected.Color != null;
+        EditColor = Selected.Color ?? DepartmentPalette.AutoHex(Selected.Id);
+
         // Available parents (exclude self + descendants to prevent cycles)
         var allDepts = await _departmentRepo.GetAllAsync();
         var descendantIds = await _departmentRepo.GetDescendantIdsAsync(Selected.Id);
@@ -342,6 +351,8 @@ public class DepartmentViewModel
             Selected.DefaultFilePermission = EditHasOwnPermission
                 ? (long)EditDefaultPermission
                 : null;
+            // Normalize guards the trust boundary: this value is emitted into inline CSS.
+            Selected.Color = EditUseCustomColor ? DepartmentPalette.Normalize(EditColor) : null;
 
             await _departmentRepo.UpdateAsync(Selected);
 

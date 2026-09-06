@@ -28,4 +28,5 @@ public enum PrincipalKind
 /// <param name="Name">Display name (also the search and sort key).</param>
 /// <param name="Kind">Principal type, used for tabs, icon and colour.</param>
 /// <param name="Hint">Optional secondary line (e.g. username or member count).</param>
-public record PrincipalPickerItem(Guid Id, string Name, PrincipalKind Kind, string? Hint = null);
+/// <param name="Color">Optional custom <c>#RRGGBB</c> color (departments); null uses the kind default / automatic color.</param>
+public record PrincipalPickerItem(Guid Id, string Name, PrincipalKind Kind, string? Hint = null, string? Color = null);

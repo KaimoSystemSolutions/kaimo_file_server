@@ -4120,6 +4120,33 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Color ähnelt.
+        /// </summary>
+        public static string Web_Dept_Label_Color {
+            get {
+                return ResourceManager.GetString("Web_Dept_Label_Color", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Use custom color ähnelt.
+        /// </summary>
+        public static string Web_Dept_CustomColor {
+            get {
+                return ResourceManager.GetString("Web_Dept_CustomColor", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die When disabled, an automatic color is derived from the department so it stays visually distinguishable. ähnelt.
+        /// </summary>
+        public static string Web_Dept_ColorHint {
+            get {
+                return ResourceManager.GetString("Web_Dept_ColorHint", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Inherits from (parent department) ähnelt.
         /// </summary>
         public static string Web_Dept_Label_InheritsFrom {

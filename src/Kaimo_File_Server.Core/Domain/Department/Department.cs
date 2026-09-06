@@ -50,6 +50,14 @@ namespace Kaimo_File_Server.Core.Domain.Department
         /// </summary>
         public long? DefaultFilePermission { get; set; }
 
+        /// <summary>
+        /// Optional custom display color as a <c>#RRGGBB</c> hex string.
+        /// <c>null</c> means the UI derives a stable automatic color from
+        /// <see cref="Id"/>, so every department is visually distinguishable
+        /// without requiring manual assignment.
+        /// </summary>
+        public string? Color { get; set; }
+
         /// <summary>EF Core constructor.</summary>
         internal Department() { }
 

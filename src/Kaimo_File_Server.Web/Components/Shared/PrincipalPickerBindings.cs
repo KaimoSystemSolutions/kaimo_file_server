@@ -31,7 +31,7 @@ public static class PrincipalPickerBindings
     // -- Single-select helpers for department pickers --
 
     public static IReadOnlyList<PrincipalPickerItem> ToDepartmentItems(this IEnumerable<Department> depts) =>
-        depts.Select(d => new PrincipalPickerItem(d.Id, d.Name, PrincipalKind.Department)).ToList();
+        depts.Select(d => new PrincipalPickerItem(d.Id, d.Name, PrincipalKind.Department, Color: d.Color)).ToList();
 
     /// <summary>Wraps an optional id as a single-element selection (empty when null).</summary>
     public static IReadOnlyCollection<Guid> AsSelection(this Guid? id) =>
