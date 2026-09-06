@@ -154,7 +154,7 @@
    uniformity is what keeps the live refresh from visibly reflowing. */
 
 .log-table {
-    --log-grid: 150px 66px 108px 150px minmax(0, 1fr) 22px;
+    --log-grid: 150px 84px 108px 150px minmax(0, 1fr) 22px;
     display: flex;
     flex-direction: column;
     border: 1px solid var(--border);
@@ -233,7 +233,9 @@
 .log-date {
     margin-left: 7px;
     color: var(--text-tertiary);
-    font-size: 11px;
+    /* Matches the time size so the date reads clearly, but the tertiary
+       colour keeps it visibly the secondary part of the timestamp. */
+    font-size: 12px;
 }
 
 .log-level {

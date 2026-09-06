@@ -152,7 +152,7 @@
                 {
                     @foreach (var entry in Viewer.Entries)
                     {
-                        <details class="log-row @(HasDetails(entry) ? "log-row--expandable" : "log-row--static")" role="row">
+                        <details @key='$"{entry.Instance}:{entry.Sequence}"' class="log-row @(HasDetails(entry) ? "log-row--expandable" : "log-row--static")" role="row">
                             <summary class="log-row-summary">
                                 <time title="@entry.TimestampUtc.ToString("O")">@entry.TimestampUtc.ToLocalTime().ToString("HH:mm:ss.fff")<span class="log-date">@entry.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd")</span></time>
                                 <span class="log-level log-level-@entry.Level.ToString().ToLowerInvariant()">@LevelLabel(entry.Level)</span>
