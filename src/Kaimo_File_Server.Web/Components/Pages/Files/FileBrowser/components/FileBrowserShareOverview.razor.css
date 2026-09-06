@@ -83,6 +83,43 @@
     border-right: 0;
 }
 
+/* --- Sortable headers (mirrors the file browser) --- */
+.col-sortable {
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+}
+
+.col-sortable:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.col-header-text {
+    vertical-align: middle;
+}
+
+.sort-arrow {
+    display: inline-block;
+    width: 0;
+    height: 0;
+    margin-left: 5px;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+}
+
+.sort-arrow--asc {
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 5px solid var(--accent);
+}
+
+.sort-arrow--desc {
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--accent);
+}
+
 .file-grid-row:last-child > div {
     border-bottom: 0;
 }

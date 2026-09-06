@@ -46,15 +46,27 @@ else
 {
     <div class="file-table-wrap share-overview-table @(ShowDepartmentColumn ? "share-overview-table--with-dept" : "")">
         <div class="file-grid-header">
-            <div class="col-name">@Resources.Web_Folder_Name</div>
-            <div class="col-share-path">@Resources.Web_ShareList_Label_Path</div>
+            <div class="col-name col-sortable" @onclick="@(() => OnHeaderClick("name"))">
+                <span class="col-header-text">@Resources.Web_Folder_Name</span>
+                @SortArrow("name")
+            </div>
+            <div class="col-share-path col-sortable" @onclick="@(() => OnHeaderClick("path"))">
+                <span class="col-header-text">@Resources.Web_ShareList_Label_Path</span>
+                @SortArrow("path")
+            </div>
             @if (ShowDepartmentColumn)
             {
-                <div class="col-department">@Resources.Web_Admin_Label_Department</div>
+                <div class="col-department col-sortable" @onclick="@(() => OnHeaderClick("department"))">
+                    <span class="col-header-text">@Resources.Web_Admin_Label_Department</span>
+                    @SortArrow("department")
+                </div>
             }
-            <div class="col-size">@Resources.Web_Folder_Size</div>
+            <div class="col-size col-sortable" @onclick="@(() => OnHeaderClick("size"))">
+                <span class="col-header-text">@Resources.Web_Folder_Size</span>
+                @SortArrow("size")
+            </div>
         </div>
-        @foreach (var share in VM.Shares)
+        @foreach (var share in SortedLocalShares())
         {
             <button class="file-grid-row file-row-dir share-overview-row" type="button" @onclick="() => OpenShare(share.Name)">
                 <div class="col-name">
@@ -69,14 +81,14 @@ else
                 <div class="col-size">@(VM.GetShareSize(share) is { } size ? FormatHelper.FormatFileSize(size) : "…")</div>
             </button>
         }
-        @foreach (var share in RemoteVM.Shares)
+        @foreach (var share in SortedRemoteShares())
         {
             <button class="file-grid-row file-row-dir share-overview-row" type="button" @onclick="() => OpenRemoteShare(share.Id)">
                 <div class="col-name">
                     @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--folder-stroke)", CssClass: "file-icon"))
                     <span>@share.Name</span>
                 </div>
-                <div class="col-share-path">@(string.IsNullOrWhiteSpace(share.ConnectionName) ? share.ProviderDisplayName : share.ConnectionName) · @share.RemotePath</div>
+                <div class="col-share-path">@RemotePathText(share)</div>
                 @if (ShowDepartmentColumn)
                 {
                     @DepartmentCell(share.Department)
@@ -108,6 +120,63 @@ else
                 <span class="dept-muted">—</span>
             }
         </div>;
+
+    // Column sorting mirrors the file browser: click cycles descending → ascending
+    // → default (unsorted), and only one column is active at a time.
+    private string? _sortColumn;
+    private int _sortDirection; // 0 = default, 1 = descending, 2 = ascending
+
+    private void OnHeaderClick(string column)
+    {
+        if (_sortColumn == column)
+        {
+            _sortDirection = (_sortDirection + 1) % 3;
+            if (_sortDirection == 0)
+                _sortColumn = null;
+        }
+        else
+        {
+            _sortColumn = column;
+            _sortDirection = 1;
+        }
+    }
+
+    private RenderFragment SortArrow(string column) =>
+        _sortColumn == column
+            ? @<span class="sort-arrow @(_sortDirection == 1 ? "sort-arrow--desc" : "sort-arrow--asc")"></span>
+            : @<text></text>;
+
+    private IOrderedEnumerable<T> Direction<T, TKey>(IEnumerable<T> items, Func<T, TKey> key)
+        => _sortDirection == 1 ? items.OrderByDescending(key) : items.OrderBy(key);
+
+    private IEnumerable<ShareDefinition> SortedLocalShares()
+    {
+        if (_sortColumn is null || _sortDirection == 0) return VM.Shares;
+        return _sortColumn switch
+        {
+            "name" => Direction(VM.Shares, s => s.Name.ToLowerInvariant()),
+            "path" => Direction(VM.Shares, s => s.Path.ToLowerInvariant()),
+            "department" => Direction(VM.Shares, s => VM.GetDepartment(s)?.Name.ToLowerInvariant() ?? ""),
+            "size" => Direction(VM.Shares, s => VM.GetShareSize(s) ?? 0L),
+            _ => VM.Shares
+        };
+    }
+
+    private IEnumerable<CloudAccessShareListItem> SortedRemoteShares()
+    {
+        if (_sortColumn is null || _sortDirection == 0) return RemoteVM.Shares;
+        return _sortColumn switch
+        {
+            "name" => Direction(RemoteVM.Shares, s => s.Name.ToLowerInvariant()),
+            "path" => Direction(RemoteVM.Shares, s => RemotePathText(s).ToLowerInvariant()),
+            "department" => Direction(RemoteVM.Shares, s => s.Department?.Name.ToLowerInvariant() ?? ""),
+            _ => RemoteVM.Shares // remote shares have no numeric size; keep default order
+        };
+    }
+
+    // The Path column text for a remote share, so the row and the sort key stay identical.
+    private static string RemotePathText(CloudAccessShareListItem share) =>
+        $"{(string.IsNullOrWhiteSpace(share.ConnectionName) ? share.ProviderDisplayName : share.ConnectionName)} · {share.RemotePath}";
 
     protected override void OnInitialized() => VM.OnStateChanged += OnVmStateChanged;
 
