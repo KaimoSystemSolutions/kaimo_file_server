@@ -232,13 +232,18 @@
 
 .settings-workspace {
     display: block;
-    min-height: min(680px, calc(100vh - 190px));
+    /* Bound to the viewport so the page itself never scrolls; the tab strip
+       and content pane each scroll on their own (see below). Falls back to a
+       growing page on very short viewports via min-height. */
+    height: calc(100vh - 190px);
+    min-height: 420px;
 }
 
 .settings-page {
     width: 100%;
     min-width: 0;
-    min-height: inherit;
+    height: 100%;
+    min-height: 0;
     display: grid;
     grid-template-columns: 230px minmax(0, 1fr);
     align-self: stretch;
@@ -251,11 +256,21 @@
     box-shadow: none;
 }
 
+/* Vertical tab strip scrolls independently when the list is taller than the pane. */
+.settings-page ::deep .detail-tabs--vertical {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
 /* The vertical settings sidebar is now the shared <Tabs> vertical variant.
    Its styling lives in Components/Shared/Tabs.razor.css (.detail-tabs--vertical). */
 
 .settings-content {
     min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 22px 24px 28px;
     background: var(--bg-secondary);
 }
@@ -304,8 +319,24 @@
 }
 
 @media (max-width: 800px) {
+    /* Single column: let the whole page scroll normally instead of trapping
+       content inside a fixed-height pane. */
+    .settings-workspace {
+        height: auto;
+        min-height: 0;
+    }
+
     .settings-page {
         grid-template-columns: 1fr;
+        height: auto;
+    }
+
+    .settings-page ::deep .detail-tabs--vertical {
+        overflow-y: visible;
+    }
+
+    .settings-content {
+        overflow-y: visible;
     }
 }
 
