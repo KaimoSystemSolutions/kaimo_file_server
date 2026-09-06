@@ -16,7 +16,7 @@
 }
 
 .sidebar-brand {
-    min-height: 72px;
+    min-height: 71px;
     display: flex;
     align-items: center;
     gap: 11px;
@@ -167,7 +167,7 @@
     top: 0;
     z-index: 100;
     margin: 0 -28px 20px;
-    padding: 11px 28px;
+    /*padding: 11px 28px;*/
     border-bottom: 1px solid var(--border);
     background: color-mix(in srgb, var(--bg-tertiary) 92%, transparent);
     backdrop-filter: blur(10px);
