@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Kaimo_File_Server.Core.Helpers;
 
 namespace Kaimo_File_Server.Web.DynamicHelpers;
 
@@ -20,10 +21,14 @@ public static class DepartmentPalette
     private const int Lightness = 55;
     private const double SoftAlpha = 0.17;
 
+    // The Global department has no editable color; give it a fixed green default
+    // instead of the (red) hue its well-known id would otherwise hash to.
+    private const string GlobalHex = "#338000";
+
     /// <summary>Stroke/text color and matching soft background for a department.</summary>
     public static (string Color, string Soft) For(Guid id, string? hex)
     {
-        var custom = Normalize(hex);
+        var custom = Normalize(hex) ?? (id == WellKnownGUIDs.DEPARTMENT_GLOBAL ? GlobalHex : null);
         if (custom is not null)
         {
             var (r, g, b) = ParseHex(custom);
