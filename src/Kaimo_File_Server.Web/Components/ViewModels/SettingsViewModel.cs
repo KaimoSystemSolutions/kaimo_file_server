@@ -1155,7 +1155,13 @@ public class SettingsViewModel
         foreach (var c in ContextCommandCatalog.All)
             if (!_order.Contains(c.Id))
                 _order.Add(c.Id);
+
+        // General items (new folder / refresh) are pinned to the bottom of the menu.
+        // OrderBy is a stable sort, so relative order within each group is preserved.
+        _order = _order.OrderBy(id => IsGeneralCmd(id) ? 1 : 0).ToList();
     }
+
+    private static bool IsGeneralCmd(string id) => ContextCommandCatalog.GeneralIds.Contains(id);
 
     /// <summary>Command rows for the matrix, in the global order.</summary>
     public IReadOnlyList<ContextCommand> OrderedCommands =>
@@ -1208,6 +1214,8 @@ public class SettingsViewModel
     public void ReorderCommand(string commandId, string targetId)
     {
         if (commandId == targetId) return;
+        // Keep general and main items in separate blocks: only reorder within a group.
+        if (IsGeneralCmd(commandId) != IsGeneralCmd(targetId)) return;
         var from = _order.IndexOf(commandId);
         var to = _order.IndexOf(targetId);
         if (from < 0 || to < 0) return;
@@ -1219,13 +1227,16 @@ public class SettingsViewModel
     public void MoveCommandUp(string commandId)
     {
         var i = _order.IndexOf(commandId);
-        if (i > 0) (_order[i - 1], _order[i]) = (_order[i], _order[i - 1]);
+        // Block swapping across the main/general boundary.
+        if (i > 0 && IsGeneralCmd(commandId) == IsGeneralCmd(_order[i - 1]))
+            (_order[i - 1], _order[i]) = (_order[i], _order[i - 1]);
     }
 
     public void MoveCommandDown(string commandId)
     {
         var i = _order.IndexOf(commandId);
-        if (i >= 0 && i < _order.Count - 1) (_order[i + 1], _order[i]) = (_order[i], _order[i + 1]);
+        if (i >= 0 && i < _order.Count - 1 && IsGeneralCmd(commandId) == IsGeneralCmd(_order[i + 1]))
+            (_order[i + 1], _order[i]) = (_order[i], _order[i + 1]);
     }
 
     /// <summary>The commands that would render for <see cref="PreviewScope"/>, in order.</summary>

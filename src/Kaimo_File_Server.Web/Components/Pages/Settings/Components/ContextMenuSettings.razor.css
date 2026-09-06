@@ -288,6 +288,10 @@ tr.ctx-danger .ctx-box--on { background: var(--danger); border-color: var(--dang
 .ctx-order-lab { font-size: 14px; }
 .ctx-order-btns { margin-left: auto; display: inline-flex; gap: 2px; }
 
+/* fixed divider between the reorderable main block and the pinned general items
+   (new folder / refresh), which always stay at the bottom and cannot be mixed in. */
+.ctx-order-sep { height: 1px; background: var(--border); margin: 6px 6px; list-style: none; }
+
 /* ── live preview ── */
 .ctx-preview { padding: 16px 18px 20px; }
 .ctx-preview-cap { font-size: 13px; color: var(--text-tertiary); margin: 0 0 12px; }

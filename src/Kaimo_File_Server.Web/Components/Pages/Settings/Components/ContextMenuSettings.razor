@@ -119,11 +119,23 @@
                 <span class="ctx-hint">@T("Web_Settings_Ctx_OrderHint")</span>
             </div>
             <ul class="ctx-order">
-                @{ var pos = 0; }
-                @foreach (var cmd in VM.OrderedCommands)
+                @{
+                    var ordered = VM.OrderedCommands;
+                    var firstGeneral = ordered.ToList().FindIndex(x => ContextCommandCatalog.GeneralIds.Contains(x.Id));
+                    var pos = 0;
+                }
+                @foreach (var cmd in ordered)
                 {
                     var c = cmd;
                     var i = pos++;
+                    var isGeneral = ContextCommandCatalog.GeneralIds.Contains(c.Id);
+                    // Arrows stop at the group boundary: no crossing between main and general.
+                    var upDisabled = i == 0 || (isGeneral && i == firstGeneral);
+                    var downDisabled = i == ordered.Count - 1 || (!isGeneral && i == firstGeneral - 1);
+                    if (firstGeneral >= 0 && i == firstGeneral)
+                    {
+                        <li class="ctx-order-sep" aria-hidden="true"></li>
+                    }
                     var cls = c.IsDanger ? "ctx-danger" : "";
                     if (_dragId == c.Id) cls += " ctx-dragging";
                     if (_dragOverId == c.Id && _dragId != c.Id) cls += " ctx-dropbefore";
@@ -144,9 +156,9 @@
                         <span class="ctx-order-lab">@c.DisplayLabel</span>
                         <span class="ctx-order-btns">
                             <button class="btn-icon btn-icon--small" title="@Resources.Web_Settings_CtxMoveUp"
-                                    disabled="@(i == 0)" @onclick="() => VM.MoveCommandUp(c.Id)">↑</button>
+                                    disabled="@upDisabled" @onclick="() => VM.MoveCommandUp(c.Id)">↑</button>
                             <button class="btn-icon btn-icon--small" title="@Resources.Web_Settings_CtxMoveDown"
-                                    disabled="@(i == VM.OrderedCommands.Count - 1)" @onclick="() => VM.MoveCommandDown(c.Id)">↓</button>
+                                    disabled="@downDisabled" @onclick="() => VM.MoveCommandDown(c.Id)">↓</button>
                         </span>
                     </li>
                 }
