@@ -261,6 +261,42 @@
   <data name="Web_Button_Close" xml:space="preserve">
     <value>Close</value>
   </data>
+  <data name="Web_Picker_Placeholder" xml:space="preserve">
+    <value>Select…</value>
+  </data>
+  <data name="Web_Picker_Search" xml:space="preserve">
+    <value>Search by name</value>
+  </data>
+  <data name="Web_Picker_NoMatches" xml:space="preserve">
+    <value>No matches</value>
+  </data>
+  <data name="Web_Picker_Empty" xml:space="preserve">
+    <value>Nothing to choose from</value>
+  </data>
+  <data name="Web_Picker_Selected" xml:space="preserve">
+    <value>{0} selected</value>
+  </data>
+  <data name="Web_Picker_NothingSelected" xml:space="preserve">
+    <value>Nothing selected yet</value>
+  </data>
+  <data name="Web_Picker_Remove" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Web_Picker_Users" xml:space="preserve">
+    <value>Users</value>
+  </data>
+  <data name="Web_Picker_Groups" xml:space="preserve">
+    <value>Groups</value>
+  </data>
+  <data name="Web_Picker_Roles" xml:space="preserve">
+    <value>Roles</value>
+  </data>
+  <data name="Web_Picker_Departments" xml:space="preserve">
+    <value>Departments</value>
+  </data>
+  <data name="Web_Picker_Shares" xml:space="preserve">
+    <value>Shares</value>
+  </data>
   <data name="Web_Selection_None" xml:space="preserve">
     <value>No selection</value>
   </data>
@@ -523,7 +559,7 @@
     <value>Inheritance</value>
   </data>
   <data name="Web_Acl_EmptyHint" xml:space="preserve">
-    <value>No permissions have been configured. Without ACL entries, all users with share access have full access.</value>
+    <value>No permissions have been configured.</value>
   </data>
   <data name="Web_Acl_AddPermission" xml:space="preserve">
     <value>Add Permission</value>
@@ -1687,7 +1723,7 @@
     <value>No file selected</value>
   </data>
   <data name="Web_Login_PageTitle" xml:space="preserve">
-    <value>Kaimo Files – Login</value>
+    <value>Kaimo File Server – Login</value>
   </data>
   <data name="Web_Login_Subtitle" xml:space="preserve">
     <value>Sign in to continue</value>
@@ -1723,7 +1759,7 @@
     <value>Loading…</value>
   </data>
   <data name="Web_Admin_PageTitle" xml:space="preserve">
-    <value>Kaimo Files – Administration</value>
+    <value>Kaimo File Server – Administration</value>
   </data>
   <data name="Web_Admin_Heading" xml:space="preserve">
     <value>Administration</value>
@@ -2044,7 +2080,7 @@
     <value>Share</value>
   </data>
   <data name="Web_Dept_PageTitle" xml:space="preserve">
-    <value>Kaimo Files – Departments</value>
+    <value>Kaimo File Server – Departments</value>
   </data>
   <data name="Web_Dept_Heading" xml:space="preserve">
     <value>Departments</value>
@@ -3886,7 +3922,7 @@
     <value>Current RAM usage</value>
   </data>
   <data name="Web_Settings_Mem_Description" xml:space="preserve">
-    <value>Memory consumption of the running Kaimo Files process. The .NET heap is the snapshot after the last garbage collection; refreshing does not force a GC.</value>
+    <value>Memory consumption of the running Kaimo File Server process. The .NET heap is the snapshot after the last garbage collection; refreshing does not force a GC.</value>
   </data>
   <data name="Web_Settings_Mem_WorkingSet" xml:space="preserve">
     <value>Working memory · {0} % of {1}</value>

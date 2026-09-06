@@ -183,30 +183,12 @@
                 <div class="acl-form">
                     <div class="acl-form-row">
                         <span class="detail-label">@Resources.Web_Acl_Type</span>
-                        <div class="acl-type-tabs">
-                            <button class="acl-type-tab @(VM.NewPrincipalType == "user" ? "active" : "")" @onclick='() => SetPrincipalType("user")'>@Resources.Web_Acl_Button_User</button>
-                            <button class="acl-type-tab @(VM.NewPrincipalType == "group" ? "active" : "")" @onclick='() => SetPrincipalType("group")'>@Resources.Web_Acl_Button_Group</button>
-                        </div>
-                    </div>
-                    <div class="acl-form-row">
-                        <span class="detail-label">@(VM.NewPrincipalType == "user" ? Resources.Web_Acl_Button_User : Resources.Web_Acl_Button_Group)</span>
-                        <select class="edit-input" @onchange="OnPrincipalSelected">
-                            <option value="">— @Resources.Web_Acl_SelectPlaceholder —</option>
-                            @if (VM.NewPrincipalType == "user")
-                            {
-                                @foreach (var u in VM.AllUsers)
-                                {
-                                    <option value="@u.Id">@(u.Name ?? u.Username)</option>
-                                }
-                            }
-                            else
-                            {
-                                @foreach (var g in VM.AllGroups)
-                                {
-                                    <option value="@g.Id">@g.Name</option>
-                                }
-                            }
-                        </select>
+                        <PrincipalPickerField Mode="SelectionMode.Single"
+                                              Items="PrincipalItems"
+                                              SelectedIds="SelectedPrincipalIds"
+                                              SelectedIdsChanged="OnPrincipalPicked"
+                                              Title="@Resources.Web_Acl_AddPermission"
+                                              Placeholder="@Resources.Web_Acl_SelectPlaceholder" />
                     </div>
                     @RenderPermissionForm(true)
                 </div>

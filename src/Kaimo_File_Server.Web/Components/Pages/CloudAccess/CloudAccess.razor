@@ -115,13 +115,12 @@ else
                 </label>
                 <label>
                     <span class="detail-label">@R("Web_CloudAccess_Department")</span>
-                    <select class="edit-input" @bind="_connectionDepartmentId">
-                        <option value="@Guid.Empty">@R("Web_CloudAccess_Select")</option>
-                        @foreach (var department in VM.ManageableDepartments)
-                        {
-                            <option value="@department.Id">@department.Name</option>
-                        }
-                    </select>
+                    <PrincipalPickerField Mode="SelectionMode.Single"
+                                          Items="VM.ManageableDepartments.ToDepartmentItems()"
+                                          SelectedIds="_connectionDepartmentId.AsSelection()"
+                                          SelectedIdsChanged="ids => _connectionDepartmentId = ids.FirstOrNull() ?? Guid.Empty"
+                                          Title="@R("Web_CloudAccess_Department")"
+                                          Placeholder="@R("Web_CloudAccess_Select")" />
                 </label>
             </div>
             <div class="detail-actions cloud-access-form-actions">
@@ -187,17 +186,12 @@ else
                     <div class="detail-section cloud-access-principal-editor">
                         <span class="detail-label">@R("Web_CloudAccess_Access")</span>
                         <p class="share-help-text">@R("Web_CloudAccess_AccessHelp")</p>
-                        <select class="edit-input"
-                                aria-label="@R("Web_CloudAccess_Access")"
-                                value="@Guid.Empty"
-                                @onchange="AddCreatePrincipal">
-                            <option value="@Guid.Empty">@R("Web_CloudAccess_PrincipalPlaceholder")</option>
-                            @foreach (var principal in AvailableUnselectedPrincipals(_principalIds))
-                            {
-                                <option value="@principal.Id">@PrincipalDisplay(principal)</option>
-                            }
-                        </select>
-                        @PrincipalList(_principalIds, RemoveCreatePrincipal)
+                        <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                              Items="PrincipalItems()"
+                                              SelectedIds="_principalIds"
+                                              SelectedIdsChanged="ids => SetPrincipalIds(_principalIds, ids)"
+                                              Title="@R("Web_CloudAccess_Access")"
+                                              Placeholder="@R("Web_CloudAccess_PrincipalPlaceholder")" />
                     </div>
                 }
 
@@ -335,17 +329,12 @@ else
                 {
                     <div class="detail-section cloud-access-principal-editor">
                         <p class="share-help-text">@R("Web_CloudAccess_AccessEditHelp")</p>
-                        <select class="edit-input"
-                                aria-label="@R("Web_CloudAccess_Access")"
-                                value="@Guid.Empty"
-                                @onchange="AddGrantPrincipal">
-                            <option value="@Guid.Empty">@R("Web_CloudAccess_PrincipalPlaceholder")</option>
-                            @foreach (var principal in AvailableUnselectedPrincipals(_grantPrincipalIds))
-                            {
-                                <option value="@principal.Id">@PrincipalDisplay(principal)</option>
-                            }
-                        </select>
-                        @PrincipalList(_grantPrincipalIds, RemoveGrantPrincipal)
+                        <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                              Items="PrincipalItems()"
+                                              SelectedIds="_grantPrincipalIds"
+                                              SelectedIdsChanged="ids => SetPrincipalIds(_grantPrincipalIds, ids)"
+                                              Title="@R("Web_CloudAccess_Access")"
+                                              Placeholder="@R("Web_CloudAccess_PrincipalPlaceholder")" />
                         <div class="detail-actions cloud-access-detail-actions">
                             <button class="btn-primary" type="button" disabled="@_busy" @onclick="SaveGrantsAsync">@R("Web_CloudAccess_SaveAccess")</button>
                         </div>
@@ -597,16 +586,19 @@ else
             _grantPrincipalIds = await VM.LoadShareGrantsAsync(_selectedShare.Id);
     }
 
-    private void AddCreatePrincipal(ChangeEventArgs e) => AddPrincipal(e, _principalIds);
-    private void AddGrantPrincipal(ChangeEventArgs e) => AddPrincipal(e, _grantPrincipalIds);
-    private static void AddPrincipal(ChangeEventArgs e, HashSet<Guid> target)
+    // Users and groups are picked via the shared principal picker (its own tabs split the kinds);
+    // the selection is written back into the existing HashSet so the save calls are unchanged.
+    private IReadOnlyList<PrincipalPickerItem> PrincipalItems()
+        => VM.AvailablePrincipals
+            .Select(p => new PrincipalPickerItem(p.Id, p.Name, p is Group ? PrincipalKind.Group : PrincipalKind.User))
+            .ToList();
+
+    private static void SetPrincipalIds(HashSet<Guid> target, IReadOnlyList<Guid> ids)
     {
-        if (Guid.TryParse(e.Value?.ToString(), out var id) && id != Guid.Empty)
+        target.Clear();
+        foreach (var id in ids)
             target.Add(id);
     }
-
-    private void RemoveCreatePrincipal(Guid id) => _principalIds.Remove(id);
-    private void RemoveGrantPrincipal(Guid id) => _grantPrincipalIds.Remove(id);
 
     private async Task SaveGrantsAsync()
     {
@@ -673,35 +665,6 @@ else
         var url = await VM.AuthorizeConnectionAsync(connection.Id);
         Nav.NavigateTo(url, forceLoad: true);
     });
-
-    private RenderFragment PrincipalList(HashSet<Guid> selected, Action<Guid> remove) => builder =>
-    {
-        var sequence = 0;
-        builder.OpenElement(sequence++, "div");
-        builder.AddAttribute(sequence++, "class", "cloud-access-principal-list");
-        foreach (var principal in VM.AvailablePrincipals.Where(x => selected.Contains(x.Id)))
-        {
-            builder.OpenElement(sequence++, "div");
-            builder.AddAttribute(sequence++, "class", "cloud-access-principal-row");
-            builder.OpenElement(sequence++, "span");
-            builder.AddContent(sequence++, PrincipalDisplay(principal));
-            builder.CloseElement();
-            builder.OpenElement(sequence++, "button");
-            builder.AddAttribute(sequence++, "type", "button");
-            builder.AddAttribute(sequence++, "class", "btn-secondary compact-button");
-            builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => remove(principal.Id)));
-            builder.AddContent(sequence++, R("Web_CloudAccess_RemovePrincipal"));
-            builder.CloseElement();
-            builder.CloseElement();
-        }
-        builder.CloseElement();
-    };
-
-    private IEnumerable<Identity> AvailableUnselectedPrincipals(HashSet<Guid> selected)
-        => VM.AvailablePrincipals.Where(x => !selected.Contains(x.Id));
-
-    private string PrincipalDisplay(Identity principal)
-        => $"{(principal is Group ? R("Web_CloudAccess_Group") : R("Web_CloudAccess_User"))}: {principal.Name}";
 
     private static bool IsReady(StorageConnection connection)
         => connection.State == StorageConnectionState.Ready;

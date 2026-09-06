@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════
-   Kaimo Files – app.css
+   Kaimo File Server – app.css
    Dark/Light Theme, Synology-inspired File Server UI
    ══════════════════════════════════════════════════════════ */
 
@@ -1518,6 +1518,327 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 12px;
     color: var(--text-tertiary);
     text-align: center;
+}
+
+/* ══════════════════════════════════════════════════════════
+   Principal picker (users / groups / roles / departments / shares)
+   Shared modal picker with search, scrollable list and selected chips.
+   ══════════════════════════════════════════════════════════ */
+
+.principal-picker {
+    position: relative;
+}
+
+.principal-picker-trigger {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 38px;
+    padding: 5px 10px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-strong, var(--border));
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+    .principal-picker-trigger:hover {
+        border-color: var(--border-light);
+    }
+
+    .principal-picker-trigger:focus-visible {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-subtle);
+    }
+
+.principal-picker-placeholder {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text-tertiary);
+}
+
+.principal-picker-single {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.principal-picker-single-name {
+    font-size: 13px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.principal-picker-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    flex: 1;
+    min-width: 0;
+}
+
+.principal-picker-chevron {
+    flex-shrink: 0;
+    color: var(--text-tertiary);
+}
+
+.principal-picker-clear {
+    flex-shrink: 0;
+    color: var(--text-tertiary);
+}
+
+.principal-picker-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 7px;
+    border-radius: var(--radius-control);
+    font-size: 12px;
+    line-height: 1.3;
+}
+
+.principal-picker-chip-name {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.principal-picker-chip-x {
+    display: inline-flex;
+    cursor: pointer;
+    opacity: 0.75;
+}
+
+    .principal-picker-chip-x:hover {
+        opacity: 1;
+    }
+
+/* -- Dialog -- */
+
+.principal-picker-dialog {
+    display: flex;
+    flex-direction: column;
+    width: 540px;
+    max-width: 92vw;
+    max-height: 82vh;
+    padding: 18px;
+    overflow: hidden;
+}
+
+.principal-picker-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+    .principal-picker-header .modal-title {
+        margin: 0;
+    }
+
+.principal-picker-tabs {
+    display: flex;
+    gap: 2px;
+    margin-top: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.principal-picker-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 11px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text-secondary);
+    cursor: pointer;
+    margin-bottom: -1px;
+}
+
+    .principal-picker-tab:hover {
+        color: var(--text-primary);
+    }
+
+    .principal-picker-tab.is-active {
+        color: var(--text-primary);
+        font-weight: 500;
+        border-bottom-color: var(--accent);
+    }
+
+.principal-picker-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 0 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+    .principal-picker-search:focus-within {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-subtle);
+    }
+
+.principal-picker-search-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    line-height: 0;
+    color: var(--text-tertiary);
+    pointer-events: none;
+}
+
+/* The icon is a flex sibling, not an overlay, so page-level input padding can't push text under it. */
+.principal-picker-search .modal-input {
+    flex: 1;
+    min-width: 0;
+    height: 34px;
+    border: none;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+}
+
+    .principal-picker-search .modal-input:focus {
+        border: none;
+        box-shadow: none;
+    }
+
+.principal-picker-list {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 190px;
+    margin-top: 10px;
+    padding: 2px;
+}
+
+.principal-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 7px 10px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-control);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+    .principal-picker-row:hover {
+        background: var(--bg-hover);
+    }
+
+    .principal-picker-row.is-selected {
+        background: var(--accent-selected);
+    }
+
+    .principal-picker-row.has-divider {
+        border-top: 1px solid var(--border-light);
+        margin-top: 3px;
+        padding-top: 10px;
+    }
+
+.principal-picker-check {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 2px;
+    background: transparent;
+    box-sizing: border-box;
+    /* Flex centring keeps the mark on whole pixels (a 2px border leaves a 12px
+       content box, so even-sized marks stay crisp and centred). */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Filled box with a check mark – same control for single- and multi-select. */
+.principal-picker-check.is-checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+    .principal-picker-check.is-checked::after {
+        content: "";
+        width: 4px;
+        height: 8px;
+        border: solid var(--text-on-accent);
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+    }
+
+.principal-picker-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border-radius: var(--radius-control);
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.principal-picker-avatar--round {
+    border-radius: 50%;
+}
+
+.principal-picker-row-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.principal-picker-name {
+    display: block;
+    font-size: 13px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.principal-picker-hint {
+    display: block;
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+.principal-picker-empty {
+    padding: 26px 12px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-tertiary);
+}
+
+.principal-picker-selectedbar {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+}
+
+.principal-picker-selectedbar-label {
+    margin-bottom: 6px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: var(--label-spacing);
+    color: var(--text-tertiary);
 }
 
 /* -- Create Form Card (User/Group Creation) -- */

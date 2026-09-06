@@ -10,19 +10,11 @@
             <div class="create-form-fields">
                 <div class="form-group">
                     <label>@Resources.Web_Admin_Label_Department</label>
-                    <select class="edit-input" @bind="CreateUserDepartmentId">
-                        @if (!VM.AuthorizedDepartmentsForCreate.Any())
-                        {
-                            <option value="">@Resources.Web_Admin_NoDepartments</option>
-                        }
-                        else
-                        {
-                            @foreach (var dept in VM.AuthorizedDepartmentsForCreate)
-                            {
-                                <option value="@dept.Id">@dept.Name</option>
-                            }
-                        }
-                    </select>
+                    <PrincipalPickerField Mode="SelectionMode.Single"
+                                          Items="VM.AuthorizedDepartmentsForCreate.ToDepartmentItems()"
+                                          SelectedIds="VM.CreateUserDepartmentId.AsSelection()"
+                                          SelectedIdsChanged="ids => VM.CreateUserDepartmentId = ids.FirstOrNull()"
+                                          Title="@Resources.Web_Admin_Label_Department" />
                 </div>
                 <div class="form-group">
                     <label>@Resources.Web_Admin_Label_DisplayName</label>
@@ -95,12 +87,11 @@
                 </div>
                 <div class="form-group">
                     <label>@Resources.Web_Admin_Label_Department</label>
-                    <select class="edit-input" @bind="CreateGroupDepartmentId">
-                        @foreach (var dept in VM.AllDepartments)
-                        {
-                            <option value="@dept.Id">@dept.Name</option>
-                        }
-                    </select>
+                    <PrincipalPickerField Mode="SelectionMode.Single"
+                                          Items="VM.AllDepartments.ToDepartmentItems()"
+                                          SelectedIds="new[] { VM.CreateGroupDepartmentId }"
+                                          SelectedIdsChanged="ids => VM.CreateGroupDepartmentId = ids.FirstOrNull() ?? WellKnownGUIDs.DEPARTMENT_GLOBAL"
+                                          Title="@Resources.Web_Admin_Label_Department" />
                     <span class="form-hint">@Resources.Web_Admin_GroupDeptHint</span>
                 </div>
             </div>
@@ -146,8 +137,6 @@
 @code {
     [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
     [Parameter] public EventCallback OnChanged { get; set; }
-    private string CreateUserDepartmentId { get => VM.CreateUserDepartmentId?.ToString() ?? ""; set => VM.CreateUserDepartmentId = Guid.TryParse(value, out var id) ? id : null; }
-    private string CreateGroupDepartmentId { get => VM.CreateGroupDepartmentId.ToString(); set => VM.CreateGroupDepartmentId = Guid.TryParse(value, out var id) ? id : WellKnownGUIDs.DEPARTMENT_GLOBAL; }
     private async Task CreateUser() { await VM.CreateUserAsync(); await OnChanged.InvokeAsync(); }
     private async Task CreateGroup() { await VM.CreateGroupAsync(); await OnChanged.InvokeAsync(); }
     private async Task CreateRole() { await VM.CreateRoleAsync(); await OnChanged.InvokeAsync(); }

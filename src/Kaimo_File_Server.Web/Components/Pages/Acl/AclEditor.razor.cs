@@ -2,6 +2,7 @@ using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Web.Components.Shared;
 using Microsoft.AspNetCore.Components;
 
 namespace Kaimo_File_Server.Web.Components.Pages.Acl;
@@ -43,12 +44,28 @@ public partial class AclEditor
     private async Task DeleteEntry(Guid id) { await VM.DeleteEntryAsync(id); if (OnChanged.HasDelegate) await OnChanged.InvokeAsync(); }
     private async Task AddEntry() { if (await VM.AddEntryAsync() && OnChanged.HasDelegate) await OnChanged.InvokeAsync(); }
     private async Task SaveEdit() { if (await VM.SaveEditEntryAsync() && OnChanged.HasDelegate) await OnChanged.InvokeAsync(); }
-    private void SetPrincipalType(string type) { VM.NewPrincipalType = type; VM.NewPrincipalId = null; }
     private void SetEntryType(AclEntryType type) => VM.NewEntryType = type;
     private void TogglePerm(FilePermission flag) => VM.NewPermissions = VM.TogglePermission(VM.NewPermissions, flag);
     private void ToggleShortcut(FilePermission shortcut) => VM.NewPermissions = VM.ApplyShortcut(VM.NewPermissions, shortcut);
     private void ToggleInheritance(AclInheritance flag) => VM.NewInheritance ^= flag;
-    private void OnPrincipalSelected(ChangeEventArgs e) { var value = e.Value?.ToString(); VM.NewPrincipalId = !string.IsNullOrEmpty(value) && Guid.TryParse(value, out var id) ? id : null; }
+
+    // Users and groups are pickable as ACL principals; the picker's own tabs replace the
+    // former type toggle + native <select>. The chosen item's kind updates NewPrincipalType.
+    private IReadOnlyList<PrincipalPickerItem> PrincipalItems =>
+        VM.AllUsers.Select(u => new PrincipalPickerItem(u.Id, u.Name ?? u.Username, PrincipalKind.User, u.Username))
+            .Concat(VM.AllGroups.Select(g => new PrincipalPickerItem(g.Id, g.Name, PrincipalKind.Group)))
+            .ToList();
+
+    private IReadOnlyCollection<Guid> SelectedPrincipalIds =>
+        VM.NewPrincipalId is { } id ? new[] { id } : Array.Empty<Guid>();
+
+    private void OnPrincipalPicked(IReadOnlyList<Guid> ids)
+    {
+        var id = ids.Count > 0 ? ids[0] : (Guid?)null;
+        VM.NewPrincipalId = id;
+        if (id is { } gid)
+            VM.NewPrincipalType = VM.AllGroups.Any(g => g.Id == gid) ? "group" : "user";
+    }
     private static void AddIf(List<string> parts, bool condition, string text) { if (condition) parts.Add(text); }
     private string FormatPermissions(FilePermission p)
     {

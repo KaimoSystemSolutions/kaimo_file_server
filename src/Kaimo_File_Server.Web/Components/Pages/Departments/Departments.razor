@@ -64,13 +64,12 @@ else
                 </div>
                 <div class="form-group">
                     <label>@Resources.Web_Dept_Label_Parent</label>
-                    <select class="edit-input" @bind="CreateParentIdString">
-                        <option value="">@Resources.Web_Dept_NoParent</option>
-                        @foreach (var dept in VM.Departments)
-                        {
-                            <option value="@dept.Id">@dept.Name</option>
-                        }
-                    </select>
+                    <PrincipalPickerField Mode="SelectionMode.Single"
+                                          Items="VM.Departments.ToDepartmentItems()"
+                                          SelectedIds="VM.CreateParentId.AsSelection()"
+                                          SelectedIdsChanged="ids => VM.CreateParentId = ids.FirstOrNull()"
+                                          Title="@Resources.Web_Dept_Label_Parent"
+                                          Placeholder="@Resources.Web_Dept_NoParent" />
                 </div>
             </div>
             @if (VM.ErrorMessage is not null)
@@ -136,13 +135,12 @@ else
                         </div>
                         <div class="form-group">
                             <label>@Resources.Web_Dept_Label_InheritsFrom</label>
-                            <select class="edit-input" @bind="EditParentIdString">
-                                <option value="">@Resources.Web_Dept_NoParent</option>
-                                @foreach (var dept in VM.AvailableParents)
-                                {
-                                    <option value="@dept.Id">@dept.Name</option>
-                                }
-                            </select>
+                            <PrincipalPickerField Mode="SelectionMode.Single"
+                                                  Items="VM.AvailableParents.ToDepartmentItems()"
+                                                  SelectedIds="VM.EditParentId.AsSelection()"
+                                                  SelectedIdsChanged="ids => VM.EditParentId = ids.FirstOrNull()"
+                                                  Title="@Resources.Web_Dept_Label_InheritsFrom"
+                                                  Placeholder="@Resources.Web_Dept_NoParent" />
                             <span class="form-hint">@Resources.Web_Dept_InheritHint</span>
                         </div>
                     </div>
@@ -194,10 +192,12 @@ else
                     {
                     <div class="detail-section" style="margin-top: 16px;">
 <span class="detail-label">@Resources.Web_Dept_Label_Members</span>
-                        <MultiSelect Items="VM.EditMembers"
-                                     Label="m => m.Name"
-                                     Hint="m => m.Username"
-                                     PlaceholderText="@Resources.Web_Common_NoMembers" />
+                        <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                     Items="VM.EditMembers.ToPickerItems(PrincipalKind.User, u => u.Id, u => u.Name, u => u.Username)"
+                                     SelectedIds="VM.EditMembers.CheckedIds(u => u.Id)"
+                                     SelectedIdsChanged="ids => VM.EditMembers.ApplySelection(ids, u => u.Id)"
+                                     Title="@Resources.Web_Dept_Label_Members"
+                                     Placeholder="@Resources.Web_Common_NoMembers" />
                     </div>
                     }
 
@@ -209,10 +209,12 @@ else
                         <p class="form-hint" style="margin-bottom: 4px;">
 @Resources.Web_Dept_GroupsHint
                         </p>
-                        <MultiSelect Items="VM.EditGroups"
-                                     Label="g => g.Name"
-                                     Hint='g => VM.Departments.FirstOrDefault(d => d.Id == g.DepartmentId)?.Name ?? "Global"'
-                                     PlaceholderText="@Resources.Web_Common_NoGroupsAssigned" />
+                        <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                     Items='VM.EditGroups.ToPickerItems(PrincipalKind.Group, g => g.Id, g => g.Name, g => VM.Departments.FirstOrDefault(d => d.Id == g.DepartmentId)?.Name ?? "Global")'
+                                     SelectedIds="VM.EditGroups.CheckedIds(g => g.Id)"
+                                     SelectedIdsChanged="ids => VM.EditGroups.ApplySelection(ids, g => g.Id)"
+                                     Title="@Resources.Web_Dept_Label_AssignedGroups"
+                                     Placeholder="@Resources.Web_Common_NoGroupsAssigned" />
                     </div>
                     }
 
@@ -224,11 +226,12 @@ else
                         <p class="form-hint" style="margin-bottom: 4px;">
 @Resources.Web_Dept_SharesHint
                         </p>
-                        <MultiSelect Items="VM.EditShares"
-                                     Label="s => s.Name"
-                                     Hint='s => $"{s.Path} — {VM.Departments.FirstOrDefault(d => d.Id == s.DepartmentId)?.Name ?? "Global"}"'
-                                     PlaceholderText="@Resources.Web_Common_NoSharesAvailable"
-                                     EmptyText="@Resources.Web_Dept_NoSharesAvailable" />
+                        <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                     Items='VM.EditShares.ToPickerItems(PrincipalKind.Share, s => s.Id, s => s.Name, s => $"{s.Path} — {VM.Departments.FirstOrDefault(d => d.Id == s.DepartmentId)?.Name ?? "Global"}")'
+                                     SelectedIds="VM.EditShares.CheckedIds(s => s.Id)"
+                                     SelectedIdsChanged="ids => VM.EditShares.ApplySelection(ids, s => s.Id)"
+                                     Title="@Resources.Web_Dept_Label_AssignedShares"
+                                     Placeholder="@Resources.Web_Common_NoSharesAvailable" />
                     </div>
                     }
 
@@ -262,96 +265,130 @@ else
                              OnClick="() => SwitchTab(DepartmentDetailTab.Assignments)" />
                     </Tabs>
 
-                    <div class="detail-field-grid">
-                        @if (_activeTab == DepartmentDetailTab.General)
-                        {
-                        @if (!string.IsNullOrWhiteSpace(VM.Selected.Description))
-                        {
-                            <div class="detail-field">
-<span class="detail-field-label">@Resources.Web_Admin_Label_Description</span>
-                                <span class="detail-field-value">@VM.Selected.Description</span>
-                            </div>
-                        }
-                        <div class="detail-field">
-<span class="detail-field-label">@Resources.Web_Dept_Label_InheritsFromView</span>
+                    @* -------- GENERAL -------- *@
+                    @if (_activeTab == DepartmentDetailTab.General)
+                    {
+                    <div class="dept-overview-list">
+                        <div class="dept-overview-row dept-overview-row--multiline">
+                            <span class="dept-overview-label">@Resources.Web_Admin_Label_Description</span>
+                            <span class="dept-overview-value @(string.IsNullOrWhiteSpace(VM.Selected.Description) ? "dept-overview-value--empty" : "")">
+                                @(string.IsNullOrWhiteSpace(VM.Selected.Description) ? Resources.Web_Admin_NoDescription : VM.Selected.Description)
+                            </span>
+                        </div>
+                        <div class="dept-overview-row">
+                            <span class="dept-overview-label">@Resources.Web_Dept_Label_InheritsFromView</span>
                             @if (VM.Selected.ParentDepartmentId.HasValue)
                             {
-                                <span class="detail-field-value">@VM.GetParentName(VM.Selected.ParentDepartmentId)</span>
+                                <span class="dept-overview-value">@VM.GetParentName(VM.Selected.ParentDepartmentId)</span>
                             }
                             else
                             {
-                                <span class="detail-field-value detail-field-value--empty">@Resources.Web_Dept_NoParentTopLevel</span>
+                                <span class="dept-overview-value dept-overview-value--empty">@Resources.Web_Dept_NoParentTopLevel</span>
                             }
                         </div>
-                        <div class="detail-field">
-                            <span class="detail-field-label">ID</span>
-                            <span class="detail-field-value" style="font-size: 11px; font-family: monospace;">@VM.Selected.Id</span>
-                        </div>
-                        }
-                        @if (_activeTab == DepartmentDetailTab.Assignments)
-                        {
-                        <div class="detail-field">
-<span class="detail-field-label">@string.Format(Resources.Web_Dept_Label_MembersCount, VM.Members.Count)</span>
-                            <span class="detail-field-value">
-@(VM.Members.Any() ? Format(VM.Members.Select(u => u.Name), 8) : Resources.Web_Common_NoMembers)
-                            </span>
-                        </div>
-                        <div class="detail-field">
-<span class="detail-field-label">@string.Format(Resources.Web_Dept_Label_GroupsCount, VM.Groups.Count)</span>
-                            <span class="detail-field-value">
-@(VM.Groups.Any() ? Format(VM.Groups.Select(g => g.Name), 5) : Resources.Web_Dept_NoGroupsAssigned)
-                            </span>
-                        </div>
-                        <div class="detail-field">
-<span class="detail-field-label">@string.Format(Resources.Web_Dept_Label_SharesCount, VM.Shares.Count)</span>
-                            <span class="detail-field-value">
-@(VM.Shares.Any() ? Format(VM.Shares.Select(s => s.Name), 5) : Resources.Web_Dept_NoSharesAssigned)
-                            </span>
-                        </div>
-                        }
+                    </div>
+                    }
 
-                        @* -- Effective Permission -- *@
-                        @if (_activeTab == DepartmentDetailTab.Permissions)
-                        {
-                        <div class="detail-field">
-<span class="detail-field-label">@Resources.Web_Dept_DefaultFilePerm</span>
-                            <span class="detail-field-value">
-                                @if (VM.PermInfo is not null)
+                    @* -------- ASSIGNMENTS -------- *@
+                    @if (_activeTab == DepartmentDetailTab.Assignments)
+                    {
+                    <div class="dept-assign-groups">
+                        <section class="dept-assign-section">
+                            <div class="dept-assign-heading">
+                                <span class="dept-assign-label">@Resources.Web_Dept_Label_Members</span>
+                                <span class="dept-assign-count">@VM.Members.Count</span>
+                            </div>
+                            <div class="dept-chip-list">
+                                @if (VM.Members.Any())
                                 {
-
-                                    @if (VM.PermInfo.HasNoDefault)
+                                    @foreach (var member in VM.Members)
                                     {
-<span class="detail-field-value--empty">@Resources.Web_Dept_NoDefaultPerm</span>
-                                    }
-                                    else
-                                    {
-                                        <div>
-                                            <div class="permission-tags">
-                                                @foreach (var flag in DepartmentViewModel.PermFlags)
-                                                {
-                                                    if ((VM.PermInfo.Permission & flag.Flag) == flag.Flag)
-                                                    {
-                                                        <span class="permission-tag">@flag.Label</span>
-                                                    }
-                                                }
-                                            </div>
-                                            @if (!VM.PermInfo.IsOwn && VM.PermInfo.InheritedFromName is not null)
-                                            {
-                                                <span class="inherited-hint">
-                                                    @Assets.SVG("chevron_right.svg", new SvgOptions(
-                                                        Width: 12, Height: 12,
-                                                        Color: "var(--text-tertiary)", StrokeWidth: 1.5f,
-                                                        Style: "vertical-align: -1px; margin-right: 2px;"))
-                                                    Geerbt von: @VM.PermInfo.InheritedFromName
-                                                </span>
-                                            }
-                                        </div>
+                                        <span class="dept-chip">@member.Name</span>
                                     }
                                 }
-                            </span>
-                        </div>
-                        }
+                                else
+                                {
+                                    <span class="dept-chip-empty">@Resources.Web_Common_NoMembers</span>
+                                }
+                            </div>
+                        </section>
+                        <section class="dept-assign-section">
+                            <div class="dept-assign-heading">
+                                <span class="dept-assign-label">@Resources.Web_Dept_Label_AssignedGroups</span>
+                                <span class="dept-assign-count">@VM.Groups.Count</span>
+                            </div>
+                            <div class="dept-chip-list">
+                                @if (VM.Groups.Any())
+                                {
+                                    @foreach (var group in VM.Groups)
+                                    {
+                                        <span class="dept-chip">@group.Name</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="dept-chip-empty">@Resources.Web_Dept_NoGroupsAssigned</span>
+                                }
+                            </div>
+                        </section>
+                        <section class="dept-assign-section">
+                            <div class="dept-assign-heading">
+                                <span class="dept-assign-label">@Resources.Web_Dept_Label_AssignedShares</span>
+                                <span class="dept-assign-count">@VM.Shares.Count</span>
+                            </div>
+                            <div class="dept-chip-list">
+                                @if (VM.Shares.Any())
+                                {
+                                    @foreach (var share in VM.Shares)
+                                    {
+                                        <span class="dept-chip">@share.Name</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="dept-chip-empty">@Resources.Web_Dept_NoSharesAssigned</span>
+                                }
+                            </div>
+                        </section>
                     </div>
+                    }
+
+                    @* -------- PERMISSIONS -------- *@
+                    @if (_activeTab == DepartmentDetailTab.Permissions)
+                    {
+                    <section class="dept-perm-card">
+                        <div class="dept-perm-card-label">@Resources.Web_Dept_DefaultFilePerm</div>
+                        @if (VM.PermInfo is not null)
+                        {
+                            @if (VM.PermInfo.HasNoDefault)
+                            {
+                                <span class="dept-chip-empty">@Resources.Web_Dept_NoDefaultPerm</span>
+                            }
+                            else
+                            {
+                                <div class="permission-tags">
+                                    @foreach (var flag in DepartmentViewModel.PermFlags)
+                                    {
+                                        if ((VM.PermInfo.Permission & flag.Flag) == flag.Flag)
+                                        {
+                                            <span class="permission-tag">@flag.Label</span>
+                                        }
+                                    }
+                                </div>
+                                @if (!VM.PermInfo.IsOwn && VM.PermInfo.InheritedFromName is not null)
+                                {
+                                    <span class="inherited-hint">
+                                        @Assets.SVG("chevron_right.svg", new SvgOptions(
+                                            Width: 12, Height: 12,
+                                            Color: "var(--text-tertiary)", StrokeWidth: 1.5f,
+                                            Style: "vertical-align: -1px; margin-right: 2px;"))
+                                        @string.Format(Resources.Web_Dept_InheritedFrom, VM.PermInfo.InheritedFromName)
+                                    </span>
+                                }
+                            }
+                        }
+                    </section>
+                    }
 
                     <div class="detail-actions">
                         @if (VM.CanEdit && !VM.IsGlobalDepartment(VM.Selected))

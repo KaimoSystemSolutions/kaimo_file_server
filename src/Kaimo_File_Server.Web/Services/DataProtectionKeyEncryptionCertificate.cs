@@ -44,7 +44,7 @@ public static class DataProtectionKeyEncryptionCertificate
         {
             using var rsa = RSA.Create(3072);
             var request = new CertificateRequest(
-                "CN=Kaimo Files Data Protection",
+                "CN=Kaimo File Server Data Protection",
                 rsa,
                 HashAlgorithmName.SHA256,
                 RSASignaturePadding.Pkcs1);

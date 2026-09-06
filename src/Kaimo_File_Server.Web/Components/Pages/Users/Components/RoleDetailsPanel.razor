@@ -154,26 +154,12 @@
                                     <div class="assignment-form">
                                         <div class="form-group">
                                             <label>@Resources.Web_Admin_AssignTo</label>
-                                            <div class="toggle-button-group">
-                                                <button class="toggle-btn @(!VM.NewAssignmentPrincipalIsGroup ? "toggle-btn--active" : "")"
-@onclick="() => { VM.NewAssignmentPrincipalIsGroup = false; VM.NewAssignmentPrincipalId = null; }">@Resources.Web_Admin_Label_User</button>
-                                                <button class="toggle-btn @(VM.NewAssignmentPrincipalIsGroup ? "toggle-btn--active" : "")"
-@onclick="() => { VM.NewAssignmentPrincipalIsGroup = true; VM.NewAssignmentPrincipalId = null; }">@Resources.Web_Admin_Label_Group</button>
-                                            </div>
-                                        </div>
-                                        <div class="form-group">
-<label>@(VM.NewAssignmentPrincipalIsGroup ? Resources.Web_Admin_Label_Group : Resources.Web_Admin_Label_User)</label>
-                                            <select class="edit-input" @bind="SelectedPrincipalIdString">
-                                                <option value="">@Resources.Web_Common_Select</option>
-                                                @if (VM.NewAssignmentPrincipalIsGroup)
-                                                {
-                                                    @foreach (var g in VM.AllGroups) { <option value="@g.Id">@g.Name</option> }
-                                                }
-                                                else
-                                                {
-                                                    @foreach (var u in VM.AllUsers) { <option value="@u.Id">@u.Name (@u.Username)</option> }
-                                                }
-                                            </select>
+                                            <PrincipalPickerField Mode="SelectionMode.Single"
+                                                                  Items="AssigneeItems()"
+                                                                  SelectedIds="VM.NewAssignmentPrincipalId.AsSelection()"
+                                                                  SelectedIdsChanged="OnAssigneePicked"
+                                                                  Title="@Resources.Web_Admin_AssignTo"
+                                                                  Placeholder="@Resources.Web_Common_Select" />
                                         </div>
                                         <div class="form-group">
                                             <label>@Resources.Web_Admin_Label_Scope</label>
@@ -187,26 +173,24 @@
                                         {
                                             <div class="form-group">
 <label>@Resources.Web_Admin_Label_Department</label>
-                                                <select class="edit-input" @bind="SelectedScopeIdString">
-                                                    <option value="">@Resources.Web_Common_Select</option>
-                                                    @foreach (var dept in VM.AllDepartments)
-                                                    {
-                                                        <option value="@dept.Id">@dept.Name</option>
-                                                    }
-                                                </select>
+                                                <PrincipalPickerField Mode="SelectionMode.Single"
+                                                                      Items="VM.AllDepartments.ToDepartmentItems()"
+                                                                      SelectedIds="VM.NewAssignmentScopeId.AsSelection()"
+                                                                      SelectedIdsChanged="ids => VM.NewAssignmentScopeId = ids.FirstOrNull()"
+                                                                      Title="@Resources.Web_Admin_Label_Department"
+                                                                      Placeholder="@Resources.Web_Common_Select" />
                                             </div>
                                         }
                                         else if (VM.NewAssignmentScopeType == ScopeType.Share)
                                         {
                                             <div class="form-group">
                                                 <label>@Resources.Web_Admin_Label_Share</label>
-                                                <select class="edit-input" @bind="SelectedScopeIdString">
-                                                    <option value="">@Resources.Web_Common_Select</option>
-                                                    @foreach (var share in VM.AllShares)
-                                                    {
-                                                        <option value="@share.Id">@share.Name</option>
-                                                    }
-                                                </select>
+                                                <PrincipalPickerField Mode="SelectionMode.Single"
+                                                                      Items="ShareItems()"
+                                                                      SelectedIds="VM.NewAssignmentScopeId.AsSelection()"
+                                                                      SelectedIdsChanged="ids => VM.NewAssignmentScopeId = ids.FirstOrNull()"
+                                                                      Title="@Resources.Web_Admin_Label_Share"
+                                                                      Placeholder="@Resources.Web_Common_Select" />
                                             </div>
                                             <div class="detail-info" style="margin-top: 4px;">
                                                 @Icons.SVG("circle_info.svg", new SvgOptions(
@@ -295,9 +279,24 @@
     [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
     [Parameter] public EventCallback OnChanged { get; set; }
     private bool _showAllRolePerms;
-    private string SelectedPrincipalIdString { get => VM.NewAssignmentPrincipalId?.ToString() ?? ""; set => VM.NewAssignmentPrincipalId = Guid.TryParse(value, out var id) ? id : null; }
     private string SelectedScopeTypeString { get => VM.NewAssignmentScopeType.ToString(); set { VM.NewAssignmentScopeType = Enum.TryParse<ScopeType>(value, out var st) ? st : ScopeType.Global; VM.NewAssignmentScopeId = null; } }
-    private string SelectedScopeIdString { get => VM.NewAssignmentScopeId?.ToString() ?? ""; set => VM.NewAssignmentScopeId = Guid.TryParse(value, out var id) ? id : null; }
+
+    // Assignee (user or group) via the shared picker's own tabs; the chosen item's kind sets the group flag.
+    private IReadOnlyList<PrincipalPickerItem> AssigneeItems() =>
+        VM.AllUsers.Select(u => new PrincipalPickerItem(u.Id, u.Name, PrincipalKind.User, u.Username))
+            .Concat(VM.AllGroups.Select(g => new PrincipalPickerItem(g.Id, g.Name, PrincipalKind.Group)))
+            .ToList();
+
+    private IReadOnlyList<PrincipalPickerItem> ShareItems() =>
+        VM.AllShares.Select(s => new PrincipalPickerItem(s.Id, s.Name, PrincipalKind.Share)).ToList();
+
+    private void OnAssigneePicked(IReadOnlyList<Guid> ids)
+    {
+        var id = ids.Count > 0 ? ids[0] : (Guid?)null;
+        VM.NewAssignmentPrincipalId = id;
+        if (id is { } gid)
+            VM.NewAssignmentPrincipalIsGroup = VM.AllGroups.Any(g => g.Id == gid);
+    }
     private async Task EditRole() { await VM.StartEditRoleAsync(); StateHasChanged(); }
     private async Task SaveRole() { await VM.SaveRoleAsync(); await OnChanged.InvokeAsync(); }
     private void CancelEdit() { VM.CancelEdit(); StateHasChanged(); }

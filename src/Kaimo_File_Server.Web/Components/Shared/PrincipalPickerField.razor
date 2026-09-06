@@ -1,0 +1,375 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+
+@*
+    Reusable principal picker (users / groups / roles / departments / shares).
+
+    A compact trigger shows the current selection (chips for multi-select, a single
+    row for single-select). Clicking it opens a modal with optional type tabs, a
+    search box, a scrollable list and – for multi-select – a "selected" bar.
+    Selected rows float to the top of the list (alphabetical within each block) and
+    keep a visible, ticked box rather than disappearing.
+
+    The component is pure presentation: callers project their entities into
+    PrincipalPickerItem and bind SelectedIds. Edits happen on an internal working
+    copy and are committed only on an explicit action: picking a row (single mode)
+    or pressing Save (multiple mode). Cancelling – Escape, the ✕, or a click on the
+    backdrop – discards the working copy and fires nothing.
+*@
+
+<div class="principal-picker @Class" @attributes="AdditionalAttributes">
+    <div class="principal-picker-trigger" @onclick="Open" role="button" tabindex="0"
+         @onkeydown="TriggerKeyDown" aria-haspopup="dialog">
+        @if (_selected.Count == 0)
+        {
+            <span class="principal-picker-placeholder">@(Placeholder ?? Text("Web_Picker_Placeholder", "Select…"))</span>
+        }
+        else if (Mode == SelectionMode.Single)
+        {
+            var item = SelectedItems.FirstOrDefault();
+            @if (item is not null)
+            {
+                <span class="principal-picker-single">
+                    @Avatar(item, 22)
+                    <span class="principal-picker-single-name">@item.Name</span>
+                </span>
+            }
+        }
+        else
+        {
+            <span class="principal-picker-chips">
+                @foreach (var item in SelectedItems)
+                {
+                    @Chip(item, removable: false)
+                }
+            </span>
+        }
+        @if (Mode == SelectionMode.Single && _selected.Count > 0)
+        {
+            <span class="principal-picker-chip-x principal-picker-clear" role="button" tabindex="0"
+                  @onclick="ClearSingle" @onclick:stopPropagation="true"
+                  aria-label="@Text("Web_Picker_Remove", "Remove")">
+                @Assets.SVG("close.svg", new SvgOptions(Width: 13, Height: 13, StrokeWidth: 2))
+            </span>
+        }
+        @Assets.SVG("chevron_down_transparent.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2, CssClass: "principal-picker-chevron"))
+    </div>
+</div>
+
+@if (_open)
+{
+    <div class="modal-backdrop" @onclick="Cancel">
+        <div class="modal-dialog principal-picker-dialog" role="dialog" aria-modal="true" tabindex="-1"
+             aria-label="@DialogTitle" @onclick:stopPropagation="true" @onkeydown="OnDialogKeyDown">
+
+            <div class="principal-picker-header">
+                <h3 class="modal-title">@DialogTitle</h3>
+                <button class="btn-icon btn-icon--small" type="button" @onclick="Cancel"
+                        aria-label="@Text("Web_Common_Close", "Close")">
+                    @Assets.SVG("close.svg", new SvgOptions(Width: 15, Height: 15, StrokeWidth: 2))
+                </button>
+            </div>
+
+            @if (Kinds.Count > 1)
+            {
+                <div class="principal-picker-tabs" role="tablist">
+                    @foreach (var kind in Kinds)
+                    {
+                        <button type="button" role="tab" aria-selected="@(kind == _activeKind)"
+                                class="principal-picker-tab @(kind == _activeKind ? "is-active" : "")"
+                                @onclick="() => SetKind(kind)">
+                            @Assets.SVG(IconFor(kind), new SvgOptions(Width: 15, Height: 15, StrokeWidth: 2))
+                            <span>@TabLabel(kind)</span>
+                        </button>
+                    }
+                </div>
+            }
+
+            <div class="principal-picker-search">
+                <span class="principal-picker-search-icon">
+                    @Assets.SVG("search.svg", new SvgOptions(Width: 15, Height: 15, StrokeWidth: 2))
+                </span>
+                <input type="text" class="modal-input" placeholder="@Text("Web_Picker_Search", "Search by name")"
+                       @bind="_search" @bind:event="oninput" @ref="_searchInput" />
+            </div>
+
+            <div class="principal-picker-list" role="listbox" aria-multiselectable="@(Mode == SelectionMode.Multiple)">
+                @{
+                    var rows = VisibleRows();
+                    var firstUnselected = rows.FindIndex(r => !_selected.Contains(r.Id));
+                }
+                @if (rows.Count == 0)
+                {
+                    <div class="principal-picker-empty">
+                        @(HasAnyForKind ? Text("Web_Picker_NoMatches", "No matches") : Text("Web_Picker_Empty", "Nothing to choose from"))
+                    </div>
+                }
+                else
+                {
+                    @for (var i = 0; i < rows.Count; i++)
+                    {
+                        var item = rows[i];
+                        var isChecked = _selected.Contains(item.Id);
+                        var divider = i == firstUnselected && firstUnselected > 0;
+                        <button type="button" role="option" aria-selected="@isChecked"
+                                class="principal-picker-row @(isChecked ? "is-selected" : "") @(divider ? "has-divider" : "")"
+                                @onclick="() => Toggle(item.Id)">
+                            <span class="principal-picker-check @(isChecked ? "is-checked" : "")"></span>
+                            @Avatar(item, 28)
+                            <span class="principal-picker-row-text">
+                                <span class="principal-picker-name">@item.Name</span>
+                                @if (!string.IsNullOrEmpty(item.Hint))
+                                {
+                                    <span class="principal-picker-hint">@item.Hint</span>
+                                }
+                            </span>
+                        </button>
+                    }
+                }
+            </div>
+
+            @if (Mode == SelectionMode.Multiple)
+            {
+                <div class="principal-picker-selectedbar">
+                    <div class="principal-picker-selectedbar-label">
+                        @string.Format(Text("Web_Picker_Selected", "{0} selected"), _selected.Count)
+                    </div>
+                    <div class="principal-picker-chips">
+                        @if (_selected.Count == 0)
+                        {
+                            <span class="principal-picker-hint">@Text("Web_Picker_NothingSelected", "Nothing selected yet")</span>
+                        }
+                        else
+                        {
+                            @foreach (var item in SelectedItems)
+                            {
+                                @Chip(item, removable: true)
+                            }
+                        }
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn-secondary" type="button" @onclick="Cancel">@Text("Web_Common_Cancel", "Cancel")</button>
+                    <button class="btn-primary" type="button" @onclick="Save">@Text("Web_Common_Save", "Save")</button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Selection cardinality. Single commits and closes on pick; Multiple commits on Save.</summary>
+    [Parameter] public SelectionMode Mode { get; set; } = SelectionMode.Multiple;
+
+    /// <summary>All selectable items. Each carries its <see cref="PrincipalKind"/>; tabs appear only when more than one kind is present.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<PrincipalPickerItem> Items { get; set; } = [];
+
+    /// <summary>Currently selected ids. Bindable via <c>@bind-SelectedIds</c>.</summary>
+    [Parameter] public IReadOnlyCollection<Guid> SelectedIds { get; set; } = [];
+
+    /// <summary>Fired when the selection is committed (row pick in single mode, Save in multiple mode, or the trigger clear).</summary>
+    [Parameter] public EventCallback<IReadOnlyList<Guid>> SelectedIdsChanged { get; set; }
+
+    /// <summary>Dialog title; falls back to a generic label.</summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Trigger text shown when nothing is selected.</summary>
+    [Parameter] public string? Placeholder { get; set; }
+
+    /// <summary>Extra CSS classes for local overrides.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)] public IDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private bool _open;
+    private bool _focusPending;
+    private string _search = string.Empty;
+    private PrincipalKind _activeKind;
+    private readonly HashSet<Guid> _selected = [];
+    private ElementReference _searchInput;
+
+    // While the dialog is closed the trigger mirrors the committed selection; while it is
+    // open the working copy is authoritative so parent re-renders don't clobber pending edits.
+    protected override void OnParametersSet()
+    {
+        if (!_open)
+            ResetWorkingCopy();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_open && _focusPending)
+        {
+            _focusPending = false;
+            try { await _searchInput.FocusAsync(); } catch { /* element may be gone if closed meanwhile */ }
+        }
+    }
+
+    private void ResetWorkingCopy()
+    {
+        _selected.Clear();
+        foreach (var id in SelectedIds)
+            _selected.Add(id);
+    }
+
+    private List<PrincipalKind> Kinds =>
+        Items.Select(i => i.Kind).Distinct().OrderBy(k => (int)k).ToList();
+
+    private IEnumerable<PrincipalPickerItem> SelectedItems =>
+        Items.Where(i => _selected.Contains(i.Id));
+
+    private bool HasAnyForKind => Items.Any(i => i.Kind == _activeKind);
+
+    private string DialogTitle => Title ?? Text("Web_Picker_Placeholder", "Select…");
+
+    private void Open()
+    {
+        ResetWorkingCopy();
+        // Open on the tab of the current selection so a previously chosen group/role isn't hidden.
+        var kinds = Kinds;
+        _activeKind = SelectedItems.FirstOrDefault()?.Kind
+            ?? (kinds.Count > 0 ? kinds[0] : PrincipalKind.User);
+        _search = string.Empty;
+        _open = true;
+        _focusPending = true;
+    }
+
+    // Cancel: discard the working copy and fire nothing, so the trigger keeps showing the committed selection.
+    private void Cancel()
+    {
+        _open = false;
+        ResetWorkingCopy();
+    }
+
+    private void OnDialogKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            Cancel();
+    }
+
+    private async Task ClearSingle()
+    {
+        _selected.Clear();
+        await SelectedIdsChanged.InvokeAsync([]);
+    }
+
+    private void TriggerKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or " ")
+            Open();
+    }
+
+    private void SetKind(PrincipalKind kind) => _activeKind = kind;
+
+    private async Task Toggle(Guid id)
+    {
+        if (Mode == SelectionMode.Single)
+        {
+            // A row pick is the commit in single mode.
+            _selected.Clear();
+            _selected.Add(id);
+            await SelectedIdsChanged.InvokeAsync(_selected.ToList());
+            _open = false;
+        }
+        else if (!_selected.Add(id))
+        {
+            _selected.Remove(id);
+        }
+    }
+
+    private async Task Save()
+    {
+        await SelectedIdsChanged.InvokeAsync(_selected.ToList());
+        _open = false;
+    }
+
+    private List<PrincipalPickerItem> VisibleRows()
+    {
+        var term = _search.Trim();
+        var rows = Items.Where(i => i.Kind == _activeKind);
+        if (term.Length > 0)
+            rows = rows.Where(i => i.Name.Contains(term, StringComparison.OrdinalIgnoreCase));
+
+        // Selected first, then alphabetical within each block.
+        return rows
+            .OrderByDescending(i => _selected.Contains(i.Id))
+            .ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string IconFor(PrincipalKind kind) => kind switch
+    {
+        PrincipalKind.Group => "users.svg",
+        PrincipalKind.Role => "shield.svg",
+        PrincipalKind.Department => "building.svg",
+        PrincipalKind.Share => "folder.svg",
+        _ => "user.svg",
+    };
+
+    private static (string Color, string Soft) ColorsFor(PrincipalKind kind) => kind switch
+    {
+        PrincipalKind.Group => ("var(--entity-group)", "var(--entity-group-soft)"),
+        PrincipalKind.Role => ("var(--entity-role)", "var(--entity-role-soft)"),
+        PrincipalKind.Department => ("var(--entity-department)", "var(--entity-department-soft)"),
+        PrincipalKind.Share => ("var(--folder-stroke)", "var(--folder-fill)"),
+        _ => ("var(--entity-user)", "var(--entity-user-soft)"),
+    };
+
+    private string TabLabel(PrincipalKind kind) => kind switch
+    {
+        PrincipalKind.Group => Text("Web_Picker_Groups", "Groups"),
+        PrincipalKind.Role => Text("Web_Picker_Roles", "Roles"),
+        PrincipalKind.Department => Text("Web_Picker_Departments", "Departments"),
+        PrincipalKind.Share => Text("Web_Picker_Shares", "Shares"),
+        _ => Text("Web_Picker_Users", "Users"),
+    };
+
+    private static string Initials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) return "?";
+        var first = parts[0][..1];
+        var second = parts.Length > 1 ? parts[^1][..1] : string.Empty;
+        return (first + second).ToUpperInvariant();
+    }
+
+    private RenderFragment Avatar(PrincipalPickerItem item, int size) => __builder =>
+    {
+        var (color, soft) = ColorsFor(item.Kind);
+        <span class="principal-picker-avatar @(item.Kind == PrincipalKind.User ? "principal-picker-avatar--round" : "")"
+              style="width:@(size)px;height:@(size)px;background:@soft;color:@color;">
+            @if (item.Kind == PrincipalKind.User)
+            {
+                @Initials(item.Name)
+            }
+            else
+            {
+                @Assets.SVG(IconFor(item.Kind), new SvgOptions(Width: size - 12, Height: size - 12, Color: color, StrokeWidth: 2))
+            }
+        </span>
+    };
+
+    private RenderFragment Chip(PrincipalPickerItem item, bool removable) => __builder =>
+    {
+        var (color, soft) = ColorsFor(item.Kind);
+        <span class="principal-picker-chip" style="background:@soft;color:@color;">
+            @Assets.SVG(IconFor(item.Kind), new SvgOptions(Width: 12, Height: 12, Color: color, StrokeWidth: 2))
+            <span class="principal-picker-chip-name">@item.Name</span>
+            @if (removable)
+            {
+                <span class="principal-picker-chip-x" role="button" tabindex="0"
+                      @onclick="() => Toggle(item.Id)" @onclick:stopPropagation="true"
+                      aria-label="@Text("Web_Picker_Remove", "Remove")">
+                    @Assets.SVG("close.svg", new SvgOptions(Width: 11, Height: 11, Color: color, StrokeWidth: 2.5f))
+                </span>
+            }
+        </span>
+    };
+
+    // Razor components use a fallback so a missing satellite resource never makes an
+    // administration control unusable (mirrors DirectoryPickerDialog.Text).
+    private static string Text(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
+}

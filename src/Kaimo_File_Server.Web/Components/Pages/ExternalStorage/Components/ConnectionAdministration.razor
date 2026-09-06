@@ -622,7 +622,12 @@ else
                 }
                 else
                 {
-                    <select class="edit-input" @bind="_departmentId"><option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>@foreach (var department in VM.ManageableDepartments) { <option value="@department.Id">@department.Name</option> }</select>
+                    <PrincipalPickerField Mode="SelectionMode.Single"
+                                          Items="VM.ManageableDepartments.ToDepartmentItems()"
+                                          SelectedIds="_departmentId.AsSelection()"
+                                          SelectedIdsChanged="ids => _departmentId = ids.FirstOrNull() ?? Guid.Empty"
+                                          Title="@R("Web_CloudAccess_Department")"
+                                          Placeholder="@R("Web_ExternalStorage_Select")" />
                 }
             </label>
             @if (!_editing && _departmentId == Guid.Empty)

@@ -261,6 +261,42 @@
   <data name="Web_Button_Close" xml:space="preserve">
     <value>Schliesen</value>
   </data>
+  <data name="Web_Picker_Placeholder" xml:space="preserve">
+    <value>Auswählen…</value>
+  </data>
+  <data name="Web_Picker_Search" xml:space="preserve">
+    <value>Nach Name suchen</value>
+  </data>
+  <data name="Web_Picker_NoMatches" xml:space="preserve">
+    <value>Keine Treffer</value>
+  </data>
+  <data name="Web_Picker_Empty" xml:space="preserve">
+    <value>Nichts zur Auswahl</value>
+  </data>
+  <data name="Web_Picker_Selected" xml:space="preserve">
+    <value>{0} ausgewählt</value>
+  </data>
+  <data name="Web_Picker_NothingSelected" xml:space="preserve">
+    <value>Noch nichts ausgewählt</value>
+  </data>
+  <data name="Web_Picker_Remove" xml:space="preserve">
+    <value>Entfernen</value>
+  </data>
+  <data name="Web_Picker_Users" xml:space="preserve">
+    <value>Benutzer</value>
+  </data>
+  <data name="Web_Picker_Groups" xml:space="preserve">
+    <value>Gruppen</value>
+  </data>
+  <data name="Web_Picker_Roles" xml:space="preserve">
+    <value>Rollen</value>
+  </data>
+  <data name="Web_Picker_Departments" xml:space="preserve">
+    <value>Abteilungen</value>
+  </data>
+  <data name="Web_Picker_Shares" xml:space="preserve">
+    <value>Freigaben</value>
+  </data>
   <data name="Web_Selection_None" xml:space="preserve">
     <value>Keine Auswahl</value>
   </data>
@@ -523,7 +559,7 @@
     <value>Vererbung</value>
   </data>
   <data name="Web_Acl_EmptyHint" xml:space="preserve">
-    <value>Keine Berechtigungen konfiguriert. Ohne ACL-Einträge haben alle Benutzer mit Share-Zugriff vollen Zugriff.</value>
+    <value>Keine Berechtigungen konfiguriert.</value>
   </data>
   <data name="Web_Acl_AddPermission" xml:space="preserve">
     <value>Berechtigung hinzufügen</value>
@@ -1687,7 +1723,7 @@
     <value>Keine Datei ausgewählt</value>
   </data>
   <data name="Web_Login_PageTitle" xml:space="preserve">
-    <value>Kaimo Files – Anmelden</value>
+    <value>Kaimo File Server – Anmelden</value>
   </data>
   <data name="Web_Login_Subtitle" xml:space="preserve">
     <value>Melde dich an, um fortzufahren</value>
@@ -1723,7 +1759,7 @@
     <value>Lade...</value>
   </data>
   <data name="Web_Admin_PageTitle" xml:space="preserve">
-    <value>Kaimo Files – Verwaltung</value>
+    <value>Kaimo File Server – Verwaltung</value>
   </data>
   <data name="Web_Admin_Heading" xml:space="preserve">
     <value>Verwaltung</value>
@@ -2044,7 +2080,7 @@
     <value>Freigabe</value>
   </data>
   <data name="Web_Dept_PageTitle" xml:space="preserve">
-    <value>Kaimo Files – Abteilungen</value>
+    <value>Kaimo File Server – Abteilungen</value>
   </data>
   <data name="Web_Dept_Heading" xml:space="preserve">
     <value>Abteilungen</value>

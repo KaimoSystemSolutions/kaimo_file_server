@@ -19,10 +19,12 @@
                             </div>
                             <div class="detail-section">
 <span class="detail-label">@Resources.Web_Admin_Label_Users</span>
-                                <MultiSelect Items="VM.EditGroupMembers"
-                                             Label="m => m.Name"
-                                             Hint="m => m.Username"
-                                             PlaceholderText="@Resources.Web_Common_NoMembers" />
+                                <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                             Items="VM.EditGroupMembers.ToPickerItems(PrincipalKind.User, u => u.Id, u => u.Name, u => u.Username)"
+                                             SelectedIds="VM.EditGroupMembers.CheckedIds(u => u.Id)"
+                                             SelectedIdsChanged="ids => VM.EditGroupMembers.ApplySelection(ids, u => u.Id)"
+                                             Title="@Resources.Web_Admin_Label_Users"
+                                             Placeholder="@Resources.Web_Common_NoMembers" />
                             </div>
                             @if (VM.ErrorMessage is not null)
                             {

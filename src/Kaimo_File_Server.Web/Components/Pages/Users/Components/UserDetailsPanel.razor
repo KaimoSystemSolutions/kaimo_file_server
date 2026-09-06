@@ -70,20 +70,22 @@
 
                 <div class="form-group">
                     <label>@Resources.Web_Admin_Label_Groups</label>
-                    <MultiSelect Class="user-group-select"
-                                 Items="VM.EditUserGroups"
-                                 Label="g => g.Name"
-                                 Hint="g => VM.GetDepartmentName(g.DepartmentId)"
-                                 PlaceholderText="@Resources.Web_Common_NoGroupsAssigned"
-                                 EmptyText="@Resources.Web_Common_NoGroups" />
+                    <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                 Items="VM.EditUserGroups.ToPickerItems(PrincipalKind.Group, g => g.Id, g => g.Name, g => VM.GetDepartmentName(g.DepartmentId))"
+                                 SelectedIds="VM.EditUserGroups.CheckedIds(g => g.Id)"
+                                 SelectedIdsChanged="ids => VM.EditUserGroups.ApplySelection(ids, g => g.Id)"
+                                 Title="@Resources.Web_Admin_Label_Groups"
+                                 Placeholder="@Resources.Web_Common_NoGroupsAssigned" />
                 </div>
 
                 <div class="form-group">
                     <label>@Resources.Web_Admin_Label_Roles</label>
-                    <MultiSelect Class="user-role-select"
-                                 Items="VM.EditUserRoles"
-                                 Label="r => r.Name"
-                                 PlaceholderText="@Resources.Web_Common_NoRolesAssigned" />
+                    <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                 Items="VM.EditUserRoles.ToPickerItems(PrincipalKind.Role, r => r.Id, r => r.Name)"
+                                 SelectedIds="VM.EditUserRoles.CheckedIds(r => r.Id)"
+                                 SelectedIdsChanged="ids => VM.EditUserRoles.ApplySelection(ids, r => r.Id)"
+                                 Title="@Resources.Web_Admin_Label_Roles"
+                                 Placeholder="@Resources.Web_Common_NoRolesAssigned" />
                 </div>
             </div>
 
