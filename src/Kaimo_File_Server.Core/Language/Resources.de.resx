@@ -192,6 +192,27 @@
   <data name="Context_Menu_Delete" xml:space="preserve">
     <value>Löschen</value>
   </data>
+  <data name="Context_Menu_EmptyRecycleBin" xml:space="preserve">
+    <value>Papierkorb leeren</value>
+  </data>
+  <data name="Web_EmptyRecycle_Message" xml:space="preserve">
+    <value>Dadurch werden alle Elemente im Papierkorb endgültig entfernt.</value>
+  </data>
+  <data name="Web_EmptyRecycle_Warning" xml:space="preserve">
+    <value>Diese Aktion kann nicht rückgängig gemacht werden.</value>
+  </data>
+  <data name="Web_EmptyRecycle_Progress" xml:space="preserve">
+    <value>Papierkorb wird geleert…</value>
+  </data>
+  <data name="Web_EmptyRecycle_Success" xml:space="preserve">
+    <value>Papierkorb geleert.</value>
+  </data>
+  <data name="Web_EmptyRecycle_AlreadyEmpty" xml:space="preserve">
+    <value>Der Papierkorb ist bereits leer.</value>
+  </data>
+  <data name="Web_EmptyRecycle_PartialFailure" xml:space="preserve">
+    <value>{0} von {1} Elementen aus dem Papierkorb entfernt.</value>
+  </data>
   <data name="Context_Menu_Download" xml:space="preserve">
     <value>Herunterladen</value>
   </data>

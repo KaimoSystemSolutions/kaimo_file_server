@@ -95,7 +95,70 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Context_Menu_Delete", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Empty recycle bin ähnelt.
+        /// </summary>
+        public static string Context_Menu_EmptyRecycleBin {
+            get {
+                return ResourceManager.GetString("Context_Menu_EmptyRecycleBin", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This permanently removes all items in the recycle bin. ähnelt.
+        /// </summary>
+        public static string Web_EmptyRecycle_Message {
+            get {
+                return ResourceManager.GetString("Web_EmptyRecycle_Message", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This action cannot be undone. ähnelt.
+        /// </summary>
+        public static string Web_EmptyRecycle_Warning {
+            get {
+                return ResourceManager.GetString("Web_EmptyRecycle_Warning", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Emptying recycle bin… ähnelt.
+        /// </summary>
+        public static string Web_EmptyRecycle_Progress {
+            get {
+                return ResourceManager.GetString("Web_EmptyRecycle_Progress", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Recycle bin emptied. ähnelt.
+        /// </summary>
+        public static string Web_EmptyRecycle_Success {
+            get {
+                return ResourceManager.GetString("Web_EmptyRecycle_Success", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The recycle bin is already empty. ähnelt.
+        /// </summary>
+        public static string Web_EmptyRecycle_AlreadyEmpty {
+            get {
+                return ResourceManager.GetString("Web_EmptyRecycle_AlreadyEmpty", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} of {1} items removed from the recycle bin. ähnelt.
+        /// </summary>
+        public static string Web_EmptyRecycle_PartialFailure {
+            get {
+                return ResourceManager.GetString("Web_EmptyRecycle_PartialFailure", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Download ähnelt.
         /// </summary>

@@ -171,6 +171,13 @@ public partial class FileBrowser
         ShareEntryPolicy.Classify(entry.Path).Kind ==
             ShareEntryKind.RecycleBin;
 
+    /// <summary>
+    /// Whether the entry is the recycle-bin root folder — gates the
+    /// "empty recycle bin" command in the context menu and selection toolbar.
+    /// </summary>
+    public bool IsRecycleBinRoot(FileMetadata? entry) =>
+        entry is not null && IsRecycleBinEntry(entry);
+
     private IEnumerable<FileMetadata> ApplySort(IEnumerable<FileMetadata> items)
     {
         if (_sortColumn is null || _sortDirection == 0)

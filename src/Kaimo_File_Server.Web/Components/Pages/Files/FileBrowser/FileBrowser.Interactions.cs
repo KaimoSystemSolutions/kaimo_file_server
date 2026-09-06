@@ -29,6 +29,8 @@ public partial class FileBrowser
     private bool _showDeleteConfirm;
     private List<FileMetadata> _deleteTargets = new();
     private string? _deleteError;
+    private bool _showEmptyRecycleConfirm;
+    private FileMetadata? _emptyRecycleTarget;
     private HashSet<FileMetadata> _selectedItems = new();
     private bool _showRenameDialog;
     private FileMetadata? _renameTarget;
@@ -64,6 +66,8 @@ public partial class FileBrowser
     private bool CanOpenSelection => VM.Capabilities.CanOpen && _selectedItems.Count == 1;
     private bool CanRenameSelection => VM.Capabilities.CanRename && _selectedItems.Count == 1;
     private bool CanDeleteSelection => VM.Capabilities.CanDelete && _selectedItems.Count > 0;
+    private bool CanEmptyRecycleSelection =>
+        VM.Capabilities.CanDelete && _selectedItems.Count == 1 && IsRecycleBinRoot(_selectedItems.First());
     private bool CanAclSelection => CanManageAcls() && _selectedItems.Count == 1;
     private bool CanPasteClipboard => _clipboard.Count > 0 || BrowserClipboard.Source is not null;
     
@@ -501,6 +505,74 @@ public partial class FileBrowser
         StateHasChanged();
         await Task.Yield(); // let Blazor render the modal first
         await _deleteModalRef.FocusAsync();
+    }
+
+    // ========== Empty recycle bin ==========
+
+    /// <summary>
+    /// Opens the confirmation dialog for permanently clearing the recycle bin.
+    /// Invoked from the context menu and the selection toolbar.
+    /// </summary>
+    internal Task EmptyRecycleBin(FileMetadata recycleRoot)
+    {
+        if (!IsRecycleBinRoot(recycleRoot)) return Task.CompletedTask;
+        _emptyRecycleTarget = recycleRoot;
+        _showEmptyRecycleConfirm = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void CancelEmptyRecycle()
+    {
+        _showEmptyRecycleConfirm = false;
+        _emptyRecycleTarget = null;
+    }
+
+    /// <summary>
+    /// Permanently deletes every top-level entry inside the recycle bin. Items already
+    /// live under <c>.RECYCLE_BIN</c>, so <see cref="FileBrowserViewModel.DeleteAsync"/>
+    /// removes them for good rather than recycling them again. One failure never aborts
+    /// the batch; the folder itself is kept.
+    /// </summary>
+    private async Task ConfirmEmptyRecycle()
+    {
+        var recycleRoot = _emptyRecycleTarget;
+        _showEmptyRecycleConfirm = false;
+        _emptyRecycleTarget = null;
+        _selectedItems.Clear();
+        await RenderClosedDialogAsync();
+
+        if (recycleRoot is null) return;
+
+        var children = await VM.ListDirectoryAsync(recycleRoot.Path);
+        if (children.Count == 0)
+        {
+            Toast.Show(Resources.Web_EmptyRecycle_AlreadyEmpty, ToastType.Info);
+            return;
+        }
+
+        var toastId = Toast.Show(Resources.Web_EmptyRecycle_Progress, ToastType.Progress);
+        var failed = new List<string>();
+        foreach (var child in children)
+        {
+            var result = await VM.DeleteAsync(child);
+            if (!result.Success)
+                failed.Add(child.Name);
+        }
+
+        if (failed.Count == 0)
+        {
+            Toast.Update(toastId, Resources.Web_EmptyRecycle_Success, type: ToastType.Success);
+        }
+        else
+        {
+            Toast.Update(toastId,
+                string.Format(Resources.Web_EmptyRecycle_PartialFailure, children.Count - failed.Count, children.Count),
+                type: ToastType.Error);
+        }
+
+        await VM.LoadShareAsync(ShareName, SubPath ?? "");
+        StateHasChanged();
     }
 
     private void AclSelected()

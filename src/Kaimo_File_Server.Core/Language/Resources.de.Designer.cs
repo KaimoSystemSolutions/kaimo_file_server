@@ -195,6 +195,48 @@ namespace Kaimo_File_Server.Core.Language {
             }
         }
 
+        internal static string Context_Menu_EmptyRecycleBin {
+            get {
+                return ResourceManager.GetString("Context_Menu_EmptyRecycleBin", resourceCulture);
+            }
+        }
+
+        internal static string Web_EmptyRecycle_Message {
+            get {
+                return ResourceManager.GetString("Web_EmptyRecycle_Message", resourceCulture);
+            }
+        }
+
+        internal static string Web_EmptyRecycle_Warning {
+            get {
+                return ResourceManager.GetString("Web_EmptyRecycle_Warning", resourceCulture);
+            }
+        }
+
+        internal static string Web_EmptyRecycle_Progress {
+            get {
+                return ResourceManager.GetString("Web_EmptyRecycle_Progress", resourceCulture);
+            }
+        }
+
+        internal static string Web_EmptyRecycle_Success {
+            get {
+                return ResourceManager.GetString("Web_EmptyRecycle_Success", resourceCulture);
+            }
+        }
+
+        internal static string Web_EmptyRecycle_AlreadyEmpty {
+            get {
+                return ResourceManager.GetString("Web_EmptyRecycle_AlreadyEmpty", resourceCulture);
+            }
+        }
+
+        internal static string Web_EmptyRecycle_PartialFailure {
+            get {
+                return ResourceManager.GetString("Web_EmptyRecycle_PartialFailure", resourceCulture);
+            }
+        }
+
         internal static string Context_Menu_Download {
             get {
                 return ResourceManager.GetString("Context_Menu_Download", resourceCulture);

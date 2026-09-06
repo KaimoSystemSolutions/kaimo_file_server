@@ -107,6 +107,10 @@
             "open" => FileBrowser.VM.Capabilities.CanOpen,
             "rename" => FileBrowser.VM.Capabilities.CanRename,
             "delete" => FileBrowser.VM.Capabilities.CanDelete,
+            // "Empty recycle bin" only applies to the recycle-bin root folder itself.
+            "recycle.empty" => scope == ContextMenuScope.Folder
+                               && FileBrowser.VM.Capabilities.CanDelete
+                               && FileBrowser.IsRecycleBinRoot(selected.FirstOrDefault()),
             "compress.zip" or "compress.targz" => FileBrowser.VM.Capabilities.CanArchive,
             "versions" => FileBrowser.VM.Capabilities.HasVersions,
             "properties" => FileBrowser.VM.Capabilities.HasProperties,
@@ -170,6 +174,8 @@
             => async () => { foreach (var item in selected) await ContextDelete(item); },
         "delete"
             => async () => { await ContextDelete(target!); },
+
+        "recycle.empty" => async () => { CloseContextMenu(); await FileBrowser.EmptyRecycleBin(target!); },
 
         "permissions" => () => { ContextAcl(target!); return Task.CompletedTask; },
 

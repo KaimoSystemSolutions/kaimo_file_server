@@ -192,6 +192,27 @@
   <data name="Context_Menu_Delete" xml:space="preserve">
     <value>Delete</value>
   </data>
+  <data name="Context_Menu_EmptyRecycleBin" xml:space="preserve">
+    <value>Empty recycle bin</value>
+  </data>
+  <data name="Web_EmptyRecycle_Message" xml:space="preserve">
+    <value>This permanently removes all items in the recycle bin.</value>
+  </data>
+  <data name="Web_EmptyRecycle_Warning" xml:space="preserve">
+    <value>This action cannot be undone.</value>
+  </data>
+  <data name="Web_EmptyRecycle_Progress" xml:space="preserve">
+    <value>Emptying recycle bin…</value>
+  </data>
+  <data name="Web_EmptyRecycle_Success" xml:space="preserve">
+    <value>Recycle bin emptied.</value>
+  </data>
+  <data name="Web_EmptyRecycle_AlreadyEmpty" xml:space="preserve">
+    <value>The recycle bin is already empty.</value>
+  </data>
+  <data name="Web_EmptyRecycle_PartialFailure" xml:space="preserve">
+    <value>{0} of {1} items removed from the recycle bin.</value>
+  </data>
   <data name="Context_Menu_Download" xml:space="preserve">
     <value>Download</value>
   </data>

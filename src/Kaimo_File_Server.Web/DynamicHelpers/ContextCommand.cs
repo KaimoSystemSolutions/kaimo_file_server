@@ -91,6 +91,11 @@ public static class ContextCommandCatalog
         new ContextCommand("delete", () => Resources.Context_Menu_Delete, "trash.svg",
             IsDanger: true, ValidScopes: SingleAndMulti),
 
+        // Only meaningful on the recycle-bin root folder; a runtime guard in the
+        // menu renderer hides it for every other folder.
+        new ContextCommand("recycle.empty", () => Resources.Context_Menu_EmptyRecycleBin, "trash.svg",
+            IsDanger: true, ValidScopes: new[] { ContextMenuScope.Folder }),
+
         new ContextCommand("permissions", () => Resources.Context_Menu_Permissions, "shield.svg",
             IconOptions: new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"),
             ValidScopes: AllSingle),

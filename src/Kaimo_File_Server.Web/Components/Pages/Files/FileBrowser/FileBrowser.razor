@@ -115,6 +115,14 @@
                 <span>@Resources.Web_Action_Delete</span>
             </button>
         }
+        @if (CanEmptyRecycleSelection)
+        {
+            <button class="toolbar-btn toolbar-btn--danger" title="@Resources.Context_Menu_EmptyRecycleBin"
+                    @onclick="() => EmptyRecycleBin(_selectedItems.First())">
+                @Assets.SVG("trash.svg", new SvgOptions(Width: 16, Height: 16))
+                <span>@Resources.Context_Menu_EmptyRecycleBin</span>
+            </button>
+        }
         @if (VM.Capabilities.HasFileAcls)
         {
             <button class="toolbar-btn" title="@Resources.Web_Action_Permissions"
@@ -203,6 +211,25 @@
     </div>
 }
 
+
+@* -- Dialog: confirm emptying the recycle bin -- *@
+@if (_showEmptyRecycleConfirm)
+{
+    <div class="modal-backdrop" @onclick="CancelEmptyRecycle" tabindex="0">
+        <div class="modal-dialog" @onclick:stopPropagation="true">
+            <h3 class="modal-title">@Resources.Context_Menu_EmptyRecycleBin</h3>
+            <p class="modal-text">
+                @Resources.Web_EmptyRecycle_Message
+                <br/>
+                <span class="modal-warning">@Resources.Web_EmptyRecycle_Warning</span>
+            </p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" @onclick="CancelEmptyRecycle">@Resources.Web_Button_Cancel</button>
+                <button class="btn btn-danger" @onclick="ConfirmEmptyRecycle">@Resources.Context_Menu_EmptyRecycleBin</button>
+            </div>
+        </div>
+    </div>
+}
 
 @if (_showCloudToLocal)
 {
