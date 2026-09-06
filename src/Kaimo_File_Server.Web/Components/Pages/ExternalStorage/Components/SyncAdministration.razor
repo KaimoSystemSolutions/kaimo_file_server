@@ -226,7 +226,6 @@ else
                     </div>
                     <span class="detail-subtitle">@selected.ConnectionName · @ProviderFor(selected)</span>
                 </div>
-                <StatusBadge Tone="@SyncStateTone(selected)" Class="sync-state" Label="@SyncState(selected)" />
             </div>
             <div class="sync-detail-actions-top">
                 <button class="btn-secondary" type="button" disabled="@(_busy || !selected.Definition.Enabled)" @onclick="() => RunAsync(selected)">@R("Web_ExternalStorage_RunNow")</button>
