@@ -119,10 +119,10 @@ else
                 @switch (_activeTab)
                 {
                     case ShareDetailTab.Settings:
-                        <ShareSettingsPanel VM="VM" OnDeleted="HandleShareDeleted"/>
+                        <ShareSettingsPanel VM="VM" OnDeleted="HandleShareDeleted" OnChanged="StateHasChanged"/>
                         break;
                     case ShareDetailTab.Access:
-                        <ShareAccessPanel VM="VM" IsLoaded="_accessLoaded"/>
+                        <ShareAccessPanel VM="VM" IsLoaded="_accessLoaded" OnChanged="StateHasChanged"/>
                         break;
                     case ShareDetailTab.Acl:
                         <div class="detail-section">

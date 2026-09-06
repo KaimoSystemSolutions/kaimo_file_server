@@ -18,11 +18,11 @@
             <label>@Resources.Web_ShareList_VisibilityHeader</label>
             <div class="detail-section">
                 <div class="detail-value-row">
+                    <label class="toggle-switch" title="@(VM.SelectedShare.IsShareHidden ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)">
+                        <input type="checkbox" checked="@VM.SelectedShare.IsShareHidden" disabled="@VM.IsSelectedShareReadOnly" @onchange="ToggleShareHidden" />
+                        <span class="toggle-slider"></span>
+                    </label>
                     <span class="detail-value">@(VM.SelectedShare.IsShareHidden ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)</span>
-                    <button class="btn-secondary compact-button" @onclick="ToggleShareHidden"
-                            disabled="@VM.IsSelectedShareReadOnly">
-                        @(VM.SelectedShare.IsShareHidden ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
-                    </button>
                 </div>
             </div>
         </div>
@@ -32,10 +32,12 @@
 @code {
     [Parameter, EditorRequired] public ShareListViewModel VM { get; set; } = default!;
     [Parameter] public bool IsLoaded { get; set; }
+    // Raised after an edit so the parent can re-render the overview list in sync.
+    [Parameter] public EventCallback OnChanged { get; set; }
 
     private async Task ToggleShareHidden()
     {
         await VM.ToggleShareHiddenAsync();
-        StateHasChanged();
+        await OnChanged.InvokeAsync();
     }
 }

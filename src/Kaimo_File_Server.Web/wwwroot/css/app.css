@@ -2680,10 +2680,11 @@ h1, h2, h3, h4, h5, h6 {
         position: absolute;
         height: 16px;
         width: 16px;
-        left: 3px;
-        bottom: 3px;
+        left: 2px;
+        top: 50%;
         background: #fff;
-        border-radius: 50%;
+        border-radius: var(--radius-control);
+        transform: translateY(-50%);
         transition: transform 0.2s;
     }
 
@@ -2692,7 +2693,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
     .toggle-switch input:checked + .toggle-slider::before {
-        transform: translateX(16px);
+        transform: translate(16px, -50%);
     }
 
 /* ══════════════════════════════════════════════════════════

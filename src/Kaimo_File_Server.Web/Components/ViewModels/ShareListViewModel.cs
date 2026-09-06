@@ -892,15 +892,12 @@ public partial class ShareListViewModel
     {
         if (SelectedShare is null) return false;
 
-        EditErrorMessage = null;
-        EditSuccessMessage = null;
-
         if (!EnsureSelectedShareWritable())
             return false;
 
         // Enabling/disabling a share governs whether anyone can access it → ManageShareAccess.
         if (!await CanManageSelectedShareAsync(ManagementPermission.ManageShareAccess))
-        { EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
+        { EditSuccessMessage = null; EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
 
         try
         {
@@ -909,22 +906,20 @@ public partial class ShareListViewModel
 
             _logger.LogInformation("Share '{ShareName}' {Status}",
                 SelectedShare.Name, SelectedShare.IsEnabled ? "enabled" : "disabled");
+            // The in-memory share (shared with the list) is already updated and saved;
+            // no full reload needed. Setting the message only here avoids the banner
+            // blinking off/on, which shifts the whole panel (visible flicker).
+            EditErrorMessage = null;
             EditSuccessMessage = SelectedShare.IsEnabled
                 ? Resources.Web_Share_Enabled
                 : Resources.Web_Share_Disabled;
-
-            await LoadAsync();
-
-            // Re-select
-            var updated = Shares.FirstOrDefault(s => s.Id == SelectedShare.Id);
-            if (updated is not null)
-                SelectedShare = updated;
 
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error changing the share status");
+            EditSuccessMessage = null;
             EditErrorMessage = Resources.Web_Error_ChangeStatusFailed;
             return false;
         }
@@ -934,15 +929,12 @@ public partial class ShareListViewModel
     {
         if (SelectedShare is null) return false;
 
-        EditErrorMessage = null;
-        EditSuccessMessage = null;
-
         if (!EnsureSelectedShareWritable())
             return false;
 
         // The recycle bin is a share feature setting → EditShareSettings.
         if (!await CanManageSelectedShareAsync(ManagementPermission.EditShareSettings))
-        { EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
+        { EditSuccessMessage = null; EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
 
         try
         {
@@ -951,22 +943,17 @@ public partial class ShareListViewModel
 
             _logger.LogInformation("Recycle bin for share '{ShareName}' {Status}",
                 SelectedShare.Name, SelectedShare.IsRecycleEnabled ? "enabled" : "disabled");
+            EditErrorMessage = null;
             EditSuccessMessage = SelectedShare.IsRecycleEnabled
                 ? Resources.Web_Share_RecycleEnabled
                 : Resources.Web_Share_RecycleDisabled;
-
-            await LoadAsync();
-
-            // Re-select
-            var updated = Shares.FirstOrDefault(s => s.Id == SelectedShare.Id);
-            if (updated is not null)
-                SelectedShare = updated;
 
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error changing the recycle bin status");
+            EditSuccessMessage = null;
             EditErrorMessage = Resources.Web_Error_ChangeStatusFailed;
             return false;
         }
@@ -976,15 +963,12 @@ public partial class ShareListViewModel
     {
         if (SelectedShare is null) return false;
 
-        EditErrorMessage = null;
-        EditSuccessMessage = null;
-
         if (!EnsureSelectedShareWritable())
             return false;
 
         // Visibility (hidden = excluded from listings/ABE) is share-access control → ManageShareAccess.
         if (!await CanManageSelectedShareAsync(ManagementPermission.ManageShareAccess))
-        { EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
+        { EditSuccessMessage = null; EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
 
         try
         {
@@ -993,22 +977,17 @@ public partial class ShareListViewModel
 
             _logger.LogInformation("Share '{ShareName}' visibility {Status}",
                 SelectedShare.Name, SelectedShare.IsShareHidden ? "hidden" : "visible");
+            EditErrorMessage = null;
             EditSuccessMessage = SelectedShare.IsShareHidden
                 ? Resources.Web_Share_Enabled
                 : Resources.Web_Share_Disabled;
-
-            await LoadAsync();
-
-            // Re-select
-            var updated = Shares.FirstOrDefault(s => s.Id == SelectedShare.Id);
-            if (updated is not null)
-                SelectedShare = updated;
 
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error changing the share visibility");
+            EditSuccessMessage = null;
             EditErrorMessage = Resources.Web_Error_ChangeVisibilityFailed;
             return false;
         }

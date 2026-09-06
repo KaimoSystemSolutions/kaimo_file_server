@@ -58,22 +58,22 @@
     <div class="detail-section">
         <span class="detail-label">@Resources.Web_ShareList_Label_Status</span>
         <div class="detail-value-row">
+            <label class="toggle-switch" title="@(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)">
+                <input type="checkbox" checked="@VM.SelectedShare.IsEnabled" disabled="@isReadOnly" @onchange="ToggleShareEnabled" />
+                <span class="toggle-slider"></span>
+            </label>
             <span class="detail-value">@(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)</span>
-            <button class="btn-secondary compact-button" @onclick="ToggleShareEnabled"
-                    disabled="@isReadOnly">
-                @(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
-            </button>
         </div>
     </div>
 
     <div class="detail-section">
         <span class="detail-label">@Resources.Web_ShareList_Label_RecycleBin</span>
         <div class="detail-value-row">
+            <label class="toggle-switch" title="@(VM.SelectedShare.IsRecycleEnabled ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)">
+                <input type="checkbox" checked="@VM.SelectedShare.IsRecycleEnabled" disabled="@isReadOnly" @onchange="ToggleRecycleEnabled" />
+                <span class="toggle-slider"></span>
+            </label>
             <span class="detail-value">@(VM.SelectedShare.IsRecycleEnabled ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)</span>
-            <button class="btn-secondary compact-button" @onclick="ToggleRecycleEnabled"
-                    disabled="@isReadOnly">
-                @(VM.SelectedShare.IsRecycleEnabled ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)
-            </button>
         </div>
     </div>
 
@@ -100,11 +100,13 @@
 @code {
     [Parameter, EditorRequired] public ShareListViewModel VM { get; set; } = default!;
     [Parameter] public EventCallback OnDeleted { get; set; }
+    // Raised after an edit so the parent can re-render the overview list in sync.
+    [Parameter] public EventCallback OnChanged { get; set; }
 
-    private async Task RenameShare() { await VM.RenameShareAsync(); StateHasChanged(); }
-    private async Task ChangeStoragePool() { await VM.ChangeStoragePoolAsync(); StateHasChanged(); }
-    private async Task ToggleShareEnabled() { await VM.ToggleShareEnabledAsync(); StateHasChanged(); }
-    private async Task ToggleRecycleEnabled() { await VM.ToggleRecycleEnabledAsync(); StateHasChanged(); }
+    private async Task RenameShare() { await VM.RenameShareAsync(); await OnChanged.InvokeAsync(); }
+    private async Task ChangeStoragePool() { await VM.ChangeStoragePoolAsync(); await OnChanged.InvokeAsync(); }
+    private async Task ToggleShareEnabled() { await VM.ToggleShareEnabledAsync(); await OnChanged.InvokeAsync(); }
+    private async Task ToggleRecycleEnabled() { await VM.ToggleRecycleEnabledAsync(); await OnChanged.InvokeAsync(); }
 
     private async Task DeleteShare()
     {
