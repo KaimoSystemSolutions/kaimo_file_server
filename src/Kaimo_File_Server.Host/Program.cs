@@ -52,6 +52,17 @@ builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Backup.Databa
 
 
 var host = builder.Build();
+
+// Preflight: verify the service can actually write to every mounted data
+// directory before touching the database or files. Bind mounts created with root
+// ownership silently block the non-root container user, so this surfaces one
+// clear, actionable failure at boot instead of a cryptic error at first write.
+Kaimo_File_Server.Infrastructure.Startup.WritableDirectoryCheck.VerifyFromConfiguration(
+    host.Services.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Kaimo_File_Server.Infrastructure.Startup"),
+    builder.Configuration,
+    includeBackups: true);
+
 // Host owns the database: apply the one-shot startup restore (if requested),
 // take a pre-migration safety backup, migrate + seed, then signal readiness.
 await host.MigrateSeedAndBackupAsync();

@@ -80,6 +80,15 @@ builder.WebHost.ConfigureKestrel(options =>
 
 var app = builder.Build();
 
+// Preflight: verify every mounted data directory is writable by the non-root
+// container user before serving. The bridge does not mount the backup volume, so
+// that path is excluded.
+Kaimo_File_Server.Infrastructure.Startup.WritableDirectoryCheck.VerifyFromConfiguration(
+    app.Services.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Kaimo_File_Server.Infrastructure.Startup"),
+    builder.Configuration,
+    includeBackups: false);
+
 // The Host process owns the schema (migrations + seeding). The bridge must not
 // migrate; it waits until the Host has finished before serving requests, so its
 // P1-11 receipt tables and everything else are guaranteed to exist.

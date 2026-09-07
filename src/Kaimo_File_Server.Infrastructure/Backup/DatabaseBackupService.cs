@@ -40,7 +40,7 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
     public async Task<BackupFileInfo> CreateBackupAsync(
         BackupTrigger trigger, CancellationToken cancellationToken = default)
     {
-        Directory.CreateDirectory(BackupRootPath);
+        EnsureBackupDirectoryWritable();
 
         var createdAt = _time.GetLocalNow();
         var fileName = BackupFileNaming.Build(createdAt, trigger);
@@ -196,6 +196,26 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
         }
 
         return Task.CompletedTask;
+    }
+
+    // Fail fast with an actionable message instead of letting pg_dump surface a
+    // bare "Permission denied". The dump runs as the container's non-root user, so
+    // the mounted host backup directory must be writable by that account — a common
+    // trip-up when the backup volume is first added to an existing deployment.
+    private void EnsureBackupDirectoryWritable()
+    {
+        try
+        {
+            Startup.WritableDirectoryCheck.Probe(BackupRootPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new InvalidOperationException(
+                $"Backup directory '{BackupRootPath}' is not writable by the service account. " +
+                "Grant the container user write access to the mounted host directory " +
+                $"(e.g. 'chown -R 1654:1654 <host path bound to {BackupRootPath}>') and restart.",
+                ex);
+        }
     }
 
     private Dictionary<string, string> PasswordEnvironment()

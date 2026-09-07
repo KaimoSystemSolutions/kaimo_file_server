@@ -71,8 +71,6 @@ var baseStoragePath = builder.Configuration.GetValue<string>("Storage:RootPath")
 var applicationDataPath = builder.Configuration.GetValue<string>("Storage:ApplicationDataPath") ?? "/data/kaimo-system";
 var poolStoragePaths = Directory.GetDirectories(baseStoragePath).Select(path => path).ToList();
 
-var f = ServiceCollectionExtensions.GetActiveStorageMounts();
-
 builder.Services.AddCoreServices(poolStoragePaths, applicationDataPath);
 
 builder.Services.AddMemoryCache();
@@ -305,6 +303,15 @@ builder.Services.AddHostedService<CloudSyncSchedulerService>();
 // ══════════════════════════════════════════
 
 var app = builder.Build();
+
+// Preflight: verify every mounted data directory is writable by the non-root
+// container user before serving. Fails fast with one actionable message instead
+// of surfacing a cryptic permission error at the first upload/backup/log write.
+Kaimo_File_Server.Infrastructure.Startup.WritableDirectoryCheck.VerifyFromConfiguration(
+    app.Services.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("Kaimo_File_Server.Infrastructure.Startup"),
+    builder.Configuration,
+    includeBackups: true);
 
 // The Host process owns the schema (migrations + seeding). Web must not migrate;
 // it waits until the Host has finished so tables and seed data are present.
