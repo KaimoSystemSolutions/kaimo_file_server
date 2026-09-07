@@ -54,13 +54,23 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         public async Task DeleteAsync(Guid id)
         {
             await using var db = await dbFactory.CreateDbContextAsync();
-            
+
             var group = await db.Groups.FindAsync(id);
-            if (group != null)
+            if (group == null)
             {
-                db.Groups.Remove(group);
-                await db.SaveChangesAsync();
+                return;
             }
+
+            // No FK cascade reaches these: user_groups links by a plain Guid, and
+            // PrincipalId is polymorphic user-or-group. Remove every link the group
+            // held, or its id keeps showing up as a member / role- and grant-holder
+            // after the group is gone.
+            await db.UserGroups.Where(ug => ug.GroupId == id).ExecuteDeleteAsync();
+            await db.ScopedRoleAssignments.Where(a => a.PrincipalId == id).ExecuteDeleteAsync();
+            await db.CloudAccessGrants.Where(g => g.PrincipalId == id).ExecuteDeleteAsync();
+
+            db.Groups.Remove(group);
+            await db.SaveChangesAsync();
         }
 
         /// <inheritdoc />

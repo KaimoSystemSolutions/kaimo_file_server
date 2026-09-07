@@ -95,11 +95,22 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             await using var db = await dbFactory.CreateDbContextAsync();
 
             var user = await db.Users.FindAsync(id);
-            if (user != null)
+            if (user == null)
             {
-                db.Users.Remove(user);
-                await db.SaveChangesAsync();
+                return;
             }
+
+            // These link tables reference the user by a plain Guid (PrincipalId is
+            // polymorphic user-or-group), so there is no FK cascade to rely on.
+            // Remove every assignment the user held, or its id keeps showing up
+            // under groups / roles / departments after the account is gone.
+            await db.UserGroups.Where(ug => ug.UserId == id).ExecuteDeleteAsync();
+            await db.DepartmentUsers.Where(du => du.UserId == id).ExecuteDeleteAsync();
+            await db.ScopedRoleAssignments.Where(a => a.PrincipalId == id).ExecuteDeleteAsync();
+            await db.CloudAccessGrants.Where(g => g.PrincipalId == id).ExecuteDeleteAsync();
+
+            db.Users.Remove(user);
+            await db.SaveChangesAsync();
         }
 
         // --------------------------------------------
