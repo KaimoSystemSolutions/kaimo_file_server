@@ -744,6 +744,9 @@
   <data name="Web_Error_NoPermission" xml:space="preserve">
     <value>You don't have permissions for the global settings.</value>
   </data>
+  <data name="Web_Error_LastAdmin" xml:space="preserve">
+    <value>Cannot remove the last administrator — at least one enabled global administrator must remain.</value>
+  </data>
   <data name="Web_Error_AccessDenied" xml:space="preserve">
     <value>Access denied.</value>
   </data>

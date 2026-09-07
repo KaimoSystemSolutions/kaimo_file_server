@@ -571,6 +571,18 @@ public class UserListViewModel
             return;
         }
 
+        // Last-admin protection: if this user is currently the SOLE enabled global admin,
+        // the save must not strip that — neither by disabling the account nor by unchecking
+        // the Administrator role (group-inherited admin survives a role uncheck).
+        var adminUserIds = await GetEnabledGlobalAdminUserIdsAsync();
+        if (adminUserIds.Contains(SelectedUser.Id) && !adminUserIds.Any(id => id != SelectedUser.Id))
+        {
+            var keepsAdminRole = EditUserRoles.Any(r => r.IsChecked && IsAdminRole(r.Item));
+            var willBeAdmin = EditUserIsEnabled
+                && (keepsAdminRole || await UserInheritsGlobalAdminFromGroupAsync(SelectedUser.Id));
+            if (!willBeAdmin) { ErrorMessage = Resources.Web_Error_LastAdmin; return; }
+        }
+
         try
         {
             IsSaving = true;
@@ -867,6 +879,12 @@ public class UserListViewModel
                 _actorContext, rolePerms, assignment.ScopeType, assignment.ScopeId))
         { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
+        // Last-admin protection: never remove the global assignment that is the sole
+        // remaining source of an enabled global administrator.
+        if (assignment.ScopeType == ScopeType.Global && role is not null && IsAdminRole(role)
+            && (await GetEnabledGlobalAdminUserIdsAsync(excludeAssignmentId: assignmentId)).Count == 0)
+        { ErrorMessage = Resources.Web_Error_LastAdmin; return; }
+
         try
         {
             IsSaving = true;
@@ -1044,6 +1062,12 @@ public class UserListViewModel
         if (SelectedUser is null || _actorContext is null) return;
         if (!await _mgmtAuth.CanManageUserAsync(_actorContext, SelectedUser.Id, ManagementPermission.DeleteUsers))
         { ErrorMessage = Resources.Web_Error_NoPermission; return; }
+
+        // Last-admin protection: deleting the user removes their assignments and group
+        // memberships too, so refuse if this user is the sole enabled global admin.
+        var adminUserIds = await GetEnabledGlobalAdminUserIdsAsync();
+        if (adminUserIds.Count == 1 && adminUserIds.Contains(SelectedUser.Id))
+        { ErrorMessage = Resources.Web_Error_LastAdmin; return; }
 
         try
         {
@@ -1238,5 +1262,70 @@ public class UserListViewModel
         }
 
         return items.OrderBy(i => i.PrincipalName).ToList();
+    }
+
+    // ══════════════════════════════════════════
+    //  Last-Admin Protection
+    // ══════════════════════════════════════════
+
+    /// <summary>A role that carries the complete <see cref="ManagementPermission.FullAdmin"/>
+    /// mask — the same definition the page uses for <c>IsGlobalAdmin</c>.</summary>
+    private static bool IsAdminRole(Role role)
+        => (role.ManagementPermissions & ManagementPermission.FullAdmin) == ManagementPermission.FullAdmin;
+
+    /// <summary>
+    /// The set of ENABLED users who effectively hold a global FullAdmin role, either
+    /// directly or inherited through group membership. This is the authoritative
+    /// "who can still administer the system" set that the last-admin guards protect:
+    /// no operation may reduce it to empty, or the whole management UI becomes
+    /// permanently unreachable.
+    /// </summary>
+    // ponytail: the guards live in this ViewModel because all write paths that can
+    // strip global admin (role uncheck, assignment delete, user delete, user disable)
+    // are here. If a second write path appears (planned client-sync REST API), move
+    // this helper into ManagementAuthService.
+    private async Task<HashSet<Guid>> GetEnabledGlobalAdminUserIdsAsync(Guid? excludeAssignmentId = null)
+    {
+        var globalAssignments = await _assignmentRepo.GetByScopeAsync(ScopeType.Global, Guid.Empty);
+        var roles = (await _roleRepo.GetAllAsync()).ToDictionary(r => r.Id);
+        var users = (await _userRepo.GetAllAsync()).ToDictionary(u => u.Id);
+        var groupIds = (await _groupRepo.GetAllAsync()).Select(g => g.Id).ToHashSet();
+
+        var admins = new HashSet<Guid>();
+        foreach (var a in globalAssignments)
+        {
+            if (a.Id == excludeAssignmentId) continue;
+            if (!roles.TryGetValue(a.RoleId, out var role) || !IsAdminRole(role)) continue;
+
+            if (users.TryGetValue(a.PrincipalId, out var user))
+            {
+                if (user.IsEnabled) admins.Add(user.Id);
+            }
+            else if (groupIds.Contains(a.PrincipalId))
+            {
+                foreach (var member in await _groupRepo.GetMembersAsync(a.PrincipalId))
+                    if (member.IsEnabled) admins.Add(member.Id);
+            }
+        }
+        return admins;
+    }
+
+    /// <summary>Whether <paramref name="userId"/> inherits a global FullAdmin role through
+    /// any group it belongs to. Used to tell whether unchecking the user's OWN admin role
+    /// still leaves it an admin (group-inherited authority is untouched by that edit).</summary>
+    private async Task<bool> UserInheritsGlobalAdminFromGroupAsync(Guid userId)
+    {
+        var globalAssignments = await _assignmentRepo.GetByScopeAsync(ScopeType.Global, Guid.Empty);
+        var roles = (await _roleRepo.GetAllAsync()).ToDictionary(r => r.Id);
+        var groupIds = (await _groupRepo.GetAllAsync()).Select(g => g.Id).ToHashSet();
+
+        foreach (var a in globalAssignments)
+        {
+            if (!groupIds.Contains(a.PrincipalId)) continue;
+            if (!roles.TryGetValue(a.RoleId, out var role) || !IsAdminRole(role)) continue;
+            if ((await _groupRepo.GetMembersAsync(a.PrincipalId)).Any(m => m.Id == userId))
+                return true;
+        }
+        return false;
     }
 }

@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
@@ -481,5 +482,168 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
             AuthStateFor(actor.Username),
             NullLogger<UserListViewModel>.Instance,
             ShareRepo(), _config.Object);
+    }
+
+    // ═══════════════════ Last-admin protection ═══════════════════
+
+    private Role SeedAdminRole(string name = "Administrator")
+        => SeedRole(name, ManagementPermission.FullAdmin, system: true);
+
+    private ScopedRoleAssignment SeedGlobalAssignment(Guid principalId, Guid roleId)
+    {
+        var assignment = new ScopedRoleAssignment(principalId, roleId, ScopeType.Global, Guid.Empty);
+        using var db = NewContext();
+        db.ScopedRoleAssignments.Add(assignment);
+        db.SaveChanges();
+        return assignment;
+    }
+
+    private void SeedGroupMember(Guid groupId, Guid userId)
+    {
+        using var db = NewContext();
+        db.UserGroups.Add(new UserGroup(userId, groupId));
+        db.SaveChanges();
+    }
+
+    [Fact]
+    public async Task SaveUserAsync_SoleAdminUnchecksOwnAdminRole_IsBlocked()
+    {
+        var admin = SeedUser("admin");
+        var adminRole = SeedAdminRole();
+        var assignment = SeedGlobalAssignment(admin.Id, adminRole.Id);
+
+        var sut = BuildGlobalAdminSut(admin);
+        await sut.LoadAsync();
+        await sut.SelectUserAsync(sut.Users.Single(u => u.Id == admin.Id));
+        await sut.StartEditUserAsync();
+
+        foreach (var r in sut.EditUserRoles) r.IsChecked = false; // drop the admin role
+        await sut.SaveUserAsync();
+
+        Assert.Equal(Resources.Web_Error_LastAdmin, sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a => a.Id == assignment.Id));
+    }
+
+    [Fact]
+    public async Task SaveUserAsync_SecondAdminExists_CanUncheckOwnAdminRole()
+    {
+        var admin = SeedUser("admin");
+        var admin2 = SeedUser("admin2");
+        var adminRole = SeedAdminRole();
+        var ownAssignment = SeedGlobalAssignment(admin.Id, adminRole.Id);
+        SeedGlobalAssignment(admin2.Id, adminRole.Id);
+
+        var sut = BuildGlobalAdminSut(admin);
+        await sut.LoadAsync();
+        await sut.SelectUserAsync(sut.Users.Single(u => u.Id == admin.Id));
+        await sut.StartEditUserAsync();
+
+        foreach (var r in sut.EditUserRoles) r.IsChecked = false;
+        await sut.SaveUserAsync();
+
+        Assert.NotEqual(Resources.Web_Error_LastAdmin, sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.False(await db.ScopedRoleAssignments.AnyAsync(a => a.Id == ownAssignment.Id));
+    }
+
+    [Fact]
+    public async Task SaveUserAsync_SoleAdminDisablesOwnAccount_IsBlocked()
+    {
+        var admin = SeedUser("admin");
+        var adminRole = SeedAdminRole();
+        SeedGlobalAssignment(admin.Id, adminRole.Id);
+
+        var sut = BuildGlobalAdminSut(admin);
+        await sut.LoadAsync();
+        await sut.SelectUserAsync(sut.Users.Single(u => u.Id == admin.Id));
+        await sut.StartEditUserAsync();
+
+        sut.EditUserIsEnabled = false; // disabling the last admin locks everyone out
+        await sut.SaveUserAsync();
+
+        Assert.Equal(Resources.Web_Error_LastAdmin, sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.True((await db.Users.FindAsync(admin.Id))!.IsEnabled);
+    }
+
+    [Fact]
+    public async Task ConfirmDeleteUserAsync_SoleAdmin_IsBlocked()
+    {
+        var admin = SeedUser("admin");
+        var adminRole = SeedAdminRole();
+        SeedGlobalAssignment(admin.Id, adminRole.Id);
+
+        var sut = BuildGlobalAdminSut(admin);
+        await sut.LoadAsync();
+        await sut.SelectUserAsync(sut.Users.Single(u => u.Id == admin.Id));
+        sut.RequestDeleteUser();
+        await sut.ConfirmDeleteUserAsync();
+
+        Assert.Equal(Resources.Web_Error_LastAdmin, sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.True(await db.Users.AnyAsync(u => u.Id == admin.Id));
+    }
+
+    [Fact]
+    public async Task DeleteAssignmentAsync_SoleGlobalAdminAssignment_IsBlocked()
+    {
+        var admin = SeedUser("admin");
+        var adminRole = SeedAdminRole();
+        var assignment = SeedGlobalAssignment(admin.Id, adminRole.Id);
+
+        var sut = BuildGlobalAdminSut(admin);
+        await sut.LoadAsync();
+        await sut.SwitchTabAsync(AdminTab.Roles);
+        await sut.SelectRoleAsync(sut.Roles.Single(r => r.Id == adminRole.Id));
+
+        await sut.DeleteAssignmentAsync(assignment.Id);
+
+        Assert.Equal(Resources.Web_Error_LastAdmin, sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a => a.Id == assignment.Id));
+    }
+
+    [Fact]
+    public async Task DeleteAssignmentAsync_SecondAdminExists_IsAllowed()
+    {
+        var admin = SeedUser("admin");
+        var admin2 = SeedUser("admin2");
+        var adminRole = SeedAdminRole();
+        var ownAssignment = SeedGlobalAssignment(admin.Id, adminRole.Id);
+        SeedGlobalAssignment(admin2.Id, adminRole.Id);
+
+        var sut = BuildGlobalAdminSut(admin);
+        await sut.LoadAsync();
+        await sut.SwitchTabAsync(AdminTab.Roles);
+        await sut.SelectRoleAsync(sut.Roles.Single(r => r.Id == adminRole.Id));
+
+        await sut.DeleteAssignmentAsync(ownAssignment.Id);
+
+        Assert.NotEqual(Resources.Web_Error_LastAdmin, sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.False(await db.ScopedRoleAssignments.AnyAsync(a => a.Id == ownAssignment.Id));
+    }
+
+    [Fact]
+    public async Task SaveUserAsync_AdminInheritedFromGroup_UncheckingOwnRolesIsAllowed()
+    {
+        // The user is a global admin ONLY through group membership. Unchecking their own
+        // (empty) direct roles must NOT be blocked — the group-inherited admin survives.
+        var admin = SeedUser("admin");
+        var adminRole = SeedAdminRole();
+        var adminGroup = SeedGroup("Admins");
+        SeedGroupMember(adminGroup.Id, admin.Id);
+        SeedGlobalAssignment(adminGroup.Id, adminRole.Id);
+
+        var sut = BuildGlobalAdminSut(admin);
+        await sut.LoadAsync();
+        await sut.SelectUserAsync(sut.Users.Single(u => u.Id == admin.Id));
+        await sut.StartEditUserAsync();
+
+        foreach (var r in sut.EditUserRoles) r.IsChecked = false;
+        await sut.SaveUserAsync();
+
+        Assert.NotEqual(Resources.Web_Error_LastAdmin, sut.ErrorMessage);
     }
 }

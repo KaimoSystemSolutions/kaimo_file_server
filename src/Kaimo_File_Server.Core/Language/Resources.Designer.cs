@@ -5045,6 +5045,15 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Error_NoPermission", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Cannot remove the last administrator — at least one enabled global administrator must remain. ähnelt.
+        /// </summary>
+        public static string Web_Error_LastAdmin {
+            get {
+                return ResourceManager.GetString("Web_Error_LastAdmin", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die No share loaded. ähnelt.
