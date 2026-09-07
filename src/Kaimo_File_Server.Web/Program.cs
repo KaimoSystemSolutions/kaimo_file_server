@@ -307,11 +307,14 @@ var app = builder.Build();
 // Preflight: verify every mounted data directory is writable by the non-root
 // container user before serving. Fails fast with one actionable message instead
 // of surfacing a cryptic permission error at the first upload/backup/log write.
-Kaimo_File_Server.Infrastructure.Startup.WritableDirectoryCheck.VerifyFromConfiguration(
-    app.Services.GetRequiredService<ILoggerFactory>()
-        .CreateLogger("Kaimo_File_Server.Infrastructure.Startup"),
-    builder.Configuration,
-    includeBackups: true);
+// Skipped in Development so local runs work without the container's mount layout.
+var preflightLogger = app.Services.GetRequiredService<ILoggerFactory>()
+    .CreateLogger("Kaimo_File_Server.Infrastructure.Startup");
+if (app.Environment.IsDevelopment())
+    preflightLogger.LogInformation("Skipping writable-directory preflight in Development.");
+else
+    Kaimo_File_Server.Infrastructure.Startup.WritableDirectoryCheck.VerifyFromConfiguration(
+        preflightLogger, builder.Configuration, includeBackups: true);
 
 // The Host process owns the schema (migrations + seeding). Web must not migrate;
 // it waits until the Host has finished so tables and seed data are present.

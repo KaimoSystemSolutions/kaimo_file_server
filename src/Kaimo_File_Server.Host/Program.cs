@@ -57,11 +57,14 @@ var host = builder.Build();
 // directory before touching the database or files. Bind mounts created with root
 // ownership silently block the non-root container user, so this surfaces one
 // clear, actionable failure at boot instead of a cryptic error at first write.
-Kaimo_File_Server.Infrastructure.Startup.WritableDirectoryCheck.VerifyFromConfiguration(
-    host.Services.GetRequiredService<ILoggerFactory>()
-        .CreateLogger("Kaimo_File_Server.Infrastructure.Startup"),
-    builder.Configuration,
-    includeBackups: true);
+// Skipped in Development so local runs work without the container's mount layout.
+var preflightLogger = host.Services.GetRequiredService<ILoggerFactory>()
+    .CreateLogger("Kaimo_File_Server.Infrastructure.Startup");
+if (builder.Environment.IsDevelopment())
+    preflightLogger.LogInformation("Skipping writable-directory preflight in Development.");
+else
+    Kaimo_File_Server.Infrastructure.Startup.WritableDirectoryCheck.VerifyFromConfiguration(
+        preflightLogger, builder.Configuration, includeBackups: true);
 
 // Host owns the database: apply the one-shot startup restore (if requested),
 // take a pre-migration safety backup, migrate + seed, then signal readiness.

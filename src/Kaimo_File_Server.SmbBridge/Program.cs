@@ -82,12 +82,15 @@ var app = builder.Build();
 
 // Preflight: verify every mounted data directory is writable by the non-root
 // container user before serving. The bridge does not mount the backup volume, so
-// that path is excluded.
-Kaimo_File_Server.Infrastructure.Startup.WritableDirectoryCheck.VerifyFromConfiguration(
-    app.Services.GetRequiredService<ILoggerFactory>()
-        .CreateLogger("Kaimo_File_Server.Infrastructure.Startup"),
-    builder.Configuration,
-    includeBackups: false);
+// that path is excluded. Skipped in Development so local runs work without the
+// container's mount layout.
+var preflightLogger = app.Services.GetRequiredService<ILoggerFactory>()
+    .CreateLogger("Kaimo_File_Server.Infrastructure.Startup");
+if (app.Environment.IsDevelopment())
+    preflightLogger.LogInformation("Skipping writable-directory preflight in Development.");
+else
+    Kaimo_File_Server.Infrastructure.Startup.WritableDirectoryCheck.VerifyFromConfiguration(
+        preflightLogger, builder.Configuration, includeBackups: false);
 
 // The Host process owns the schema (migrations + seeding). The bridge must not
 // migrate; it waits until the Host has finished before serving requests, so its
