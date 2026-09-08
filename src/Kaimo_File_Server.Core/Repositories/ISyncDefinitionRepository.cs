@@ -19,6 +19,15 @@ public interface ISyncDefinitionRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Returns every enabled sync definition whose local root lives in the given
+    /// share. Used to decide whether a share-relative path lies inside a synced
+    /// folder (e.g. to warn or restrict ACL editing there).
+    /// </summary>
+    Task<IReadOnlyList<SyncDefinition>> GetEnabledByShareAsync(
+        Guid shareId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Creates or updates a first-class sync configuration. Provider credentials
     /// and mutable run state are never accepted by this operation.
     /// </summary>

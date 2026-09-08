@@ -85,6 +85,7 @@ public abstract class DatabaseTestBase : IDisposable
     protected AclRepository AclRepo() => new(DbFactory);
     protected DepartmentRepository DepartmentRepo() => new(DbFactory);
     protected FileMetadataRepository FileMetadataRepo() => new(DbFactory);
+    protected SyncDefinitionRepository SyncDefinitionRepo() => new(DbFactory);
     protected ScopedRoleAssignmentRepository ScopedRoleRepo() => new(DbFactory);
 
     // ─────────────────────── Real ACL evaluation ───────────────────────

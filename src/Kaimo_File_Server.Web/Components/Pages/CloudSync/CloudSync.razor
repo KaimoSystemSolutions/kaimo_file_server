@@ -381,6 +381,11 @@ else
                             <small>@Text("Web_CloudSync_Advanced_SyncDeletions_Help", "When a file is deleted on one side, delete it on the other side too instead of restoring it. Recoverable via the recycle bin when the share has one enabled.")</small>
                         </label>
                     }
+                    <label class="detail-field cloud-sync-checkbox">
+                        <input type="checkbox" @bind="VM.EditRootLevelPermissionsOnly" disabled="@(!VM.CanConfigureSelected)" />
+                        <span>@Text("Web_CloudSync_Advanced_RootLevelPermissions", "Manage permissions only on the sync folder")</span>
+                        <small>@Text("Web_CloudSync_Advanced_RootLevelPermissions_Help", "Block setting permissions on files and subfolders inside this synced folder. Because synchronization matches items by path, a rename or move it performs would otherwise silently drop their permissions. Permissions on the sync folder itself stay editable.")</small>
+                    </label>
                 </div>
                 }
 

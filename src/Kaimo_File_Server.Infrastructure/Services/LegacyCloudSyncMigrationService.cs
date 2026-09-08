@@ -266,7 +266,10 @@ public sealed class LegacyCloudSyncMigrationService(
                 // Must be part of the fingerprint: otherwise toggling delete
                 // propagation in the legacy editor leaves the checksum unchanged
                 // and the refreshed setting never reaches the first-class row.
-                advanced.SyncDeletions
+                advanced.SyncDeletions,
+                // Same reasoning for the root-level-only ACL restriction: it must
+                // change the fingerprint so the migrated first-class row picks it up.
+                advanced.RootLevelPermissionsOnly
             },
             folder.DisplayName,
             folder.Description

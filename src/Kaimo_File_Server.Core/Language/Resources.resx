@@ -849,6 +849,12 @@
   <data name="Web_Acl_Added" xml:space="preserve">
     <value>Permission added.</value>
   </data>
+  <data name="Web_Acl_SyncFolderWarning" xml:space="preserve">
+    <value>This item is inside a synchronized folder. Permissions set here are not preserved when the synchronization renames or moves the item, because it matches items by path. Set permissions on the sync folder instead.</value>
+  </data>
+  <data name="Web_Acl_SyncFolderBlocked" xml:space="preserve">
+    <value>This synchronized folder is configured to manage permissions on the folder level only. Set permissions on the sync folder root instead of on items inside it.</value>
+  </data>
   <data name="Web_Acl_Updated" xml:space="preserve">
     <value>Permission updated.</value>
   </data>
@@ -2522,6 +2528,12 @@
   </data>
   <data name="Web_CloudSync_Advanced_SyncDeletions_Help" xml:space="preserve">
     <value>When a file or folder is deleted on one side, delete it on the other side too instead of restoring it. Takes effect from the second run after enabling. If the share has a recycle bin, locally deleted items are moved there and stay recoverable.</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_RootLevelPermissions" xml:space="preserve">
+    <value>Manage permissions only on the sync folder</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_RootLevelPermissions_Help" xml:space="preserve">
+    <value>Block setting permissions on files and subfolders inside this synced folder. Because synchronization matches items by path, a rename or move it performs would otherwise silently drop their permissions. Permissions on the sync folder itself stay editable, and existing entries keep working.</value>
   </data>
   <data name="Web_CloudSync_Schedule" xml:space="preserve">
     <value>Automatic sync</value>

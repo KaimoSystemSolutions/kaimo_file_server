@@ -542,6 +542,17 @@ h1, h2, h3, h4, h5, h6 {
     margin-bottom: 16px;
 }
 
+.warning-banner {
+    padding: 10px 14px;
+    background: var(--warning-subtle);
+    color: var(--warning);
+    border-radius: var(--radius-control);
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid color-mix(in srgb, var(--warning) 34%, var(--border));
+    margin-bottom: 16px;
+}
+
 /* -- Loading & Empty State -- */
 
 .loading-state {

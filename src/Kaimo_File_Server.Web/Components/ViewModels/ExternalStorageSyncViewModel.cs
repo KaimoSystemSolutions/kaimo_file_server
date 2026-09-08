@@ -448,7 +448,8 @@ public sealed class ExternalStorageSyncViewModel(
             .Split([',', ';', ' ', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(extension => extension.StartsWith('.') ? extension : $".{extension}")
             .ToHashSet(StringComparer.OrdinalIgnoreCase),
-        SyncDeletions = model.SyncDeletions
+        SyncDeletions = model.SyncDeletions,
+        RootLevelPermissionsOnly = model.RootLevelPermissionsOnly
     };
 
     private static long? ToBytes(long? value, long multiplier)
@@ -490,4 +491,8 @@ public sealed class ExternalStorageSyncEditModel
 
     /// <summary>Propagate deletions in two-way mode instead of restoring them.</summary>
     public bool SyncDeletions { get; set; }
+
+    /// <summary>Restrict ACL management to this sync's root folder (see
+    /// <see cref="CloudSyncAdvancedSettings.RootLevelPermissionsOnly"/>).</summary>
+    public bool RootLevelPermissionsOnly { get; set; }
 }

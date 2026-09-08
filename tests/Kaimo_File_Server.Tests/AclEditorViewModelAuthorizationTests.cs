@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Threading;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
@@ -27,6 +28,7 @@ public class AclEditorViewModelAuthorizationTests
     private readonly Mock<IGroupRepository> _groupRepo = new();
     private readonly Mock<IRoleRepository> _roleRepo = new();
     private readonly Mock<IShareRepository> _shareRepo = new();
+    private readonly Mock<ISyncDefinitionRepository> _syncDefinitions = new();
     private readonly Mock<IDepartmentRepository> _departmentRepo = new();
     private readonly Mock<IDepartmentPermissionService> _deptPermissions = new();
     private readonly Mock<IManagementAuthService> _mgmtAuth = new();
@@ -66,9 +68,16 @@ public class AclEditorViewModelAuthorizationTests
         _groupRepo.Setup(g => g.GetAllAsync()).ReturnsAsync(new List<Group>());
         _roleRepo.Setup(r => r.GetAllAsync()).ReturnsAsync(new List<Role>());
 
+        // Default: no sync folder covers the path (see AclEditorViewModelSyncFolderTests
+        // for the enclosing-sync-folder behavior).
+        _syncDefinitions
+            .Setup(s => s.GetEnabledByShareAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<SyncDefinition>());
+
         _sut = new AclEditorViewModel(
             _aclRepo.Object, _metaRepo.Object, _userRepo.Object,
             _groupRepo.Object, _roleRepo.Object, _shareRepo.Object,
+            _syncDefinitions.Object,
             _departmentRepo.Object, _deptPermissions.Object, _mgmtAuth.Object,
             _userContextFactory.Object, _authState.Object,
             NullLogger<AclEditorViewModel>.Instance);

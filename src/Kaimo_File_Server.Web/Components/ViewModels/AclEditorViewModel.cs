@@ -15,6 +15,7 @@ public class AclEditorViewModel
     private readonly IGroupRepository _groupRepo;
     private readonly IRoleRepository _roleRepo;
     private readonly IShareRepository _shareRepo;
+    private readonly ISyncDefinitionRepository _syncDefinitions;
     private readonly IDepartmentRepository _departmentRepo;
     private readonly IDepartmentPermissionService _deptPermissions;
     private readonly IManagementAuthService _mgmtAuth;
@@ -29,6 +30,7 @@ public class AclEditorViewModel
         IGroupRepository groupRepo,
         IRoleRepository roleRepo,
         IShareRepository shareRepo,
+        ISyncDefinitionRepository syncDefinitions,
         IDepartmentRepository departmentRepo,
         IDepartmentPermissionService deptPermissions,
         IManagementAuthService mgmtAuth,
@@ -42,6 +44,7 @@ public class AclEditorViewModel
         _groupRepo = groupRepo;
         _roleRepo = roleRepo;
         _shareRepo = shareRepo;
+        _syncDefinitions = syncDefinitions;
         _departmentRepo = departmentRepo;
         _deptPermissions = deptPermissions;
         _mgmtAuth = mgmtAuth;
@@ -79,6 +82,22 @@ public class AclEditorViewModel
     public bool IsLoaded { get; private set; }
     public string? ErrorMessage { get; private set; }
     public string? SuccessMessage { get; private set; }
+
+    /// <summary>
+    /// Non-blocking notice shown when this path lives inside a synced folder: ACLs
+    /// on items there are not preserved when the synchronization renames or moves
+    /// them. Null when the path is not inside a synced folder (or is the sync root
+    /// itself, which is stable).
+    /// </summary>
+    public string? WarningMessage { get; private set; }
+
+    /// <summary>
+    /// True when the enclosing sync folder is configured for root-level-only
+    /// permission management and this path is strictly below its root; ACL
+    /// additions and edits are then refused. Deletions stay allowed so stale
+    /// entries can be cleaned up.
+    /// </summary>
+    private bool _blockAclWrites;
 
     /// <summary>This path's own ACLs (editable)</summary>
     public List<AccessEntry> Entries { get; private set; } = [];
@@ -128,6 +147,8 @@ public class AclEditorViewModel
         IsLoaded = false;
         ErrorMessage = null;
         SuccessMessage = null;
+        WarningMessage = null;
+        _blockAclWrites = false;
 
         try
         {
@@ -149,6 +170,9 @@ public class AclEditorViewModel
             _logger.LogDebug(
                 "AclEditor loading: raw='{RawPath}' → normalized='{NormalizedPath}', shareId={ShareId}",
                 path, NormalizedPath, shareId);
+
+            // Flag / restrict ACL management inside a synced folder (see fields).
+            await EvaluateSyncFolderPolicyAsync(shareId);
 
             // Load or create this path's own FileMetadata
             var meta = await _metaRepo.GetOrCreateAsync(
@@ -180,6 +204,38 @@ public class AclEditorViewModel
             _logger.LogError(ex, "Error loading ACL for '{Path}'", path);
             ErrorMessage = Resources.Web_Acl_LoadPermissionsFailed;
         }
+    }
+
+    /// <summary>
+    /// Sets <see cref="WarningMessage"/> and the internal write-block flag based on
+    /// whether <see cref="NormalizedPath"/> lies strictly below an enabled sync
+    /// definition's root in this share. The root itself is stable configuration,
+    /// so it is neither warned about nor blocked.
+    /// </summary>
+    private async Task EvaluateSyncFolderPolicyAsync(Guid shareId)
+    {
+        var definitions = await _syncDefinitions.GetEnabledByShareAsync(shareId);
+        var enclosing = definitions.FirstOrDefault(
+            def => IsStrictlyInside(def.LocalPath, NormalizedPath));
+        if (enclosing is null)
+            return;
+
+        WarningMessage = Resources.Web_Acl_SyncFolderWarning;
+        if (enclosing.AdvancedSettings.RootLevelPermissionsOnly)
+            _blockAclWrites = true;
+    }
+
+    /// <summary>
+    /// True when <paramref name="path"/> is a descendant of <paramref name="root"/>
+    /// (not the root itself). Both are already <see cref="ShareRelativePath"/>-normalized
+    /// (forward slashes, no surrounding slash, "" = share root).
+    /// </summary>
+    private static bool IsStrictlyInside(string root, string path)
+    {
+        if (string.Equals(root, path, StringComparison.OrdinalIgnoreCase))
+            return false;
+        return root.Length == 0
+            || path.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<List<InheritedAclEntry>> LoadInheritedAclsAsync(Guid shareId, bool isDirectory)
@@ -290,6 +346,9 @@ public class AclEditorViewModel
         if (!await CanManageAclsAsync())
         { ErrorMessage = Resources.Web_Error_AccessDenied; return false; }
 
+        if (_blockAclWrites)
+        { ErrorMessage = Resources.Web_Acl_SyncFolderBlocked; return false; }
+
         if (NewPrincipalId is null)
         { ErrorMessage = Resources.Web_Error_PrincipalNotSelected; return false; }
 
@@ -350,6 +409,9 @@ public class AclEditorViewModel
 
         if (!await CanManageAclsAsync())
         { ErrorMessage = Resources.Web_Error_AccessDenied; return false; }
+
+        if (_blockAclWrites)
+        { ErrorMessage = Resources.Web_Acl_SyncFolderBlocked; return false; }
 
         if (NewPermissions == FilePermission.None)
         { ErrorMessage = Resources.Web_Acl_SelectAtLeastOnePermission; return false; }

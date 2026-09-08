@@ -45,6 +45,16 @@ public sealed class SyncDefinitionRepository(IDbContextFactory<ApplicationDbCont
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<SyncDefinition>> GetEnabledByShareAsync(
+        Guid shareId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.SyncDefinitions.AsNoTracking()
+            .Where(sync => sync.LocalShareId == shareId && sync.Enabled)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<List<SyncDefinitionScheduleEntry>> GetEnabledScheduledAsync(
         CancellationToken cancellationToken = default)
     {

@@ -30,6 +30,11 @@
         <div class="success-banner">@VM.SuccessMessage</div>
     }
 
+    @if (VM.WarningMessage is not null)
+    {
+        <div class="warning-banner">@VM.WarningMessage</div>
+    }
+
     @if (_loaded)
     {
         @* -- Department default (readonly, share-wide baseline) -- *@

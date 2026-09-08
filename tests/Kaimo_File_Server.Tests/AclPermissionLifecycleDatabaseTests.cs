@@ -231,7 +231,7 @@ public class AclPermissionLifecycleDatabaseTests : DatabaseTestBase
 
         return new AclEditorViewModel(
             AclRepo(), FileMetadataRepo(), UserRepo(), GroupRepo(), RoleRepo(),
-            ShareRepo(), DepartmentRepo(),
+            ShareRepo(), SyncDefinitionRepo(), DepartmentRepo(),
             new DepartmentPermissionService(DepartmentRepo(), ShareRepo(), GroupRepo()),
             auth.Object,
             UserContextFactoryFor((actor.Username, ctx)).Object,

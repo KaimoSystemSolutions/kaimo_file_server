@@ -849,6 +849,12 @@
   <data name="Web_Acl_Added" xml:space="preserve">
     <value>Berechtigung hinzugefügt.</value>
   </data>
+  <data name="Web_Acl_SyncFolderWarning" xml:space="preserve">
+    <value>Dieses Objekt liegt in einem synchronisierten Ordner. Hier gesetzte Berechtigungen bleiben nicht erhalten, wenn die Synchronisierung das Objekt umbenennt oder verschiebt, da sie Objekte anhand des Pfads zuordnet. Setze Berechtigungen stattdessen auf dem Sync-Ordner.</value>
+  </data>
+  <data name="Web_Acl_SyncFolderBlocked" xml:space="preserve">
+    <value>Dieser synchronisierte Ordner ist so konfiguriert, dass Berechtigungen nur auf Ordnerebene verwaltet werden. Setze Berechtigungen auf dem Sync-Wurzelordner statt auf Objekten darin.</value>
+  </data>
   <data name="Web_Acl_Updated" xml:space="preserve">
     <value>Berechtigung aktualisiert.</value>
   </data>
@@ -2522,6 +2528,12 @@
   </data>
   <data name="Web_CloudSync_Advanced_SyncDeletions_Help" xml:space="preserve">
     <value>Wird eine Datei oder ein Ordner auf einer Seite gelöscht, wird sie auch auf der anderen Seite gelöscht, statt wiederhergestellt zu werden. Wirksam ab dem zweiten Lauf nach dem Aktivieren. Hat der Share einen Papierkorb, werden lokal gelöschte Elemente dorthin verschoben und bleiben wiederherstellbar.</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_RootLevelPermissions" xml:space="preserve">
+    <value>Berechtigungen nur auf dem Sync-Ordner verwalten</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_RootLevelPermissions_Help" xml:space="preserve">
+    <value>Verhindert das Setzen von Berechtigungen auf Dateien und Unterordnern in diesem synchronisierten Ordner. Da die Synchronisierung Objekte anhand des Pfads zuordnet, würde ein von ihr durchgeführtes Umbenennen oder Verschieben deren Berechtigungen sonst unbemerkt verwerfen. Berechtigungen auf dem Sync-Ordner selbst bleiben bearbeitbar, und bestehende Einträge funktionieren weiter.</value>
   </data>
   <data name="Web_CloudSync_Schedule" xml:space="preserve">
     <value>Automatische Synchronisierung</value>

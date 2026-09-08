@@ -209,6 +209,11 @@ else
                             <small>@R("Web_CloudSync_Advanced_SyncDeletions_Help")</small>
                         </label>
                     }
+                    <label class="storage-form-checkbox">
+                        <input type="checkbox" @bind="_model.RootLevelPermissionsOnly" />
+                        <span>@R("Web_CloudSync_Advanced_RootLevelPermissions")</span>
+                        <small>@R("Web_CloudSync_Advanced_RootLevelPermissions_Help")</small>
+                    </label>
                 </div>
             }
             <div class="detail-actions">
@@ -394,7 +399,8 @@ else
             MaxUploadRateKbps = ToUnit(definition.AdvancedSettings.MaxUploadBytesPerSecond, 1024L),
             MaxDownloadRateKbps = ToUnit(definition.AdvancedSettings.MaxDownloadBytesPerSecond, 1024L),
             ExcludedExtensions = string.Join(", ", definition.AdvancedSettings.ExcludedExtensions),
-            SyncDeletions = definition.AdvancedSettings.SyncDeletions
+            SyncDeletions = definition.AdvancedSettings.SyncDeletions,
+            RootLevelPermissionsOnly = definition.AdvancedSettings.RootLevelPermissionsOnly
         };
     }
 
