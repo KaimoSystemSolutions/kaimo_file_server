@@ -17,10 +17,9 @@
             @onclick="Toggle">
         @Assets.SVG("upload.svg", new SvgOptions(Width: 18, Height: 18, StrokeWidth: 2))
         <span>@Text("Web_Jobs_Title", "Running jobs")</span>
-        @if (TotalCount > 0)
-        {
-            <span class="job-menu-count">@TotalCount</span>
-        }
+        @* Always rendered so the slot reserves room for a two-digit count and
+           the surrounding controls don't shift when a number appears. *@
+        <span class="job-menu-count @(TotalCount > 0 ? "" : "job-menu-count--empty")">@(TotalCount > 0 ? TotalCount.ToString() : "")</span>
     </button>
 
     @if (_isOpen)
