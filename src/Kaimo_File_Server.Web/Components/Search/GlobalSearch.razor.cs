@@ -54,6 +54,8 @@ public partial class GlobalSearch : IDisposable
 
     private string _searchQuery = "";
     private string _scope = ScopeDest;
+    private string _lastScope = ScopeDest;   // last non-"pick" scope, to revert to
+    private ElementReference _searchInput;
 
     private List<FileDocument> _fileResults = new();
     private List<SearchDestination> _destResults = new();
@@ -126,7 +128,7 @@ public partial class GlobalSearch : IDisposable
             _inBrowser = false;
             _contextShare = null;
             _contextSubPath = "";
-            _scope = ScopeDest;
+            _scope = _lastScope = ScopeDest;
             return;
         }
 
@@ -135,7 +137,7 @@ public partial class GlobalSearch : IDisposable
         {
             _contextShare = null;
             _contextSubPath = "";
-            _scope = ScopeGlobal;
+            _scope = _lastScope = ScopeGlobal;
             return;
         }
 
@@ -143,7 +145,7 @@ public partial class GlobalSearch : IDisposable
         _contextSubPath = segs.Length > 2
             ? string.Join('/', segs.Skip(2).Select(Uri.UnescapeDataString))
             : "";
-        _scope = ScopeFolder;
+        _scope = _lastScope = ScopeFolder;
     }
 
     /// <summary>Scope options for the current context, as (value, label) pairs.</summary>
@@ -247,14 +249,44 @@ public partial class GlobalSearch : IDisposable
     private async Task OnScopeChanged()
     {
         if (_scope == ScopePick)
+        {
             // Selecting the option opens the picker automatically the first time;
             // afterwards the info button reopens it.
             _pickerOpen = true;
+        }
         else
-            // Leaving the "selected shares" scope clears the share filter.
+        {
+            // A base scope: remember it (to revert to) and clear the share filter.
+            _lastScope = _scope;
             _pickedShares.Clear();
+        }
 
         await RunSearchNow();
+    }
+
+    /// <summary>
+    /// Fired when the share dialog closes. With nothing selected the dropdown springs
+    /// back to the last base scope; either way the results dropdown is kept open (we
+    /// return focus to the input so the focus-out auto-hide doesn't collapse it).
+    /// </summary>
+    private async Task OnPickerOpenChanged(bool open)
+    {
+        _pickerOpen = open;
+        if (open)
+            return;
+
+        if (_pickedShares.Count == 0)
+            _scope = _lastScope;
+
+        await RunSearchNow();
+        await RefocusSearchAsync();
+    }
+
+    private async Task RefocusSearchAsync()
+    {
+        // Returning focus makes the component "focus-within" again, cancelling the
+        // pending focus-out hide so the dropdown stays open after the dialog closes.
+        try { await _searchInput.FocusAsync(); } catch { /* element may be gone */ }
     }
 
     private string SharesSelectedTitle =>

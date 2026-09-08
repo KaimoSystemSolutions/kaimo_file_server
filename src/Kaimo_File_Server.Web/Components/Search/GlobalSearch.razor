@@ -9,6 +9,7 @@
             @Assets.SVG("search.svg", new SvgOptions())
             <input type="text"
                    class="search-input"
+                   @ref="_searchInput"
                    aria-label="@Resources.Web_Search_Searching"
                    placeholder="@Resources.Web_Search_Searching"
                    @bind="_searchQuery"
@@ -109,7 +110,8 @@
         </button>
         <PrincipalPickerField Mode="SelectionMode.Multiple"
                               HideTrigger="true"
-                              @bind-Open="_pickerOpen"
+                              Open="_pickerOpen"
+                              OpenChanged="OnPickerOpenChanged"
                               Items="ShareItems"
                               SelectedIds="PickedShareIds"
                               SelectedIdsChanged="OnSharesPicked"
