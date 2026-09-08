@@ -1,0 +1,118 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Search
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+
+<div class="global-search" @onfocusin="OnFocusIn" @onfocusout="OnFocusOut">
+    <div class="search-area">
+        <div class="search-bar @(HasResults ? "has-results" : "")">
+            @Assets.SVG("search.svg", new SvgOptions())
+            <input type="text"
+                   class="search-input"
+                   aria-label="@Resources.Web_Search_Searching"
+                   placeholder="@Resources.Web_Search_Searching"
+                   @bind="_searchQuery"
+                   @bind:event="oninput"
+                   @bind:after="OnSearchInputChanged"
+                   @onkeydown="HandleSearchKeyDown" />
+            @if (_searchQuery.Length > 0)
+            {
+                <span class="search-scope-hint" title="@ScopeHint()">@ScopeHint()</span>
+                <button class="search-clear" type="button"
+                        title="@Text("Web_Search_Clear", "Clear search")"
+                        aria-label="@Text("Web_Search_Clear", "Clear search")"
+                        @onclick="ClearSearch">✕</button>
+            }
+
+            @if (_dropdownVisible && HasResults)
+            {
+                <div class="search-dropdown">
+                    @if (_fileResults.Any())
+                    {
+                        @foreach (var group in _fileResults.GroupBy(r => r.ShareName))
+                        {
+                            <div class="search-group-header">@group.Key</div>
+                            @foreach (var result in group)
+                            {
+                                <div class="search-result-item" @onmousedown="() => NavigateToFile(result)">
+                                    @Assets.SVG(result.IsDirectory ? "folder.svg" : FileHelper.GetIcon(result.FileName), new SvgOptions())
+                                    <div class="search-result-info">
+                                        <span class="search-result-name">@result.FileName</span>
+                                        <span class="search-result-meta">
+                                            @if (!string.IsNullOrEmpty(result.HighlightSnippet))
+                                            {
+                                                @((MarkupString)result.HighlightSnippet)
+                                            }
+                                            else
+                                            {
+                                                @result.SharePath
+                                            }
+                                        </span>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    }
+                    @if (_destResults.Any())
+                    {
+                        <div class="search-group-header">@Text("Web_Search_Section_Destinations", "Settings & tabs")</div>
+                        @foreach (var dest in _destResults)
+                        {
+                            <div class="search-result-item" @onmousedown="() => NavigateToDestination(dest)">
+                                @Assets.SVG(dest.Icon, new SvgOptions())
+                                <div class="search-result-info">
+                                    <span class="search-result-name">@dest.Title</span>
+                                    <span class="search-result-meta">@dest.Category</span>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            }
+            else if (_dropdownVisible && _isSearching)
+            {
+                <div class="search-dropdown">
+                    <div class="search-result-item searching">
+                        <span>@Resources.Web_Search_Searching</span>
+                    </div>
+                </div>
+            }
+            else if (_dropdownVisible && _searchQuery.Length >= 2 && !HasResults && !_isSearching)
+            {
+                <div class="search-dropdown">
+                    <div class="search-result-item no-results">
+                        <span>@Resources.Web_Search_NoResults</span>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* One uniform scope control for every context, right of the search bar. *@
+    <select class="search-scope-select" aria-label="@Text("Web_Search_SearchInShare", "Search scope")"
+            @bind="_scope" @bind:after="OnScopeChanged">
+        @foreach (var opt in ScopeOptions())
+        {
+            <option value="@opt.Value">@opt.Label</option>
+        }
+    </select>
+
+    @* "Selected shares" scope: an info button shows the count (tooltip) and reopens
+       the shared picker — the same multi-select share dialog as the department editor,
+       which auto-opens the first time the option is chosen. *@
+    @if (!_inBrowser && _scope == ScopePick)
+    {
+        <button type="button" class="search-scope-badge"
+                title="@SharesSelectedTitle" aria-label="@SharesSelectedTitle"
+                @onclick="() => _pickerOpen = true">
+            @_pickedShares.Count
+        </button>
+        <PrincipalPickerField Mode="SelectionMode.Multiple"
+                              HideTrigger="true"
+                              @bind-Open="_pickerOpen"
+                              Items="ShareItems"
+                              SelectedIds="PickedShareIds"
+                              SelectedIdsChanged="OnSharesPicked"
+                              Title="@Text("Web_Search_Scope_PickedShare", "Selected shares")" />
+    }
+</div>

@@ -34,12 +34,14 @@ public sealed class FilenameSearchService
     }
 
     public async Task<List<FileDocument>> SearchAsync(
-        string searchText, UserContext user, CancellationToken ct = default)
+        string searchText, UserContext user,
+        string? shareName = null, string? pathPrefix = null,
+        CancellationToken ct = default)
     {
         if (user is null || string.IsNullOrWhiteSpace(searchText))
             return new List<FileDocument>();
 
-        var raw = await CollectRawMatchesAsync(searchText, ct);
+        var raw = await CollectRawMatchesAsync(searchText, shareName, pathPrefix, ct);
         if (raw.Count == 0)
             return raw;
 
@@ -51,9 +53,13 @@ public sealed class FilenameSearchService
     /// Enumerates files under each persisted share path and keeps those whose name contains
     /// the query. Hidden/system folders (".versions", ".dp-keys", recycle bin, …)
     /// are skipped — they are never part of the Elasticsearch index either.
+    ///
+    /// When <paramref name="shareName"/> is set the walk is restricted to that share,
+    /// and when <paramref name="pathPrefix"/> is also set (a share-relative folder) the
+    /// walk starts at that folder so only it and its descendants are considered.
     /// </summary>
     private async Task<List<FileDocument>> CollectRawMatchesAsync(
-        string searchText, CancellationToken ct)
+        string searchText, string? shareName, string? pathPrefix, CancellationToken ct)
     {
         var results = new List<FileDocument>();
 
@@ -62,10 +68,23 @@ public sealed class FilenameSearchService
             .GetRequiredService<IShareRepository>()
             .GetAllEnabledAsync();
 
+        if (!string.IsNullOrWhiteSpace(shareName))
+            shares = shares
+                .Where(s => string.Equals(s.Name, shareName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+        var relativePrefix = (pathPrefix ?? string.Empty).Replace('\\', '/').Trim('/');
+
         foreach (var share in shares)
         {
             ct.ThrowIfCancellationRequested();
-            if (!Directory.Exists(share.Path))
+
+            // Start the walk at the scoped subfolder when one is given, so "this
+            // folder and below" is honored; otherwise at the share root.
+            var walkRoot = relativePrefix.Length == 0
+                ? share.Path
+                : Path.Combine(share.Path, relativePrefix.Replace('/', Path.DirectorySeparatorChar));
+            if (!Directory.Exists(walkRoot))
                 continue;
 
             try
@@ -78,7 +97,7 @@ public sealed class FilenameSearchService
                 };
 
                 // Match files by name...
-                foreach (var absolutePath in Directory.EnumerateFiles(share.Path, "*", options))
+                foreach (var absolutePath in Directory.EnumerateFiles(walkRoot, "*", options))
                 {
                     ct.ThrowIfCancellationRequested();
 
@@ -103,7 +122,7 @@ public sealed class FilenameSearchService
                 }
 
                 // ...and directories by name, so folders show up in search too.
-                foreach (var absolutePath in Directory.EnumerateDirectories(share.Path, "*", options))
+                foreach (var absolutePath in Directory.EnumerateDirectories(walkRoot, "*", options))
                 {
                     ct.ThrowIfCancellationRequested();
 

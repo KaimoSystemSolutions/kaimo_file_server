@@ -17,7 +17,10 @@ public class NoOpSearchService : ISearchService
         => Task.CompletedTask;
     public Task onDirectoryRenamed(string oldAbsolutePath, string newAbsolutePath)
         => Task.CompletedTask;
-    public Task<List<FileDocument>> SearchAsync(string searchText, UserContext user, CancellationToken ct = default)
+    public Task<List<FileDocument>> SearchAsync(
+        string searchText, UserContext user,
+        string? shareName = null, string? pathPrefix = null,
+        CancellationToken ct = default)
         => Task.FromResult(new List<FileDocument>());
     public Task InitializeAsync(CancellationToken ct = default)
         => Task.CompletedTask;

@@ -18,8 +18,10 @@
     backdrop – discards the working copy and fires nothing.
 *@
 
+@if (!HideTrigger)
+{
 <div class="principal-picker @Class" @attributes="AdditionalAttributes">
-    <div class="principal-picker-trigger" @onclick="Open" role="button" tabindex="0"
+    <div class="principal-picker-trigger" @onclick="OpenDialog" role="button" tabindex="0"
          @onkeydown="TriggerKeyDown" aria-haspopup="dialog">
         @if (_selected.Count == 0)
         {
@@ -56,6 +58,7 @@
         @Assets.SVG("chevron_down_transparent.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2, CssClass: "principal-picker-chevron"))
     </div>
 </div>
+}
 
 @if (_open)
 {
@@ -183,6 +186,16 @@
 
     [Parameter(CaptureUnmatchedValues = true)] public IDictionary<string, object>? AdditionalAttributes { get; set; }
 
+    /// <summary>Hide the built-in trigger and drive open/close externally (via <see cref="Open"/>).
+    /// Used when another control (e.g. an info button) owns the affordance.</summary>
+    [Parameter] public bool HideTrigger { get; set; }
+
+    /// <summary>Externally controlled open state. Bindable via <c>@bind-Open</c>; the component
+    /// sets it back to false when the dialog closes, so callers must bind it to reopen.</summary>
+    [Parameter] public bool Open { get; set; }
+
+    [Parameter] public EventCallback<bool> OpenChanged { get; set; }
+
     private bool _open;
     private bool _focusPending;
     private string _search = string.Empty;
@@ -194,7 +207,11 @@
     // open the working copy is authoritative so parent re-renders don't clobber pending edits.
     protected override void OnParametersSet()
     {
-        if (!_open)
+        // Honor an external open request (HideTrigger callers); otherwise keep the
+        // trigger mirroring the committed selection while closed.
+        if (Open && !_open)
+            OpenDialog();
+        else if (!_open)
             ResetWorkingCopy();
     }
 
@@ -224,7 +241,7 @@
 
     private string DialogTitle => Title ?? Text("Web_Picker_Placeholder", "Select…");
 
-    private void Open()
+    private void OpenDialog()
     {
         ResetWorkingCopy();
         // Open on the tab of the current selection so a previously chosen group/role isn't hidden.
@@ -237,16 +254,24 @@
     }
 
     // Cancel: discard the working copy and fire nothing, so the trigger keeps showing the committed selection.
-    private void Cancel()
+    private async Task Cancel()
     {
-        _open = false;
         ResetWorkingCopy();
+        await CloseInternal();
     }
 
-    private void OnDialogKeyDown(KeyboardEventArgs e)
+    // Closes the dialog and notifies an external @bind-Open owner so it can reopen later.
+    private async Task CloseInternal()
+    {
+        _open = false;
+        if (OpenChanged.HasDelegate)
+            await OpenChanged.InvokeAsync(false);
+    }
+
+    private async Task OnDialogKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Escape")
-            Cancel();
+            await Cancel();
     }
 
     private async Task ClearSingle()
@@ -258,7 +283,7 @@
     private void TriggerKeyDown(KeyboardEventArgs e)
     {
         if (e.Key is "Enter" or " ")
-            Open();
+            OpenDialog();
     }
 
     private void SetKind(PrincipalKind kind) => _activeKind = kind;
@@ -271,7 +296,7 @@
             _selected.Clear();
             _selected.Add(id);
             await SelectedIdsChanged.InvokeAsync(_selected.ToList());
-            _open = false;
+            await CloseInternal();
         }
         else if (!_selected.Add(id))
         {
@@ -282,7 +307,7 @@
     private async Task Save()
     {
         await SelectedIdsChanged.InvokeAsync(_selected.ToList());
-        _open = false;
+        await CloseInternal();
     }
 
     private List<PrincipalPickerItem> VisibleRows()

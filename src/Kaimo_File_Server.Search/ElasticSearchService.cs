@@ -513,13 +513,15 @@ public class ElasticSearchService : ISearchService
     // ══════════════════════════════════════════
 
     public async Task<List<FileDocument>> SearchAsync(
-        string searchText, UserContext user, CancellationToken ct = default)
+        string searchText, UserContext user,
+        string? shareName = null, string? pathPrefix = null,
+        CancellationToken ct = default)
     {
         // Fail closed: no user context means no results, ever.
         if (user is null)
             return new List<FileDocument>();
 
-        var raw = await RawSearchAsync(searchText, ct);
+        var raw = await RawSearchAsync(searchText, shareName, pathPrefix, ct);
         if (raw.Count == 0)
             return raw;
 
@@ -531,18 +533,25 @@ public class ElasticSearchService : ISearchService
     /// Executes the raw query. Matches partial words in file names via the n-gram
     /// field and fuzzy whole words in the content. NEVER call this from the UI —
     /// the result is unfiltered and must pass <see cref="FilterByAclAsync"/> first.
+    ///
+    /// When <paramref name="shareName"/> / <paramref name="pathPrefix"/> are set, the
+    /// query is filtered to that share (and folder subtree) via keyword filters.
     /// </summary>
-    private async Task<List<FileDocument>> RawSearchAsync(string searchText, CancellationToken ct)
+    private async Task<List<FileDocument>> RawSearchAsync(
+        string searchText, string? shareName, string? pathPrefix, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(searchText))
             return new List<FileDocument>();
+
+        var scopeFilters = BuildScopeFilters(shareName, pathPrefix);
 
         var response = await _client.SearchAsync<FileDocument>(s => s
             .Indices(IndexName)
             .Size(RawFetchSize)
             .Query(q => q
-                .Bool(b => b
-                    .Should(
+                .Bool(b =>
+                {
+                    b.Should(
                         // Partial-word matches on the file name (n-gram analyzed).
                         sh => sh.Match(m => m
                             .Field("fileName")
@@ -562,8 +571,12 @@ public class ElasticSearchService : ISearchService
                             .Boost(2)
                         )
                     )
-                    .MinimumShouldMatch(1)
-                )
+                    .MinimumShouldMatch(1);
+
+                    // Scope to a share / folder subtree without affecting relevance.
+                    if (scopeFilters.Count > 0)
+                        b.Filter(scopeFilters);
+                })
             )
             .Highlight(h => h
                 .Fields(f => f
@@ -603,6 +616,38 @@ public class ElasticSearchService : ISearchService
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// Builds the keyword filters that scope a search to one share and, optionally,
+    /// one folder subtree. <c>shareName</c>/<c>sharePath</c> are indexed as keyword
+    /// fields, so an exact term and a prefix match cleanly. The folder clause keeps
+    /// both the folder itself (exact) and everything below it (prefix + separator),
+    /// so a sibling like "reports2" is not swept in by "reports".
+    /// </summary>
+    private static List<Query> BuildScopeFilters(string? shareName, string? pathPrefix)
+    {
+        var filters = new List<Query>();
+        if (string.IsNullOrWhiteSpace(shareName))
+            return filters;
+
+        filters.Add(new TermQuery { Field = "shareName", Value = shareName });
+
+        var prefix = (pathPrefix ?? string.Empty).Replace('\\', '/').Trim('/');
+        if (prefix.Length > 0)
+        {
+            filters.Add(new BoolQuery
+            {
+                Should = new List<Query>
+                {
+                    new TermQuery { Field = "sharePath", Value = prefix },
+                    new PrefixQuery { Field = "sharePath", Value = prefix + "/" }
+                },
+                MinimumShouldMatch = 1
+            });
+        }
+
+        return filters;
     }
 
     // ══════════════════════════════════════════

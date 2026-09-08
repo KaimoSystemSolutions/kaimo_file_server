@@ -254,14 +254,16 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
     // ══════════════════════════════════════════
 
     public async Task<List<FileDocument>> SearchAsync(
-        string searchText, UserContext user, CancellationToken ct = default)
+        string searchText, UserContext user,
+        string? shareName = null, string? pathPrefix = null,
+        CancellationToken ct = default)
     {
         if (await IsElasticActiveAsync(ct))
         {
             try
             {
                 await EnsureEsInitializedAsync(ct);
-                return await _es.SearchAsync(searchText, user, ct);
+                return await _es.SearchAsync(searchText, user, shareName, pathPrefix, ct);
             }
             catch (OperationCanceledException)
             {
@@ -274,7 +276,7 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
             }
         }
 
-        return await _filename.SearchAsync(searchText, user, ct);
+        return await _filename.SearchAsync(searchText, user, shareName, pathPrefix, ct);
     }
 
     public async Task InitializeAsync(CancellationToken ct = default)

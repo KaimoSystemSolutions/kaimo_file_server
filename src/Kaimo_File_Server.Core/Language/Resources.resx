@@ -720,6 +720,51 @@
   <data name="Web_Search_NoResults" xml:space="preserve">
     <value>No results found</value>
   </data>
+  <data name="Web_Search_Clear" xml:space="preserve">
+    <value>Clear search</value>
+  </data>
+  <data name="Web_Search_Section_Destinations" xml:space="preserve">
+    <value>Settings &amp; tabs</value>
+  </data>
+  <data name="Web_Search_Scope_Folder" xml:space="preserve">
+    <value>This folder</value>
+  </data>
+  <data name="Web_Search_Scope_Share" xml:space="preserve">
+    <value>Entire share</value>
+  </data>
+  <data name="Web_Search_Scope_Global" xml:space="preserve">
+    <value>Global</value>
+  </data>
+  <data name="Web_Search_Scope_Settings" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="Web_Search_SearchInShare" xml:space="preserve">
+    <value>Search in share:</value>
+  </data>
+  <data name="Web_Search_AllShares" xml:space="preserve">
+    <value>All shares</value>
+  </data>
+  <data name="Web_Search_Hint_In" xml:space="preserve">
+    <value>Searching in:</value>
+  </data>
+  <data name="Web_Search_Hint_AllShares" xml:space="preserve">
+    <value>Searching all shares</value>
+  </data>
+  <data name="Web_Search_Hint_Settings" xml:space="preserve">
+    <value>Searching settings &amp; tabs</value>
+  </data>
+  <data name="Web_Search_Cat_Page" xml:space="preserve">
+    <value>Page</value>
+  </data>
+  <data name="Web_Search_Scope_PickedShare" xml:space="preserve">
+    <value>Selected share</value>
+  </data>
+  <data name="Web_Search_PickShare" xml:space="preserve">
+    <value>Choose shares…</value>
+  </data>
+  <data name="Web_Search_SharesSelected" xml:space="preserve">
+    <value>{0} shares selected</value>
+  </data>
   <data name="Web_Login_Failed" xml:space="preserve">
     <value>Login failed. Please try again.</value>
   </data>

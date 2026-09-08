@@ -720,6 +720,51 @@
   <data name="Web_Search_NoResults" xml:space="preserve">
     <value>Keine Dateien gefunden</value>
   </data>
+  <data name="Web_Search_Clear" xml:space="preserve">
+    <value>Suche löschen</value>
+  </data>
+  <data name="Web_Search_Section_Destinations" xml:space="preserve">
+    <value>Einstellungen &amp; Tabs</value>
+  </data>
+  <data name="Web_Search_Scope_Folder" xml:space="preserve">
+    <value>Dieser Ordner</value>
+  </data>
+  <data name="Web_Search_Scope_Share" xml:space="preserve">
+    <value>Gesamter Share</value>
+  </data>
+  <data name="Web_Search_Scope_Global" xml:space="preserve">
+    <value>Global</value>
+  </data>
+  <data name="Web_Search_Scope_Settings" xml:space="preserve">
+    <value>Einstellungen</value>
+  </data>
+  <data name="Web_Search_SearchInShare" xml:space="preserve">
+    <value>In Share suchen:</value>
+  </data>
+  <data name="Web_Search_AllShares" xml:space="preserve">
+    <value>Alle Shares</value>
+  </data>
+  <data name="Web_Search_Hint_In" xml:space="preserve">
+    <value>Suche in:</value>
+  </data>
+  <data name="Web_Search_Hint_AllShares" xml:space="preserve">
+    <value>Suche in allen Shares</value>
+  </data>
+  <data name="Web_Search_Hint_Settings" xml:space="preserve">
+    <value>Suche in Einstellungen &amp; Tabs</value>
+  </data>
+  <data name="Web_Search_Cat_Page" xml:space="preserve">
+    <value>Bereich</value>
+  </data>
+  <data name="Web_Search_Scope_PickedShare" xml:space="preserve">
+    <value>Ausgewählter Share</value>
+  </data>
+  <data name="Web_Search_PickShare" xml:space="preserve">
+    <value>Shares wählen…</value>
+  </data>
+  <data name="Web_Search_SharesSelected" xml:space="preserve">
+    <value>{0} Shares ausgewählt</value>
+  </data>
   <data name="Web_Login_Failed" xml:space="preserve">
     <value>Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.</value>
   </data>

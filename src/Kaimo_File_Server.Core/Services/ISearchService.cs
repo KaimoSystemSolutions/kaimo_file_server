@@ -27,8 +27,16 @@ public interface ISearchService
     /// Searches the index and returns ONLY the documents the given user is allowed
     /// to read (ListReadData). The ACL check is mandatory and performed before any
     /// result leaves the service — never expose raw hits to the UI.
+    ///
+    /// Optionally scoped: when <paramref name="shareName"/> is set, only hits in that
+    /// share are considered; when <paramref name="pathPrefix"/> is also set (a
+    /// share-relative folder path), only that folder and everything below it. Both
+    /// null (the default) keeps the original global-across-all-shares behavior.
     /// </summary>
-    Task<List<FileDocument>> SearchAsync(string searchText, UserContext user, CancellationToken ct = default);
+    Task<List<FileDocument>> SearchAsync(
+        string searchText, UserContext user,
+        string? shareName = null, string? pathPrefix = null,
+        CancellationToken ct = default);
 
     Task InitializeAsync(CancellationToken ct = default);
 }

@@ -3712,12 +3712,154 @@ h1, h2, h3, h4, h5, h6 {
     top: 0;
     z-index: 100;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 10px;
     padding: 16px 24px;
     background: var(--bg-primary);
     border-bottom: 1px solid var(--border);
     margin-bottom: 25px;
+}
+
+/* GlobalSearch: the search input (full width) with one scope dropdown to its
+   right. It is the growing flex child of .search-bar-container; the job menu
+   stays right-aligned beside it. */
+.global-search {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Holds the bar + its absolutely-positioned results dropdown. */
+.search-area {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Mini "where am I searching" hint inside the bar, right of the input. */
+.search-scope-hint {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    opacity: 0.9;
+}
+
+.search-scope-select {
+    flex: 0 0 auto;
+    max-width: 200px;
+    padding: 8px 10px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.search-scope-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
+}
+
+/* Info button for the active share selection: shows the count, tooltip lists how
+   many are selected, click reopens the picker dialog. */
+.search-scope-badge {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 26px;
+    padding: 0 7px;
+    border-radius: 999px;
+    border: 1px solid var(--accent);
+    background: var(--accent-subtle);
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.search-scope-badge:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+/* Compact result rows: lower height, still legible. */
+.global-search .search-result-item {
+    padding: 5px 12px;
+    gap: 9px;
+}
+
+.global-search .search-result-item svg {
+    width: 17px;
+    height: 17px;
+}
+
+/* One row per result: name on the left, secondary info (path / snippet /
+   category) on the right, both truncated — no more stacked second line. */
+.global-search .search-result-info {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.global-search .search-result-name {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+
+.global-search .search-result-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: auto;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.global-search .search-result-meta mark {
+    background: rgba(var(--accent-rgb), 0.25);
+    color: var(--text-primary);
+    border-radius: var(--radius-control);
+    padding: 0 2px;
+}
+
+/* Hairline between results so it reads as separate rows, and breathing room
+   under the last one. */
+.global-search .search-result-item:not(:last-child) {
+    border-bottom: 1px solid var(--border);
+}
+
+/* No double line at a section boundary: drop the item's hairline when the next
+   row is a group header (which already draws its own top separator). */
+.global-search .search-result-item:has(+ .search-group-header) {
+    border-bottom: none;
+}
+
+.global-search .search-dropdown {
+    padding-bottom: 6px;
+}
+
+.global-search .search-group-header {
+    padding: 6px 12px 2px;
 }
 
 .search-bar {
@@ -3732,6 +3874,12 @@ h1, h2, h3, h4, h5, h6 {
     flex: 1;
     min-width: 0;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Inside GlobalSearch the bar must not stretch vertically in the column layout. */
+.global-search .search-bar {
+    flex: 0 0 auto;
+    width: 100%;
 }
 
 .search-bar:focus-within {
