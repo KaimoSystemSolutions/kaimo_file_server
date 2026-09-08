@@ -75,8 +75,6 @@ public class FileHelper
         [".ts"]   = "file_code.svg",
         [".py"]   = "file_code.svg",
         [".java"] = "file_code.svg",
-        [".html"] = "file_code.svg",
-        [".css"]  = "file_code.svg",
         [".json"] = "file_code.svg",
         [".xml"]  = "file_code.svg",
         [".yaml"] = "file_code.svg",
@@ -84,12 +82,21 @@ public class FileHelper
         [".sh"]   = "file_code.svg",
         [".sql"]  = "file_code.svg",
 
+        // Web
+        [".html"] = "file_html.svg",
+        [".htm"]  = "file_html.svg",
+        [".css"]  = "file_css.svg",
+        [".php"]  = "file_php.svg",
+
         // Executables
         [".exe"]  = "file_exe.svg",
         [".msi"]  = "file_exe.svg",
         [".deb"]  = "file_exe.svg",
         [".rpm"]  = "file_exe.svg",
         [".appimage"] = "file_exe.svg",
+        [".jar"]  = "file_exe.svg",
+        [".bat"]  = "file_exe.svg",
+        [".cmd"]  = "file_exe.svg",
     };
 
     private static readonly Dictionary<string, string> ContentTypeMap = new(StringComparer.OrdinalIgnoreCase)

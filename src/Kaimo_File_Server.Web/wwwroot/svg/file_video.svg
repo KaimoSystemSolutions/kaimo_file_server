@@ -1,4 +1,4 @@
 <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <rect x="2" y="4" width="20" height="16" rx="4" ry="4" />
-    <polygon points="10 8 16 12 10 16" />
+  <rect x="2" y="4" width="20" height="16" rx="4" ry="4" fill="#7A6FD0" stroke="none" />
+  <polygon points="10 8 16 12 10 16" fill="#fff" stroke="none" />
 </svg>
