@@ -6,6 +6,7 @@
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inherits AppLayoutComponentBase
 @inject ThemeService Theme
+@inject DateFormatService DateFmt
 @inject NavigationManager Nav
 @inject JwtAuthenticationStateProvider AuthState
 @inject AuthenticationStateProvider AuthStateProvider
@@ -187,6 +188,10 @@
                                  && await ManagementAuthService.HasAnyPermissionAsync(
                                         _currentUser, ManagementPermission.ManageSystemSettings);
         }
+
+        // Load the global date-display format once for the whole circuit (uses the
+        // DbContext, which is available here — unlike the theme init in OnAfterRender).
+        await DateFmt.InitializeAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

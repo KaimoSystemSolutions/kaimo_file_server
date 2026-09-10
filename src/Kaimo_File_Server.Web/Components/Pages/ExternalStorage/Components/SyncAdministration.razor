@@ -12,6 +12,7 @@
 @inject ExternalStorageSyncViewModel VM
 @inject ICloudSyncJobRunner SyncJobRunner
 @inject IJSRuntime JS
+@inject DateFormatService DateFmt
 @inherits AppComponentBase
 
 @if (VM.IsLoading)
@@ -255,7 +256,7 @@ else
                     <dl>
                         <dt>@R("Web_ExternalStorage_State")</dt><dd><StatusBadge Tone="@SyncStateTone(selected)" Label="@SyncState(selected)" /></dd>
                         <dt>@R("Web_CloudSync_Schedule")</dt><dd>@(selected.Definition.Schedule.IsEnabled ? R("Web_ExternalStorage_ScheduleEnabled") : R("Web_ExternalStorage_Disabled"))</dd>
-                        <dt>@R("Web_ExternalStorage_LastRun")</dt><dd>@FormatDate(selected.Runtime?.LastRunAtUtc)</dd>
+                        <dt>@R("Web_ExternalStorage_LastRun")</dt><dd>@DateFmt.FormatDateTime(selected.Runtime?.LastRunAtUtc, nullText: R("Web_CloudSync_Never"))</dd>
                     </dl>
                 </section>
                 @if (!string.IsNullOrWhiteSpace(selected.Definition.Description))
@@ -517,7 +518,6 @@ else
     private static long? ToUnit(long? value, long divisor) => value is > 0 ? (long)Math.Ceiling(value.Value / (double)divisor) : null;
     private static string DisplayName(ExternalStorageSyncListItem item) => string.IsNullOrWhiteSpace(item.Definition.DisplayName) ? item.ShareName : item.Definition.DisplayName;
     private static string DisplayPath(string path) => string.IsNullOrEmpty(path) ? "/" : $"/{path}";
-    private static string FormatDate(DateTime? value) => value?.ToLocalTime().ToString("g") ?? R("Web_CloudSync_Never");
     private string ProviderName(string id) => VM.GetProviderName(id);
     private string ProviderIdFor(ExternalStorageSyncListItem item)
         => VM.Connections.FirstOrDefault(connection => connection.Id == item.Definition.ConnectionId)?.ProviderId ?? "";

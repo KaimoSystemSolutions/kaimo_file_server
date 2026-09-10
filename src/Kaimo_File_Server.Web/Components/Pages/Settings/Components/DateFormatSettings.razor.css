@@ -1,0 +1,89 @@
+.dateformat-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--space-3);
+    margin: var(--space-3) 0 var(--space-4);
+}
+
+.dateformat-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.dateformat-card:hover {
+    border-color: var(--accent);
+    background: var(--accent-subtle);
+}
+
+.dateformat-card.is-selected {
+    border-color: var(--accent);
+    background: var(--accent-selected);
+}
+
+/* Native radio drives keyboard/selection but stays visually hidden. */
+.dateformat-card-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+}
+
+/* Keyboard focus only — a mouse click selects without adding a second ring. */
+.dateformat-card:has(:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.dateformat-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.dateformat-card-name {
+    font-family: var(--font-heading);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--label-spacing);
+    color: var(--text-primary);
+}
+
+.dateformat-card-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--text-on-accent);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.dateformat-card-example {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+    font-size: 16px;
+    color: var(--text-primary);
+}
+
+.dateformat-card-pattern {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+.dateformat-actions {
+    margin-top: var(--space-2);
+}

@@ -300,6 +300,19 @@
     border-bottom: 0;
 }
 
+/* The "Region & Language" tab bundles two sections under a single full-width
+   divider of its own, so drop the per-section border/spacing there and give the
+   language row the same label→control gap the date-format cards use. */
+.settings-content ::deep .region-settings .detail-section {
+    border-bottom: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+
+.settings-content ::deep .region-settings > .detail-section:first-child .settings-row {
+    margin-top: 12px;
+}
+
 /* The log viewer is a full console; let it use the whole content width
    instead of the narrow reading measure applied to form sections. */
 .settings-content ::deep .log-viewer-section {

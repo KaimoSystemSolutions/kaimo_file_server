@@ -1053,6 +1053,27 @@
   <data name="Web_Settings_LanguageSaveFailed" xml:space="preserve">
     <value>Fehler beim Speichern der Sprache.</value>
   </data>
+  <data name="Web_Settings_Tab_Region" xml:space="preserve">
+    <value>Region &amp; Sprache</value>
+  </data>
+  <data name="Web_Settings_DateFormat_Detail" xml:space="preserve">
+    <value>Systemweites Anzeigeformat für Datumsangaben</value>
+  </data>
+  <data name="Web_Settings_DateFormat_European" xml:space="preserve">
+    <value>Europäisch</value>
+  </data>
+  <data name="Web_Settings_DateFormat_Iso" xml:space="preserve">
+    <value>ISO</value>
+  </data>
+  <data name="Web_Settings_DateFormat_American" xml:space="preserve">
+    <value>Amerikanisch</value>
+  </data>
+  <data name="Web_Settings_DateFormatSaved" xml:space="preserve">
+    <value>Datumsformat gespeichert. Die Änderung wird beim nächsten Laden der Seite wirksam.</value>
+  </data>
+  <data name="Web_Settings_DateFormatSaveFailed" xml:space="preserve">
+    <value>Fehler beim Speichern des Datumsformats.</value>
+  </data>
   <data name="Web_Settings_NoPermissionDataServices" xml:space="preserve">
     <value>Keine Berechtigung zum Verwalten der Datendienste.</value>
   </data>

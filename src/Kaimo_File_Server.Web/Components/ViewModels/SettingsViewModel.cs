@@ -108,6 +108,19 @@ public class SettingsViewModel
         ["en"] = "English",
     };
 
+    // ── Date display format ──
+
+    /// <summary>Selected global date-display format (config key <c>display.dateformat</c>).</summary>
+    public string SelectedDateFormat { get; set; } = DateFormatService.DefaultFormat;
+
+    /// <summary>Available date formats: key → resx label key for the option.</summary>
+    public static readonly Dictionary<string, string> AvailableDateFormats = new()
+    {
+        ["iso"] = "Web_Settings_DateFormat_Iso",
+        ["european"] = "Web_Settings_DateFormat_European",
+        ["american"] = "Web_Settings_DateFormat_American",
+    };
+
     // ── Data Services (SMB) ──
 
     /// <summary>Desired state of the SMB service (config flag).</summary>
@@ -282,6 +295,8 @@ public class SettingsViewModel
             if (CanManageSettings)
             {
                 var languageTask = _config.GetStringAsync("app.language", "de");
+                var dateFormatTask = _config.GetStringAsync(
+                    DateFormatService.ConfigKey, DateFormatService.DefaultFormat);
                 var contextMenuTask = _config.GetAsync(
                     ContextMenuConfig.ConfigKey, ContextMenuConfig.Default());
                 var passwordPolicyTask = _config.GetAsync(
@@ -294,6 +309,7 @@ public class SettingsViewModel
 
                 await Task.WhenAll(
                     languageTask,
+                    dateFormatTask,
                     contextMenuTask,
                     passwordPolicyTask,
                     sessionSecurityTask,
@@ -301,6 +317,7 @@ public class SettingsViewModel
                     cloudAccessSettingsTask);
 
                 SelectedLanguage = await languageTask;
+                SelectedDateFormat = await dateFormatTask;
                 CtxConfig = await contextMenuTask;
                 RebuildContextEditorState();
                 PwPolicy = await passwordPolicyTask;
@@ -402,6 +419,35 @@ public class SettingsViewModel
         {
             _logger.LogError(ex, "Failed to save language setting");
             ErrorMessage = Resources.Web_Settings_LanguageSaveFailed;
+            return false;
+        }
+    }
+
+    // ── Save Date Format ──
+
+    public async Task<bool> SaveDateFormatAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!CanManageSettings)
+        {
+            ErrorMessage = Resources.Web_Settings_NoPermissionChange;
+            return false;
+        }
+
+        try
+        {
+            await _config.SetAsync(DateFormatService.ConfigKey, SelectedDateFormat);
+
+            _logger.LogInformation("Date display format changed to '{Format}'", SelectedDateFormat);
+            SuccessMessage = Resources.Web_Settings_DateFormatSaved;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save date format setting");
+            ErrorMessage = Resources.Web_Settings_DateFormatSaveFailed;
             return false;
         }
     }

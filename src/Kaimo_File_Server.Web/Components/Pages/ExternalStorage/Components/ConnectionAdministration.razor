@@ -10,6 +10,7 @@
 @using System.Security.Cryptography
 @implements IAsyncDisposable
 @inject CloudAccessViewModel VM
+@inject DateFormatService DateFmt
 @inject IStorageConnectionProviderCatalog ProviderCatalog
 @inject IRsyncSshSetupService RsyncSshSetup
 @inject NavigationManager Nav
@@ -149,7 +150,7 @@ else
                             <dl>
                                 <dt>@R("Web_ExternalStorage_State")</dt>
                                 <dd><StatusBadge Tone="@StateTone(_selected.State)" Class="connection-state" Label="@StateName(_selected.State)" /></dd>
-                                <dt>@R("Web_ExternalStorage_LastVerified")</dt><dd>@FormatDate(_selected.LastVerifiedAtUtc)</dd>
+                                <dt>@R("Web_ExternalStorage_LastVerified")</dt><dd>@DateFmt.FormatDateTime(_selected.LastVerifiedAtUtc, nullText: R("Web_CloudSync_Never"))</dd>
                                 <dt>@R("Web_ExternalStorage_ProfileHealth")</dt><dd>@(_selected.ProviderProfileId is null ? R("Web_ExternalStorage_ProfileLegacy") : R("Web_ExternalStorage_ProfileConfigured"))</dd>
                                 <dt>@R("Web_ExternalStorage_SecretHealth")</dt><dd>@SecretHealth(_selected)</dd>
                             </dl>
@@ -449,7 +450,6 @@ else
             ? R("Web_ExternalStorage_NotAuthorized")
             : R("Web_ExternalStorage_Protected")
     };
-    private static string FormatDate(DateTime? value) => value?.ToLocalTime().ToString("g") ?? R("Web_CloudSync_Never");
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 
     // Explicit, localized message for a persisted connection error code, with a

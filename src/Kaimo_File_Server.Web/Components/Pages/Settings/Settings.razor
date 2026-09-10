@@ -27,7 +27,7 @@ else
             <Tabs Orientation="TabOrientation.Vertical">
                 @if (VM.CanManageSettings)
                 {
-                    <Tab Active="@(_activeTab == SettingsTab.Language)" Icon="globe.svg" Label="@Resources.Web_Settings_Tab_Language" OnClick="() => SwitchTab(SettingsTab.Language)" />
+                    <Tab Active="@(_activeTab == SettingsTab.Language)" Icon="globe.svg" Label="@Resources.Web_Settings_Tab_Region" OnClick="() => SwitchTab(SettingsTab.Language)" />
                     <Tab Active="@(_activeTab == SettingsTab.ContextMenu)" Icon="edit.svg" Label="@Resources.Web_Settings_Tab_ContextMenu" OnClick="() => SwitchTab(SettingsTab.ContextMenu)" />
                     <Tab Active="@(_activeTab == SettingsTab.PasswordPolicy)" Icon="shield.svg" Label="@Resources.Web_Settings_Tab_Password" OnClick="() => SwitchTab(SettingsTab.PasswordPolicy)" />
                     <Tab Active="@(_activeTab == SettingsTab.Network)" Icon="compass.svg" Label="@Resources.Web_Settings_Tab_IP_Address" OnClick="() => SwitchTab(SettingsTab.Network)" />
@@ -64,7 +64,7 @@ else
 
                 @switch (_activeTab)
                 {
-                    case SettingsTab.Language when VM.CanManageSettings: <LanguageSettings VM="VM" /> break;
+                    case SettingsTab.Language when VM.CanManageSettings: <RegionSettings VM="VM" /> break;
                     case SettingsTab.ContextMenu when VM.CanManageSettings: <ContextMenuSettings VM="VM" /> break;
                     case SettingsTab.PasswordPolicy when VM.CanManageSettings: <PasswordPolicySettings VM="VM" /> break;
                     case SettingsTab.Network when VM.CanManageSettings: <NetworkSettings VM="VM" /> break;

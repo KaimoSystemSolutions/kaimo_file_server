@@ -17,6 +17,7 @@
 @inject CloudToLocalTransferService CloudTransfer
 @inject CrossShareTransferService CrossShareTransfer
 @inject FileBrowserClipboardService BrowserClipboard
+@inject DateFormatService DateFmt
 
 <PageTitle>@(VM.CurrentBrowserShare?.Name ?? Resources.Web_Files) - Kaimo Files</PageTitle>
 
@@ -482,10 +483,10 @@ else
                     }
                 </div>
 
-                <div class="col-created">@entry.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
-                <div class="col-modified">@entry.ModifiedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                <div class="col-created">@DateFmt.FormatDateTime(entry.CreatedAt)</div>
+                <div class="col-modified">@DateFmt.FormatDateTime(entry.ModifiedAt)</div>
                 <div
-                    class="col-lastaccess">@(entry.LastAccessedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "–")</div>
+                    class="col-lastaccess">@DateFmt.FormatDateTime(entry.LastAccessedAt)</div>
             </div>
 
             @if (_showFolderAcl && _aclFolderPath == aclPath)

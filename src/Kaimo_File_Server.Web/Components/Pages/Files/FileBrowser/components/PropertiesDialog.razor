@@ -2,6 +2,7 @@
 @using Kaimo_File_Server.Web.Components.Pages.Acl
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inherits AppComponentBase
+@inject DateFormatService DateFmt
 
 @*
     Compact, Windows-Explorer-style "Properties" dialog for a single file or folder.
@@ -76,13 +77,13 @@
                         <div class="properties-divider"></div>
 
                         <dt>@Resources.Web_Properties_Created</dt>
-                        <dd>@FormatTs(_target.CreatedAt)</dd>
+                        <dd>@DateFmt.FormatDateTime(_target.CreatedAt)</dd>
 
                         <dt>@Resources.Web_Properties_Modified</dt>
-                        <dd>@FormatTs(_target.ModifiedAt)</dd>
+                        <dd>@DateFmt.FormatDateTime(_target.ModifiedAt)</dd>
 
                         <dt>@Resources.Web_Properties_Accessed</dt>
-                        <dd>@(_target.LastAccessedAt is { } la ? FormatTs(la) : "–")</dd>
+                        <dd>@DateFmt.FormatDateTime(_target.LastAccessedAt)</dd>
 
                         <div class="properties-divider"></div>
 
@@ -206,9 +207,6 @@
         var ext = System.IO.Path.GetExtension(_target!.Name);
         return string.IsNullOrEmpty(ext) ? "–" : ext.ToLowerInvariant();
     }
-
-    private static string FormatTs(DateTime utc)
-        => utc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss");
 
     private static string T(string key) => Resources.ResourceManager.GetString(key) ?? key;
 }

@@ -3,6 +3,7 @@
 @inherits AppComponentBase
 @inject IJSRuntime JS
 @inject ToastService Toast
+@inject DateFormatService DateFmt
 
 @if (_show)
 {
@@ -40,7 +41,7 @@
                             {
                                 <button class="version-row version-row--clickable" @onclick="() => SelectSnapshot(ts)">
                                     @Assets.SVG("history.svg", new SvgOptions(Width: 16, Height: 16))
-                                    <span class="version-row-main">@FormatTs(ts)</span>
+                                    <span class="version-row-main">@DateFmt.FormatDateTime(ts)</span>
                                     @Assets.SVG("chevron_right.svg", new SvgOptions(Width: 16, Height: 16, Color: "var(--text-tertiary)"))
                                 </button>
                             }
@@ -54,7 +55,7 @@
                         <button class="btn-icon btn-icon--small" title="@Resources.Web_Version_FolderBack" @onclick="BackToSnapshots">
                             @Assets.SVG("chevron_left.svg", new SvgOptions(Width: 16, Height: 16))
                         </button>
-                        <span class="version-asof">@string.Format(Resources.Web_Version_FolderAsOf, FormatTs(_selectedSnapshot!.Value))</span>
+                        <span class="version-asof">@string.Format(Resources.Web_Version_FolderAsOf, DateFmt.FormatDateTime(_selectedSnapshot!.Value))</span>
                     </div>
                     @if (_folderEntries.Count == 0)
                     {
@@ -101,7 +102,7 @@
                             {
                                 <div class="version-row">
                                     <span class="version-badge">@string.Format(Resources.Web_Version_Number, v.VersionNumber)</span>
-                                    <span class="version-row-main">@FormatTs(v.SnapshotTimestampUtc)</span>
+                                    <span class="version-row-main">@DateFmt.FormatDateTime(v.SnapshotTimestampUtc)</span>
                                     <span class="version-row-size">@FormatHelper.FormatFileSize(v.Size)</span>
                                     <div class="version-row-actions">
                                         <button class="btn-icon btn-icon--small" title="@Resources.Web_Version_Preview"
@@ -136,7 +137,7 @@
             <p class="modal-text">
                 @((MarkupString)string.Format(Resources.Web_Version_RestoreConfirm,
                     $"<strong>{System.Net.WebUtility.HtmlEncode(_target?.Name)}</strong>",
-                    $"<strong>{FormatTs(_restoreConfirm.Value)}</strong>"))
+                    $"<strong>{DateFmt.FormatDateTime(_restoreConfirm.Value)}</strong>"))
             </p>
             <div class="modal-actions">
                 <button class="btn btn-secondary" @onclick="CancelRestore">@Resources.Web_Button_Cancel</button>
@@ -325,7 +326,4 @@
 
         return shareRelativeFilePath;
     }
-
-    private static string FormatTs(DateTime utc)
-        => utc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss");
 }

@@ -1,6 +1,7 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Infrastructure.Backup
 @inject NavigationManager Nav
+@inject DateFormatService DateFmt
 
 <div class="detail-section">
     <span class="detail-label">@R("Web_Settings_Backup_ScheduleTitle")</span>
@@ -69,7 +70,7 @@
                 @foreach (var backup in VM.Backups)
                 {
                     <tr>
-                        <td>@backup.CreatedAtLocal.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>@DateFmt.FormatDateTimeLocal(backup.CreatedAtLocal.DateTime)</td>
                         <td>@TriggerLabel(backup.Trigger)</td>
                         <td>@FormatSize(backup.SizeBytes)</td>
                         <td><a class="btn-secondary" href="@VM.CreateBackupDownloadUrl(Nav.BaseUri, backup.FileName)">@R("Web_Settings_Backup_Download")</a></td>

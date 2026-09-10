@@ -9482,6 +9482,69 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Settings_LanguageSaveFailed", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Region &amp; Language ähnelt.
+        /// </summary>
+        public static string Web_Settings_Tab_Region {
+            get {
+                return ResourceManager.GetString("Web_Settings_Tab_Region", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Systemwide date display format ähnelt.
+        /// </summary>
+        public static string Web_Settings_DateFormat_Detail {
+            get {
+                return ResourceManager.GetString("Web_Settings_DateFormat_Detail", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die European ähnelt.
+        /// </summary>
+        public static string Web_Settings_DateFormat_European {
+            get {
+                return ResourceManager.GetString("Web_Settings_DateFormat_European", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die ISO ähnelt.
+        /// </summary>
+        public static string Web_Settings_DateFormat_Iso {
+            get {
+                return ResourceManager.GetString("Web_Settings_DateFormat_Iso", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die American ähnelt.
+        /// </summary>
+        public static string Web_Settings_DateFormat_American {
+            get {
+                return ResourceManager.GetString("Web_Settings_DateFormat_American", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Date format saved. The change takes effect on the next page load. ähnelt.
+        /// </summary>
+        public static string Web_Settings_DateFormatSaved {
+            get {
+                return ResourceManager.GetString("Web_Settings_DateFormatSaved", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Error saving the date format. ähnelt.
+        /// </summary>
+        public static string Web_Settings_DateFormatSaveFailed {
+            get {
+                return ResourceManager.GetString("Web_Settings_DateFormatSaveFailed", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Error loading the settings. ähnelt.

@@ -1,0 +1,12 @@
+@* Groups the two regional preferences — interface language and date display
+   format — into a single settings category, each shown as its own section. *@
+
+<div class="region-settings">
+    <LanguageSettings VM="VM" />
+    <div class="region-section-divider"></div>
+    <DateFormatSettings VM="VM" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+}

@@ -106,8 +106,9 @@ public static class SearchDestinations
             "/cloud-access", "cloud-download.svg", ConnectionsGate),
 
         // ── Settings sections (deep-linked via ?tab=) ──
-        new("Web_Settings_Tab_Language",
-            ["language", "sprache", "localization", "lokalisierung", "i18n"],
+        new("Web_Settings_Tab_Region",
+            ["language", "sprache", "localization", "lokalisierung", "i18n",
+             "region", "date format", "datumsformat", "datum", "date", "iso"],
             "/settings?tab=language", "globe.svg", Settings),
         new("Web_Settings_Tab_ContextMenu",
             ["context menu", "kontextmenü", "kontextmenu", "rechtsklick"],

@@ -130,6 +130,7 @@ builder.Services.AddOpenApi("v1");
 // ══════════════════════════════════════════
 
 builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<DateFormatService>();
 builder.Services.AddScoped<ToastService>();
 builder.Services.AddScoped<JobService>();
 builder.Services.AddSingleton<LogDownloadTokenService>();

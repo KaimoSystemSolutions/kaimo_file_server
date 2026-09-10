@@ -69,6 +69,7 @@ public partial class CloudSync : IAsyncDisposable
     private DotNetObjectReference<CloudSync>? _schedulePaintReference;
 
     [Inject] private IJSRuntime JS { get; set; } = default!;
+    [Inject] private DateFormatService DateFmt { get; set; } = default!;
 
     /// <summary>
     /// Performs the initial authenticated load after interactive rendering and
@@ -317,10 +318,8 @@ public partial class CloudSync : IAsyncDisposable
     private static string DisplayLocalPath(string path)
         => string.IsNullOrEmpty(path) ? "/" : $"/{path}";
 
-    private static string FormatLastSync(DateTime? value)
-        => value is null
-            ? Text("Web_CloudSync_Never", "Never")
-            : value.Value.ToLocalTime().ToString("g");
+    private string FormatLastSync(DateTime? value)
+        => DateFmt.FormatDateTime(value, nullText: Text("Web_CloudSync_Never", "Never"));
 
     private static string ModeLabel(SyncMode mode) => mode switch
     {
