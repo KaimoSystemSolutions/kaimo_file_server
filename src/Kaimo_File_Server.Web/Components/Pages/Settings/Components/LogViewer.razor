@@ -211,10 +211,16 @@
     {
         if (!firstRender)
             return;
-        await Viewer.InitializeAsync(_lifetime.Token);
+        // Capture the token before awaiting: a fast tab switch disposes _lifetime
+        // during InitializeAsync, and reading _lifetime.Token afterwards throws
+        // ObjectDisposedException.
+        var token = _lifetime.Token;
+        await Viewer.InitializeAsync(token);
+        if (token.IsCancellationRequested)
+            return;
         _initialized = true;
         if (Viewer.IsAuthorized)
-            _refreshLoop = RunRefreshLoopAsync(_lifetime.Token);
+            _refreshLoop = RunRefreshLoopAsync(token);
         StateHasChanged();
     }
 
