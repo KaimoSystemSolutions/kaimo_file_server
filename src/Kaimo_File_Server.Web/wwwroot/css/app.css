@@ -14,6 +14,10 @@
     --radius-modal: 4px;     /* modal dialogs */
     /* 50% (avatars/dots) stays literal. */
 
+    /* Shared height for the top-bar controls (search bar, scope select, job
+       menu) so they line up flush regardless of their own content. */
+    --topbar-control-h: 40px;
+
     /* Spacing scale (4px base) — applied to the shared primitives. */
     --space-1: 4px;
     --space-2: 8px;
@@ -3753,8 +3757,9 @@ h1, h2, h3, h4, h5, h6 {
 
 .search-scope-select {
     flex: 0 0 auto;
+    height: var(--topbar-control-h);
     max-width: 200px;
-    padding: 8px 10px;
+    padding: 0 10px;
     font-size: 13px;
     border: 1px solid var(--border);
     border-radius: var(--radius-surface);
@@ -3867,10 +3872,11 @@ h1, h2, h3, h4, h5, h6 {
     display: flex;
     align-items: center;
     gap: 10px;
+    height: var(--topbar-control-h);
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius-surface);
-    padding: 8px 14px;
+    padding: 0 14px;
     flex: 1;
     min-width: 0;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -4081,10 +4087,10 @@ h1, h2, h3, h4, h5, h6 {
 
 .job-menu-toggle {
     display: flex;
-    min-height: 38px;
+    height: var(--topbar-control-h);
     align-items: center;
     gap: 7px;
-    padding: 8px 11px;
+    padding: 0 11px;
     border: 1px solid var(--border);
     border-radius: var(--radius-surface);
     background: var(--bg-secondary);
