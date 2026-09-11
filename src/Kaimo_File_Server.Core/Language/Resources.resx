@@ -1074,6 +1074,15 @@
   <data name="Web_Settings_DateFormatSaveFailed" xml:space="preserve">
     <value>Error saving the date format.</value>
   </data>
+  <data name="Web_Settings_TimeFormat_Detail" xml:space="preserve">
+    <value>Systemwide time display format</value>
+  </data>
+  <data name="Web_Settings_TimeFormat_24h" xml:space="preserve">
+    <value>24-hour</value>
+  </data>
+  <data name="Web_Settings_TimeFormat_12h" xml:space="preserve">
+    <value>12-hour (AM/PM)</value>
+  </data>
   <data name="Web_Settings_NoPermissionDataServices" xml:space="preserve">
     <value>No permission to manage the data services.</value>
   </data>

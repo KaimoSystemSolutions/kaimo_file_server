@@ -23,4 +23,13 @@ public class DateFormatServiceTests
         Assert.Equal(expectedDate, date);
         Assert.Equal(expectedDateTime, dateTime);
     }
+
+    [Theory]
+    [InlineData("24h", "HH:mm")]
+    [InlineData("12h", "h:mm tt")]
+    [InlineData("12H", "h:mm tt")] // case-insensitive
+    [InlineData("nonsense", "HH:mm")] // unknown → default (24h)
+    [InlineData("", "HH:mm")]
+    public void TimePatternFor_MapsKnownFormats_AndFallsBackTo24h(string timeFormat, string expected)
+        => Assert.Equal(expected, DateFormatService.TimePatternFor(timeFormat));
 }

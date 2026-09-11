@@ -121,6 +121,16 @@ public class SettingsViewModel
         ["american"] = "Web_Settings_DateFormat_American",
     };
 
+    /// <summary>Selected global time-display format (config key <c>display.timeformat</c>).</summary>
+    public string SelectedTimeFormat { get; set; } = DateFormatService.DefaultTimeFormat;
+
+    /// <summary>Available time formats: key → resx label key for the option.</summary>
+    public static readonly Dictionary<string, string> AvailableTimeFormats = new()
+    {
+        ["24h"] = "Web_Settings_TimeFormat_24h",
+        ["12h"] = "Web_Settings_TimeFormat_12h",
+    };
+
     // ── Data Services (SMB) ──
 
     /// <summary>Desired state of the SMB service (config flag).</summary>
@@ -297,6 +307,8 @@ public class SettingsViewModel
                 var languageTask = _config.GetStringAsync("app.language", "de");
                 var dateFormatTask = _config.GetStringAsync(
                     DateFormatService.ConfigKey, DateFormatService.DefaultFormat);
+                var timeFormatTask = _config.GetStringAsync(
+                    DateFormatService.TimeConfigKey, DateFormatService.DefaultTimeFormat);
                 var contextMenuTask = _config.GetAsync(
                     ContextMenuConfig.ConfigKey, ContextMenuConfig.Default());
                 var passwordPolicyTask = _config.GetAsync(
@@ -310,6 +322,7 @@ public class SettingsViewModel
                 await Task.WhenAll(
                     languageTask,
                     dateFormatTask,
+                    timeFormatTask,
                     contextMenuTask,
                     passwordPolicyTask,
                     sessionSecurityTask,
@@ -318,6 +331,7 @@ public class SettingsViewModel
 
                 SelectedLanguage = await languageTask;
                 SelectedDateFormat = await dateFormatTask;
+                SelectedTimeFormat = await timeFormatTask;
                 CtxConfig = await contextMenuTask;
                 RebuildContextEditorState();
                 PwPolicy = await passwordPolicyTask;
@@ -439,8 +453,11 @@ public class SettingsViewModel
         try
         {
             await _config.SetAsync(DateFormatService.ConfigKey, SelectedDateFormat);
+            await _config.SetAsync(DateFormatService.TimeConfigKey, SelectedTimeFormat);
 
-            _logger.LogInformation("Date display format changed to '{Format}'", SelectedDateFormat);
+            _logger.LogInformation(
+                "Date/time display format changed to '{Format}' / '{TimeFormat}'",
+                SelectedDateFormat, SelectedTimeFormat);
             SuccessMessage = Resources.Web_Settings_DateFormatSaved;
             return true;
         }

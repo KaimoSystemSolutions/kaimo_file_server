@@ -9545,7 +9545,34 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Settings_DateFormatSaveFailed", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Systemwide time display format ähnelt.
+        /// </summary>
+        public static string Web_Settings_TimeFormat_Detail {
+            get {
+                return ResourceManager.GetString("Web_Settings_TimeFormat_Detail", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die 24-hour ähnelt.
+        /// </summary>
+        public static string Web_Settings_TimeFormat_24h {
+            get {
+                return ResourceManager.GetString("Web_Settings_TimeFormat_24h", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die 12-hour (AM/PM) ähnelt.
+        /// </summary>
+        public static string Web_Settings_TimeFormat_12h {
+            get {
+                return ResourceManager.GetString("Web_Settings_TimeFormat_12h", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Error loading the settings. ähnelt.
         /// </summary>

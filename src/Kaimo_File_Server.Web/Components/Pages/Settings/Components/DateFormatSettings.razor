@@ -25,6 +25,28 @@
         }
     </div>
 
+    <span class="detail-label">@Resources.Web_Settings_TimeFormat_Detail</span>
+
+    <div class="dateformat-options" role="radiogroup" aria-label="@Resources.Web_Settings_TimeFormat_Detail">
+        @foreach (var fmt in SettingsViewModel.AvailableTimeFormats)
+        {
+            var selected = VM.SelectedTimeFormat == fmt.Key;
+            <label class="dateformat-card @(selected ? "is-selected" : "")">
+                <input class="dateformat-card-input" type="radio" name="timeformat"
+                       checked="@selected" @onchange="() => VM.SelectedTimeFormat = fmt.Key" />
+                <span class="dateformat-card-head">
+                    <span class="dateformat-card-name">@Label(fmt.Value)</span>
+                    @if (selected)
+                    {
+                        <span class="dateformat-card-check" aria-hidden="true">✓</span>
+                    }
+                </span>
+                <span class="dateformat-card-example">@TimeExample(fmt.Key)</span>
+                <span class="dateformat-card-pattern">@DateFormatService.TimePatternFor(fmt.Key)</span>
+            </label>
+        }
+    </div>
+
     <div class="settings-row dateformat-actions">
         <button class="btn-primary" @onclick="Save">@Resources.Web_Settings_Button_Save</button>
     </div>
@@ -37,9 +59,16 @@
 
     private static string Label(string key) => Resources.ResourceManager.GetString(key) ?? key;
 
-    // Live example rendered with the same patterns the display service uses.
-    private static string Example(string format)
-        => DateTime.Now.ToString(DateFormatService.PatternFor(format).dateTime, CultureInfo.InvariantCulture);
+    // Live example rendered with the same patterns the display service uses; the
+    // date example follows the currently selected time format so the two agree.
+    private string Example(string format)
+        => DateTime.Now.ToString(
+            $"{DateFormatService.PatternFor(format).date} {DateFormatService.TimePatternFor(VM.SelectedTimeFormat)}",
+            CultureInfo.InvariantCulture);
 
-    private static string Pattern(string format) => DateFormatService.PatternFor(format).dateTime;
+    private static string TimeExample(string timeFormat)
+        => DateTime.Now.ToString(DateFormatService.TimePatternFor(timeFormat), CultureInfo.InvariantCulture);
+
+    private static string Pattern(string format)
+        => DateFormatService.PatternFor(format).date;
 }

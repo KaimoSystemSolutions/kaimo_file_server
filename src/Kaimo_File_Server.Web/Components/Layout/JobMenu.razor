@@ -1,11 +1,14 @@
+@using System.Globalization
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Infrastructure.Clouds
 @using Kaimo_File_Server.Search
 @using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Services
 @implements IDisposable
 @inject JobService JobService
 @inject ICloudSyncJobRunner SyncJobRunner
 @inject ISearchAdminService SearchAdmin
+@inject DateFormatService DateFmt
 @inherits AppComponentBase
 
 <div class="job-menu">
@@ -65,7 +68,7 @@
                                 <span>@(_reindexCancelRequested ? Text("Web_Jobs_Cancelling", "Cancelling…") : $"{_reindex.Percent}%")</span>
                                 @if (_reindex.StartedAt is not null)
                                 {
-                                    <span>@_reindex.StartedAt.Value.ToLocalTime().ToString("t")</span>
+                                    <span>@FormatTime(_reindex.StartedAt.Value)</span>
                                 }
                             </div>
                         </article>
@@ -94,7 +97,7 @@
                                 <span>@(job.IsCancellationRequested
                                     ? Text("Web_Jobs_Cancelling", "Cancelling…")
                                     : $"{job.Progress}%")</span>
-                                <span>@job.StartedAt.ToLocalTime().ToString("t")</span>
+                                <span>@FormatTime(job.StartedAt)</span>
                             </div>
                         </article>
                     }
@@ -125,7 +128,7 @@
                                 <span>@(job.IsCancellationRequested
                                     ? Text("Web_Jobs_Cancelling", "Cancelling…")
                                     : $"{job.Progress}%")</span>
-                                <span>@job.StartedAt.ToLocalTime().ToString("t")</span>
+                                <span>@FormatTime(job.StartedAt)</span>
                             </div>
                         </article>
                     }
@@ -162,6 +165,18 @@
         ? Text("Web_Settings_Search_ReindexAllShares", "All shares")
         : _reindex.ShareName!;
     private int TotalCount => JobService.Jobs.Count + SyncJobRunner.Jobs.Count + (ReindexRunning ? 1 : 0);
+
+    // Renders a UTC timestamp as local time using the configured time format
+    // (24h or 12h AM/PM), so job times match the rest of the UI.
+    private string FormatTime(DateTime utc)
+        => utc.ToLocalTime().ToString(DateFmt.TimePattern, CultureInfo.InvariantCulture);
+
+    private string FormatTime(DateTimeOffset started)
+        => started.ToLocalTime().ToString(DateFmt.TimePattern, CultureInfo.InvariantCulture);
+
+    // Ensure the configured time format is loaded even if this menu renders before
+    // the layout's own initialization; InitializeAsync is idempotent.
+    protected override Task OnInitializedAsync() => DateFmt.InitializeAsync();
 
     protected override void OnInitialized()
     {
