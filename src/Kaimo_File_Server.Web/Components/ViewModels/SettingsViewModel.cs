@@ -11,6 +11,7 @@ using Kaimo_File_Server.Infrastructure.Logging;
 using Microsoft.AspNetCore.Components.Authorization;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Search;
+using Kaimo_File_Server.Web.Controllers.WebDav;
 using Kaimo_File_Server.Web.DynamicHelpers;
 using Kaimo_File_Server.Web.Services;
 using Kaimo_File_Server.Web.Services.Https;
@@ -155,6 +156,23 @@ public class SettingsViewModel
         (SmbProtocolVersion.Smb302, "SMB 3.0.2"),
         (SmbProtocolVersion.Smb311, "SMB 3.1.1"),
     ];
+
+    // ── Data Services (WebDAV) ──
+
+    /// <summary>Desired state of the WebDAV service (config flag; opt-in, defaults off).</summary>
+    public bool WebDavEnabled { get; set; }
+
+    /// <summary>Whether WebDAV Basic authentication is refused over plain HTTP.</summary>
+    public bool WebDavRequireHttps { get; set; } = true;
+
+    /// <summary>
+    /// Reported WebDAV status. The service runs in-process (no reconciler), so this
+    /// is written directly to reflect the desired state when the toggle is saved.
+    /// </summary>
+    public string WebDavStatus { get; private set; } = "Unbekannt";
+
+    /// <summary>The connect URL shown as a read-only hint (e.g. <c>https://host:8443/dav/</c>).</summary>
+    public static string BuildWebDavUrl(string baseUri) => $"{baseUri.TrimEnd('/')}/dav/";
 
     // ── Search engine (Elasticsearch) ──
 
@@ -361,6 +379,10 @@ public class SettingsViewModel
                 // Status is written by the host process → read fresh, not cached.
                 SmbStatus = await _config.GetFreshAsync(
                     DataServiceKeys.StatusKey("smb"), "Unbekannt");
+
+                WebDavEnabled = await _config.GetBoolAsync(WebDavOptions.EnabledKey, false);
+                WebDavRequireHttps = await _config.GetBoolAsync(WebDavOptions.RequireHttpsKey, true);
+                WebDavStatus = await _config.GetFreshAsync(WebDavOptions.StatusKey, "Unbekannt");
             }
         }
         catch (Exception ex)
@@ -524,7 +546,16 @@ public class SettingsViewModel
         {
             await _config.SetAsync(DataServiceKeys.EnabledKey("smb"), SmbEnabled);
 
-            _logger.LogInformation("SMB service desired state set to {Enabled}", SmbEnabled);
+            await _config.SetAsync(WebDavOptions.EnabledKey, WebDavEnabled);
+            await _config.SetAsync(WebDavOptions.RequireHttpsKey, WebDavRequireHttps);
+            // In-process service: no reconciler writes the status, so reflect the
+            // desired state directly (mirrors the SMB status the host reports back).
+            WebDavStatus = (WebDavEnabled ? DataServiceStatus.Running : DataServiceStatus.Stopped).ToString();
+            await _config.SetAsync(WebDavOptions.StatusKey, WebDavStatus);
+
+            _logger.LogInformation(
+                "SMB service desired state set to {SmbEnabled}; WebDAV set to {WebDavEnabled}",
+                SmbEnabled, WebDavEnabled);
             SuccessMessage = SmbEnabled
                 ? Resources.Web_Settings_SmbEnabled
                 : Resources.Web_Settings_SmbDisabled;
@@ -543,6 +574,7 @@ public class SettingsViewModel
     {
         if (!CanManageDataServices) return;
         SmbStatus = await _config.GetFreshAsync(DataServiceKeys.StatusKey("smb"), "Unbekannt");
+        WebDavStatus = await _config.GetFreshAsync(WebDavOptions.StatusKey, "Unbekannt");
     }
 
     /// <summary>

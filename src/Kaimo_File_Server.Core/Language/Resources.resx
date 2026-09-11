@@ -1095,6 +1095,12 @@
   <data name="Web_Settings_SmbDisabled" xml:space="preserve">
     <value>SMB is being disabled. The change is applied by the service within a few seconds.</value>
   </data>
+  <data name="Web_Settings_WebDavEnabled" xml:space="preserve">
+    <value>WebDAV is being enabled. The change is applied within a few seconds.</value>
+  </data>
+  <data name="Web_Settings_WebDavDisabled" xml:space="preserve">
+    <value>WebDAV is being disabled. The change is applied within a few seconds.</value>
+  </data>
   <data name="Web_Settings_Tab_ContextMenu" xml:space="preserve">
     <value>Context menu</value>
   </data>
@@ -4118,6 +4124,15 @@
   </data>
   <data name="Web_Settings_Data_SmbToggle" xml:space="preserve">
     <value>Enable/disable SMB</value>
+  </data>
+  <data name="Web_Settings_Data_WebDavToggle" xml:space="preserve">
+    <value>Enable/disable WebDAV</value>
+  </data>
+  <data name="Web_Settings_Data_WebDavUrl" xml:space="preserve">
+    <value>WebDAV address</value>
+  </data>
+  <data name="Web_Settings_Data_WebDavRequireHttps" xml:space="preserve">
+    <value>Require HTTPS for Basic authentication (recommended)</value>
   </data>
   <data name="Web_Settings_Data_RefreshStatus" xml:space="preserve">
     <value>Refresh status</value>

@@ -2,6 +2,7 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject AssetProvider Icons
+@inject NavigationManager Nav
 
 <div class="detail-section">
     <span class="detail-label">@R("Web_Settings_Data_Title")</span>
@@ -10,6 +11,12 @@
         <div class="service-info"><span class="service-name">SMB / CIFS</span><span class="service-status service-status--@VM.SmbStatus.ToLowerInvariant()">@StatusLabel(VM.SmbStatus)</span></div>
         <label class="toggle-switch" title="@R("Web_Settings_Data_SmbToggle")"><input type="checkbox" @bind="VM.SmbEnabled" /><span class="toggle-slider"></span></label>
     </div>
+    <div class="service-row">
+        <div class="service-info"><span class="service-name">WebDAV</span><span class="service-status service-status--@VM.WebDavStatus.ToLowerInvariant()">@StatusLabel(VM.WebDavStatus)</span></div>
+        <label class="toggle-switch" title="@R("Web_Settings_Data_WebDavToggle")"><input type="checkbox" @bind="VM.WebDavEnabled" /><span class="toggle-slider"></span></label>
+    </div>
+    <label class="pw-rule"><input type="checkbox" @bind="VM.WebDavRequireHttps" /><span>@R("Web_Settings_Data_WebDavRequireHttps")</span></label>
+    <p class="settings-description">@R("Web_Settings_Data_WebDavUrl"): <code>@SettingsViewModel.BuildWebDavUrl(Nav.BaseUri)</code></p>
     <div class="settings-row settings-actions">
         <button class="btn-primary" @onclick="SaveServices">@Resources.Web_Settings_Button_Save</button>
         <button class="btn-icon" title="@R("Web_Settings_Data_RefreshStatus")" @onclick="Refresh"><span>@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</span></button>

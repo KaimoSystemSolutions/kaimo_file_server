@@ -14,6 +14,7 @@ using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components;
 using Kaimo_File_Server.Web.Components.ViewModels;
+using Kaimo_File_Server.Web.Controllers.WebDav;
 using Kaimo_File_Server.Web.Middleware;
 using Kaimo_File_Server.Web.Services;
 using Kaimo_File_Server.Web.Services.Api;
@@ -116,8 +117,43 @@ var apiJwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "KaimoFileServer";
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
+    {
         options.TokenValidationParameters =
-            JwtTokenService.CreateValidationParameters(apiJwtSecret, apiJwtIssuer));
+            JwtTokenService.CreateValidationParameters(apiJwtSecret, apiJwtIssuer);
+        // On /dav the WebDAV Basic scheme owns the 401 challenge (Basic realm only —
+        // the Windows redirector aborts a mount offered a scheme it cannot satisfy),
+        // so the bearer handler must not also add a `WWW-Authenticate: Bearer` header
+        // there. Bearer authentication itself still works on /dav.
+        options.Events = new JwtBearerEvents
+        {
+            OnChallenge = context =>
+            {
+                if (context.Request.Path.StartsWithSegments(WebDavPathResolver.Prefix))
+                    context.HandleResponse();
+                return Task.CompletedTask;
+            }
+        };
+    })
+    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, WebDavBasicAuthenticationHandler>(
+        WebDavBasicAuthenticationHandler.SchemeName, _ => { });
+
+// WebDAV runs in-process as a routed branch of this pipeline (see WebDavController).
+// A five-second-cached view of its settings and an in-memory class-2 lock table.
+builder.Services.AddSingleton<WebDavOptions>();
+builder.Services.AddSingleton<WebDavLockManager>();
+
+// Honor X-Forwarded-Proto so `services.webdav.requireHttps` sees the real scheme
+// behind a TLS-terminating reverse proxy. Trust is scoped to the deployment's
+// front proxy (see the admin guide); the known-proxy list is cleared so a
+// containerized proxy on an arbitrary address is honored.
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+        | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Issues/rotates client-API access + refresh tokens.
 builder.Services.AddScoped<ApiTokenService>();
@@ -380,10 +416,20 @@ else
     }
 }
 
+// Resolve the real client scheme/IP from the reverse proxy before anything reads
+// Request.IsHttps (the WebDAV Basic handler's HTTPS requirement depends on it).
+app.UseForwardedHeaders();
+
 // Authenticate/authorize before antiforgery and endpoints so [Authorize] API
 // controllers see the JWT-derived principal. Blazor keeps its own cascading auth.
 app.UseAuthentication();
 app.UseAuthorization();
+
+// While the WebDAV service is switched off, short-circuit /dav with 503 before the
+// endpoint runs. In-process, so no reconciler — the flag is read with a 5s cache.
+app.UseWhen(
+    context => context.Request.Path.StartsWithSegments(WebDavPathResolver.Prefix),
+    branch => branch.UseMiddleware<WebDavEnabledMiddleware>());
 
 app.UseAntiforgery();
 
