@@ -14,7 +14,7 @@
     {
     <div class="service-row">
         <div class="service-info"><span class="service-name">Elasticsearch</span><span class="service-status service-status--@(VM.SearchEsEffective ? "running" : "stopped")">@SearchStatusLabel()</span></div>
-        <label class="toggle-switch" title="@R("Web_Settings_Search_Toggle")"><input type="checkbox" @bind="VM.SearchEsEnabled" /><span class="toggle-slider"></span></label>
+        <label class="toggle-switch" title="@R("Web_Settings_Search_Toggle")"><input type="checkbox" checked="@VM.SearchEsEnabled" @onchange="ToggleEsEnabled" /><span class="toggle-slider"></span></label>
     </div>
     <div class="info-card">
         <div class="info-row"><span class="info-key">@R("Web_Settings_Search_Desired")</span><span class="info-val">@(VM.SearchEsEnabled ? R("Web_Common_Enabled") : R("Web_Common_Disabled"))</span></div>
@@ -31,10 +31,13 @@
     {
         <div class="usage-bar"><div class="usage-bar-fill" style="width: @VM.ReindexProgress.Percent%;"></div></div>
         <p class="settings-hint">@string.Format(R("Web_Settings_Search_Indexing"), VM.ReindexProgress.Done, VM.ReindexProgress.Total, VM.ReindexProgress.Percent)</p>
+        <div class="settings-row settings-actions">
+            <button class="btn-danger-outline" @onclick="CancelReindex">@R("Web_Settings_Search_CancelReindex")</button>
+        </div>
     }
     else if (VM.ReindexProgress.FinishedAt is not null)
     {
-        <p class="settings-hint">@(VM.ReindexProgress.Error is null ? string.Format(R("Web_Settings_Search_LastRunDone"), VM.ReindexProgress.Done, VM.ReindexProgress.Total) : string.Format(R("Web_Settings_Search_LastRunError"), VM.ReindexProgress.Error))</p>
+        <p class="settings-hint">@ReindexResultText()</p>
     }
     <div class="settings-row settings-actions">
         <select class="edit-input settings-select" @bind="VM.ReindexSelectedShare" disabled="@VM.ReindexProgress.Running">
@@ -47,11 +50,61 @@
     }
 </div>
 
+@implements IDisposable
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
     private async Task Save() { await VM.SaveSearchAsync(); StateHasChanged(); }
     private async Task Refresh() { await VM.LoadSearchStateAsync(); StateHasChanged(); }
-    private async Task StartReindex() { await VM.StartReindexAsync(); StateHasChanged(); }
+    private async Task StartReindex() { await VM.StartReindexAsync(); StartPolling(); StateHasChanged(); }
+    private void CancelReindex() { VM.CancelReindex(); StateHasChanged(); }
+    // Mirror the share edit/status/recycle-bin toggles: checked + @onchange instead
+    // of @bind. Only updates the desired flag; it is persisted on the Save button.
+    private void ToggleEsEnabled(ChangeEventArgs e) => VM.SearchEsEnabled = e.Value is true;
     private string SearchStatusLabel() => VM.SearchEsEffective ? R("Web_Settings_Search_StatusActive") : VM.SearchEsEnabled && !VM.SearchEsReachable ? R("Web_Settings_Search_StatusUnreachable") : R("Web_Settings_Search_StatusFilenameMode");
+
+    private string ReindexResultText()
+    {
+        var p = VM.ReindexProgress;
+        if (p.Error is not null) return string.Format(R("Web_Settings_Search_LastRunError"), p.Error);
+        if (p.Canceled) return string.Format(R("Web_Settings_Search_LastRunCanceled"), p.Done, p.Total);
+        return string.Format(R("Web_Settings_Search_LastRunDone"), p.Done, p.Total);
+    }
+
+    // The reindex runs in the background; poll its progress once a second while it
+    // is running so the bar actually moves. Without this the bar only updates on a
+    // manual refresh click. Started here (StartReindex) and when the panel opens
+    // onto an already-running reindex (OnParametersSet); stops itself on completion.
+    private Timer? _pollTimer;
+
+    protected override void OnParametersSet()
+    {
+        if (VM.ReindexProgress.Running) StartPolling();
+    }
+
+    private void StartPolling()
+    {
+        if (_pollTimer is not null) return;
+        _pollTimer = new Timer(async _ =>
+        {
+            try
+            {
+                await InvokeAsync(async () =>
+                {
+                    await VM.RefreshReindexProgressAsync();
+                    StateHasChanged();
+                    if (!VM.ReindexProgress.Running) StopPolling();
+                });
+            }
+            catch { /* circuit torn down mid-tick — nothing to do */ }
+        }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    private void StopPolling()
+    {
+        _pollTimer?.Dispose();
+        _pollTimer = null;
+    }
+
+    public void Dispose() => StopPolling();
 }

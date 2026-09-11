@@ -4008,6 +4008,12 @@
   <data name="Web_Settings_Search_LastRunError" xml:space="preserve">
     <value>Letzter Lauf mit Fehler beendet: {0}</value>
   </data>
+  <data name="Web_Settings_Search_LastRunCanceled" xml:space="preserve">
+    <value>Letzter Lauf abgebrochen: {0} / {1} Dateien indexiert.</value>
+  </data>
+  <data name="Web_Settings_Search_CancelReindex" xml:space="preserve">
+    <value>Indexierung abbrechen</value>
+  </data>
   <data name="Web_Settings_Search_StartReindex" xml:space="preserve">
     <value>Indexierung starten</value>
   </data>

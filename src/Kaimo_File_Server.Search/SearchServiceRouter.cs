@@ -60,6 +60,7 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
     private readonly object _reindexGate = new();
     private ReindexProgress _reindexProgress = ReindexProgress.Idle;
     private Task? _reindexTask;
+    private CancellationTokenSource? _reindexCts;
 
     public SearchServiceRouter(
         ElasticSearchService es,
@@ -329,8 +330,20 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
                 ShareName = shareName
             };
 
-            _reindexTask = Task.Run(() => RunReindexAsync(shareName));
+            _reindexCts?.Dispose();
+            _reindexCts = new CancellationTokenSource();
+            var token = _reindexCts.Token;
+            _reindexTask = Task.Run(() => RunReindexAsync(shareName, token));
             return true;
+        }
+    }
+
+    public void CancelReindex()
+    {
+        lock (_reindexGate)
+        {
+            if (_reindexProgress.Running)
+                _reindexCts?.Cancel();
         }
     }
 
@@ -340,14 +353,19 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
             return _reindexProgress;
     }
 
-    private async Task RunReindexAsync(string? shareName = null)
+    private async Task RunReindexAsync(string? shareName, CancellationToken ct)
     {
         var started = DateTime.UtcNow;
         try
         {
-            await EnsureEsInitializedAsync(CancellationToken.None);
+            await EnsureEsInitializedAsync(ct);
 
-            var progress = new Progress<(int done, int total)>(p =>
+            // SYNCHRONOUS on purpose: Progress<T> posts its callbacks to the thread
+            // pool, so a late "100%" callback could land AFTER the completion block
+            // below and flip Running back to true — leaving the bar stuck at 100%.
+            // SyncProgress applies each update inline, in order, so all reports are
+            // done before ReindexAllAsync returns and the completion block wins.
+            var progress = new SyncProgress<(int done, int total)>(p =>
             {
                 lock (_reindexGate)
                 {
@@ -362,7 +380,7 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
                 }
             });
 
-            await _es.ReindexAllAsync(progress, CancellationToken.None, shareName);
+            await _es.ReindexAllAsync(progress, ct, shareName);
 
             lock (_reindexGate)
             {
@@ -373,6 +391,24 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
                     Total = _reindexProgress.Total,
                     StartedAt = started,
                     FinishedAt = DateTime.UtcNow,
+                    ShareName = shareName
+                };
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // User-requested stop — not an error. Keep the progress reached so far
+            // and mark it as canceled for the settings page.
+            lock (_reindexGate)
+            {
+                _reindexProgress = new ReindexProgress
+                {
+                    Running = false,
+                    Done = _reindexProgress.Done,
+                    Total = _reindexProgress.Total,
+                    StartedAt = started,
+                    FinishedAt = DateTime.UtcNow,
+                    Canceled = true,
                     ShareName = shareName
                 };
             }
@@ -394,5 +430,18 @@ public sealed class SearchServiceRouter : ISearchService, ISearchAdminService
                 };
             }
         }
+    }
+
+    /// <summary>
+    /// An <see cref="IProgress{T}"/> that invokes its handler synchronously on the
+    /// calling thread, unlike <see cref="Progress{T}"/> which posts to the thread
+    /// pool. Guarantees progress updates are applied in order and before the
+    /// reporting method returns — see the note at the call site.
+    /// </summary>
+    private sealed class SyncProgress<T> : IProgress<T>
+    {
+        private readonly Action<T> _handler;
+        public SyncProgress(Action<T> handler) => _handler = handler;
+        public void Report(T value) => _handler(value);
     }
 }

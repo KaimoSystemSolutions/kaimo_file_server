@@ -567,7 +567,11 @@ public class ElasticSearchService : ISearchService
                         sh => sh.Match(m => m
                             .Field("content.std")
                             .Query(searchText)
-                            .Fuzziness(new Fuzziness("AUTO"))
+                            // AUTO:5,8 — no fuzziness below 5 chars. Plain "AUTO"
+                            // (=AUTO:3,6) allows 1 edit already at 3 chars, which on
+                            // a 3-letter word matches most of the vocabulary and
+                            // produces hits with no visible relation to the query.
+                            .Fuzziness(new Fuzziness("AUTO:5,8"))
                             .Boost(2)
                         )
                     )
@@ -813,8 +817,11 @@ public class ElasticSearchService : ISearchService
             }
 
             done++;
-            if (done % 25 == 0 || done == total)
-                progress?.Report((done, total));
+            // Report every item: indexing a single large file (content extraction
+            // + ES round-trip) can take seconds, so a coarser interval would leave
+            // the progress bar frozen between updates. The report only sets an
+            // in-memory field, so per-item cost is negligible.
+            progress?.Report((done, total));
         }
 
         foreach (var directory in dirs)
@@ -833,8 +840,7 @@ public class ElasticSearchService : ISearchService
             }
 
             done++;
-            if (done % 25 == 0 || done == total)
-                progress?.Report((done, total));
+            progress?.Report((done, total));
         }
 
         _logger.LogDebug(

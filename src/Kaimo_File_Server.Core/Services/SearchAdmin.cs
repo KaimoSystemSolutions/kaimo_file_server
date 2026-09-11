@@ -46,6 +46,9 @@ public sealed class ReindexProgress
     public DateTime? FinishedAt { get; init; }
     public string? Error { get; init; }
 
+    /// <summary>True when the run was stopped by the user (not an error, not a full pass).</summary>
+    public bool Canceled { get; init; }
+
     /// <summary>Share this run is scoped to; null/empty means all shares.</summary>
     public string? ShareName { get; init; }
 
@@ -74,6 +77,13 @@ public interface ISearchAdminService
     /// unreachable) or a reindex is already running.
     /// </summary>
     Task<bool> TryStartReindexAsync(string? shareName = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Requests cancellation of the currently running reindex, if any. Returns
+    /// immediately; the run stops at its next file/directory boundary and reports
+    /// its progress as <see cref="ReindexProgress.Canceled"/>.
+    /// </summary>
+    void CancelReindex();
 
     /// <summary>Current/last reindex progress (in-memory, process-local).</summary>
     ReindexProgress GetReindexProgress();

@@ -789,6 +789,15 @@ public class SettingsViewModel
         return Task.CompletedTask;
     }
 
+    /// <summary>Requests cancellation of the running reindex. The run stops at its
+    /// next file/directory boundary; the poll reflects the canceled state.</summary>
+    public void CancelReindex()
+    {
+        if (!CanManageSettings) return;
+        _searchAdmin.CancelReindex();
+        ReindexProgress = _searchAdmin.GetReindexProgress();
+    }
+
     public async Task<bool> SaveSearchAsync()
     {
         ErrorMessage = null;

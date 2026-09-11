@@ -39,49 +39,10 @@
     color: var(--danger, #d14343);
 }
 
-/* -- Toggle Switch (mirrors UserList styling) -- */
-
-.settings-page ::deep .toggle-switch {
-    position: relative;
-    width: 40px;
-    height: 22px;
-    flex-shrink: 0;
-}
-
-    .settings-page ::deep .toggle-switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-    }
-
-.settings-page ::deep .toggle-slider {
-    position: absolute;
-    cursor: pointer;
-    inset: 0;
-    background: var(--bg-active);
-    border-radius: var(--radius-surface);
-    transition: background 0.2s;
-}
-
-    .settings-page ::deep .toggle-slider::before {
-        content: "";
-        position: absolute;
-        height: 16px;
-        width: 16px;
-        left: 3px;
-        bottom: 3px;
-        background: white;
-        border-radius: 50%;
-        transition: transform 0.2s;
-    }
-
-.settings-page ::deep .toggle-switch input:checked + .toggle-slider {
-    background: var(--accent);
-}
-
-    .settings-page ::deep .toggle-switch input:checked + .toggle-slider::before {
-        transform: translateX(18px);
-    }
+/* Toggle switches use the shared global .toggle-switch styles in app.css (same as share
+   settings); the former scoped ::deep copy conflicted with the global rule and misaligned
+   the knob when checked (round knob sliding out to the bottom-right instead of the squared
+   knob centered vertically). */
 
 /* -- Context-menu builder (single checkbox list) -- */
 

@@ -39,8 +39,8 @@
                 <div class="job-menu-list">
                     @if (ReindexRunning)
                     {
-                        @* Process-wide reindex (started by any admin), read-only for
-                           anyone with system-settings rights. Not cancellable here. *@
+                        @* Process-wide reindex (started by any admin), visible to
+                           anyone with system-settings rights — who may also cancel it. *@
                         <article class="job-menu-item">
                             <div class="job-menu-item-heading">
                                 <div>
@@ -49,12 +49,20 @@
                                         Text("Web_Settings_Search_Indexing", "Indexing… {0} / {1} ({2} %)"),
                                         _reindex.Done, _reindex.Total, _reindex.Percent)</small>
                                 </div>
+                                <button class="job-cancel"
+                                        type="button"
+                                        disabled="@_reindexCancelRequested"
+                                        title="@Text("Web_Jobs_Cancel", "Cancel job")"
+                                        aria-label="@Text("Web_Jobs_Cancel", "Cancel job")"
+                                        @onclick="CancelReindex">
+                                    @Assets.SVG("close.svg", new SvgOptions(Width: 13, Height: 13, StrokeWidth: 2))
+                                </button>
                             </div>
                             <div class="job-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@_reindex.Percent">
                                 <div class="job-progress-fill" style="width: @(_reindex.Percent)%"></div>
                             </div>
                             <div class="job-menu-meta">
-                                <span>@(_reindex.Percent)%</span>
+                                <span>@(_reindexCancelRequested ? Text("Web_Jobs_Cancelling", "Cancelling…") : $"{_reindex.Percent}%")</span>
                                 @if (_reindex.StartedAt is not null)
                                 {
                                     <span>@_reindex.StartedAt.Value.ToLocalTime().ToString("t")</span>
@@ -137,6 +145,10 @@
     private bool _isOpen;
     private ReindexProgress _reindex = ReindexProgress.Idle;
     private (bool Running, int Done, int Total) _reindexSig;
+    // Local "cancel clicked" flag for immediate UI feedback: the reindex has no
+    // per-request signal and keeps Running=true until it stops at the next
+    // file/directory boundary. Reset once the run is no longer running.
+    private bool _reindexCancelRequested;
 
     // The reindex reports progress into an in-memory record, not through an event,
     // so a light timer polls it. GetReindexProgress is a cheap in-memory read; we
@@ -173,6 +185,7 @@
 
         _reindex = p;
         _reindexSig = sig;
+        if (!p.Running) _reindexCancelRequested = false;
         _ = InvokeAsync(StateHasChanged);
     }
 
@@ -182,6 +195,14 @@
 
     // Menu and toast cancellation both target the same registered job id.
     private void Cancel(string id) => JobService.Cancel(id);
+
+    // Requests cancellation of the process-wide reindex; the row updates via the
+    // poll once the run stops. Only reachable for users who can see the row.
+    private void CancelReindex()
+    {
+        SearchAdmin.CancelReindex();
+        _reindexCancelRequested = true;
+    }
 
     // Job notifications are thread-agnostic; InvokeAsync safely returns rendering
     // to the component's synchronization context.
