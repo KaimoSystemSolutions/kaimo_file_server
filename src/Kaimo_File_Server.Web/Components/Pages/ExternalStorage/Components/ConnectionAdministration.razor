@@ -65,10 +65,12 @@ else
                 <div class="connection-list-header" aria-hidden="true">
                     <span>@R("Web_ExternalStorage_Name")</span>
                     <span>@R("Web_ExternalStorage_State")</span>
-                    <span>@R("Web_ExternalStorage_Usage")</span>
+                    <span>@R("Web_ExternalStorage_Tab_Syncs")</span>
+                    <span>@R("Web_Shares_VirtualShares")</span>
                 </div>
                 @foreach (var connection in VM.Connections)
                 {
+                    var usage = Usage(connection.Id);
                     <button class="connection-row @(_selected?.Id == connection.Id ? "connection-row--selected" : "")" type="button" @onclick="() => SelectConnection(connection)">
                         <span class="connection-name">
                             <span class="connection-provider-icon" style="color: @ProviderColor(connection.ProviderId)">@Assets.SVG(ProviderIcon(connection.ProviderId), new SvgOptions(Width: 18, Height: 18))</span>
@@ -78,7 +80,8 @@ else
                             </span>
                         </span>
                         <StatusBadge Tone="@StateTone(connection.State)" Class="connection-state" Label="@StateName(connection.State)" />
-                        <span class="connection-usage">@UsageSummary(connection.Id)</span>
+                        <span class="connection-usage">@usage.SyncCount</span>
+                        <span class="connection-usage">@usage.VirtualShareCount</span>
                     </button>
                 }
             </div>
@@ -391,11 +394,6 @@ else
         _departmentId = Guid.Empty;
     }
     private StorageConnectionUsage Usage(Guid id) => VM.ConnectionUsage.GetValueOrDefault(id) ?? new StorageConnectionUsage(0, 0);
-    private string UsageSummary(Guid id)
-    {
-        var usage = Usage(id);
-        return $"{usage.SyncCount} / {usage.VirtualShareCount}";
-    }
     private string ProviderName(string id) => ProviderCatalog.TryGet(id, out var provider) ? provider.DisplayName : id;
     private static string ProviderIcon(string id) => id.ToLowerInvariant() switch
     {

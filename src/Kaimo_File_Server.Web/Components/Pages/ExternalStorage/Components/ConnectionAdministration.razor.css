@@ -323,10 +323,14 @@
     background: var(--bg-secondary);
 }
 
+/* fr tracks (never `auto`) so column boundaries line up across every row —
+   each row is its own grid, so an auto-sized column sizes to that row's own
+   content and shifts the state badge and counts. Columns: name, state, syncs,
+   virtual shares. */
 .connection-list-header,
 .connection-row {
     display: grid;
-    grid-template-columns: minmax(190px, 1fr) minmax(130px, auto) minmax(72px, auto);
+    grid-template-columns: minmax(190px, 2.2fr) minmax(120px, 1.2fr) minmax(64px, 1fr) minmax(96px, 1fr);
     align-items: center;
     gap: 14px;
 }
@@ -418,7 +422,7 @@
 .connection-usage {
     color: var(--text-secondary);
     font-size: 12px;
-    text-align: right;
+    text-align: left;
 }
 
 .connection-detail {
