@@ -3,6 +3,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Clouds;
 
 namespace Kaimo_File_Server.Core.Services.DataServices;
@@ -108,17 +109,26 @@ public interface ICloudConnection
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        // The size pre-scan already walks the remote tree; capture every listing
+        // it produces so reconciliation reuses them instead of re-listing the
+        // whole remote tree a second time (one network round-trip per directory).
+        // ponytail: holds the full remote tree's metadata in memory for the run;
+        // fuse listing and reconciliation into one streaming walk if that ever
+        // matters on very large trees.
+        var remoteListings = new Dictionary<string, IReadOnlyList<CloudItemMeta>>(
+            StringComparer.OrdinalIgnoreCase);
         long totalBytes = mode switch
         {
             SyncMode.Push => await Guard(SyncEndpoint.Local,
                 () => fileService.GetDirectorySizeAsync(localPath, user)),
             SyncMode.Pull => await Guard(SyncEndpoint.Remote,
-                () => GetDirectorySizeAsync(remotePath, cancellationToken)),
+                () => ListRemoteTreeAsync(remotePath, remoteListings, cancellationToken)),
             SyncMode.TwoWay => Math.Max(
                 await Guard(SyncEndpoint.Local,
                     () => fileService.GetDirectorySizeAsync(localPath, user)),
                 await Guard(SyncEndpoint.Remote,
-                    () => GetDirectorySizeAsync(remotePath, cancellationToken))),
+                    () => ListRemoteTreeAsync(remotePath, remoteListings, cancellationToken))),
             _ => 0
         };
 
@@ -154,11 +164,42 @@ public interface ICloudConnection
             applyDeletions ? previousManifest : null,
             newManifest,
             failures,
+            remoteListings,
             isRoot: true,
             cancellationToken
             );
 
         return newManifest;
+    }
+
+    /// <summary>
+    /// Recursively lists the remote tree once, caching every directory's listing
+    /// by path and returning the total byte size. Replaces a separate size-only
+    /// walk so reconciliation can reuse these listings instead of re-listing the
+    /// whole remote tree, halving remote metadata round-trips on pull/two-way.
+    /// </summary>
+    private async Task<long> ListRemoteTreeAsync(
+        string remoteDir,
+        IDictionary<string, IReadOnlyList<CloudItemMeta>> cache,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        // Match the exact path SyncDirectory lists and looks up by, so the cache
+        // hits: the trimmed directory at the root and "{dir}/{name}" for children,
+        // never the provider's own item.Path (which may be normalized differently).
+        string dir = remoteDir.TrimEnd('/');
+        var items = await ListAsync(dir, cancellationToken);
+        cache[dir] = items;
+
+        long total = 0;
+        foreach (var item in items)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            total += item.IsDirectory
+                ? await ListRemoteTreeAsync($"{dir}/{item.Name}", cache, cancellationToken)
+                : item.Size;
+        }
+        return total;
     }
 
     /// <summary>
@@ -218,6 +259,7 @@ public interface ICloudConnection
         SyncManifest? previousManifest,
         SyncManifest? newManifest,
         ICollection<SyncFailure>? failures,
+        IReadOnlyDictionary<string, IReadOnlyList<CloudItemMeta>> remoteListings,
         bool isRoot,
         CancellationToken cancellationToken
         )
@@ -232,8 +274,14 @@ public interface ICloudConnection
         Dictionary<string, FileMetadata> localItems;
         try
         {
-            remoteItems = (await Guard(SyncEndpoint.Remote,
-                    () => ListAsync(remoteDir, cancellationToken)))
+            // The size pre-scan already listed the remote tree; reuse its snapshot
+            // so this directory is not fetched from the provider a second time.
+            // A cache miss (e.g. a subtree created remotely mid-run) falls back to
+            // a live listing so nothing is skipped.
+            remoteItems = (remoteListings.TryGetValue(remoteDir, out var cachedRemote)
+                    ? cachedRemote
+                    : await Guard(SyncEndpoint.Remote,
+                        () => ListAsync(remoteDir, cancellationToken)))
                 .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
 
             localItems = (await Guard(SyncEndpoint.Local,
@@ -367,6 +415,7 @@ public interface ICloudConnection
                             previousManifest,
                             newManifest,
                             failures,
+                            remoteListings,
                             isRoot: false,
                             cancellationToken);
                     }
@@ -398,6 +447,7 @@ public interface ICloudConnection
                     previousManifest,
                     newManifest,
                     failures,
+                    remoteListings,
                     isRoot: false,
                     cancellationToken);
 
@@ -487,9 +537,10 @@ public interface ICloudConnection
 
     /// <summary>
     /// Downloads one remote file to the local endpoint with a transient-fault
-    /// retry. The payload is spilled to a self-deleting temp file rather than
-    /// buffered in memory, so an extremely large file cannot exhaust the process
-    /// heap. Returns true only when the download succeeded.
+    /// retry. The payload streams straight through an <see cref="IFileSession"/>
+    /// write handle, so it is written to local storage exactly once (no temp-file
+    /// round-trip) while staying bounded in memory. Returns true only when the
+    /// download succeeded.
     /// </summary>
     private async Task<bool> PullFileAsync(
         IFileService fileService,
@@ -507,20 +558,22 @@ public interface ICloudConnection
         syncProgress.Update($"Pulling {displayName}...");
         bool ok = await TryTransferAsync(failures, localChild, SyncFailureOperation.Download, async () =>
         {
-            // ponytail: temp-file spill (seekable, bounded memory); a true stream
-            // without the second write needs an OpenWrite API on IFileService.
-            await using var raw = new FileStream(
-                Path.GetTempFileName(),
-                FileMode.Create, FileAccess.ReadWrite, FileShare.None,
-                4096, FileOptions.DeleteOnClose | FileOptions.Asynchronous);
-            await using var ms = options.LimitDownload(raw);
-            await DownloadAsync(remoteChild, ms, cancellationToken);
-
-            ms.Position = 0;
+            // Open a write handle and stream the download directly into it. The
+            // session's dispose runs the same versioning/ownership/change-log and
+            // search-index hooks as WriteFileAsync, so behavior is preserved.
+            var open = await fileService.OpenAsync(
+                localChild, OpenMode.CreateOrTruncate, AccessIntent.Write, ShareIntent.None,
+                user, cancellationToken);
+            await using var session = open.Session;
+            await using (var sink = options.LimitDownload(new FileSessionWriteStream(session)))
+            {
+                await DownloadAsync(remoteChild, sink, cancellationToken);
+                await sink.FlushAsync(cancellationToken);
+            }
             cancellationToken.ThrowIfCancellationRequested();
-            await fileService.WriteFileAsync(localChild, ms, user);
-            cancellationToken.ThrowIfCancellationRequested();
-            await fileService.SetModifiedAtAsync(localChild, user, modifiedAt);
+            // Stamp the source modification time so pull change-detection keeps
+            // working on the next run (mirrors the former SetModifiedAtAsync call).
+            await session.SetTimesAsync(new FileTimes(null, modifiedAt, null), cancellationToken);
         }, cancellationToken);
 
         if (ok)
@@ -705,4 +758,44 @@ public sealed class SyncDirectoryMissingException(SyncEndpoint endpoint, Excepti
         innerException)
 {
     public SyncEndpoint Endpoint { get; } = endpoint;
+}
+
+/// <summary>
+/// Forward-only write stream that funnels a download straight into an
+/// <see cref="IFileSession"/> at increasing offsets, so a pulled file is written
+/// to local storage once with no intermediate buffer. It never disposes the
+/// session: the caller owns the session's lifetime (and its close-time hooks).
+/// </summary>
+internal sealed class FileSessionWriteStream(IFileSession session) : Stream
+{
+    private long _position;
+
+    public override bool CanRead => false;
+    public override bool CanSeek => false;
+    public override bool CanWrite => true;
+    public override long Length => _position;
+    public override long Position { get => _position; set => throw new NotSupportedException(); }
+
+    public override async ValueTask WriteAsync(
+        ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        if (buffer.IsEmpty) return;
+        await session.WriteAsync(_position, buffer, cancellationToken);
+        _position += buffer.Length;
+    }
+
+    public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        => WriteAsync(new ReadOnlyMemory<byte>(buffer, offset, count), cancellationToken).AsTask();
+
+    public override void Write(byte[] buffer, int offset, int count)
+        => WriteAsync(new ReadOnlyMemory<byte>(buffer, offset, count)).AsTask().GetAwaiter().GetResult();
+
+    public override Task FlushAsync(CancellationToken cancellationToken)
+        => session.FlushAsync(cancellationToken).AsTask();
+
+    public override void Flush() => FlushAsync(CancellationToken.None).GetAwaiter().GetResult();
+
+    public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
 }

@@ -224,6 +224,47 @@ public sealed class CloudSyncReconciliationTests
         Assert.Empty(failures);
     }
 
+    [Fact]
+    public async Task Pull_NewerRemoteFile_StreamsBytesAndModifiedTimeLocally()
+    {
+        var remote = new InMemoryRemote();
+        remote.PutFile("/a.txt", "remote-content", Time(20));
+        var local = new InMemoryFileService();
+        local.PutFile("a.txt", "stale", Time(10)); // older: must be overwritten
+
+        var options = new CloudSyncTransferOptions(new CloudSyncAdvancedSettings());
+
+        await ((ICloudConnection)remote).SyncAsync(
+            local, User, RemoteRoot, LocalRoot, SyncMode.Pull, options,
+            previousManifest: null);
+
+        // The download streamed straight through the write session: content and
+        // the source modification time both land locally.
+        Assert.Equal("remote-content", local.ReadText("a.txt"));
+        Assert.Equal(Time(20), local.GetModified("a.txt"));
+    }
+
+    [Fact]
+    public async Task Pull_ListsEachRemoteDirectoryOnce()
+    {
+        var remote = new InMemoryRemote();
+        remote.PutFile("/root.txt", "r", Time(10));
+        remote.PutDir("/sub");
+        remote.PutFile("/sub/child.txt", "c", Time(10));
+        var local = new InMemoryFileService();
+
+        var options = new CloudSyncTransferOptions(new CloudSyncAdvancedSettings());
+
+        await ((ICloudConnection)remote).SyncAsync(
+            local, User, RemoteRoot, LocalRoot, SyncMode.Pull, options,
+            previousManifest: null);
+
+        // The size pre-scan's listings are reused by reconciliation: each remote
+        // directory is fetched exactly once (was twice before caching).
+        Assert.All(remote.ListCalls.Values, count => Assert.Equal(1, count));
+        Assert.True(local.HasFile("sub/child.txt"));
+    }
+
     private static DateTime Time(int minute) =>
         new(2026, 1, 1, 0, minute, 0, DateTimeKind.Utc);
 
@@ -258,6 +299,8 @@ public sealed class CloudSyncReconciliationTests
 
         public void PutFile(string path, string content, DateTime modified)
             => _files[Normalize(path)] = (System.Text.Encoding.UTF8.GetBytes(content), modified);
+
+        public void PutDir(string path) => _dirs.Add(Normalize(path));
 
         public void RemoveFile(string path) => _files.Remove(Normalize(path));
 
@@ -314,9 +357,13 @@ public sealed class CloudSyncReconciliationTests
             return Task.FromResult(total);
         }
 
+        /// <summary>Counts how often each directory is listed, to prove reconciliation reuses the pre-scan.</summary>
+        public Dictionary<string, int> ListCalls { get; } = new();
+
         public Task<IReadOnlyList<CloudItemMeta>> ListAsync(string path, CancellationToken ct = default)
         {
             string key = Normalize(path);
+            ListCalls[key] = ListCalls.TryGetValue(key, out int n) ? n + 1 : 1;
             var items = new List<CloudItemMeta>();
             foreach (var (file, value) in _files.Where(f => Parent(f.Key) == key))
                 items.Add(new CloudItemMeta(false, NameOf(file), "/" + file, value.Data.Length, value.Modified));
@@ -340,6 +387,11 @@ public sealed class CloudSyncReconciliationTests
         public void RemoveFile(string path) => _files.Remove(Normalize(path));
 
         public bool HasFile(string path) => _files.ContainsKey(Normalize(path));
+
+        public string ReadText(string path)
+            => System.Text.Encoding.UTF8.GetString(_files[Normalize(path)].Data);
+
+        public DateTime GetModified(string path) => _files[Normalize(path)].Modified;
 
         public Task<List<FileMetadata>> ListAsync(string directoryPath, UserContext user)
         {
@@ -423,7 +475,64 @@ public sealed class CloudSyncReconciliationTests
         public Task NotifyExternalDeleteAsync(string path, bool isDirectory) => throw new NotSupportedException();
         public Task NotifyExternalRenameAsync(string oldPath, string newPath, bool isDirectory, Guid sambaLifecycleEventId) => throw new NotSupportedException();
         public Task<HashSet<string>> FilterReadablePathsAsync(IReadOnlyList<(string relativePath, bool isDirectory)> items, UserContext user) => throw new NotSupportedException();
-        public Task<FileOpenResult> OpenAsync(string path, OpenMode mode, AccessIntent intent, ShareIntent share, UserContext user, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<FileOpenResult> OpenAsync(string path, OpenMode mode, AccessIntent intent, ShareIntent share, UserContext user, CancellationToken ct = default)
+        {
+            // The pull path opens a write handle and streams the download into it.
+            // Commit happens on session dispose, mirroring FileSession semantics.
+            var session = new InMemorySession(_files, Normalize(path), user);
+            return Task.FromResult(new FileOpenResult(session, FileOpenStatus.Created));
+        }
+
+        /// <summary>Buffers offset-based writes and commits them to the parent store on dispose.</summary>
+        private sealed class InMemorySession(
+            Dictionary<string, (byte[] Data, DateTime Modified)> files,
+            string key,
+            UserContext user) : IFileSession
+        {
+            private readonly MemoryStream _buffer = new();
+            private DateTime _modified = DateTime.UnixEpoch;
+
+            public string RelativePath => key;
+            public string AbsolutePath => key;
+            public bool IsDirectory => false;
+            public long Length => _buffer.Length;
+            public UserContext User => user;
+            public bool IsReadOnly => false;
+
+            public ValueTask WriteAsync(long offset, ReadOnlyMemory<byte> data, CancellationToken ct = default)
+            {
+                _buffer.Position = offset;
+                _buffer.Write(data.Span);
+                return ValueTask.CompletedTask;
+            }
+
+            public ValueTask SetTimesAsync(FileTimes times, CancellationToken ct = default)
+            {
+                if (times.LastWritten is { } written)
+                    _modified = written;
+                return ValueTask.CompletedTask;
+            }
+
+            public ValueTask SetLengthAsync(long length, CancellationToken ct = default)
+            {
+                _buffer.SetLength(length);
+                return ValueTask.CompletedTask;
+            }
+
+            public ValueTask FlushAsync(CancellationToken ct = default) => ValueTask.CompletedTask;
+
+            public ValueTask DisposeAsync()
+            {
+                files[key] = (_buffer.ToArray(), _modified);
+                return ValueTask.CompletedTask;
+            }
+
+            public ValueTask<int> ReadAsync(long offset, Memory<byte> buffer, CancellationToken ct = default)
+                => throw new NotSupportedException();
+            public ValueTask RenameAsync(string newRelativePath, bool replaceExisting, CancellationToken ct = default)
+                => throw new NotSupportedException();
+            public void MarkDeleteOnClose() => throw new NotSupportedException();
+        }
         public Task<IFileSession> OpenSnapshotAsync(string realPath, DateTime snapshotTimestampUtc, UserContext user, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<List<DateTime>> GetSnapshotTimestampsAsync(UserContext user) => throw new NotSupportedException();
         public Task<List<FileVersion>> GetFileVersionsAsync(string path, UserContext user) => throw new NotSupportedException();
