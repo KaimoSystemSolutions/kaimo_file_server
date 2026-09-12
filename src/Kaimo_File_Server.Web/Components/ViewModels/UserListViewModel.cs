@@ -616,6 +616,14 @@ public class UserListViewModel
             if (await _mgmtAuth.CanManageUserAsync(_actorContext, SelectedUser.Id, ManagementPermission.AssignRoles))
                 await _userRepo.SetRolesForUserAsync(SelectedUser.Id, selectedRoleIds);
 
+            // Admin role <-> Admins group are mirrored. Derive the intended admin state
+            // from what was actually persisted (each list respects its own permission
+            // gate above), then reconcile both representations.
+            var hasAdminRole = (await _userRepo.GetRolesForUserAsync(SelectedUser.Id)).Any(IsAdminRole);
+            var inAdminsGroup = (await _userRepo.GetGroupsForUserAsync(SelectedUser.Id))
+                .Any(g => g.Id == WellKnownGUIDs.GROUP_ADMINS);
+            await ReconcileAdminCouplingAsync(SelectedUser.Id, hasAdminRole || inAdminsGroup);
+
             await LoadTabDataAsync();
             SelectedUser = Users.FirstOrDefault(u => u.Id == SelectedUser.Id);
             if (SelectedUser is not null)
@@ -682,6 +690,15 @@ public class UserListViewModel
             return;
         }
 
+        // Admins membership mirrors the global admin role, so emptying it of enabled
+        // members would strip the last admin. Block that, mirroring the last-admin guard.
+        if (SelectedGroup.Id == WellKnownGUIDs.GROUP_ADMINS
+            && !EditGroupMembers.Any(m => m.IsChecked && m.Item.IsEnabled))
+        {
+            ErrorMessage = Resources.Web_Error_LastAdmin;
+            return;
+        }
+
         try
         {
             IsSaving = true;
@@ -701,7 +718,24 @@ public class UserListViewModel
             }
 
             var selectedUserIds = EditGroupMembers.Where(m => m.IsChecked).Select(m => m.Item.Id).ToList();
-            await _groupRepo.SetMembersAsync(SelectedGroup.Id, selectedUserIds);
+
+            if (SelectedGroup.Id == WellKnownGUIDs.GROUP_ADMINS)
+            {
+                // Full-mirror: every membership change here grants/revokes the admin role.
+                var previousMemberIds = (await _groupRepo.GetMembersAsync(SelectedGroup.Id))
+                    .Select(u => u.Id).ToHashSet();
+                await _groupRepo.SetMembersAsync(SelectedGroup.Id, selectedUserIds);
+
+                foreach (var uid in selectedUserIds)
+                    await ReconcileAdminCouplingAsync(uid, true);
+                foreach (var uid in previousMemberIds.Where(id => !selectedUserIds.Contains(id)))
+                    await ReconcileAdminCouplingAsync(uid, false);
+            }
+            else
+            {
+                await _groupRepo.SetMembersAsync(SelectedGroup.Id, selectedUserIds);
+            }
+
             GroupMembers = (await _groupRepo.GetMembersAsync(SelectedGroup.Id)).OrderBy(u => u.Name).ToList();
 
             IsEditing = false;
@@ -850,6 +884,12 @@ public class UserListViewModel
             await _assignmentRepo.CreateAsync(new ScopedRoleAssignment(
                 NewAssignmentPrincipalId.Value, SelectedRole.Id, NewAssignmentScopeType, scopeId));
 
+            // Granting the global admin role to a USER also puts them in the Admins group.
+            // (A group principal keeps the existing group-inheritance path, untouched.)
+            if (NewAssignmentScopeType == ScopeType.Global && IsAdminRole(SelectedRole)
+                && await _userRepo.GetByIdAsync(NewAssignmentPrincipalId.Value) is not null)
+                await ReconcileAdminCouplingAsync(NewAssignmentPrincipalId.Value, true);
+
             IsAddingAssignment = false;
             await LoadRoleScopedAssignmentsAsync(SelectedRole.Id);
             SuccessMessage = Resources.Web_Assignment_Created;
@@ -890,6 +930,11 @@ public class UserListViewModel
             IsSaving = true;
             ErrorMessage = null;
             await _assignmentRepo.DeleteAsync(assignmentId);
+
+            // Full-mirror: removing a user's global admin role also removes them from Admins.
+            if (assignment.ScopeType == ScopeType.Global && role is not null && IsAdminRole(role)
+                && await _userRepo.GetByIdAsync(assignment.PrincipalId) is not null)
+                await ReconcileAdminCouplingAsync(assignment.PrincipalId, false);
 
             if (SelectedRole is not null) await LoadRoleScopedAssignmentsAsync(SelectedRole.Id);
             if (SelectedUser is not null) await LoadUserScopedAssignmentsAsync(SelectedUser.Id);
@@ -954,6 +999,8 @@ public class UserListViewModel
 
             await _userRepo.CreateAsync(user);
             await _departmentRepo.AddUserAsync(CreateUserDepartmentId.Value, user.Id);
+            // Every user is a member of the global Everyone group.
+            await _groupRepo.AddMemberAsync(WellKnownGUIDs.GROUP_EVERYONE, user.Id);
 
             IsCreatingUser = false;
             await LoadTabDataAsync();
@@ -1088,6 +1135,8 @@ public class UserListViewModel
     public async Task ConfirmDeleteGroupAsync()
     {
         if (SelectedGroup is null || _actorContext is null) return;
+        if (WellKnownGUIDs.PROTECTED_GROUPS.Contains(SelectedGroup.Id))
+        { ErrorMessage = Resources.Web_Error_SystemGroupUndeletable; return; }
         if (!await _mgmtAuth.CanManageGroupAsync(_actorContext, SelectedGroup.Id, ManagementPermission.DeleteGroups))
         { ErrorMessage = Resources.Web_Error_NoPermission; return; }
 
@@ -1308,6 +1357,34 @@ public class UserListViewModel
             }
         }
         return admins;
+    }
+
+    /// <summary>
+    /// Keeps the two admin representations of a user in lockstep (full mirror): a direct
+    /// global <see cref="WellKnownGUIDs.ROLE_ADMIN"/> assignment and membership in the
+    /// Admins group (<see cref="WellKnownGUIDs.GROUP_ADMINS"/>). Both are ensured when
+    /// <paramref name="shouldBeAdmin"/> is true and both are removed when false. Idempotent.
+    /// Callers are responsible for the last-admin guard before revoking.
+    /// </summary>
+    private async Task ReconcileAdminCouplingAsync(Guid userId, bool shouldBeAdmin)
+    {
+        var globalAssignments = await _assignmentRepo.GetByPrincipalAndScopeAsync(
+            userId, ScopeType.Global, Guid.Empty);
+        var adminAssignment = globalAssignments.FirstOrDefault(a => a.RoleId == WellKnownGUIDs.ROLE_ADMIN);
+
+        if (shouldBeAdmin)
+        {
+            if (adminAssignment is null)
+                await _assignmentRepo.CreateAsync(
+                    ScopedRoleAssignment.Global(userId, WellKnownGUIDs.ROLE_ADMIN));
+            await _groupRepo.AddMemberAsync(WellKnownGUIDs.GROUP_ADMINS, userId);
+        }
+        else
+        {
+            if (adminAssignment is not null)
+                await _assignmentRepo.DeleteAsync(adminAssignment.Id);
+            await _groupRepo.RemoveMemberAsync(WellKnownGUIDs.GROUP_ADMINS, userId);
+        }
     }
 
     /// <summary>Whether <paramref name="userId"/> inherits a global FullAdmin role through

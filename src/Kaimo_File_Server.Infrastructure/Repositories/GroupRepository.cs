@@ -1,4 +1,5 @@
 ﻿using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -53,6 +54,15 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         /// <inheritdoc />
         public async Task DeleteAsync(Guid id)
         {
+            // Root-cause guard: the two system groups can never be deleted, on any
+            // write path (UI or future client-sync API). The ViewModel adds a nicer
+            // localized message on top of this.
+            if (WellKnownGUIDs.PROTECTED_GROUPS.Contains(id))
+            {
+                throw new InvalidOperationException(
+                    $"Group {id} is a protected system group and cannot be deleted.");
+            }
+
             await using var db = await dbFactory.CreateDbContextAsync();
 
             var group = await db.Groups.FindAsync(id);
@@ -94,6 +104,29 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             db.UserGroups.RemoveRange(existing);
             db.UserGroups.AddRange(userIds.Select(uId => new UserGroup(uId, groupId)));
             await db.SaveChangesAsync();
+        }
+
+        /// <inheritdoc />
+        public async Task AddMemberAsync(Guid groupId, Guid userId)
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            var exists = await db.UserGroups
+                .AnyAsync(ug => ug.GroupId == groupId && ug.UserId == userId);
+            if (exists) return;
+
+            db.UserGroups.Add(new UserGroup(userId, groupId));
+            await db.SaveChangesAsync();
+        }
+
+        /// <inheritdoc />
+        public async Task RemoveMemberAsync(Guid groupId, Guid userId)
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            await db.UserGroups
+                .Where(ug => ug.GroupId == groupId && ug.UserId == userId)
+                .ExecuteDeleteAsync();
         }
     }
 }

@@ -44,5 +44,15 @@ namespace Kaimo_File_Server.Core.Repositories
         /// Users not in <paramref name="userIds"/> are removed; new ones are added.
         /// </summary>
         Task SetMembersAsync(Guid groupId, List<Guid> userIds);
+
+        /// <summary>
+        /// Adds a single user to a group. Idempotent: a no-op if already a member.
+        /// </summary>
+        Task AddMemberAsync(Guid groupId, Guid userId);
+
+        /// <summary>
+        /// Removes a single user from a group. Idempotent: a no-op if not a member.
+        /// </summary>
+        Task RemoveMemberAsync(Guid groupId, Guid userId);
     }
 }

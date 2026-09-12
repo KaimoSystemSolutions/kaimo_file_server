@@ -792,6 +792,9 @@
   <data name="Web_Error_LastAdmin" xml:space="preserve">
     <value>Der letzte Administrator kann nicht entfernt werden — mindestens ein aktivierter globaler Administrator muss bestehen bleiben.</value>
   </data>
+  <data name="Web_Error_SystemGroupUndeletable" xml:space="preserve">
+    <value>Dies ist eine Systemgruppe und kann nicht gelöscht werden.</value>
+  </data>
   <data name="Web_Error_AccessDenied" xml:space="preserve">
     <value>Zugriff verweigert.</value>
   </data>

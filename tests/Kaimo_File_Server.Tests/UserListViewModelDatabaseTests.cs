@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
@@ -645,5 +646,171 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
         await sut.SaveUserAsync();
 
         Assert.NotEqual(Resources.Web_Error_LastAdmin, sut.ErrorMessage);
+    }
+
+    // ═══════════════════ Admin role <-> Admins group coupling ═══════════════════
+
+    // The coupling keys on the canonical well-known ids, so tests seed those.
+    private Role SeedWellKnownAdminRole()
+    {
+        var role = new Role(WellKnownGUIDs.ROLE_ADMIN, "Administrator", ManagementPermission.FullAdmin, true);
+        using var db = NewContext();
+        db.Roles.Add(role);
+        db.SaveChanges();
+        return role;
+    }
+
+    private Group SeedGroupWithId(Guid id, string name)
+    {
+        var group = new Group(id, name);
+        using var db = NewContext();
+        db.Groups.Add(group);
+        db.SaveChanges();
+        return group;
+    }
+
+    [Fact]
+    public async Task SaveUserAsync_GrantAdminRole_AddsUserToAdminsGroup()
+    {
+        var actor = SeedUser("admin");
+        var adminRole = SeedWellKnownAdminRole();
+        SeedGroupWithId(WellKnownGUIDs.GROUP_ADMINS, "Admins");
+        var target = SeedUser("bob");
+
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SelectUserAsync(sut.Users.Single(u => u.Id == target.Id));
+        await sut.StartEditUserAsync();
+        foreach (var r in sut.EditUserRoles) r.IsChecked = r.Item.Id == adminRole.Id;
+        await sut.SaveUserAsync();
+
+        await using var db = NewContext();
+        Assert.True(await db.UserGroups.AnyAsync(
+            ug => ug.UserId == target.Id && ug.GroupId == WellKnownGUIDs.GROUP_ADMINS));
+    }
+
+    [Fact]
+    public async Task SaveGroupAsync_AddUserToAdmins_GrantsAdminRole()
+    {
+        var actor = SeedUser("admin");
+        SeedWellKnownAdminRole();
+        SeedGroupWithId(WellKnownGUIDs.GROUP_ADMINS, "Admins");
+        var target = SeedUser("bob");
+
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.SwitchTabAsync(AdminTab.Groups);
+        await sut.LoadAsync();
+        await sut.SwitchTabAsync(AdminTab.Groups);
+        await sut.SelectGroupAsync(sut.Groups.Single(g => g.Id == WellKnownGUIDs.GROUP_ADMINS));
+        await sut.StartEditGroupAsync();
+        foreach (var m in sut.EditGroupMembers) m.IsChecked = m.Item.Id == target.Id;
+        await sut.SaveGroupAsync();
+
+        await using var db = NewContext();
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a =>
+            a.PrincipalId == target.Id && a.RoleId == WellKnownGUIDs.ROLE_ADMIN
+            && a.ScopeType == ScopeType.Global));
+    }
+
+    [Fact]
+    public async Task DeleteAssignmentAsync_RemoveAdminRole_RemovesUserFromAdminsGroup()
+    {
+        // Two admins so the last-admin guard permits the removal; both are consistent
+        // (direct role assignment + Admins membership) as the runtime keeps them.
+        var actor = SeedUser("admin");
+        var admin2 = SeedUser("admin2");
+        var adminRole = SeedWellKnownAdminRole();
+        SeedGroupWithId(WellKnownGUIDs.GROUP_ADMINS, "Admins");
+        SeedGlobalAssignment(actor.Id, adminRole.Id);
+        SeedGroupMember(WellKnownGUIDs.GROUP_ADMINS, actor.Id);
+        var a2 = SeedGlobalAssignment(admin2.Id, adminRole.Id);
+        SeedGroupMember(WellKnownGUIDs.GROUP_ADMINS, admin2.Id);
+
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SwitchTabAsync(AdminTab.Roles);
+        await sut.SelectRoleAsync(sut.Roles.Single(r => r.Id == adminRole.Id));
+        await sut.DeleteAssignmentAsync(a2.Id);
+
+        Assert.NotEqual(Resources.Web_Error_LastAdmin, sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.False(await db.UserGroups.AnyAsync(
+            ug => ug.UserId == admin2.Id && ug.GroupId == WellKnownGUIDs.GROUP_ADMINS));
+    }
+
+    [Fact]
+    public async Task SaveGroupAsync_EmptyingAdminsGroup_IsBlocked()
+    {
+        var actor = SeedUser("admin");
+        var adminRole = SeedWellKnownAdminRole();
+        SeedGroupWithId(WellKnownGUIDs.GROUP_ADMINS, "Admins");
+        SeedGlobalAssignment(actor.Id, adminRole.Id);
+        SeedGroupMember(WellKnownGUIDs.GROUP_ADMINS, actor.Id);
+
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.SwitchTabAsync(AdminTab.Groups);
+        await sut.LoadAsync();
+        await sut.SwitchTabAsync(AdminTab.Groups);
+        await sut.SelectGroupAsync(sut.Groups.Single(g => g.Id == WellKnownGUIDs.GROUP_ADMINS));
+        await sut.StartEditGroupAsync();
+        foreach (var m in sut.EditGroupMembers) m.IsChecked = false; // try to remove everyone
+        await sut.SaveGroupAsync();
+
+        Assert.Equal(Resources.Web_Error_LastAdmin, sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.True(await db.UserGroups.AnyAsync(
+            ug => ug.GroupId == WellKnownGUIDs.GROUP_ADMINS && ug.UserId == actor.Id));
+    }
+
+    // ═══════════════════ Everyone membership on create ═══════════════════
+
+    [Fact]
+    public async Task CreateUserAsync_AddsUserToEveryoneGroup()
+    {
+        var actor = SeedUser("admin");
+        var dept = SeedDepartment("Sales");
+        SeedGroupWithId(WellKnownGUIDs.GROUP_EVERYONE, "Everyone");
+
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        sut.CreateUserName = "Dana";
+        sut.CreateUserUsername = "dana";
+        sut.CreateUserPassword = "Passw0rd!";
+        sut.CreateUserDepartmentId = dept.Id;
+        await sut.CreateUserAsync();
+
+        await using var db = NewContext();
+        var dana = await db.Users.SingleAsync(u => u.Username == "dana");
+        Assert.True(await db.UserGroups.AnyAsync(
+            ug => ug.UserId == dana.Id && ug.GroupId == WellKnownGUIDs.GROUP_EVERYONE));
+    }
+
+    // ═══════════════════ Protected (undeletable) system groups ═══════════════════
+
+    [Fact]
+    public async Task ConfirmDeleteGroupAsync_SystemGroup_IsBlocked()
+    {
+        var actor = SeedUser("admin");
+        SeedGroupWithId(WellKnownGUIDs.GROUP_ADMINS, "Admins");
+
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.SwitchTabAsync(AdminTab.Groups);
+        await sut.LoadAsync();
+        await sut.SwitchTabAsync(AdminTab.Groups);
+        await sut.SelectGroupAsync(sut.Groups.Single(g => g.Id == WellKnownGUIDs.GROUP_ADMINS));
+        await sut.ConfirmDeleteGroupAsync();
+
+        Assert.Equal(Resources.Web_Error_SystemGroupUndeletable, sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.True(await db.Groups.AnyAsync(g => g.Id == WellKnownGUIDs.GROUP_ADMINS));
+    }
+
+    [Fact]
+    public async Task GroupRepository_DeleteAsync_ProtectedGroup_Throws()
+    {
+        SeedGroupWithId(WellKnownGUIDs.GROUP_EVERYONE, "Everyone");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => GroupRepo().DeleteAsync(WellKnownGUIDs.GROUP_EVERYONE));
     }
 }

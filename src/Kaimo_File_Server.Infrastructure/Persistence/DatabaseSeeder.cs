@@ -80,6 +80,9 @@ public class DatabaseSeeder
             await SeedBootstrapAdminAsync();
         }
 
+        // Runs after all users exist, so it covers seeded, bootstrapped and pre-existing users.
+        await BackfillEveryoneMembershipAsync();
+
         await SeedConfigAsync();
     }
 
@@ -126,6 +129,9 @@ public class DatabaseSeeder
 
         db.ScopedRoleAssignments.Add(
             ScopedRoleAssignment.Global(admin.Id, adminRole.Id));
+        // Mirror the admin role into the Admins group (the coupling invariant the runtime
+        // enforces). Everyone membership is handled by the backfill at the end of seeding.
+        db.UserGroups.Add(new UserGroup(admin.Id, WellKnownGUIDs.GROUP_ADMINS));
         await db.SaveChangesAsync();
 
         if (generated)
@@ -245,8 +251,12 @@ public class DatabaseSeeder
         "Developers", "Backend-Team", "Frontend-Team", "Marketing-Team"
     ];
 
-    private static readonly string[] SystemGroups = [
-        "Admins", "Everyone"
+    // System groups have fixed well-known IDs so code can reference them without a
+    // fragile name lookup. Order does not matter.
+    private static readonly (Guid Id, string Name)[] SystemGroupDefinitions =
+    [
+        (WellKnownGUIDs.GROUP_ADMINS,   "Admins"),
+        (WellKnownGUIDs.GROUP_EVERYONE, "Everyone"),
     ];
 
     private async Task SeedGroupsAsync()
@@ -278,23 +288,81 @@ public class DatabaseSeeder
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
 
-        var existingNames = (await db.Groups.Select(g => g.Name).ToListAsync())
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
+        var allGroups = await db.Groups.ToListAsync();
         var changed = false;
 
-        foreach (var name in SystemGroups)
+        foreach (var (wellKnownId, name) in SystemGroupDefinitions)
         {
-            if (existingNames.Add(name))
+            // Already present under its well-known id: nothing to do.
+            if (allGroups.Any(g => g.Id == wellKnownId))
+                continue;
+
+            // Legacy install: a group of this name exists with a random id (pre-well-known
+            // GUIDs). Remap it — and everything referencing it — onto the well-known id.
+            var legacy = allGroups.FirstOrDefault(
+                g => string.Equals(g.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (legacy is not null)
             {
-                db.Groups.Add(new Group(Guid.NewGuid(), name));
-                _logger.LogDebug(LogEvents.SeedGroupCreated, LogMessages.SeedGroupCreated, name);
-                changed = true;
+                await RemapGroupIdAsync(db, legacy.Id, wellKnownId, name);
+                continue;
             }
+
+            db.Groups.Add(new Group(wellKnownId, name));
+            _logger.LogDebug(LogEvents.SeedGroupCreated, LogMessages.SeedGroupCreated, name);
+            changed = true;
         }
 
         if (changed)
             await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Repoints a group onto a new id. <see cref="Group.Id"/> is the PK and is referenced
+    /// by plain <see cref="Guid"/> columns with no FK cascade, and EF cannot mutate a PK in
+    /// place — so repoint every reference (mirroring <c>GroupRepository.DeleteAsync</c>),
+    /// then swap the row. Provider-agnostic via <c>ExecuteUpdate</c> (no raw SQL).
+    /// </summary>
+    private async Task RemapGroupIdAsync(
+        ApplicationDbContext db, Guid oldId, Guid newId, string name)
+    {
+        await db.UserGroups.Where(ug => ug.GroupId == oldId)
+            .ExecuteUpdateAsync(s => s.SetProperty(ug => ug.GroupId, newId));
+        await db.ScopedRoleAssignments.Where(a => a.PrincipalId == oldId)
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.PrincipalId, newId));
+        await db.CloudAccessGrants.Where(g => g.PrincipalId == oldId)
+            .ExecuteUpdateAsync(s => s.SetProperty(g => g.PrincipalId, newId));
+
+        var old = await db.Groups.FindAsync(oldId);
+        if (old is not null) db.Groups.Remove(old);
+        db.Groups.Add(new Group(newId, name));
+        await db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Remapped system group '{Name}' from {OldId} to well-known id {NewId}.",
+            name, oldId, newId);
+    }
+
+    /// <summary>
+    /// Ensures every user is a member of the global Everyone group. Idempotent; only
+    /// adds the missing rows. Covers both existing installs (upgrade backfill) and any
+    /// user that reached the database without going through the normal create path.
+    /// </summary>
+    private async Task BackfillEveryoneMembershipAsync()
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        var everyoneId = WellKnownGUIDs.GROUP_EVERYONE;
+        var missing = await db.Users
+            .Where(u => !db.UserGroups.Any(ug => ug.UserId == u.Id && ug.GroupId == everyoneId))
+            .Select(u => u.Id)
+            .ToListAsync();
+
+        if (missing.Count == 0)
+            return;
+
+        db.UserGroups.AddRange(missing.Select(uid => new UserGroup(uid, everyoneId)));
+        await db.SaveChangesAsync();
+        _logger.LogInformation("Backfilled {Count} user(s) into the Everyone group.", missing.Count);
     }
 
     // ══════════════════════════════════════════

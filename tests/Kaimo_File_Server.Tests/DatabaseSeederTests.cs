@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Infrastructure.Security;
@@ -156,5 +157,65 @@ public class DatabaseSeederTests : IDisposable
 
         Assert.Equal(1, await _db.Users.CountAsync(u => u.Username == "admin"));
         Assert.False(await _db.Users.AnyAsync(u => u.Username == "guest"));
+    }
+
+    // ─────────────── System groups (well-known IDs) ───────────────
+
+    [Fact]
+    public async Task SeedAsync_CreatesSystemGroupsWithWellKnownIds()
+    {
+        await SeedAsync(("Seed:DemoData", "false"));
+
+        using var db = _dbFactory.CreateDbContext();
+        Assert.True(await db.Groups.AnyAsync(g => g.Id == WellKnownGUIDs.GROUP_ADMINS && g.Name == "Admins"));
+        Assert.True(await db.Groups.AnyAsync(g => g.Id == WellKnownGUIDs.GROUP_EVERYONE && g.Name == "Everyone"));
+    }
+
+    [Fact]
+    public async Task SeedAsync_BootstrapAdmin_IsInAdminsGroupWithAdminRole()
+    {
+        await SeedAsync(("Seed:DemoData", "false"));
+
+        using var db = _dbFactory.CreateDbContext();
+        var admin = await db.Users.SingleAsync(u => u.Username == "admin");
+        Assert.True(await db.UserGroups.AnyAsync(ug => ug.UserId == admin.Id && ug.GroupId == WellKnownGUIDs.GROUP_ADMINS));
+        Assert.True(await db.ScopedRoleAssignments.AnyAsync(a => a.PrincipalId == admin.Id && a.RoleId == WellKnownGUIDs.ROLE_ADMIN));
+    }
+
+    [Fact]
+    public async Task SeedAsync_AllUsersAreMembersOfEveryone()
+    {
+        await SeedAsync(("Seed:DemoData", "true"));
+
+        using var db = _dbFactory.CreateDbContext();
+        var userIds = await db.Users.Select(u => u.Id).ToListAsync();
+        Assert.NotEmpty(userIds);
+        foreach (var id in userIds)
+            Assert.True(await db.UserGroups.AnyAsync(ug => ug.UserId == id && ug.GroupId == WellKnownGUIDs.GROUP_EVERYONE),
+                $"User {id} is not a member of the Everyone group.");
+    }
+
+    [Fact]
+    public async Task SeedAsync_RemapsLegacySystemGroupOntoWellKnownId()
+    {
+        // Simulate a pre-well-known-GUID install: an "Admins" group with a random id
+        // plus a membership row pointing at it.
+        var legacyId = Guid.NewGuid();
+        var user = new User(
+            Guid.NewGuid(), "Legacy", "legacy",
+            _passwords.HashPassword("Passw0rd!"), "nt-hash",
+            description: "", email: "", isEnabled: true, canChangePassword: true);
+        _db.Groups.Add(new Group(legacyId, "Admins"));
+        _db.Users.Add(user);
+        _db.UserGroups.Add(new UserGroup(user.Id, legacyId));
+        await _db.SaveChangesAsync();
+
+        await SeedAsync(("Seed:DemoData", "false"));
+
+        using var db = _dbFactory.CreateDbContext();
+        Assert.False(await db.Groups.AnyAsync(g => g.Id == legacyId));                         // old row gone
+        Assert.True(await db.Groups.AnyAsync(g => g.Id == WellKnownGUIDs.GROUP_ADMINS));       // remapped
+        Assert.True(await db.UserGroups.AnyAsync(                                              // membership repointed
+            ug => ug.UserId == user.Id && ug.GroupId == WellKnownGUIDs.GROUP_ADMINS));
     }
 }

@@ -5063,7 +5063,16 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Error_LastAdmin", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die This is a system group and cannot be deleted. ähnelt.
+        /// </summary>
+        public static string Web_Error_SystemGroupUndeletable {
+            get {
+                return ResourceManager.GetString("Web_Error_SystemGroupUndeletable", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die No share loaded. ähnelt.
         /// </summary>
