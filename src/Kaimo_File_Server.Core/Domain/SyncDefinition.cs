@@ -72,6 +72,20 @@ public sealed class SyncDefinitionRuntime
     public string? LastErrorCode { get; set; }
 
     /// <summary>
+    /// Number of individual items that could not be synchronized in the last
+    /// otherwise-successful run. Null or zero means the run had no per-item
+    /// failures. A hard abort is reported through <see cref="LastErrorCode"/>.
+    /// </summary>
+    public int? LastRunFailureCount { get; set; }
+
+    /// <summary>
+    /// JSON array of the first failed items from the last run (path, operation,
+    /// reason), capped so a run with very many failures cannot bloat the row.
+    /// Null when the last run had no per-item failures.
+    /// </summary>
+    public string? LastRunFailures { get; set; }
+
+    /// <summary>
     /// Serialized <see cref="Kaimo_File_Server.Core.Services.DataServices.SyncManifest"/>
     /// captured after the last successful two-way run. It lets the next run tell a
     /// newly created item apart from one deleted on the opposite endpoint. Null

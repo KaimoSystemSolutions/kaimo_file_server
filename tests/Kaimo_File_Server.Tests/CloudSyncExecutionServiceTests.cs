@@ -92,7 +92,10 @@ public sealed class CloudSyncExecutionServiceTests
                 && request.ExcludedExtensions!.Contains(".tmp")),
             It.IsAny<CancellationToken>()), Times.Once);
         definitions.Verify(repository => repository.MarkCompletedAsync(
-            definition.Id, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+            definition.Id,
+            It.IsAny<DateTime>(),
+            It.IsAny<IReadOnlyList<SyncFailure>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -147,6 +150,7 @@ public sealed class CloudSyncExecutionServiceTests
                 It.IsAny<CloudSyncTransferOptions?>(),
                 It.IsAny<SyncManifest?>(),
                 It.IsAny<Action<string?, int>?>(),
+                It.IsAny<ICollection<SyncFailure>?>(),
                 It.IsAny<CancellationToken>()))
             .Returns(async () =>
             {
@@ -210,6 +214,7 @@ public sealed class CloudSyncExecutionServiceTests
         definitions.Verify(repository => repository.MarkCompletedAsync(
             definition.Id,
             It.IsAny<DateTime>(),
+            It.IsAny<IReadOnlyList<SyncFailure>?>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 }

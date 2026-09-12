@@ -1,0 +1,15 @@
+@page "/sync"
+@page "/sync/{ShareName}"
+@inject NavigationManager Nav
+
+@code {
+    // The legacy cloud-sync page moved into the unified external-storage
+    // workspace. This stub keeps old bookmarks and the OAuth callback redirects
+    // (which still land on "/sync") working: the connected folder is imported
+    // into a SyncDefinition by the migration service when the target page loads.
+    // Query parameters from the old connect flow are intentionally dropped.
+    [Parameter] public string? ShareName { get; set; }
+
+    protected override void OnInitialized()
+        => Nav.NavigateTo("/external-storage?tab=syncs", forceLoad: true);
+}

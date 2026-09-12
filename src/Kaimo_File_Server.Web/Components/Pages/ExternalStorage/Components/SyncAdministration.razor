@@ -8,6 +8,7 @@
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Microsoft.JSInterop
 @using System.Globalization
+@using System.Text.Json
 @implements IAsyncDisposable
 @inject ExternalStorageSyncViewModel VM
 @inject ICloudSyncJobRunner SyncJobRunner
@@ -270,6 +271,23 @@ else
             @if (!string.IsNullOrWhiteSpace(selected.Runtime?.LastErrorCode))
             {
                 <div class="error-banner">@ErrorMessage(selected.Runtime!.LastErrorCode)</div>
+            }
+            @if (selected.Runtime?.LastRunFailureCount > 0)
+            {
+                var failed = FailedItems(selected);
+                <details class="sync-failures">
+                    <summary>@string.Format(R("Web_CloudSync_FailedItemsHeader"), selected.Runtime!.LastRunFailureCount)</summary>
+                    <ul>
+                        @foreach (var failure in failed)
+                        {
+                            <li><code>@failure.Path</code> — @failure.Reason</li>
+                        }
+                    </ul>
+                    @if (selected.Runtime!.LastRunFailureCount > failed.Count)
+                    {
+                        <p class="sync-failures-more">@string.Format(R("Web_CloudSync_FailedItemsMore"), selected.Runtime!.LastRunFailureCount!.Value - failed.Count)</p>
+                    }
+                </details>
             }
             <div class="detail-actions sync-summary-actions">
                 <button class="btn-secondary sync-edit-action" type="button" disabled="@_busy" @onclick="() => StartEdit(selected)">@R("Web_CloudAccess_Edit")</button>
@@ -545,12 +563,35 @@ else
         => VM.Connections.FirstOrDefault(c => c.Id == _model.ConnectionId) is { } connection
            && VM.Supports(connection, capability);
     private static string ModeName(SyncMode mode) => mode switch { SyncMode.Pull => R("Web_CloudSync_Mode_Pull"), SyncMode.Push => R("Web_CloudSync_Mode_Push"), _ => R("Web_CloudSync_Mode_TwoWay") };
-    private static string Health(ExternalStorageSyncListItem item) => string.IsNullOrWhiteSpace(item.Runtime?.LastErrorCode) ? R("Web_ExternalStorage_Healthy") : R("Web_ExternalStorage_AttentionRequired");
+    private static string Health(ExternalStorageSyncListItem item)
+        => !string.IsNullOrWhiteSpace(item.Runtime?.LastErrorCode) ? R("Web_ExternalStorage_AttentionRequired")
+            : item.Runtime?.LastRunFailureCount > 0 ? R("Web_ExternalStorage_CompletedWithErrors")
+            : R("Web_ExternalStorage_Healthy");
     private static string SyncState(ExternalStorageSyncListItem item)
         => item.Definition.Enabled ? Health(item) : R("Web_ExternalStorage_Disabled");
     private static StatusTone SyncStateTone(ExternalStorageSyncListItem item)
         => !item.Definition.Enabled ? StatusTone.Neutral
-            : string.IsNullOrWhiteSpace(item.Runtime?.LastErrorCode) ? StatusTone.Positive : StatusTone.Warning;
+            : !string.IsNullOrWhiteSpace(item.Runtime?.LastErrorCode) || item.Runtime?.LastRunFailureCount > 0
+                ? StatusTone.Warning
+                : StatusTone.Positive;
+
+    // The persisted failure list is capped (see SyncDefinitionRepository); the
+    // total is reported separately by LastRunFailureCount. A malformed payload
+    // degrades to showing just the count rather than throwing in the UI.
+    private static IReadOnlyList<SyncFailure> FailedItems(ExternalStorageSyncListItem item)
+    {
+        if (string.IsNullOrWhiteSpace(item.Runtime?.LastRunFailures))
+            return Array.Empty<SyncFailure>();
+        try
+        {
+            return JsonSerializer.Deserialize<List<SyncFailure>>(item.Runtime!.LastRunFailures!)
+                ?? (IReadOnlyList<SyncFailure>)Array.Empty<SyncFailure>();
+        }
+        catch (JsonException)
+        {
+            return Array.Empty<SyncFailure>();
+        }
+    }
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 
     // Turns a persisted error code into an explicit, localized message. Falls back

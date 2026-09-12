@@ -28,6 +28,7 @@ public interface ICloudSyncExecutionService
 public enum CloudSyncExecutionResult
 {
     Completed,
+    CompletedWithErrors,
     Busy,
     Missing
 }
@@ -137,6 +138,7 @@ public sealed class CloudSyncExecutionService(
                     await syncDefinitions.GetManifestAsync(definition.Id, cancellationToken))
                 : null;
             SyncManifest? newManifest;
+            var failures = new List<SyncFailure>();
             try
             {
                 newManifest = await connection.SyncAsync(
@@ -150,6 +152,7 @@ public sealed class CloudSyncExecutionService(
                     new CloudSyncTransferOptions(folder.AdvancedSettings, share.IsRecycleEnabled),
                     previousManifest,
                     reportProgress,
+                    failures,
                     cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -194,8 +197,11 @@ public sealed class CloudSyncExecutionService(
                 connection.AcknowledgeCredentialChanges();
             }
 
+            // A run that copied everything it could but hit individual-item
+            // failures is completed (state and manifest are advanced), with the
+            // failures recorded so the operator can see exactly what was skipped.
             await syncDefinitions.MarkCompletedAsync(
-                definition.Id, completedAtUtc, cancellationToken);
+                definition.Id, completedAtUtc, failures, cancellationToken);
 
             // Persist the converged tree after every two-way run so a later
             // enable of delete propagation has a ready baseline. newManifest is
@@ -212,7 +218,9 @@ public sealed class CloudSyncExecutionService(
                 normalizedPath,
                 completedAtUtc,
                 credentialChanges);
-            return CloudSyncExecutionResult.Completed;
+            return failures.Count > 0
+                ? CloudSyncExecutionResult.CompletedWithErrors
+                : CloudSyncExecutionResult.Completed;
         }
     }
 
@@ -273,7 +281,10 @@ public sealed class CloudSyncExecutionService(
         }
 
         DateTime completedAtUtc = DateTime.UtcNow;
-        await syncDefinitions.MarkCompletedAsync(definition.Id, completedAtUtc, cancellationToken);
+        // The native transport reports success or throws as a whole; it has no
+        // per-item failure list to record.
+        await syncDefinitions.MarkCompletedAsync(
+            definition.Id, completedAtUtc, cancellationToken: cancellationToken);
         await shares.UpdateCloudSyncRuntimeStateAsync(
             share.Id,
             normalizedLocalPath,

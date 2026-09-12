@@ -270,7 +270,6 @@ builder.Services.AddScoped<FileBrowserViewModel>();
 builder.Services.AddScoped<UserListViewModel>();
 builder.Services.AddScoped<AclEditorViewModel>();
 builder.Services.AddScoped<DepartmentViewModel>();
-builder.Services.AddScoped<CloudSyncViewModel>();
 builder.Services.AddScoped<ExternalStorageSyncViewModel>();
 builder.Services.AddScoped<ClientDeviceAdminViewModel>();
 builder.Services.AddScoped<CloudAccessViewModel>();

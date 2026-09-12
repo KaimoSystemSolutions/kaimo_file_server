@@ -1,6 +1,8 @@
+using System.Text.Json;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -136,9 +138,15 @@ public sealed class SyncDefinitionRepository(IDbContextFactory<ApplicationDbCont
         return true;
     }
 
+    // Cap on the number of failed items persisted per run, so a run that fails
+    // for millions of files cannot bloat the runtime row. The count is always
+    // exact; only the detail list is truncated.
+    private const int MaxPersistedFailures = 20;
+
     public async Task MarkCompletedAsync(
         Guid syncDefinitionId,
         DateTime completedAtUtc,
+        IReadOnlyList<SyncFailure>? failures = null,
         CancellationToken cancellationToken = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
@@ -151,12 +159,18 @@ public sealed class SyncDefinitionRepository(IDbContextFactory<ApplicationDbCont
             db.SyncDefinitionRuntimes.Add(runtime);
         }
 
+        int failureCount = failures?.Count ?? 0;
         runtime.LastRunAtUtc = completedAtUtc;
         runtime.LastSuccessfulRunAtUtc = completedAtUtc;
         runtime.CurrentJobId = null;
         runtime.LeaseOwner = null;
         runtime.ProgressPercent = 100;
         runtime.LastErrorCode = null;
+        // A clean run clears any previous summary so stale failures do not linger.
+        runtime.LastRunFailureCount = failureCount > 0 ? failureCount : null;
+        runtime.LastRunFailures = failureCount > 0
+            ? JsonSerializer.Serialize(failures!.Take(MaxPersistedFailures))
+            : null;
         runtime.UpdatedAtUtc = completedAtUtc;
         await db.SaveChangesAsync(cancellationToken);
     }

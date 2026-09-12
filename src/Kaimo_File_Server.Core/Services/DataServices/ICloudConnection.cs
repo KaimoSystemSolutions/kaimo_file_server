@@ -1,5 +1,7 @@
+using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Infrastructure.Clouds;
 
@@ -86,6 +88,13 @@ public interface ICloudConnection
     /// The manifest of paths present after this run when delete propagation is
     /// active (persist it for the next run), otherwise <c>null</c>.
     /// </returns>
+    /// <param name="failures">
+    /// Optional sink for per-item failures. When supplied, a single file that
+    /// cannot be transferred is recorded here and the run continues with the
+    /// next item instead of aborting; the caller reports the collected list
+    /// after the run. A missing configured root directory still fails the whole
+    /// run (it is a configuration error, not a per-item problem).
+    /// </param>
     async Task<SyncManifest?> SyncAsync(
         IFileService fileService,
         UserContext user,
@@ -95,6 +104,7 @@ public interface ICloudConnection
         CloudSyncTransferOptions? transferOptions = null,
         SyncManifest? previousManifest = null,
         Action<string?, int>? reportProgress = null,
+        ICollection<SyncFailure>? failures = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -143,6 +153,8 @@ public interface ICloudConnection
             progress,
             applyDeletions ? previousManifest : null,
             newManifest,
+            failures,
+            isRoot: true,
             cancellationToken
             );
 
@@ -205,17 +217,38 @@ public interface ICloudConnection
         SyncProgress syncProgress,
         SyncManifest? previousManifest,
         SyncManifest? newManifest,
+        ICollection<SyncFailure>? failures,
+        bool isRoot,
         CancellationToken cancellationToken
         )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var remoteItems = (await Guard(SyncEndpoint.Remote,
-                () => ListAsync(remoteDir, cancellationToken)))
-            .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
 
-        var localItems = (await Guard(SyncEndpoint.Local,
-                () => fileService.ListAsync(localDir, user)))
-            .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
+        // Listing failures on the configured root are hard errors (a removed or
+        // inaccessible sync folder is a configuration problem, surfaced via
+        // SyncDirectoryMissingException). Below the root they are recorded and the
+        // subtree is skipped, so one unreadable folder cannot abort the whole run.
+        Dictionary<string, CloudItemMeta> remoteItems;
+        Dictionary<string, FileMetadata> localItems;
+        try
+        {
+            remoteItems = (await Guard(SyncEndpoint.Remote,
+                    () => ListAsync(remoteDir, cancellationToken)))
+                .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
+
+            localItems = (await Guard(SyncEndpoint.Local,
+                    () => fileService.ListAsync(localDir, user)))
+                .ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception) when (!isRoot)
+        {
+            failures?.Add(new SyncFailure(localDir, SyncFailureOperation.List, exception.Message));
+            return;
+        }
         cancellationToken.ThrowIfCancellationRequested();
 
         var allNames = new HashSet<string>(
@@ -258,35 +291,40 @@ public interface ICloudConnection
                 if (previousManifest?.Contains(localChild) == true)
                 {
                     syncProgress.Update($"Removing {local!.Name}...");
-                    await fileService.DeleteFileAsync(localChild, user, options.HonorRecycleBin);
+                    await TryTransferAsync(failures, localChild, SyncFailureOperation.Delete,
+                        () => fileService.DeleteFileAsync(localChild, user, options.HonorRecycleBin),
+                        cancellationToken);
                     continue;
                 }
 
                 if (local!.IsDirectory)
                 {
-                    await CreateDirectoryAsync(remoteChild, cancellationToken);
-                    newManifest?.Paths.Add(localChild);
-
-                    await UploadDirectoryRecursive(
-                        fileService,
-                        user,
-                        localChild,
-                        remoteChild,
-                        syncProgress,
-                        options,
-                        newManifest,
-                        cancellationToken);
+                    // Only record the new subtree in the manifest once its remote
+                    // directory exists; otherwise a failed create would let a later
+                    // run treat the local-only folder as remotely deleted.
+                    if (await TryTransferAsync(failures, remoteChild, SyncFailureOperation.CreateDirectory,
+                            () => CreateDirectoryAsync(remoteChild, cancellationToken), cancellationToken))
+                    {
+                        newManifest?.Paths.Add(localChild);
+                        await UploadDirectoryRecursive(
+                            fileService,
+                            user,
+                            localChild,
+                            remoteChild,
+                            syncProgress,
+                            options,
+                            newManifest,
+                            failures,
+                            cancellationToken);
+                    }
                 }
-                else
+                else if (await PushFileAsync(fileService, user, localChild, remoteChild,
+                             local.Name, local.ModifiedAt, local.Size, options, syncProgress,
+                             failures, cancellationToken))
                 {
-                    syncProgress.Update($"Pushing {local.Name}...");
-
-                    await using var stream = options.LimitUpload(await fileService.ReadFileAsync(localChild, user));
-                    await UploadAsync(remoteChild, stream, local.ModifiedAt, cancellationToken);
+                    // Manifest only on success: a file that failed to upload does
+                    // not exist remotely, so it must not look converged next run.
                     newManifest?.Paths.Add(localChild);
-
-                    syncProgress.TransferredBytes += local.Size;
-                    syncProgress.Update($"Pushing {local.Name}...");
                 }
 
                 continue;
@@ -306,45 +344,38 @@ public interface ICloudConnection
                 if (previousManifest?.Contains(localChild) == true)
                 {
                     syncProgress.Update($"Removing {remote!.Name}...");
-                    await DeleteAsync(remoteChild, remote.IsDirectory, cancellationToken);
+                    await TryTransferAsync(failures, remoteChild, SyncFailureOperation.Delete,
+                        () => DeleteAsync(remoteChild, remote.IsDirectory, cancellationToken),
+                        cancellationToken);
                     continue;
                 }
 
                 if (remote!.IsDirectory)
                 {
-                    await fileService.CreateDirectoryAsync(localChild, user);
-                    cancellationToken.ThrowIfCancellationRequested();
-                    newManifest?.Paths.Add(localChild);
-
-                    await SyncDirectory(
-                        fileService,
-                        user,
-                        remoteChild,
-                        localChild,
-                        mode,
-                        options,
-                        syncProgress,
-                        previousManifest,
-                        newManifest,
-                        cancellationToken);
+                    if (await TryTransferAsync(failures, localChild, SyncFailureOperation.CreateDirectory,
+                            () => fileService.CreateDirectoryAsync(localChild, user), cancellationToken))
+                    {
+                        newManifest?.Paths.Add(localChild);
+                        await SyncDirectory(
+                            fileService,
+                            user,
+                            remoteChild,
+                            localChild,
+                            mode,
+                            options,
+                            syncProgress,
+                            previousManifest,
+                            newManifest,
+                            failures,
+                            isRoot: false,
+                            cancellationToken);
+                    }
                 }
-                else
+                else if (await PullFileAsync(fileService, user, localChild, remoteChild,
+                             remote.Name, remote.ModifiedAt, remote.Size, options, syncProgress,
+                             failures, cancellationToken))
                 {
-                    syncProgress.Update($"Pulling {remote.Name}...");
-
-                    await using var raw = new MemoryStream();
-                    await using var ms = options.LimitDownload(raw);
-                    await DownloadAsync(remoteChild, ms, cancellationToken);
-
-                    ms.Position = 0;
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await fileService.WriteFileAsync(localChild, ms, user);
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await fileService.SetModifiedAtAsync(localChild, user, remote.ModifiedAt);
                     newManifest?.Paths.Add(localChild);
-
-                    syncProgress.TransferredBytes += remote.Size;
-                    syncProgress.Update($"Pulling {remote.Name}...");
                 }
 
                 continue;
@@ -366,6 +397,8 @@ public interface ICloudConnection
                     syncProgress,
                     previousManifest,
                     newManifest,
+                    failures,
+                    isRoot: false,
                     cancellationToken);
 
                 continue;
@@ -374,8 +407,9 @@ public interface ICloudConnection
             if (local!.IsDirectory != remote!.IsDirectory)
                 continue;
 
-            // Present on both sides as files: reconciled below regardless of which
-            // way the newer copy flows, so it stays in the converged manifest.
+            // Present on both sides as files: it stays in the converged manifest
+            // regardless of whether the newer-copy reconciliation succeeds, because
+            // the file still exists on both endpoints either way.
             newManifest?.Paths.Add(localChild);
 
             //--------------------------------------------------
@@ -384,22 +418,9 @@ public interface ICloudConnection
             if (mode == SyncMode.Pull)
             {
                 if (CompareModifiedTime(local.ModifiedAt, remote.ModifiedAt) < 0)
-                {
-                    syncProgress.Update($"Pulling {remote.Name}...");
-
-                    await using var raw = new MemoryStream();
-                    await using var ms = options.LimitDownload(raw);
-                    await DownloadAsync(remoteChild, ms, cancellationToken);
-
-                    ms.Position = 0;
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await fileService.WriteFileAsync(localChild, ms, user);
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await fileService.SetModifiedAtAsync(localChild, user, remote.ModifiedAt);
-
-                    syncProgress.TransferredBytes += remote.Size;
-                    syncProgress.Update($"Pulling {remote.Name}...");
-                }
+                    await PullFileAsync(fileService, user, localChild, remoteChild,
+                        remote.Name, remote.ModifiedAt, remote.Size, options, syncProgress,
+                        failures, cancellationToken);
 
                 continue;
             }
@@ -410,15 +431,9 @@ public interface ICloudConnection
             if (mode == SyncMode.Push)
             {
                 if (CompareModifiedTime(local.ModifiedAt, remote.ModifiedAt) > 0)
-                {
-                    syncProgress.Update($"Pushing {local.Name}...");
-
-                    await using var stream = options.LimitUpload(await fileService.ReadFileAsync(localChild, user));
-                    await UploadAsync(remoteChild, stream, local.ModifiedAt, cancellationToken);
-
-                    syncProgress.TransferredBytes += local.Size;
-                    syncProgress.Update($"Pushing {local.Name}...");
-                }
+                    await PushFileAsync(fileService, user, localChild, remoteChild,
+                        local.Name, local.ModifiedAt, local.Size, options, syncProgress,
+                        failures, cancellationToken);
 
                 continue;
             }
@@ -427,31 +442,147 @@ public interface ICloudConnection
             // Two-way
             //--------------------------------------------------
             if (CompareModifiedTime(local.ModifiedAt, remote.ModifiedAt) > 0)
-            {
-                syncProgress.Update($"Pushing {local.Name}...");
-
-                await using var stream = options.LimitUpload(await fileService.ReadFileAsync(localChild, user));
-                await UploadAsync(remoteChild, stream, local.ModifiedAt, cancellationToken);
-
-                syncProgress.TransferredBytes += local.Size;
-                syncProgress.Update($"Pushing {local.Name}...");
-            }
+                await PushFileAsync(fileService, user, localChild, remoteChild,
+                    local.Name, local.ModifiedAt, local.Size, options, syncProgress,
+                    failures, cancellationToken);
             else if (CompareModifiedTime(local.ModifiedAt, remote.ModifiedAt) < 0)
+                await PullFileAsync(fileService, user, localChild, remoteChild,
+                    remote.Name, remote.ModifiedAt, remote.Size, options, syncProgress,
+                    failures, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Uploads one local file to the remote endpoint with a transient-fault retry.
+    /// Returns true only when the upload succeeded; a definitive failure is
+    /// recorded in <paramref name="failures"/> and the caller continues.
+    /// </summary>
+    private async Task<bool> PushFileAsync(
+        IFileService fileService,
+        UserContext user,
+        string localChild,
+        string remoteChild,
+        string displayName,
+        DateTime modifiedAt,
+        long size,
+        CloudSyncTransferOptions options,
+        SyncProgress syncProgress,
+        ICollection<SyncFailure>? failures,
+        CancellationToken cancellationToken)
+    {
+        syncProgress.Update($"Pushing {displayName}...");
+        bool ok = await TryTransferAsync(failures, localChild, SyncFailureOperation.Upload, async () =>
+        {
+            await using var stream = options.LimitUpload(await fileService.ReadFileAsync(localChild, user));
+            await UploadAsync(remoteChild, stream, modifiedAt, cancellationToken);
+        }, cancellationToken);
+
+        if (ok)
+        {
+            syncProgress.TransferredBytes += size;
+            syncProgress.Update($"Pushing {displayName}...");
+        }
+        return ok;
+    }
+
+    /// <summary>
+    /// Downloads one remote file to the local endpoint with a transient-fault
+    /// retry. The payload is spilled to a self-deleting temp file rather than
+    /// buffered in memory, so an extremely large file cannot exhaust the process
+    /// heap. Returns true only when the download succeeded.
+    /// </summary>
+    private async Task<bool> PullFileAsync(
+        IFileService fileService,
+        UserContext user,
+        string localChild,
+        string remoteChild,
+        string displayName,
+        DateTime modifiedAt,
+        long size,
+        CloudSyncTransferOptions options,
+        SyncProgress syncProgress,
+        ICollection<SyncFailure>? failures,
+        CancellationToken cancellationToken)
+    {
+        syncProgress.Update($"Pulling {displayName}...");
+        bool ok = await TryTransferAsync(failures, localChild, SyncFailureOperation.Download, async () =>
+        {
+            // ponytail: temp-file spill (seekable, bounded memory); a true stream
+            // without the second write needs an OpenWrite API on IFileService.
+            await using var raw = new FileStream(
+                Path.GetTempFileName(),
+                FileMode.Create, FileAccess.ReadWrite, FileShare.None,
+                4096, FileOptions.DeleteOnClose | FileOptions.Asynchronous);
+            await using var ms = options.LimitDownload(raw);
+            await DownloadAsync(remoteChild, ms, cancellationToken);
+
+            ms.Position = 0;
+            cancellationToken.ThrowIfCancellationRequested();
+            await fileService.WriteFileAsync(localChild, ms, user);
+            cancellationToken.ThrowIfCancellationRequested();
+            await fileService.SetModifiedAtAsync(localChild, user, modifiedAt);
+        }, cancellationToken);
+
+        if (ok)
+        {
+            syncProgress.TransferredBytes += size;
+            syncProgress.Update($"Pulling {displayName}...");
+        }
+        return ok;
+    }
+
+    /// <summary>
+    /// Classifies an exception as a transient fault worth retrying. Definitive
+    /// provider rejections (4xx other than 429) are not retried so a permanently
+    /// forbidden or missing item fails fast instead of stalling the run.
+    /// </summary>
+    private static bool IsTransient(Exception exception) => exception switch
+    {
+        ProviderRequestException providerError =>
+            providerError.StatusCode is null
+            || (int)providerError.StatusCode.Value >= 500
+            || (int)providerError.StatusCode.Value == 429,
+        HttpRequestException => true,
+        System.Net.Sockets.SocketException => true,
+        TimeoutException => true,
+        IOException => true,
+        _ => false
+    };
+
+    /// <summary>
+    /// Runs one item's transfer, retrying a few times on transient faults with a
+    /// short back-off. A genuine cancellation is rethrown so it is never bucketed
+    /// as a per-item failure; any other definitive error is recorded and the run
+    /// continues with the next item. Returns true only on success.
+    /// </summary>
+    // ponytail: fixed 3-attempt ceiling, per file; enough for transient network blips.
+    private static async Task<bool> TryTransferAsync(
+        ICollection<SyncFailure>? failures,
+        string path,
+        SyncFailureOperation operation,
+        Func<Task> action,
+        CancellationToken cancellationToken)
+    {
+        const int maxAttempts = 3;
+        for (int attempt = 1; ; attempt++)
+        {
+            try
             {
-                syncProgress.Update($"Pulling {remote.Name}...");
-
-                await using var raw = new MemoryStream();
-                await using var ms = options.LimitDownload(raw);
-                await DownloadAsync(remoteChild, ms, cancellationToken);
-
-                ms.Position = 0;
-                cancellationToken.ThrowIfCancellationRequested();
-                await fileService.WriteFileAsync(localChild, ms, user);
-                cancellationToken.ThrowIfCancellationRequested();
-                await fileService.SetModifiedAtAsync(localChild, user, remote.ModifiedAt);
-                
-                syncProgress.TransferredBytes += remote.Size;
-                syncProgress.Update($"Pulling {remote.Name}...");
+                await action();
+                return true;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception) when (attempt < maxAttempts && IsTransient(exception))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt * attempt), cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                failures?.Add(new SyncFailure(path, operation, exception.Message));
+                return false;
             }
         }
     }
@@ -468,12 +599,33 @@ public interface ICloudConnection
         SyncProgress syncProgress,
         CloudSyncTransferOptions options,
         SyncManifest? newManifest,
+        ICollection<SyncFailure>? failures,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await CreateDirectoryAsync(remoteDir, cancellationToken);
 
-        foreach (var item in await fileService.ListAsync(localDir, user))
+        // A directory whose remote counterpart cannot be created (or listed) is
+        // recorded and skipped rather than aborting the whole upload.
+        if (!await TryTransferAsync(failures, remoteDir, SyncFailureOperation.CreateDirectory,
+                () => CreateDirectoryAsync(remoteDir, cancellationToken), cancellationToken))
+            return;
+
+        IReadOnlyList<FileMetadata> children;
+        try
+        {
+            children = await fileService.ListAsync(localDir, user);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            failures?.Add(new SyncFailure(localDir, SyncFailureOperation.List, exception.Message));
+            return;
+        }
+
+        foreach (var item in children)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string localChild = $"{localDir}/{item.Name}";
@@ -495,20 +647,18 @@ public interface ICloudConnection
                     syncProgress,
                     options,
                     newManifest,
+                    failures,
                     cancellationToken);
             }
             else
             {
-                syncProgress.Update($"Pushing {item.Name}");
-
                 if (options.ShouldSkip(item.Name, item.Size))
                     continue;
-                await using var stream = options.LimitUpload(await fileService.ReadFileAsync(localChild, user));
-                await UploadAsync(remoteChild, stream, item.ModifiedAt, cancellationToken);
-                newManifest?.Paths.Add(localChild);
 
-                syncProgress.TransferredBytes += item.Size;
-                syncProgress.Update($"Pushing {item.Name}");
+                if (await PushFileAsync(fileService, user, localChild, remoteChild,
+                        item.Name, item.ModifiedAt, item.Size, options, syncProgress,
+                        failures, cancellationToken))
+                    newManifest?.Paths.Add(localChild);
             }
         }
     }

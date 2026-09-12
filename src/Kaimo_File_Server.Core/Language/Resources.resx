@@ -2715,6 +2715,9 @@
   <data name="Web_CloudSync_Directory_Parent" xml:space="preserve">
     <value>Parent folder</value>
   </data>
+  <data name="Web_CloudSync_Directory_PathHint" xml:space="preserve">
+    <value>Type or paste a path…</value>
+  </data>
   <data name="Web_CloudSync_Directory_Select" xml:space="preserve">
     <value>Select this folder</value>
   </data>
@@ -3392,6 +3395,15 @@
   </data>
   <data name="Web_ExternalStorage_AttentionRequired" xml:space="preserve">
     <value>Attention required</value>
+  </data>
+  <data name="Web_ExternalStorage_CompletedWithErrors" xml:space="preserve">
+    <value>Completed with errors</value>
+  </data>
+  <data name="Web_CloudSync_FailedItemsHeader" xml:space="preserve">
+    <value>{0} item(s) could not be synchronized</value>
+  </data>
+  <data name="Web_CloudSync_FailedItemsMore" xml:space="preserve">
+    <value>and {0} more</value>
   </data>
   <data name="Web_ExternalStorage_SyncStarted" xml:space="preserve">
     <value>Sync started</value>

@@ -2715,6 +2715,9 @@
   <data name="Web_CloudSync_Directory_Parent" xml:space="preserve">
     <value>Übergeordneter Ordner</value>
   </data>
+  <data name="Web_CloudSync_Directory_PathHint" xml:space="preserve">
+    <value>Pfad eingeben oder einfügen…</value>
+  </data>
   <data name="Web_CloudSync_Directory_Select" xml:space="preserve">
     <value>Diesen Ordner auswählen</value>
   </data>
@@ -3323,6 +3326,15 @@
   </data>
   <data name="Web_ExternalStorage_AttentionRequired" xml:space="preserve">
     <value>Aktion erforderlich</value>
+  </data>
+  <data name="Web_ExternalStorage_CompletedWithErrors" xml:space="preserve">
+    <value>Mit Fehlern abgeschlossen</value>
+  </data>
+  <data name="Web_CloudSync_FailedItemsHeader" xml:space="preserve">
+    <value>{0} Element(e) konnten nicht synchronisiert werden</value>
+  </data>
+  <data name="Web_CloudSync_FailedItemsMore" xml:space="preserve">
+    <value>und {0} weitere</value>
   </data>
   <data name="Web_ExternalStorage_SyncStarted" xml:space="preserve">
     <value>Synchronisierung gestartet</value>

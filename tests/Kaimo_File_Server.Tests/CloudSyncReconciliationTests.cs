@@ -154,6 +154,76 @@ public sealed class CloudSyncReconciliationTests
         Assert.False(remote.HasFile("/a.txt"));
     }
 
+    [Fact]
+    public async Task Sync_OneFileFails_OthersStillTransfer_AndFailureIsCollected()
+    {
+        var remote = new InMemoryRemote(); // empty: both files are new local uploads
+        var local = new InMemoryFileService();
+        local.PutFile("a.txt", "aaa", Time(10));
+        local.PutFile("b.txt", "bbb", Time(10));
+        remote.HardFailUploads.Add("a.txt"); // definitive (non-transient) failure
+
+        var failures = new List<SyncFailure>();
+        var options = new CloudSyncTransferOptions(new CloudSyncAdvancedSettings());
+
+        var manifest = await ((ICloudConnection)remote).SyncAsync(
+            local, User, RemoteRoot, LocalRoot, SyncMode.TwoWay, options,
+            previousManifest: null, reportProgress: null, failures: failures);
+
+        // The good file is transferred despite the other failing.
+        Assert.True(remote.HasFile("/b.txt"));
+        Assert.False(remote.HasFile("/a.txt"));
+        // Exactly the failing file is reported, tagged as an upload failure.
+        var failure = Assert.Single(failures);
+        Assert.EndsWith("a.txt", failure.Path);
+        Assert.Equal(SyncFailureOperation.Upload, failure.Operation);
+        // A file that failed to upload must not be recorded as converged, or a
+        // later run could treat it as remotely deleted and remove it locally.
+        Assert.Contains("/b.txt", manifest!.Paths);
+        Assert.DoesNotContain("/a.txt", manifest.Paths);
+    }
+
+    [Fact]
+    public async Task Sync_TransientUploadFailure_IsRetriedAndSucceeds()
+    {
+        var remote = new InMemoryRemote();
+        var local = new InMemoryFileService();
+        local.PutFile("a.txt", "aaa", Time(10));
+        remote.TransientUploads["a.txt"] = 2; // fail twice, succeed on the third attempt
+
+        var failures = new List<SyncFailure>();
+        var options = new CloudSyncTransferOptions(new CloudSyncAdvancedSettings());
+
+        await ((ICloudConnection)remote).SyncAsync(
+            local, User, RemoteRoot, LocalRoot, SyncMode.TwoWay, options,
+            previousManifest: null, reportProgress: null, failures: failures);
+
+        Assert.True(remote.HasFile("/a.txt"));
+        Assert.Empty(failures);
+    }
+
+    [Fact]
+    public async Task Sync_AlreadyCancelled_ThrowsAndRecordsNoFailure()
+    {
+        var remote = new InMemoryRemote();
+        var local = new InMemoryFileService();
+        local.PutFile("a.txt", "aaa", Time(10));
+
+        var failures = new List<SyncFailure>();
+        var options = new CloudSyncTransferOptions(new CloudSyncAdvancedSettings());
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            ((ICloudConnection)remote).SyncAsync(
+                local, User, RemoteRoot, LocalRoot, SyncMode.TwoWay, options,
+                previousManifest: null, reportProgress: null, failures: failures,
+                cancellationToken: cts.Token));
+
+        // A genuine cancellation is never bucketed as a per-item failure.
+        Assert.Empty(failures);
+    }
+
     private static DateTime Time(int minute) =>
         new(2026, 1, 1, 0, minute, 0, DateTimeKind.Utc);
 
@@ -180,6 +250,12 @@ public sealed class CloudSyncReconciliationTests
         public string ServiceName => "in-memory";
         public Task Dispose() => Task.CompletedTask;
 
+        // Test hooks for the resilience path: uploads to a path in HardFailUploads
+        // always throw a non-transient error; TransientUploads throws the given
+        // number of transient errors before succeeding (to exercise the retry).
+        public HashSet<string> HardFailUploads { get; } = new();
+        public Dictionary<string, int> TransientUploads { get; } = new();
+
         public void PutFile(string path, string content, DateTime modified)
             => _files[Normalize(path)] = (System.Text.Encoding.UTF8.GetBytes(content), modified);
 
@@ -189,9 +265,17 @@ public sealed class CloudSyncReconciliationTests
 
         public Task UploadAsync(string path, Stream data, DateTime modifiedTime, CancellationToken ct = default)
         {
+            string key = Normalize(path);
+            if (HardFailUploads.Contains(key))
+                throw new UnauthorizedAccessException($"upload denied for {key}");
+            if (TransientUploads.TryGetValue(key, out int remaining) && remaining > 0)
+            {
+                TransientUploads[key] = remaining - 1;
+                throw new IOException($"transient failure for {key}");
+            }
             using var ms = new MemoryStream();
             data.CopyTo(ms);
-            _files[Normalize(path)] = (ms.ToArray(), modifiedTime);
+            _files[key] = (ms.ToArray(), modifiedTime);
             return Task.CompletedTask;
         }
 

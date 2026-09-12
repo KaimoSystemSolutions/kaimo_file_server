@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Services.DataServices;
 
 namespace Kaimo_File_Server.Core.Repositories;
 
@@ -46,9 +47,15 @@ public interface ISyncDefinitionRepository
     Task<List<SyncDefinitionScheduleEntry>> GetEnabledScheduledAsync(
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Records a successful run. <paramref name="failures"/> carries the per-item
+    /// failures the run collected without aborting (empty or null clears any
+    /// previous failure summary, so a clean run shows no stale errors).
+    /// </summary>
     Task MarkCompletedAsync(
         Guid syncDefinitionId,
         DateTime completedAtUtc,
+        IReadOnlyList<SyncFailure>? failures = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

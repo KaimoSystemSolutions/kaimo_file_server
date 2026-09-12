@@ -37,7 +37,6 @@ public sealed record SearchDestination(
     {
         _ when Url.StartsWith("/settings", StringComparison.Ordinal) => Loc("Web_Nav_Settings", "Settings"),
         _ when Url.StartsWith("/external-storage", StringComparison.Ordinal)
-            || Url.StartsWith("/sync", StringComparison.Ordinal)
             || Url.StartsWith("/cloud-access", StringComparison.Ordinal)
             => Loc("Web_ExternalStorage_Title", "External Storage"),
         _ => Loc("Web_Search_Cat_Page", "Page"),
@@ -95,9 +94,6 @@ public static class SearchDestinations
         new("Web_ExternalStorage_Tab_Syncs",
             ["sync", "syncs", "synchronisation", "synchronisierung"],
             "/external-storage?tab=syncs", "cloud-download.svg", ManagementPermission.SyncAdmin),
-        new("Web_CloudSync_Title",
-            ["cloud sync", "cloudsync", "ordner sync", "folder sync"],
-            "/sync", "cloud-download.svg", ManagementPermission.SyncAdmin),
         new("Web_ExternalStorage_Tab_Connections",
             ["connection", "connections", "verbindung", "verbindungen", "external storage", "externer speicher"],
             "/external-storage?tab=connections", "cloud-download.svg", ConnectionsGate),

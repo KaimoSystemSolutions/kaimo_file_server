@@ -5135,6 +5135,9 @@ input[type="radio"] {
 }
 
 .directory-picker-path {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
     overflow: hidden;
     padding: 8px 10px;
     border: 1px solid var(--border);
@@ -5145,6 +5148,12 @@ input[type="radio"] {
     font-size: 12px;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.directory-picker-path:focus {
+    outline: none;
+    border-color: var(--accent);
+    color: var(--text-primary);
 }
 
 .directory-picker-toolbar {

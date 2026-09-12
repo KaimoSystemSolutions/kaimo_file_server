@@ -9,7 +9,10 @@
              aria-label="@Title" @onclick:stopPropagation="true">
             <h3 class="modal-title">@Title</h3>
 
-            <div class="directory-picker-path" title="@DisplayPath">@DisplayPath</div>
+            <input class="directory-picker-path" type="text" spellcheck="false"
+                   autocomplete="off" title="@DisplayPath" value="@DisplayPath"
+                   placeholder="@Text("Web_CloudSync_Directory_PathHint", "Type or paste a path…")"
+                   @onchange="OnPathEnteredAsync" />
 
             <div class="directory-picker-toolbar">
                 <button class="btn-secondary" type="button" disabled="@IsAtRoot" @onclick="NavigateToParentAsync">
@@ -87,9 +90,22 @@
         var normalized = CurrentPath.Replace('\\', '/').Trim('/');
         var separator = normalized.LastIndexOf('/');
         var parent = separator < 0 ? "" : normalized[..separator];
+        return OnNavigate.InvokeAsync(NormalizePath(parent));
+    }
+
+    // Let the user type or paste a path directly. Accepts Windows or Linux
+    // separators with any leading/trailing slashes; onchange fires on Enter/blur.
+    private Task OnPathEnteredAsync(ChangeEventArgs e)
+        => OnNavigate.InvokeAsync(NormalizePath(e.Value?.ToString() ?? ""));
+
+    // Collapse both separator styles and stray slashes into the canonical form
+    // each provider expects: remote is rooted with a leading "/", local is not.
+    private string NormalizePath(string raw)
+    {
+        var normalized = (raw ?? "").Replace('\\', '/').Trim().Trim('/');
         if (IsRemote)
-            parent = parent.Length == 0 ? "/" : $"/{parent}";
-        return OnNavigate.InvokeAsync(parent);
+            return normalized.Length == 0 ? "/" : $"/{normalized}";
+        return normalized;
     }
 
     // Razor components use a fallback so missing satellite resources never make
