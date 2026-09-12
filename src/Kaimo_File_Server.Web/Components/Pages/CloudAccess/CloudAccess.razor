@@ -24,7 +24,7 @@
             <p class="subtitle">@R("Web_CloudAccess_Subtitle")</p>
         </div>
         <div class="page-header-actions">
-            @if (VM.Shares.Any())
+            @if (VM.Shares.Any() && VM.CanManageVirtualShares)
             {
                 <button class="btn-secondary vs-info-toggle @(_showVirtualShareDetails ? "vs-info-toggle--active" : "")"
                         type="button"
@@ -83,9 +83,21 @@
 {
     <div class="loading-state"><div class="spinner"></div><p>@R("Web_CloudAccess_Loading")</p></div>
 }
-else if (!VM.CanManage)
+else if (!VM.CanManage && !VM.Shares.Any())
 {
-    <div class="error-banner">@R("Web_CloudAccess_NoPermission")</div>
+    @* An actor with neither management rights nor any accessible share. In the virtual
+       shares tab this is simply "nothing to show" — not a management-permission error. *@
+    @if (Embedded && VirtualSharesOnly)
+    {
+        <div class="empty-state">
+            @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 64, Height: 64, Color: "var(--text-tertiary)"))
+            <p>@R("Web_CloudAccess_NoShares")</p>
+        </div>
+    }
+    else
+    {
+        <div class="error-banner">@R("Web_CloudAccess_NoPermission")</div>
+    }
 }
 else
 {
@@ -231,7 +243,7 @@ else
                     {
                         var isSelected = _selectedShare?.Id == share.Id;
                         var connection = VM.Connections.FirstOrDefault(x => x.Id == share.ConnectionId);
-                        var isUsable = IsShareUsable(share, connection);
+                        var isUsable = VM.IsShareUsable(share);
                         <button class="vs-table-row @(isSelected ? "vs-table-row--selected" : "")"
                                 type="button" role="option" aria-selected="@isSelected"
                                 @onclick="() => SelectShareAsync(share)" @ondblclick="() => OpenShare(share)">
@@ -243,16 +255,26 @@ else
                             </span>
                             <span class="vs-table-cell">
                                 <StatusBadge Tone="@(isUsable ? StatusTone.Positive : StatusTone.Negative)"
-                                             Label="@ShareStatusText(share, connection)" />
+                                             Label="@ShareStatusText(share)" />
                             </span>
                             @if (_showVirtualShareDetails)
                             {
-                                <span class="vs-table-cell vs-connection" title="@(connection?.Name)">
-                                    @(connection?.Name ?? "—")
-                                </span>
-                                <span class="vs-table-cell vs-connection" title="@share.RemoteRootPath">
-                                    @share.RemoteRootPath
-                                </span>
+                                @* Connection and remote-folder are management details — show
+                                   them only for shares the actor may manage. *@
+                                if (VM.CanManageShare(share))
+                                {
+                                    <span class="vs-table-cell vs-connection" title="@(connection?.Name)">
+                                        @(connection?.Name ?? "—")
+                                    </span>
+                                    <span class="vs-table-cell vs-connection" title="@share.RemoteRootPath">
+                                        @share.RemoteRootPath
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="vs-table-cell vs-connection">—</span>
+                                    <span class="vs-table-cell vs-connection">—</span>
+                                }
                             }
                         </button>
                     }
@@ -283,7 +305,18 @@ else
         }
 
         <aside class="admin-detail @(Embedded && VirtualSharesOnly ? "vs-detail-pane" : "cloud-access-detail-pane")">
-            @if (_selectedShare is not null)
+            @if (_selectedShare is not null && !VM.CanManageShare(_selectedShare))
+            {
+                @* Access-only: the actor may open the share but not inspect or edit its settings. *@
+                <div class="detail-header">
+                    <h3>@_selectedShare.Name</h3>
+                    <span class="detail-subtitle">@R("Web_CloudAccess_Title")</span>
+                </div>
+                <div class="detail-actions cloud-access-detail-actions">
+                    <button class="btn-primary" type="button" @onclick="() => OpenShare(_selectedShare)">@R("Web_CloudAccess_Open")</button>
+                </div>
+            }
+            else if (_selectedShare is not null)
             {
                 <div class="detail-header">
                     <h3>@_selectedShare.Name</h3>
@@ -574,6 +607,9 @@ else
         _selectedShare = share;
         _editingShare = false;
         _activeTab = CloudAccessTab.General;
+        // Principals back the management (access) editor; loading them requires manage
+        // rights. For a share the actor can only access, skip it — no management pane shows.
+        if (!VM.CanManageShare(share)) return;
         var connection = VM.Connections.FirstOrDefault(x => x.Id == share.ConnectionId);
         if (connection is not null)
             await VM.LoadPrincipalsAsync(connection.DepartmentId);
@@ -672,21 +708,15 @@ else
     private void ToggleVirtualShareDetails() => _showVirtualShareDetails = !_showVirtualShareDetails;
 
     /// <summary>
-    /// A virtual share is usable only when it is enabled and its backing connection is ready;
-    /// this mirrors the availability semantics of local shares.
-    /// </summary>
-    private static bool IsShareUsable(CloudAccessShare share, StorageConnection? connection)
-        => share.IsEnabled && connection is not null && IsReady(connection);
-
-    /// <summary>
     /// Resolves the status label shown in the share list. Reuses the local-share wording so both
-    /// share kinds present identical states (available / not available / disabled).
+    /// share kinds present identical states (available / not available / disabled). Connection
+    /// readiness comes from the view model so access-only shares also report correctly.
     /// </summary>
-    private string ShareStatusText(CloudAccessShare share, StorageConnection? connection)
+    private string ShareStatusText(CloudAccessShare share)
     {
         if (!share.IsEnabled)
             return R("Web_ShareList_Card_Disabled");
-        if (connection is null || !IsReady(connection))
+        if (!VM.IsShareUsable(share))
             return R("Web_ShareList_Card_Unavailable");
         return R("Web_ShareList_Card_Available");
     }

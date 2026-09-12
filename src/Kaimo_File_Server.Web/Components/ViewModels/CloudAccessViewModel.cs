@@ -30,7 +30,10 @@ public sealed class CloudAccessViewModel
     private readonly IStorageConnectionProviderCatalog? _providerCatalog;
     private readonly ICredentialVault? _credentialVault;
     private readonly IStorageDirectoryTargetResolver? _directoryTargets;
+    private readonly CloudAccessAuthorizationService? _cloudAuthorization;
     private UserContext? _actor;
+    private AuthorizedScopeResult? _shareScope;
+    private Dictionary<Guid, StorageConnectionState> _connectionStates = [];
 
     public CloudAccessViewModel(
         ICloudAccessRepository repository,
@@ -47,7 +50,8 @@ public sealed class CloudAccessViewModel
         ILogger<CloudAccessViewModel> logger,
         IStorageConnectionProviderCatalog? providerCatalog = null,
         ICredentialVault? credentialVault = null,
-        IStorageDirectoryTargetResolver? directoryTargets = null)
+        IStorageDirectoryTargetResolver? directoryTargets = null,
+        CloudAccessAuthorizationService? cloudAuthorization = null)
     {
         _repository = repository;
         _connections = connections;
@@ -61,6 +65,7 @@ public sealed class CloudAccessViewModel
         _localShares = localShares;
         _oneDriveConnections = oneDriveConnections;
         _logger = logger;
+        _cloudAuthorization = cloudAuthorization;
         _providerCatalog = providerCatalog;
         _credentialVault = credentialVault;
         _directoryTargets = directoryTargets;
@@ -79,6 +84,25 @@ public sealed class CloudAccessViewModel
     public bool CanUseConnections { get; private set; }
     public string? ErrorMessage { get; private set; }
 
+    /// <summary>
+    /// True if the actor may manage the given share (edit/delete/grants). A share the
+    /// actor only has access to via a grant returns false, so the UI can show it in the
+    /// list without exposing its management details.
+    /// </summary>
+    public bool CanManageShare(CloudAccessShare share)
+        => _shareScope is not null
+           && (_shareScope.IsUnrestricted || _shareScope.ScopeIds.Contains(share.DepartmentId));
+
+    /// <summary>
+    /// A virtual share is usable when it is enabled and its backing connection is ready.
+    /// Resolves against the full connection-state map, so it is correct even for shares
+    /// the actor only has access to (whose connection is not in <see cref="Connections"/>).
+    /// </summary>
+    public bool IsShareUsable(CloudAccessShare share)
+        => share.IsEnabled
+           && _connectionStates.TryGetValue(share.ConnectionId, out var state)
+           && state == StorageConnectionState.Ready;
+
     public async Task LoadAsync()
     {
         IsLoading = true;
@@ -93,6 +117,7 @@ public sealed class CloudAccessViewModel
                 _actor, ManagementPermission.UseConnections);
             var shareScope = await _managementAuth.GetAuthorizedDepartmentIdsAsync(
                 _actor, ManagementPermission.ManageCloudAccess);
+            _shareScope = shareScope;
             CanManageConnections = HasDepartments(connectionScope);
             CanUseConnections = HasDepartments(usageScope);
             CanManageVirtualShares = HasDepartments(shareScope);
@@ -104,15 +129,28 @@ public sealed class CloudAccessViewModel
             ManageableDepartments = allDepartments.Where(x => connectionManagementIds.Contains(x.Id))
                 .OrderByGlobalFirst().ToList();
             var visibleConnectionIds = connectionManagementIds.Concat(connectionUsageIds).ToHashSet();
-            Connections = (await _connections.GetAllAsync())
+            var allConnections = await _connections.GetAllAsync();
+            // Readiness of every connection, keyed by id, so the share list can show a
+            // correct status even for access-only shares whose backing connection sits
+            // outside the actor's management/use scope (and is therefore not in Connections).
+            _connectionStates = allConnections.ToDictionary(x => x.Id, x => x.State);
+            Connections = allConnections
                 .Where(x => visibleConnectionIds.Contains(x.DepartmentId)).ToList();
             ConnectionUsage = (await Task.WhenAll(Connections.Select(async connection =>
                     new KeyValuePair<Guid, StorageConnectionUsage>(
                         connection.Id,
                         await _connections.GetUsageAsync(connection.Id)))))
                 .ToDictionary(item => item.Key, item => item.Value);
-            Shares = (await _repository.GetSharesAsync())
-                .Where(x => shareIds.Contains(x.DepartmentId)).ToList();
+            // Managed shares (any state, incl. disabled) so managers keep full visibility,
+            // unioned with shares the actor merely has access to via a grant. This lets a
+            // non-manager still see the virtual shares they are allowed to open, while the
+            // management controls stay gated per-share by CanManageShare.
+            var managedShares = (await _repository.GetSharesAsync())
+                .Where(x => shareIds.Contains(x.DepartmentId));
+            var accessibleShares = _cloudAuthorization is null
+                ? []
+                : await _cloudAuthorization.GetVisibleSharesAsync(_actor);
+            Shares = managedShares.UnionBy(accessibleShares, share => share.Id).ToList();
         }
         catch (Exception exception)
         {

@@ -33,14 +33,20 @@
                 @Assets.SVG("folder.svg", new SvgOptions())
                 <span class="nav-label">@Resources.Web_Nav_Shares</span>
             </NavLink>
-            <NavLink class="nav-item" href="/users" Match="NavLinkMatch.All">
-                @Assets.SVG("users.svg", new SvgOptions())
-                <span class="nav-label">@Resources.Web_Nav_Users</span>
-            </NavLink>
-            <NavLink class="nav-item" href="/departments" Match="NavLinkMatch.All">
-                @Assets.SVG("building.svg", new SvgOptions())
-                <span class="nav-label">@Resources.Web_Nav_Departments</span>
-            </NavLink>
+            @if (_canManageUsers)
+            {
+                <NavLink class="nav-item" href="/users" Match="NavLinkMatch.All">
+                    @Assets.SVG("users.svg", new SvgOptions())
+                    <span class="nav-label">@Resources.Web_Nav_Users</span>
+                </NavLink>
+            }
+            @if (_canViewDepartments)
+            {
+                <NavLink class="nav-item" href="/departments" Match="NavLinkMatch.All">
+                    @Assets.SVG("building.svg", new SvgOptions())
+                    <span class="nav-label">@Resources.Web_Nav_Departments</span>
+                </NavLink>
+            }
             @* Keep the File Browser selected while navigating within a share. *@
             <NavLink class="nav-item" href="/files" Match="NavLinkMatch.Prefix">
                 @Assets.SVG("compass.svg", new SvgOptions())
@@ -125,6 +131,8 @@
     private bool _canManageSyncs;
     private bool _canManageCloudAccess;
     private bool _canManageSettings;
+    private bool _canManageUsers;
+    private bool _canViewDepartments;
     private UserContext? _currentUser;
     
     [Inject] private IJSRuntime JS { get; set; } = default!;
@@ -187,6 +195,22 @@
             _canManageSettings = _currentUser != null
                                  && await ManagementAuthService.HasAnyPermissionAsync(
                                         _currentUser, ManagementPermission.ManageSystemSettings);
+            // Mirror UserListViewModel.CanAccessPage — show the tab only if the user
+            // can reach the page behind it.
+            _canManageUsers = _currentUser != null
+                              && await ManagementAuthService.HasAnyPermissionAsync(
+                                     _currentUser,
+                                     ManagementPermission.CreateUsers
+                                     | ManagementPermission.EditUserProfiles
+                                     | ManagementPermission.CreateGroups
+                                     | ManagementPermission.ManageGroupMembers
+                                     | ManagementPermission.AssignRoles);
+            // Mirror DepartmentViewModel.CanAccessPage (FullAdmin carries ViewDepartment).
+            _canViewDepartments = _currentUser != null
+                                  && await ManagementAuthService.HasAnyPermissionAsync(
+                                         _currentUser,
+                                         ManagementPermission.ViewDepartment
+                                         | ManagementPermission.EditDepartment);
         }
 
         // Load the global date-display format once for the whole circuit (uses the

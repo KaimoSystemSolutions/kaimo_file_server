@@ -55,17 +55,29 @@
 
                 @if (ShowExtendedInfo)
                 {
-                    <span class="share-table-cell share-pool" title="@(StoragePoolName?.Invoke(share))">
-                        @(StoragePoolName?.Invoke(share) ?? "—")
-                    </span>
-                    <span class="share-table-cell">
-                        <StatusBadge Tone="@(share.IsRecycleEnabled ? StatusTone.Positive : StatusTone.Neutral)" ShowDot="false"
-                                     Label="@(share.IsRecycleEnabled ? Resources.Web_ShareList_Card_Yes : Resources.Web_ShareList_Card_No)" />
-                    </span>
-                    <span class="share-table-cell">
-                        <StatusBadge Tone="@(share.IsShareHidden ? StatusTone.Negative : StatusTone.Positive)" ShowDot="false"
-                                     Label="@(share.IsShareHidden ? Resources.Web_ShareList_Card_Yes : Resources.Web_ShareList_Card_No)" />
-                    </span>
+                    @* Storage pool, recycle-bin and hidden state are management details —
+                       only reveal them for shares the current user may manage. *@
+                    if (CanViewDetails?.Invoke(share) ?? true)
+                    {
+                        <span class="share-table-cell share-pool" title="@(StoragePoolName?.Invoke(share))">
+                            @(StoragePoolName?.Invoke(share) ?? "—")
+                        </span>
+                        <span class="share-table-cell">
+                            <StatusBadge Tone="@(share.IsRecycleEnabled ? StatusTone.Positive : StatusTone.Neutral)" ShowDot="false"
+                                         Label="@(share.IsRecycleEnabled ? Resources.Web_ShareList_Card_Yes : Resources.Web_ShareList_Card_No)" />
+                        </span>
+                        <span class="share-table-cell">
+                            <StatusBadge Tone="@(share.IsShareHidden ? StatusTone.Negative : StatusTone.Positive)" ShowDot="false"
+                                         Label="@(share.IsShareHidden ? Resources.Web_ShareList_Card_Yes : Resources.Web_ShareList_Card_No)" />
+                        </span>
+                    }
+                    else
+                    {
+                        @* Keep the grid columns aligned for non-manageable shares. *@
+                        <span class="share-table-cell">—</span>
+                        <span class="share-table-cell">—</span>
+                        <span class="share-table-cell">—</span>
+                    }
                 }
             </button>
         }
@@ -78,6 +90,8 @@
     [Parameter] public bool ShowExtendedInfo { get; set; }
     [Parameter] public Func<ShareDefinition, bool>? StorageAvailable { get; set; }
     [Parameter] public Func<ShareDefinition, string>? StoragePoolName { get; set; }
+    /// <summary>Per-share gate for the management-only columns (pool, recycle bin, hidden).</summary>
+    [Parameter] public Func<ShareDefinition, bool>? CanViewDetails { get; set; }
     [Parameter] public EventCallback<ShareDefinition> OnSelected { get; set; }
     [Parameter] public EventCallback<string> OnOpened { get; set; }
 

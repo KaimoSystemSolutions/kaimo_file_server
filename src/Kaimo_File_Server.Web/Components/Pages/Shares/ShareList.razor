@@ -32,7 +32,7 @@ else
         <p class="subtitle">@string.Format(Resources.Web_ShareList_Welcome, VM.CurrentUserName)</p>
     </div>
     <div class="page-header-actions">
-        @if (VM.Shares.Any())
+        @if (VM.Shares.Any() && VM.IsAdmin)
         {
             <button class="btn-secondary share-info-toggle @(_showExtendedShareInfo ? "share-info-toggle--active" : "")"
                     title="@(_showExtendedShareInfo
@@ -87,6 +87,7 @@ else
                        ShowExtendedInfo="_showExtendedShareInfo"
                        StorageAvailable="VM.IsShareStorageAvailable"
                        StoragePoolName="VM.GetStoragePoolDisplayNameForShare"
+                       CanViewDetails="@(s => VM.CanManageShare(s.Id))"
                        OnSelected="HandleCardClick"
                        OnOpened="OpenShare"/>
 
