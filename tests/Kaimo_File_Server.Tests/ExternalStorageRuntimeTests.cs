@@ -79,7 +79,6 @@ public sealed class ExternalStorageRuntimeTests : DatabaseTestBase
     {
         var connection = new StorageConnection
         {
-            DepartmentId = Guid.NewGuid(),
             CreatedByUserId = Guid.NewGuid(),
             ProviderId = "onedrive",
             Name = "Connection " + Guid.NewGuid().ToString("N"),

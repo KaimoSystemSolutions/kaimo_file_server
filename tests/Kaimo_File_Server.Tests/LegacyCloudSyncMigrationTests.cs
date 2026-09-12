@@ -69,7 +69,6 @@ public sealed class LegacyCloudSyncMigrationTests : DatabaseTestBase
         Assert.Equal(user.Id, definition.RunAsUserId);
         Assert.True(definition.Schedule.IsEnabled);
         Assert.Equal(1024, definition.AdvancedSettings.MaxDownloadBytesPerSecond);
-        Assert.Equal(share.DepartmentId, connection.DepartmentId);
         Assert.DoesNotContain("sensitive-refresh-token", connection.EncryptedCredentialPayload);
         var credentials = vault.UnprotectConnectionCredentials(connection);
         Assert.Equal("sensitive-refresh-token", credentials["refreshToken"]);

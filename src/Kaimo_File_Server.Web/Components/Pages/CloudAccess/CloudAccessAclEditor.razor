@@ -1,0 +1,189 @@
+@using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+
+@* Root-level ACL editor for a virtual share. Deliberately mirrors the file ACL
+   editor (AclEditor.razor) — same layout, class names and add/edit flow — but the
+   only permission choice is Read vs. Write, and every entry is an allow grant. *@
+<div class="acl-editor">
+    @if (Grants.Count > 0)
+    {
+        <div class="acl-list">
+            @foreach (var (principalId, level) in Grants.OrderBy(g => PrincipalName(g.Key), StringComparer.CurrentCultureIgnoreCase))
+            {
+                var isEditing = _editingId == principalId;
+                var kind = PrincipalKindOf(principalId);
+                <div class="acl-entry acl-entry--allow @(isEditing ? "acl-entry--editing" : "")">
+                    <div class="acl-entry-header">
+                        <div class="acl-entry-principal">
+                            @(kind switch
+                            {
+                                PrincipalKind.Group => Assets.SVG("users.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
+                                _ => Assets.SVG("user.svg", new SvgOptions(Width: 14, Height: 14, Color: "var(--text-tertiary)", StrokeWidth: 2, CssClass: "acl-icon")),
+                            })
+                            <span class="acl-entry-name">@PrincipalName(principalId)</span>
+                            <span class="acl-entry-type-badge badge--allow">@LevelLabel(level)</span>
+                        </div>
+                        <div class="acl-entry-actions">
+                            @if (!isEditing)
+                            {
+                                <button class="btn-icon btn-icon--small" type="button" title="@Resources.Web_Acl_Edit" @onclick="() => StartEdit(principalId, level)">
+                                    @Assets.SVG("edit_box.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                                </button>
+                                <button class="btn-icon btn-icon--small btn-icon--danger" type="button" title="@Resources.Web_Acl_Remove" @onclick="() => RemoveAsync(principalId)">
+                                    @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                                </button>
+                            }
+                        </div>
+                    </div>
+                    @if (isEditing)
+                    {
+                        @LevelForm(isAdd: false)
+                    }
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="empty-hint">@Resources.Web_Acl_EmptyHint</p>
+    }
+
+    @if (_adding)
+    {
+        <div class="acl-add-form">
+            <h4>@Resources.Web_Acl_AddPermission</h4>
+            <div class="acl-form">
+                <div class="acl-form-row">
+                    <span class="detail-label">@Resources.Web_Acl_Type</span>
+                    <PrincipalPickerField Mode="SelectionMode.Single"
+                                          Items="AvailableToAdd()"
+                                          SelectedIds="_addPrincipalId is { } id ? new[] { id } : []"
+                                          SelectedIdsChanged="OnPrincipalPicked"
+                                          Title="@Resources.Web_Acl_AddPermission"
+                                          Placeholder="@Resources.Web_Acl_SelectPlaceholder" />
+                </div>
+                @LevelForm(isAdd: true)
+            </div>
+        </div>
+    }
+    else if (_editingId is null)
+    {
+        <button class="btn-secondary" type="button" style="margin-top: 12px;" @onclick="StartAdd">
+            + @Resources.Web_Acl_AddPermission
+        </button>
+    }
+</div>
+
+@code {
+    /// <summary>Principals that may be granted access (already projected to picker items).</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<PrincipalPickerItem> Principals { get; set; } = [];
+
+    /// <summary>The current grants, keyed by principal. Mutated in place; <see cref="OnChanged"/> fires after edits.</summary>
+    [Parameter, EditorRequired] public Dictionary<Guid, CloudAccessPermission> Grants { get; set; } = [];
+
+    /// <summary>Raised after any add, edit, or removal so the parent can react (e.g. mark dirty).</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private bool _adding;
+    private Guid? _addPrincipalId;
+    private CloudAccessPermission _addLevel = CloudAccessPermission.Read;
+    private Guid? _editingId;
+    private CloudAccessPermission _editLevel = CloudAccessPermission.Read;
+
+    private RenderFragment LevelForm(bool isAdd) => __builder =>
+    {
+        <div class="acl-form" style="@(isAdd ? "" : "margin-top: 8px;")">
+            <div class="acl-form-row">
+                <span class="detail-label">@Resources.Web_Acl_Action</span>
+                <div class="acl-type-tabs">
+                    <button class="acl-type-tab @((isAdd ? _addLevel : _editLevel) == CloudAccessPermission.Read ? "active acl-tab--allow" : "")"
+                            type="button" @onclick="() => SetLevel(isAdd, CloudAccessPermission.Read)">
+                        @Resources.Web_Acl_Permission_Read
+                    </button>
+                    <button class="acl-type-tab @((isAdd ? _addLevel : _editLevel) == CloudAccessPermission.Write ? "active acl-tab--allow" : "")"
+                            type="button" @onclick="() => SetLevel(isAdd, CloudAccessPermission.Write)">
+                        @Resources.Web_Acl_Permission_Write
+                    </button>
+                </div>
+            </div>
+            <div class="acl-form-actions">
+                @if (isAdd)
+                {
+                    <button class="btn-primary" type="button" disabled="@(_addPrincipalId is null)" @onclick="AddAsync">@Resources.Web_Acl_Button_Add</button>
+                    <button class="btn-secondary" type="button" @onclick="CancelAdd">@Resources.Web_Acl_Button_Cancel</button>
+                }
+                else
+                {
+                    <button class="btn-primary" type="button" @onclick="SaveEditAsync">@Resources.Web_Acl_Button_Save</button>
+                    <button class="btn-secondary" type="button" @onclick="() => _editingId = null">@Resources.Web_Acl_Button_Cancel</button>
+                }
+            </div>
+        </div>
+    };
+
+    private void StartAdd()
+    {
+        _editingId = null;
+        _adding = true;
+        _addPrincipalId = null;
+        _addLevel = CloudAccessPermission.Read;
+    }
+
+    private void CancelAdd() => _adding = false;
+
+    private void OnPrincipalPicked(IReadOnlyList<Guid> ids) => _addPrincipalId = ids.Count > 0 ? ids[0] : null;
+
+    private void SetLevel(bool isAdd, CloudAccessPermission level)
+    {
+        if (isAdd) _addLevel = level; else _editLevel = level;
+    }
+
+    private async Task AddAsync()
+    {
+        if (_addPrincipalId is not { } id) return;
+        Grants[id] = _addLevel;
+        _adding = false;
+        await OnChanged.InvokeAsync();
+    }
+
+    private void StartEdit(Guid principalId, CloudAccessPermission level)
+    {
+        _adding = false;
+        _editingId = principalId;
+        _editLevel = level;
+    }
+
+    private async Task SaveEditAsync()
+    {
+        if (_editingId is { } id)
+        {
+            Grants[id] = _editLevel;
+            _editingId = null;
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task RemoveAsync(Guid principalId)
+    {
+        if (Grants.Remove(principalId))
+            await OnChanged.InvokeAsync();
+    }
+
+    // Principals not yet granted, so the add picker never offers a duplicate.
+    private IReadOnlyList<PrincipalPickerItem> AvailableToAdd()
+        => Principals.Where(p => !Grants.ContainsKey(p.Id)).ToList();
+
+    private string PrincipalName(Guid id)
+        => Principals.FirstOrDefault(p => p.Id == id)?.Name ?? id.ToString();
+
+    private PrincipalKind PrincipalKindOf(Guid id)
+        => Principals.FirstOrDefault(p => p.Id == id)?.Kind ?? PrincipalKind.User;
+
+    private static string LevelLabel(CloudAccessPermission level)
+        => level == CloudAccessPermission.Write
+            ? Resources.Web_Acl_Permission_Write
+            : Resources.Web_Acl_Permission_Read;
+}

@@ -2,6 +2,7 @@
 @using System.Diagnostics
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Pages.Acl
+@using Kaimo_File_Server.Web.Components.Pages.CloudAccess
 @using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser.components
 @using Kaimo_File_Server.Web.DynamicHelpers
 @using Kaimo_File_Server.Web.Helpers
@@ -18,6 +19,7 @@
 @inject CrossShareTransferService CrossShareTransfer
 @inject FileBrowserClipboardService BrowserClipboard
 @inject DateFormatService DateFmt
+@inject CloudAccessViewModel CloudAcl
 
 <PageTitle>@(VM.CurrentBrowserShare?.Name ?? Resources.Web_Files) - Kaimo Files</PageTitle>
 
@@ -56,6 +58,14 @@
             {
                 <span class="acl-badge">@rootCount</span>
             }
+        }
+        @if (CanManageVirtualShareAcls())
+        {
+            <button class="btn-secondary page-command @(_showVirtualAclPanel ? "page-command--active" : "")" title="@Resources.Web_ManagePermissions"
+                    @onclick="ToggleVirtualAclPanel">
+                @Assets.SVG("acl_panel.svg", new SvgOptions(Color: _showVirtualAclPanel ? "var(--accent)" : "currentColor"))
+                <span>@Resources.Web_ManagePermissions</span>
+            </button>
         }
     </div>
 </div>
@@ -314,6 +324,22 @@ else
                        ShareId="@VM.CurrentShare!.Id"
                        IsDirectory="true"
                        OnChanged="LoadAclCounts"/>
+        </div>
+    }
+
+    @* -- Virtual (Cloud Access) share root ACL panel -- *@
+    @if (_showVirtualAclPanel && CanManageVirtualShareAcls())
+    {
+        <div class="acl-panel">
+            <div class="acl-panel-header">
+                <h3>
+                    @Assets.SVG("shield.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2, CssClass: "acl-indicator-icon"))
+                </h3>
+                <span class="detail-subtitle">@Resources.Web_Acl_ShareRoot</span>
+            </div>
+            <CloudAccessAclEditor Principals="_virtualPrincipals"
+                                  Grants="_virtualGrants"
+                                  OnChanged="SaveVirtualGrantsAsync" />
         </div>
     }
 

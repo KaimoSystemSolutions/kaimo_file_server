@@ -897,9 +897,6 @@
   <data name="Web_Acl_SyncFolderWarning" xml:space="preserve">
     <value>This item is inside a synchronized folder. Permissions set here are not preserved when the synchronization renames or moves the item, because it matches items by path. Set permissions on the sync folder instead.</value>
   </data>
-  <data name="Web_Acl_SyncFolderBlocked" xml:space="preserve">
-    <value>This synchronized folder is configured to manage permissions on the folder level only. Set permissions on the sync folder root instead of on items inside it.</value>
-  </data>
   <data name="Web_Acl_Updated" xml:space="preserve">
     <value>Permission updated.</value>
   </data>
@@ -2610,12 +2607,6 @@
   <data name="Web_CloudSync_Advanced_SyncDeletions_Help" xml:space="preserve">
     <value>When a file or folder is deleted on one side, delete it on the other side too instead of restoring it. Takes effect from the second run after enabling. If the share has a recycle bin, locally deleted items are moved there and stay recoverable.</value>
   </data>
-  <data name="Web_CloudSync_Advanced_RootLevelPermissions" xml:space="preserve">
-    <value>Manage permissions only on the sync folder</value>
-  </data>
-  <data name="Web_CloudSync_Advanced_RootLevelPermissions_Help" xml:space="preserve">
-    <value>Block setting permissions on files and subfolders inside this synced folder. Because synchronization matches items by path, a rename or move it performs would otherwise silently drop their permissions. Permissions on the sync folder itself stay editable, and existing entries keep working.</value>
-  </data>
   <data name="Web_CloudSync_Schedule" xml:space="preserve">
     <value>Automatic sync</value>
   </data>
@@ -2942,9 +2933,6 @@
   </data>
   <data name="Web_CloudAccess_Browse" xml:space="preserve">
     <value>Browse…</value>
-  </data>
-  <data name="Web_CloudAccess_AccessMode" xml:space="preserve">
-    <value>Access mode</value>
   </data>
   <data name="Web_CloudAccess_ReadOnly" xml:space="preserve">
     <value>Read only</value>
@@ -3474,9 +3462,6 @@
   <data name="Web_ExternalStorage_PathInUse" xml:space="preserve">
     <value>This local folder already has a sync.</value>
   </data>
-  <data name="Web_ExternalStorage_DepartmentMismatch" xml:space="preserve">
-    <value>The connection and local share must belong to the same department.</value>
-  </data>
   <data name="Web_ExternalStorage_SelectConnection" xml:space="preserve">
     <value>Select a connection to inspect its details.</value>
   </data>
@@ -3710,9 +3695,6 @@
   </data>
   <data name="Web_ExternalStorage_SmbSharePickerHelp" xml:space="preserve">
     <value>Available SMB shares are loaded after connecting and can be selected when configuring a sync.</value>
-  </data>
-  <data name="Web_ExternalStorage_DepartmentRequiredHint" xml:space="preserve">
-    <value>A department is required: it controls who can see, use, and manage this connection. Choose Global to make it available across all departments.</value>
   </data>
   <data name="Web_ExternalStorage_RuntimeIdentity" xml:space="preserve">
     <value>Runtime network identity</value>

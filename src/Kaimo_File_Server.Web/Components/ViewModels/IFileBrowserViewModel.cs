@@ -35,6 +35,13 @@ public interface IFileBrowserViewModel
     bool CanManageSyncs => false;
 
     /// <summary>
+    /// True when the current backend is a virtual (Cloud Access) share whose root-level
+    /// ACLs the actor may manage. Local backends keep the safe default; the file browser
+    /// uses it to offer the "manage permissions" action at the virtual share's root.
+    /// </summary>
+    bool CanManageVirtualShareAcls => false;
+
+    /// <summary>
     /// Returns the sync marker for an entry when it is, or lives beneath, the local
     /// destination folder of a sync; <c>null</c> otherwise. Backends without local
     /// syncs (Cloud Access, remote) keep the safe default.

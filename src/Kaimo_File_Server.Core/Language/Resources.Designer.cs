@@ -232,15 +232,6 @@ namespace Kaimo_File_Server.Core.Language {
         }
 
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die das Sperren von ACLs in einem synchronisierten Ordner erklärt.
-        /// </summary>
-        public static string Web_Acl_SyncFolderBlocked {
-            get {
-                return ResourceManager.GetString("Web_Acl_SyncFolderBlocked", resourceCulture);
-            }
-        }
-
-        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Add Permission ähnelt.
         /// </summary>
         public static string Web_Acl_AddPermission {

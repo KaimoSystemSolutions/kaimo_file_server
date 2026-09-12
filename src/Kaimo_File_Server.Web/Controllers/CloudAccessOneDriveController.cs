@@ -81,11 +81,11 @@ public sealed class CloudAccessOneDriveController(
         if (connection is null || !string.Equals(connection.ProviderId, "onedrive", StringComparison.OrdinalIgnoreCase))
             return NotFound("Cloud Access connection not found.");
         // The single-use ticket is the authorization proof: it is issued only after
-        // the ManageConnections check and is bound to this connection and department.
-        // The Blazor localStorage JWT is not present on this full-page navigation, so
-        // the session is intentionally not required here (see the download endpoint).
+        // the ManageConnections check and is bound to this connection. The Blazor
+        // localStorage JWT is not present on this full-page navigation, so the
+        // session is intentionally not required here (see the download endpoint).
         if (!await tickets.IsValidAsync(
-                ticket, connectionId, string.Empty, "onedrive-access", null, connection.DepartmentId))
+                ticket, connectionId, string.Empty, "onedrive-access"))
             return BadRequest("The Cloud Access authorization request is invalid or has expired.");
         try
         {
@@ -113,8 +113,7 @@ public sealed class CloudAccessOneDriveController(
             return Ok(new { state = "failed", message = R("Web_CloudAccess_ConnectionMissing") });
         if (result.AuthorizationTicket is null || result.RefreshToken is null || result.Scope is null
             || !await tickets.TryConsumeAsync(
-                result.AuthorizationTicket, result.ShareId, string.Empty, "onedrive-access",
-                null, record.DepartmentId))
+                result.AuthorizationTicket, result.ShareId, string.Empty, "onedrive-access"))
             return Ok(new { state = "failed", message = R("Web_CloudSync_Device_Expired") });
 
         var credentials = new Dictionary<string, string>

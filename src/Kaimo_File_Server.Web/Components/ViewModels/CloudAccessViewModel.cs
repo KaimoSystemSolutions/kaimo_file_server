@@ -111,31 +111,31 @@ public sealed class CloudAccessViewModel
         {
             _actor = await GetActorAsync();
             if (_actor is null) return;
-            var connectionScope = await _managementAuth.GetAuthorizedDepartmentIdsAsync(
+            // Connections are global: no department anchor, so management and use are
+            // global-scope permissions. Only virtual shares carry a department.
+            CanManageConnections = await _managementAuth.HasGlobalPermissionAsync(
                 _actor, ManagementPermission.ManageConnections);
-            var usageScope = await _managementAuth.GetAuthorizedDepartmentIdsAsync(
+            CanUseConnections = await _managementAuth.HasGlobalPermissionAsync(
                 _actor, ManagementPermission.UseConnections);
             var shareScope = await _managementAuth.GetAuthorizedDepartmentIdsAsync(
                 _actor, ManagementPermission.ManageCloudAccess);
             _shareScope = shareScope;
-            CanManageConnections = HasDepartments(connectionScope);
-            CanUseConnections = HasDepartments(usageScope);
             CanManageVirtualShares = HasDepartments(shareScope);
             CanManage = CanManageConnections || CanManageVirtualShares || CanUseConnections;
             var allDepartments = await _departments.GetAllAsync();
-            var connectionManagementIds = GetDepartmentIds(connectionScope, allDepartments);
-            var connectionUsageIds = GetDepartmentIds(usageScope, allDepartments);
             var shareIds = GetDepartmentIds(shareScope, allDepartments);
-            ManageableDepartments = allDepartments.Where(x => connectionManagementIds.Contains(x.Id))
+            // Departments a virtual share may be mapped to = where the actor can manage
+            // cloud access (Global first, as the default mapping).
+            ManageableDepartments = allDepartments.Where(x => shareIds.Contains(x.Id))
                 .OrderByGlobalFirst().ToList();
-            var visibleConnectionIds = connectionManagementIds.Concat(connectionUsageIds).ToHashSet();
             var allConnections = await _connections.GetAllAsync();
             // Readiness of every connection, keyed by id, so the share list can show a
-            // correct status even for access-only shares whose backing connection sits
-            // outside the actor's management/use scope (and is therefore not in Connections).
+            // correct status even for access-only shares whose backing connection the
+            // actor cannot manage/use (and which is therefore not in Connections).
             _connectionStates = allConnections.ToDictionary(x => x.Id, x => x.State);
-            Connections = allConnections
-                .Where(x => visibleConnectionIds.Contains(x.DepartmentId)).ToList();
+            Connections = CanManageConnections || CanUseConnections
+                ? allConnections
+                : [];
             ConnectionUsage = (await Task.WhenAll(Connections.Select(async connection =>
                     new KeyValuePair<Guid, StorageConnectionUsage>(
                         connection.Id,
@@ -160,14 +160,13 @@ public sealed class CloudAccessViewModel
         finally { IsLoading = false; }
     }
 
-    public async Task<string> CreateOneDriveConnectionAsync(string name, Guid departmentId)
+    public async Task<string> CreateOneDriveConnectionAsync(string name)
     {
-        await EnsureCanManageConnectionDepartmentAsync(departmentId);
+        await EnsureCanManageConnectionsAsync();
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 200)
             throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
         var connection = new StorageConnection
         {
-            DepartmentId = departmentId,
             CreatedByUserId = _actor!.User.Id,
             ProviderProfileId = WellKnownProviderProfiles.MicrosoftPublicClient,
             ProviderId = "onedrive",
@@ -177,7 +176,7 @@ public sealed class CloudAccessViewModel
         };
         await _connections.SaveAsync(connection);
         var ticket = await _tickets.IssueAsync(
-            connection.Id, string.Empty, "onedrive-access", _actor.User.Id, connection.DepartmentId);
+            connection.Id, string.Empty, "onedrive-access", _actor.User.Id);
         return $"/api/cloud-access/onedrive/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
     }
 
@@ -185,14 +184,13 @@ public sealed class CloudAccessViewModel
     /// Creates a pending Dropbox connection and returns the authorization page URL.
     /// Dropbox uses PKCE with only a public application key; no secret is stored.
     /// </summary>
-    public async Task<string> CreateDropboxConnectionAsync(string name, Guid departmentId)
+    public async Task<string> CreateDropboxConnectionAsync(string name)
     {
-        await EnsureCanManageConnectionDepartmentAsync(departmentId);
+        await EnsureCanManageConnectionsAsync();
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 200)
             throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
         var connection = new StorageConnection
         {
-            DepartmentId = departmentId,
             CreatedByUserId = _actor!.User.Id,
             ProviderId = "dropbox",
             Name = name.Trim(),
@@ -201,7 +199,7 @@ public sealed class CloudAccessViewModel
         };
         await _connections.SaveAsync(connection);
         var ticket = await _tickets.IssueAsync(
-            connection.Id, string.Empty, "dropbox-access", _actor.User.Id, connection.DepartmentId);
+            connection.Id, string.Empty, "dropbox-access", _actor.User.Id);
         return $"/api/cloud-access/dropbox/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
     }
 
@@ -212,14 +210,13 @@ public sealed class CloudAccessViewModel
     public async Task CreateConfiguredConnectionAsync(
         string providerId,
         string name,
-        Guid departmentId,
         string settingsJson,
         string? username = null,
         string? password = null,
         string? domain = null,
         byte[]? sshPrivateKey = null)
     {
-        await EnsureCanManageConnectionDepartmentAsync(departmentId);
+        await EnsureCanManageConnectionsAsync();
         if (_providerCatalog is null)
             throw new NotSupportedException(R("Web_ExternalStorage_ProviderUnsupported"));
         var provider = _providerCatalog.GetRequired(providerId);
@@ -247,7 +244,6 @@ public sealed class CloudAccessViewModel
 
         var connection = new StorageConnection
         {
-            DepartmentId = departmentId,
             CreatedByUserId = _actor!.User.Id,
             ProviderId = provider.Id,
             Name = normalizedName,
@@ -308,7 +304,7 @@ public sealed class CloudAccessViewModel
             _ => throw new NotSupportedException(R("Web_ExternalStorage_AuthorizeUnsupported"))
         };
         var ticket = await _tickets.IssueAsync(
-            connection.Id, string.Empty, purpose, _actor!.User.Id, connection.DepartmentId);
+            connection.Id, string.Empty, purpose, _actor!.User.Id);
         return $"/api/cloud-access/{endpoint}/connect?connectionId={connection.Id}&ticket={Uri.EscapeDataString(ticket)}";
     }
 
@@ -488,6 +484,13 @@ public sealed class CloudAccessViewModel
             foreach (var user in await _departments.GetUsersAsync(id)) users[user.Id] = user;
             foreach (var group in await _departments.GetGroupsAsync(id)) groups[group.Id] = group;
         }
+        // The creator and the built-in Admins group receive access to every new share
+        // (see CreateShareAsync). They must always be visible and manageable in the ACL
+        // editor even when they sit outside this department's scope.
+        if (_actor is not null) users[_actor.User.Id] = _actor.User;
+        foreach (var group in await _groups.GetAllAsync())
+            if (string.Equals(group.Name, AdminsGroupName, StringComparison.OrdinalIgnoreCase))
+                groups[group.Id] = group;
         AvailablePrincipals = users.Values.Cast<Identity>().Concat(groups.Values)
             .OrderBy(x => x is Group ? 1 : 0).ThenBy(x => x.Name).ToList();
     }
@@ -496,9 +499,10 @@ public sealed class CloudAccessViewModel
         Guid connectionId,
         string name,
         string remoteRootPath,
-        bool isReadOnly,
-        IEnumerable<Guid> principalIds)
+        Guid departmentId,
+        IReadOnlyDictionary<Guid, CloudAccessPermission> grants)
     {
+        await EnsureCanManageDepartmentAsync(departmentId);
         var connectionRecord = await GetUsableConnectionAsync(connectionId);
         if (_providerCatalog is not null
             && !_providerCatalog.GetRequired(connectionRecord.ProviderId).Capabilities
@@ -529,24 +533,60 @@ public sealed class CloudAccessViewModel
         var share = new CloudAccessShare
         {
             ConnectionId = connectionId,
-            DepartmentId = connectionRecord.DepartmentId,
+            DepartmentId = departmentId,
             Name = normalizedName,
             RemoteRootPath = folder.Path,
             RemoteRootItemId = folder.StableId,
-            IsReadOnly = isReadOnly || !Supports(connectionRecord, StorageProviderCapabilities.Write),
             IsEnabled = true
         };
         await _repository.UpsertShareAsync(share);
+
+        // The creator and the built-in Admins group always get read+write on a new share,
+        // regardless of the department-scoped principal picker.
+        var effectiveGrants = new Dictionary<Guid, CloudAccessPermission>(grants)
+        {
+            [_actor!.User.Id] = CloudAccessPermission.Write
+        };
+        var alwaysAllowed = new HashSet<Guid> { _actor.User.Id };
+        if (await ResolveAdminsGroupIdAsync() is { } adminsGroupId)
+        {
+            effectiveGrants[adminsGroupId] = CloudAccessPermission.Write;
+            alwaysAllowed.Add(adminsGroupId);
+        }
+        await _repository.ReplaceGrantsAsync(
+            share.Id, BuildGrants(share.Id, connectionRecord, effectiveGrants, alwaysAllowed));
+        await LoadAsync();
+    }
+
+    /// <summary>Name of the seeded system group that always receives access to new virtual shares.</summary>
+    private const string AdminsGroupName = "Admins";
+
+    private async Task<Guid?> ResolveAdminsGroupIdAsync()
+        => (await _groups.GetAllAsync())
+            .FirstOrDefault(group => string.Equals(group.Name, AdminsGroupName, StringComparison.OrdinalIgnoreCase))?.Id;
+
+    /// <summary>
+    /// Materializes root-level grants for the allowed principals, clamping Write to Read
+    /// when the backing provider cannot write (mirrors the old share-wide read-only flag).
+    /// Principals in <paramref name="alwaysAllowed"/> bypass the department-scoped filter.
+    /// </summary>
+    private IEnumerable<CloudAccessGrant> BuildGrants(
+        Guid shareId,
+        StorageConnection connection,
+        IReadOnlyDictionary<Guid, CloudAccessPermission> grants,
+        IReadOnlySet<Guid>? alwaysAllowed = null)
+    {
+        bool canWrite = Supports(connection, StorageProviderCapabilities.Write);
         var allowed = AvailablePrincipals.Select(x => x.Id).ToHashSet();
-        var grants = principalIds.Distinct().Where(allowed.Contains)
-            .Select(id => new CloudAccessGrant
+        return grants
+            .Where(pair => allowed.Contains(pair.Key) || (alwaysAllowed?.Contains(pair.Key) ?? false))
+            .Select(pair => new CloudAccessGrant
             {
-                ShareId = share.Id,
-                PrincipalId = id,
+                ShareId = shareId,
+                PrincipalId = pair.Key,
+                Permission = canWrite ? pair.Value : CloudAccessPermission.Read,
                 GrantedByUserId = _actor!.User.Id
             });
-        await _repository.ReplaceGrantsAsync(share.Id, grants);
-        await LoadAsync();
     }
 
     /// <summary>
@@ -556,8 +596,7 @@ public sealed class CloudAccessViewModel
     public async Task UpdateShareAsync(
         Guid shareId,
         string name,
-        string remoteRootPath,
-        bool isReadOnly)
+        string remoteRootPath)
     {
         var share = await _repository.GetShareAsync(shareId)
                     ?? throw new InvalidOperationException(R("Web_CloudAccess_ShareMissing"));
@@ -590,7 +629,6 @@ public sealed class CloudAccessViewModel
         share.Name = normalizedName;
         share.RemoteRootPath = folder.Path;
         share.RemoteRootItemId = folder.StableId;
-        share.IsReadOnly = isReadOnly || !Supports(connectionRecord, StorageProviderCapabilities.Write);
         await _repository.UpsertShareAsync(share);
         await LoadAsync();
     }
@@ -604,32 +642,33 @@ public sealed class CloudAccessViewModel
         await LoadAsync();
     }
 
-    public async Task<HashSet<Guid>> LoadShareGrantsAsync(Guid shareId)
+    public async Task<Dictionary<Guid, CloudAccessPermission>> LoadShareGrantsAsync(Guid shareId)
     {
         var share = await _repository.GetShareAsync(shareId)
                     ?? throw new InvalidOperationException(R("Web_CloudAccess_ShareMissing"));
         await EnsureCanManageDepartmentAsync(share.DepartmentId);
         await LoadPrincipalsAsync(share.DepartmentId);
         var allowed = AvailablePrincipals.Select(x => x.Id).ToHashSet();
-        var current = await _repository.GetPrincipalIdsAsync(shareId);
-        current.IntersectWith(allowed);
-        return current;
+        return (await _repository.GetGrantsAsync(shareId))
+            .Where(grant => allowed.Contains(grant.PrincipalId))
+            .ToDictionary(grant => grant.PrincipalId, grant => grant.Permission);
     }
 
-    public async Task UpdateShareGrantsAsync(Guid shareId, IEnumerable<Guid> principalIds)
+    public async Task UpdateShareGrantsAsync(Guid shareId, IReadOnlyDictionary<Guid, CloudAccessPermission> grants)
     {
         var share = await _repository.GetShareAsync(shareId)
                     ?? throw new InvalidOperationException(R("Web_CloudAccess_ShareMissing"));
         await EnsureCanManageDepartmentAsync(share.DepartmentId);
         await LoadPrincipalsAsync(share.DepartmentId);
+        var connectionRecord = await GetUsableConnectionAsync(share.ConnectionId);
+        // The editor only manages principals it can display (the department scope). Grants
+        // for principals outside that scope — e.g. the creator or the Admins group on a
+        // non-global share — are preserved so an ACL edit never silently drops them.
         var allowed = AvailablePrincipals.Select(x => x.Id).ToHashSet();
-        var grants = principalIds.Distinct().Where(allowed.Contains).Select(id => new CloudAccessGrant
-        {
-            ShareId = shareId,
-            PrincipalId = id,
-            GrantedByUserId = _actor!.User.Id
-        });
-        await _repository.ReplaceGrantsAsync(shareId, grants);
+        var preserved = (await _repository.GetGrantsAsync(shareId))
+            .Where(grant => !allowed.Contains(grant.PrincipalId));
+        await _repository.ReplaceGrantsAsync(
+            shareId, preserved.Concat(BuildGrants(shareId, connectionRecord, grants)));
     }
 
     public async Task DeleteConnectionAsync(Guid connectionId)
@@ -648,7 +687,7 @@ public sealed class CloudAccessViewModel
     {
         var connection = await _connections.GetAsync(connectionId)
                          ?? throw new InvalidOperationException(R("Web_CloudAccess_ConnectionMissing"));
-        await EnsureCanManageConnectionDepartmentAsync(connection.DepartmentId);
+        await EnsureCanManageConnectionsAsync();
         return connection;
     }
 
@@ -656,20 +695,24 @@ public sealed class CloudAccessViewModel
     {
         var connection = await _connections.GetAsync(connectionId)
                          ?? throw new InvalidOperationException(R("Web_CloudAccess_ConnectionMissing"));
-        await EnsureCanManageDepartmentAsync(connection.DepartmentId);
-        _actor ??= await GetActorAsync();
-        if (_actor is null || !await _managementAuth.CanManageDepartmentAsync(
-                _actor, connection.DepartmentId, ManagementPermission.UseConnections))
-            throw new UnauthorizedAccessException(R("Web_StorageConnection_UseDenied"));
+        await EnsureCanUseConnectionsAsync();
         return connection;
     }
 
-    private async Task EnsureCanManageConnectionDepartmentAsync(Guid departmentId)
+    private async Task EnsureCanManageConnectionsAsync()
     {
         _actor ??= await GetActorAsync();
-        if (_actor is null || !await _managementAuth.CanManageDepartmentAsync(
-                _actor, departmentId, ManagementPermission.ManageConnections))
+        if (_actor is null || !await _managementAuth.HasGlobalPermissionAsync(
+                _actor, ManagementPermission.ManageConnections))
             throw new UnauthorizedAccessException(R("Web_StorageConnection_ManageDenied"));
+    }
+
+    private async Task EnsureCanUseConnectionsAsync()
+    {
+        _actor ??= await GetActorAsync();
+        if (_actor is null || !await _managementAuth.HasGlobalPermissionAsync(
+                _actor, ManagementPermission.UseConnections))
+            throw new UnauthorizedAccessException(R("Web_StorageConnection_UseDenied"));
     }
 
     private async Task EnsureCanManageDepartmentAsync(Guid departmentId)

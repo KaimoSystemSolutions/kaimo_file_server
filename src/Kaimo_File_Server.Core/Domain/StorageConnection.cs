@@ -34,7 +34,6 @@ public enum StorageAuthorizationMode
 public sealed class StorageConnection
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid DepartmentId { get; set; }
     public Guid CreatedByUserId { get; set; }
     public Guid? ProviderProfileId { get; set; }
     public string ProviderId { get; set; } = string.Empty;

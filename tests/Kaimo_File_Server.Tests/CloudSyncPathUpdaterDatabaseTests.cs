@@ -147,7 +147,6 @@ public sealed class CloudSyncPathUpdaterDatabaseTests : DatabaseTestBase
     {
         var connection = new StorageConnection
         {
-            DepartmentId = share.DepartmentId,
             ProviderId = "google",
             Name = "conn-" + Guid.NewGuid().ToString("N")[..8],
             State = StorageConnectionState.Ready,

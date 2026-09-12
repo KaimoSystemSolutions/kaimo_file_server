@@ -3,6 +3,7 @@ using System;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Kaimo_File_Server.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260912181841_DropStorageConnectionDepartment")]
+    partial class DropStorageConnectionDepartment
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -252,9 +255,6 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                     b.Property<Guid>("GrantedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Permission")
-                        .HasColumnType("integer");
-
                     b.HasKey("ShareId", "PrincipalId");
 
                     b.HasIndex("PrincipalId");
@@ -282,6 +282,9 @@ namespace Kaimo_File_Server.Infrastructure.Migrations
                         .HasColumnType("character varying(1000)");
 
                     b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsReadOnly")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Name")

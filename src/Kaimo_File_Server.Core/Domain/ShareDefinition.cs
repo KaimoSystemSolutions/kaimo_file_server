@@ -366,26 +366,13 @@ namespace Kaimo_File_Server.Core.Domain
         /// </summary>
         public bool SyncDeletions { get; set; }
 
-        /// <summary>
-        /// When <c>true</c>, per-item access control lists may only be managed on
-        /// this sync's root folder — the ACL editor blocks adding or editing
-        /// permissions on any file or subfolder below it. Rationale: the
-        /// synchronization reconciles by path (no stable file identity), so a
-        /// rename or move it performs drops the ACL that was attached to the old
-        /// path. Restricting permissions to the stable root avoids that
-        /// silent-loss surprise. Existing entries below the root keep working and
-        /// remain removable; only new writes below the root are refused.
-        /// </summary>
-        public bool RootLevelPermissionsOnly { get; set; }
-
         public CloudSyncAdvancedSettings Clone() => new()
         {
             MaxFileSizeBytes = MaxFileSizeBytes,
             ExcludedExtensions = new HashSet<string>(ExcludedExtensions ?? [], StringComparer.OrdinalIgnoreCase),
             MaxUploadBytesPerSecond = MaxUploadBytesPerSecond,
             MaxDownloadBytesPerSecond = MaxDownloadBytesPerSecond,
-            SyncDeletions = SyncDeletions,
-            RootLevelPermissionsOnly = RootLevelPermissionsOnly
+            SyncDeletions = SyncDeletions
         };
 
         public bool Equals(CloudSyncAdvancedSettings? other)
@@ -394,7 +381,6 @@ namespace Kaimo_File_Server.Core.Domain
                && MaxUploadBytesPerSecond == other.MaxUploadBytesPerSecond
                && MaxDownloadBytesPerSecond == other.MaxDownloadBytesPerSecond
                && SyncDeletions == other.SyncDeletions
-               && RootLevelPermissionsOnly == other.RootLevelPermissionsOnly
                && (ExcludedExtensions ?? []).SetEquals(other.ExcludedExtensions ?? []);
 
         public override bool Equals(object? obj) => Equals(obj as CloudSyncAdvancedSettings);
@@ -406,7 +392,6 @@ namespace Kaimo_File_Server.Core.Domain
             hash.Add(MaxUploadBytesPerSecond);
             hash.Add(MaxDownloadBytesPerSecond);
             hash.Add(SyncDeletions);
-            hash.Add(RootLevelPermissionsOnly);
             foreach (var extension in (ExcludedExtensions ?? []).Order(StringComparer.OrdinalIgnoreCase))
                 hash.Add(extension, StringComparer.OrdinalIgnoreCase);
             return hash.ToHashCode();

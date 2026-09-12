@@ -62,7 +62,7 @@ public sealed class StorageConnectionRepositoryTests : DatabaseTestBase
             db.CloudAccessShares.Add(new CloudAccessShare
             {
                 ConnectionId = connection.Id,
-                DepartmentId = connection.DepartmentId,
+                DepartmentId = Guid.NewGuid(),
                 Name = "Remote documents",
                 RemoteRootPath = "documents"
             });
@@ -90,7 +90,7 @@ public sealed class StorageConnectionRepositoryTests : DatabaseTestBase
             db.CloudAccessShares.Add(new CloudAccessShare
             {
                 ConnectionId = connection.Id,
-                DepartmentId = connection.DepartmentId,
+                DepartmentId = Guid.NewGuid(),
                 Name = "Protected remote share",
                 RemoteRootPath = string.Empty
             });
@@ -160,7 +160,6 @@ public sealed class StorageConnectionRepositoryTests : DatabaseTestBase
     private static StorageConnection NewConnection()
         => new()
         {
-            DepartmentId = Guid.NewGuid(),
             CreatedByUserId = Guid.NewGuid(),
             ProviderId = "onedrive",
             Name = $"Connection {Guid.NewGuid():N}",

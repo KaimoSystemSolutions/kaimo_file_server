@@ -14,7 +14,6 @@ public sealed class SyncDefinitionRepositoryTests : DatabaseTestBase
         var share = SeedShare("first-class-save");
         var connection = new StorageConnection
         {
-            DepartmentId = share.DepartmentId,
             CreatedByUserId = Guid.NewGuid(),
             ProviderId = "onedrive",
             Name = "Reusable connection",
@@ -54,7 +53,6 @@ public sealed class SyncDefinitionRepositoryTests : DatabaseTestBase
         var share = SeedShare("imported-delete");
         var connection = new StorageConnection
         {
-            DepartmentId = share.DepartmentId,
             CreatedByUserId = Guid.NewGuid(),
             ProviderId = "google",
             Name = "Imported connection",
@@ -103,7 +101,6 @@ public sealed class SyncDefinitionRepositoryTests : DatabaseTestBase
         var share = SeedShare("sync-runtime");
         var connection = new StorageConnection
         {
-            DepartmentId = share.DepartmentId,
             CreatedByUserId = Guid.NewGuid(),
             ProviderId = "google",
             Name = $"Runtime connection {Guid.NewGuid():N}",

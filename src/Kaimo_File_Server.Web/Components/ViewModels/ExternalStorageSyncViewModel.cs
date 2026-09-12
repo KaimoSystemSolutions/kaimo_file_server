@@ -70,15 +70,13 @@ public sealed class ExternalStorageSyncViewModel(
                 .ToArray();
 
             var allConnections = await connections.GetAllAsync();
-            var connectionScope = await managementAuth.GetAuthorizedDepartmentIdsAsync(
-                _actor, ManagementPermission.UseConnections);
-            var visibleDepartmentIds = connectionScope.IsUnrestricted
-                ? allConnections.Select(connection => connection.DepartmentId).ToHashSet()
-                : connectionScope.ScopeIds.ToHashSet();
-            Connections = allConnections
-                .Where(connection => visibleDepartmentIds.Contains(connection.DepartmentId))
-                .OrderBy(connection => connection.Name, StringComparer.CurrentCultureIgnoreCase)
-                .ToArray();
+            // Connections are global: visible to any holder of global UseConnections.
+            Connections = await managementAuth.HasGlobalPermissionAsync(
+                    _actor, ManagementPermission.UseConnections)
+                ? allConnections
+                    .OrderBy(connection => connection.Name, StringComparer.CurrentCultureIgnoreCase)
+                    .ToArray()
+                : [];
 
             var shareNames = allShares.ToDictionary(share => share.Id, share => share.Name);
             var connectionNames = allConnections.ToDictionary(connection => connection.Id, connection => connection.Name);
@@ -114,7 +112,6 @@ public sealed class ExternalStorageSyncViewModel(
         EnsureCapability(connection, StorageProviderCapabilities.Sync, "Web_ExternalStorage_SyncUnsupported",
             "This provider does not support synchronization.");
         EnsureDirectionSupported(connection, model.Mode);
-        ValidateDepartmentMatch(share, connection);
         if (providerCatalog.GetRequired(connection.ProviderId).Capabilities
             .HasFlag(StorageProviderCapabilities.Browse))
             model.RemotePath = (await directoryTargets.ResolveDirectoryAsync(connection, model.RemotePath)).Path;
@@ -154,7 +151,6 @@ public sealed class ExternalStorageSyncViewModel(
         EnsureCapability(connection, StorageProviderCapabilities.Sync, "Web_ExternalStorage_SyncUnsupported",
             "This provider does not support synchronization.");
         EnsureDirectionSupported(connection, model.Mode);
-        ValidateDepartmentMatch(share, connection);
         if (providerCatalog.GetRequired(connection.ProviderId).Capabilities
             .HasFlag(StorageProviderCapabilities.Browse))
             model.RemotePath = (await directoryTargets.ResolveDirectoryAsync(connection, model.RemotePath)).Path;
@@ -241,10 +237,10 @@ public sealed class ExternalStorageSyncViewModel(
         await EnsureActorAsync();
         var storageConnection = await GetUsableConnectionAsync(connectionId);
         // A local share is optional while browsing: authorization is already
-        // enforced on the connection. When one is chosen we still verify the two
-        // belong to the same department, matching the create/update guard.
+        // enforced on the connection (global UseConnections). When one is chosen we
+        // still verify the actor may configure syncs on it.
         if (localShareId != Guid.Empty)
-            ValidateDepartmentMatch(await GetBrowsableShareAsync(localShareId), storageConnection);
+            await GetBrowsableShareAsync(localShareId);
 
         try
         {
@@ -365,10 +361,10 @@ public sealed class ExternalStorageSyncViewModel(
         var connection = await connections.GetAsync(id)
                          ?? throw new InvalidOperationException(Text(
                              "Web_CloudAccess_ConnectionMissing", "The connection no longer exists."));
-        if (!await managementAuth.CanManageDepartmentAsync(
-                _actor!, connection.DepartmentId, ManagementPermission.UseConnections))
+        if (!await managementAuth.HasGlobalPermissionAsync(
+                _actor!, ManagementPermission.UseConnections))
             throw new UnauthorizedAccessException(Text(
-                "Web_StorageConnection_UseDenied", "You may not use connections in this department."));
+                "Web_StorageConnection_UseDenied", "You may not use connections."));
         if (connection.State != StorageConnectionState.Ready
             || (RequiresProtectedCredential(connection.AuthorizationMode)
                 && string.IsNullOrWhiteSpace(connection.EncryptedCredentialPayload)))
@@ -407,14 +403,6 @@ public sealed class ExternalStorageSyncViewModel(
             or StorageAuthorizationMode.SshKey
             or StorageAuthorizationMode.NetworkIdentity);
 
-    private static void ValidateDepartmentMatch(ShareDefinition share, StorageConnection connection)
-    {
-        if (share.DepartmentId != connection.DepartmentId)
-            throw new InvalidOperationException(Text(
-                "Web_ExternalStorage_DepartmentMismatch",
-                "The connection and local share must belong to the same department."));
-    }
-
     private async Task EnsureActorAsync()
     {
         _actor ??= await GetActorAsync();
@@ -448,8 +436,7 @@ public sealed class ExternalStorageSyncViewModel(
             .Split([',', ';', ' ', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(extension => extension.StartsWith('.') ? extension : $".{extension}")
             .ToHashSet(StringComparer.OrdinalIgnoreCase),
-        SyncDeletions = model.SyncDeletions,
-        RootLevelPermissionsOnly = model.RootLevelPermissionsOnly
+        SyncDeletions = model.SyncDeletions
     };
 
     private static long? ToBytes(long? value, long multiplier)
@@ -491,8 +478,4 @@ public sealed class ExternalStorageSyncEditModel
 
     /// <summary>Propagate deletions in two-way mode instead of restoring them.</summary>
     public bool SyncDeletions { get; set; }
-
-    /// <summary>Restrict ACL management to this sync's root folder (see
-    /// <see cref="CloudSyncAdvancedSettings.RootLevelPermissionsOnly"/>).</summary>
-    public bool RootLevelPermissionsOnly { get; set; }
 }

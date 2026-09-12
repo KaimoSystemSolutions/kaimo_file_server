@@ -48,7 +48,9 @@ public sealed class CrossShareTransferService(
 
         foreach (var share in await cloudRepository.GetSharesAsync())
         {
-            if (share.IsEnabled && !share.IsReadOnly && await cloudAuthorization.CanAccessAsync(actor, share))
+            // Transfer targets require write access; GetEffectivePermissionAsync already
+            // returns null for disabled shares and for actors without any grant.
+            if (await cloudAuthorization.GetEffectivePermissionAsync(actor, share) == CloudAccessPermission.Write)
             {
                 var connection = await connections.GetAsync(share.ConnectionId);
                 if (connection?.State == StorageConnectionState.Ready)
@@ -142,8 +144,9 @@ public sealed class CrossShareTransferService(
 
         var shareRemote = await cloudRepository.GetShareAsync(info.Id, cancellationToken)
             ?? throw new UnauthorizedAccessException("The virtual share does not exist.");
-        if (!shareRemote.IsEnabled || (requireWrite && shareRemote.IsReadOnly)
-            || !await cloudAuthorization.CanAccessAsync(actor, shareRemote))
+        // Null = disabled or no grant; Read is insufficient when a write is required.
+        var permission = await cloudAuthorization.GetEffectivePermissionAsync(actor, shareRemote);
+        if (permission is null || (requireWrite && permission != CloudAccessPermission.Write))
             throw new UnauthorizedAccessException("The virtual share is not accessible.");
         var record = await connections.GetAsync(shareRemote.ConnectionId, cancellationToken);
         if (record?.State != StorageConnectionState.Ready)

@@ -35,11 +35,11 @@ public sealed class CloudAccessDropboxController(
         if (connection is null || !string.Equals(connection.ProviderId, "dropbox", StringComparison.OrdinalIgnoreCase))
             return NotFound("Cloud Access connection not found.");
         // The single-use ticket is the authorization proof: it is issued only after
-        // the ManageConnections check and is bound to this connection and department.
-        // The Blazor localStorage JWT is not present on this full-page navigation, so
-        // the session is intentionally not required here (see the download endpoint).
+        // the ManageConnections check and is bound to this connection. The Blazor
+        // localStorage JWT is not present on this full-page navigation, so the
+        // session is intentionally not required here (see the download endpoint).
         if (!await tickets.IsValidAsync(
-                ticket, connectionId, string.Empty, "dropbox-access", null, connection.DepartmentId))
+                ticket, connectionId, string.Empty, "dropbox-access"))
             return BadRequest("The Cloud Access authorization request is invalid or has expired.");
         if (!dropboxAuthorization.IsConfigured)
             return Redirect(ConnectionsPage(error: R("Web_CloudAccess_Dropbox_NotConfigured")));
@@ -69,8 +69,7 @@ public sealed class CloudAccessDropboxController(
             return Ok(new { state = "failed", message = R("Web_CloudAccess_ConnectionMissing") });
         if (result.AuthorizationTicket is null || result.RefreshToken is null || result.Scope is null
             || !await tickets.TryConsumeAsync(
-                result.AuthorizationTicket, result.ConnectionId, string.Empty, "dropbox-access",
-                null, record.DepartmentId))
+                result.AuthorizationTicket, result.ConnectionId, string.Empty, "dropbox-access"))
             return Ok(new { state = "failed", message = R("Web_CloudAccess_Dropbox_Expired") });
 
         var credentials = new Dictionary<string, string>

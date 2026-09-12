@@ -34,9 +34,17 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
     private readonly CloudAccessDownloadTicketStore _downloadTickets;
     private readonly CloudAccessDirectoryCache _directoryCache;
     private CloudAccessShare? _share;
+    private bool _shareWritable;
+    private bool _canManage;
     private StorageConnection? _connectionRecord;
     private IStorageSession? _session;
     private IRemoteFileStore? _remoteFiles;
+
+    /// <summary>The loaded virtual share, or null before the first successful load.</summary>
+    public Guid? CurrentVirtualShareId => _share?.Id;
+
+    /// <inheritdoc />
+    public override bool CanManageVirtualShareAcls => _canManage;
 
     public RemoteCloudAccessFileBrowserViewModel(
         ICloudAccessRepository repository,
@@ -74,8 +82,8 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
             var share = await _repository.GetShareAsync(shareId)
                         ?? throw new FileNotFoundException("The virtual share does not exist.");
             var actor = await GetActorAsync() ?? throw new UnauthorizedAccessException("Sign-in is required.");
-            if (!await _authorization.CanAccessAsync(actor, share))
-                throw new UnauthorizedAccessException("You may not access this virtual share.");
+            var permission = await _authorization.GetEffectivePermissionAsync(actor, share)
+                ?? throw new UnauthorizedAccessException("You may not access this virtual share.");
 
             var connectionRecord = await _connections.GetAsync(share.ConnectionId)
                                    ?? throw new InvalidOperationException("The provider connection is missing.");
@@ -94,7 +102,9 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
 
             await ReplaceConnectionAsync(connectionRecord);
             _share = share;
-            Capabilities = BuildCapabilities(_session!.Capabilities, share.IsReadOnly);
+            _shareWritable = permission == CloudAccessPermission.Write;
+            _canManage = await _authorization.CanManageAsync(actor, share);
+            Capabilities = BuildCapabilities(_session!.Capabilities, readOnly: !_shareWritable);
             var items = await ListCoreAsync(relativePath);
             CompleteLoad(
                 new BrowserShareInfo(share.Id, share.Name, BrowserShareKind.Remote, connectionRecord.ProviderId),
@@ -255,7 +265,7 @@ public sealed class RemoteCloudAccessFileBrowserViewModel : RemoteFileBrowserVie
 
     private async Task<OperationResult> RunWriteAsync(Func<IRemoteFileStore, Task> action, string userError)
     {
-        if (_share?.IsReadOnly != false || _remoteFiles is null)
+        if (!_shareWritable || _remoteFiles is null)
             return OperationResult.Fail(R("Web_CloudAccess_Error_ReadOnly"));
         try
         {

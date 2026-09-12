@@ -27,6 +27,14 @@ public abstract class RemoteFileBrowserViewModelBase : IFileBrowserViewModel
     public bool CanManageAcls => false;
     public bool CanManageSyncs => false;
 
+    /// <summary>
+    /// Whether the actor may manage this virtual share's root ACLs. Overridden by the
+    /// concrete Cloud Access view model; the base default is <c>false</c>. Declared here
+    /// (not only as an interface default) so that interface dispatch through the base
+    /// reaches the override instead of the interface's own default member.
+    /// </summary>
+    public virtual bool CanManageVirtualShareAcls => false;
+
     public IEnumerable<FileMetadata> Directories
         => Items.Where(item => item.IsDirectory).OrderBy(item => item.Name);
 

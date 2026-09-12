@@ -228,7 +228,6 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(x => x.LastErrorCode).HasMaxLength(2000);
                 entity.Property(x => x.ConcurrencyVersion).IsConcurrencyToken();
                 entity.HasIndex(x => x.Name).IsUnique();
-                entity.HasIndex(x => x.DepartmentId);
                 entity.HasIndex(x => x.ProviderProfileId);
                 entity.HasOne<ProviderProfile>().WithMany().HasForeignKey(x => x.ProviderProfileId)
                     .OnDelete(DeleteBehavior.Restrict);
@@ -253,6 +252,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
             {
                 entity.ToTable("cloud_access_grants");
                 entity.HasKey(x => new { x.ShareId, x.PrincipalId });
+                entity.Property(x => x.Permission).HasConversion<int>();
                 entity.HasIndex(x => x.PrincipalId);
                 entity.HasOne<CloudAccessShare>().WithMany().HasForeignKey(x => x.ShareId)
                     .OnDelete(DeleteBehavior.Cascade);

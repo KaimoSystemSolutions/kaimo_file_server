@@ -216,7 +216,6 @@ else
     private string? _managedKnownHostsPath;
     private bool _testSucceeded;
     private bool _testFailed;
-    private Guid _departmentId;
     private string? _error;
     private bool _editing;
     private bool _editEnabled = true;
@@ -247,7 +246,6 @@ else
     // rsync-over-SSH and SFTP share the identical pinned-SSH setup (key + host key).
     private bool UsesPinnedSshSetup => IsRsyncSshProvider || IsSftpProvider;
     private bool CanCreate => !string.IsNullOrWhiteSpace(_name)
-                              && _departmentId != Guid.Empty
                               && SelectedProvider is not null
                               && (SelectedProviderUsesInteractiveAuthorization
                                   || (IsSmbProvider && !string.IsNullOrWhiteSpace(_server)
@@ -283,8 +281,8 @@ else
         if (SelectedProviderUsesInteractiveAuthorization)
         {
             string uri = SelectedProvider!.AuthorizationModes.Contains(StorageAuthorizationMode.DeviceCode)
-                ? await VM.CreateOneDriveConnectionAsync(_name, _departmentId)
-                : await VM.CreateDropboxConnectionAsync(_name, _departmentId);
+                ? await VM.CreateOneDriveConnectionAsync(_name)
+                : await VM.CreateDropboxConnectionAsync(_name);
             Nav.NavigateTo(uri, forceLoad: true);
         }
         else
@@ -294,7 +292,7 @@ else
             string settingsJson = BuildSettingsJson();
             bool usesUsernamePassword = IsSmbProvider || IsWebDavProvider;
             await VM.CreateConfiguredConnectionAsync(
-                _provider, _name, _departmentId, settingsJson,
+                _provider, _name, settingsJson,
                 usesUsernamePassword ? _username : null,
                 usesUsernamePassword ? _password : null,
                 IsSmbProvider ? _domain : null,
@@ -304,8 +302,7 @@ else
             _sshPrivateKey = null;
             _managedKnownHostsPath = null;
             _creating = false;
-            _selected = VM.Connections.FirstOrDefault(connection =>
-                connection.Name == _name && connection.DepartmentId == _departmentId);
+            _selected = VM.Connections.FirstOrDefault(connection => connection.Name == _name);
         }
     });
     private async Task AuthorizeAsync() => await ActAsync(async () => Nav.NavigateTo(await VM.AuthorizeConnectionAsync(_selected!.Id), forceLoad: true));
@@ -391,7 +388,6 @@ else
         _remoteRoot = "/";
         _port = 445;
         _minimumDialect = "3.1.1";
-        _departmentId = Guid.Empty;
     }
     private StorageConnectionUsage Usage(Guid id) => VM.ConnectionUsage.GetValueOrDefault(id) ?? new StorageConnectionUsage(0, 0);
     private string ProviderName(string id) => ProviderCatalog.TryGet(id, out var provider) ? provider.DisplayName : id;
@@ -613,25 +609,6 @@ else
                 }
             </label>
             <label><span>@R("Web_CloudAccess_ConnectionName")</span><input class="edit-input" maxlength="200" @bind="_name" /></label>
-            <label><span>@R("Web_CloudAccess_Department")</span>
-                @if (_editing)
-                {
-                    <input class="edit-input" value="@DepartmentName(_departmentId)" disabled />
-                }
-                else
-                {
-                    <PrincipalPickerField Mode="SelectionMode.Single"
-                                          Items="VM.ManageableDepartments.ToDepartmentItems()"
-                                          SelectedIds="_departmentId.AsSelection()"
-                                          SelectedIdsChanged="ids => _departmentId = ids.FirstOrNull() ?? Guid.Empty"
-                                          Title="@R("Web_CloudAccess_Department")"
-                                          Placeholder="@R("Web_ExternalStorage_Select")" />
-                }
-            </label>
-            @if (!_editing && _departmentId == Guid.Empty)
-            {
-                <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_DepartmentRequiredHint")</p>
-            }
         }
         else if (_activeConnectionTab == ConnectionTab.Connection)
         {
@@ -759,7 +736,6 @@ else
         _activeConnectionTab = ConnectionTab.General;
         _editEnabled = _selected.State != StorageConnectionState.Disabled;
         _provider = _selected.ProviderId;
-        _departmentId = _selected.DepartmentId;
         _name = _selected.Name;
         _password = _username = _domain = _server = _serverUrl = string.Empty;
         _remoteRoot = "/";
@@ -860,9 +836,6 @@ else
                         ? !string.IsNullOrWhiteSpace(_server) && _port is >= 1 and <= 65535
                           && !string.IsNullOrWhiteSpace(_username) && !string.IsNullOrWhiteSpace(_remoteRoot)
                         : !string.IsNullOrWhiteSpace(_settingsJson)));
-
-    private string DepartmentName(Guid id)
-        => VM.ManageableDepartments.FirstOrDefault(department => department.Id == id)?.Name ?? "—";
 
     private static string? ReadJsonString(System.Text.Json.JsonElement root, string name)
         => root.TryGetProperty(name, out var value) && value.ValueKind == System.Text.Json.JsonValueKind.String

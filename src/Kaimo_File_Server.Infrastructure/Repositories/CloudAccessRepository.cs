@@ -40,13 +40,12 @@ public sealed class CloudAccessRepository(IDbContextFactory<ApplicationDbContext
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<HashSet<Guid>> GetPrincipalIdsAsync(Guid shareId, CancellationToken cancellationToken = default)
+    public async Task<List<CloudAccessGrant>> GetGrantsAsync(Guid shareId, CancellationToken cancellationToken = default)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        return (await db.CloudAccessGrants.AsNoTracking()
+        return await db.CloudAccessGrants.AsNoTracking()
             .Where(x => x.ShareId == shareId)
-            .Select(x => x.PrincipalId)
-            .ToListAsync(cancellationToken)).ToHashSet();
+            .ToListAsync(cancellationToken);
     }
 
     public async Task ReplaceGrantsAsync(Guid shareId, IEnumerable<CloudAccessGrant> grants, CancellationToken cancellationToken = default)
@@ -65,5 +64,19 @@ public sealed class CloudAccessRepository(IDbContextFactory<ApplicationDbContext
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         return await db.CloudAccessGrants.AsNoTracking()
             .AnyAsync(x => x.ShareId == shareId && ids.Contains(x.PrincipalId), cancellationToken);
+    }
+
+    public async Task<CloudAccessPermission?> GetEffectivePermissionAsync(
+        Guid shareId, IEnumerable<Guid> principalIds, CancellationToken cancellationToken = default)
+    {
+        var ids = principalIds.Distinct().ToArray();
+        if (ids.Length == 0) return null;
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var levels = await db.CloudAccessGrants.AsNoTracking()
+            .Where(x => x.ShareId == shareId && ids.Contains(x.PrincipalId))
+            .Select(x => x.Permission)
+            .ToListAsync(cancellationToken);
+        // Write (1) outranks Read (0); null when the actor holds no grant at all.
+        return levels.Count == 0 ? null : levels.Max();
     }
 }

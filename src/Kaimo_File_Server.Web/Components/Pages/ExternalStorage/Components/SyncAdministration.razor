@@ -102,7 +102,7 @@ else
                     </select></label>
                     <label><span>@R("Web_ExternalStorage_LocalShare")</span><select class="edit-input" @bind="_model.LocalShareId">
                         <option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>
-                        @foreach (var share in VM.Shares.Where(ShareMatchesConnection))
+                        @foreach (var share in VM.Shares)
                         {
                             <option value="@share.Id">@share.Name</option>
                         }
@@ -211,11 +211,6 @@ else
                             <small>@R("Web_CloudSync_Advanced_SyncDeletions_Help")</small>
                         </label>
                     }
-                    <label class="storage-form-checkbox">
-                        <input type="checkbox" @bind="_model.RootLevelPermissionsOnly" />
-                        <span>@R("Web_CloudSync_Advanced_RootLevelPermissions")</span>
-                        <small>@R("Web_CloudSync_Advanced_RootLevelPermissions_Help")</small>
-                    </label>
                 </div>
             }
             <div class="detail-actions">
@@ -418,8 +413,7 @@ else
             MaxUploadRateKbps = ToUnit(definition.AdvancedSettings.MaxUploadBytesPerSecond, 1024L),
             MaxDownloadRateKbps = ToUnit(definition.AdvancedSettings.MaxDownloadBytesPerSecond, 1024L),
             ExcludedExtensions = string.Join(", ", definition.AdvancedSettings.ExcludedExtensions),
-            SyncDeletions = definition.AdvancedSettings.SyncDeletions,
-            RootLevelPermissionsOnly = definition.AdvancedSettings.RootLevelPermissionsOnly
+            SyncDeletions = definition.AdvancedSettings.SyncDeletions
         };
     }
 
@@ -531,8 +525,6 @@ else
                 SetScheduleSlot(ScheduleDays[row], hour, SchedulePaintValue);
         return InvokeAsync(StateHasChanged);
     }
-    private bool ShareMatchesConnection(ShareDefinition share)
-        => VM.Connections.FirstOrDefault(c => c.Id == _model.ConnectionId)?.DepartmentId == share.DepartmentId;
     private static long? ToUnit(long? value, long divisor) => value is > 0 ? (long)Math.Ceiling(value.Value / (double)divisor) : null;
     private static string DisplayName(ExternalStorageSyncListItem item) => string.IsNullOrWhiteSpace(item.Definition.DisplayName) ? item.ShareName : item.Definition.DisplayName;
     private static string DisplayPath(string path) => string.IsNullOrEmpty(path) ? "/" : $"/{path}";

@@ -50,15 +50,22 @@ public sealed class CloudAccessShareBrowserViewModel(
 
             var visible = await authorization.GetVisibleSharesAsync(actor);
             var connections = (await connectionsRepository.GetAllAsync()).ToDictionary(x => x.Id);
-            Shares = visible.Where(x => connections.TryGetValue(x.ConnectionId, out var connection)
-                                        && connection.State == StorageConnectionState.Ready)
-                .Select(x => new CloudAccessShareListItem(
+            var usable = visible.Where(x => connections.TryGetValue(x.ConnectionId, out var connection)
+                                            && connection.State == StorageConnectionState.Ready);
+            var items = new List<CloudAccessShareListItem>();
+            foreach (var x in usable)
+            {
+                // Read-only for THIS actor: their highest grant is not Write.
+                bool readOnly = await authorization.GetEffectivePermissionAsync(actor, x)
+                    != CloudAccessPermission.Write;
+                items.Add(new CloudAccessShareListItem(
                     x.Id, x.Name, connections[x.ConnectionId].ProviderId,
                     ProviderDisplayName(connections[x.ConnectionId].ProviderId),
                     connections[x.ConnectionId].Name,
-                    x.RemoteRootPath, x.IsReadOnly,
-                    ResolveDepartment(departments, x.DepartmentId)))
-                .OrderBy(x => x.Name).ToList();
+                    x.RemoteRootPath, readOnly,
+                    ResolveDepartment(departments, x.DepartmentId)));
+            }
+            Shares = items.OrderBy(x => x.Name).ToList();
         }
         catch (Exception exception)
         {

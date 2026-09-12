@@ -17,9 +17,8 @@ namespace Kaimo_File_Server.Tests;
 /// Pins the ACL editor's behavior for items inside a cloud/external sync folder.
 /// The sync reconciles by path (no stable file identity), so a rename it performs
 /// silently drops a per-item ACL. The editor therefore warns for any item below a
-/// sync root, and — when that sync is configured for root-level-only permissions —
-/// refuses new ACL writes below the root while leaving the root itself and
-/// deletions of stale entries alone.
+/// sync root, while leaving the root itself unflagged. The warning is informational
+/// only — writes below the root stay allowed.
 /// </summary>
 public class AclEditorViewModelSyncFolderTests
 {
@@ -89,7 +88,7 @@ public class AclEditorViewModelSyncFolderTests
     }
 
     /// <summary>Makes the share host a single enabled sync rooted at <paramref name="root"/>.</summary>
-    private void WithSyncRoot(string root, bool rootLevelPermissionsOnly) =>
+    private void WithSyncRoot(string root) =>
         _syncDefinitions
             .Setup(s => s.GetEnabledByShareAsync(_shareId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<SyncDefinition>
@@ -99,10 +98,7 @@ public class AclEditorViewModelSyncFolderTests
                     LocalShareId = _shareId,
                     LocalPath = root,
                     Enabled = true,
-                    AdvancedSettings = new CloudSyncAdvancedSettings
-                    {
-                        RootLevelPermissionsOnly = rootLevelPermissionsOnly
-                    }
+                    AdvancedSettings = new CloudSyncAdvancedSettings()
                 }
             });
 
@@ -119,9 +115,9 @@ public class AclEditorViewModelSyncFolderTests
     }
 
     [Fact]
-    public async Task Load_InsideSyncRoot_WithoutRestriction_WarnsButAllowsWrites()
+    public async Task Load_InsideSyncRoot_WarnsButAllowsWrites()
     {
-        WithSyncRoot("cloud", rootLevelPermissionsOnly: false);
+        WithSyncRoot("cloud");
 
         await _sut.LoadAsync("cloud/reports/q3.xlsx", _shareId, isDirectory: false);
 
@@ -135,42 +131,9 @@ public class AclEditorViewModelSyncFolderTests
     }
 
     [Fact]
-    public async Task Load_InsideSyncRoot_WithRestriction_BlocksAddAndEdit()
+    public async Task Load_OnSyncRootItself_DoesNotWarn()
     {
-        WithSyncRoot("cloud", rootLevelPermissionsOnly: true);
-
-        await _sut.LoadAsync("cloud/reports/q3.xlsx", _shareId, isDirectory: false);
-        Assert.Equal(Resources.Web_Acl_SyncFolderWarning, _sut.WarningMessage);
-
-        StageNewEntry();
-        bool added = await _sut.AddEntryAsync();
-        Assert.False(added);
-        Assert.Equal(Resources.Web_Acl_SyncFolderBlocked, _sut.ErrorMessage);
-        _aclRepo.Verify(a => a.AddAsync(It.IsAny<AccessEntry>()), Times.Never);
-
-        _sut.StartEditEntry(new AccessEntry(
-            _principalId, AclEntryType.Allow, FilePermission.ListReadData, AclInheritance.Everything));
-        bool saved = await _sut.SaveEditEntryAsync();
-        Assert.False(saved);
-        Assert.Equal(Resources.Web_Acl_SyncFolderBlocked, _sut.ErrorMessage);
-    }
-
-    [Fact]
-    public async Task Load_InsideSyncRoot_WithRestriction_StillAllowsDelete()
-    {
-        WithSyncRoot("cloud", rootLevelPermissionsOnly: true);
-        await _sut.LoadAsync("cloud/reports/q3.xlsx", _shareId, isDirectory: false);
-
-        bool deleted = await _sut.DeleteEntryAsync(Guid.NewGuid());
-
-        Assert.True(deleted);
-        _aclRepo.Verify(a => a.DeleteAsync(It.IsAny<Guid>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task Load_OnSyncRootItself_NeitherWarnsNorBlocks()
-    {
-        WithSyncRoot("cloud", rootLevelPermissionsOnly: true);
+        WithSyncRoot("cloud");
 
         await _sut.LoadAsync("cloud", _shareId, isDirectory: true);
 

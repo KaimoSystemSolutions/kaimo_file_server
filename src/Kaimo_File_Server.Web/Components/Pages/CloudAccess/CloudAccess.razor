@@ -1,6 +1,7 @@
 @page "/cloud-access"
 @using Kaimo_File_Server.Core.Domain
 @using Kaimo_File_Server.Core.Domain.Identity
+@using Kaimo_File_Server.Core.Helpers
 @using Kaimo_File_Server.Core.Services.ExternalStorage
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.Pages.CloudSync.Components
@@ -125,15 +126,6 @@ else
                     <span class="detail-label">@R("Web_CloudAccess_ConnectionName")</span>
                     <input class="edit-input" @bind="_connectionName" @bind:event="oninput" maxlength="200" />
                 </label>
-                <label>
-                    <span class="detail-label">@R("Web_CloudAccess_Department")</span>
-                    <PrincipalPickerField Mode="SelectionMode.Single"
-                                          Items="VM.ManageableDepartments.ToDepartmentItems()"
-                                          SelectedIds="_connectionDepartmentId.AsSelection()"
-                                          SelectedIdsChanged="ids => _connectionDepartmentId = ids.FirstOrNull() ?? Guid.Empty"
-                                          Title="@R("Web_CloudAccess_Department")"
-                                          Placeholder="@R("Web_CloudAccess_Select")" />
-                </label>
             </div>
             <div class="detail-actions cloud-access-form-actions">
                 <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CloseConnectionForm">@Resources.Web_Button_Cancel</button>
@@ -178,11 +170,13 @@ else
                         <input class="edit-input" @bind="_shareName" @bind:event="oninput" maxlength="200" />
                     </label>
                     <label>
-                        <span class="detail-label">@R("Web_CloudAccess_AccessMode")</span>
-                        <select class="edit-input" @bind="_readOnly">
-                            <option value="false">@R("Web_CloudAccess_ReadWrite")</option>
-                            <option value="true">@R("Web_CloudAccess_ReadOnly")</option>
-                        </select>
+                        <span class="detail-label">@R("Web_CloudAccess_Department")</span>
+                        <PrincipalPickerField Mode="SelectionMode.Single"
+                                              Items="VM.ManageableDepartments.ToDepartmentItems()"
+                                              SelectedIds="_shareDepartmentId.AsSelection()"
+                                              SelectedIdsChanged="OnShareDepartmentChangedAsync"
+                                              Title="@R("Web_CloudAccess_Department")"
+                                              Placeholder="@R("Web_CloudAccess_Select")" />
                     </label>
                     <label class="cloud-access-folder-field">
                         <span class="detail-label">@R("Web_CloudAccess_RemoteFolder")</span>
@@ -198,12 +192,7 @@ else
                     <div class="detail-section cloud-access-principal-editor">
                         <span class="detail-label">@R("Web_CloudAccess_Access")</span>
                         <p class="share-help-text">@R("Web_CloudAccess_AccessHelp")</p>
-                        <PrincipalPickerField Mode="SelectionMode.Multiple"
-                                              Items="PrincipalItems()"
-                                              SelectedIds="_principalIds"
-                                              SelectedIdsChanged="ids => SetPrincipalIds(_principalIds, ids)"
-                                              Title="@R("Web_CloudAccess_Access")"
-                                              Placeholder="@R("Web_CloudAccess_PrincipalPlaceholder")" />
+                        <CloudAccessAclEditor Principals="PrincipalItems()" Grants="_principalLevels" />
                     </div>
                 }
 
@@ -297,7 +286,6 @@ else
                                 type="button" @onclick="() => SelectShareAsync(share)" @ondblclick="() => OpenShare(share)">
                             @Assets.SVG("cloud-download.svg", new SvgOptions(Width: 22, Height: 22))
                             <span><strong>@share.Name</strong><small>@share.RemoteRootPath</small></span>
-                            <span class="share-state">@(share.IsReadOnly ? R("Web_CloudAccess_ReadOnly") : R("Web_CloudAccess_ReadWrite"))</span>
                         </button>
                     }
                 }
@@ -335,12 +323,10 @@ else
                     <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_Connection")</span><span class="detail-value">@(connection?.Name ?? "—")</span></div>
                     <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_Account")</span><span class="detail-value">@(connection?.AccountEmail ?? connection?.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</span></div>
                     <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_RemoteFolder")</span><span class="detail-value">@_selectedShare.RemoteRootPath</span></div>
-                    <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_AccessMode")</span><span class="detail-value">@(_selectedShare.IsReadOnly ? R("Web_CloudAccess_ReadOnly") : R("Web_CloudAccess_ReadWrite"))</span></div>
                     @if (_editingShare)
                     {
                         <div class="cloud-access-form cloud-access-edit-form">
                             <label><span class="detail-label">@R("Web_CloudAccess_ShareName")</span><input class="edit-input" @bind="_editShareName" @bind:event="oninput" maxlength="200" /></label>
-                            <label><span class="detail-label">@R("Web_CloudAccess_AccessMode")</span><select class="edit-input" @bind="_editShareReadOnly"><option value="false">@R("Web_CloudAccess_ReadWrite")</option><option value="true">@R("Web_CloudAccess_ReadOnly")</option></select></label>
                             <label class="cloud-access-folder-field"><span class="detail-label">@R("Web_CloudAccess_RemoteFolder")</span><div class="cloud-access-path"><input class="edit-input" value="@_editShareRoot" readonly /><button class="btn-secondary" type="button" disabled="@_busy" @onclick="OpenEditPickerAsync">@R("Web_CloudAccess_Browse")</button></div></label>
                         </div>
                     }
@@ -362,12 +348,7 @@ else
                 {
                     <div class="detail-section cloud-access-principal-editor">
                         <p class="share-help-text">@R("Web_CloudAccess_AccessEditHelp")</p>
-                        <PrincipalPickerField Mode="SelectionMode.Multiple"
-                                              Items="PrincipalItems()"
-                                              SelectedIds="_grantPrincipalIds"
-                                              SelectedIdsChanged="ids => SetPrincipalIds(_grantPrincipalIds, ids)"
-                                              Title="@R("Web_CloudAccess_Access")"
-                                              Placeholder="@R("Web_CloudAccess_PrincipalPlaceholder")" />
+                        <CloudAccessAclEditor Principals="PrincipalItems()" Grants="_grantLevels" />
                         <div class="detail-actions cloud-access-detail-actions">
                             <button class="btn-primary" type="button" disabled="@_busy" @onclick="SaveGrantsAsync">@R("Web_CloudAccess_SaveAccess")</button>
                         </div>
@@ -451,12 +432,11 @@ else
     private bool _showShareForm;
     private string _connectionProvider = "";
     private string _connectionName = "";
-    private Guid _connectionDepartmentId;
     private Guid _shareConnectionId;
+    private Guid _shareDepartmentId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
     private string _shareName = "";
     private string _remoteRoot = "";
-    private bool _readOnly;
-    private readonly HashSet<Guid> _principalIds = [];
+    private readonly Dictionary<Guid, CloudAccessPermission> _principalLevels = [];
     private bool _busy;
     private string? _error;
     private bool _pickerOpen;
@@ -468,20 +448,19 @@ else
     private bool _pickingEditedShare;
     private CloudAccessShare? _selectedShare;
     private CloudAccessTab _activeTab = CloudAccessTab.General;
-    private HashSet<Guid> _grantPrincipalIds = [];
+    private readonly Dictionary<Guid, CloudAccessPermission> _grantLevels = [];
     private bool _editingShare;
     private string _editShareName = "";
     private string _editShareRoot = "";
-    private bool _editShareReadOnly;
     private Guid? _editingConnectionId;
     private string _editConnectionName = "";
     private bool _showVirtualShareDetails;
 
     private bool CanConnect => _connectionProvider == "onedrive"
-                               && !string.IsNullOrWhiteSpace(_connectionName)
-                               && _connectionDepartmentId != Guid.Empty;
+                               && !string.IsNullOrWhiteSpace(_connectionName);
     private bool CanCreateShare => _shareConnectionId != Guid.Empty
                                    && !string.IsNullOrWhiteSpace(_shareName)
+                                   && _shareDepartmentId != Guid.Empty
                                    && !string.IsNullOrWhiteSpace(_remoteRoot);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -494,7 +473,9 @@ else
         {
             _shareConnectionId = connectionId;
             _showShareForm = true;
-            await VM.LoadPrincipalsAsync(VM.Connections.Single(connection => connection.Id == connectionId).DepartmentId);
+            // New shares default to the Global department; principals follow it.
+            _shareDepartmentId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
+            await VM.LoadPrincipalsAsync(_shareDepartmentId);
         }
         StateHasChanged();
     }
@@ -508,11 +489,23 @@ else
 
     private void CloseConnectionForm() => _showConnectionForm = false;
 
-    private void ToggleShareForm()
+    private async Task ToggleShareForm()
     {
         _showShareForm = !_showShareForm;
         _showConnectionForm = false;
         _error = null;
+        // Grantable principals follow the share's department (default Global).
+        if (_showShareForm)
+            await RunAsync(() => VM.LoadPrincipalsAsync(_shareDepartmentId));
+    }
+
+    private async Task OnShareDepartmentChangedAsync(IReadOnlyList<Guid> ids)
+    {
+        _shareDepartmentId = ids.FirstOrNull() ?? Guid.Empty;
+        // Grantable principals change with the department, so drop any staged grants.
+        _principalLevels.Clear();
+        if (_shareDepartmentId != Guid.Empty)
+            await RunAsync(() => VM.LoadPrincipalsAsync(_shareDepartmentId));
     }
 
     private void CloseShareForm() => _showShareForm = false;
@@ -521,26 +514,26 @@ else
     {
         if (_connectionProvider != "onedrive")
             throw new ArgumentException(R("Web_CloudAccess_Provider_Select"));
-        var url = await VM.CreateOneDriveConnectionAsync(_connectionName, _connectionDepartmentId);
+        var url = await VM.CreateOneDriveConnectionAsync(_connectionName);
         Nav.NavigateTo(url, forceLoad: true);
     });
 
-    private async Task ConnectionChangedAsync(ChangeEventArgs e)
+    private Task ConnectionChangedAsync(ChangeEventArgs e)
     {
+        // The connection no longer carries a department; grantable principals follow the
+        // share's own department, loaded when that department is chosen.
         _shareConnectionId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : Guid.Empty;
         _remoteRoot = "";
-        _principalIds.Clear();
-        var connection = VM.Connections.FirstOrDefault(x => x.Id == _shareConnectionId);
-        if (connection is not null)
-            await RunAsync(() => VM.LoadPrincipalsAsync(connection.DepartmentId));
+        return Task.CompletedTask;
     }
 
     private async Task CreateShareAsync() => await RunAsync(async () =>
     {
-        await VM.CreateShareAsync(_shareConnectionId, _shareName, _remoteRoot, _readOnly, _principalIds);
+        await VM.CreateShareAsync(_shareConnectionId, _shareName, _remoteRoot, _shareDepartmentId, _principalLevels);
         _shareName = "";
         _remoteRoot = "";
-        _principalIds.Clear();
+        _shareDepartmentId = WellKnownGUIDs.DEPARTMENT_GLOBAL;
+        _principalLevels.Clear();
         _showShareForm = false;
     });
 
@@ -610,16 +603,19 @@ else
         // Principals back the management (access) editor; loading them requires manage
         // rights. For a share the actor can only access, skip it — no management pane shows.
         if (!VM.CanManageShare(share)) return;
-        var connection = VM.Connections.FirstOrDefault(x => x.Id == share.ConnectionId);
-        if (connection is not null)
-            await VM.LoadPrincipalsAsync(connection.DepartmentId);
+        await VM.LoadPrincipalsAsync(share.DepartmentId);
     }
 
     private async Task SwitchTabAsync(CloudAccessTab tab)
     {
         _activeTab = tab;
         if (tab == CloudAccessTab.Access && _selectedShare is not null)
-            _grantPrincipalIds = await VM.LoadShareGrantsAsync(_selectedShare.Id);
+        {
+            var grants = await VM.LoadShareGrantsAsync(_selectedShare.Id);
+            _grantLevels.Clear();
+            foreach (var (principalId, level) in grants)
+                _grantLevels[principalId] = level;
+        }
     }
 
     // Users and groups are picked via the shared principal picker (its own tabs split the kinds);
@@ -629,17 +625,10 @@ else
             .Select(p => new PrincipalPickerItem(p.Id, p.Name, p is Group ? PrincipalKind.Group : PrincipalKind.User))
             .ToList();
 
-    private static void SetPrincipalIds(HashSet<Guid> target, IReadOnlyList<Guid> ids)
-    {
-        target.Clear();
-        foreach (var id in ids)
-            target.Add(id);
-    }
-
     private async Task SaveGrantsAsync()
     {
         if (_selectedShare is null) return;
-        await RunAsync(() => VM.UpdateShareGrantsAsync(_selectedShare.Id, _grantPrincipalIds));
+        await RunAsync(() => VM.UpdateShareGrantsAsync(_selectedShare.Id, _grantLevels));
     }
 
     private void StartEditShare()
@@ -647,7 +636,6 @@ else
         if (_selectedShare is null) return;
         _editShareName = _selectedShare.Name;
         _editShareRoot = _selectedShare.RemoteRootPath;
-        _editShareReadOnly = _selectedShare.IsReadOnly;
         _editingShare = true;
     }
 
@@ -659,7 +647,7 @@ else
         var shareId = _selectedShare.Id;
         await RunAsync(async () =>
         {
-            await VM.UpdateShareAsync(shareId, _editShareName, _editShareRoot, _editShareReadOnly);
+            await VM.UpdateShareAsync(shareId, _editShareName, _editShareRoot);
             _selectedShare = VM.Shares.SingleOrDefault(x => x.Id == shareId);
             _editingShare = false;
         });

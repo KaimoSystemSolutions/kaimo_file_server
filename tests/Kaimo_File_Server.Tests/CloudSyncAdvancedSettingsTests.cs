@@ -4,41 +4,41 @@ using Xunit;
 namespace Kaimo_File_Server.Tests;
 
 /// <summary>
-/// Guards that <see cref="CloudSyncAdvancedSettings.RootLevelPermissionsOnly"/> is
-/// carried by every value-semantics path — JSON round-trip (the persisted column),
-/// <see cref="CloudSyncAdvancedSettings.Clone"/> (used by the legacy→first-class
-/// migration), and equality (used by the editor's dirty-check).
+/// Guards the value-semantics paths of <see cref="CloudSyncAdvancedSettings"/> — the
+/// JSON round-trip (the persisted column) and equality (the editor's dirty-check) —
+/// and that a legacy payload carrying the removed RootLevelPermissionsOnly field still
+/// deserializes cleanly.
 /// </summary>
 public class CloudSyncAdvancedSettingsTests
 {
     [Fact]
-    public void JsonRoundTrip_PreservesRootLevelPermissionsOnly()
+    public void JsonRoundTrip_PreservesSyncDeletions()
     {
-        var settings = new CloudSyncAdvancedSettings { RootLevelPermissionsOnly = true };
+        var settings = new CloudSyncAdvancedSettings { SyncDeletions = true };
 
         var restored = SyncDefinition.DeserializeAdvancedSettings(
             SyncDefinition.SerializeAdvancedSettings(settings));
 
-        Assert.True(restored.RootLevelPermissionsOnly);
-    }
-
-    [Fact]
-    public void Deserialize_LegacyPayloadWithoutField_DefaultsToFalse()
-    {
-        var restored = SyncDefinition.DeserializeAdvancedSettings("{\"SyncDeletions\":true}");
-
-        Assert.False(restored.RootLevelPermissionsOnly);
         Assert.True(restored.SyncDeletions);
     }
 
     [Fact]
-    public void CloneAndEquality_DistinguishRootLevelPermissionsOnly()
+    public void Deserialize_LegacyPayloadWithRemovedField_IsIgnored()
     {
-        var on = new CloudSyncAdvancedSettings { RootLevelPermissionsOnly = true };
-        var off = new CloudSyncAdvancedSettings { RootLevelPermissionsOnly = false };
+        var restored = SyncDefinition.DeserializeAdvancedSettings(
+            "{\"SyncDeletions\":true,\"RootLevelPermissionsOnly\":true}");
+
+        Assert.True(restored.SyncDeletions);
+    }
+
+    [Fact]
+    public void CloneAndEquality_DistinguishSyncDeletions()
+    {
+        var on = new CloudSyncAdvancedSettings { SyncDeletions = true };
+        var off = new CloudSyncAdvancedSettings { SyncDeletions = false };
 
         Assert.Equal(on, on.Clone());
-        Assert.True(on.Clone().RootLevelPermissionsOnly);
+        Assert.True(on.Clone().SyncDeletions);
         Assert.NotEqual(on, off);
     }
 }

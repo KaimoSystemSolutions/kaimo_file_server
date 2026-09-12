@@ -91,14 +91,6 @@ public class AclEditorViewModel
     /// </summary>
     public string? WarningMessage { get; private set; }
 
-    /// <summary>
-    /// True when the enclosing sync folder is configured for root-level-only
-    /// permission management and this path is strictly below its root; ACL
-    /// additions and edits are then refused. Deletions stay allowed so stale
-    /// entries can be cleaned up.
-    /// </summary>
-    private bool _blockAclWrites;
-
     /// <summary>This path's own ACLs (editable)</summary>
     public List<AccessEntry> Entries { get; private set; } = [];
 
@@ -148,7 +140,6 @@ public class AclEditorViewModel
         ErrorMessage = null;
         SuccessMessage = null;
         WarningMessage = null;
-        _blockAclWrites = false;
 
         try
         {
@@ -207,10 +198,10 @@ public class AclEditorViewModel
     }
 
     /// <summary>
-    /// Sets <see cref="WarningMessage"/> and the internal write-block flag based on
-    /// whether <see cref="NormalizedPath"/> lies strictly below an enabled sync
-    /// definition's root in this share. The root itself is stable configuration,
-    /// so it is neither warned about nor blocked.
+    /// Sets <see cref="WarningMessage"/> based on whether <see cref="NormalizedPath"/>
+    /// lies strictly below an enabled sync definition's root in this share. The root
+    /// itself is stable configuration, so it is not warned about. The notice is
+    /// informational only — permissions below the root stay editable.
     /// </summary>
     private async Task EvaluateSyncFolderPolicyAsync(Guid shareId)
     {
@@ -221,8 +212,6 @@ public class AclEditorViewModel
             return;
 
         WarningMessage = Resources.Web_Acl_SyncFolderWarning;
-        if (enclosing.AdvancedSettings.RootLevelPermissionsOnly)
-            _blockAclWrites = true;
     }
 
     /// <summary>
@@ -346,9 +335,6 @@ public class AclEditorViewModel
         if (!await CanManageAclsAsync())
         { ErrorMessage = Resources.Web_Error_AccessDenied; return false; }
 
-        if (_blockAclWrites)
-        { ErrorMessage = Resources.Web_Acl_SyncFolderBlocked; return false; }
-
         if (NewPrincipalId is null)
         { ErrorMessage = Resources.Web_Error_PrincipalNotSelected; return false; }
 
@@ -409,9 +395,6 @@ public class AclEditorViewModel
 
         if (!await CanManageAclsAsync())
         { ErrorMessage = Resources.Web_Error_AccessDenied; return false; }
-
-        if (_blockAclWrites)
-        { ErrorMessage = Resources.Web_Acl_SyncFolderBlocked; return false; }
 
         if (NewPermissions == FilePermission.None)
         { ErrorMessage = Resources.Web_Acl_SelectAtLeastOnePermission; return false; }
