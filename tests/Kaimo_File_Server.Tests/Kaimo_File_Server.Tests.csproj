@@ -8,25 +8,29 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
-    <!-- Match the Web project: the transitive AspNetCore.OpenApi 10.0.11 source generator
-         targets the 2.x API, and 2.7.5 is patched for NU1903 (GHSA-v5pm-xwqc-g5wc). -->
-    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.11" />
-    <PackageReference Include="xunit" Version="2.*" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
+    <PackageReference Include="Microsoft.Build.Tasks.Git">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Moq" Version="4.*" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <!-- Match the Web project: the transitive AspNetCore.OpenApi 10.0.x source generator
+         targets the 2.x API, and 2.12.2 is patched for NU1903 (GHSA-v5pm-xwqc-g5wc). -->
+    <PackageReference Include="Microsoft.OpenApi" />
+    <PackageReference Include="System.Security.Cryptography.Xml" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Moq" />
     <!-- In-memory relational DB for seeder tests (Sqlite supports TPC inheritance) -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <!-- Pin up the vulnerable native SQLite bundle pulled in transitively by EF Sqlite
          (NU1903, GHSA-2m69-gcr7-jv3q on SQLitePCLRaw.lib.e_sqlite3 2.1.11). 3.0.3 brings a
          patched SQLite native library and is API-compatible with EF Core's provider. -->
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.9" />
-    <PackageReference Include="Grpc.Core.Api" Version="2.71.0" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Grpc.Core.Api" />
   </ItemGroup>
 
   <ItemGroup>
