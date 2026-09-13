@@ -107,7 +107,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel
     // Sync local destinations for the loaded share, ordered most-specific (longest
     // LocalPath) first so a nested sync wins over an ancestor one. Loaded per share,
     // not per directory, and reused across in-place directory refreshes.
-    private List<(string LocalPath, SyncMode Mode, string Name)> _shareSyncs = [];
+    private List<(string LocalPath, SyncMode Mode, string Name, DateTime? LastSuccessfulRunAtUtc, HashSet<string>? RemotePaths)> _shareSyncs = [];
 
     public List<FileMetadata> Items { get; private set; } = [];
     public string CurrentPath { get; private set; } = "";
@@ -921,16 +921,39 @@ public class FileBrowserViewModel : IFileBrowserViewModel
     {
         var all = await _syncRepo.GetAllAsync();
         _shareSyncs = all
-            .Select(entry => entry.Definition)
-            .Where(sync => sync.Enabled && sync.LocalShareId == shareId)
-            .Select(sync => (
-                LocalPath: ShareRelativePath.Normalize(sync.LocalPath),
-                sync.Mode,
-                Name: string.IsNullOrWhiteSpace(sync.DisplayName)
-                    ? (sync.LocalPath.Length == 0 ? CurrentShare?.Name ?? "" : sync.LocalPath)
-                    : sync.DisplayName))
+            .Where(entry => entry.Definition.Enabled && entry.Definition.LocalShareId == shareId)
+            .Select(entry => (
+                LocalPath: ShareRelativePath.Normalize(entry.Definition.LocalPath),
+                entry.Definition.Mode,
+                Name: string.IsNullOrWhiteSpace(entry.Definition.DisplayName)
+                    ? (entry.Definition.LocalPath.Length == 0 ? CurrentShare?.Name ?? "" : entry.Definition.LocalPath)
+                    : entry.Definition.DisplayName,
+                entry.Runtime?.LastSuccessfulRunAtUtc,
+                // Only pull consults the converged manifest (which paths the remote
+                // actually backs); other modes never look at it, so skip the parse.
+                RemotePaths: entry.Definition.Mode == SyncMode.Pull
+                    ? RemoteBackedPaths(entry.Runtime?.LastSyncManifest)
+                    : null))
             .OrderByDescending(sync => sync.LocalPath.Length)
             .ToList();
+    }
+
+    // Normalizes a persisted sync manifest into a share-relative, case-insensitive set.
+    // Returns null when no manifest has been recorded yet (a pull that has not run under
+    // manifest tracking) so the caller falls back to the timestamp heuristic instead of
+    // flagging every item as local-only. The manifest is written with the engine's raw
+    // "{dir}/{name}" paths (which can carry a leading slash at a root sync), so each entry
+    // is renormalized to the canonical form the browser compares against.
+    private static HashSet<string>? RemoteBackedPaths(string? manifestJson)
+    {
+        var manifest = SyncManifest.Deserialize(manifestJson);
+        if (manifest is null)
+            return null;
+
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in manifest.Paths)
+            paths.Add(ShareRelativePath.Normalize(path));
+        return paths;
     }
 
     /// <summary>
@@ -945,10 +968,22 @@ public class FileBrowserViewModel : IFileBrowserViewModel
         var rel = ShareRelativePath.Normalize(ShareRelativeOf(entry));
         foreach (var sync in _shareSyncs)
         {
+            // The sync's own destination folder always shows the plain sync emblem: it
+            // anchors the sync and must never inherit a warning from a stray child (it is
+            // never recorded in its own manifest, and its write time moves with any child).
+            if (sync.LocalPath.Length > 0 && rel == sync.LocalPath)
+                return new SyncFolderMarker(sync.Mode, sync.Name, SyncItemState.Synced);
+
             if (sync.LocalPath.Length == 0
-                || rel == sync.LocalPath
                 || rel.StartsWith(sync.LocalPath + "/", StringComparison.Ordinal))
-                return new SyncFolderMarker(sync.Mode, sync.Name);
+            {
+                // null (no manifest yet) tells the evaluator to fall back to the
+                // timestamp heuristic; a set means membership is authoritative.
+                bool? isRemoteBacked = sync.RemotePaths?.Contains(rel);
+                var state = SyncItemStateEvaluator.Evaluate(
+                    entry.ModifiedAt, sync.LastSuccessfulRunAtUtc, sync.Mode, isRemoteBacked);
+                return new SyncFolderMarker(sync.Mode, sync.Name, state);
+            }
         }
 
         return null;

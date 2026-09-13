@@ -5,11 +5,53 @@ using Kaimo_File_Server.Web.Helpers;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
+/// <summary>Per-entry sync state that drives which emblem the file browser shows.</summary>
+public enum SyncItemState
+{
+    /// <summary>Item existed at/before the last successful run — considered in sync.</summary>
+    Synced,
+    /// <summary>Changed since the last run under a push/two-way sync — upload still pending.</summary>
+    PendingUpload,
+    /// <summary>Changed since the last run under a pull-only sync — will never be uploaded.</summary>
+    PullBlocked
+}
+
 /// <summary>
 /// Marks a browsed entry that lives at (or beneath) the local destination folder of
 /// a sync. Drives the sync emblem and its tooltip in the file browser.
 /// </summary>
-public sealed record SyncFolderMarker(SyncMode Mode, string SyncName);
+public sealed record SyncFolderMarker(SyncMode Mode, string SyncName, SyncItemState State = SyncItemState.Synced);
+
+/// <summary>Decides a browsed entry's sync state from timestamps and direction.</summary>
+public static class SyncItemStateEvaluator
+{
+    /// <summary>
+    /// Decides an entry's emblem. Applies to files and folders alike (a folder's write time
+    /// moves when its direct children change).
+    ///
+    /// Pull is authoritative from the remote: a run never uploads a local item, so once the
+    /// converged manifest is known, "synced" is decided purely by <paramref name="isRemoteBacked"/>
+    /// (present in the manifest) — a local-only item stays flagged across runs until removed or,
+    /// with delete propagation on, deleted. <paramref name="isRemoteBacked"/> is <c>null</c> when
+    /// no manifest exists yet (a pull that has not run under manifest tracking); the timestamp
+    /// heuristic below then stands in until the first run records one.
+    ///
+    /// ponytail: push/two-way have no manifest and keep the mtime heuristic. A successful run
+    /// really does upload the item, so "last write at/before the last success" == synced holds;
+    /// anything newer (or before any success) is still pending upload. Both times must be UTC.
+    /// </summary>
+    public static SyncItemState Evaluate(
+        DateTime modifiedAtUtc, DateTime? lastSuccessfulRunAtUtc, SyncMode mode, bool? isRemoteBacked)
+    {
+        if (mode == SyncMode.Pull && isRemoteBacked is bool backed)
+            return backed ? SyncItemState.Synced : SyncItemState.PullBlocked;
+
+        if (lastSuccessfulRunAtUtc is not null && modifiedAtUtc <= lastSuccessfulRunAtUtc)
+            return SyncItemState.Synced;
+
+        return mode == SyncMode.Pull ? SyncItemState.PullBlocked : SyncItemState.PendingUpload;
+    }
+}
 
 /// <summary>
 /// Contract consumed by the reusable file-browser UI. Core browsing operations are

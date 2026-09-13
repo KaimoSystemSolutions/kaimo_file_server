@@ -351,6 +351,12 @@
   <data name="Web_Sync_FolderTooltip" xml:space="preserve">
     <value>Synchronized folder of "{0}"</value>
   </data>
+  <data name="Web_Sync_PendingUploadTooltip" xml:space="preserve">
+    <value>Not yet uploaded to "{0}" — will sync on the next run</value>
+  </data>
+  <data name="Web_Sync_PullBlockedTooltip" xml:space="preserve">
+    <value>Not uploaded — "{0}" is a pull-only sync</value>
+  </data>
   <data name="Web_Upload_Progress" xml:space="preserve">
     <value>Uploading "{0}"…</value>
   </data>
@@ -2609,6 +2615,9 @@
   </data>
   <data name="Web_CloudSync_Advanced_SyncDeletions_Help" xml:space="preserve">
     <value>When a file or folder is deleted on one side, delete it on the other side too instead of restoring it. Takes effect from the second run after enabling. If the share has a recycle bin, locally deleted items are moved there and stay recoverable.</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_SyncDeletions_PullHelp" xml:space="preserve">
+    <value>Mirror the remote exactly: files and folders that no longer exist remotely — including ones created locally that were never uploaded — are deleted locally, so the local copy stays a 1:1 mirror. If the share has a recycle bin, deleted items are moved there and stay recoverable.</value>
   </data>
   <data name="Web_CloudSync_Schedule" xml:space="preserve">
     <value>Automatic sync</value>

@@ -393,6 +393,28 @@ public partial class FileBrowser
         _ => "sync-twoway.svg"
     };
 
+    /// <summary>Emblem icon: synced entries keep the direction glyph; unsynced ones warn.</summary>
+    private static string SyncMarkerIcon(SyncFolderMarker marker) => marker.State switch
+    {
+        SyncItemState.PendingUpload => "upload.svg",   // will still be uploaded
+        SyncItemState.PullBlocked => "warning.svg",    // pull-only: never uploaded
+        _ => SyncIcon(marker.Mode)
+    };
+
+    /// <summary>Info tint for a synced entry, warning tint for anything still pending.</summary>
+    private static string SyncMarkerColor(SyncItemState state)
+        => state == SyncItemState.Synced ? "var(--info)" : "var(--warning)";
+
+    private static string SyncIndicatorClass(SyncItemState state)
+        => state == SyncItemState.Synced ? "" : "sync-indicator--warn";
+
+    private string SyncMarkerTooltip(SyncFolderMarker marker) => marker.State switch
+    {
+        SyncItemState.PendingUpload => string.Format(Resources.Web_Sync_PendingUploadTooltip, marker.SyncName),
+        SyncItemState.PullBlocked => string.Format(Resources.Web_Sync_PullBlockedTooltip, marker.SyncName),
+        _ => string.Format(Resources.Web_Sync_FolderTooltip, marker.SyncName)
+    };
+
     private string GetFileAclPath(FileMetadata file)
         => VM.ShareRelativeOf(file);
 

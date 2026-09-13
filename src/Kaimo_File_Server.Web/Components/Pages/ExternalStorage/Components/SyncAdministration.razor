@@ -203,12 +203,12 @@ else
                         <label><span>@R("Web_CloudSync_Advanced_MaxUpload")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxUploadRateKbps" /><small>@R("Web_CloudSync_Advanced_Unlimited_Help")</small></label>
                         <label><span>@R("Web_CloudSync_Advanced_MaxDownload")</span><input class="edit-input" type="number" min="0" @bind="_model.MaxDownloadRateKbps" /><small>@R("Web_CloudSync_Advanced_Unlimited_Help")</small></label>
                     </div>
-                    @if (_model.Mode == SyncMode.TwoWay)
+                    @if (_model.Mode == SyncMode.TwoWay || _model.Mode == SyncMode.Pull)
                     {
                         <label class="storage-form-checkbox">
                             <input type="checkbox" @bind="_model.SyncDeletions" />
                             <span>@R("Web_CloudSync_Advanced_SyncDeletions")</span>
-                            <small>@R("Web_CloudSync_Advanced_SyncDeletions_Help")</small>
+                            <small>@(_model.Mode == SyncMode.Pull ? R("Web_CloudSync_Advanced_SyncDeletions_PullHelp") : R("Web_CloudSync_Advanced_SyncDeletions_Help"))</small>
                         </label>
                     }
                 </div>

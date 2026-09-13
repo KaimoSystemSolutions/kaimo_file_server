@@ -149,7 +149,10 @@ public interface ICloudConnection
         // has a baseline immediately instead of wasting the first run establishing
         // one. The previous manifest is only *consulted* (to delete) when the
         // option is on; otherwise deletions are ignored and items are copied.
-        bool buildManifest = mode == SyncMode.TwoWay;
+        // Pull also builds a manifest — not for delete propagation, but so the file
+        // browser can tell a remote-backed item (present here) from a local-only one
+        // (absent) and flag the latter as "won't be uploaded".
+        bool buildManifest = mode == SyncMode.TwoWay || mode == SyncMode.Pull;
         bool applyDeletions = options.SyncDeletions && mode == SyncMode.TwoWay;
         var newManifest = buildManifest ? new SyncManifest() : null;
 
@@ -331,7 +334,21 @@ public interface ICloudConnection
             if (localExists && !remoteExists)
             {
                 if (mode == SyncMode.Pull)
+                {
+                    // Pull mirror: with delete propagation on, the remote is
+                    // authoritative, so an item present only locally (including one
+                    // created locally that was never uploaded) is removed to keep the
+                    // local tree a 1:1 copy of the remote. The delete honors the
+                    // share recycle bin. Off: local-only items are left untouched.
+                    if (options.SyncDeletions)
+                    {
+                        syncProgress.Update($"Removing {local!.Name}...");
+                        await TryTransferAsync(failures, localChild, SyncFailureOperation.Delete,
+                            () => fileService.DeleteFileAsync(localChild, user, options.HonorRecycleBin),
+                            cancellationToken);
+                    }
                     continue;
+                }
 
                 // Present locally, absent remotely, and known from the last run:
                 // it was deleted remotely, so remove it locally instead of

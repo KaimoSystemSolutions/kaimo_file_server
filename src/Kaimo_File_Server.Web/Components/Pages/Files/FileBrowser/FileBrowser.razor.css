@@ -388,6 +388,11 @@
     flex-shrink: 0;
 }
 
+/* Not-yet-synced entries (pending upload, or pull-only so never uploaded). */
+.sync-indicator--warn .sync-indicator-icon {
+    color: var(--warning);
+}
+
 /* ══════════════════════════════════════════════════════════
    File Upload Drag-Over
    ══════════════════════════════════════════════════════════ */

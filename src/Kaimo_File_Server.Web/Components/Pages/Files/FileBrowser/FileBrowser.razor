@@ -469,9 +469,9 @@ else
                     <span>@entry.Name</span>
                     @if (syncMarker is not null)
                     {
-                        <span class="sync-indicator"
-                              title="@string.Format(Resources.Web_Sync_FolderTooltip, syncMarker.SyncName)">
-                            @Assets.SVG(SyncIcon(syncMarker.Mode), new SvgOptions(Width: 20, Height: 20, Color: "var(--info)", StrokeWidth: 2, CssClass: "sync-indicator-icon"))
+                        <span class="sync-indicator @SyncIndicatorClass(syncMarker.State)"
+                              title="@SyncMarkerTooltip(syncMarker)">
+                            @Assets.SVG(SyncMarkerIcon(syncMarker), new SvgOptions(Width: 20, Height: 20, Color: SyncMarkerColor(syncMarker.State), StrokeWidth: 2, CssClass: "sync-indicator-icon"))
                         </span>
                     }
                     @if (aclCount > 0)

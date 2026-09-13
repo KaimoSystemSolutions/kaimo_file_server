@@ -2786,7 +2786,16 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_CloudSync_Advanced_SyncDeletions_Help", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Mirror the remote exactly: files and folders that no longer exist remotely are deleted locally, so the local copy stays a 1:1 mirror. ähnelt.
+        /// </summary>
+        public static string Web_CloudSync_Advanced_SyncDeletions_PullHelp {
+            get {
+                return ResourceManager.GetString("Web_CloudSync_Advanced_SyncDeletions_PullHelp", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Enter 0 or leave empty for no limit. ähnelt.
         /// </summary>
@@ -11363,7 +11372,25 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Sync_FolderTooltip", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Not yet uploaded to &quot;{0}&quot; — will sync on the next run ähnelt.
+        /// </summary>
+        public static string Web_Sync_PendingUploadTooltip {
+            get {
+                return ResourceManager.GetString("Web_Sync_PendingUploadTooltip", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Not uploaded — &quot;{0}&quot; is a pull-only sync ähnelt.
+        /// </summary>
+        public static string Web_Sync_PullBlockedTooltip {
+            get {
+                return ResourceManager.GetString("Web_Sync_PullBlockedTooltip", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die {0} groups ähnelt.
         /// </summary>

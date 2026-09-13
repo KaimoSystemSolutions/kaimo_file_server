@@ -22,7 +22,7 @@
 .sync-name-text strong, .sync-name-text small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sync-name-text strong { color: var(--text-primary); font-size: 13.5px; font-weight: 650; }
 .sync-name-text small { margin-top: 3px; color: var(--text-tertiary); font-size: 11.5px; }
-.sync-list-header span:nth-child(2), .sync-row ::deep .sync-state { justify-self: center; }
+.sync-list-header span:nth-child(2), .sync-row ::deep .sync-state { justify-self: start; }
 .sync-mode { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-size: 12px; }
 .sync-edit-action { border-color: var(--accent-border); color: var(--accent-strong); }
 

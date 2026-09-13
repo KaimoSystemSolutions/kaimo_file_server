@@ -351,6 +351,12 @@
   <data name="Web_Sync_FolderTooltip" xml:space="preserve">
     <value>Synchronisierter Ordner von „{0}"</value>
   </data>
+  <data name="Web_Sync_PendingUploadTooltip" xml:space="preserve">
+    <value>Noch nicht zu „{0}" hochgeladen – wird beim nächsten Lauf synchronisiert</value>
+  </data>
+  <data name="Web_Sync_PullBlockedTooltip" xml:space="preserve">
+    <value>Nicht hochgeladen – „{0}" ist eine reine Pull-Synchronisierung</value>
+  </data>
   <data name="Web_Upload_Progress" xml:space="preserve">
     <value>Lade „{0}" hoch…</value>
   </data>
@@ -2609,6 +2615,9 @@
   </data>
   <data name="Web_CloudSync_Advanced_SyncDeletions_Help" xml:space="preserve">
     <value>Wird eine Datei oder ein Ordner auf einer Seite gelöscht, wird sie auch auf der anderen Seite gelöscht, statt wiederhergestellt zu werden. Wirksam ab dem zweiten Lauf nach dem Aktivieren. Hat der Share einen Papierkorb, werden lokal gelöschte Elemente dorthin verschoben und bleiben wiederherstellbar.</value>
+  </data>
+  <data name="Web_CloudSync_Advanced_SyncDeletions_PullHelp" xml:space="preserve">
+    <value>Spiegelt das Remote exakt: Dateien und Ordner, die remote nicht mehr vorhanden sind – auch lokal erstellte, die nie hochgeladen wurden – werden lokal gelöscht, sodass die lokale Kopie ein 1-zu-1-Spiegel bleibt. Hat der Share einen Papierkorb, werden gelöschte Elemente dorthin verschoben und bleiben wiederherstellbar.</value>
   </data>
   <data name="Web_CloudSync_Schedule" xml:space="preserve">
     <value>Automatische Synchronisierung</value>
