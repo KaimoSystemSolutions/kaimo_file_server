@@ -16,7 +16,15 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-surface);
     background: var(--bg-secondary);
-    overflow: hidden;
+    /* Deliberately NOT overflow:hidden. Blazor's <Virtualize> walks up to the first
+       ancestor whose overflow-y is not "visible" and treats it as the scroll
+       container. Any clipping here (even overflow-x, which forces overflow-y to
+       "auto") made this height-less, content-growing element that container — so it
+       never scrolled, both virtualization spacers stayed on-screen, and Virtualize
+       rendered the ENTIRE directory into the DOM. Keeping overflow visible lets
+       Virtualize find the real scroll container (.main), so only the visible rows
+       render. The rounded corners are handled per-corner below instead of by
+       clipping. The marquee JS already scrolls .main, so this does not affect it. */
     width: 100%;
 }
 
@@ -25,6 +33,11 @@
 .file-grid-header {
     display: grid;
     grid-template-columns: var(--grid-cols);
+    /* Round with the wrapper's top corners: the wrapper no longer clips (see
+       .file-table-wrap), so the header carries its own top rounding. */
+    border-top-left-radius: var(--radius-surface);
+    border-top-right-radius: var(--radius-surface);
+    overflow: hidden;
 }
 
     .file-grid-header > div {

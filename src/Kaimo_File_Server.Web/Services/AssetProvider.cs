@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Web.DynamicHelpers;
 using Microsoft.AspNetCore.Components;
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -26,7 +27,12 @@ public class AssetProvider
     };
     
     private readonly IWebHostEnvironment _env;
-    private readonly Dictionary<string, string> _pathsCache = new();
+    // This provider is a singleton, so the cache is shared across all circuits and
+    // threads — hence ConcurrentDictionary. The inline SVG icons are rendered per
+    // visible row on every re-render (selection, sorting, etc.); re-reading and
+    // re-parsing each file from disk on every one of those calls made every
+    // interaction do dozens of file reads, which is especially slow over a bind mount.
+    private readonly ConcurrentDictionary<string, string> _pathsCache = new();
 
     public AssetProvider(IWebHostEnvironment env)
     {
@@ -88,20 +94,21 @@ public class AssetProvider
 
     private string loadSvgPaths(string relativePath)
     {
-        if (!_env.IsDevelopment() && _pathsCache.TryGetValue(relativePath, out var cached))
-            return cached;
-        
-        var fullPath = Path.Combine(_env.WebRootPath, relativePath);
+        // Always cache, in every environment. Icons are static assets; re-reading and
+        // re-parsing them from disk on every render (previously done in Development)
+        // dominated the cost of routine interactions. Editing an SVG during development
+        // now needs an app restart to take effect — an acceptable trade for the speed-up.
+        return _pathsCache.GetOrAdd(relativePath, static (path, env) =>
+        {
+            var fullPath = Path.Combine(env.WebRootPath, path);
 
-        // Normalize so every element sits on its own line regardless of how the
-        // file was formatted (Inkscape spreads attributes across many lines),
-        // then keep only the drawing elements.
-        var flattened = Regex.Replace(File.ReadAllText(fullPath), @"\s+", " ").Replace("<", "\n<");
-        var svgPaths = string.Join('\n', flattened.Split('\n')
-            .Where(l => RELEVANT_SVG_TAGS.Any(tag => l.TrimStart().StartsWith("<" + tag))));
-
-        _pathsCache[relativePath] = svgPaths;
-        return svgPaths;
+            // Normalize so every element sits on its own line regardless of how the
+            // file was formatted (Inkscape spreads attributes across many lines),
+            // then keep only the drawing elements.
+            var flattened = Regex.Replace(File.ReadAllText(fullPath), @"\s+", " ").Replace("<", "\n<");
+            return string.Join('\n', flattened.Split('\n')
+                .Where(l => RELEVANT_SVG_TAGS.Any(tag => l.TrimStart().StartsWith("<" + tag))));
+        }, _env);
     }
 
     private string parameterizeSVG(string svgPaths, SvgOptions options)

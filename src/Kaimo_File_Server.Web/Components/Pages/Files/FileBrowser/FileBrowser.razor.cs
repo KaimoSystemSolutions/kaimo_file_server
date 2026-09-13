@@ -126,7 +126,7 @@ public partial class FileBrowser
 
     private float GetTableExtraPaddingPx()
     {
-        int itemCount = SortedDirectories.Count() + SortedFiles.Count();
+        int itemCount = SortedEntries.Count;
         float remainingHeight = EmptyAreaHeightPx - itemCount * ItemHeightPx;
 
         if (itemCount == 0)
@@ -159,9 +159,43 @@ public partial class FileBrowser
     private IEnumerable<FileMetadata> SortedDirectories => ApplySort(VM.Directories);
     private IEnumerable<FileMetadata> SortedFiles => ApplySort(VM.Files);
 
+    // Cache for the materialized entry list. Sorting the whole directory and allocating a
+    // new list is O(n log n); without this it ran on every render — and Blazor Server
+    // re-renders the whole component on every click, selection change and context-menu open,
+    // which made large folders lag badly. The cache is rebuilt only when the inputs that
+    // affect ordering actually change: a fresh listing (VM.Items is reassigned per load, so
+    // reference identity detects navigation/refresh/delete/paste) or a new sort setting.
+    private List<FileMetadata>? _sortedEntriesCache;
+    private object? _sortedEntriesItemsRef;
+    private string? _sortedEntriesColumn;
+    private int _sortedEntriesDirection = -1;
+
     // Single sequence for <Virtualize>: directories first (each group sorted), then files.
     // Materialized because Virtualize needs an indexable collection.
-    private List<FileMetadata> SortedEntries => SortedDirectories.Concat(SortedFiles).ToList();
+    private List<FileMetadata> SortedEntries
+    {
+        get
+        {
+            // Size sort depends on directory sizes that load asynchronously, so it must
+            // re-sort live as those values arrive — never serve it from the cache.
+            if (_sortColumn == "size" && _sortDirection != 0)
+                return SortedDirectories.Concat(SortedFiles).ToList();
+
+            if (_sortedEntriesCache is not null &&
+                ReferenceEquals(_sortedEntriesItemsRef, VM.Items) &&
+                _sortedEntriesColumn == _sortColumn &&
+                _sortedEntriesDirection == _sortDirection)
+            {
+                return _sortedEntriesCache;
+            }
+
+            _sortedEntriesCache = SortedDirectories.Concat(SortedFiles).ToList();
+            _sortedEntriesItemsRef = VM.Items;
+            _sortedEntriesColumn = _sortColumn;
+            _sortedEntriesDirection = _sortDirection;
+            return _sortedEntriesCache;
+        }
+    }
 
     // Only the recycle-bin root itself (a top-level ".RECYCLE_BIN") gets the trash icon.
     // Folders nested inside it are ordinary directories and keep the folder icon.
