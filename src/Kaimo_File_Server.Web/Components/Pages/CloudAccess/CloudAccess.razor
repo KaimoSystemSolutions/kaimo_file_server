@@ -175,6 +175,7 @@ else
                                               Items="VM.ManageableDepartments.ToDepartmentItems()"
                                               SelectedIds="_shareDepartmentId.AsSelection()"
                                               SelectedIdsChanged="OnShareDepartmentChangedAsync"
+                                              AllowClear="false"
                                               Title="@R("Web_CloudAccess_Department")"
                                               Placeholder="@R("Web_CloudAccess_Select")" />
                     </label>
@@ -221,6 +222,7 @@ else
                 <div class="vs-table-header" aria-hidden="true">
                     <span>@Resources.Web_ShareList_Label_Name</span>
                     <span>@Resources.Web_ShareList_Label_Status</span>
+                    <span>@Resources.Web_ShareList_Label_Department</span>
                     @if (_showVirtualShareDetails)
                     {
                         <span>@R("Web_CloudAccess_Connection")</span>
@@ -245,6 +247,19 @@ else
                             <span class="vs-table-cell">
                                 <StatusBadge Tone="@(isUsable ? StatusTone.Positive : StatusTone.Negative)"
                                              Label="@ShareStatusText(share)" />
+                            </span>
+                            <span class="vs-table-cell vs-dept">
+                                @{ var dept = VM.GetDepartmentDisplay(share); }
+                                @if (dept is not null)
+                                {
+                                    <span class="dept-chip"
+                                          style="border-color:@dept.Color; background:@dept.Soft;"
+                                          title="@dept.Name">@dept.Name</span>
+                                }
+                                else
+                                {
+                                    <span class="dept-muted">—</span>
+                                }
                             </span>
                             @if (_showVirtualShareDetails)
                             {
@@ -323,6 +338,42 @@ else
                     <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_Connection")</span><span class="detail-value">@(connection?.Name ?? "—")</span></div>
                     <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_Account")</span><span class="detail-value">@(connection?.AccountEmail ?? connection?.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</span></div>
                     <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_RemoteFolder")</span><span class="detail-value">@_selectedShare.RemoteRootPath</span></div>
+
+                    @if (VM.ManageableDepartments.Count > 0)
+                    {
+                        <div class="detail-section">
+                            <span class="detail-label">@Resources.Web_ShareList_Label_Department</span>
+                            <PrincipalPickerField Mode="SelectionMode.Single"
+                                                  Items="VM.ManageableDepartments.ToDepartmentItems()"
+                                                  SelectedIds="_editShareDepartmentId.AsSelection()"
+                                                  SelectedIdsChanged="ids => _editShareDepartmentId =
+                                                      ids.FirstOrNull() ?? _selectedShare.DepartmentId"
+                                                  AllowClear="false"
+                                                  Title="@Resources.Web_ShareList_Label_Department" />
+
+                            @if (!_showShareDepartmentConfirm)
+                            {
+                                <button class="btn-primary department-change-button" type="button"
+                                        disabled="@(_busy || _editShareDepartmentId == _selectedShare.DepartmentId)"
+                                        @onclick="() => _showShareDepartmentConfirm = true">
+                                    @Resources.Web_ShareList_Action_ChangeDepartment
+                                </button>
+                            }
+                            else
+                            {
+                                <div class="confirm-delete">
+                                    <p>@Resources.Web_ShareList_DepartmentChangeWarning</p>
+                                    <div class="delete-actions">
+                                        <button class="btn-primary" type="button" disabled="@_busy"
+                                                @onclick="ChangeShareDepartmentAsync">@Resources.Web_ShareList_Action_ChangeDepartmentConfirm</button>
+                                        <button class="btn-secondary" type="button"
+                                                @onclick="() => _showShareDepartmentConfirm = false">@Resources.Web_Button_Cancel</button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+
                     @if (_editingShare)
                     {
                         <div class="cloud-access-form cloud-access-edit-form">
@@ -452,6 +503,8 @@ else
     private bool _editingShare;
     private string _editShareName = "";
     private string _editShareRoot = "";
+    private Guid _editShareDepartmentId;
+    private bool _showShareDepartmentConfirm;
     private Guid? _editingConnectionId;
     private string _editConnectionName = "";
     private bool _showVirtualShareDetails;
@@ -599,6 +652,8 @@ else
     {
         _selectedShare = share;
         _editingShare = false;
+        _editShareDepartmentId = share.DepartmentId;
+        _showShareDepartmentConfirm = false;
         _activeTab = CloudAccessTab.General;
         // Principals back the management (access) editor; loading them requires manage
         // rights. For a share the actor can only access, skip it — no management pane shows.
@@ -640,6 +695,18 @@ else
     }
 
     private void CancelEditShare() => _editingShare = false;
+
+    private async Task ChangeShareDepartmentAsync()
+    {
+        if (_selectedShare is null) return;
+        var shareId = _selectedShare.Id;
+        await RunAsync(async () =>
+        {
+            await VM.ChangeShareDepartmentAsync(shareId, _editShareDepartmentId);
+            _selectedShare = VM.Shares.SingleOrDefault(x => x.Id == shareId);
+            _showShareDepartmentConfirm = false;
+        });
+    }
 
     private async Task SaveShareAsync()
     {

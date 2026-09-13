@@ -1589,6 +1589,29 @@ h1, h2, h3, h4, h5, h6 {
     white-space: nowrap;
 }
 
+/* Department chip: the department color as a frame (and faint fill) around the
+   name so it stands out; border-color/background are supplied inline per item.
+   Shared by the share management list and the department picker trigger. The file
+   browser share overview keeps its own scoped copy. */
+.dept-chip {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-secondary);
+    padding: 2px 9px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.dept-muted {
+    color: var(--text-tertiary);
+}
+
 .principal-picker-chips {
     display: flex;
     flex-wrap: wrap;

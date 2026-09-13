@@ -87,6 +87,7 @@ else
                        ShowExtendedInfo="_showExtendedShareInfo"
                        StorageAvailable="VM.IsShareStorageAvailable"
                        StoragePoolName="VM.GetStoragePoolDisplayNameForShare"
+                       Department="VM.GetDepartmentDisplay"
                        CanViewDetails="@(s => VM.CanManageShare(s.Id))"
                        OnSelected="HandleCardClick"
                        OnOpened="OpenShare"/>

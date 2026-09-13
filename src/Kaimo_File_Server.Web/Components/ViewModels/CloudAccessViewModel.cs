@@ -8,6 +8,7 @@ using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.Clouds;
+using Kaimo_File_Server.Web.DynamicHelpers;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 
@@ -34,6 +35,9 @@ public sealed class CloudAccessViewModel
     private UserContext? _actor;
     private AuthorizedScopeResult? _shareScope;
     private Dictionary<Guid, StorageConnectionState> _connectionStates = [];
+    // DepartmentId → department (all departments), for the list-view chip lookup.
+    private IReadOnlyDictionary<Guid, Department> _departmentsById =
+        new Dictionary<Guid, Department>();
 
     public CloudAccessViewModel(
         ICloudAccessRepository repository,
@@ -103,6 +107,21 @@ public sealed class CloudAccessViewModel
            && _connectionStates.TryGetValue(share.ConnectionId, out var state)
            && state == StorageConnectionState.Ready;
 
+    /// <summary>
+    /// The department a virtual share belongs to, with its palette colors for the
+    /// list-view chip. Mirrors the local share overview so both lists render the same
+    /// chip. Returns <c>null</c> when the department is unknown.
+    /// </summary>
+    public DepartmentDisplay? GetDepartmentDisplay(CloudAccessShare share)
+    {
+        if (!_departmentsById.TryGetValue(share.DepartmentId, out var department))
+            return null;
+
+        var (color, soft) = DepartmentPalette.For(department.Id, department.Color);
+        return new DepartmentDisplay(
+            string.IsNullOrWhiteSpace(department.Name) ? "—" : department.Name, color, soft);
+    }
+
     public async Task LoadAsync()
     {
         IsLoading = true;
@@ -123,6 +142,7 @@ public sealed class CloudAccessViewModel
             CanManageVirtualShares = HasDepartments(shareScope);
             CanManage = CanManageConnections || CanManageVirtualShares || CanUseConnections;
             var allDepartments = await _departments.GetAllAsync();
+            _departmentsById = allDepartments.ToDictionary(x => x.Id);
             var shareIds = GetDepartmentIds(shareScope, allDepartments);
             // Departments a virtual share may be mapped to = where the actor can manage
             // cloud access (Global first, as the default mapping).
@@ -629,6 +649,25 @@ public sealed class CloudAccessViewModel
         share.Name = normalizedName;
         share.RemoteRootPath = folder.Path;
         share.RemoteRootItemId = folder.StableId;
+        await _repository.UpsertShareAsync(share);
+        await LoadAsync();
+    }
+
+    /// <summary>
+    /// Reassigns a virtual share to another department. The actor must be able to manage
+    /// both the current and the target department. Existing grants are principal-keyed and
+    /// untouched; what shifts is which department admins may manage the share (mirrors the
+    /// local share department change).
+    /// </summary>
+    public async Task ChangeShareDepartmentAsync(Guid shareId, Guid departmentId)
+    {
+        var share = await _repository.GetShareAsync(shareId)
+                    ?? throw new InvalidOperationException(R("Web_CloudAccess_ShareMissing"));
+        await EnsureCanManageDepartmentAsync(share.DepartmentId);
+        await EnsureCanManageDepartmentAsync(departmentId);
+        if (share.DepartmentId == departmentId) return;
+
+        share.DepartmentId = departmentId;
         await _repository.UpsertShareAsync(share);
         await LoadAsync();
     }

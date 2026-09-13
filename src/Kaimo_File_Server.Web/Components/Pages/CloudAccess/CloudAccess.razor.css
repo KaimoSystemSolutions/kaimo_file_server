@@ -113,12 +113,12 @@
 
 .vs-table--compact .vs-table-header,
 .vs-table--compact .vs-table-row {
-    grid-template-columns: minmax(150px, 1.6fr) minmax(118px, 0.8fr);
+    grid-template-columns: minmax(150px, 1.6fr) minmax(110px, 0.8fr) minmax(120px, 0.9fr);
 }
 
 .vs-table--extended .vs-table-header,
 .vs-table--extended .vs-table-row {
-    grid-template-columns: minmax(130px, 1.3fr) minmax(102px, 0.7fr) minmax(108px, 0.9fr) minmax(120px, 1fr);
+    grid-template-columns: minmax(130px, 1.3fr) minmax(100px, 0.7fr) minmax(120px, 0.9fr) minmax(108px, 0.9fr) minmax(120px, 1fr);
 }
 
 .vs-table-header {
@@ -205,6 +205,24 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.vs-dept {
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Department change: same treatment as the local share settings — the button sits
+   under the picker with its own spacing, and the confirm box keeps that spacing. */
+.department-change-button {
+    margin-top: 10px;
+    padding: 5px 12px;
+    font-size: 12px;
+    min-height: 28px;
+}
+
+.detail-section > .confirm-delete {
+    margin-top: 10px;
 }
 
 .vs-detail-pane {

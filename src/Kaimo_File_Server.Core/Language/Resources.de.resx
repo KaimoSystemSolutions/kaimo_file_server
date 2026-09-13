@@ -471,6 +471,18 @@
   <data name="Web_ShareList_Label_RecycleBin" xml:space="preserve">
     <value>Papierkorb</value>
   </data>
+  <data name="Web_ShareList_Label_Department" xml:space="preserve">
+    <value>Abteilung</value>
+  </data>
+  <data name="Web_ShareList_Action_ChangeDepartment" xml:space="preserve">
+    <value>Abteilung ändern</value>
+  </data>
+  <data name="Web_ShareList_Action_ChangeDepartmentConfirm" xml:space="preserve">
+    <value>Ändern</value>
+  </data>
+  <data name="Web_ShareList_DepartmentChangeWarning" xml:space="preserve">
+    <value>Der Wechsel der Abteilung ändert, welche Abteilungs-Administratoren diesen Share verwalten dürfen und welche Abteilungs-Standardrechte greifen. Bestehende explizite ACL-Einträge bleiben unverändert und funktionieren weiterhin.</value>
+  </data>
   <data name="Web_ShareList_Label_Users" xml:space="preserve">
     <value>Benutzer</value>
   </data>
@@ -1271,6 +1283,12 @@
   </data>
   <data name="Web_Share_RecycleDisabled" xml:space="preserve">
     <value>Papierkorb für Share deaktiviert.</value>
+  </data>
+  <data name="Web_Share_DepartmentChanged" xml:space="preserve">
+    <value>Abteilung des Shares geändert.</value>
+  </data>
+  <data name="Web_Share_DepartmentUnchanged" xml:space="preserve">
+    <value>Abteilung unverändert.</value>
   </data>
   <data name="Web_Error_ArchiveExists" xml:space="preserve">
     <value>Ein Archiv mit dem Namen "{0}" existiert bereits.</value>

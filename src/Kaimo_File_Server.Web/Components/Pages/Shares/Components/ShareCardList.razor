@@ -9,6 +9,7 @@
     <div class="share-table-header" aria-hidden="true">
         <span>@Resources.Web_ShareList_Label_Name</span>
         <span>@Resources.Web_ShareList_Label_Status</span>
+        <span>@Resources.Web_ShareList_Label_Department</span>
         @if (ShowExtendedInfo)
         {
             <span>@Resources.Web_ShareList_Label_StoragePool</span>
@@ -53,6 +54,20 @@
                                          : Resources.Web_ShareList_Card_Disabled)" />
                 </span>
 
+                <span class="share-table-cell share-dept">
+                    @{ var dept = Department?.Invoke(share); }
+                    @if (dept is not null)
+                    {
+                        <span class="dept-chip"
+                              style="border-color:@dept.Color; background:@dept.Soft;"
+                              title="@dept.Name">@dept.Name</span>
+                    }
+                    else
+                    {
+                        <span class="dept-muted">—</span>
+                    }
+                </span>
+
                 @if (ShowExtendedInfo)
                 {
                     @* Storage pool, recycle-bin and hidden state are management details —
@@ -90,6 +105,8 @@
     [Parameter] public bool ShowExtendedInfo { get; set; }
     [Parameter] public Func<ShareDefinition, bool>? StorageAvailable { get; set; }
     [Parameter] public Func<ShareDefinition, string>? StoragePoolName { get; set; }
+    /// <summary>The department a share belongs to, rendered as a colored chip (mirrors the file browser).</summary>
+    [Parameter] public Func<ShareDefinition, DepartmentDisplay?>? Department { get; set; }
     /// <summary>Per-share gate for the management-only columns (pool, recycle bin, hidden).</summary>
     [Parameter] public Func<ShareDefinition, bool>? CanViewDetails { get; set; }
     [Parameter] public EventCallback<ShareDefinition> OnSelected { get; set; }

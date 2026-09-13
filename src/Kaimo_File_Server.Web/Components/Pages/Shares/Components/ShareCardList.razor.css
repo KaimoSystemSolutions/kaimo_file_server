@@ -15,12 +15,12 @@
 
 .share-table--compact .share-table-header,
 .share-table--compact .share-table-row {
-    grid-template-columns: minmax(170px, 1fr) minmax(112px, 0.42fr);
+    grid-template-columns: minmax(160px, 1fr) minmax(100px, 0.42fr) minmax(120px, 0.7fr);
 }
 
 .share-table--extended .share-table-header,
 .share-table--extended .share-table-row {
-    grid-template-columns: minmax(160px, 1.25fr) minmax(110px, 0.7fr) minmax(110px, 0.9fr) minmax(88px, 0.55fr) minmax(78px, 0.5fr);
+    grid-template-columns: minmax(150px, 1.2fr) minmax(100px, 0.6fr) minmax(120px, 0.75fr) minmax(110px, 0.9fr) minmax(88px, 0.55fr) minmax(78px, 0.5fr);
 }
 
 .share-table-header {
@@ -117,6 +117,11 @@
     white-space: nowrap;
 }
 
+.share-dept {
+    min-width: 0;
+    overflow: hidden;
+}
+
 @media (max-width: 1280px) {
     .share-table--extended .share-table-header,
     .share-table--extended .share-table-row {
@@ -140,6 +145,7 @@
         gap: 8px;
     }
 
+    .share-table--compact .share-table-row > :nth-child(n + 3),
     .share-table--extended .share-table-row > :nth-child(n + 3) {
         display: none;
     }

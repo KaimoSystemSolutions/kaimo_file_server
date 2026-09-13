@@ -10787,7 +10787,25 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Share_RecycleDisabled", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Department of the share changed. ähnelt.
+        /// </summary>
+        public static string Web_Share_DepartmentChanged {
+            get {
+                return ResourceManager.GetString("Web_Share_DepartmentChanged", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Department unchanged. ähnelt.
+        /// </summary>
+        public static string Web_Share_DepartmentUnchanged {
+            get {
+                return ResourceManager.GetString("Web_Share_DepartmentUnchanged", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Recycle bin enabled for the share. ähnelt.
         /// </summary>
@@ -11093,7 +11111,43 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_ShareList_Label_RecycleBin", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Department ähnelt.
+        /// </summary>
+        public static string Web_ShareList_Label_Department {
+            get {
+                return ResourceManager.GetString("Web_ShareList_Label_Department", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Change department ähnelt.
+        /// </summary>
+        public static string Web_ShareList_Action_ChangeDepartment {
+            get {
+                return ResourceManager.GetString("Web_ShareList_Action_ChangeDepartment", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Change ähnelt.
+        /// </summary>
+        public static string Web_ShareList_Action_ChangeDepartmentConfirm {
+            get {
+                return ResourceManager.GetString("Web_ShareList_Action_ChangeDepartmentConfirm", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Changing the department reassigns which department administrators can manage this share and which department default permissions apply. Existing explicit ACL entries are not changed and keep working. ähnelt.
+        /// </summary>
+        public static string Web_ShareList_DepartmentChangeWarning {
+            get {
+                return ResourceManager.GetString("Web_ShareList_DepartmentChangeWarning", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Status ähnelt.
         /// </summary>

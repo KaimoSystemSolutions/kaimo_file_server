@@ -5,3 +5,30 @@
 .compact-button { padding: 4px 10px; font-size: 12px; }
 .delete-actions { display: flex; gap: 8px; }
 .edit-input { min-height: 28px; padding: 5px 10px; font-size: 12px; line-height: 1.4; }
+
+/* Field + action rows (rename, move pool): the field grows, the button keeps a
+   fixed size and stays vertically centred with the field. The margin-top:0
+   cancels a global rename-button offset that otherwise drops it below the input. */
+.detail-rename-row .edit-input,
+.detail-value-row .edit-input { flex: 1; min-width: 0; }
+
+.detail-rename-row .btn-primary,
+.detail-value-row .btn-primary {
+    flex-shrink: 0;
+    margin-top: 0;
+    padding: 5px 12px;
+    font-size: 12px;
+    min-height: 28px;
+}
+
+/* Change-department button sits under the full-width picker, so it needs its own
+   top spacing; same size as the other field-action buttons. */
+.department-change-button {
+    margin-top: 10px;
+    padding: 5px 12px;
+    font-size: 12px;
+    min-height: 28px;
+}
+
+/* Confirm box replaces the button under the picker → keep the same top spacing. */
+.detail-section > .confirm-delete { margin-top: 10px; }

@@ -295,7 +295,8 @@ builder.Services.AddScoped<ShareListViewModel>(sp =>
         sp.GetRequiredService<IFileVersionService>(),
         cloudSyncOperations:
             sp.GetRequiredService<ICloudSyncOperationCoordinator>(),
-        config: sp.GetRequiredService<IConfigRepository>()));
+        config: sp.GetRequiredService<IConfigRepository>(),
+        departmentRepo: sp.GetRequiredService<IDepartmentRepository>()));
 
 // ══════════════════════════════════════════
 //  DataProtection

@@ -20,8 +20,20 @@
 
 @if (!HideTrigger)
 {
+    // For a single-select department the trigger itself becomes the colored frame
+    // (its border + faint fill are the department color), and only the plain name
+    // sits inside — no nested chip border.
+    var singleDept = Mode == SelectionMode.Single
+        ? SelectedItems.FirstOrDefault(i => i.Kind == PrincipalKind.Department)
+        : null;
+    string? triggerStyle = null;
+    if (singleDept is not null)
+    {
+        var (frameColor, frameSoft) = ColorsFor(singleDept);
+        triggerStyle = $"border-color:{frameColor};background:{frameSoft};";
+    }
 <div class="principal-picker @Class" @attributes="AdditionalAttributes">
-    <div class="principal-picker-trigger" @onclick="OpenDialog" role="button" tabindex="0"
+    <div class="principal-picker-trigger" style="@triggerStyle" @onclick="OpenDialog" role="button" tabindex="0"
          @onkeydown="TriggerKeyDown" aria-haspopup="dialog">
         @if (_selected.Count == 0)
         {
@@ -32,10 +44,19 @@
             var item = SelectedItems.FirstOrDefault();
             @if (item is not null)
             {
-                <span class="principal-picker-single">
-                    @Avatar(item, 22)
-                    <span class="principal-picker-single-name">@item.Name</span>
-                </span>
+                @if (item.Kind == PrincipalKind.Department)
+                {
+                    <span class="principal-picker-single">
+                        <span class="principal-picker-single-name" title="@item.Name">@item.Name</span>
+                    </span>
+                }
+                else
+                {
+                    <span class="principal-picker-single">
+                        @Avatar(item, 22)
+                        <span class="principal-picker-single-name">@item.Name</span>
+                    </span>
+                }
             }
         }
         else
@@ -47,7 +68,7 @@
                 }
             </span>
         }
-        @if (Mode == SelectionMode.Single && _selected.Count > 0)
+        @if (AllowClear && Mode == SelectionMode.Single && _selected.Count > 0)
         {
             <span class="principal-picker-chip-x principal-picker-clear" role="button" tabindex="0"
                   @onclick="ClearSingle" @onclick:stopPropagation="true"
@@ -171,6 +192,10 @@
 
     /// <summary>Currently selected ids. Bindable via <c>@bind-SelectedIds</c>.</summary>
     [Parameter] public IReadOnlyCollection<Guid> SelectedIds { get; set; } = [];
+
+    /// <summary>Single-select only: show the inline clear (✕) on the trigger. Set false for a
+    /// mandatory value (e.g. a department that must always be set) where clearing makes no sense.</summary>
+    [Parameter] public bool AllowClear { get; set; } = true;
 
     /// <summary>Fired when the selection is committed (row pick in single mode, Save in multiple mode, or the trigger clear).</summary>
     [Parameter] public EventCallback<IReadOnlyList<Guid>> SelectedIdsChanged { get; set; }

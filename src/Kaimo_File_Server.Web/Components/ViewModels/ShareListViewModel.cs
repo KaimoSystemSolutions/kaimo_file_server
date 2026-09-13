@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Language;
@@ -9,6 +10,7 @@ using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Search;
+using Kaimo_File_Server.Web.DynamicHelpers;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
@@ -38,6 +40,7 @@ public partial class ShareListViewModel
     private readonly ISearchService? _searchService;
     private readonly ICloudSyncOperationCoordinator? _cloudSyncOperations;
     private readonly IConfigRepository? _config;
+    private readonly IDepartmentRepository? _departmentRepo;
 
     // Admin-assigned pool labels (normalized path → friendly name), refreshed in
     // LoadAsync. Empty until loaded, which falls back to path-derived names.
@@ -60,7 +63,8 @@ public partial class ShareListViewModel
         IFileVersionService? versionService = null,
         ISearchService? searchService = null,
         ICloudSyncOperationCoordinator? cloudSyncOperations = null,
-        IConfigRepository? config = null)
+        IConfigRepository? config = null,
+        IDepartmentRepository? departmentRepo = null)
     {
         _shareRepo = shareRepo;
         _userRepo = userRepo;
@@ -82,6 +86,7 @@ public partial class ShareListViewModel
         _searchService = searchService;
         _cloudSyncOperations = cloudSyncOperations;
         _config = config;
+        _departmentRepo = departmentRepo;
     }
 
     /// <summary>
@@ -123,6 +128,18 @@ public partial class ShareListViewModel
     public bool ShowDeleteConfirm { get; set; }
     public bool IsRenaming { get; private set; }
     public bool IsMovingPool { get; private set; }
+
+    // -- Department --
+
+    // All departments (global first) for the settings picker; empty when no
+    // department repository is wired (keeps the section hidden).
+    public List<Department> Departments { get; private set; } = [];
+    // DepartmentId → department, for the list-view chip lookup.
+    private IReadOnlyDictionary<Guid, Department> _departmentsById =
+        new Dictionary<Guid, Department>();
+    // The department currently chosen in the picker for the selected share.
+    public Guid EditShareDepartmentId { get; set; }
+    public bool ShowDepartmentConfirm { get; set; }
 
     public IReadOnlyList<StoragePoolItem> StoragePools { get; private set; }
 
@@ -184,6 +201,13 @@ public partial class ShareListViewModel
             ErrorMessage = null;
 
             await RefreshPoolNamesAsync();
+
+            if (_departmentRepo is not null)
+            {
+                Departments = (await _departmentRepo.GetAllAsync())
+                    .OrderByGlobalFirst().ToList();
+                _departmentsById = Departments.ToDictionary(d => d.Id);
+            }
 
             var state = await _authState.GetAuthenticationStateAsync();
             CurrentUserName = state.User.FindFirst("display_name")?.Value
@@ -337,6 +361,22 @@ public partial class ShareListViewModel
                 share.Name);
             return "—";
         }
+    }
+
+    /// <summary>
+    /// The department a share belongs to, with its palette colors for the list-view
+    /// chip. Mirrors <c>ShareBrowserViewModel.GetDepartment</c> so the management list
+    /// and the file browser share overview render the same chip. Returns <c>null</c>
+    /// when the department is unknown, so the caller shows a plain placeholder.
+    /// </summary>
+    public DepartmentDisplay? GetDepartmentDisplay(ShareDefinition share)
+    {
+        if (!_departmentsById.TryGetValue(share.DepartmentId, out var department))
+            return null;
+
+        var (color, soft) = DepartmentPalette.For(department.Id, department.Color);
+        return new DepartmentDisplay(
+            string.IsNullOrWhiteSpace(department.Name) ? "—" : department.Name, color, soft);
     }
 
     /// <summary>
@@ -495,9 +535,11 @@ public partial class ShareListViewModel
         EditSharePoolPath = Path.GetDirectoryName(Path.GetFullPath(share.Path))
             ?? _storagePools.FirstOrDefault()
             ?? string.Empty;
+        EditShareDepartmentId = share.DepartmentId;
         EditErrorMessage = null;
         EditSuccessMessage = null;
         ShowDeleteConfirm = false;
+        ShowDepartmentConfirm = false;
         ShowAccessPanel = false;
         IsCreating = false;
     }
@@ -507,9 +549,11 @@ public partial class ShareListViewModel
         SelectedShare = null;
         EditShareName = "";
         EditSharePoolPath = "";
+        EditShareDepartmentId = Guid.Empty;
         EditErrorMessage = null;
         EditSuccessMessage = null;
         ShowDeleteConfirm = false;
+        ShowDepartmentConfirm = false;
         ShowAccessPanel = false;
     }
 
@@ -989,6 +1033,57 @@ public partial class ShareListViewModel
             _logger.LogError(ex, "Error changing the share visibility");
             EditSuccessMessage = null;
             EditErrorMessage = Resources.Web_Error_ChangeVisibilityFailed;
+            return false;
+        }
+    }
+
+    // -- Change department --
+
+    /// <summary>
+    /// Reassigns the selected share to <see cref="EditShareDepartmentId"/>. This is a
+    /// pure DB field change (no filesystem move), so it needs no share lock or cloud
+    /// lease. Explicit ACL entries are principal-keyed and untouched; what shifts is
+    /// the department-default permission layer and which department-scoped admins may
+    /// manage the share (see the confirm warning in ShareSettingsPanel).
+    /// </summary>
+    public async Task<bool> ChangeDepartmentAsync()
+    {
+        if (SelectedShare is null) return false;
+
+        if (!EnsureSelectedShareWritable())
+            return false;
+
+        // Assigning the share's department is a share settings change → EditShareSettings.
+        if (!await CanManageSelectedShareAsync(ManagementPermission.EditShareSettings))
+        { EditSuccessMessage = null; EditErrorMessage = Resources.Web_Error_NoPermission; return false; }
+
+        if (EditShareDepartmentId == SelectedShare.DepartmentId)
+        {
+            ShowDepartmentConfirm = false;
+            EditErrorMessage = null;
+            EditSuccessMessage = Resources.Web_Share_DepartmentUnchanged;
+            return true;
+        }
+
+        try
+        {
+            SelectedShare.DepartmentId = EditShareDepartmentId;
+            await _shareRepo.UpdateAsync(SelectedShare);
+
+            _logger.LogInformation(
+                "Share '{ShareName}' reassigned to department '{DepartmentId}'",
+                SelectedShare.Name, EditShareDepartmentId);
+
+            ShowDepartmentConfirm = false;
+            EditErrorMessage = null;
+            EditSuccessMessage = Resources.Web_Share_DepartmentChanged;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error changing the share department");
+            EditSuccessMessage = null;
+            EditErrorMessage = Resources.Web_Error_ChangeStatusFailed;
             return false;
         }
     }

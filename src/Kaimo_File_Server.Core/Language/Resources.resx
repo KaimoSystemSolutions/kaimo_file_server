@@ -471,6 +471,18 @@
   <data name="Web_ShareList_Label_RecycleBin" xml:space="preserve">
     <value>Recycle bin</value>
   </data>
+  <data name="Web_ShareList_Label_Department" xml:space="preserve">
+    <value>Department</value>
+  </data>
+  <data name="Web_ShareList_Action_ChangeDepartment" xml:space="preserve">
+    <value>Change department</value>
+  </data>
+  <data name="Web_ShareList_Action_ChangeDepartmentConfirm" xml:space="preserve">
+    <value>Change</value>
+  </data>
+  <data name="Web_ShareList_DepartmentChangeWarning" xml:space="preserve">
+    <value>Changing the department reassigns which department administrators can manage this share and which department default permissions apply. Existing explicit ACL entries are not changed and keep working.</value>
+  </data>
   <data name="Web_ShareList_Label_Users" xml:space="preserve">
     <value>Users</value>
   </data>
@@ -1271,6 +1283,12 @@
   </data>
   <data name="Web_Share_RecycleDisabled" xml:space="preserve">
     <value>Recycle bin disabled for the share.</value>
+  </data>
+  <data name="Web_Share_DepartmentChanged" xml:space="preserve">
+    <value>Department of the share changed.</value>
+  </data>
+  <data name="Web_Share_DepartmentUnchanged" xml:space="preserve">
+    <value>Department unchanged.</value>
   </data>
   <data name="Web_Error_ArchiveExists" xml:space="preserve">
     <value>An archive named "{0}" already exists.</value>
