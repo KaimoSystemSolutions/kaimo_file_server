@@ -102,7 +102,13 @@ else
                                 <h3>@R("Web_CloudAccess_EditConnection")</h3>
                                 <p>@_selected.Name · @ProviderName(_selected.ProviderId)</p>
                             </div>
-                            <label class="connection-enabled"><input type="checkbox" @bind="_editEnabled" /> <span>@R("Web_ExternalStorage_Enabled")</span></label>
+                            <div class="connection-enabled">
+                                <label class="toggle-switch" title="@R("Web_ExternalStorage_Enabled")">
+                                    <input type="checkbox" @bind="_editEnabled" />
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span>@R("Web_ExternalStorage_Enabled")</span>
+                            </div>
                         </div>
                         @ConnectionTabStrip
                         <div class="connection-tab-panel"><div class="connection-form">@ConnectionFormFields</div></div>
@@ -577,16 +583,16 @@ else
     // General tab; the connection and security tabs appear when relevant.
     private RenderFragment ConnectionTabStrip => @<text>
         <Tabs class="detail-tabs--panel connection-tabs" aria-label="@R("Web_CloudAccess_EditConnection")">
-            <Tab Active="@(_activeConnectionTab == ConnectionTab.General)" Label="@R("Web_ExternalStorage_ConnTab_General")"
+            <Tab Active="@(_activeConnectionTab == ConnectionTab.General)" Icon="settings.svg" Label="@R("Web_ExternalStorage_ConnTab_General")"
                  OnClick="() => _activeConnectionTab = ConnectionTab.General" />
             @if (ShowConnectionTab)
             {
-                <Tab Active="@(_activeConnectionTab == ConnectionTab.Connection)" Label="@R("Web_ExternalStorage_ConnTab_Connection")"
+                <Tab Active="@(_activeConnectionTab == ConnectionTab.Connection)" Icon="globe.svg" Label="@R("Web_ExternalStorage_ConnTab_Connection")"
                      OnClick="() => _activeConnectionTab = ConnectionTab.Connection" />
             }
             @if (ShowSecurityTab)
             {
-                <Tab Active="@(_activeConnectionTab == ConnectionTab.Security)" Label="@R("Web_ExternalStorage_ConnTab_Security")"
+                <Tab Active="@(_activeConnectionTab == ConnectionTab.Security)" Icon="shield.svg" Label="@R("Web_ExternalStorage_ConnTab_Security")"
                      OnClick="() => _activeConnectionTab = ConnectionTab.Security" />
             }
         </Tabs>

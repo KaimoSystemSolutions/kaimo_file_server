@@ -77,15 +77,21 @@ else
                     <h3>@(_editingId is null ? R("Web_ExternalStorage_CreateSync") : R("Web_ExternalStorage_EditSync"))</h3>
                     <span>@(_editingId is null ? R("Web_ExternalStorage_SyncsHelp") : _model.DisplayName)</span>
                 </div>
-                <label class="storage-enabled"><input type="checkbox" @bind="_model.Enabled" /> <span>@R("Web_ExternalStorage_Enabled")</span></label>
+                <div class="storage-enabled">
+                    <label class="toggle-switch" title="@R("Web_ExternalStorage_Enabled")">
+                        <input type="checkbox" @bind="_model.Enabled" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span>@R("Web_ExternalStorage_Enabled")</span>
+                </div>
             </div>
 
             <Tabs class="detail-tabs--panel" aria-label="@R("Web_ExternalStorage_EditSync")">
-                <Tab Active="@(_activeSettingsTab == SyncSettingsTab.General)" Label="@R("Web_CloudSync_Tab_General")"
+                <Tab Active="@(_activeSettingsTab == SyncSettingsTab.General)" Icon="settings.svg" Label="@R("Web_CloudSync_Tab_General")"
                      OnClick="() => _activeSettingsTab = SyncSettingsTab.General" />
-                <Tab Active="@(_activeSettingsTab == SyncSettingsTab.Schedule)" Label="@R("Web_CloudSync_Tab_Schedule")"
+                <Tab Active="@(_activeSettingsTab == SyncSettingsTab.Schedule)" Icon="history.svg" Label="@R("Web_CloudSync_Tab_Schedule")"
                      OnClick="() => _activeSettingsTab = SyncSettingsTab.Schedule" />
-                <Tab Active="@(_activeSettingsTab == SyncSettingsTab.Advanced)" Label="@R("Web_CloudSync_Tab_Advanced")"
+                <Tab Active="@(_activeSettingsTab == SyncSettingsTab.Advanced)" Icon="gear.svg" Label="@R("Web_CloudSync_Tab_Advanced")"
                      OnClick="() => _activeSettingsTab = SyncSettingsTab.Advanced" />
             </Tabs>
 
