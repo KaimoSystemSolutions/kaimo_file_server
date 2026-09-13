@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* SPDX-FileCopyrightText: 2026 Kaimo File Server */
 #ifndef KAIMO_LOCAL_PROTOCOL_H
 #define KAIMO_LOCAL_PROTOCOL_H
 

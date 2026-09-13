@@ -1,5 +1,12 @@
 # samba-vfs — Phase-0-Spike (Proof-of-Concept)
 
+> **License: GPL-3.0-or-later** (see [`LICENSE`](LICENSE)), unlike the rest of
+> the repository, which is AGPL-3.0-or-later. This module is compiled against
+> and loaded into Samba's `smbd` and is therefore a derivative work of Samba
+> (GPL). It talks to the .NET control plane only over a local socket / gRPC
+> boundary, which keeps the two license domains separate. This part cannot be
+> relicensed commercially.
+
 Goal of this directory: **prove that the Samba+VFS approach is viable**, before investing further. See overall plan: [`../../docu/smb-samba-vfs-migration.md`](../../docu/smb-samba-vfs-migration.md).
 
 Phase 0 clarifies the two biggest unknowns:
