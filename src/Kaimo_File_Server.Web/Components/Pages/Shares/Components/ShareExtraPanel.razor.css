@@ -1,0 +1,30 @@
+.detail-section { margin-bottom: 18px; }
+.detail-label { margin-bottom: 6px; font-size: 13px; text-transform: none; letter-spacing: 0.01em; color: var(--text-secondary); }
+.detail-value { display: block; padding: 5px 10px; background: var(--bg-tertiary); border: 1px solid var(--border-light); border-radius: var(--radius-control); color: var(--text-primary); font-size: 12px; line-height: 1.4; word-break: break-word; }
+.detail-value-row { display: flex; align-items: center; gap: 8px; }
+.delete-actions { display: flex; gap: 8px; }
+.edit-input { min-height: 28px; padding: 5px 10px; font-size: 12px; line-height: 1.4; }
+
+/* Field + action rows (move pool): the field grows, the button keeps a fixed size and
+   stays vertically centred with the field. */
+.detail-value-row .edit-input { flex: 1; min-width: 0; }
+
+.detail-value-row .btn-primary {
+    flex-shrink: 0;
+    margin-top: 0;
+    padding: 5px 12px;
+    font-size: 12px;
+    min-height: 28px;
+}
+
+/* Change-department button sits under the full-width picker, so it needs its own
+   top spacing; same size as the other field-action buttons. */
+.department-change-button {
+    margin-top: 10px;
+    padding: 5px 12px;
+    font-size: 12px;
+    min-height: 28px;
+}
+
+/* Confirm box replaces the button under the picker → keep the same top spacing. */
+.detail-section > .confirm-delete { margin-top: 10px; }

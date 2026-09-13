@@ -23,7 +23,6 @@ public partial class ShareList
 
     private ShareDetailTab _activeTab = ShareDetailTab.Settings;
     private string _aclEditorKey = "";
-    private bool _accessLoaded;
     private bool _showExtendedShareInfo;
 
     protected override void OnParametersSet()
@@ -56,17 +55,15 @@ public partial class ShareList
         _handledSuccessfulConnection = true;
 
         HandleCardClick(share);
-        await SwitchTab(ShareDetailTab.Cloud);
         StateHasChanged();
         Toasts.Show(Text("Web_ShareList_CloudConnected", "The cloud connection was added successfully."), ToastType.Success);
     }
-    
+
     private void HandleCardClick(ShareDefinition share)
     {
         if (VM.CanManageShare(share.Id))
         {
             _activeTab = ShareDetailTab.Settings;
-            _accessLoaded = false;
             VM.SelectShare(share);
             StateHasChanged();
             return;
@@ -75,18 +72,12 @@ public partial class ShareList
         OpenShare(share.Name);
     }
 
-    private async Task SwitchTab(ShareDetailTab tab)
+    private void SwitchTab(ShareDetailTab tab)
     {
         if (VM.IsSelectedShareReadOnly && tab != ShareDetailTab.Settings)
             return;
 
         _activeTab = tab;
-
-        if (tab == ShareDetailTab.Access && !_accessLoaded)
-        {
-            await VM.LoadAccessAsync();
-            _accessLoaded = true;
-        }
 
         if (tab == ShareDetailTab.Acl)
             _aclEditorKey = $"{VM.SelectedShare?.Name}_{DateTime.UtcNow.Ticks}";
@@ -98,7 +89,6 @@ public partial class ShareList
     {
         VM.DeselectShare();
         _activeTab = ShareDetailTab.Settings;
-        _accessLoaded = false;
         VM.IsCreating = !VM.IsCreating;
         StateHasChanged();
     }
@@ -116,7 +106,6 @@ public partial class ShareList
     private void HandleShareDeleted()
     {
         _activeTab = ShareDetailTab.Settings;
-        _accessLoaded = false;
         StateHasChanged();
     }
 }
@@ -130,7 +119,6 @@ internal enum ShareKind
 internal enum ShareDetailTab
 {
     Settings,
-    Access,
-    Acl,
-    Cloud
+    Extra,
+    Acl
 }

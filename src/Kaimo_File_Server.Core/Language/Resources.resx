@@ -507,6 +507,9 @@
   <data name="Web_ShareList_Tab_General" xml:space="preserve">
     <value>General</value>
   </data>
+  <data name="Web_ShareList_Tab_Extra" xml:space="preserve">
+    <value>Advanced</value>
+  </data>
   <data name="Web_ShareList_Tab_Visibility" xml:space="preserve">
     <value>Visibility</value>
   </data>
@@ -2996,6 +2999,9 @@
   </data>
   <data name="Web_CloudAccess_TabGeneral" xml:space="preserve">
     <value>General</value>
+  </data>
+  <data name="Web_CloudAccess_TabExtra" xml:space="preserve">
+    <value>Additional</value>
   </data>
   <data name="Web_CloudAccess_TabAccess" xml:space="preserve">
     <value>Access</value>

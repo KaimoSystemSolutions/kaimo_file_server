@@ -32,77 +32,6 @@
     </div>
 
     <div class="detail-section">
-        <span class="detail-label">@Resources.Web_ShareList_Label_StoragePool</span>
-        <div class="detail-value-row">
-            <select class="edit-input"
-                    @bind="VM.EditSharePoolPath"
-                    disabled="@(isReadOnly || VM.IsMovingPool)">
-                @if (VM.GetPoolNameForShare(VM.SelectedShare) is null)
-                {
-                    <option value="@VM.EditSharePoolPath">
-                        @Resources.Web_ShareList_StoragePoolUnconfigured
-                    </option>
-                }
-                @foreach (var pool in VM.StoragePools)
-                {
-                    <option value="@pool.Path">@pool.Name — @pool.Path</option>
-                }
-            </select>
-            <button class="btn-primary"
-                    @onclick="ChangeStoragePool"
-                    disabled="@(isReadOnly || VM.IsMovingPool)">
-                @(VM.IsMovingPool ? "…" : Resources.Web_ShareList_Action_MovePool)
-            </button>
-        </div>
-    </div>
-
-    @if (VM.Departments.Count > 0)
-    {
-        <div class="detail-section">
-            <span class="detail-label">@Resources.Web_ShareList_Label_Department</span>
-            <PrincipalPickerField Mode="SelectionMode.Single"
-                                  Items="VM.Departments.ToDepartmentItems()"
-                                  SelectedIds="VM.EditShareDepartmentId.AsSelection()"
-                                  SelectedIdsChanged="ids => VM.EditShareDepartmentId =
-                                      ids.FirstOrNull() ?? WellKnownGUIDs.DEPARTMENT_GLOBAL"
-                                  AllowClear="false"
-                                  Title="@Resources.Web_ShareList_Label_Department" />
-
-            @if (!VM.ShowDepartmentConfirm)
-            {
-                <button class="btn-primary department-change-button"
-                        @onclick="() => VM.ShowDepartmentConfirm = true"
-                        disabled="@(isReadOnly || VM.EditShareDepartmentId == VM.SelectedShare.DepartmentId)">
-                    @Resources.Web_ShareList_Action_ChangeDepartment
-                </button>
-            }
-            else
-            {
-                <div class="confirm-delete">
-                    <p>@Resources.Web_ShareList_DepartmentChangeWarning</p>
-                    <div class="delete-actions">
-                        <button class="btn-primary" disabled="@isReadOnly"
-                                @onclick="ChangeDepartment">@Resources.Web_ShareList_Action_ChangeDepartmentConfirm</button>
-                        <button class="btn-secondary"
-                                @onclick="() => VM.ShowDepartmentConfirm = false">@Resources.Web_Button_Cancel</button>
-                    </div>
-                </div>
-            }
-        </div>
-    }
-
-    <div class="detail-section">
-        <span class="detail-label">@Resources.Web_ShareList_Label_Status</span>
-        <div class="detail-value-row">
-            <label class="toggle-switch" title="@(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)">
-                <input type="checkbox" checked="@VM.SelectedShare.IsEnabled" disabled="@isReadOnly" @onchange="ToggleShareEnabled" />
-                <span class="toggle-slider"></span>
-            </label>
-            <span class="detail-value">@(VM.SelectedShare.IsEnabled ? Resources.Web_ShareList_Status_Active : Resources.Web_ShareList_Status_Disabled)</span>
-        </div>
-    </div>
-
-    <div class="detail-section">
         <span class="detail-label">@Resources.Web_ShareList_Label_RecycleBin</span>
         <div class="detail-value-row">
             <label class="toggle-switch" title="@(VM.SelectedShare.IsRecycleEnabled ? Resources.Web_ShareList_Action_Disable : Resources.Web_ShareList_Action_Enable)">
@@ -140,10 +69,7 @@
     [Parameter] public EventCallback OnChanged { get; set; }
 
     private async Task RenameShare() { await VM.RenameShareAsync(); await OnChanged.InvokeAsync(); }
-    private async Task ChangeStoragePool() { await VM.ChangeStoragePoolAsync(); await OnChanged.InvokeAsync(); }
-    private async Task ToggleShareEnabled() { await VM.ToggleShareEnabledAsync(); await OnChanged.InvokeAsync(); }
     private async Task ToggleRecycleEnabled() { await VM.ToggleRecycleEnabledAsync(); await OnChanged.InvokeAsync(); }
-    private async Task ChangeDepartment() { await VM.ChangeDepartmentAsync(); await OnChanged.InvokeAsync(); }
 
     private async Task DeleteShare()
     {

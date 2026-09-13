@@ -225,6 +225,83 @@
     margin-top: 10px;
 }
 
+/* Label + section spacing in the detail pane must match the local share settings panel
+   exactly (13px non-uppercase label, 6px gap to the field, 18px between sections).
+   Scoped to the detail panes so the create/connection forms keep their own labels. */
+.vs-detail-pane .detail-section,
+.cloud-access-detail-pane .detail-section {
+    margin-bottom: 18px;
+}
+
+.vs-detail-pane .detail-label,
+.cloud-access-detail-pane .detail-label {
+    margin-bottom: 6px;
+    font-size: 13px;
+    text-transform: none;
+    letter-spacing: 0.01em;
+    color: var(--text-secondary);
+}
+
+/* Read-only detail values and inline edit rows (name rename, remote-folder change) —
+   mirror the local share settings panel so both share kinds present identical fields.
+   Sizing is scoped to the edit rows so the create form inputs stay unaffected. */
+.detail-value {
+    display: block;
+    padding: 5px 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-control);
+    color: var(--text-primary);
+    font-size: 12px;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.detail-value-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.detail-rename-row .edit-input,
+.detail-value-row .edit-input,
+.vs-folder-row .edit-input {
+    flex: 1;
+    min-width: 0;
+    min-height: 28px;
+    padding: 5px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.detail-rename-row .btn-primary,
+.detail-value-row .btn-primary,
+.detail-value-row .btn-secondary,
+.vs-folder-row .btn-secondary,
+.vs-folder-save {
+    flex-shrink: 0;
+    margin-top: 0;
+    padding: 5px 12px;
+    font-size: 12px;
+    min-height: 28px;
+}
+
+/* Remote folder: the path field takes half the row, the browse button sits beside it,
+   and the save button drops below, left-aligned. */
+.vs-folder-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vs-folder-row .edit-input {
+    flex: 0 1 50%;
+}
+
+.vs-folder-save {
+    margin-top: 8px;
+}
+
 .vs-detail-pane {
     width: auto;
     min-width: 0;
@@ -311,10 +388,6 @@
 .cloud-access-form label {
     display: grid;
     gap: .4rem;
-}
-
-.cloud-access-edit-form {
-    grid-template-columns: repeat(2, minmax(180px, 1fr));
 }
 
 .cloud-access-folder-field {

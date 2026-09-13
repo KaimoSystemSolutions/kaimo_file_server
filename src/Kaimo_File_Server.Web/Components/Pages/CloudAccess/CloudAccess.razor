@@ -328,6 +328,8 @@ else
                 <Tabs class="detail-tabs--panel">
                     <Tab Active="@(_activeTab == CloudAccessTab.General)" Icon="settings.svg" Label="@R("Web_CloudAccess_TabGeneral")"
                          OnClick="() => SwitchTabAsync(CloudAccessTab.General)" />
+                    <Tab Active="@(_activeTab == CloudAccessTab.Extra)" Icon="archive.svg" Label="@R("Web_CloudAccess_TabExtra")"
+                         OnClick="() => SwitchTabAsync(CloudAccessTab.Extra)" />
                     <Tab Active="@(_activeTab == CloudAccessTab.Access)" Icon="users.svg" Label="@R("Web_CloudAccess_TabAccess")"
                          OnClick="() => SwitchTabAsync(CloudAccessTab.Access)" />
                 </Tabs>
@@ -335,10 +337,61 @@ else
                 @if (_activeTab == CloudAccessTab.General)
                 {
                     var connection = VM.Connections.FirstOrDefault(x => x.Id == _selectedShare.ConnectionId);
-                    <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_Connection")</span><span class="detail-value">@(connection?.Name ?? "—")</span></div>
-                    <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_Account")</span><span class="detail-value">@(connection?.AccountEmail ?? connection?.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</span></div>
-                    <div class="detail-section"><span class="detail-label">@R("Web_CloudAccess_RemoteFolder")</span><span class="detail-value">@_selectedShare.RemoteRootPath</span></div>
 
+                    <div class="detail-section">
+                        <span class="detail-label">@R("Web_CloudAccess_ShareName")</span>
+                        <div class="detail-rename-row">
+                            <input class="edit-input" type="text" @bind="_editShareName" @bind:event="oninput" disabled="@_busy" maxlength="200" />
+                            <button class="btn-primary" type="button"
+                                    disabled="@(_busy || string.IsNullOrWhiteSpace(_editShareName) || _editShareName.Trim() == _selectedShare.Name)"
+                                    @onclick="RenameShareAsync">@Resources.Web_Action_Rename</button>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <span class="detail-label">@R("Web_CloudAccess_Connection")</span>
+                        <span class="detail-value">@(connection?.Name ?? "—")</span>
+                    </div>
+
+                    <div class="detail-section">
+                        <span class="detail-label">@R("Web_CloudAccess_Account")</span>
+                        <span class="detail-value">@(connection?.AccountEmail ?? connection?.AccountDisplayName ?? R("Web_CloudAccess_NotAuthorized"))</span>
+                    </div>
+
+                    <div class="detail-section">
+                        <span class="detail-label">@R("Web_CloudAccess_RemoteFolder")</span>
+                        <div class="vs-folder-row">
+                            <input class="edit-input" value="@_editShareRoot" readonly />
+                            <button class="btn-secondary" type="button" disabled="@_busy" @onclick="OpenEditPickerAsync">@R("Web_CloudAccess_Browse")</button>
+                        </div>
+                        <button class="btn-primary vs-folder-save" type="button"
+                                disabled="@(_busy || string.IsNullOrWhiteSpace(_editShareRoot) || _editShareRoot == _selectedShare.RemoteRootPath)"
+                                @onclick="ChangeFolderAsync">@R("Web_CloudAccess_Save")</button>
+                    </div>
+
+                    <div class="detail-actions cloud-access-detail-actions">
+                        <button class="btn-primary" type="button" @onclick="() => OpenShare(_selectedShare)">@R("Web_CloudAccess_Open")</button>
+                        @if (!_showShareDeleteConfirm)
+                        {
+                            <button class="btn-danger-outline" type="button"
+                                    @onclick="() => _showShareDeleteConfirm = true">@Resources.Web_ShareList_DeleteShare</button>
+                        }
+                        else
+                        {
+                            <div class="confirm-delete">
+                                <p>@string.Format(Resources.Web_ShareList_DeleteConfirm, _selectedShare.Name)</p>
+                                <div class="delete-actions">
+                                    <button class="btn-danger-outline" type="button" disabled="@_busy"
+                                            @onclick="() => DeleteShareAsync(_selectedShare)">@Resources.Web_ShareList_DeletePermanently</button>
+                                    <button class="btn-secondary" type="button"
+                                            @onclick="() => _showShareDeleteConfirm = false">@Resources.Web_Button_Cancel</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else if (_activeTab == CloudAccessTab.Extra)
+                {
                     @if (VM.ManageableDepartments.Count > 0)
                     {
                         <div class="detail-section">
@@ -373,27 +426,10 @@ else
                             }
                         </div>
                     }
-
-                    @if (_editingShare)
+                    else
                     {
-                        <div class="cloud-access-form cloud-access-edit-form">
-                            <label><span class="detail-label">@R("Web_CloudAccess_ShareName")</span><input class="edit-input" @bind="_editShareName" @bind:event="oninput" maxlength="200" /></label>
-                            <label class="cloud-access-folder-field"><span class="detail-label">@R("Web_CloudAccess_RemoteFolder")</span><div class="cloud-access-path"><input class="edit-input" value="@_editShareRoot" readonly /><button class="btn-secondary" type="button" disabled="@_busy" @onclick="OpenEditPickerAsync">@R("Web_CloudAccess_Browse")</button></div></label>
-                        </div>
+                        <div class="detail-empty"><p>@R("Web_CloudAccess_DetailHint")</p></div>
                     }
-                    <div class="detail-actions cloud-access-detail-actions">
-                        @if (_editingShare)
-                        {
-                            <button class="btn-secondary" type="button" disabled="@_busy" @onclick="CancelEditShare">@R("Web_CloudAccess_Cancel")</button>
-                            <button class="btn-primary" type="button" disabled="@(_busy || string.IsNullOrWhiteSpace(_editShareName) || string.IsNullOrWhiteSpace(_editShareRoot))" @onclick="SaveShareAsync">@R("Web_CloudAccess_Save")</button>
-                        }
-                        else
-                        {
-                            <button class="btn-secondary" type="button" @onclick="StartEditShare">@R("Web_CloudAccess_Edit")</button>
-                        }
-                        <button class="btn-primary" type="button" @onclick="() => OpenShare(_selectedShare)">@R("Web_CloudAccess_Open")</button>
-                        <button class="btn-danger-outline" type="button" @onclick="() => DeleteShareAsync(_selectedShare)">@Resources.Web_Action_Delete</button>
-                    </div>
                 }
                 else
                 {
@@ -500,11 +536,11 @@ else
     private CloudAccessShare? _selectedShare;
     private CloudAccessTab _activeTab = CloudAccessTab.General;
     private readonly Dictionary<Guid, CloudAccessPermission> _grantLevels = [];
-    private bool _editingShare;
     private string _editShareName = "";
     private string _editShareRoot = "";
     private Guid _editShareDepartmentId;
     private bool _showShareDepartmentConfirm;
+    private bool _showShareDeleteConfirm;
     private Guid? _editingConnectionId;
     private string _editConnectionName = "";
     private bool _showVirtualShareDetails;
@@ -651,9 +687,11 @@ else
     private async Task SelectShareAsync(CloudAccessShare share)
     {
         _selectedShare = share;
-        _editingShare = false;
+        _editShareName = share.Name;
+        _editShareRoot = share.RemoteRootPath;
         _editShareDepartmentId = share.DepartmentId;
         _showShareDepartmentConfirm = false;
+        _showShareDeleteConfirm = false;
         _activeTab = CloudAccessTab.General;
         // Principals back the management (access) editor; loading them requires manage
         // rights. For a share the actor can only access, skip it — no management pane shows.
@@ -686,16 +724,6 @@ else
         await RunAsync(() => VM.UpdateShareGrantsAsync(_selectedShare.Id, _grantLevels));
     }
 
-    private void StartEditShare()
-    {
-        if (_selectedShare is null) return;
-        _editShareName = _selectedShare.Name;
-        _editShareRoot = _selectedShare.RemoteRootPath;
-        _editingShare = true;
-    }
-
-    private void CancelEditShare() => _editingShare = false;
-
     private async Task ChangeShareDepartmentAsync()
     {
         if (_selectedShare is null) return;
@@ -708,15 +736,33 @@ else
         });
     }
 
-    private async Task SaveShareAsync()
+    // Name and remote folder each commit on their own button (mirroring the local share
+    // settings panel). Each sends the current stored value for the other field, so an
+    // uncommitted edit there is never silently applied, and only the committed field is
+    // re-synced from the reloaded share.
+    private async Task RenameShareAsync()
     {
         if (_selectedShare is null) return;
         var shareId = _selectedShare.Id;
+        var currentRoot = _selectedShare.RemoteRootPath;
         await RunAsync(async () =>
         {
-            await VM.UpdateShareAsync(shareId, _editShareName, _editShareRoot);
+            await VM.UpdateShareAsync(shareId, _editShareName, currentRoot);
             _selectedShare = VM.Shares.SingleOrDefault(x => x.Id == shareId);
-            _editingShare = false;
+            if (_selectedShare is not null) _editShareName = _selectedShare.Name;
+        });
+    }
+
+    private async Task ChangeFolderAsync()
+    {
+        if (_selectedShare is null) return;
+        var shareId = _selectedShare.Id;
+        var currentName = _selectedShare.Name;
+        await RunAsync(async () =>
+        {
+            await VM.UpdateShareAsync(shareId, currentName, _editShareRoot);
+            _selectedShare = VM.Shares.SingleOrDefault(x => x.Id == shareId);
+            if (_selectedShare is not null) _editShareRoot = _selectedShare.RemoteRootPath;
         });
     }
 
@@ -741,6 +787,7 @@ else
     private async Task DeleteShareAsync(CloudAccessShare share)
     {
         await RunAsync(() => VM.DeleteShareAsync(share.Id));
+        _showShareDeleteConfirm = false;
         if (_selectedShare?.Id == share.Id) _selectedShare = null;
     }
 
@@ -803,5 +850,5 @@ else
 
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 
-    private enum CloudAccessTab { General, Access }
+    private enum CloudAccessTab { General, Extra, Access }
 }

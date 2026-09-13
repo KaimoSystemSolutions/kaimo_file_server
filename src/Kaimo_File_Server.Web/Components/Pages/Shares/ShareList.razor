@@ -110,12 +110,10 @@ else
                 <Tabs class="detail-tabs--panel">
                     <Tab Active="@(_activeTab == ShareDetailTab.Settings)" Icon="settings.svg" Label="@Resources.Web_ShareList_Tab_General"
                          OnClick="() => SwitchTab(ShareDetailTab.Settings)" />
-                    <Tab Active="@(_activeTab == ShareDetailTab.Access)" Disabled="@VM.IsSelectedShareReadOnly" Icon="users.svg" Label="@Resources.Web_ShareList_Tab_Visibility"
-                         OnClick="() => SwitchTab(ShareDetailTab.Access)" />
+                    <Tab Active="@(_activeTab == ShareDetailTab.Extra)" Disabled="@VM.IsSelectedShareReadOnly" Icon="archive.svg" Label="@Text("Web_ShareList_Tab_Extra", "Additional")"
+                         OnClick="() => SwitchTab(ShareDetailTab.Extra)" />
                     <Tab Active="@(_activeTab == ShareDetailTab.Acl)" Disabled="@VM.IsSelectedShareReadOnly" Icon="shield.svg" Label="@Resources.Web_ShareList_Tab_ACL"
                          OnClick="() => SwitchTab(ShareDetailTab.Acl)" />
-                    <Tab Active="@(_activeTab == ShareDetailTab.Cloud)" Disabled="@VM.IsSelectedShareReadOnly" Icon="cloud-download.svg" Label="@Text("Web_ShareList_Tab_Cloud", "Cloud")"
-                         OnClick="() => SwitchTab(ShareDetailTab.Cloud)" />
                 </Tabs>
 
                 @switch (_activeTab)
@@ -123,8 +121,8 @@ else
                     case ShareDetailTab.Settings:
                         <ShareSettingsPanel VM="VM" OnDeleted="HandleShareDeleted" OnChanged="StateHasChanged"/>
                         break;
-                    case ShareDetailTab.Access:
-                        <ShareAccessPanel VM="VM" IsLoaded="_accessLoaded" OnChanged="StateHasChanged"/>
+                    case ShareDetailTab.Extra:
+                        <ShareExtraPanel VM="VM" OnChanged="StateHasChanged"/>
                         break;
                     case ShareDetailTab.Acl:
                         <div class="detail-section">
@@ -134,9 +132,6 @@ else
                                        ShareId="@VM.SelectedShare.Id"
                                        IsDirectory="true"/>
                         </div>
-                        break;
-                    case ShareDetailTab.Cloud:
-                        <ShareCloudPanel VM="VM" />
                         break;
                 }
             }
