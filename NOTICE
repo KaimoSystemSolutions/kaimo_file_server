@@ -1,0 +1,61 @@
+Kaimo File Server
+Copyright (C) 2026 Kaimo File Server
+
+  NOTE: Replace "Kaimo File Server" above with the single legal copyright
+  holder (your name or your company). Dual licensing (see below) only works
+  while ONE party holds all rights — confirm the holder before the first
+  external contribution is merged.
+
+================================================================================
+Licensing overview
+================================================================================
+
+This repository is licensed under more than one license. The license that
+applies to a given file is determined, in order of precedence:
+
+  1. an SPDX-License-Identifier header inside the file, if present;
+  2. a LICENSE file in the nearest enclosing directory;
+  3. the repository-root LICENSE (the default).
+
+Default (repository root LICENSE): GNU Affero General Public License v3.0
+or later (AGPL-3.0-or-later). This covers the entire code base unless a file
+or subdirectory states otherwise -- in particular all .NET projects under
+src/ and tests/.
+
+Exception -- src/samba-vfs/: GNU General Public License v3.0 or later
+(GPL-3.0-or-later); see src/samba-vfs/LICENSE. This directory contains a
+Samba VFS module that is compiled against, and dynamically loaded into,
+Samba's smbd. It is a derivative work of Samba (GPL-3.0-or-later) and is
+therefore distributed under the GPL. It communicates with the AGPL .NET
+control plane only over an arm's-length local socket / gRPC boundary; that
+process boundary is what keeps the two license domains separate.
+
+================================================================================
+Commercial / proprietary use
+================================================================================
+
+The AGPL is the license for the open-source distribution. As the sole
+copyright holder you are not bound by your own AGPL: you may additionally
+offer the software under a separate commercial license and may build and
+sell proprietary modules.
+
+To keep this option open, every external contribution must be covered by a
+Contributor License Agreement (CLA) that grants you the right to relicense
+the contribution commercially. Without a CLA, contributed code stays
+AGPL-only and the project can no longer be dual-licensed as a whole.
+
+The Samba VFS module in src/samba-vfs/ cannot be relicensed commercially --
+its GPL obligation stems from Samba, not from this project's own copyright.
+
+================================================================================
+Third-party components
+================================================================================
+
+Managed (NuGet) dependencies are under permissive licenses (MIT, Apache-2.0,
+BSD-3-Clause, PostgreSQL) and impose no copyleft on this project. See
+Directory.Packages.props for the authoritative list and each package's own
+license for its notice requirements.
+
+Elasticsearch (run as a separate service, not redistributed here) is under
+its own license (SSPL / Elastic License 2.0 / AGPL-3.0). Only the Apache-2.0
+.NET client is bundled with this project.

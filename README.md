@@ -43,6 +43,24 @@ external storage integration, synchronization and custom storage management.
 
 Under [/example](/example) you find more infos about it
 
+## 📜 License
+
+Kaimo File Server is open source under the **GNU Affero General Public License
+v3.0 or later** ([`LICENSE`](LICENSE)). You may use, modify and redistribute it;
+if you modify it and offer it to others — including over a network as a service —
+you must make your modified source available under the same license.
+
+Exceptions and details are in [`NOTICE`](NOTICE):
+
+- **`src/samba-vfs/`** is **GPL-3.0-or-later** (it is a Samba-derived module),
+  see [`src/samba-vfs/LICENSE`](src/samba-vfs/LICENSE).
+- Bundled NuGet dependencies are permissive (MIT / Apache-2.0 / BSD / PostgreSQL).
+
+**Commercial use:** a separate commercial license is available from the copyright
+holder for those who cannot meet the AGPL obligations or want to build
+proprietary modules. Contributions are accepted under a Contributor License
+Agreement so the project can continue to be offered under both licenses.
+
 
 ## Why I built this
 
