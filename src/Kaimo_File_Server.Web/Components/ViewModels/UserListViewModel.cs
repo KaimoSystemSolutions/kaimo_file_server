@@ -82,6 +82,9 @@ public class UserListViewModel
     public string? SuccessMessage { get; private set; }
     public AdminTab ActiveTab { get; private set; } = AdminTab.Users;
 
+    /// <summary>Free-text filter for the active tab's list; reset on tab switch.</summary>
+    public string EntitySearch { get; set; } = "";
+
     // -- Actor Permissions --
     public bool IsGlobalAdmin { get; private set; }
     public bool CanAccessPage { get; private set; }
@@ -303,6 +306,18 @@ public class UserListViewModel
         return dept?.Name ?? departmentId.ToString();
     }
 
+    /// <summary>
+    /// Department name plus its color/soft background, so the group list can render
+    /// the same colored chip the share management list uses (see
+    /// <see cref="DynamicHelpers.DepartmentPalette"/>).
+    /// </summary>
+    public DepartmentDisplay GetDepartmentDisplay(Guid departmentId)
+    {
+        var hex = AllDepartments.FirstOrDefault(d => d.Id == departmentId)?.Color;
+        var (color, soft) = DynamicHelpers.DepartmentPalette.For(departmentId, hex);
+        return new DepartmentDisplay(GetDepartmentName(departmentId), color, soft);
+    }
+
     // ══════════════════════════════════════════
     //  Load & Permission Resolution
     // ══════════════════════════════════════════
@@ -446,6 +461,7 @@ public class UserListViewModel
     public async Task SwitchTabAsync(AdminTab tab)
     {
         ActiveTab = tab;
+        EntitySearch = "";
         CancelEdit(); CancelCreate();
         SelectedUser = null; SelectedGroup = null; SelectedRole = null;
         ErrorMessage = null; SuccessMessage = null;

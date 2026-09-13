@@ -1580,7 +1580,16 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Admin_Tab_Roles", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Filter… ähnelt.
+        /// </summary>
+        public static string Web_Admin_FilterPlaceholder {
+            get {
+                return ResourceManager.GetString("Web_Admin_FilterPlaceholder", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Users ähnelt.
         /// </summary>

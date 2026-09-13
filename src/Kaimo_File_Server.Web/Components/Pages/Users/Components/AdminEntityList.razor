@@ -2,6 +2,8 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Core.Helpers
 @using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject AssetProvider Icons
 @* ════════════════════ LIST ════════════════════ *@
                 @switch (VM.ActiveTab)
                 {
@@ -9,6 +11,10 @@
                         @if (!VM.Users.Any())
                         {
                             <div class="user-list-container empty-state"><p>@Resources.Web_Common_NoUsers</p></div>
+                        }
+                        else if (!FilteredUsers.Any())
+                        {
+                            <div class="user-list-container empty-state"><p>@Resources.Web_Search_NoResults</p></div>
                         }
                         else
                         {
@@ -18,7 +24,7 @@
                                     <div class="user-cell-username">@Resources.Web_Admin_Label_Username</div>
                                     <div class="user-cell-status">@Resources.Web_Admin_Label_Status</div>
                                 </div>
-                                @foreach (var user in VM.Users)
+                                @foreach (var user in FilteredUsers)
                                 {
                                     var isSelected = VM.SelectedUser?.Id == user.Id;
                                     <button class="user-list-row user-list-selectable @(isSelected ? "user-list-selected" : "")" type="button"
@@ -49,25 +55,41 @@
                         {
                             <div class="user-list-container empty-state"><p>@Resources.Web_Common_NoGroups</p></div>
                         }
+                        else if (!FilteredGroups.Any())
+                        {
+                            <div class="user-list-container empty-state"><p>@Resources.Web_Search_NoResults</p></div>
+                        }
                         else
                         {
                             <div class="user-list-container entity-list-container">
                                 <div class="user-list-row entity-list-row user-list-header">
                                     <div class="user-cell-name">@Resources.Web_Admin_Label_GroupName</div>
                                 </div>
-                                @foreach (var departmentGroup in VM.Groups
+                                @foreach (var departmentGroup in FilteredGroups
                                     .GroupBy(group => new { group.DepartmentId, Name = VM.GetDepartmentName(group.DepartmentId) })
                                     .OrderBy(group => group.Key.DepartmentId == WellKnownGUIDs.DEPARTMENT_GLOBAL ? 0 : 1)
                                     .ThenBy(group => group.Key.Name))
                                 {
-                                    <div class="entity-list-department-heading">@departmentGroup.Key.Name</div>
-                                    @foreach (var group in departmentGroup.OrderBy(group => group.Name))
+                                    var departmentId = departmentGroup.Key.DepartmentId;
+                                    var dept = VM.GetDepartmentDisplay(departmentId);
+                                    var isCollapsed = _collapsedDepartments.Contains(departmentId);
+                                    <button class="entity-list-department-heading" type="button"
+                                            aria-expanded="@(!isCollapsed)"
+                                            @onclick="() => ToggleDepartment(departmentId)">
+                                        @Icons.SVG("chevron_right.svg", new SvgOptions(Width: 12, Height: 12, StrokeWidth: 2,
+                                            CssClass: "entity-list-department-chevron" + (isCollapsed ? "" : " entity-list-department-chevron--open")))
+                                        <span class="dept-chip" style="border-color:@dept.Color; background:@dept.Soft;" title="@dept.Name">@dept.Name</span>
+                                    </button>
+                                    @if (!isCollapsed)
                                     {
-                                        var isSelected = VM.SelectedGroup?.Id == group.Id;
-                                        <button class="user-list-row entity-list-row user-list-selectable @(isSelected ? "user-list-selected" : "")" type="button"
-                                             @onclick="() => SelectGroup(group)">
-                                            <div class="user-cell-name"><span>@group.Name</span></div>
-                                        </button>
+                                        @foreach (var group in departmentGroup.OrderBy(group => group.Name))
+                                        {
+                                            var isSelected = VM.SelectedGroup?.Id == group.Id;
+                                            <button class="user-list-row entity-list-row user-list-selectable @(isSelected ? "user-list-selected" : "")" type="button"
+                                                 @onclick="() => SelectGroup(group)">
+                                                <div class="user-cell-name"><span>@group.Name</span></div>
+                                            </button>
+                                        }
                                     }
                                 }
                             </div>
@@ -79,6 +101,10 @@
                         {
                             <div class="user-list-container empty-state"><p>@Resources.Web_Common_NoRoles</p></div>
                         }
+                        else if (!FilteredRoles.Any())
+                        {
+                            <div class="user-list-container empty-state"><p>@Resources.Web_Search_NoResults</p></div>
+                        }
                         else
                         {
                             <div class="user-list-container entity-list-container">
@@ -86,7 +112,7 @@
                                     <div class="user-cell-name">@Resources.Web_Admin_Label_RoleName</div>
                                     <div class="user-cell-meta">@Resources.Web_Admin_Label_Type</div>
                                 </div>
-                                @foreach (var role in VM.Roles)
+                                @foreach (var role in FilteredRoles)
                                 {
                                     var isSelected = VM.SelectedRole?.Id == role.Id;
                                     <button class="user-list-row entity-list-row user-list-selectable @(isSelected ? "user-list-selected" : "")" type="button"
@@ -107,6 +133,35 @@
 @code {
     [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
     [Parameter] public EventCallback OnChanged { get; set; }
+
+    // Departments start expanded; a collapsed id hides that department's groups.
+    private readonly HashSet<Guid> _collapsedDepartments = [];
+
+    // Free-text filter shared with the page header (VM.EntitySearch), reset on tab switch.
+    private static bool Matches(string? value, string term)
+        => value?.Contains(term, StringComparison.CurrentCultureIgnoreCase) ?? false;
+
+    private IEnumerable<User> FilteredUsers
+        => string.IsNullOrWhiteSpace(VM.EntitySearch)
+            ? VM.Users
+            : VM.Users.Where(u => Matches(u.Name, VM.EntitySearch) || Matches(u.Username, VM.EntitySearch));
+
+    private IEnumerable<Group> FilteredGroups
+        => string.IsNullOrWhiteSpace(VM.EntitySearch)
+            ? VM.Groups
+            : VM.Groups.Where(g => Matches(g.Name, VM.EntitySearch)
+                || Matches(VM.GetDepartmentName(g.DepartmentId), VM.EntitySearch));
+
+    private IEnumerable<Role> FilteredRoles
+        => string.IsNullOrWhiteSpace(VM.EntitySearch)
+            ? VM.Roles
+            : VM.Roles.Where(r => Matches(r.Name, VM.EntitySearch));
+
+    private void ToggleDepartment(Guid departmentId)
+    {
+        if (!_collapsedDepartments.Add(departmentId))
+            _collapsedDepartments.Remove(departmentId);
+    }
 
     private async Task SelectUser(User user) { await VM.SelectUserAsync(user); await OnChanged.InvokeAsync(); }
     private async Task SelectGroup(Group group) { await VM.SelectGroupAsync(group); await OnChanged.InvokeAsync(); }

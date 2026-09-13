@@ -211,6 +211,19 @@
     align-items: center;
 }
 
+/* Heading (left) and actions (right) share the leftover space equally so the
+   search bar sits centered between them. */
+.entity-page-heading {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.entity-page-actions {
+    flex: 1 1 0;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
 .entity-create-button {
     min-height: 34px;
     gap: 7px;

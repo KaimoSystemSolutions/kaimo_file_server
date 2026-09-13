@@ -29,9 +29,14 @@ else if (!VM.CanAccessPage)
 else
 {
     <div class="page-header entity-page-header">
-        <div>
+        <div class="entity-page-heading">
             <h1>@Resources.Web_Admin_Heading</h1>
             <p class="subtitle">@VM.TabSubtitle</p>
+        </div>
+        <div class="entity-page-search search-bar">
+            @Icons.SVG("search.svg", new SvgOptions())
+            <input class="search-input" type="search" @bind="VM.EntitySearch" @bind:event="oninput"
+                   placeholder="@Resources.Web_Admin_FilterPlaceholder" aria-label="@Resources.Web_Admin_FilterPlaceholder" />
         </div>
         <div class="entity-page-actions">
             @if (VM.ActiveTab == AdminTab.Users && VM.CanCreateUsers)

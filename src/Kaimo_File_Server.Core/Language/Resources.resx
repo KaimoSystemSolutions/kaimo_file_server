@@ -1893,6 +1893,9 @@
   <data name="Web_Admin_Tab_Roles" xml:space="preserve">
     <value>Roles</value>
   </data>
+  <data name="Web_Admin_FilterPlaceholder" xml:space="preserve">
+    <value>Filter…</value>
+  </data>
   <data name="Web_Admin_CreateUser" xml:space="preserve">
     <value>Create user</value>
   </data>

@@ -4145,14 +4145,32 @@ h1, h2, h3, h4, h5, h6 {
     padding: 0 2px;
 }
 
+.entity-page-search {
+    width: 240px;
+    max-width: 100%;
+}
+
 .entity-list-department-heading {
-    padding: 10px 14px 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 14px 6px;
+    border: none;
     border-top: 1px solid var(--border);
+    background: none;
+    text-align: left;
+    cursor: pointer;
+}
+
+.entity-list-department-chevron {
+    flex-shrink: 0;
     color: var(--text-tertiary);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    transition: transform 0.2s;
+}
+
+.entity-list-department-chevron--open {
+    transform: rotate(90deg);
 }
 
 /* -- Running jobs menu -- */
