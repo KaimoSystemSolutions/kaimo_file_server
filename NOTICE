@@ -59,3 +59,17 @@ license for its notice requirements.
 Elasticsearch (run as a separate service, not redistributed here) is under
 its own license (SSPL / Elastic License 2.0 / AGPL-3.0). Only the Apache-2.0
 .NET client is bundled with this project.
+
+Bundled browser assets (redistributed under src/Kaimo_File_Server.Web/wwwroot/lib/):
+
+  - Bootstrap 5.3.3 -- MIT License, Copyright 2011-2024 The Bootstrap Authors.
+    The MIT notice is retained in the header of every bundled .css and .js file.
+
+  - mammoth.js -- BSD 2-Clause License, Copyright (c) 2013 Michael Williamson.
+    The minified build (mammoth.browser.min.js) carries no header, so the notice
+    is kept in mammoth/mammoth.LICENSE.txt next to the file.
+
+  - Plus Jakarta Sans (fonts/PlusJakartaSans-VariableFont_wght.ttf) -- SIL Open
+    Font License 1.1, Copyright 2020 The Plus Jakarta Sans Project Authors. The
+    OFL requires the notice and license to travel with the font; both are kept in
+    fonts/PlusJakartaSans-OFL.txt.
