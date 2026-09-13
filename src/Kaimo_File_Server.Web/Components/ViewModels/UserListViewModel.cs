@@ -108,6 +108,9 @@ public class UserListViewModel
     /// <summary>All departments for display purposes (group/user detail, selectors).</summary>
     public List<Department> AllDepartments { get; private set; } = [];
 
+    /// <summary>Currently configured password policy, for display in the create-user form.</summary>
+    public PasswordPolicy PasswordPolicy { get; private set; } = PasswordPolicy.Default();
+
     // -- Per-Selection Permissions --
     public bool CanEditSelectedUser { get; private set; }
     public bool CanDeleteSelectedUser { get; private set; }
@@ -320,6 +323,7 @@ public class UserListViewModel
             }
 
             AllDepartments = (await _departmentRepo.GetAllAsync()).OrderByGlobalFirst().ToList();
+            PasswordPolicy = await GetPasswordPolicyAsync();
 
             await ResolveActorPermissionsAsync();
 

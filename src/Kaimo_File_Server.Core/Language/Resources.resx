@@ -1954,7 +1954,7 @@
     <value>Optional</value>
   </data>
   <data name="Web_Admin_Placeholder_Password" xml:space="preserve">
-    <value>At least 6 characters</value>
+    <value>Enter a password</value>
   </data>
   <data name="Web_Admin_Placeholder_GroupName" xml:space="preserve">
     <value>e.g. Developers</value>
