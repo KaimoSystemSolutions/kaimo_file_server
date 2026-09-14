@@ -213,5 +213,36 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
 
             await db.SaveChangesAsync();
         }
+
+        /// <inheritdoc />
+        // Uses the tracked SaveChanges path (not ExecuteUpdate) so the read-only demo
+        // guard — a SaveChanges interceptor — covers this self-service write surface.
+        public async Task UpdatePersonalNamesAsync(Guid userId, string? firstName, string? lastName)
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            var user = await db.Users.FindAsync(userId)
+                ?? throw new KeyNotFoundException($"User {userId} not found");
+
+            user.FirstName = firstName;
+            user.LastName = lastName;
+
+            await db.SaveChangesAsync();
+        }
+
+        /// <inheritdoc />
+        // SaveChanges path (see UpdatePersonalNamesAsync) so the read-only demo guard applies.
+        public async Task UpdatePhotoAsync(Guid userId, byte[]? photo, string? contentType)
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+
+            var user = await db.Users.FindAsync(userId)
+                ?? throw new KeyNotFoundException($"User {userId} not found");
+
+            user.Photo = photo;
+            user.PhotoContentType = contentType;
+
+            await db.SaveChangesAsync();
+        }
     }
 }

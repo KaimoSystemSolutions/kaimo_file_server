@@ -14,6 +14,7 @@
 @inject IUserContextFactory UserContextFactory
 @inject IManagementAuthService ManagementAuthService
 @inject DemoModeOptions Demo
+@inject Kaimo_File_Server.Web.Components.ProfileNavigator ProfileNav
 
 
 <div class="app-shell" data-theme="@Theme.Current">
@@ -71,10 +72,20 @@
             </NavLink>
             @if (!string.IsNullOrEmpty(_displayName))
             {
-                <div class="sidebar-user">
-                    <div class="sidebar-avatar">@_initials</div>
+                <button type="button" class="sidebar-user" @onclick="GoToOwnProfile"
+                        title="@Resources.Web_Nav_ViewProfile">
+                    <div class="sidebar-avatar">
+                        @if (_avatarUri is not null)
+                        {
+                            <img src="@_avatarUri" alt="" />
+                        }
+                        else
+                        {
+                            @_initials
+                        }
+                    </div>
                     <span class="sidebar-username">@_displayName</span>
-                </div>
+                </button>
             }
             <div class="sidebar-actions">
                 <button class="theme-toggle" @onclick="ToggleTheme" title="@Resources.Web_Nav_ToggleTheme">
@@ -125,6 +136,7 @@
 @code {
     private string _displayName = "";
     private string _initials = "";
+    private string? _avatarUri;
 
     private int _fileInputKey;
 
@@ -183,6 +195,9 @@
         if (username != null)
         {
             _currentUser = await UserContextFactory.CreateByUsernameAsync(username);
+            _avatarUri = DynamicHelpers.UserAvatar.DataUri(_currentUser?.User);
+            if (_currentUser?.User is { } actor)
+                _initials = DynamicHelpers.UserAvatar.Initials(actor);
             _canManageSyncs = _currentUser != null
                               && await ManagementAuthService.HasAnyPermissionAsync(_currentUser, ManagementPermission.SyncAdmin);
             _canManageCloudAccess = _currentUser != null
@@ -231,6 +246,16 @@
     {
         await Theme.ToggleAsync();
         StateHasChanged();
+    }
+
+    // Jumps to the user administration page with the actor's own record preselected.
+    // Self-view is always permitted, even for users without management permissions.
+    // Routed through ProfileNavigator (not the URL) so a repeat click re-selects even when
+    // the page is already open, and so a Groups/Roles view switches back to Users.
+    private async Task GoToOwnProfile()
+    {
+        await ProfileNav.RequestSelfAsync();
+        Nav.NavigateTo("/users");
     }
 
     private async Task Logout()

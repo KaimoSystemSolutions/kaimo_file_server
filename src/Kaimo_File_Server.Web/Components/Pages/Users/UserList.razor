@@ -30,14 +30,20 @@ else
 {
     <div class="page-header entity-page-header">
         <div class="entity-page-heading">
-            <h1>@Resources.Web_Admin_Heading</h1>
-            <p class="subtitle">@VM.TabSubtitle</p>
+            <h1>@(VM.IsManagementUser ? Resources.Web_Admin_Heading : Resources.Web_Profile_Heading)</h1>
+            @if (VM.IsManagementUser)
+            {
+                <p class="subtitle">@VM.TabSubtitle</p>
+            }
         </div>
-        <div class="entity-page-search search-bar">
-            @Icons.SVG("search.svg", new SvgOptions())
-            <input class="search-input" type="search" @bind="VM.EntitySearch" @bind:event="oninput"
-                   placeholder="@Resources.Web_Admin_FilterPlaceholder" aria-label="@Resources.Web_Admin_FilterPlaceholder" />
-        </div>
+        @if (VM.IsManagementUser)
+        {
+            <div class="entity-page-search search-bar">
+                @Icons.SVG("search.svg", new SvgOptions())
+                <input class="search-input" type="search" @bind="VM.EntitySearch" @bind:event="oninput"
+                       placeholder="@Resources.Web_Admin_FilterPlaceholder" aria-label="@Resources.Web_Admin_FilterPlaceholder" />
+            </div>
+        }
         <div class="entity-page-actions">
             @if (VM.ActiveTab == AdminTab.Users && VM.CanCreateUsers)
             {
@@ -64,7 +70,7 @@ else
     </div>
 
     @* -- Tabs -- *@
-    <div class="admin-tabs entity-tabs" role="tablist">
+    <div class="admin-tabs entity-tabs" role="tablist" hidden="@(!VM.IsManagementUser)">
         @if (VM.CanCreateUsers || VM.AuthorizedDepartmentsForView.Any())
         {
             <button class="admin-tab entity-tab entity-tab--users @(VM.ActiveTab == AdminTab.Users ? "active" : "")" type="button" role="tab" aria-selected="@(VM.ActiveTab == AdminTab.Users)"

@@ -1926,6 +1926,42 @@
   <data name="Web_Admin_Label_Email" xml:space="preserve">
     <value>E-Mail</value>
   </data>
+  <data name="Web_Admin_Label_FirstName" xml:space="preserve">
+    <value>Vorname</value>
+  </data>
+  <data name="Web_Admin_Label_LastName" xml:space="preserve">
+    <value>Nachname</value>
+  </data>
+  <data name="Web_Admin_Label_CurrentPassword" xml:space="preserve">
+    <value>Aktuelles Passwort</value>
+  </data>
+  <data name="Web_Admin_Label_Photo" xml:space="preserve">
+    <value>Profilbild</value>
+  </data>
+  <data name="Web_Admin_Photo_Change" xml:space="preserve">
+    <value>Bild ändern</value>
+  </data>
+  <data name="Web_Admin_Photo_Remove" xml:space="preserve">
+    <value>Entfernen</value>
+  </data>
+  <data name="Web_Admin_Photo_TooLarge" xml:space="preserve">
+    <value>Das Bild ist zu groß (maximal 256 KB).</value>
+  </data>
+  <data name="Web_Admin_Photo_InvalidType" xml:space="preserve">
+    <value>Es sind nur Bilddateien erlaubt.</value>
+  </data>
+  <data name="Web_User_CurrentPasswordWrong" xml:space="preserve">
+    <value>Das aktuelle Passwort ist falsch.</value>
+  </data>
+  <data name="Web_Profile_Heading" xml:space="preserve">
+    <value>Mein Profil</value>
+  </data>
+  <data name="Web_Profile_SelfServiceHint" xml:space="preserve">
+    <value>Hier kannst du Bild, Name und Passwort ändern. Für andere Änderungen wende dich an eine Administratorin oder einen Administrator.</value>
+  </data>
+  <data name="Web_Nav_ViewProfile" xml:space="preserve">
+    <value>Mein Profil anzeigen</value>
+  </data>
   <data name="Web_Admin_Label_Description" xml:space="preserve">
     <value>Beschreibung</value>
   </data>

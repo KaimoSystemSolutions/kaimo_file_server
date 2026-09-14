@@ -73,6 +73,10 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.NtHash).IsRequired().HasMaxLength(256);
                 entity.Property(e => e.Description).HasMaxLength(500);
                 entity.Property(e => e.Email).HasMaxLength(254);
+                entity.Property(e => e.FirstName).HasMaxLength(100);
+                entity.Property(e => e.LastName).HasMaxLength(100);
+                // Photo is stored as bytea; upload size is capped in the application layer.
+                entity.Property(e => e.PhotoContentType).HasMaxLength(100);
                 entity.Property(e => e.IsEnabled).IsRequired().HasDefaultValue(true);
                 entity.Property(e => e.CanChangePassword).IsRequired().HasDefaultValue(true);
             });

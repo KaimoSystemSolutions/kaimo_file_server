@@ -268,6 +268,7 @@ builder.Services.AddScoped<LoginViewModel>();
 builder.Services.AddScoped<ShareBrowserViewModel>();
 builder.Services.AddScoped<FileBrowserViewModel>();
 builder.Services.AddScoped<UserListViewModel>();
+builder.Services.AddScoped<Kaimo_File_Server.Web.Components.ProfileNavigator>();
 builder.Services.AddScoped<AclEditorViewModel>();
 builder.Services.AddScoped<DepartmentViewModel>();
 builder.Services.AddScoped<ExternalStorageSyncViewModel>();

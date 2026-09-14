@@ -1,8 +1,10 @@
+@using System.IO
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Core.Security
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
 @inject AssetProvider Icons
+@inject IJSRuntime JS
 
 @if (VM.SelectedUser is not null)
 {
@@ -20,73 +22,152 @@
             </div>
 
             <div class="user-edit-form detail-field-grid">
-                <div class="form-group">
-                    <label>@Resources.Web_Admin_Label_DisplayName</label>
-                    <input type="text" class="edit-input" @bind="VM.EditUserName" />
+                @if (!VM.CanEditSelectedUser)
+                {
+                    <p class="user-selfservice-hint">@Resources.Web_Profile_SelfServiceHint</p>
+                }
+
+                @* Profile picture — self-service and full-profile admins alike. *@
+                <div class="form-group user-photo-edit">
+                    <label>@Resources.Web_Admin_Label_Photo</label>
+                    <div class="user-photo-edit-row">
+                        <span class="user-photo-preview" aria-hidden="true">
+                            @if (VM.EditPhotoDataUri is { } previewUri)
+                            {
+                                <img src="@previewUri" alt="" />
+                            }
+                            else
+                            {
+                                @UserAvatar.Initials(VM.SelectedUser)
+                            }
+                        </span>
+                        <div class="user-photo-actions">
+                            <label class="btn-secondary user-photo-upload">
+                                @Resources.Web_Admin_Photo_Change
+                                <InputFile OnChange="OnPhotoSelected" accept="image/*" style="display:none" />
+                            </label>
+                            @if (VM.HasEditPhoto)
+                            {
+                                <button type="button" class="btn-secondary" @onclick="RemovePhoto">
+                                    @Resources.Web_Admin_Photo_Remove
+                                </button>
+                            }
+                        </div>
+                    </div>
                 </div>
+
+                @if (VM.CanEditSelectedUser)
+                {
+                    <div class="form-group">
+                        <label>@Resources.Web_Admin_Label_DisplayName</label>
+                        <input type="text" class="edit-input" @bind="VM.EditUserName" @attributes="HtmlAttr.NoAutofill" />
+                    </div>
+                }
+
                 <div class="form-group">
-                    <label>@Resources.Web_Admin_Label_Email</label>
-                    <input type="email" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Email"
-                           @bind="VM.EditUserEmail" @bind:event="oninput" />
-                </div>
-                <div class="form-group">
-                    <label>@Resources.Web_Admin_Label_Description</label>
+                    <label>@Resources.Web_Admin_Label_FirstName</label>
                     <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Optional"
-                           @bind="VM.EditUserDescription" @bind:event="oninput" />
+                           @bind="VM.EditUserFirstName" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
                 </div>
+                <div class="form-group">
+                    <label>@Resources.Web_Admin_Label_LastName</label>
+                    <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Optional"
+                           @bind="VM.EditUserLastName" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
+                </div>
+
+                @if (VM.CanEditSelectedUser)
+                {
+                    <div class="form-group">
+                        <label>@Resources.Web_Admin_Label_Email</label>
+                        <input type="email" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Email"
+                               @bind="VM.EditUserEmail" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
+                    </div>
+                    <div class="form-group">
+                        <label>@Resources.Web_Admin_Label_Description</label>
+                        <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Optional"
+                               @bind="VM.EditUserDescription" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
+                    </div>
+                }
+
                 @if (VM.CanResetPasswordForSelected)
                 {
+                    @* Administrator password reset — no current password required. *@
                     <div class="form-group">
                         <label>@Resources.Web_Admin_Label_NewPassword</label>
                         <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_PasswordEmpty"
-                               @bind="VM.NewPassword" @bind:event="oninput" />
+                               @bind="VM.NewPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
                     </div>
                     @if (!string.IsNullOrEmpty(VM.NewPassword))
                     {
                         <div class="form-group">
                             <label>@Resources.Web_Admin_Label_ConfirmPassword</label>
                             <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_ConfirmPassword"
-                                   @bind="VM.ConfirmPassword" @bind:event="oninput" />
+                                   @bind="VM.ConfirmPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
+                        </div>
+                    }
+                }
+                else if (VM.IsSelfPasswordChange && VM.SelectedUser.CanChangePassword)
+                {
+                    @* Self password change — requires the current password. *@
+                    <div class="form-group">
+                        <label>@Resources.Web_Admin_Label_CurrentPassword</label>
+                        <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_PasswordEmpty"
+                               @bind="VM.CurrentPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
+                    </div>
+                    <div class="form-group">
+                        <label>@Resources.Web_Admin_Label_NewPassword</label>
+                        <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_PasswordEmpty"
+                               @bind="VM.NewPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(VM.NewPassword))
+                    {
+                        <div class="form-group">
+                            <label>@Resources.Web_Admin_Label_ConfirmPassword</label>
+                            <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_ConfirmPassword"
+                                   @bind="VM.ConfirmPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
                         </div>
                     }
                 }
 
-                <div class="create-form-toggles user-edit-toggles">
-                    <div class="toggle-row">
-                        <span class="toggle-label-text">@Resources.Web_Admin_Toggle_AccountEnabled</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" @bind="VM.EditUserIsEnabled" />
-                            <span class="toggle-slider"></span>
-                        </label>
+                @if (VM.CanEditSelectedUser)
+                {
+                    <div class="create-form-toggles user-edit-toggles">
+                        <div class="toggle-row">
+                            <span class="toggle-label-text">@Resources.Web_Admin_Toggle_AccountEnabled</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" @bind="VM.EditUserIsEnabled" />
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="toggle-row">
+                            <span class="toggle-label-text">@Resources.Web_Admin_Toggle_CanChangePassword</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" @bind="VM.EditUserCanChangePassword" />
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
                     </div>
-                    <div class="toggle-row">
-                        <span class="toggle-label-text">@Resources.Web_Admin_Toggle_CanChangePassword</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" @bind="VM.EditUserCanChangePassword" />
-                            <span class="toggle-slider"></span>
-                        </label>
+
+                    <div class="form-group">
+                        <label>@Resources.Web_Admin_Label_Groups</label>
+                        <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                     Items="VM.EditUserGroups.ToPickerItems(PrincipalKind.Group, g => g.Id, g => g.Name, g => VM.GetDepartmentName(g.DepartmentId))"
+                                     SelectedIds="VM.EditUserGroups.CheckedIds(g => g.Id)"
+                                     SelectedIdsChanged="ids => VM.EditUserGroups.ApplySelection(ids, g => g.Id)"
+                                     Title="@Resources.Web_Admin_Label_Groups"
+                                     Placeholder="@Resources.Web_Common_NoGroupsAssigned" />
                     </div>
-                </div>
 
-                <div class="form-group">
-                    <label>@Resources.Web_Admin_Label_Groups</label>
-                    <PrincipalPickerField Mode="SelectionMode.Multiple"
-                                 Items="VM.EditUserGroups.ToPickerItems(PrincipalKind.Group, g => g.Id, g => g.Name, g => VM.GetDepartmentName(g.DepartmentId))"
-                                 SelectedIds="VM.EditUserGroups.CheckedIds(g => g.Id)"
-                                 SelectedIdsChanged="ids => VM.EditUserGroups.ApplySelection(ids, g => g.Id)"
-                                 Title="@Resources.Web_Admin_Label_Groups"
-                                 Placeholder="@Resources.Web_Common_NoGroupsAssigned" />
-                </div>
-
-                <div class="form-group">
-                    <label>@Resources.Web_Admin_Label_Roles</label>
-                    <PrincipalPickerField Mode="SelectionMode.Multiple"
-                                 Items="VM.EditUserRoles.ToPickerItems(PrincipalKind.Role, r => r.Id, r => r.Name)"
-                                 SelectedIds="VM.EditUserRoles.CheckedIds(r => r.Id)"
-                                 SelectedIdsChanged="ids => VM.EditUserRoles.ApplySelection(ids, r => r.Id)"
-                                 Title="@Resources.Web_Admin_Label_Roles"
-                                 Placeholder="@Resources.Web_Common_NoRolesAssigned" />
-                </div>
+                    <div class="form-group">
+                        <label>@Resources.Web_Admin_Label_Roles</label>
+                        <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                     Items="VM.EditUserRoles.ToPickerItems(PrincipalKind.Role, r => r.Id, r => r.Name)"
+                                     SelectedIds="VM.EditUserRoles.CheckedIds(r => r.Id)"
+                                     SelectedIdsChanged="ids => VM.EditUserRoles.ApplySelection(ids, r => r.Id)"
+                                     Title="@Resources.Web_Admin_Label_Roles"
+                                     Placeholder="@Resources.Web_Common_NoRolesAssigned" />
+                    </div>
+                }
             </div>
 
             @if (VM.ErrorMessage is not null)
@@ -112,7 +193,16 @@
 
         <div class="user-detail-shell user-detail-shell--viewing">
             <div class="user-profile-header">
-                <span class="user-profile-avatar" aria-hidden="true">@Initials(VM.SelectedUser.Name, VM.SelectedUser.Username)</span>
+                <span class="user-profile-avatar" aria-hidden="true">
+                    @if (UserAvatar.DataUri(VM.SelectedUser) is { } avatarUri)
+                    {
+                        <img src="@avatarUri" alt="" />
+                    }
+                    else
+                    {
+                        @UserAvatar.Initials(VM.SelectedUser)
+                    }
+                </span>
                 <span class="user-profile-identity">
                     <strong>@DisplayName(VM.SelectedUser.Name, VM.SelectedUser.Username)</strong>
                     <small>@@@VM.SelectedUser.Username</small>
@@ -128,6 +218,21 @@
             </div>
 
             <div class="user-overview-list">
+                @if (!string.IsNullOrWhiteSpace(VM.SelectedUser.FirstName) || !string.IsNullOrWhiteSpace(VM.SelectedUser.LastName))
+                {
+                    <div class="user-overview-row">
+                        <span class="user-overview-label">@Resources.Web_Admin_Label_FirstName</span>
+                        <span class="user-overview-value @(string.IsNullOrWhiteSpace(VM.SelectedUser.FirstName) ? "user-overview-value--empty" : "")">
+                            @(string.IsNullOrWhiteSpace(VM.SelectedUser.FirstName) ? Resources.Web_Admin_NotSpecified : VM.SelectedUser.FirstName)
+                        </span>
+                    </div>
+                    <div class="user-overview-row">
+                        <span class="user-overview-label">@Resources.Web_Admin_Label_LastName</span>
+                        <span class="user-overview-value @(string.IsNullOrWhiteSpace(VM.SelectedUser.LastName) ? "user-overview-value--empty" : "")">
+                            @(string.IsNullOrWhiteSpace(VM.SelectedUser.LastName) ? Resources.Web_Admin_NotSpecified : VM.SelectedUser.LastName)
+                        </span>
+                    </div>
+                }
                 <div class="user-overview-row">
                     <span class="user-overview-label">@Resources.Web_Admin_Label_Email</span>
                     <span class="user-overview-value @(string.IsNullOrWhiteSpace(VM.SelectedUser.Email) ? "user-overview-value--empty" : "")">
@@ -289,7 +394,7 @@
             </div>
 
             <div class="detail-actions user-view-actions">
-                @if (VM.CanEditSelectedUser)
+                @if (VM.CanEditSelectedProfile)
                 {
                     <button class="btn-primary user-edit-button" @onclick="EditUser">
                         @Icons.SVG("edit.svg", new SvgOptions(Width: 15, Height: 15, StrokeWidth: 2f))
@@ -324,25 +429,94 @@
     }
 }
 
+@if (_cropOpen)
+{
+    <div class="avatar-crop-overlay" @onclick="CloseCrop">
+        <div class="avatar-crop-dialog" @onclick:stopPropagation="true">
+            <h3 class="avatar-crop-title">@Resources.Web_Admin_Photo_Change</h3>
+            <div class="avatar-crop-frame">
+                <canvas @ref="_cropCanvas" width="@CropSize" height="@CropSize"></canvas>
+            </div>
+            <div class="avatar-crop-zoom">
+                <button type="button" class="btn-secondary" @onclick="() => ZoomCrop(0.8)" aria-label="Zoom out">&minus;</button>
+                <button type="button" class="btn-secondary" @onclick="() => ZoomCrop(1.25)" aria-label="Zoom in">+</button>
+            </div>
+            <div class="avatar-crop-actions">
+                <button type="button" class="btn-primary" @onclick="ConfirmCrop">@Resources.Web_Common_Save</button>
+                <button type="button" class="btn-secondary" @onclick="CloseCrop">@Resources.Web_Common_Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
     [Parameter] public EventCallback OnChanged { get; set; }
     private async Task EditUser() { await VM.StartEditUserAsync(); StateHasChanged(); }
     private async Task SaveUser() { await VM.SaveUserAsync(); await OnChanged.InvokeAsync(); }
+
+    // Crop-dialog state.
+    private bool _cropOpen;
+    private bool _cropInited;
+    private string? _cropSourceUri;
+    private ElementReference _cropCanvas;
+    private const int CropSize = 256;
+
+    private async Task OnPhotoSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null) return;
+        if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        { VM.ReportError(Resources.Web_Admin_Photo_InvalidType); StateHasChanged(); return; }
+        // The source may be larger than the stored cap; we downscale it in the crop step,
+        // so allow a generous ceiling here (still bounded to avoid loading huge files).
+        if (file.Size > 12 * 1024 * 1024)
+        { VM.ReportError(Resources.Web_Admin_Photo_TooLarge); StateHasChanged(); return; }
+
+        using var ms = new MemoryStream();
+        await file.OpenReadStream(12 * 1024 * 1024).CopyToAsync(ms);
+        _cropSourceUri = $"data:{file.ContentType};base64,{Convert.ToBase64String(ms.ToArray())}";
+        _cropInited = false;
+        _cropOpen = true;
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_cropOpen && !_cropInited && _cropSourceUri is not null)
+        {
+            _cropInited = true;
+            await JS.InvokeVoidAsync("kaimoAvatarCrop.init", _cropCanvas, _cropSourceUri, CropSize);
+        }
+    }
+
+    private async Task ZoomCrop(double factor)
+        => await JS.InvokeVoidAsync("kaimoAvatarCrop.zoom", _cropCanvas, factor);
+
+    private async Task ConfirmCrop()
+    {
+        var dataUrl = await JS.InvokeAsync<string>("kaimoAvatarCrop.result", _cropCanvas);
+        var comma = dataUrl.IndexOf(',');
+        if (comma > 0)
+        {
+            var bytes = Convert.FromBase64String(dataUrl[(comma + 1)..]);
+            VM.SetEditPhoto(bytes, "image/jpeg");
+        }
+        CloseCrop();
+    }
+
+    private void CloseCrop()
+    {
+        _cropOpen = false;
+        _cropInited = false;
+        _cropSourceUri = null;
+        StateHasChanged();
+    }
+
+    private void RemovePhoto() { VM.ClearEditPhoto(); StateHasChanged(); }
     private void CancelEdit() { VM.CancelEdit(); StateHasChanged(); }
     private async Task ConfirmDeleteUser() { await VM.ConfirmDeleteUserAsync(); await OnChanged.InvokeAsync(); }
     private async Task DeleteAssignment(Guid id) { await VM.DeleteAssignmentAsync(id); StateHasChanged(); }
     private static string DisplayName(string? name, string username) => string.IsNullOrWhiteSpace(name) ? username : name;
-    private static string Initials(string? name, string username)
-    {
-        var source = DisplayName(name, username);
-        var words = source.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return words.Length switch
-        {
-            0 => "?",
-            1 => words[0][..Math.Min(2, words[0].Length)].ToUpperInvariant(),
-            _ => string.Concat(words.Take(2).Select(word => char.ToUpperInvariant(word[0])))
-        };
-    }
     private static string FormatScopeType(ScopeType type) => type switch { ScopeType.Global => Resources.Web_Admin_ScopeType_Global, ScopeType.Department => Resources.Web_Admin_ScopeType_Department, ScopeType.Share => Resources.Web_Admin_ScopeType_Share, _ => type.ToString() };
 }

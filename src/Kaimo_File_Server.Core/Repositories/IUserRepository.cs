@@ -102,6 +102,18 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <param name="isEnabled">Whether the account is active.</param>
         /// <param name="canChangePassword">Whether the user is allowed to change their own password.</param>
         Task UpdateProfileAsync(Guid userId, string description, string email, bool isEnabled, bool canChangePassword);
+
+        /// <summary>
+        /// Updates the user's given/sur name (AD <c>givenName</c>/<c>sn</c>).
+        /// Passing <c>null</c> clears the respective field.
+        /// </summary>
+        Task UpdatePersonalNamesAsync(Guid userId, string? firstName, string? lastName);
+
+        /// <summary>
+        /// Sets or clears (when <paramref name="photo"/> is <c>null</c>) the user's
+        /// profile picture and its MIME type.
+        /// </summary>
+        Task UpdatePhotoAsync(Guid userId, byte[]? photo, string? contentType);
     }
 
     /// <summary>Minimal database projection used by Samba credential export.</summary>

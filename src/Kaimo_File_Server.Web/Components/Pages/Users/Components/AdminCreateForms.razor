@@ -1,6 +1,7 @@
 @using Kaimo_File_Server.Core.Helpers
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
 
 @* -- Create User Form -- *@
     @if (VM.IsCreatingUser)
@@ -19,22 +20,22 @@
                 <div class="form-group">
                     <label>@Resources.Web_Admin_Label_DisplayName</label>
                     <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_DisplayName"
-                           @bind="VM.CreateUserName" @bind:event="oninput" />
+                           @bind="VM.CreateUserName" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
                 </div>
                 <div class="form-group">
                     <label>@Resources.Web_Admin_Label_Username</label>
                     <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Username"
-                           @bind="VM.CreateUserUsername" @bind:event="oninput" />
+                           @bind="VM.CreateUserUsername" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
                 </div>
                 <div class="form-group">
                     <label>@Resources.Web_Admin_Label_Email</label>
                     <input type="email" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Email"
-                           @bind="VM.CreateUserEmail" @bind:event="oninput" />
+                           @bind="VM.CreateUserEmail" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
                 </div>
                 <div class="form-group">
                     <label>@Resources.Web_Admin_Label_Description</label>
                     <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Optional"
-                           @bind="VM.CreateUserDescription" @bind:event="oninput" />
+                           @bind="VM.CreateUserDescription" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
                 </div>
                 <div class="form-group">
                     <div class="label-with-info">
@@ -43,7 +44,7 @@
                                 aria-label="@Resources.Web_Settings_Pw_Title" @onclick="() => _showPwPolicy = !_showPwPolicy">i</button>
                     </div>
                     <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Password"
-                           @bind="VM.CreateUserPassword" @bind:event="oninput" />
+                           @bind="VM.CreateUserPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
                     @if (_showPwPolicy)
                     {
                         <div class="pw-policy-popover">

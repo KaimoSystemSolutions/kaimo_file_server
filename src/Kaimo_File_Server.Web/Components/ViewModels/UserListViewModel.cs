@@ -87,7 +87,16 @@ public class UserListViewModel
 
     // -- Actor Permissions --
     public bool IsGlobalAdmin { get; private set; }
+
+    /// <summary>A logged-in actor may always at least reach this page to view their own
+    /// profile; the management surfaces (tabs, create, other users) are gated by
+    /// <see cref="IsManagementUser"/>.</summary>
     public bool CanAccessPage { get; private set; }
+
+    /// <summary>Whether the actor holds any user/group/role management authority. When
+    /// <c>false</c> the page runs in self-service mode: only the actor's own record is
+    /// listed and only the personal (Tier-1) fields are editable.</summary>
+    public bool IsManagementUser { get; private set; }
     public bool CanCreateUsers { get; private set; }
     public bool CanManageGroups { get; private set; }
 
@@ -119,6 +128,26 @@ public class UserListViewModel
     public bool CanDeleteSelectedUser { get; private set; }
     public bool CanResetPasswordForSelected { get; private set; }
 
+    /// <summary>The actor's own user id, once the actor context is built.</summary>
+    public Guid? ActorUserId => _actorContext?.User.Id;
+
+    /// <summary>Whether the selected record is the actor's own account.</summary>
+    public bool IsViewingSelf => SelectedUser is not null
+        && _actorContext is not null && SelectedUser.Id == _actorContext.User.Id;
+
+    /// <summary>Whether the actor may open the edit form for the selection: either full
+    /// profile authority, or it is their own record (Tier-1 personal fields).</summary>
+    public bool CanEditSelectedProfile => CanEditSelectedUser || IsViewingSelf;
+
+    /// <summary>Whether the actor may change the selected user's password from the edit form:
+    /// an admin with reset authority, or the user changing their OWN password when the account
+    /// permits it (mirrors Windows/AD "user may change own password").</summary>
+    public bool CanChangePasswordForSelected => CanResetPasswordForSelected
+        || (IsViewingSelf && (SelectedUser?.CanChangePassword ?? false));
+
+    /// <summary>True only for the self-service password path (requires the current password).</summary>
+    public bool IsSelfPasswordChange => !CanResetPasswordForSelected && IsViewingSelf;
+
     // -- Selection --
     public User? SelectedUser { get; set; }
     public Group? SelectedGroup { get; set; }
@@ -132,10 +161,25 @@ public class UserListViewModel
     public string EditUserName { get; set; } = "";
     public string EditUserDescription { get; set; } = "";
     public string EditUserEmail { get; set; } = "";
+    public string EditUserFirstName { get; set; } = "";
+    public string EditUserLastName { get; set; } = "";
     public bool EditUserIsEnabled { get; set; } = true;
     public bool EditUserCanChangePassword { get; set; } = true;
     public List<CheckboxItem<Group>> EditUserGroups { get; private set; } = [];
     public List<CheckboxItem<Role>> EditUserRoles { get; private set; } = [];
+
+    // -- Profile picture edit (shared by admin full-edit and self-service) --
+    /// <summary>Upload cap. Comfortably above the AD <c>thumbnailPhoto</c> ~100 KB norm while
+    /// keeping the base64 payload embedded on the page small.</summary>
+    public const int MaxPhotoBytes = 256 * 1024;
+    public byte[]? EditUserPhoto { get; private set; }
+    public string? EditUserPhotoContentType { get; private set; }
+    private bool _photoChanged;
+    public bool HasEditPhoto => EditUserPhoto is { Length: > 0 };
+    public string? EditPhotoDataUri => DynamicHelpers.UserAvatar.DataUri(EditUserPhoto, EditUserPhotoContentType);
+
+    /// <summary>Current password, required when a user changes their OWN password (self-service).</summary>
+    public string CurrentPassword { get; set; } = "";
 
     // -- User-Details --
     public List<Group> UserGroups { get; private set; } = [];
@@ -398,7 +442,10 @@ public class UserListViewModel
 
         CanDeleteRoles = CanEditRoleDefinitions;
 
-        CanAccessPage = CanCreateUsers || canEditUsers || CanManageGroups || CanManageRoles;
+        IsManagementUser = CanCreateUsers || canEditUsers || CanManageGroups || CanManageRoles;
+        // Any logged-in actor may reach the page to view (and self-service edit) their own
+        // profile; management surfaces are gated separately by IsManagementUser.
+        CanAccessPage = true;
 
         // Resolve authorized departments for user creation
         var createResult = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
@@ -547,8 +594,8 @@ public class UserListViewModel
     {
         if (SelectedUser is null || _actorContext is null) return;
 
-        if (!await _mgmtAuth.CanManageUserAsync(
-                _actorContext, SelectedUser.Id, ManagementPermission.EditUserProfiles))
+        // Full profile authority OR editing one's own record (Tier-1 personal fields).
+        if (!CanEditSelectedUser && !IsViewingSelf)
         {
             ErrorMessage = Resources.Web_User_NoPermissionEdit;
             return;
@@ -556,7 +603,18 @@ public class UserListViewModel
 
         IsEditing = true;
         ErrorMessage = null; SuccessMessage = null;
-        NewPassword = ""; ConfirmPassword = "";
+        NewPassword = ""; ConfirmPassword = ""; CurrentPassword = "";
+
+        // Personal fields — editable by the user themselves and by full-profile admins.
+        EditUserFirstName = SelectedUser.FirstName ?? "";
+        EditUserLastName = SelectedUser.LastName ?? "";
+        EditUserPhoto = SelectedUser.Photo;
+        EditUserPhotoContentType = SelectedUser.PhotoContentType;
+        _photoChanged = false;
+
+        // Security/identity/membership fields are only populated (and shown) for a full-profile
+        // admin; a self-service user never touches them.
+        if (!CanEditSelectedUser) return;
 
         EditUserName = SelectedUser.Name;
         EditUserDescription = SelectedUser.Description ?? "";
@@ -587,7 +645,10 @@ public class UserListViewModel
         if (!await _mgmtAuth.CanManageUserAsync(
                 _actorContext, SelectedUser.Id, ManagementPermission.EditUserProfiles))
         {
-            ErrorMessage = Resources.Web_Error_NoPermission;
+            // No full authority → only the self-service subset (own personal fields + own
+            // password) is permitted, and only on one's own record.
+            if (!IsViewingSelf) { ErrorMessage = Resources.Web_Error_NoPermission; return; }
+            await SaveSelfProfileAsync();
             return;
         }
 
@@ -614,6 +675,11 @@ public class UserListViewModel
             await _userRepo.UpdateProfileAsync(
                 SelectedUser.Id, EditUserDescription.Trim(), EditUserEmail.Trim(),
                 EditUserIsEnabled, EditUserCanChangePassword);
+
+            await _userRepo.UpdatePersonalNamesAsync(
+                SelectedUser.Id, NullIfBlank(EditUserFirstName), NullIfBlank(EditUserLastName));
+            if (_photoChanged)
+                await _userRepo.UpdatePhotoAsync(SelectedUser.Id, EditUserPhoto, EditUserPhotoContentType);
 
             if (!string.IsNullOrWhiteSpace(NewPassword))
             {
@@ -666,6 +732,82 @@ public class UserListViewModel
         }
         finally { IsSaving = false; }
     }
+
+    /// <summary>
+    /// Self-service save: persists only the Tier-1 personal fields (given/sur name, photo)
+    /// and — when the account permits and the current password checks out — the user's own
+    /// password. Never touches identity, security or membership fields.
+    /// </summary>
+    private async Task SaveSelfProfileAsync()
+    {
+        if (SelectedUser is null) return;
+
+        try
+        {
+            IsSaving = true;
+            ErrorMessage = null;
+
+            if (!string.IsNullOrWhiteSpace(NewPassword))
+            {
+                if (!SelectedUser.CanChangePassword)
+                { ErrorMessage = Resources.Web_User_NoPermissionPasswordReset; return; }
+                if (!_passwordService.VerifyPassword(CurrentPassword, SelectedUser.PasswordHash))
+                { ErrorMessage = Resources.Web_User_CurrentPasswordWrong; return; }
+                var pwError = (await GetPasswordPolicyAsync()).Validate(NewPassword);
+                if (pwError is not null) { ErrorMessage = pwError; return; }
+                if (NewPassword != ConfirmPassword)
+                { ErrorMessage = Resources.Web_User_PasswordsDoNotMatch; return; }
+                await _userRepo.UpdatePasswordAsync(SelectedUser.Id,
+                    _passwordService.HashPassword(NewPassword),
+                    _ntHashProtector.Protect(_passwordService.ComputeNtHash(NewPassword)));
+            }
+
+            await _userRepo.UpdatePersonalNamesAsync(
+                SelectedUser.Id, NullIfBlank(EditUserFirstName), NullIfBlank(EditUserLastName));
+            if (_photoChanged)
+                await _userRepo.UpdatePhotoAsync(SelectedUser.Id, EditUserPhoto, EditUserPhotoContentType);
+
+            await LoadTabDataAsync();
+            SelectedUser = Users.FirstOrDefault(u => u.Id == SelectedUser.Id);
+            if (SelectedUser is not null) await ResolveSelectedUserPermissionsAsync(SelectedUser);
+
+            IsEditing = false;
+            NewPassword = ""; ConfirmPassword = ""; CurrentPassword = "";
+            SuccessMessage = Resources.Web_ChangesSaved;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving own profile for {UserId}", SelectedUser?.Id);
+            ErrorMessage = Resources.Web_Error_SaveFailed;
+        }
+        finally { IsSaving = false; }
+    }
+
+    // ══════════════════════════════════════════
+    //  Profile picture
+    // ══════════════════════════════════════════
+
+    /// <summary>Stages an uploaded image for the next save (admin or self-service).</summary>
+    public void SetEditPhoto(byte[] bytes, string contentType)
+    {
+        EditUserPhoto = bytes;
+        EditUserPhotoContentType = contentType;
+        _photoChanged = true;
+    }
+
+    /// <summary>Stages removal of the current photo for the next save.</summary>
+    public void ClearEditPhoto()
+    {
+        EditUserPhoto = null;
+        EditUserPhotoContentType = null;
+        _photoChanged = true;
+    }
+
+    /// <summary>Surfaces a UI-side validation error (e.g. rejected photo) on the shared banner.</summary>
+    public void ReportError(string message) => ErrorMessage = message;
+
+    private static string? NullIfBlank(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     // ══════════════════════════════════════════
     //  Edit Group
@@ -1208,7 +1350,8 @@ public class UserListViewModel
     {
         IsEditing = false; IsSaving = false;
         IsConfirmingDelete = false; IsAddingAssignment = false;
-        NewPassword = ""; ConfirmPassword = "";
+        NewPassword = ""; ConfirmPassword = ""; CurrentPassword = "";
+        _photoChanged = false;
         ErrorMessage = null;
     }
 
@@ -1242,16 +1385,35 @@ public class UserListViewModel
         if (IsGlobalAdmin) { Users = allUsers; return; }
 
         var authorizedDeptIds = AuthorizedDepartmentsForView.Select(d => d.Id).ToHashSet();
-        if (authorizedDeptIds.Count == 0) { Users = []; return; }
+        var selfId = _actorContext?.User.Id;
 
         var filtered = new List<User>();
         foreach (var user in allUsers)
         {
+            // Self is always viewable, even without department-view authority — this also
+            // supplies the single row a pure self-service user sees.
+            if (user.Id == selfId) { filtered.Add(user); continue; }
+            if (authorizedDeptIds.Count == 0) continue;
             var userDepts = await _departmentRepo.GetDepartmentsForUserAsync(user.Id);
             if (userDepts.Any(d => authorizedDeptIds.Contains(d.Id)))
                 filtered.Add(user);
         }
         Users = filtered;
+    }
+
+    /// <summary>Jumps to the actor's own record for the "view my profile" navigation:
+    /// switches to the Users tab first (so a Groups/Roles view does not stay stuck), then
+    /// selects the actor if not already selected.</summary>
+    public async Task GoToSelfAsync()
+    {
+        if (_actorContext is null) return;
+
+        if (ActiveTab != AdminTab.Users)
+            await SwitchTabAsync(AdminTab.Users);
+
+        var self = Users.FirstOrDefault(u => u.Id == _actorContext.User.Id);
+        if (self is not null && SelectedUser?.Id != self.Id)
+            await SelectUserAsync(self);
     }
 
     private async Task LoadFilteredGroupsAsync()

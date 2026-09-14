@@ -30,6 +30,16 @@
                                     <button class="user-list-row user-list-selectable @(isSelected ? "user-list-selected" : "")" type="button"
                                         @onclick="() => SelectUser(user)">
                                         <div class="user-cell-name">
+                                            <span class="user-list-avatar" aria-hidden="true">
+                                                @if (UserAvatar.DataUri(user) is { } uri)
+                                                {
+                                                    <img src="@uri" alt="" />
+                                                }
+                                                else
+                                                {
+                                                    @UserAvatar.Initials(user)
+                                                }
+                                            </span>
                                             <span>@user.Name</span>
                                         </div>
                                         <div class="user-cell-username">@user.Username</div>

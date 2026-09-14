@@ -1076,7 +1076,79 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Admin_Label_Email", resourceCulture);
             }
         }
-        
+
+        public static string Web_Admin_Label_FirstName {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_FirstName", resourceCulture);
+            }
+        }
+
+        public static string Web_Admin_Label_LastName {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_LastName", resourceCulture);
+            }
+        }
+
+        public static string Web_Admin_Label_CurrentPassword {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_CurrentPassword", resourceCulture);
+            }
+        }
+
+        public static string Web_Admin_Label_Photo {
+            get {
+                return ResourceManager.GetString("Web_Admin_Label_Photo", resourceCulture);
+            }
+        }
+
+        public static string Web_Admin_Photo_Change {
+            get {
+                return ResourceManager.GetString("Web_Admin_Photo_Change", resourceCulture);
+            }
+        }
+
+        public static string Web_Admin_Photo_Remove {
+            get {
+                return ResourceManager.GetString("Web_Admin_Photo_Remove", resourceCulture);
+            }
+        }
+
+        public static string Web_Admin_Photo_TooLarge {
+            get {
+                return ResourceManager.GetString("Web_Admin_Photo_TooLarge", resourceCulture);
+            }
+        }
+
+        public static string Web_Admin_Photo_InvalidType {
+            get {
+                return ResourceManager.GetString("Web_Admin_Photo_InvalidType", resourceCulture);
+            }
+        }
+
+        public static string Web_User_CurrentPasswordWrong {
+            get {
+                return ResourceManager.GetString("Web_User_CurrentPasswordWrong", resourceCulture);
+            }
+        }
+
+        public static string Web_Profile_Heading {
+            get {
+                return ResourceManager.GetString("Web_Profile_Heading", resourceCulture);
+            }
+        }
+
+        public static string Web_Profile_SelfServiceHint {
+            get {
+                return ResourceManager.GetString("Web_Profile_SelfServiceHint", resourceCulture);
+            }
+        }
+
+        public static string Web_Nav_ViewProfile {
+            get {
+                return ResourceManager.GetString("Web_Nav_ViewProfile", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Group ähnelt.
         /// </summary>

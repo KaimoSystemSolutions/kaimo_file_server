@@ -29,6 +29,26 @@ namespace Kaimo_File_Server.Core.Domain.Identity
         public string? Email { get; set; }
 
         /// <summary>
+        /// Optional given name (maps to the AD <c>givenName</c> attribute).
+        /// Independent of <see cref="Identity.Name"/>, which remains the authoritative
+        /// display name — kept separate so existing name handling stays unchanged.
+        /// </summary>
+        public string? FirstName { get; set; }
+
+        /// <summary>Optional surname (maps to the AD <c>sn</c> attribute).</summary>
+        public string? LastName { get; set; }
+
+        /// <summary>
+        /// Optional profile picture bytes. Maps to the AD <c>thumbnailPhoto</c>
+        /// attribute (a small JPEG/PNG, typically &lt; 100 KB) so a future LDAP/AD
+        /// synchronisation can copy the image across in either direction.
+        /// </summary>
+        public byte[]? Photo { get; set; }
+
+        /// <summary>MIME type of <see cref="Photo"/> (e.g. <c>image/jpeg</c>), used when rendering.</summary>
+        public string? PhotoContentType { get; set; }
+
+        /// <summary>
         /// When <c>false</c>, the account is locked and all authentication
         /// attempts are rejected regardless of correct credentials.
         /// </summary>
