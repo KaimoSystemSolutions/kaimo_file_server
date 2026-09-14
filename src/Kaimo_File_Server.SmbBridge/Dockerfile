@@ -13,6 +13,8 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 # nuget.config first → deterministic restore (nuget.org as sole source).
 COPY ["nuget.config", "."]
+# Central Package Management: restore reads all package versions from here.
+COPY ["Directory.Packages.props", "."]
 COPY ["src/Kaimo_File_Server.SmbBridge/Kaimo_File_Server.SmbBridge.csproj", "src/Kaimo_File_Server.SmbBridge/"]
 COPY ["src/Kaimo_File_Server.Core/Kaimo_File_Server.Core.csproj", "src/Kaimo_File_Server.Core/"]
 COPY ["src/Kaimo_File_Server.Infrastructure/Kaimo_File_Server.Infrastructure.csproj", "src/Kaimo_File_Server.Infrastructure/"]
