@@ -113,7 +113,7 @@ else
             @* ════════════════════ DETAIL PANEL ════════════════════ *@
             @if (VM.SelectedUser is not null || VM.SelectedGroup is not null || VM.SelectedRole is not null)
             {
-                <aside class="admin-detail entity-detail">
+                <aside class="admin-detail entity-detail @(VM.IsEditing && VM.SelectedUser is not null ? "entity-detail--editing" : "")">
 
                     @if (VM.SuccessMessage is not null)
                     {

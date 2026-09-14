@@ -117,6 +117,13 @@ public class UserListViewModel
     public List<Department> AuthorizedDepartmentsForCreate { get; private set; } = [];
     public List<Department> AuthorizedDepartmentsForView { get; private set; } = [];
 
+    /// <summary>Departments the actor may add/remove users from (EditDepartment); offered in the
+    /// user-edit department picker. Unrestricted actors get every department.</summary>
+    public List<Department> AuthorizedDepartmentsForAssign { get; private set; } = [];
+
+    /// <summary>Whether the user-edit form should expose the department multi-select at all.</summary>
+    public bool CanAssignDepartments { get; private set; }
+
     /// <summary>All departments for display purposes (group/user detail, selectors).</summary>
     public List<Department> AllDepartments { get; private set; } = [];
 
@@ -167,6 +174,7 @@ public class UserListViewModel
     public bool EditUserCanChangePassword { get; set; } = true;
     public List<CheckboxItem<Group>> EditUserGroups { get; private set; } = [];
     public List<CheckboxItem<Role>> EditUserRoles { get; private set; } = [];
+    public List<CheckboxItem<Department>> EditUserDepartments { get; private set; } = [];
 
     // -- Profile picture edit (shared by admin full-edit and self-service) --
     /// <summary>Upload cap. Comfortably above the AD <c>thumbnailPhoto</c> ~100 KB norm while
@@ -200,6 +208,30 @@ public class UserListViewModel
     // -- Group-Edit --
     public string EditGroupName { get; set; } = "";
     public List<CheckboxItem<User>> EditGroupMembers { get; private set; } = [];
+
+    /// <summary>Ids of the users already in the edited group's department, captured when the edit
+    /// starts. Drives the live "will be added to the department" warning below.</summary>
+    private HashSet<Guid> _editGroupDeptMemberIds = [];
+
+    /// <summary>Live warning shown while editing a department-scoped group's members: the selected
+    /// users that are not yet in the group's department and so will be added to it on save. <c>null</c>
+    /// when the group is Global or every selected member already belongs to the department.</summary>
+    public string? EditGroupDeptWarning
+    {
+        get
+        {
+            if (SelectedGroup is null || SelectedGroup.DepartmentId == WellKnownGUIDs.DEPARTMENT_GLOBAL)
+                return null;
+            var missing = EditGroupMembers
+                .Where(m => m.IsChecked && !_editGroupDeptMemberIds.Contains(m.Item.Id))
+                .Select(m => m.Item.Name)
+                .ToList();
+            return missing.Count == 0
+                ? null
+                : string.Format(Resources.Web_Group_DeptWarning,
+                    GetDepartmentName(SelectedGroup.DepartmentId), string.Join(", ", missing));
+        }
+    }
 
     // -- Role-Edit --
     public string EditRoleName { get; set; } = "";
@@ -466,6 +498,11 @@ public class UserListViewModel
         }
 
         CreateUserDepartmentId = AuthorizedDepartmentsForCreate.FirstOrDefault()?.Id;
+
+        var assignResult = await _mgmtAuth.GetAuthorizedDepartmentIdsAsync(
+            _actorContext, ManagementPermission.EditDepartment);
+        AuthorizedDepartmentsForAssign = await LoadDepartmentsFromScopeResultAsync(assignResult);
+        CanAssignDepartments = AuthorizedDepartmentsForAssign.Count > 0;
     }
 
     private async Task ResolveSelectedUserPermissionsAsync(User user)
@@ -636,6 +673,11 @@ public class UserListViewModel
         var userRoles = await _userRepo.GetRolesForUserAsync(SelectedUser.Id);
         var userRoleIds = userRoles.Select(r => r.Id).ToHashSet();
         EditUserRoles = allRoles.Select(r => new CheckboxItem<Role>(r, userRoleIds.Contains(r.Id))).ToList();
+
+        // Departments the actor may manage; pre-checked where the user is already a member.
+        // Memberships in departments outside this authorized set stay untouched on save.
+        EditUserDepartments = AuthorizedDepartmentsForAssign
+            .Select(d => new CheckboxItem<Department>(d, departmentIds.Contains(d.Id))).ToList();
     }
 
     public async Task SaveUserAsync()
@@ -694,7 +736,39 @@ public class UserListViewModel
                     _ntHashProtector.Protect(_passwordService.ComputeNtHash(NewPassword)));
             }
 
-            var selectedGroupIds = EditUserGroups.Where(g => g.IsChecked).Select(g => g.Item.Id).ToList();
+            // Department membership — diff against the picker's authorized subset only, so
+            // memberships in departments the actor cannot manage are never touched. Each change
+            // is still gated per-department by EditDepartment.
+            var finalDeptIds = UserDepartments.Select(d => d.Id).ToHashSet();
+            if (CanAssignDepartments)
+            {
+                var shownDeptIds = EditUserDepartments.Select(d => d.Item.Id).ToHashSet();
+                var desiredDeptIds = EditUserDepartments.Where(d => d.IsChecked).Select(d => d.Item.Id).ToHashSet();
+
+                foreach (var deptId in desiredDeptIds.Except(finalDeptIds))
+                    if (await _mgmtAuth.CanManageDepartmentAsync(_actorContext, deptId, ManagementPermission.EditDepartment))
+                        await _departmentRepo.AddUserAsync(deptId, SelectedUser.Id);
+
+                foreach (var deptId in finalDeptIds.Intersect(shownDeptIds).Except(desiredDeptIds))
+                    if (await _mgmtAuth.CanManageDepartmentAsync(_actorContext, deptId, ManagementPermission.EditDepartment))
+                    {
+                        await _departmentRepo.RemoveUserAsync(deptId, SelectedUser.Id);
+                        // Mirror DepartmentViewModel: leaving a department drops group memberships tied to it.
+                        var groups = await _userRepo.GetGroupsForUserAsync(SelectedUser.Id);
+                        var remaining = groups.Where(g => g.DepartmentId != deptId).Select(g => g.Id).ToList();
+                        if (remaining.Count != groups.Count)
+                            await _userRepo.SetGroupsForUserAsync(SelectedUser.Id, remaining);
+                    }
+
+                finalDeptIds = (await _departmentRepo.GetDepartmentsForUserAsync(SelectedUser.Id)).Select(d => d.Id).ToHashSet();
+            }
+
+            // A user's groups must stay within the user's departments (or Global), so drop any
+            // whose department the user no longer belongs to after the diff above.
+            var selectedGroupIds = EditUserGroups.Where(g => g.IsChecked)
+                .Where(g => g.Item.DepartmentId == WellKnownGUIDs.DEPARTMENT_GLOBAL
+                            || finalDeptIds.Contains(g.Item.DepartmentId))
+                .Select(g => g.Item.Id).ToList();
             if (await _mgmtAuth.CanManageUserAsync(_actorContext, SelectedUser.Id, ManagementPermission.AssignGroups))
                 await _userRepo.SetGroupsForUserAsync(SelectedUser.Id, selectedGroupIds);
 
@@ -813,9 +887,21 @@ public class UserListViewModel
     //  Edit Group
     // ══════════════════════════════════════════
 
+    /// <summary>Whether the selected group may be edited at all. The Everyone group is a live
+    /// mirror of every registered user (membership is maintained automatically from user
+    /// creation to deletion), so it is never editable — neither its name nor its members.</summary>
+    public bool SelectedGroupIsEditable => SelectedGroup is not null
+        && SelectedGroup.Id != WellKnownGUIDs.GROUP_EVERYONE;
+
     public async Task StartEditGroupAsync()
     {
         if (SelectedGroup is null || _actorContext is null) return;
+
+        if (!SelectedGroupIsEditable)
+        {
+            ErrorMessage = Resources.Web_Error_EveryoneNotEditable;
+            return;
+        }
 
         if (!await _mgmtAuth.CanManageGroupAsync(
                 _actorContext, SelectedGroup.Id, ManagementPermission.ManageGroupMembers))
@@ -833,11 +919,23 @@ public class UserListViewModel
         var members = await _groupRepo.GetMembersAsync(SelectedGroup.Id);
         var memberIds = members.Select(u => u.Id).ToHashSet();
         EditGroupMembers = allUsers.Select(u => new CheckboxItem<User>(u, memberIds.Contains(u.Id))).ToList();
+
+        // Capture the group's current department members so the edit UI can warn, live, which
+        // selected users will be pulled into the department on save (see EditGroupDeptWarning).
+        _editGroupDeptMemberIds = SelectedGroup.DepartmentId == WellKnownGUIDs.DEPARTMENT_GLOBAL
+            ? []
+            : (await _departmentRepo.GetUsersAsync(SelectedGroup.DepartmentId)).Select(u => u.Id).ToHashSet();
     }
 
     public async Task SaveGroupAsync()
     {
         if (SelectedGroup is null || _actorContext is null) return;
+
+        if (!SelectedGroupIsEditable)
+        {
+            ErrorMessage = Resources.Web_Error_EveryoneNotEditable;
+            return;
+        }
 
         if (!await _mgmtAuth.CanManageGroupAsync(
                 _actorContext, SelectedGroup.Id, ManagementPermission.ManageGroupMembers))
@@ -898,10 +996,30 @@ public class UserListViewModel
                 await _groupRepo.SetMembersAsync(SelectedGroup.Id, selectedUserIds);
             }
 
+            // A member of a department-scoped group must also belong to that department —
+            // otherwise the membership is orphaned: it would not surface on the user's own
+            // record, and the user's next profile save would silently drop it (the group is
+            // filtered out of the department-scoped picker). So grant the group's department
+            // to every selected member that lacks it, and surface who was affected.
+            var addedToDept = new List<string>();
+            if (SelectedGroup.DepartmentId != WellKnownGUIDs.DEPARTMENT_GLOBAL)
+            {
+                var deptMemberIds = (await _departmentRepo.GetUsersAsync(SelectedGroup.DepartmentId))
+                    .Select(u => u.Id).ToHashSet();
+                foreach (var member in EditGroupMembers
+                             .Where(m => m.IsChecked && !deptMemberIds.Contains(m.Item.Id)))
+                {
+                    await _departmentRepo.AddUserAsync(SelectedGroup.DepartmentId, member.Item.Id);
+                    addedToDept.Add(member.Item.Name);
+                }
+            }
+
             GroupMembers = (await _groupRepo.GetMembersAsync(SelectedGroup.Id)).OrderBy(u => u.Name).ToList();
 
             IsEditing = false;
-            SuccessMessage = Resources.Web_Members_Saved;
+            SuccessMessage = addedToDept.Count == 0
+                ? Resources.Web_Members_Saved
+                : $"{Resources.Web_Members_Saved} {string.Format(Resources.Web_Group_MembersAddedToDept, GetDepartmentName(SelectedGroup.DepartmentId), string.Join(", ", addedToDept))}";
         }
         catch (Exception ex)
         {

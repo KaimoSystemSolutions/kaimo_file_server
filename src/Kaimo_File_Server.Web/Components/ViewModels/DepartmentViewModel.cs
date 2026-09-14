@@ -316,9 +316,12 @@ public class DepartmentViewModel
         EditMembers = allUsers
             .Select(u => new CheckboxItem<User>(u, memberIds.Contains(u.Id))).ToList();
 
-        // Groups (direct FK: Group.DepartmentId)
+        // Groups (direct FK: Group.DepartmentId). The Everyone group is a live mirror of every
+        // registered user and stays permanently Global — it must never be pulled into a
+        // department, so it is excluded from the assignable list.
         var allGroups = (await _groupRepo.GetAllAsync()).OrderBy(g => g.Name).ToList();
         EditGroups = allGroups
+            .Where(g => g.Id != WellKnownGUIDs.GROUP_EVERYONE)
             .Select(g => new CheckboxItem<Group>(g, g.DepartmentId == Selected.Id)).ToList();
 
         // Shares (direct FK: ShareDefinition.DepartmentId)
@@ -429,7 +432,7 @@ public class DepartmentViewModel
             IsEditing = false;
             SuccessMessage = removedGroupMemberships == 0
                 ? Resources.Web_Dept_Saved
-                : $"{Resources.Web_Dept_Saved} {removedGroupMemberships} Gruppenzuordnung(en) wurden entfernt, weil der Benutzer nicht mehr Mitglied dieser Abteilung ist.";
+                : $"{Resources.Web_Dept_Saved} {string.Format(Resources.Web_Dept_GroupMembershipsRemoved, removedGroupMemberships)}";
         }
         catch (Exception ex)
         {

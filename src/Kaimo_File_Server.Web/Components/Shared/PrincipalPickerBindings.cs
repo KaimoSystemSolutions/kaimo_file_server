@@ -1,4 +1,5 @@
 using Kaimo_File_Server.Core.Domain.Department;
+using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Web.Components.ViewModels;
 
 namespace Kaimo_File_Server.Web.Components.Shared;
@@ -27,6 +28,20 @@ public static class PrincipalPickerBindings
         foreach (var c in items)
             c.IsChecked = set.Contains(id(c.Item));
     }
+
+    /// <summary>
+    /// Projects group checkboxes into picker items bucketed and colored by their department,
+    /// so the picker lists them under per-department headers (see <see cref="PrincipalPickerField"/>).
+    /// </summary>
+    public static IReadOnlyList<PrincipalPickerItem> ToGroupItems(
+        this IEnumerable<CheckboxItem<Group>> items, Func<Guid, DepartmentDisplay> department)
+        => items.Select(c =>
+        {
+            var dept = department(c.Item.DepartmentId);
+            return new PrincipalPickerItem(
+                c.Item.Id, c.Item.Name, PrincipalKind.Group, Hint: dept.Name,
+                GroupLabel: dept.Name, GroupColor: dept.Color, GroupSoft: dept.Soft);
+        }).ToList();
 
     // -- Single-select helpers for department pickers --
 

@@ -21,151 +21,195 @@
                 </span>
             </div>
 
+            @{
+                // Security holds the password fields (admin reset or self change) and the account
+                // toggles; Assignment holds departments + groups. Hide a tab with no content for
+                // the actor (e.g. a self-service user has no assignment fields).
+                var showSecurity = VM.CanEditSelectedUser
+                    || (VM.IsSelfPasswordChange && VM.SelectedUser.CanChangePassword);
+                var showAssignment = VM.CanEditSelectedUser;
+            }
+
+            <Tabs class="detail-tabs--panel user-edit-tabs">
+                <Tab Active="@(_editTab == EditTab.General)" Icon="user.svg"
+                     Label="@Resources.Web_Admin_EditTab_General"
+                     OnClick="() => _editTab = EditTab.General" />
+                @if (showSecurity)
+                {
+                    <Tab Active="@(_editTab == EditTab.Security)" Icon="shield.svg"
+                         Label="@Resources.Web_Admin_EditTab_Security"
+                         OnClick="() => _editTab = EditTab.Security" />
+                }
+                @if (showAssignment)
+                {
+                    <Tab Active="@(_editTab == EditTab.Assignment)" Icon="users_3.svg"
+                         Label="@Resources.Web_Admin_EditTab_Assignment"
+                         OnClick="() => _editTab = EditTab.Assignment" />
+                }
+            </Tabs>
+
             <div class="user-edit-form detail-field-grid">
                 @if (!VM.CanEditSelectedUser)
                 {
                     <p class="user-selfservice-hint">@Resources.Web_Profile_SelfServiceHint</p>
                 }
 
-                @* Profile picture — self-service and full-profile admins alike. *@
-                <div class="form-group user-photo-edit">
-                    <label>@Resources.Web_Admin_Label_Photo</label>
-                    <div class="user-photo-edit-row">
-                        <span class="user-photo-preview" aria-hidden="true">
-                            @if (VM.EditPhotoDataUri is { } previewUri)
-                            {
-                                <img src="@previewUri" alt="" />
-                            }
-                            else
-                            {
-                                @UserAvatar.Initials(VM.SelectedUser)
-                            }
-                        </span>
-                        <div class="user-photo-actions">
-                            <label class="btn-secondary user-photo-upload">
-                                @Resources.Web_Admin_Photo_Change
-                                <InputFile OnChange="OnPhotoSelected" accept="image/*" style="display:none" />
-                            </label>
-                            @if (VM.HasEditPhoto)
-                            {
-                                <button type="button" class="btn-secondary" @onclick="RemovePhoto">
-                                    @Resources.Web_Admin_Photo_Remove
-                                </button>
-                            }
+                @* ── General: photo, names, email, description ── *@
+                <div class="user-edit-tabpanel detail-field-grid" hidden="@(_editTab != EditTab.General)">
+                    <div class="form-group user-photo-edit">
+                        <label>@Resources.Web_Admin_Label_Photo</label>
+                        <div class="user-photo-edit-row">
+                            <span class="user-photo-preview" aria-hidden="true">
+                                @if (VM.EditPhotoDataUri is { } previewUri)
+                                {
+                                    <img src="@previewUri" alt="" />
+                                }
+                                else
+                                {
+                                    @UserAvatar.Initials(VM.SelectedUser)
+                                }
+                            </span>
+                            <div class="user-photo-actions">
+                                <label class="btn-secondary user-photo-upload">
+                                    @Resources.Web_Admin_Photo_Change
+                                    <InputFile OnChange="OnPhotoSelected" accept="image/*" style="display:none" />
+                                </label>
+                                @if (VM.HasEditPhoto)
+                                {
+                                    <button type="button" class="btn-secondary" @onclick="RemovePhoto">
+                                        @Resources.Web_Admin_Photo_Remove
+                                    </button>
+                                }
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                @if (VM.CanEditSelectedUser)
-                {
-                    <div class="form-group">
-                        <label>@Resources.Web_Admin_Label_DisplayName</label>
-                        <input type="text" class="edit-input" @bind="VM.EditUserName" @attributes="HtmlAttr.NoAutofill" />
-                    </div>
-                }
+                    @if (VM.CanEditSelectedUser)
+                    {
+                        <div class="form-group">
+                            <label>@Resources.Web_Admin_Label_DisplayName</label>
+                            <input type="text" class="edit-input" @bind="VM.EditUserName" @attributes="HtmlAttr.NoAutofill" />
+                        </div>
+                    }
 
-                <div class="form-group">
-                    <label>@Resources.Web_Admin_Label_FirstName</label>
-                    <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Optional"
-                           @bind="VM.EditUserFirstName" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
-                </div>
-                <div class="form-group">
-                    <label>@Resources.Web_Admin_Label_LastName</label>
-                    <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Optional"
-                           @bind="VM.EditUserLastName" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
-                </div>
-
-                @if (VM.CanEditSelectedUser)
-                {
                     <div class="form-group">
-                        <label>@Resources.Web_Admin_Label_Email</label>
-                        <input type="email" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Email"
-                               @bind="VM.EditUserEmail" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
-                    </div>
-                    <div class="form-group">
-                        <label>@Resources.Web_Admin_Label_Description</label>
+                        <label>@Resources.Web_Admin_Label_FirstName</label>
                         <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Optional"
-                               @bind="VM.EditUserDescription" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
+                               @bind="VM.EditUserFirstName" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
                     </div>
-                }
-
-                @if (VM.CanResetPasswordForSelected)
-                {
-                    @* Administrator password reset — no current password required. *@
                     <div class="form-group">
-                        <label>@Resources.Web_Admin_Label_NewPassword</label>
-                        <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_PasswordEmpty"
-                               @bind="VM.NewPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
+                        <label>@Resources.Web_Admin_Label_LastName</label>
+                        <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Optional"
+                               @bind="VM.EditUserLastName" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
                     </div>
-                    @if (!string.IsNullOrEmpty(VM.NewPassword))
+
+                    @if (VM.CanEditSelectedUser)
                     {
                         <div class="form-group">
-                            <label>@Resources.Web_Admin_Label_ConfirmPassword</label>
-                            <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_ConfirmPassword"
-                                   @bind="VM.ConfirmPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
+                            <label>@Resources.Web_Admin_Label_Email</label>
+                            <input type="email" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Email"
+                                   @bind="VM.EditUserEmail" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
                         </div>
-                    }
-                }
-                else if (VM.IsSelfPasswordChange && VM.SelectedUser.CanChangePassword)
-                {
-                    @* Self password change — requires the current password. *@
-                    <div class="form-group">
-                        <label>@Resources.Web_Admin_Label_CurrentPassword</label>
-                        <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_PasswordEmpty"
-                               @bind="VM.CurrentPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
-                    </div>
-                    <div class="form-group">
-                        <label>@Resources.Web_Admin_Label_NewPassword</label>
-                        <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_PasswordEmpty"
-                               @bind="VM.NewPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
-                    </div>
-                    @if (!string.IsNullOrEmpty(VM.NewPassword))
-                    {
                         <div class="form-group">
-                            <label>@Resources.Web_Admin_Label_ConfirmPassword</label>
-                            <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_ConfirmPassword"
-                                   @bind="VM.ConfirmPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
+                            <label>@Resources.Web_Admin_Label_Description</label>
+                            <input type="text" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Optional"
+                                   @bind="VM.EditUserDescription" @bind:event="oninput" @attributes="HtmlAttr.NoAutofill" />
                         </div>
                     }
+                </div>
+
+                @* ── Security: password + account toggles ── *@
+                @if (showSecurity)
+                {
+                    <div class="user-edit-tabpanel detail-field-grid" hidden="@(_editTab != EditTab.Security)">
+                        @if (VM.CanResetPasswordForSelected)
+                        {
+                            @* Administrator password reset — no current password required. *@
+                            <div class="form-group">
+                                <label>@Resources.Web_Admin_Label_NewPassword</label>
+                                <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_PasswordEmpty"
+                                       @bind="VM.NewPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
+                            </div>
+                            @if (!string.IsNullOrEmpty(VM.NewPassword))
+                            {
+                                <div class="form-group">
+                                    <label>@Resources.Web_Admin_Label_ConfirmPassword</label>
+                                    <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_ConfirmPassword"
+                                           @bind="VM.ConfirmPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
+                                </div>
+                            }
+                        }
+                        else if (VM.IsSelfPasswordChange && VM.SelectedUser.CanChangePassword)
+                        {
+                            @* Self password change — requires the current password. *@
+                            <div class="form-group">
+                                <label>@Resources.Web_Admin_Label_CurrentPassword</label>
+                                <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_PasswordEmpty"
+                                       @bind="VM.CurrentPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
+                            </div>
+                            <div class="form-group">
+                                <label>@Resources.Web_Admin_Label_NewPassword</label>
+                                <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_PasswordEmpty"
+                                       @bind="VM.NewPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
+                            </div>
+                            @if (!string.IsNullOrEmpty(VM.NewPassword))
+                            {
+                                <div class="form-group">
+                                    <label>@Resources.Web_Admin_Label_ConfirmPassword</label>
+                                    <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_ConfirmPassword"
+                                           @bind="VM.ConfirmPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
+                                </div>
+                            }
+                        }
+
+                        @if (VM.CanEditSelectedUser)
+                        {
+                            <div class="create-form-toggles user-edit-toggles">
+                                <div class="toggle-row">
+                                    <span class="toggle-label-text">@Resources.Web_Admin_Toggle_AccountEnabled</span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" @bind="VM.EditUserIsEnabled" />
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="toggle-row">
+                                    <span class="toggle-label-text">@Resources.Web_Admin_Toggle_CanChangePassword</span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" @bind="VM.EditUserCanChangePassword" />
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        }
+                    </div>
                 }
 
-                @if (VM.CanEditSelectedUser)
+                @* ── Assignment: departments + groups (roles are managed on the Roles tab) ── *@
+                @if (showAssignment)
                 {
-                    <div class="create-form-toggles user-edit-toggles">
-                        <div class="toggle-row">
-                            <span class="toggle-label-text">@Resources.Web_Admin_Toggle_AccountEnabled</span>
-                            <label class="toggle-switch">
-                                <input type="checkbox" @bind="VM.EditUserIsEnabled" />
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                        <div class="toggle-row">
-                            <span class="toggle-label-text">@Resources.Web_Admin_Toggle_CanChangePassword</span>
-                            <label class="toggle-switch">
-                                <input type="checkbox" @bind="VM.EditUserCanChangePassword" />
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
+                    <div class="user-edit-tabpanel detail-field-grid" hidden="@(_editTab != EditTab.Assignment)">
+                        @if (VM.CanAssignDepartments)
+                        {
+                            <div class="form-group">
+                                <label>@Resources.Web_Admin_Label_Departments</label>
+                                <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                             Items="VM.EditUserDepartments.Select(d => d.Item).ToDepartmentItems()"
+                                             SelectedIds="VM.EditUserDepartments.CheckedIds(d => d.Id)"
+                                             SelectedIdsChanged="ids => VM.EditUserDepartments.ApplySelection(ids, d => d.Id)"
+                                             Title="@Resources.Web_Admin_Label_Departments"
+                                             Placeholder="@Resources.Web_Common_NoDepartments" />
+                            </div>
+                        }
 
-                    <div class="form-group">
-                        <label>@Resources.Web_Admin_Label_Groups</label>
-                        <PrincipalPickerField Mode="SelectionMode.Multiple"
-                                     Items="VM.EditUserGroups.ToPickerItems(PrincipalKind.Group, g => g.Id, g => g.Name, g => VM.GetDepartmentName(g.DepartmentId))"
-                                     SelectedIds="VM.EditUserGroups.CheckedIds(g => g.Id)"
-                                     SelectedIdsChanged="ids => VM.EditUserGroups.ApplySelection(ids, g => g.Id)"
-                                     Title="@Resources.Web_Admin_Label_Groups"
-                                     Placeholder="@Resources.Web_Common_NoGroupsAssigned" />
-                    </div>
-
-                    <div class="form-group">
-                        <label>@Resources.Web_Admin_Label_Roles</label>
-                        <PrincipalPickerField Mode="SelectionMode.Multiple"
-                                     Items="VM.EditUserRoles.ToPickerItems(PrincipalKind.Role, r => r.Id, r => r.Name)"
-                                     SelectedIds="VM.EditUserRoles.CheckedIds(r => r.Id)"
-                                     SelectedIdsChanged="ids => VM.EditUserRoles.ApplySelection(ids, r => r.Id)"
-                                     Title="@Resources.Web_Admin_Label_Roles"
-                                     Placeholder="@Resources.Web_Common_NoRolesAssigned" />
+                        <div class="form-group">
+                            <label>@Resources.Web_Admin_Label_Groups</label>
+                            <PrincipalPickerField Mode="SelectionMode.Multiple"
+                                         Items="VM.EditUserGroups.ToGroupItems(VM.GetDepartmentDisplay)"
+                                         SelectedIds="VM.EditUserGroups.CheckedIds(g => g.Id)"
+                                         SelectedIdsChanged="ids => VM.EditUserGroups.ApplySelection(ids, g => g.Id)"
+                                         Title="@Resources.Web_Admin_Label_Groups"
+                                         Placeholder="@Resources.Web_Common_NoGroupsAssigned" />
+                        </div>
                     </div>
                 }
             </div>
@@ -388,11 +432,6 @@
                 </div>
             </div>
 
-            <div class="user-technical-id">
-                <span>ID</span>
-                <code>@VM.SelectedUser.Id</code>
-            </div>
-
             <div class="detail-actions user-view-actions">
                 @if (VM.CanEditSelectedProfile)
                 {
@@ -452,7 +491,11 @@
 @code {
     [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
     [Parameter] public EventCallback OnChanged { get; set; }
-    private async Task EditUser() { await VM.StartEditUserAsync(); StateHasChanged(); }
+
+    private enum EditTab { General, Security, Assignment }
+    private EditTab _editTab = EditTab.General;
+
+    private async Task EditUser() { await VM.StartEditUserAsync(); _editTab = EditTab.General; StateHasChanged(); }
     private async Task SaveUser() { await VM.SaveUserAsync(); await OnChanged.InvokeAsync(); }
 
     // Crop-dialog state.

@@ -816,6 +816,9 @@
   <data name="Web_Error_SystemGroupUndeletable" xml:space="preserve">
     <value>Dies ist eine Systemgruppe und kann nicht gelöscht werden.</value>
   </data>
+  <data name="Web_Error_EveryoneNotEditable" xml:space="preserve">
+    <value>Die Gruppe „Everyone“ umfasst alle registrierten Benutzer und kann nicht bearbeitet werden.</value>
+  </data>
   <data name="Web_Error_AccessDenied" xml:space="preserve">
     <value>Zugriff verweigert.</value>
   </data>
@@ -966,6 +969,9 @@
   <data name="Web_Dept_Saved" xml:space="preserve">
     <value>Abteilung gespeichert.</value>
   </data>
+  <data name="Web_Dept_GroupMembershipsRemoved" xml:space="preserve">
+    <value>{0} Gruppenzuordnung(en) wurden entfernt, weil der Benutzer nicht mehr Mitglied dieser Abteilung ist.</value>
+  </data>
   <data name="Web_Dept_NameRequired" xml:space="preserve">
     <value>Abteilungsname erforderlich.</value>
   </data>
@@ -1058,6 +1064,12 @@
   </data>
   <data name="Web_Members_Saved" xml:space="preserve">
     <value>Mitglieder gespeichert.</value>
+  </data>
+  <data name="Web_Group_MembersAddedToDept" xml:space="preserve">
+    <value>Hinweis: Folgende Mitglieder wurden zusätzlich der Abteilung „{0}“ hinzugefügt, da die Gruppe dieser Abteilung zugeordnet ist: {1}</value>
+  </data>
+  <data name="Web_Group_DeptWarning" xml:space="preserve">
+    <value>Hinweis: Folgende ausgewählte Benutzer sind noch nicht Mitglied der Abteilung „{0}“ und werden ihr beim Speichern hinzugefügt: {1}</value>
   </data>
   <data name="Web_Settings_LoadFailed" xml:space="preserve">
     <value>Fehler beim Laden der Einstellungen.</value>
@@ -2057,6 +2069,15 @@
   </data>
   <data name="Web_Admin_EditUser" xml:space="preserve">
     <value>Benutzer bearbeiten</value>
+  </data>
+  <data name="Web_Admin_EditTab_General" xml:space="preserve">
+    <value>Allgemein</value>
+  </data>
+  <data name="Web_Admin_EditTab_Security" xml:space="preserve">
+    <value>Sicherheit</value>
+  </data>
+  <data name="Web_Admin_EditTab_Assignment" xml:space="preserve">
+    <value>Zuordnung</value>
   </data>
   <data name="Web_Admin_Label_NewPassword" xml:space="preserve">
     <value>Neues Passwort (optional)</value>

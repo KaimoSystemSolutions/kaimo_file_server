@@ -324,6 +324,25 @@
     border-top: 1px solid var(--border);
 }
 
+/* The tabbed edit form needs more room than the compact read view; widen the pane
+   while editing a user (the mobile rule below still collapses it to full width). */
+.entity-detail--editing {
+    width: 560px;
+    min-width: 460px;
+}
+
+/* Full-bleed panel tab bar inside the editing card (mirrors the share edit tabs);
+   bleed matches the editing shell's inner padding so it spans the card. */
+.entity-detail ::deep .user-edit-tabs {
+    margin: 2px -7px 16px;
+    padding: 0 6px;
+}
+
+/* One tab panel is visible at a time; each keeps the field-grid spacing. */
+.entity-detail ::deep .user-edit-tabpanel[hidden] {
+    display: none;
+}
+
 @media (max-width: 920px) {
     .entity-workspace {
         flex-direction: column;
@@ -372,8 +391,7 @@
     padding: 7px;
     border: 1px solid color-mix(in srgb, var(--accent) 48%, var(--border));
     border-radius: var(--radius-surface);
-    background: color-mix(in srgb, var(--accent-subtle) 28%, var(--bg-tertiary));
-    box-shadow: inset 3px 0 0 var(--accent);
+    background: var(--bg-tertiary);
 }
 
 .entity-detail ::deep .user-edit-mode-banner {
@@ -790,7 +808,8 @@
     flex-direction: column;
     gap: 13px;
     padding: 16px 0;
-    border-bottom: 1px solid var(--border);
+    /* No border-bottom: the following .detail-actions already carries a border-top,
+       and two adjacent 1px rules read as a doubled separator at the panel's foot. */
 }
 
 .entity-detail ::deep .user-membership-section {

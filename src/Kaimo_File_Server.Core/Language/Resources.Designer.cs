@@ -986,7 +986,34 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Admin_EditUser", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die General ähnelt.
+        /// </summary>
+        public static string Web_Admin_EditTab_General {
+            get {
+                return ResourceManager.GetString("Web_Admin_EditTab_General", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Security ähnelt.
+        /// </summary>
+        public static string Web_Admin_EditTab_Security {
+            get {
+                return ResourceManager.GetString("Web_Admin_EditTab_Security", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Assignment ähnelt.
+        /// </summary>
+        public static string Web_Admin_EditTab_Assignment {
+            get {
+                return ResourceManager.GetString("Web_Admin_EditTab_Assignment", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Global roles ähnelt.
         /// </summary>
@@ -7473,6 +7500,42 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Members_Saved {
             get {
                 return ResourceManager.GetString("Web_Members_Saved", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Note: the following members were also added to department "{0}", because the group belongs to it: {1} ähnelt.
+        /// </summary>
+        public static string Web_Group_MembersAddedToDept {
+            get {
+                return ResourceManager.GetString("Web_Group_MembersAddedToDept", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Note: the following selected users are not yet members of department "{0}" and will be added to it when you save: {1} ähnelt.
+        /// </summary>
+        public static string Web_Group_DeptWarning {
+            get {
+                return ResourceManager.GetString("Web_Group_DeptWarning", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die {0} group assignment(s) were removed because the user is no longer a member of this department. ähnelt.
+        /// </summary>
+        public static string Web_Dept_GroupMembershipsRemoved {
+            get {
+                return ResourceManager.GetString("Web_Dept_GroupMembershipsRemoved", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die The Everyone group represents all registered users and cannot be edited. ähnelt.
+        /// </summary>
+        public static string Web_Error_EveryoneNotEditable {
+            get {
+                return ResourceManager.GetString("Web_Error_EveryoneNotEditable", resourceCulture);
             }
         }
         

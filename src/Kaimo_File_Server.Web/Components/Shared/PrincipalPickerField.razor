@@ -119,36 +119,45 @@
             </div>
 
             <div class="principal-picker-list" role="listbox" aria-multiselectable="@(Mode == SelectionMode.Multiple)">
-                @{
-                    var rows = VisibleRows();
-                    var firstUnselected = rows.FindIndex(r => !_selected.Contains(r.Id));
-                }
-                @if (rows.Count == 0)
+                @if (ActiveKindIsGrouped)
                 {
-                    <div class="principal-picker-empty">
-                        @(HasAnyForKind ? Text("Web_Picker_NoMatches", "No matches") : Text("Web_Picker_Empty", "Nothing to choose from"))
-                    </div>
+                    var groups = VisibleGroups();
+                    @if (groups.Count == 0)
+                    {
+                        <div class="principal-picker-empty">
+                            @(HasAnyForKind ? Text("Web_Picker_NoMatches", "No matches") : Text("Web_Picker_Empty", "Nothing to choose from"))
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var group in groups)
+                        {
+                            var head = group.First();
+                            <div class="principal-picker-group-header"
+                                 style="color:@head.GroupColor;background:@head.GroupSoft;">@group.Key</div>
+                            @foreach (var item in group)
+                            {
+                                @Row(item, divider: false)
+                            }
+                        }
+                    }
                 }
                 else
                 {
-                    @for (var i = 0; i < rows.Count; i++)
+                    var rows = VisibleRows();
+                    var firstUnselected = rows.FindIndex(r => !_selected.Contains(r.Id));
+                    @if (rows.Count == 0)
                     {
-                        var item = rows[i];
-                        var isChecked = _selected.Contains(item.Id);
-                        var divider = i == firstUnselected && firstUnselected > 0;
-                        <button type="button" role="option" aria-selected="@isChecked"
-                                class="principal-picker-row @(isChecked ? "is-selected" : "") @(divider ? "has-divider" : "")"
-                                @onclick="() => Toggle(item.Id)">
-                            <span class="principal-picker-check @(isChecked ? "is-checked" : "")"></span>
-                            @Avatar(item, 28)
-                            <span class="principal-picker-row-text">
-                                <span class="principal-picker-name">@item.Name</span>
-                                @if (!string.IsNullOrEmpty(item.Hint))
-                                {
-                                    <span class="principal-picker-hint">@item.Hint</span>
-                                }
-                            </span>
-                        </button>
+                        <div class="principal-picker-empty">
+                            @(HasAnyForKind ? Text("Web_Picker_NoMatches", "No matches") : Text("Web_Picker_Empty", "Nothing to choose from"))
+                        </div>
+                    }
+                    else
+                    {
+                        @for (var i = 0; i < rows.Count; i++)
+                        {
+                            @Row(rows[i], divider: i == firstUnselected && firstUnselected > 0)
+                        }
                     }
                 }
             </div>
@@ -335,19 +344,32 @@
         await CloseInternal();
     }
 
-    private List<PrincipalPickerItem> VisibleRows()
+    private IEnumerable<PrincipalPickerItem> FilteredRows()
     {
         var term = _search.Trim();
         var rows = Items.Where(i => i.Kind == _activeKind);
-        if (term.Length > 0)
-            rows = rows.Where(i => i.Name.Contains(term, StringComparison.OrdinalIgnoreCase));
+        return term.Length > 0
+            ? rows.Where(i => i.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
+            : rows;
+    }
 
+    private List<PrincipalPickerItem> VisibleRows() =>
         // Selected first, then alphabetical within each block.
-        return rows
+        FilteredRows()
             .OrderByDescending(i => _selected.Contains(i.Id))
             .ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
-    }
+
+    // The active kind is bucketed when its items carry a group label (e.g. groups by department).
+    private bool ActiveKindIsGrouped => Items.Any(i => i.Kind == _activeKind && i.GroupLabel is not null);
+
+    // Rows bucketed by their group label, buckets and rows alphabetical.
+    private List<IGrouping<string, PrincipalPickerItem>> VisibleGroups() =>
+        FilteredRows()
+            .OrderBy(i => i.GroupLabel, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(i => i.GroupLabel ?? string.Empty)
+            .ToList();
 
     private static string IconFor(PrincipalKind kind) => kind switch
     {
@@ -367,10 +389,16 @@
         _ => ("var(--entity-user)", "var(--entity-user-soft)"),
     };
 
-    // Departments carry a per-item (custom or automatic) color; every other kind uses its CSS-variable default.
-    private static (string Color, string Soft) ColorsFor(PrincipalPickerItem item) => item.Kind == PrincipalKind.Department
-        ? DepartmentPalette.For(item.Id, item.Color)
-        : ColorsFor(item.Kind);
+    // Departments carry a per-item (custom or automatic) color; a group may carry its department's
+    // resolved color (so its row/chip match the department); every other kind uses its CSS default.
+    private static (string Color, string Soft) ColorsFor(PrincipalPickerItem item)
+    {
+        if (item.Kind == PrincipalKind.Department)
+            return DepartmentPalette.For(item.Id, item.Color);
+        if (item.GroupColor is not null && item.GroupSoft is not null)
+            return (item.GroupColor, item.GroupSoft);
+        return ColorsFor(item.Kind);
+    }
 
     private string TabLabel(PrincipalKind kind) => kind switch
     {
@@ -389,6 +417,24 @@
         var second = parts.Length > 1 ? parts[^1][..1] : string.Empty;
         return (first + second).ToUpperInvariant();
     }
+
+    private RenderFragment Row(PrincipalPickerItem item, bool divider) => __builder =>
+    {
+        var isChecked = _selected.Contains(item.Id);
+        <button type="button" role="option" aria-selected="@isChecked"
+                class="principal-picker-row @(isChecked ? "is-selected" : "") @(divider ? "has-divider" : "")"
+                @onclick="() => Toggle(item.Id)">
+            <span class="principal-picker-check @(isChecked ? "is-checked" : "")"></span>
+            @Avatar(item, 28)
+            <span class="principal-picker-row-text">
+                <span class="principal-picker-name">@item.Name</span>
+                @if (!string.IsNullOrEmpty(item.Hint))
+                {
+                    <span class="principal-picker-hint">@item.Hint</span>
+                }
+            </span>
+        </button>
+    };
 
     private RenderFragment Avatar(PrincipalPickerItem item, int size) => __builder =>
     {

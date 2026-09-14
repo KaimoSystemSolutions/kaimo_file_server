@@ -813,4 +813,70 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => GroupRepo().DeleteAsync(WellKnownGUIDs.GROUP_EVERYONE));
     }
+
+    [Fact]
+    public async Task StartEditGroupAsync_EveryoneGroup_IsBlocked()
+    {
+        var actor = SeedUser("admin");
+        SeedGroupWithId(WellKnownGUIDs.GROUP_EVERYONE, "Everyone");
+
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SwitchTabAsync(AdminTab.Groups);
+        await sut.SelectGroupAsync(sut.Groups.Single(g => g.Id == WellKnownGUIDs.GROUP_EVERYONE));
+        await sut.StartEditGroupAsync();
+
+        Assert.False(sut.IsEditing);
+        Assert.False(sut.SelectedGroupIsEditable);
+        Assert.Equal(Resources.Web_Error_EveryoneNotEditable, sut.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task SaveGroupAsync_AddMemberToDeptGroup_AlsoAddsUserToDepartment()
+    {
+        // Bug regression: adding a user to a department-scoped group via the Groups tab must
+        // also grant them that group's department, so the membership is not orphaned.
+        var actor = SeedUser("admin");
+        var dept = SeedDepartment("Sales");
+        var group = SeedGroupInDept("Sales-Team", dept.Id);
+        var alice = SeedUser("alice");
+
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SwitchTabAsync(AdminTab.Groups);
+        await sut.SelectGroupAsync(sut.Groups.Single(g => g.Id == group.Id));
+        await sut.StartEditGroupAsync();
+
+        foreach (var m in sut.EditGroupMembers)
+            m.IsChecked = m.Item.Id == alice.Id;
+        await sut.SaveGroupAsync();
+
+        await using var db = NewContext();
+        Assert.True(await db.UserGroups.AnyAsync(ug => ug.GroupId == group.Id && ug.UserId == alice.Id));
+        Assert.True(await db.DepartmentUsers.AnyAsync(du => du.DepartmentId == dept.Id && du.UserId == alice.Id));
+    }
+
+    [Fact]
+    public async Task EditGroupDeptWarning_SurfacesSelectedUsersMissingDepartment()
+    {
+        var actor = SeedUser("admin");
+        var dept = SeedDepartment("Sales");
+        var group = SeedGroupInDept("Sales-Team", dept.Id);
+        var alice = SeedUser("alice", "Alice");
+
+        var sut = BuildGlobalAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.SwitchTabAsync(AdminTab.Groups);
+        await sut.SelectGroupAsync(sut.Groups.Single(g => g.Id == group.Id));
+        await sut.StartEditGroupAsync();
+
+        Assert.Null(sut.EditGroupDeptWarning); // nothing selected yet
+
+        foreach (var m in sut.EditGroupMembers)
+            m.IsChecked = m.Item.Id == alice.Id;
+
+        Assert.NotNull(sut.EditGroupDeptWarning);
+        Assert.Contains("Alice", sut.EditGroupDeptWarning);
+        Assert.Contains("Sales", sut.EditGroupDeptWarning);
+    }
 }

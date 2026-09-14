@@ -1869,6 +1869,23 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--text-tertiary);
 }
 
+/* Per-department (bucket) header in a grouped list; color + soft fill set inline. */
+.principal-picker-group-header {
+    display: flex;
+    align-items: center;
+    margin: 9px 4px 3px;
+    padding: 3px 9px;
+    border-radius: var(--radius-control);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--label-spacing);
+}
+
+    .principal-picker-group-header:first-child {
+        margin-top: 2px;
+    }
+
 .principal-picker-selectedbar {
     margin-top: 10px;
     padding: 10px 12px;

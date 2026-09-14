@@ -29,4 +29,10 @@ public enum PrincipalKind
 /// <param name="Kind">Principal type, used for tabs, icon and colour.</param>
 /// <param name="Hint">Optional secondary line (e.g. username or member count).</param>
 /// <param name="Color">Optional custom <c>#RRGGBB</c> color (departments); null uses the kind default / automatic color.</param>
-public record PrincipalPickerItem(Guid Id, string Name, PrincipalKind Kind, string? Hint = null, string? Color = null);
+/// <param name="GroupLabel">Optional bucket label (e.g. a group's department). When present, the picker
+/// lists rows of this kind under colored section headers instead of one flat list.</param>
+/// <param name="GroupColor">Resolved stroke/text color for the bucket; also colors the row and chip.</param>
+/// <param name="GroupSoft">Resolved soft background matching <paramref name="GroupColor"/>.</param>
+public record PrincipalPickerItem(
+    Guid Id, string Name, PrincipalKind Kind, string? Hint = null, string? Color = null,
+    string? GroupLabel = null, string? GroupColor = null, string? GroupSoft = null);

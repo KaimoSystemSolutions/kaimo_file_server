@@ -26,6 +26,10 @@
                                              Title="@Resources.Web_Admin_Label_Users"
                                              Placeholder="@Resources.Web_Common_NoMembers" />
                             </div>
+                            @if (VM.EditGroupDeptWarning is not null)
+                            {
+                                <div class="warning-banner">@VM.EditGroupDeptWarning</div>
+                            }
                             @if (VM.ErrorMessage is not null)
                             {
                                 <div class="error-banner" style="margin-bottom: 12px;">@VM.ErrorMessage</div>
@@ -57,7 +61,7 @@
                                 </div>
                             </div>
                             <div class="detail-actions">
-                                @if (VM.CanManageGroups)
+                                @if (VM.CanManageGroups && VM.SelectedGroupIsEditable)
                                 {
 <button class="btn-secondary" @onclick="EditGroup">@Resources.Web_Common_Edit</button>
                                 }

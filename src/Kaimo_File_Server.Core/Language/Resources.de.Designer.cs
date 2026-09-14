@@ -1688,6 +1688,30 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Members_Saved", resourceCulture);
             }
         }
+
+        internal static string Web_Group_MembersAddedToDept {
+            get {
+                return ResourceManager.GetString("Web_Group_MembersAddedToDept", resourceCulture);
+            }
+        }
+
+        internal static string Web_Group_DeptWarning {
+            get {
+                return ResourceManager.GetString("Web_Group_DeptWarning", resourceCulture);
+            }
+        }
+
+        internal static string Web_Dept_GroupMembershipsRemoved {
+            get {
+                return ResourceManager.GetString("Web_Dept_GroupMembershipsRemoved", resourceCulture);
+            }
+        }
+
+        internal static string Web_Error_EveryoneNotEditable {
+            get {
+                return ResourceManager.GetString("Web_Error_EveryoneNotEditable", resourceCulture);
+            }
+        }
         
         internal static string Web_Settings_LoadFailed {
             get {

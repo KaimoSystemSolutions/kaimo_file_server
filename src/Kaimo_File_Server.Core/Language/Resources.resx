@@ -816,6 +816,9 @@
   <data name="Web_Error_SystemGroupUndeletable" xml:space="preserve">
     <value>This is a system group and cannot be deleted.</value>
   </data>
+  <data name="Web_Error_EveryoneNotEditable" xml:space="preserve">
+    <value>The Everyone group represents all registered users and cannot be edited.</value>
+  </data>
   <data name="Web_Error_AccessDenied" xml:space="preserve">
     <value>Access denied.</value>
   </data>
@@ -966,6 +969,9 @@
   <data name="Web_Dept_Saved" xml:space="preserve">
     <value>Department saved.</value>
   </data>
+  <data name="Web_Dept_GroupMembershipsRemoved" xml:space="preserve">
+    <value>{0} group assignment(s) were removed because the user is no longer a member of this department.</value>
+  </data>
   <data name="Web_Dept_NameRequired" xml:space="preserve">
     <value>Department name is required.</value>
   </data>
@@ -1058,6 +1064,12 @@
   </data>
   <data name="Web_Members_Saved" xml:space="preserve">
     <value>Members saved.</value>
+  </data>
+  <data name="Web_Group_MembersAddedToDept" xml:space="preserve">
+    <value>Note: the following members were also added to department "{0}", because the group belongs to it: {1}</value>
+  </data>
+  <data name="Web_Group_DeptWarning" xml:space="preserve">
+    <value>Note: the following selected users are not yet members of department "{0}" and will be added to it when you save: {1}</value>
   </data>
   <data name="Web_Settings_LoadFailed" xml:space="preserve">
     <value>Error loading the settings.</value>
@@ -2057,6 +2069,15 @@
   </data>
   <data name="Web_Admin_EditUser" xml:space="preserve">
     <value>Edit user</value>
+  </data>
+  <data name="Web_Admin_EditTab_General" xml:space="preserve">
+    <value>General</value>
+  </data>
+  <data name="Web_Admin_EditTab_Security" xml:space="preserve">
+    <value>Security</value>
+  </data>
+  <data name="Web_Admin_EditTab_Assignment" xml:space="preserve">
+    <value>Assignment</value>
   </data>
   <data name="Web_Admin_Label_NewPassword" xml:space="preserve">
     <value>New password (optional)</value>
