@@ -3,6 +3,8 @@ name: Publish Docker Host Image
 on:
   release:
     types: [published]
+  # Manual run against any branch/tag (Actions tab → Run workflow).
+  workflow_dispatch:
 
 jobs:
   push_to_registry:
