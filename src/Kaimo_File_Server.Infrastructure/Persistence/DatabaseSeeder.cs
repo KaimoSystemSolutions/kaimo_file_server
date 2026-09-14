@@ -68,6 +68,7 @@ public class DatabaseSeeder
         await SeedGlobalDepartmentAsync();
         await SeedSystemGroupsAsync();
         await SeedSystemRolesAsync();
+        await RetireUserRoleAsync();
 
         if (SeedDemoData)
         {
@@ -207,7 +208,6 @@ public class DatabaseSeeder
         ("SyncManager",       ManagementPermission.SyncAdmin,                                      true, WellKnownGUIDs.ROLE_SYNC_MANAGER),
         ("BackupManager",     ManagementPermission.ManageBackups,                                  true, WellKnownGUIDs.ROLE_BACKUP_MANAGER),
         ("ClientDeviceManager", ManagementPermission.ManageClientDevices,                          true, WellKnownGUIDs.ROLE_CLIENT_DEVICE_MANAGER),
-        ("User",              ManagementPermission.None,                                           true, WellKnownGUIDs.ROLE_USER),
     ];
 
     private async Task SeedSystemRolesAsync()
@@ -240,6 +240,41 @@ public class DatabaseSeeder
 
         if (changed)
             await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Retires the obsolete "User" system role. It only ever granted
+    /// <see cref="ManagementPermission.None"/>, so dropping it and its
+    /// assignments leaves the affected principals as ordinary users with no
+    /// change in effective rights. Runs on every startup so already-seeded
+    /// installs converge — <see cref="SeedSystemRolesAsync"/> never removes a
+    /// definition that was taken out of <c>RoleDefinitions</c>, and a system
+    /// role cannot be deleted through the UI.
+    /// </summary>
+    private async Task RetireUserRoleAsync()
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        // Match by name + IsSystemRole so a user's own custom role named "User"
+        // (IsSystemRole == false) is never touched. Covers legacy installs where
+        // the seeded role may not carry the well-known id.
+        var obsolete = await db.Roles
+            .Where(r => r.IsSystemRole && r.Name == "User")
+            .Select(r => r.Id)
+            .ToListAsync();
+
+        if (obsolete.Count == 0)
+            return;
+
+        await db.ScopedRoleAssignments
+            .Where(a => obsolete.Contains(a.RoleId))
+            .ExecuteDeleteAsync();
+        await db.Roles
+            .Where(r => obsolete.Contains(r.Id))
+            .ExecuteDeleteAsync();
+
+        _logger.LogInformation(LogEvents.SeedDuplicateRolesRemoved, LogMessages.SeedDuplicateRolesRemoved,
+            obsolete.Count, "User");
     }
 
     // ══════════════════════════════════════════
@@ -573,9 +608,7 @@ public class DatabaseSeeder
         var assignments = new (string User, string[] Roles)[]
         {
             ("admin", ["Administrator", "ShareManager", "UserManager"]),
-            ("marco", ["User"]),
-            ("anna",  ["User"]),
-            ("lisa",  ["User"]),
+            // marco/anna/lisa intentionally get no management role — they are ordinary users.
         };
 
         foreach (var (userKey, roleNames) in assignments)
@@ -704,7 +737,6 @@ public class DatabaseSeeder
 
         db.ConfigSettings.AddRange(
             new ConfigSetting { Key = "app.language", Value = "de" },
-            new ConfigSetting { Key = "app.user.defaultRole", Value = "User" },
             new ConfigSetting { Key = "app.user.isActiveOnCreation", Value = "true" },
             new ConfigSetting { Key = "app.user.maxLoginAttempts", Value = "5" },
             new ConfigSetting { Key = "app.user.lockoutMinutes", Value = "15" },

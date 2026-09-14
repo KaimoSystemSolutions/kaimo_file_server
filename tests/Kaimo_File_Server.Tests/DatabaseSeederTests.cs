@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
+using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Persistence;
 using Kaimo_File_Server.Infrastructure.Security;
@@ -217,5 +218,23 @@ public class DatabaseSeederTests : IDisposable
         Assert.True(await db.Groups.AnyAsync(g => g.Id == WellKnownGUIDs.GROUP_ADMINS));       // remapped
         Assert.True(await db.UserGroups.AnyAsync(                                              // membership repointed
             ug => ug.UserId == user.Id && ug.GroupId == WellKnownGUIDs.GROUP_ADMINS));
+    }
+
+    [Fact]
+    public async Task SeedAsync_RetiresObsoleteUserRole()
+    {
+        // Simulate an install that still carries the old "User" system role plus
+        // an assignment pointing at it.
+        var userRoleId = Guid.NewGuid();
+        var principalId = Guid.NewGuid();
+        _db.Roles.Add(new Role(userRoleId, "User", ManagementPermission.None, isSystemRole: true));
+        _db.ScopedRoleAssignments.Add(ScopedRoleAssignment.Global(principalId, userRoleId));
+        await _db.SaveChangesAsync();
+
+        await SeedAsync(("Seed:DemoData", "false"));
+
+        using var db = _dbFactory.CreateDbContext();
+        Assert.False(await db.Roles.AnyAsync(r => r.Id == userRoleId));                          // system role gone
+        Assert.False(await db.ScopedRoleAssignments.AnyAsync(a => a.RoleId == userRoleId));      // its assignment gone
     }
 }
