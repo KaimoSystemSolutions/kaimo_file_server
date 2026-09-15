@@ -96,11 +96,18 @@ public class SystemInfoService : ISystemInfoService
 
                 // Fall back to the application's own location when the configured
                 // storage path doesn't exist yet (e.g. on a dev machine).
-                var probe = Directory.Exists(storagePoolPath) ? storagePoolPath : AppContext.BaseDirectory;
-                var root = Path.GetPathRoot(Path.GetFullPath(probe));
-                if (string.IsNullOrEmpty(root)) root = probe;
+                var probe = Path.GetFullPath(Directory.Exists(storagePoolPath) ? storagePoolPath : AppContext.BaseDirectory);
 
-                var drive = new DriveInfo(root);
+                // On Unix, DriveInfo runs statvfs on the given path, which resolves to
+                // the filesystem actually mounted there — so pass the storage path
+                // itself. Using its parent (or the root "/") would report the host's
+                // root drive instead of the mount (e.g. a Proxmox mountpoint).
+                // Windows DriveInfo needs a volume root (e.g. C:\), so map to that.
+                var driveArg = OperatingSystem.IsWindows()
+                    ? (Path.GetPathRoot(probe) ?? probe)
+                    : probe;
+
+                var drive = new DriveInfo(driveArg);
                 var total = drive.TotalSize;
                 var free = drive.TotalFreeSpace;
 

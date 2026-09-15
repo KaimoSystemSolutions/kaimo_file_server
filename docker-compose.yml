@@ -1,5 +1,7 @@
 x-storage-pool-01: &storage-pool-01
   ${LOCATION_STORAGE_01:-./tests/data/storage/pool01}:/data/storage/pool01
+x-storage-pool-02: &storage-pool-02
+  ${LOCATION_STORAGE_02:-./tests/data/storage/pool02}:/data/storage/pool02
 x-app-data: &app-data
   ${LOCATION_APP_DATA:-./tests/data/kaimo-system}:/data/kaimo-system
 x-logs: &logs
@@ -53,6 +55,7 @@ services:
       KAIMO_LOG_SOURCE: host
     volumes:
       - *storage-pool-01
+      - *storage-pool-02
       - *app-data
       - *logs
       - *backups
@@ -85,6 +88,7 @@ services:
       LifecycleEvents__ReceiptRetentionDays: ${KAIMO_EVENT_RECEIPT_RETENTION_DAYS:-30}
     volumes:
       - *storage-pool-01
+      - *storage-pool-02
       - *app-data
       - *logs
       - ${KAIMO_SMB_CONTROL_PKI:-./secrets/smb-control-plane}/bridge:/run/secrets/kaimo-control-plane:ro
@@ -151,6 +155,7 @@ services:
       KAIMO_SNAPSHOT_CACHE_ROOT: ${KAIMO_SNAPSHOT_CACHE_ROOT:-/data/kaimo-system/.kaimo-snapshots}
     volumes:
       - *storage-pool-01
+      - *storage-pool-02
       - *app-data
       - *logs
       - ${LOCATION_SAMBA_EVENT_SPOOL:-./tests/data/samba-event-spool}:/var/lib/kaimo/event-spool
@@ -187,6 +192,7 @@ services:
       GOOGLE_APPLICATION_CREDENTIALS: /data/logins/google-service-account.json
     volumes:
       - *storage-pool-01
+      - *storage-pool-02
       - *app-data
       - *logs
       - *backups
