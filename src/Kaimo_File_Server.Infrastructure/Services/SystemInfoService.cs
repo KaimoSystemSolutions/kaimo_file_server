@@ -113,7 +113,9 @@ public class SystemInfoService : ISystemInfoService
 
                 result.Add(new StorageUsageInfo(
                     StoragePath: storagePoolPath,
-                    DriveName: drive.Name,
+                    // The container cannot see the host-side mount path (iSCSI, LXC, etc.),
+                    // so the configured mount path is the most meaningful "drive" label.
+                    DriveName: storagePoolPath,
                     TotalBytes: total,
                     UsedBytes: total - free,
                     FreeBytes: free,
