@@ -154,23 +154,29 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
         _logger.LogWarning("Database restore from {Path} completed.", path);
     }
 
-    public Task PruneAsync(BackupSettings settings, CancellationToken cancellationToken = default)
+    public Task PruneAsync(
+        BackupSettings settings, bool pruneScheduled = true, CancellationToken cancellationToken = default)
     {
         var now = _time.GetLocalNow();
         var backups = ListBackups();
 
         var toDelete = new List<BackupFileInfo>();
 
-        // Scheduled backups: keep the newest RetentionCount and drop anything
-        // older than RetentionDays.
-        var scheduled = backups.Where(b => b.Trigger == BackupTrigger.Scheduled).ToList();
-        for (int i = 0; i < scheduled.Count; i++)
+        // Scheduled backups: keep the newest RetentionCount and drop anything older than
+        // RetentionDays. Skipped entirely when scheduled backups are disabled, so turning
+        // them off stops creation AND scheduled pruning — existing scheduled backups are
+        // retained rather than silently deleted by a rule the user believed disabled.
+        if (pruneScheduled)
         {
-            var backup = scheduled[i];
-            var tooMany = i >= settings.RetentionCount;
-            var tooOld = (now - backup.CreatedAtLocal).TotalDays > settings.RetentionDays;
-            if (tooMany || tooOld)
-                toDelete.Add(backup);
+            var scheduled = backups.Where(b => b.Trigger == BackupTrigger.Scheduled).ToList();
+            for (int i = 0; i < scheduled.Count; i++)
+            {
+                var backup = scheduled[i];
+                var tooMany = i >= settings.RetentionCount;
+                var tooOld = (now - backup.CreatedAtLocal).TotalDays > settings.RetentionDays;
+                if (tooMany || tooOld)
+                    toDelete.Add(backup);
+            }
         }
 
         // Pre-migration backups: age-based only, with a longer retention.

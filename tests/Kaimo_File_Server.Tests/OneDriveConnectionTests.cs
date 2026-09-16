@@ -42,7 +42,7 @@ public sealed class OneDriveConnectionTests
 
         connection.AcknowledgeCredentialChanges();
         Assert.False(connection.HasPendingCredentialChanges);
-        await connection.Dispose();
+        await connection.CloseAsync();
     }
 
     [Fact]
@@ -189,7 +189,7 @@ public sealed class OneDriveConnectionTests
                 Assert.Equal(42, file.Size);
                 Assert.Equal(DateTimeKind.Utc, file.ModifiedAt.Kind);
             });
-        await connection.Dispose();
+        await connection.CloseAsync();
     }
 
     [Fact]
@@ -205,7 +205,7 @@ public sealed class OneDriveConnectionTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             connection.ListAsync("/", cancellation.Token));
 
-        await connection.Dispose();
+        await connection.CloseAsync();
     }
 
     [Fact]
@@ -251,7 +251,7 @@ public sealed class OneDriveConnectionTests
         Assert.Equal(
             ["bytes 0-10485759/10485761", "bytes 10485760-10485760/10485761"],
             uploadRanges);
-        await connection.Dispose();
+        await connection.CloseAsync();
     }
 
     [Fact]

@@ -88,9 +88,16 @@ public class FileSystemStorageTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteAsync_NonExistentPath_DoesNotThrow()
+    public async Task DeleteAsync_MissingPath_Throws()
     {
-        await _sut.DeleteAsync("ghost.txt");
+        await Assert.ThrowsAsync<FileNotFoundException>(
+            () => _sut.DeleteAsync("ghost.txt"));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_MissingPath_WithIgnoreMissing_DoesNotThrow()
+    {
+        await _sut.DeleteAsync("ghost.txt", ignoreMissing: true);
     }
 
     // ═══════════════════ Metadata ═══════════════════
@@ -289,11 +296,18 @@ public class FileSystemStorageTests : IDisposable
     // ═══════════════════ Delete idempotency ═══════════════════
 
     [Fact]
-    public async Task DeleteAsync_CalledTwice_DoesNotThrow()
+    public async Task DeleteAsync_CalledTwice_WithIgnoreMissing_DoesNotThrow()
     {
         await _sut.WriteAsync("twice.txt", new MemoryStream([1]));
         await _sut.DeleteAsync("twice.txt");
-        await _sut.DeleteAsync("twice.txt");
+        await _sut.DeleteAsync("twice.txt", ignoreMissing: true);
+    }
+
+    [Fact]
+    public async Task MoveAsync_MissingSource_Throws()
+    {
+        await Assert.ThrowsAsync<FileNotFoundException>(
+            () => _sut.MoveAsync("ghost.txt", "bin/ghost.txt"));
     }
 
     // ═══════════════════ Metadata for nested paths ═══════════════════
@@ -567,6 +581,29 @@ public class FileSystemStorageTests : IDisposable
         // ...and the pre-existing file is untouched.
         Assert.Equal([9], await File.ReadAllBytesAsync(Path.Combine(_testRoot, "bin", "dup.txt")));
     }
+
+    // ═══════════════════ Symlink safety (plan Phase 4) ═══════════════════
+
+    [Fact]
+    public async Task GetDirectorySizeAsync_SymlinkCycle_DoesNotHang()
+    {
+        var sub = Path.Combine(_testRoot, "sub");
+        Directory.CreateDirectory(sub);
+        await File.WriteAllBytesAsync(Path.Combine(sub, "real.txt"), new byte[100]);
+
+        // A cycle: sub/loop -> _testRoot. Creating a directory symlink needs Developer
+        // Mode/admin on Windows; if unavailable the test is inert here and real on CI.
+        try { Directory.CreateSymbolicLink(Path.Combine(sub, "loop"), _testRoot); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return;
+        }
+
+        // Must return (no StackOverflow / infinite loop) and count the real file once,
+        // without following the link back into the tree.
+        var size = await _sut.GetDirectorySizeAsync("sub");
+        Assert.Equal(100, size);
+    }
 }
 
 /// <summary>
@@ -605,8 +642,8 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
     public Task CreateDirectory(string path)
         => Invoke("CreateDirectory", path);
 
-    public Task DeleteAsync(string path)
-        => Invoke("DeleteAsync", path);
+    public Task DeleteAsync(string path, bool ignoreMissing = false)
+        => Invoke("DeleteAsync", path, ignoreMissing);
 
     public Task<FileMetadata> GetMetadataAsync(string path)
         => Invoke<FileMetadata>("GetMetadataAsync", path);
@@ -635,8 +672,8 @@ public class FileSystemStorageTestable : Kaimo_File_Server.Core.Storage.IStorage
     public Task ArchiveAsync(List<string> sourcePaths, string targetPath, string format)
         => Invoke("ArchiveAsync", sourcePaths, targetPath, format);
 
-    public Task<long> GetDirectorySizeAsync(string relativePath)
-        => Invoke<long>("GetDirectorySizeAsync", relativePath);
+    public Task<long> GetDirectorySizeAsync(string relativePath, CancellationToken cancellationToken = default)
+        => Invoke<long>("GetDirectorySizeAsync", relativePath, cancellationToken);
 
     public Task<bool> ExistsAsync(string path)
         => Invoke<bool>("ExistsAsync", path);

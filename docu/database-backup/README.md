@@ -44,6 +44,23 @@ Open **Settings → Backup** (requires the `ManageBackups` permission). You can:
   to delete them. Pre-migration backups are kept for 90 days and are never
   pruned by count; manual backups are never auto-deleted.
 
+### Pruning cadence
+
+Pruning runs on its own hourly schedule, **independently of and before** the
+daily backup:
+
+- A **failed backup no longer blocks pruning** — a disk-full backup failure used
+  to mean the retention rule never ran, so backups accumulated until the volume
+  filled and could never self-heal. Pruning now runs on the next hourly tick
+  regardless.
+- **Disabling scheduled backups** stops backup creation **and** scheduled
+  pruning, so existing scheduled backups are retained (a retention rule you
+  believed disabled will not silently delete them). Pre-migration pruning still
+  runs on its fixed 90-day rule, because those are machine-generated on every
+  upgrade and are the real unbounded source.
+- Right after a fresh scheduled backup completes, pruning runs again on the next
+  tick so the new backup is accounted for immediately.
+
 ### Permission / role
 
 - Permission bit: `ManagementPermission.ManageBackups`. It is part of

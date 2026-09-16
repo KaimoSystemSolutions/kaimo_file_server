@@ -319,6 +319,39 @@ public sealed class LogArchiveLoggerProvider : ILoggerProvider, ISupportExternal
                 if (TryDelete(file))
                     retainedBytes -= length;
             }
+
+            RemoveEmptyDateDirectories(sourceRoot);
+        }
+
+        /// <summary>
+        /// Prunes the now-empty YYYY/MM/DD directories the retention sweep leaves behind.
+        /// Without this the file count is bounded but the directory count grows once per
+        /// day forever. Deepest-first (ordered by path length) so a day directory is
+        /// removed before the month, and the month before the year; the source root
+        /// itself is never removed.
+        /// </summary>
+        private static void RemoveEmptyDateDirectories(string sourceRoot)
+        {
+            string[] directories;
+            try
+            {
+                directories = Directory.GetDirectories(sourceRoot, "*", SearchOption.AllDirectories);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return;
+            }
+
+            foreach (var directory in directories.OrderByDescending(path => path.Length))
+            {
+                try
+                {
+                    if (!Directory.EnumerateFileSystemEntries(directory).Any())
+                        Directory.Delete(directory);
+                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
         }
 
         private static bool TryDelete(FileInfo file)

@@ -177,8 +177,26 @@
   <data name="FileVersionCreated" xml:space="preserve">
     <value>Created version {Version} for {Path} ({OriginalBytes} -&gt; {CompressedBytes} bytes, {Ratio} ratio).</value>
   </data>
+  <data name="FileVersionBlobCorruptReplaced" xml:space="preserve">
+    <value>Replacing corrupt version blob {StoragePath}.</value>
+  </data>
+  <data name="FileVersionBlobDeleteFailed" xml:space="preserve">
+    <value>Failed to delete unreferenced version blob {StoragePath}.</value>
+  </data>
+  <data name="FileVersionRetentionSwept" xml:space="preserve">
+    <value>Version retention removed {VersionsRemoved} versions across {PathsExamined} paths older than {CutoffUtc}.</value>
+  </data>
+  <data name="FileVersionOrphanBlobsReclaimed" xml:space="preserve">
+    <value>Reclaimed {BlobsDeleted} orphaned version blobs ({BytesReclaimed} bytes), {TempFilesDeleted} stale write temporaries and {ReadCacheFilesDeleted} read-cache files across {ShardCount} shards.</value>
+  </data>
+  <data name="FileVersionOrphanSweepFailed" xml:space="preserve">
+    <value>Orphan version blob sweep failed for shard {ShardPrefix}.</value>
+  </data>
   <data name="StorageAclLoadFailed" xml:space="preserve">
     <value>ACL load failed for {Path}.</value>
+  </data>
+  <data name="StorageWalkTruncated" xml:space="preserve">
+    <value>Directory walk below {Path} was truncated ({Skipped} entries skipped: links, depth limit, or access errors).</value>
   </data>
   <data name="DatabaseReady" xml:space="preserve">
     <value>Database ready.</value>

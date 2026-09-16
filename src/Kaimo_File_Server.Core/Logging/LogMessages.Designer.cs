@@ -396,11 +396,65 @@ namespace Kaimo_File_Server.Core.Logging {
         }
 
         /// <summary>
+        ///   Looks up a localized string similar to Replacing corrupt version blob {StoragePath}..
+        /// </summary>
+        public static string FileVersionBlobCorruptReplaced {
+            get {
+                return ResourceManager.GetString("FileVersionBlobCorruptReplaced", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Failed to delete unreferenced version blob {StoragePath}..
+        /// </summary>
+        public static string FileVersionBlobDeleteFailed {
+            get {
+                return ResourceManager.GetString("FileVersionBlobDeleteFailed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Version retention removed {VersionsRemoved} versions across {PathsExamined} paths older than {CutoffUtc}..
+        /// </summary>
+        public static string FileVersionRetentionSwept {
+            get {
+                return ResourceManager.GetString("FileVersionRetentionSwept", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Reclaimed {BlobsDeleted} orphaned version blobs ({BytesReclaimed} bytes), {TempFilesDeleted} stale write temporaries and {ReadCacheFilesDeleted} read-cache files across {ShardCount} shards..
+        /// </summary>
+        public static string FileVersionOrphanBlobsReclaimed {
+            get {
+                return ResourceManager.GetString("FileVersionOrphanBlobsReclaimed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Orphan version blob sweep failed for shard {ShardPrefix}..
+        /// </summary>
+        public static string FileVersionOrphanSweepFailed {
+            get {
+                return ResourceManager.GetString("FileVersionOrphanSweepFailed", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Looks up a localized string similar to ACL load failed for {Path}..
         /// </summary>
         public static string StorageAclLoadFailed {
             get {
                 return ResourceManager.GetString("StorageAclLoadFailed", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string similar to Directory walk below {Path} was truncated ({Skipped} entries skipped: links, depth limit, or access errors)..
+        /// </summary>
+        public static string StorageWalkTruncated {
+            get {
+                return ResourceManager.GetString("StorageWalkTruncated", resourceCulture);
             }
         }
 

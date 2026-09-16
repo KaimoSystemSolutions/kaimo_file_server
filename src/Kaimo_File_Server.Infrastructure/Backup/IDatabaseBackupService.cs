@@ -35,6 +35,14 @@ public interface IDatabaseBackupService
     /// </summary>
     Task RestoreAsync(string path, CancellationToken cancellationToken = default);
 
-    /// <summary>Applies the retention policy, deleting backups that fall outside it.</summary>
-    Task PruneAsync(BackupSettings settings, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Applies the retention policy, deleting backups that fall outside it. When
+    /// <paramref name="pruneScheduled"/> is <c>false</c>, only <c>PreMigration</c> backups
+    /// are pruned and scheduled/manual backups are left alone — used when scheduled
+    /// backups are disabled, so a user who switched them off does not watch a retention
+    /// rule they believed disabled delete their existing scheduled backups. Pre-migration
+    /// backups are machine-generated on every upgrade and are the actual unbounded source,
+    /// so they are always subject to their own fixed retention.
+    /// </summary>
+    Task PruneAsync(BackupSettings settings, bool pruneScheduled = true, CancellationToken cancellationToken = default);
 }

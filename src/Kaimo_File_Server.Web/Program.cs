@@ -92,14 +92,25 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>
         options.JsonSerializerOptions.Converters.Add(
             new System.Text.Json.Serialization.JsonStringEnumConverter()));
-builder.Services.AddHttpClient(nameof(OneDriveDeviceAuthorizationService), client =>
-    client.Timeout = TimeSpan.FromSeconds(30));
-builder.Services.AddHttpClient("CloudAccessOneDrive", client =>
-    client.Timeout = Timeout.InfiniteTimeSpan);
-builder.Services.AddHttpClient(nameof(DropboxAuthorizationService), client =>
-    client.Timeout = TimeSpan.FromSeconds(30));
-builder.Services.AddHttpClient("CloudAccessDropbox", client =>
-    client.Timeout = Timeout.InfiniteTimeSpan);
+// A bounded PooledConnectionLifetime so long-lived pooled handlers pick up DNS and
+// rotate sockets instead of pinning one connection indefinitely.
+static Microsoft.Extensions.DependencyInjection.IHttpClientBuilder WithPooledHandler(
+    Microsoft.Extensions.DependencyInjection.IHttpClientBuilder b)
+    => b.ConfigurePrimaryHttpMessageHandler(() =>
+        new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) });
+
+WithPooledHandler(builder.Services.AddHttpClient(nameof(OneDriveDeviceAuthorizationService), client =>
+    client.Timeout = TimeSpan.FromSeconds(30)));
+WithPooledHandler(builder.Services.AddHttpClient("CloudAccessOneDrive", client =>
+    client.Timeout = Timeout.InfiniteTimeSpan));
+WithPooledHandler(builder.Services.AddHttpClient(nameof(DropboxAuthorizationService), client =>
+    client.Timeout = TimeSpan.FromSeconds(30)));
+WithPooledHandler(builder.Services.AddHttpClient("CloudAccessDropbox", client =>
+    client.Timeout = Timeout.InfiniteTimeSpan));
+// One-shot Google OAuth token-revocation POST (GoogleDriveConnection.RevokeAndCloseAsync).
+WithPooledHandler(builder.Services.AddHttpClient(
+    Kaimo_File_Server.Infrastructure.Clouds.GoogleDriveConnection.RevocationHttpClientName, client =>
+        client.Timeout = TimeSpan.FromSeconds(30)));
 
 // -- JWT --
 builder.Services.AddSingleton<JwtTokenService>();
@@ -247,6 +258,7 @@ builder.Services.AddSingleton<CloudAccessDownloadTicketStore>();
 builder.Services.AddSingleton<FileDownloadTicketStore>();
 builder.Services.AddSingleton<ICloudAccessSettingsStore, CloudAccessSettingsStore>();
 builder.Services.AddSingleton<CloudAccessDirectoryCache>();
+builder.Services.AddSingleton<DirectorySizeCache>();
 builder.Services.AddScoped<CloudAccessAuthorizationService>();
 builder.Services.AddScoped<CloudToLocalTransferService>();
 builder.Services.AddScoped<CrossShareTransferService>();

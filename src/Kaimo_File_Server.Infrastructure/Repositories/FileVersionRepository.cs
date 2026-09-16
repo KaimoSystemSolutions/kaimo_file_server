@@ -148,6 +148,63 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             return toDelete;
         }
 
+        public async Task<List<FileVersion>> DeleteOlderThanAsync(
+            Guid shareId, string filePath, DateTime cutoff, int keepNewest)
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync();
+
+            // Exclude the newest `keepNewest` ids from the delete set (same technique as
+            // TrimToMaxVersionsAsync). This is the retention FLOOR: age-based deletion must
+            // never empty a file's history — see FileVersionService.SweepExpiredVersionsAsync.
+            var keepIds = await db.Set<FileVersion>()
+                .Where(v => v.ShareId == shareId && v.FilePath == filePath)
+                .OrderByDescending(v => v.SnapshotTimestampUtc)
+                .Take(keepNewest)
+                .Select(v => v.Id)
+                .ToListAsync();
+
+            var toDelete = await db.Set<FileVersion>()
+                .Where(v => v.ShareId == shareId && v.FilePath == filePath
+                            && v.SnapshotTimestampUtc < cutoff && !keepIds.Contains(v.Id))
+                .ToListAsync();
+
+            if (toDelete.Count == 0) return [];
+
+            db.Set<FileVersion>().RemoveRange(toDelete);
+            await db.SaveChangesAsync();
+            return toDelete;
+        }
+
+        public async Task<IReadOnlyList<(Guid ShareId, string FilePath)>> GetPathsWithVersionsOlderThanAsync(
+            DateTime cutoff, int limit, CancellationToken cancellationToken = default)
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync();
+
+            var rows = await db.Set<FileVersion>()
+                .Where(v => v.SnapshotTimestampUtc < cutoff)
+                .Select(v => new { v.ShareId, v.FilePath })
+                .Distinct()
+                .OrderBy(x => x.ShareId).ThenBy(x => x.FilePath)
+                .Take(limit)
+                .ToListAsync(cancellationToken);
+
+            return rows.Select(x => (x.ShareId, x.FilePath)).ToList();
+        }
+
+        public async Task<HashSet<string>> GetReferencedStoragePathsUnderShardAsync(
+            string shardPrefix, CancellationToken cancellationToken = default)
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync();
+
+            var paths = await db.Set<FileVersion>()
+                .Where(v => v.StoragePath.StartsWith(shardPrefix))
+                .Select(v => v.StoragePath)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            return paths.ToHashSet(StringComparer.Ordinal);
+        }
+
         public async Task<List<FileVersion>> DeletePathAsync(Guid shareId, string path)
         {
             await using var db = await _dbFactory.CreateDbContextAsync();

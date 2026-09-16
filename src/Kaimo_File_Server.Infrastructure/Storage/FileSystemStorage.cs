@@ -317,12 +317,16 @@ public class FileSystemStorage : IStorageEngine
     
     private void AddDirectoryToZip(ZipArchive zip, string dirPath, string entryBase)
     {
-        foreach (var file in Directory.GetFiles(dirPath, "*", SearchOption.AllDirectories))
+        // Do NOT use SearchOption.AllDirectories: it follows symlinks, so a link inside
+        // the share would pull its target's bytes — possibly outside the share root —
+        // into a user-downloadable archive. SafeDirectoryWalk never follows links.
+        var result = SafeDirectoryWalk.EnumerateFiles(dirPath, walked =>
         {
-            var entryName = Path.Combine(entryBase, Path.GetRelativePath(dirPath, file))
+            var entryName = Path.Combine(entryBase, Path.GetRelativePath(dirPath, walked.FullPath))
                 .Replace('\\', '/');
-            zip.CreateEntryFromFile(file, entryName);
-        }
+            zip.CreateEntryFromFile(walked.FullPath, entryName);
+        });
+        LogWalkSkips(result, dirPath);
     }
     
     private void CreateTarGz(List<string> sourcePaths, string targetPath)
@@ -344,12 +348,15 @@ public class FileSystemStorage : IStorageEngine
     
     private void AddDirectoryToTar(TarWriter tarWriter, string dirPath, string entryBase)
     {
-        foreach (var file in Directory.GetFiles(dirPath, "*", SearchOption.AllDirectories))
+        // See AddDirectoryToZip: SearchOption.AllDirectories follows symlinks and would
+        // exfiltrate a link target's bytes into the archive. SafeDirectoryWalk does not.
+        var result = SafeDirectoryWalk.EnumerateFiles(dirPath, walked =>
         {
-            var entryName = Path.Combine(entryBase, Path.GetRelativePath(dirPath, file))
+            var entryName = Path.Combine(entryBase, Path.GetRelativePath(dirPath, walked.FullPath))
                 .Replace('\\', '/');
-            tarWriter.WriteEntry(file, entryName);
-        }
+            tarWriter.WriteEntry(walked.FullPath, entryName);
+        });
+        LogWalkSkips(result, dirPath);
     }
 
     public async Task UnzipAsync(string zipPath, string targetPath)
@@ -390,13 +397,16 @@ public class FileSystemStorage : IStorageEngine
         return Task.CompletedTask;
     }
 
-    public Task DeleteAsync(string path)
+    public Task DeleteAsync(string path, bool ignoreMissing = false)
     {
         var fullPath = ToAbsolutePath(path);
         if (File.Exists(fullPath))
             File.Delete(fullPath);
         else if (Directory.Exists(fullPath))
             Directory.Delete(fullPath, true);
+        else if (!ignoreMissing)
+            throw new FileNotFoundException(
+                $"Cannot delete '{path}': no file or directory exists at that path.", fullPath);
         return Task.CompletedTask;
     }
 
@@ -434,42 +444,44 @@ public class FileSystemStorage : IStorageEngine
             File.Move(fullOldPath, fullNewPath);
         else if (Directory.Exists(fullOldPath))
             Directory.Move(fullOldPath, fullNewPath);
+        else
+            throw new FileNotFoundException(
+                $"Cannot move '{oldPath}': no file or directory exists at the source path.", fullOldPath);
 
         return Task.FromResult(normalizedNew);
     }
 
     // ------------------ Directory Size ------------------
 
-    public Task<long> GetDirectorySizeAsync(string relativePath)
+    public Task<long> GetDirectorySizeAsync(string relativePath, CancellationToken cancellationToken = default)
     {
         var fullPath = ToAbsolutePath(relativePath);
-        var dirInfo = new DirectoryInfo(fullPath);
-        if (!dirInfo.Exists) return Task.FromResult(0L);
+        if (!Directory.Exists(fullPath)) return Task.FromResult(0L);
 
-        var size = CalculateDirectorySizeSafe(fullPath);
-        return Task.FromResult(size);
+        // The walk is synchronous syscalls; running it on a thread-pool thread is the
+        // honest representation and lets a re-navigation cancel a walk already in flight.
+        return Task.Run(() =>
+        {
+            long total = 0;
+            var result = SafeDirectoryWalk.EnumerateFiles(
+                fullPath, f => total += f.Length, cancellationToken: cancellationToken);
+            LogWalkSkips(result, fullPath);
+            return total;
+        }, cancellationToken);
     }
 
-    private static long CalculateDirectorySizeSafe(string path)
+    /// <summary>
+    /// Emits a single Debug line when a walk skipped anything (symlinks, depth cap,
+    /// entry cap or inaccessible entries). Debug — not Warning — because a share with a
+    /// couple of symlinks would otherwise log on every navigation. Content reachable
+    /// only through a skipped symlink is intentionally excluded from the result.
+    /// </summary>
+    private void LogWalkSkips(WalkResult result, string rootFullPath)
     {
-        long total = 0;
-
-        try
-        {
-            foreach (var file in Directory.EnumerateFiles(path))
-            {
-                try { total += new FileInfo(file).Length; }
-                catch { /* skip inaccessible file */ }
-            }
-
-            foreach (var dir in Directory.EnumerateDirectories(path))
-            {
-                total += CalculateDirectorySizeSafe(dir);
-            }
-        }
-        catch { /* skip inaccessible directory */ }
-
-        return total;
+        if (result.Skips.Count == 0) return;
+        _logger.LogDebug(
+            LogEvents.StorageWalkTruncated, LogMessages.StorageWalkTruncated,
+            rootFullPath, result.Skips.Count);
     }
 
     // ------------------ Metadata ------------------

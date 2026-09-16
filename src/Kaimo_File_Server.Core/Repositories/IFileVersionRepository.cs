@@ -102,6 +102,30 @@ namespace Kaimo_File_Server.Core.Repositories
         Task<List<FileVersion>> TrimToMaxVersionsAsync(Guid shareId, string filePath, int maxCount);
 
         /// <summary>
+        /// Deletes versions of a file older than <paramref name="cutoff"/> BUT always
+        /// keeps the newest <paramref name="keepNewest"/> versions, so age-based retention
+        /// can never empty a file's history. Returns the removed rows for blob GC.
+        /// </summary>
+        Task<List<FileVersion>> DeleteOlderThanAsync(
+            Guid shareId, string filePath, DateTime cutoff, int keepNewest);
+
+        /// <summary>
+        /// Distinct <c>(ShareId, FilePath)</c> pairs that have at least one version older
+        /// than <paramref name="cutoff"/>, capped at <paramref name="limit"/>. Backed by the
+        /// SnapshotTimestampUtc index, so a steady-state sweep returns zero rows cheaply.
+        /// </summary>
+        Task<IReadOnlyList<(Guid ShareId, string FilePath)>> GetPathsWithVersionsOlderThanAsync(
+            DateTime cutoff, int limit, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Every storage path referenced by any version whose storage path begins with
+        /// <paramref name="shardPrefix"/>. One query returns the whole referenced set for a
+        /// shard, so orphan reclaim can do set membership in memory rather than a query per blob.
+        /// </summary>
+        Task<HashSet<string>> GetReferencedStoragePathsUnderShardAsync(
+            string shardPrefix, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Deletes every version at <paramref name="path"/> or below it and returns
         /// the removed rows so their content-addressed blobs can be garbage-collected.
         /// </summary>

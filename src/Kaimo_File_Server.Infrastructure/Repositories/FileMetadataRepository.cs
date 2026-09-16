@@ -15,16 +15,6 @@ public class FileMetadataRepository : IFileMetadataRepository
         _dbFactory = db;
     }
 
-    public async Task<FileMetadata?> GetByPathAsync(string path)
-    {
-        await using var db = await _dbFactory.CreateDbContextAsync();
-
-        var normalized = ShareRelativePath.Normalize(path);
-        return await db.FileMetadata
-            .Include(m => m.Acl)
-            .FirstOrDefaultAsync(m => m.Path == normalized);
-    }
-
     public async Task<FileMetadata> GetOrCreateAsync(
         string path, bool isDirectory, Guid userId, Guid shareId)
     {

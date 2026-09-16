@@ -44,6 +44,11 @@ public sealed class DatabaseBackupSchedulerService(
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMinutes(1);
 
+    /// <summary>How often pruning runs, independent of whether a backup is due.</summary>
+    public static readonly TimeSpan PruneInterval = TimeSpan.FromHours(1);
+
+    private DateTimeOffset? _lastPruneLocal;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -59,13 +64,31 @@ public sealed class DatabaseBackupSchedulerService(
         {
             var settings = await settingsStore.GetAsync();
             var localNow = timeProvider.GetLocalNow();
-            var lastScheduledDate = ListLastScheduledLocalDate();
 
-            if (!IsDue(settings, localNow, lastScheduledDate))
+            // Pruning runs on its own hourly cadence, BEFORE and independent of the
+            // backup. Otherwise pruning only ran after a successful backup: disabled
+            // backups never pruned (pre-migration backups accumulated forever) and a
+            // disk-full backup failure meant the condition could never self-heal. A
+            // pruning failure is caught here so it never blocks the backup below.
+            if (ShouldPrune(localNow, _lastPruneLocal))
+            {
+                try
+                {
+                    await backupService.PruneAsync(
+                        settings, pruneScheduled: settings.Enabled, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Backup pruning failed.");
+                }
+                _lastPruneLocal = localNow;
+            }
+
+            if (!IsDue(settings, localNow, ListLastScheduledLocalDate()))
                 return;
 
             await backupService.CreateBackupAsync(BackupTrigger.Scheduled, cancellationToken);
-            await backupService.PruneAsync(settings, cancellationToken);
+            _lastPruneLocal = null; // prune again right after a fresh backup
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -76,6 +99,13 @@ public sealed class DatabaseBackupSchedulerService(
             logger.LogError(ex, "Scheduled database backup failed.");
         }
     }
+
+    /// <summary>
+    /// Pure decision: should pruning run now? True on the first tick and once per
+    /// <see cref="PruneInterval"/> thereafter. Exposed for testing.
+    /// </summary>
+    public static bool ShouldPrune(DateTimeOffset localNow, DateTimeOffset? lastPruneLocal)
+        => lastPruneLocal is null || (localNow - lastPruneLocal.Value) >= PruneInterval;
 
     /// <summary>
     /// Pure decision: is a scheduled backup due right now? Exposed for testing.

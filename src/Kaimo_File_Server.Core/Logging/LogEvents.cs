@@ -27,12 +27,18 @@ public static class LogEvents
     public static readonly EventId FileOwnerRecordFailed = new(1003, nameof(FileOwnerRecordFailed));
     public static readonly EventId FileWriteVersionFailed = new(1004, nameof(FileWriteVersionFailed));
     public static readonly EventId FileVersionCreated = new(1101, nameof(FileVersionCreated));
+    public static readonly EventId FileVersionBlobCorruptReplaced = new(1102, nameof(FileVersionBlobCorruptReplaced));
+    public static readonly EventId FileVersionBlobDeleteFailed = new(1103, nameof(FileVersionBlobDeleteFailed));
+    public static readonly EventId FileVersionRetentionSwept = new(1104, nameof(FileVersionRetentionSwept));
+    public static readonly EventId FileVersionOrphanBlobsReclaimed = new(1105, nameof(FileVersionOrphanBlobsReclaimed));
+    public static readonly EventId FileVersionOrphanSweepFailed = new(1106, nameof(FileVersionOrphanSweepFailed));
 
     #endregion
 
     #region Infrastructure (2000-2999)
 
     public static readonly EventId StorageAclLoadFailed = new(2001, nameof(StorageAclLoadFailed));
+    public static readonly EventId StorageWalkTruncated = new(2002, nameof(StorageWalkTruncated));
     public static readonly EventId SeedBootstrapAdminSkipped = new(2101, nameof(SeedBootstrapAdminSkipped));
     public static readonly EventId SeedAdminRoleMissing = new(2102, nameof(SeedAdminRoleMissing));
     public static readonly EventId SeedBootstrapAdminPassword = new(2103, nameof(SeedBootstrapAdminPassword));

@@ -49,6 +49,11 @@ builder.Services.AddHostedService<Kaimo_File_Server.Host.DataServiceReconciler>(
 // -- Scheduled database backups (Host is the sole DB owner) --
 builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Backup.DatabaseBackupSchedulerService>();
 
+// -- Storage maintenance (Host is the sole owner of storage-maintenance jobs) --
+//    Removes abandoned upload temporaries and cross-pool move staging directories.
+Kaimo_File_Server.Infrastructure.Maintenance.StorageMaintenanceServiceCollectionExtensions
+    .AddStorageMaintenance(builder.Services, builder.Configuration);
+
 
 
 var host = builder.Build();

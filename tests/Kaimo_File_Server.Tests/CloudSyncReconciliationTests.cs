@@ -289,7 +289,8 @@ public sealed class CloudSyncReconciliationTests
         private readonly HashSet<string> _dirs = new();
 
         public string ServiceName => "in-memory";
-        public Task Dispose() => Task.CompletedTask;
+        public ValueTask CloseAsync() => ValueTask.CompletedTask;
+        public Task RevokeAndCloseAsync() => Task.CompletedTask;
 
         // Test hooks for the resilience path: uploads to a path in HardFailUploads
         // always throw a non-transient error; TransientUploads throws the given
@@ -445,7 +446,7 @@ public sealed class CloudSyncReconciliationTests
             return Task.CompletedTask;
         }
 
-        public Task<long> GetDirectorySizeAsync(string relativePath, UserContext user)
+        public Task<long> GetDirectorySizeAsync(string relativePath, UserContext user, CancellationToken cancellationToken = default)
         {
             string key = Normalize(relativePath);
             long total = _files

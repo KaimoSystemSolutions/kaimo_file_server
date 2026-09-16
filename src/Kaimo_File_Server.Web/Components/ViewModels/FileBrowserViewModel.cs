@@ -47,6 +47,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel
     private readonly FileDownloadTicketStore _downloadTickets;
     private readonly DemoModeOptions _demo;
     private readonly ISyncDefinitionRepository _syncRepo;
+    private readonly DirectorySizeCache _directorySizeCache;
 
     private readonly ISearchService _searchService;
 
@@ -64,7 +65,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel
         IUserRepository userRepo,
         FileDownloadTicketStore downloadTickets,
         DemoModeOptions demo,
-        ISyncDefinitionRepository syncRepo)
+        ISyncDefinitionRepository syncRepo,
+        DirectorySizeCache directorySizeCache)
     {
         _fileServiceFactory = fileServiceFactory;
         _shareRepo = shareRepo;
@@ -78,6 +80,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel
         _downloadTickets = downloadTickets;
         _demo = demo;
         _syncRepo = syncRepo;
+        _directorySizeCache = directorySizeCache;
     }
 
     // -- State --
@@ -336,6 +339,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel
             var targetPath = GetCurrentPath(folderName);
 
             await _fileService.CreateDirectoryAsync(targetPath, userContext);
+            InvalidateDirectorySize(targetPath);
 
             _logger.LogInformation("Folder created: '{Path}' by {User}",
                 targetPath, userContext.User.Username);
@@ -379,6 +383,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel
                 relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
 
             await _fileService.DeleteFileAsync(relativePath, userContext, CurrentShare.IsRecycleEnabled);
+            InvalidateDirectorySize(relativePath);
 
             _logger.LogInformation("{Type} deleted: '{Path}' by {User}",
                 item.IsDirectory ? "Directory" : "File",
@@ -487,6 +492,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel
                 return OperationResult.Fail(Resources.Web_Error_NotAuthenticated);
 
             await _fileService.RenameAsync(relativePath, newRelativePath, userContext);
+            InvalidateDirectorySize(relativePath);
+            InvalidateDirectorySize(newRelativePath);
 
             _logger.LogInformation("{Type} {Verb}: '{OldPath}' -> '{NewPath}' by {User}",
                 item.IsDirectory ? "Directory" : "File",
@@ -584,6 +591,16 @@ public class FileBrowserViewModel : IFileBrowserViewModel
     /// instead of one full re-render per sub-directory. Any in-flight run is cancelled
     /// first, e.g. when the user quickly switches folders or navigates away.
     /// </summary>
+    /// <summary>
+    /// Drops the cached size of <paramref name="relativePath"/> and every ancestor after
+    /// a local write, so the next navigation recomputes instead of showing a stale size.
+    /// </summary>
+    private void InvalidateDirectorySize(string relativePath)
+    {
+        if (CurrentShare is not null)
+            _directorySizeCache.Invalidate(CurrentShare.Id, relativePath);
+    }
+
     internal async Task LoadDirectorySizesInBackgroundAsync()
     {
         // Cancel and replace the previous run (fast folder switches).
@@ -623,8 +640,19 @@ public class FileBrowserViewModel : IFileBrowserViewModel
                         if (relativePath.StartsWith(CurrentShare.Path))
                             relativePath = relativePath[CurrentShare.Path.Length..].TrimStart('/');
 
-                        var size = await _fileService.GetDirectorySizeAsync(relativePath, userContext);
-                        DirectorySizes[relativePath] = size;
+                        // Memoise: the walk is expensive and re-runs on every navigation
+                        // and refresh. A cache hit skips it entirely; a miss computes and
+                        // caches. The token cancels a walk abandoned by a fast folder switch.
+                        if (_directorySizeCache.TryGet(CurrentShare.Id, relativePath, out var cachedSize))
+                        {
+                            DirectorySizes[relativePath] = cachedSize;
+                        }
+                        else
+                        {
+                            var size = await _fileService.GetDirectorySizeAsync(relativePath, userContext, token);
+                            DirectorySizes[relativePath] = size;
+                            _directorySizeCache.Set(CurrentShare.Id, relativePath, size);
+                        }
 
                         PushThrottledStateChange(ref lastPushTicks);
                     }
@@ -1162,7 +1190,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel
         try
         {
             await _fileService.WriteFileAsync(targetPath, fileStream, userContext, cancellationToken);
-            
+            InvalidateDirectorySize(targetPath);
+
             _logger.LogInformation("File uploaded: '{Path}' by {User}",
                 targetPath, userContext.User.Username);
 

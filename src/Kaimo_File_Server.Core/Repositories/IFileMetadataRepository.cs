@@ -9,13 +9,6 @@ namespace Kaimo_File_Server.Core.Repositories
     public interface IFileMetadataRepository
     {
         /// <summary>
-        /// Looks up a metadata record by its relative path within a share.
-        /// </summary>
-        /// <param name="path">The normalised relative path (e.g. "docs/readme.md").</param>
-        /// <returns>The matching record, or <c>null</c> if none exists.</returns>
-        Task<FileMetadata?> GetByPathAsync(string path);
-
-        /// <summary>
         /// Returns the existing metadata record for <paramref name="path"/>,
         /// or atomically creates one if it does not yet exist.
         /// </summary>

@@ -41,6 +41,7 @@ public partial class ShareListViewModel
     private readonly ICloudSyncOperationCoordinator? _cloudSyncOperations;
     private readonly IConfigRepository? _config;
     private readonly IDepartmentRepository? _departmentRepo;
+    private readonly Kaimo_File_Server.Infrastructure.Clouds.ICloudProviderFactory? _cloudProviders;
 
     // Admin-assigned pool labels (normalized path → friendly name), refreshed in
     // LoadAsync. Empty until loaded, which falls back to path-derived names.
@@ -64,7 +65,8 @@ public partial class ShareListViewModel
         ISearchService? searchService = null,
         ICloudSyncOperationCoordinator? cloudSyncOperations = null,
         IConfigRepository? config = null,
-        IDepartmentRepository? departmentRepo = null)
+        IDepartmentRepository? departmentRepo = null,
+        Kaimo_File_Server.Infrastructure.Clouds.ICloudProviderFactory? cloudProviders = null)
     {
         _shareRepo = shareRepo;
         _userRepo = userRepo;
@@ -87,6 +89,7 @@ public partial class ShareListViewModel
         _cloudSyncOperations = cloudSyncOperations;
         _config = config;
         _departmentRepo = departmentRepo;
+        _cloudProviders = cloudProviders;
     }
 
     /// <summary>
@@ -1122,6 +1125,11 @@ public partial class ShareListViewModel
                 await _versionService.DeleteShareAsync(SelectedShare.Id);
             await _aclService.DeleteShareMetadataAsync(SelectedShare.Id);
             await _shareRepo.DeleteAsync(SelectedShare.Id);
+            // Evict any cached cloud-sync connections for the deleted share so their
+            // HttpClients and tokens do not leak until the process restarts. Coarse but
+            // safe: closing never revokes, and re-creation on next use is cheap.
+            if (_cloudProviders is not null)
+                await _cloudProviders.EvictShareAsync(SelectedShare.Id);
             _lockManager.RemoveLock(name);
 
             _logger.LogInformation("Share '{ShareName}' deleted", name);
@@ -1156,7 +1164,11 @@ public partial class ShareListViewModel
         }
         await using var cloudOperationLease = cloudOperation.Lease;
 
-        SelectedShare.CloudConnection?.Dispose();
+        // A deliberate user disconnect: revoke the grant at the provider (where
+        // supported) and close. Previously this called the fire-and-forget Dispose()
+        // without awaiting it; now it is awaited so the revoke completes.
+        if (SelectedShare.CloudConnection is not null)
+            await SelectedShare.CloudConnection.RevokeAndCloseAsync();
         SelectedShare.CloudSettings = new CloudSettings(new Dictionary<string, SyncedFolder>());
         SelectedShare.CloudConnection = null;
         await _shareRepo.UpdateAsync(SelectedShare);

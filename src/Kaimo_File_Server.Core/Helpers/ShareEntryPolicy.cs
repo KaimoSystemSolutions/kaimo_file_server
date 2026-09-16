@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace Kaimo_File_Server.Core.Helpers;
 
 /// <summary>
@@ -80,7 +82,37 @@ public static class ShareEntryPolicy
                 return rule.Classification;
         }
 
+        // Unlike the reserved first-segment namespaces above, this rule applies to the
+        // FILE NAME at any depth: an interrupted write can leave a transient artifact
+        // anywhere in the tree, not just at the share root.
+        if (IsTransientWriteArtifact(normalized))
+            return new ShareEntryClassification(ShareEntryKind.Internal, IsVisibleInFileBrowser: false);
+
         return Regular;
+    }
+
+    // Matches the artifact written by FileSystemStorage.WriteAsync:
+    // ".{name}.kaimo-{32 hex}.tmp". Deliberately exact — a user file merely containing
+    // ".kaimo-" (e.g. "my.kaimo-notes.txt") is NOT a transient artifact.
+    private static readonly Regex TransientWriteArtifactPattern = new(
+        @"^\..+\.kaimo-[0-9a-fA-F]{32}\.tmp$",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    /// <summary>
+    /// True if the last path segment is a transient write artifact
+    /// (".{name}.kaimo-{32 hex}.tmp"). Applies at any depth, because an interrupted
+    /// write can leave one anywhere. The shape is exact so a user-chosen filename cannot
+    /// be misclassified.
+    /// </summary>
+    public static bool IsTransientWriteArtifact(string? shareRelativePath)
+    {
+        var normalized = ShareRelativePath.Normalize(shareRelativePath);
+        if (normalized.Length == 0)
+            return false;
+
+        var lastSlash = normalized.LastIndexOf('/');
+        var name = lastSlash >= 0 ? normalized[(lastSlash + 1)..] : normalized;
+        return TransientWriteArtifactPattern.IsMatch(name);
     }
 
     public static bool IsVisibleInFileBrowser(string? shareRelativePath) =>

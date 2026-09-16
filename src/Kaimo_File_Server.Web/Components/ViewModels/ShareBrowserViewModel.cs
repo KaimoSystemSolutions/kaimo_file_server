@@ -198,12 +198,12 @@ public partial class ShareBrowserViewModel
         UserContext actor)
     {
         await Parallel.ForEachAsync(shares, new ParallelOptions { MaxDegreeOfParallelism = 4 },
-            async (share, _) =>
+            async (share, token) =>
             {
                 try
                 {
                     var service = _fileServiceFactory.CreateForShare(share.Id, share.Path);
-                    ShareSizes[share.Id] = await service.GetDirectorySizeAsync("", actor);
+                    ShareSizes[share.Id] = await service.GetDirectorySizeAsync("", actor, token);
                     OnStateChanged?.Invoke();
                 }
                 catch (Exception ex)

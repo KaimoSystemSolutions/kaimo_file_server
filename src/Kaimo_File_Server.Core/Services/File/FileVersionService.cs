@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.IO.Compression;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 
 namespace Kaimo_File_Server.Core.Services.File;
 
@@ -97,7 +98,8 @@ public class FileVersionService : IFileVersionService
             {
                 if (blobExisted)
                     _logger.LogWarning(
-                        "Replacing corrupt version blob {StoragePath}", blobRelativePath);
+                        LogEvents.FileVersionBlobCorruptReplaced,
+                        LogMessages.FileVersionBlobCorruptReplaced, blobRelativePath);
 
                 content.Position = 0;
                 compressedSize = await WriteValidatedBlobAsync(
@@ -410,6 +412,195 @@ public class FileVersionService : IFileVersionService
         return Path.Combine(dir1, dir2, hash + ".bin.gz");
     }
 
+    // Stale write temporary left by an interrupted blob write:
+    // ".{blobname}.{32 hex}.tmp" (WriteValidatedBlobAsync). No ".kaimo-" segment.
+    private static readonly Regex VersionWriteTempPattern = new(
+        @"^\..+\.[0-9a-fA-F]{32}\.tmp$",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    public async Task<VersionRetentionSweepResult> SweepExpiredVersionsAsync(
+        TimeSpan maxAge, int minVersionsToKeep, int maxPaths, CancellationToken cancellationToken = default)
+    {
+        var cutoff = _timeProvider.GetUtcNow().UtcDateTime - maxAge;
+        var keep = Math.Max(1, minVersionsToKeep);
+
+        // Fetch one extra to detect whether more work is pending after this bounded batch.
+        var paths = await _versionRepo.GetPathsWithVersionsOlderThanAsync(cutoff, maxPaths + 1, cancellationToken);
+        var moreWorkPending = paths.Count > maxPaths;
+        var toProcess = paths.Take(maxPaths).ToList();
+
+        var versionsRemoved = 0;
+        var removedBlobs = new List<FileVersion>();
+        foreach (var (shareId, filePath) in toProcess)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            // The floor (keep) guarantees age-based deletion NEVER empties a file's
+            // history — without it the first sweep would wipe every dormant file's history.
+            var removed = await _versionRepo.DeleteOlderThanAsync(shareId, filePath, cutoff, keep);
+            versionsRemoved += removed.Count;
+            removedBlobs.AddRange(removed);
+        }
+
+        if (removedBlobs.Count > 0)
+            await DeleteUnreferencedBlobsAsync(removedBlobs);
+
+        if (versionsRemoved > 0)
+            _logger.LogInformation(
+                LogEvents.FileVersionRetentionSwept, LogMessages.FileVersionRetentionSwept,
+                versionsRemoved, toProcess.Count, cutoff);
+
+        return new VersionRetentionSweepResult(toProcess.Count, versionsRemoved, moreWorkPending);
+    }
+
+    public async Task<OrphanBlobSweepResult> ReclaimOrphanBlobsAsync(
+        IReadOnlyList<string> shardPrefixes, TimeSpan minimumAge, CancellationToken cancellationToken = default)
+    {
+        var nowUtc = _timeProvider.GetUtcNow().UtcDateTime;
+        int examined = 0, deleted = 0, tempDeleted = 0, readCacheDeleted = 0;
+        long bytesReclaimed = 0;
+
+        var rootWithSeparator = Path.GetFullPath(_versionStorageRoot)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+
+        foreach (var shard in shardPrefixes)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var shardDir = Path.Combine(_versionStorageRoot, shard);
+            if (!Directory.Exists(shardDir)) continue;
+
+            HashSet<string> referenced;
+            try
+            {
+                // Guard 1: the shard's whole referenced set, read in ONE query BEFORE
+                // touching the filesystem (DB scope closed by the repository per call).
+                referenced = await _versionRepo.GetReferencedStoragePathsUnderShardAsync(shard, cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(
+                    LogEvents.FileVersionOrphanSweepFailed, ex,
+                    LogMessages.FileVersionOrphanSweepFailed, shard);
+                continue;
+            }
+
+            foreach (var filePath in Directory.EnumerateFiles(shardDir, "*", SearchOption.AllDirectories))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var fileName = Path.GetFileName(filePath);
+
+                if (VersionWriteTempPattern.IsMatch(fileName))
+                {
+                    if (TryDeleteAgedFile(filePath, nowUtc, minimumAge)) tempDeleted++;
+                    continue;
+                }
+
+                if (!fileName.EndsWith(".bin.gz", StringComparison.Ordinal))
+                    continue;
+
+                examined++;
+                var storagePath = Path.GetRelativePath(_versionStorageRoot, filePath);
+
+                long size;
+                DateTime lastWrite;
+                try
+                {
+                    var info = new FileInfo(filePath);
+                    size = info.Length;
+                    lastWrite = info.LastWriteTimeUtc;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    continue;
+                }
+
+                // Guard 2: minimum age — the only guard that works ACROSS processes
+                // (BlobLocks is in-process; writers run in Web/SmbBridge, this in Host).
+                if (nowUtc - lastWrite < minimumAge) continue;
+                if (referenced.Contains(storagePath)) continue;
+
+                // Guard 3: re-check under the blob stripe lock immediately before delete.
+                var blobLock = GetBlobLock(Path.GetFullPath(filePath));
+                await blobLock.WaitAsync(cancellationToken);
+                try
+                {
+                    if (await _versionRepo.IsStoragePathReferencedAsync(storagePath)) continue;
+                    System.IO.File.Delete(filePath);
+                    deleted++;
+                    bytesReclaimed += size;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    _logger.LogWarning(
+                        LogEvents.FileVersionBlobDeleteFailed, ex,
+                        LogMessages.FileVersionBlobDeleteFailed, storagePath);
+                }
+                finally
+                {
+                    blobLock.Release();
+                }
+            }
+
+            // Remove now-empty subdirectories left under the shard.
+            try
+            {
+                foreach (var dir in Directory
+                             .EnumerateDirectories(shardDir, "*", SearchOption.AllDirectories)
+                             .OrderByDescending(d => d.Length))
+                    RemoveEmptyParentDirectories(dir, rootWithSeparator);
+                RemoveEmptyParentDirectories(shardDir, rootWithSeparator);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Best-effort tidy-up; leaving an empty directory is harmless.
+            }
+        }
+
+        // Stale read-cache files: FileOptions.DeleteOnClose self-cleans on a graceful exit
+        // but a hard kill leaves them behind (a fourth orphan source).
+        readCacheDeleted = ReclaimReadCacheFiles(nowUtc, minimumAge, cancellationToken);
+
+        if (deleted > 0 || tempDeleted > 0 || readCacheDeleted > 0)
+            _logger.LogInformation(
+                LogEvents.FileVersionOrphanBlobsReclaimed, LogMessages.FileVersionOrphanBlobsReclaimed,
+                deleted, bytesReclaimed, tempDeleted, readCacheDeleted, shardPrefixes.Count);
+
+        return new OrphanBlobSweepResult(examined, deleted, bytesReclaimed, tempDeleted, readCacheDeleted);
+    }
+
+    private bool TryDeleteAgedFile(string fullPath, DateTime nowUtc, TimeSpan minimumAge)
+    {
+        try
+        {
+            if (nowUtc - System.IO.File.GetLastWriteTimeUtc(fullPath) < minimumAge)
+                return false;
+            System.IO.File.Delete(fullPath);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private int ReclaimReadCacheFiles(DateTime nowUtc, TimeSpan minimumAge, CancellationToken cancellationToken)
+    {
+        var readCache = Path.Combine(_versionStorageRoot, ".read-cache");
+        if (!Directory.Exists(readCache)) return 0;
+
+        var deleted = 0;
+        IEnumerable<string> files;
+        try { files = Directory.EnumerateFiles(readCache, "*.tmp"); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return 0; }
+
+        foreach (var file in files)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (TryDeleteAgedFile(file, nowUtc, minimumAge)) deleted++;
+        }
+        return deleted;
+    }
+
     private async Task DeleteUnreferencedBlobsAsync(IEnumerable<FileVersion> removed)
     {
         foreach (var storagePath in removed.Select(v => v.StoragePath).Distinct(StringComparer.Ordinal))
@@ -437,7 +628,9 @@ public class FileVersionService : IFileVersionService
         {
             // The DB is authoritative. Do not turn an already completed user-file
             // operation into a failure when an external process temporarily locks a blob.
-            _logger.LogWarning(ex, "Failed to delete unreferenced version blob {StoragePath}", storagePath);
+            _logger.LogWarning(
+                LogEvents.FileVersionBlobDeleteFailed, ex,
+                LogMessages.FileVersionBlobDeleteFailed, storagePath);
         }
         finally
         {

@@ -51,7 +51,10 @@ namespace Kaimo_File_Server.Infrastructure
             // -- EF Core --
             services.AddDbContextFactory<ApplicationDbContext>(options =>
             {
-                options.UseNpgsql(connectionString);
+                // A bounded per-command timeout so a pathological query fails fast and
+                // returns its pooled connection instead of pinning it indefinitely.
+                options.UseNpgsql(connectionString, npgsql =>
+                    npgsql.CommandTimeout(configuration.GetValue("Database:CommandTimeoutSeconds", 30)));
                 if (readOnlyDemo)
                     options.AddInterceptors(new Persistence.ReadOnlyDemoSaveInterceptor());
             });
@@ -198,12 +201,20 @@ namespace Kaimo_File_Server.Infrastructure
                 applicationDataPath, ".versions");
 
             services.AddScoped<IFileVersionService>(sp =>
-                new FileVersionService(
+            {
+                // Resolve the tunables from configuration here (no signature change, no
+                // touching the four Program.cs files). The on-write rule and the Host
+                // retention sweep both read these keys, so they can never disagree.
+                var configuration = sp.GetRequiredService<IConfiguration>();
+                var maxVersions = configuration.GetValue("Versioning:MaxVersions", 64);
+                var maxAgeDays = configuration.GetValue("Versioning:MaxAgeDays", 90);
+                return new FileVersionService(
                     sp.GetRequiredService<IFileVersionRepository>(),
                     versionStoragePath,
-                    defaultMaxVersions: 64,
-                    defaultMaxAge: TimeSpan.FromDays(90),
-                    logger: sp.GetRequiredService<ILogger<FileVersionService>>()));
+                    defaultMaxVersions: maxVersions,
+                    defaultMaxAge: TimeSpan.FromDays(maxAgeDays),
+                    logger: sp.GetRequiredService<ILogger<FileVersionService>>());
+            });
 
             // -- Share Lock Manager (in-memory, single instance) --
             services.AddSingleton<ShareLockManager>();

@@ -37,7 +37,8 @@ namespace Kaimo_File_Server.Core.Services.File
         Task<FileMetadata> GetMetadataAsync(string path, UserContext user);
         Task<List<FileMetadata>> ListAsync(string directoryPath, UserContext user);
         Task RenameAsync(string oldPath, string newPath, UserContext user);
-        Task<long> GetDirectorySizeAsync(string relativePath, UserContext userContext);
+        Task<long> GetDirectorySizeAsync(
+            string relativePath, UserContext userContext, CancellationToken cancellationToken = default);
         Task UnzipAsync(string zipPath, string targetPath, UserContext user);
         Task ArchiveAsync(List<string> sourcePaths, string targetPath, string format, UserContext user);
 

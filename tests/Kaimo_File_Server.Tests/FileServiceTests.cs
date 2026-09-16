@@ -1087,4 +1087,78 @@ public class FileServiceTests
             a => a.HasAccessAsync(ctx, _shareId, It.IsAny<string>(), true, FilePermission.ListReadData),
             Times.Once);
     }
+
+    // ═══════════════════ Search side-effect serialization (plan 3c) ═══════════════════
+
+    /// <summary>
+    /// Fake <see cref="ISearchService"/> that records the maximum number of side effects
+    /// observed running at once and signals when an expected number have completed.
+    /// A single instance is shared across FileService instances, exactly as the singleton
+    /// search service is in production.
+    /// </summary>
+    private sealed class ConcurrencyRecordingSearch : ISearchService
+    {
+        private readonly int _expected;
+        private readonly object _gate = new();
+        private int _current;
+        private int _completed;
+        private readonly TaskCompletionSource _allDone =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ConcurrencyRecordingSearch(int expected) => _expected = expected;
+
+        public int MaxObserved { get; private set; }
+        public Task AllDone => _allDone.Task;
+
+        public async Task onDirectoryCreated(string absolutePath)
+        {
+            lock (_gate) MaxObserved = Math.Max(MaxObserved, ++_current);
+            // Hold the critical section open long enough that a second, UNserialized
+            // invocation would overlap and push MaxObserved to 2.
+            await Task.Delay(100);
+            lock (_gate)
+            {
+                _current--;
+                if (++_completed == _expected) _allDone.TrySetResult();
+            }
+        }
+
+        public Task onFileCreated(string absolutePath, Task<Stream> fileData, CancellationToken ct = default) => Task.CompletedTask;
+        public Task onFileDeleted(string absolutePath) => Task.CompletedTask;
+        public Task onDirectoryDeleted(string absolutePath) => Task.CompletedTask;
+        public Task onFileRenamed(string oldAbsolutePath, string newAbsolutePath) => Task.CompletedTask;
+        public Task onDirectoryRenamed(string oldAbsolutePath, string newAbsolutePath) => Task.CompletedTask;
+        public Task<List<FileDocument>> SearchAsync(string searchText, UserContext user, string? shareName = null, string? pathPrefix = null, CancellationToken ct = default) => Task.FromResult(new List<FileDocument>());
+        public Task InitializeAsync(CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ConcurrentSearchSideEffects_OnSamePath_AreSerialized()
+    {
+        var search = new ConcurrencyRecordingSearch(expected: 2);
+        var aclMock = new Mock<IAclService>();
+        aclMock
+            .Setup(a => a.HasAccessAsync(It.IsAny<UserContext>(), _shareId,
+                It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<FilePermission>()))
+            .ReturnsAsync(true);
+        var storageMock = new Mock<IStorageEngine>();
+        storageMock.Setup(s => s.CreateDirectory(It.IsAny<string>())).Returns(Task.CompletedTask);
+        storageMock.Setup(s => s.ToAbsolutePath(It.IsAny<string>())).Returns<string>(p => "/abs/" + p);
+
+        // Two independently-constructed FileService instances for the SAME share, exactly
+        // as FileServiceFactory.CreateForShare produces one per operation. Before the
+        // process-wide striped lock each carried its own semaphore, so the two side
+        // effects overlapped; the shared static lock now serializes them by (share, path).
+        var a = new FileService(storageMock.Object, aclMock.Object, search, _shareId);
+        var b = new FileService(storageMock.Object, aclMock.Object, search, _shareId);
+        var ctx = CreateContext();
+
+        // The search side effects run as detached tasks, so wait on the recorder.
+        await a.CreateDirectoryAsync("shared/dir", ctx);
+        await b.CreateDirectoryAsync("shared/dir", ctx);
+
+        var finished = await Task.WhenAny(search.AllDone, Task.Delay(TimeSpan.FromSeconds(5)));
+        Assert.Same(search.AllDone, finished);
+        Assert.Equal(1, search.MaxObserved);
+    }
 }

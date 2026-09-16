@@ -209,18 +209,24 @@ public sealed class DropboxConnection : ICloudConnection, IAsyncDisposable
     }
 
     /// <summary>
-    /// Releases locally owned resources. It does not revoke the Dropbox grant
-    /// because disposal is also used for ordinary connection-cache cleanup.
+    /// Releases locally owned resources. It does not revoke the Dropbox grant, so it
+    /// is safe both for connection-cache eviction and explicit disconnect.
     /// </summary>
-    public Task Dispose()
+    public ValueTask CloseAsync()
     {
         _tokenLock.Dispose();
         if (_ownsHttpClient)
             _httpClient.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public async ValueTask DisposeAsync() => await Dispose();
+    /// <summary>
+    /// Dropbox has no provider-side revocation here, so an explicit disconnect just
+    /// releases local resources like <see cref="CloseAsync"/>.
+    /// </summary>
+    public Task RevokeAndCloseAsync() => CloseAsync().AsTask();
+
+    public async ValueTask DisposeAsync() => await CloseAsync();
 
     private async Task UploadSmallFileAsync(
         string dropboxPath,

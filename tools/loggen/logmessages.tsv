@@ -49,9 +49,15 @@ FileOwnerRecordFailed	1003	Failed to record owner for {Path}.
 FileWriteVersionFailed	1004	Versioning failed after writing {Path}.
 # -- FileVersionService 1100-1199 --
 FileVersionCreated	1101	Created version {Version} for {Path} ({OriginalBytes} -> {CompressedBytes} bytes, {Ratio} ratio).
+FileVersionBlobCorruptReplaced	1102	Replacing corrupt version blob {StoragePath}.
+FileVersionBlobDeleteFailed	1103	Failed to delete unreferenced version blob {StoragePath}.
+FileVersionRetentionSwept	1104	Version retention removed {VersionsRemoved} versions across {PathsExamined} paths older than {CutoffUtc}.
+FileVersionOrphanBlobsReclaimed	1105	Reclaimed {BlobsDeleted} orphaned version blobs ({BytesReclaimed} bytes), {TempFilesDeleted} stale write temporaries and {ReadCacheFilesDeleted} read-cache files across {ShardCount} shards.
+FileVersionOrphanSweepFailed	1106	Orphan version blob sweep failed for shard {ShardPrefix}.
 # ============================ Infrastructure (2000-2999) ============================
 # -- storage 2000-2099 --
 StorageAclLoadFailed	2001	ACL load failed for {Path}.
+StorageWalkTruncated	2002	Directory walk below {Path} was truncated ({Skipped} entries skipped: links, depth limit, or access errors).
 # -- database init 2200-2299 --
 DatabaseReady	2201	Database ready.
 DatabaseNotReadyRetry	2202	Database not ready, retrying in 3s ({RemainingAttempts} attempts left).

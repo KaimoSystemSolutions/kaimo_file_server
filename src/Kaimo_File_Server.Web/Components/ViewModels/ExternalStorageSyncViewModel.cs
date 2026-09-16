@@ -32,7 +32,8 @@ public sealed class ExternalStorageSyncViewModel(
     IStorageDirectoryTargetResolver directoryTargets,
     ICloudSyncOperationCoordinator syncOperations,
     CloudSyncSchedulerSignal schedulerSignal,
-    ILogger<ExternalStorageSyncViewModel> logger)
+    ILogger<ExternalStorageSyncViewModel> logger,
+    ICloudProviderFactory? cloudProviders = null)
 {
     private UserContext? _actor;
 
@@ -193,6 +194,10 @@ public sealed class ExternalStorageSyncViewModel(
                 "Web_CloudSync_Error_Busy", "This folder is already being synchronized or modified."));
         await using var mutation = mutationLease;
         await syncDefinitions.DeleteAsync(id);
+        // Evict cached connections for the share (coarse but safe; re-creation is cheap)
+        // so a removed sync does not leave its cloud connection and tokens cached.
+        if (cloudProviders is not null)
+            await cloudProviders.EvictShareAsync(definition.LocalShareId);
         schedulerSignal.Wake();
         await LoadAsync();
     }

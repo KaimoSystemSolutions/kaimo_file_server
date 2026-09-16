@@ -81,7 +81,7 @@ public sealed class LegacyCloudStorageConnectionProvider(
         Validate(connection);
         var credentials = credentialVault.UnprotectConnectionCredentials(connection);
         credentials["connectionId"] = connection.Id.ToString("D");
-        await cloudProviders.DisposeConnectionAsync(
+        await cloudProviders.RevokeAndEvictAsync(
             Guid.Empty,
             new SyncedFolder(connection.ProviderId, credentials, "/"));
     }

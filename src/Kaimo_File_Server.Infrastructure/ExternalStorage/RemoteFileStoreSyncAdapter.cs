@@ -15,7 +15,9 @@ internal sealed class RemoteFileStoreSyncAdapter(
 {
     public string ServiceName { get; } = serviceName;
 
-    public Task Dispose() => Task.CompletedTask;
+    public ValueTask CloseAsync() => ValueTask.CompletedTask;
+
+    public Task RevokeAndCloseAsync() => Task.CompletedTask;
 
     public Task UploadAsync(
         string path,

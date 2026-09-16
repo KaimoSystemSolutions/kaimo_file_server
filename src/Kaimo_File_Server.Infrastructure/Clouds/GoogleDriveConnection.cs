@@ -1,3 +1,4 @@
+using System.Net.Http;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Auth.OAuth2.Responses;
@@ -15,14 +16,20 @@ public class GoogleDriveConnection : ICloudConnection
     private readonly DriveService _service;
     private readonly string? _refreshToken;
     private readonly GoogleDriveScopeProfile _scopeProfile;
+    private readonly System.Net.Http.IHttpClientFactory? _httpClientFactory;
+
+    /// <summary>Named registration used for the one-shot token-revocation POST.</summary>
+    public const string RevocationHttpClientName = "GoogleTokenRevocation";
 
     public DriveService Service => _service;
 
     public GoogleDriveConnection(
         Guid shareId,
         Dictionary<string, string> data,
-        GoogleIdentityConfiguration identity)
+        GoogleIdentityConfiguration identity,
+        System.Net.Http.IHttpClientFactory? httpClientFactory = null)
     {
+        _httpClientFactory = httpClientFactory;
         var scopeProfile = data.TryGetValue("scopeProfile", out var profileValue)
             ? GoogleIdentityConfiguration.ParseScopeProfile(profileValue)
             : identity.DefaultScopeProfile;
@@ -62,10 +69,8 @@ public class GoogleDriveConnection : ICloudConnection
             });
     }
 
-    public static async Task RevokeTokenAsync(string refreshToken)
+    public static async Task RevokeTokenAsync(string refreshToken, HttpClient http)
     {
-        using var http = new HttpClient();
-
         var response = await http.PostAsync(
             "https://oauth2.googleapis.com/revoke",
             new FormUrlEncodedContent(new Dictionary<string, string>
@@ -76,10 +81,32 @@ public class GoogleDriveConnection : ICloudConnection
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task Dispose()
+    /// <summary>Releases the Drive SDK client only. Never revokes the grant.</summary>
+    public ValueTask CloseAsync()
+    {
+        Service.Dispose();
+        return ValueTask.CompletedTask;
+    }
+
+    /// <summary>Revokes the Google refresh token at the provider, then closes.</summary>
+    public async Task RevokeAndCloseAsync()
     {
         if (_refreshToken is not null)
-            await RevokeTokenAsync(_refreshToken);
+        {
+            // A pooled, factory-managed client when available; a throwaway otherwise
+            // (e.g. a directly-constructed connection in tests).
+            var http = _httpClientFactory?.CreateClient(RevocationHttpClientName);
+            var ownsClient = http is null;
+            http ??= new HttpClient();
+            try
+            {
+                await RevokeTokenAsync(_refreshToken, http);
+            }
+            finally
+            {
+                if (ownsClient) http.Dispose();
+            }
+        }
         Service.Dispose();
     }
 

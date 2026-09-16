@@ -214,7 +214,20 @@ public class FileService : IFileService
     private readonly IFileChangeLog? _changeLog;
     private readonly ILogger<FileService> _logger;
     private readonly Guid _shareId;
-    private readonly SemaphoreSlim _searchSideEffectLock = new(1, 1);
+
+    // Serializes search-index side effects for the same (share, path). This MUST be
+    // process-wide: FileServiceFactory.CreateForShare builds a fresh FileService — and
+    // would build a fresh per-instance lock — on every call, so a per-instance
+    // semaphore serializes nothing. Striped like FileVersionService.BlobLocks: bounded,
+    // shared across every FileService instance, collisions merely over-serialize.
+    private static readonly SemaphoreSlim[] SearchSideEffectLocks =
+        Enumerable.Range(0, 256).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
+
+    private static SemaphoreSlim GetSearchSideEffectLock(Guid shareId, string path)
+    {
+        var hash = (uint)HashCode.Combine(shareId, StringComparer.Ordinal.GetHashCode(path));
+        return SearchSideEffectLocks[hash % (uint)SearchSideEffectLocks.Length];
+    }
 
     public FileService(
     IStorageEngine storage,
@@ -435,7 +448,8 @@ public class FileService : IFileService
     private async Task ObserveSearchSideEffectAsync(
         Func<Task> action, string operation, string path)
     {
-        await _searchSideEffectLock.WaitAsync();
+        var gate = GetSearchSideEffectLock(_shareId, path);
+        await gate.WaitAsync();
         try
         {
             await action();
@@ -450,7 +464,7 @@ public class FileService : IFileService
         }
         finally
         {
-            _searchSideEffectLock.Release();
+            gate.Release();
         }
     }
 
@@ -1004,13 +1018,14 @@ public class FileService : IFileService
             oldNormalized, newNormalized, isDir, oldAbs, newAbs, bestEffort: false);
     }
 
-    public async Task<long> GetDirectorySizeAsync(string relativePath, UserContext user)
+    public async Task<long> GetDirectorySizeAsync(
+        string relativePath, UserContext user, CancellationToken cancellationToken = default)
     {
         var normalized = ShareRelativePath.Normalize(relativePath);
 
         await EnsureAccessAsync(user, normalized, true, FilePermission.ListReadData);
 
-        return await _storage.GetDirectorySizeAsync(normalized);
+        return await _storage.GetDirectorySizeAsync(normalized, cancellationToken);
     }
 
     public async Task<FileOpenResult> OpenAsync(

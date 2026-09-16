@@ -65,4 +65,20 @@ public sealed class ReadOnlyDemoAclServiceTests
         await Assert.ThrowsAsync<ReadOnlyDemoException>(() => _sut.DeleteAclAsync(_share, "a"));
         await Assert.ThrowsAsync<ReadOnlyDemoException>(() => _sut.DeleteShareMetadataAsync(_share));
     }
+
+    /// <summary>
+    /// The repository's DeleteFileMetadataPaths is now a bulk ExecuteDelete that bypasses
+    /// the ReadOnlyDemoSaveInterceptor. That is only safe because the demo ACL wrapper
+    /// rejects the delete BEFORE it can reach the real service (and thus the repository):
+    /// the inner service is never invoked, so the ExecuteDelete never runs in demo mode.
+    /// </summary>
+    [Fact]
+    public async Task DeleteFileMetadataPaths_InDemoMode_IsRejected()
+    {
+        await Assert.ThrowsAsync<ReadOnlyDemoException>(() => _sut.DeleteAclAsync(_share, "folder"));
+        await Assert.ThrowsAsync<ReadOnlyDemoException>(() => _sut.DeleteShareMetadataAsync(_share));
+
+        _inner.Verify(a => a.DeleteAclAsync(It.IsAny<Guid>(), It.IsAny<string>()), Times.Never);
+        _inner.Verify(a => a.DeleteShareMetadataAsync(It.IsAny<Guid>()), Times.Never);
+    }
 }

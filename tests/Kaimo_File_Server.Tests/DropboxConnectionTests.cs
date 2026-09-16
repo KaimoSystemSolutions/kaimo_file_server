@@ -60,7 +60,7 @@ public sealed class DropboxConnectionTests
                 Assert.Equal(42, file.Size);
                 Assert.Equal(DateTimeKind.Utc, file.ModifiedAt.Kind);
             });
-        await connection.Dispose();
+        await connection.CloseAsync();
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public sealed class DropboxConnectionTests
         await connection.ListAsync("/");
 
         Assert.Contains("\"path\":\"\"", listPath);
-        await connection.Dispose();
+        await connection.CloseAsync();
     }
 
     [Fact]

@@ -46,8 +46,6 @@ public class AclRepository : IAclRepository
 
     public async Task RenameFileMetadataPathsAsync(Guid shareId, string oldRelativePath, string newRelativePath)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync();
-
         const int maxAttempts = 3;
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
@@ -60,11 +58,8 @@ public class AclRepository : IAclRepository
             catch (DbUpdateException ex) when (attempt < maxAttempts
                                                && ex.InnerException is PostgresException { SqlState: "23505" })
             {
-                // Stale tracked entities from the failed attempt, plus a fresh look
-                // at the (now possibly watcher-updated) rows.
-                foreach (var entry in db.ChangeTracker.Entries().ToList())
-                    entry.State = EntityState.Detached;
-
+                // The internal attempt uses its own short-lived context, so there is no
+                // stale tracker to reset here; just back off and re-read the rows.
                 await Task.Delay(25 * attempt);
             }
         }
@@ -131,12 +126,12 @@ public class AclRepository : IAclRepository
             ? query
             : query.Where(m => m.Path == normalized || m.Path.StartsWith(prefix));
 
-        var rows = await query.ToListAsync();
-        if (rows.Count == 0) return 0;
-
-        db.FileMetadata.RemoveRange(rows);
-        await db.SaveChangesAsync();
-        return rows.Count;
+        // ExecuteDeleteAsync: a single set-based DELETE, no per-row change tracking or
+        // materialization. Safe in demo mode even though it bypasses the
+        // ReadOnlyDemoSaveInterceptor, because ReadOnlyDemoAclService.DeleteAclAsync
+        // throws ReadOnlyDemoException before any call reaches this repository. The
+        // cascade delete on AccessEntry removes the ACL rows for the deleted subtree.
+        return await query.ExecuteDeleteAsync();
     }
 
     public Task<int> DeleteShareFileMetadataAsync(Guid shareId)

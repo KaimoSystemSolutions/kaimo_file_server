@@ -43,6 +43,19 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
     private readonly ILogger<SnapshotGrpcService> _logger;
     private readonly string _cacheRoot;
 
+    /// <summary>
+    /// Recursive enumeration that never follows reparse points (symlinks/junctions) and
+    /// caps recursion at the shared <see cref="SafeDirectoryWalk.DefaultMaxDepth"/>. A
+    /// user-created link cycle inside a projected snapshot would otherwise loop forever;
+    /// the depth cap keeps every traversal bounded from one place.
+    /// </summary>
+    private static readonly EnumerationOptions RecursiveNoLinks = new()
+    {
+        RecurseSubdirectories = true,
+        AttributesToSkip = FileAttributes.System | FileAttributes.ReparsePoint,
+        MaxRecursionDepth = SafeDirectoryWalk.DefaultMaxDepth
+    };
+
     public SnapshotGrpcService(
         IShareRepository shares,
         IAuthenticationLookup auth,
@@ -699,7 +712,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         try
         {
             actualFiles = Directory.GetFiles(
-                directory, "*", SearchOption.AllDirectories);
+                directory, "*", RecursiveNoLinks);
         }
         catch (IOException)
         {
@@ -803,7 +816,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
             .ToHashSet(pathComparer);
 
         foreach (string file in Directory.EnumerateFiles(
-                     folderFull, "*", SearchOption.AllDirectories))
+                     folderFull, "*", RecursiveNoLinks))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!allowed.Contains(Path.GetFullPath(file)))
@@ -813,7 +826,7 @@ public sealed class SnapshotGrpcService : SnapshotService.SnapshotServiceBase
         // Remove stale empty directories left behind by revoked files, but retain
         // the requested directory that Samba is about to traverse.
         foreach (string directory in Directory.EnumerateDirectories(
-                     folderFull, "*", SearchOption.AllDirectories)
+                     folderFull, "*", RecursiveNoLinks)
                  .OrderByDescending(path => path.Length))
         {
             cancellationToken.ThrowIfCancellationRequested();

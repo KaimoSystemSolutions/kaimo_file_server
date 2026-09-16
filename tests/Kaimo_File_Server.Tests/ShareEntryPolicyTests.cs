@@ -65,4 +65,38 @@ public sealed class ShareEntryPolicyTests
     {
         Assert.False(ShareEntryPolicy.IsReservedForUserWrites(path));
     }
+
+    // ── Transient write artifact (plan Phase 9) ────────────────────────
+
+    [Theory]
+    [InlineData(".report.docx.kaimo-0123456789abcdef0123456789abcdef.tmp")]
+    [InlineData("docs/sub/.data.bin.kaimo-0123456789ABCDEF0123456789ABCDEF.tmp")]
+    public void Classify_TransientWriteArtifactAtAnyDepth_IsInternal(string path)
+    {
+        var result = ShareEntryPolicy.Classify(path);
+
+        Assert.Equal(ShareEntryKind.Internal, result.Kind);
+        Assert.False(result.IsVisibleInFileBrowser);
+        Assert.True(ShareEntryPolicy.IsTransientWriteArtifact(path));
+    }
+
+    [Theory]
+    [InlineData("docs/my.kaimo-notes.txt")]     // user file merely containing ".kaimo-"
+    [InlineData("docs/report.kaimo-0123456789abcdef0123456789abcdef.tmp")] // no leading dot
+    public void Classify_UserFileContainingKaimoMarker_StaysRegular(string path)
+    {
+        var result = ShareEntryPolicy.Classify(path);
+
+        Assert.Equal(ShareEntryKind.Regular, result.Kind);
+        Assert.False(ShareEntryPolicy.IsTransientWriteArtifact(path));
+    }
+
+    [Theory]
+    [InlineData(".report.docx.kaimo-nothex.tmp")]                          // non-hex guid
+    [InlineData(".report.docx.kaimo-0123456789abcdef0123456789abcdef.txt")] // wrong extension
+    public void Classify_TransientShapeWithNonHexGuid_StaysRegular(string path)
+    {
+        Assert.False(ShareEntryPolicy.IsTransientWriteArtifact(path));
+        Assert.Equal(ShareEntryKind.Regular, ShareEntryPolicy.Classify(path).Kind);
+    }
 }

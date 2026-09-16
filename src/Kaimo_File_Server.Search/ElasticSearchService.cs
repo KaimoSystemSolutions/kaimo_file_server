@@ -8,6 +8,7 @@ using Elastic.Clients.Elasticsearch.IndexManagement;
 using Elastic.Clients.Elasticsearch.Mapping;
 using Elastic.Clients.Elasticsearch.QueryDsl;
 using Kaimo_File_Server.Core.Domain;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Microsoft.Extensions.DependencyInjection;
@@ -769,7 +770,11 @@ public class ElasticSearchService : ISearchService
         {
             RecurseSubdirectories = true,
             IgnoreInaccessible = true,
-            AttributesToSkip = FileAttributes.System
+            // Skip reparse points (symlinks/junctions): following one can loop forever on
+            // a user-created cycle or index a target outside the share. Cap recursion at
+            // the shared SafeDirectoryWalk depth so every traversal stops at one bound.
+            AttributesToSkip = FileAttributes.System | FileAttributes.ReparsePoint,
+            MaxRecursionDepth = SafeDirectoryWalk.DefaultMaxDepth
         };
 
         using var scope = _scopeFactory.CreateScope();

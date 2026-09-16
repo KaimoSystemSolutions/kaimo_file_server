@@ -508,13 +508,22 @@ public class DatabaseSeeder
     // -- Lookups --
 
     private async Task<Dictionary<string, Role>> LoadRoleLookupAsync()
-        => (await (await _dbFactory.CreateDbContextAsync()).Roles.ToListAsync()).ToDictionary(r => r.Name, StringComparer.OrdinalIgnoreCase);
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return (await db.Roles.ToListAsync()).ToDictionary(r => r.Name, StringComparer.OrdinalIgnoreCase);
+    }
 
     private async Task<Dictionary<string, Group>> LoadGroupLookupAsync()
-        => (await (await _dbFactory.CreateDbContextAsync()).Groups.ToListAsync()).ToDictionary(g => g.Name, StringComparer.OrdinalIgnoreCase);
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return (await db.Groups.ToListAsync()).ToDictionary(g => g.Name, StringComparer.OrdinalIgnoreCase);
+    }
 
     private async Task<Dictionary<string, Department>> LoadDepartmentLookupAsync()
-        => (await (await _dbFactory.CreateDbContextAsync()).Departments.ToListAsync()).ToDictionary(d => d.Name, StringComparer.OrdinalIgnoreCase);
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return (await db.Departments.ToListAsync()).ToDictionary(d => d.Name, StringComparer.OrdinalIgnoreCase);
+    }
 
     // -- Shares (with direct DepartmentId) --
 

@@ -68,7 +68,8 @@ public class FileBrowserViewModelPreviewSizeTests
             _fileServiceFactory.Object, _shareRepo.Object, _dbFactory.Object,
             _userContextFactory.Object, _mgmtAuth.Object, _authState.Object,
             NullLogger<FileBrowserViewModel>.Instance, _searchService.Object, _userRepo.Object,
-            new FileDownloadTicketStore(), new DemoModeOptions(), _syncRepo.Object);
+            new FileDownloadTicketStore(), new DemoModeOptions(), _syncRepo.Object,
+            new DirectorySizeCache(TimeProvider.System));
     }
 
     private static FileMetadata Dir(string name) =>
@@ -119,8 +120,8 @@ public class FileBrowserViewModelPreviewSizeTests
         var c = Dir("c");
         _listing = new List<FileMetadata> { a, b, c };
         _fileService
-            .Setup(s => s.GetDirectorySizeAsync(It.IsAny<string>(), It.IsAny<UserContext>()))
-            .ReturnsAsync((string path, UserContext _) => path switch
+            .Setup(s => s.GetDirectorySizeAsync(It.IsAny<string>(), It.IsAny<UserContext>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string path, UserContext _, CancellationToken __) => path switch
             {
                 "a" => 100L,
                 "b" => 200L,

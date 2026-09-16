@@ -181,6 +181,10 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(e => new { e.ShareId, e.FilePath, e.SnapshotTimestampUtc }).IsUnique();
                 entity.HasIndex(e => e.SnapshotTimestampUtc);
                 entity.HasIndex(e => new { e.ShareId, e.FilePath, e.ContentHash });
+                // Backs IsStoragePathReferencedAsync (AnyAsync on StoragePath), which runs
+                // on every version deletion and once per candidate blob during orphan
+                // reclaim. Without it that is a sequential scan of a 500-char column.
+                entity.HasIndex(e => e.StoragePath);
             });
 
             modelBuilder.Entity<SambaLifecycleEventReceipt>(entity =>

@@ -15,7 +15,20 @@ namespace Kaimo_File_Server.Core.Services.DataServices;
 /// </summary>
 public interface ICloudConnection
 {
-    Task Dispose();
+    /// <summary>
+    /// Releases local resources (HTTP clients, SDK service objects, locks). Never
+    /// contacts the provider and never invalidates a persisted credential, so it is
+    /// safe to call when a cached connection is merely evicted.
+    /// </summary>
+    ValueTask CloseAsync();
+
+    /// <summary>
+    /// Revokes the persisted grant at the provider (where supported) and then closes.
+    /// Only for a deliberate, user-initiated disconnect — never for cache eviction,
+    /// which must not cost the user their authorization.
+    /// </summary>
+    Task RevokeAndCloseAsync();
+
     string ServiceName { get; }
 
     /// <summary>

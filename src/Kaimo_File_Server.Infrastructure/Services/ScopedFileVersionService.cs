@@ -7,8 +7,8 @@ namespace Kaimo_File_Server.Infrastructure.Services
     /// <summary>
     /// Lifetime-safe wrapper around the scoped <see cref="IFileVersionService"/>.
     ///
-    /// The per-share <see cref="FileService"/> instances are created once (at SMB
-    /// start-up) and live for the whole process, but the real version service
+    /// The per-share <see cref="FileService"/> instances are constructed per operation
+    /// by <c>FileServiceFactory.CreateForShare</c>, but the real version service
     /// depends on a scoped <c>ApplicationDbContext</c>. Capturing a single scoped
     /// instance would pin one DbContext for the lifetime of the server, which is a
     /// concurrency and connection-leak hazard.
@@ -126,6 +126,22 @@ namespace Kaimo_File_Server.Infrastructure.Services
             using var scope = _serviceProvider.CreateScope();
             var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
             return await svc.DeleteShareAsync(shareId);
+        }
+
+        public async Task<VersionRetentionSweepResult> SweepExpiredVersionsAsync(
+            TimeSpan maxAge, int minVersionsToKeep, int maxPaths, CancellationToken cancellationToken = default)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
+            return await svc.SweepExpiredVersionsAsync(maxAge, minVersionsToKeep, maxPaths, cancellationToken);
+        }
+
+        public async Task<OrphanBlobSweepResult> ReclaimOrphanBlobsAsync(
+            IReadOnlyList<string> shardPrefixes, TimeSpan minimumAge, CancellationToken cancellationToken = default)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var svc = scope.ServiceProvider.GetRequiredService<IFileVersionService>();
+            return await svc.ReclaimOrphanBlobsAsync(shardPrefixes, minimumAge, cancellationToken);
         }
     }
 }

@@ -60,7 +60,7 @@ public sealed class CloudProviderFactoryTests
     }
 
     [Fact]
-    public async Task DisposeConnectionAsync_AwaitsProviderCleanupAndEvictsCacheEntry()
+    public async Task RevokeAndEvictAsync_RevokesThenRemoves()
     {
         var provider = new FakeProvider();
         var factory = new CloudProviderFactory([provider]);
@@ -68,12 +68,86 @@ public sealed class CloudProviderFactoryTests
         var folder = CreateFolder();
         var first = (FakeConnection)factory.CreateOrLoad(shareId, folder);
 
-        await factory.DisposeConnectionAsync(shareId, folder);
+        await factory.RevokeAndEvictAsync(shareId, folder);
         var second = factory.CreateOrLoad(shareId, folder);
 
-        Assert.True(first.WasDisposed);
+        Assert.True(first.WasRevoked);
+        Assert.True(first.WasClosed);
         Assert.NotSame(first, second);
         Assert.Equal(2, provider.CreatedConnections);
+    }
+
+    [Fact]
+    public async Task EvictAsync_ClosesConnectionWithoutRevoking()
+    {
+        var provider = new FakeProvider();
+        var factory = new CloudProviderFactory([provider]);
+        var shareId = Guid.NewGuid();
+        var folder = CreateFolder();
+        var first = (FakeConnection)factory.CreateOrLoad(shareId, folder);
+
+        await factory.EvictAsync(shareId, folder);
+        var second = factory.CreateOrLoad(shareId, folder);
+
+        Assert.True(first.WasClosed);
+        Assert.False(first.WasRevoked); // eviction must never cost the user their grant
+        Assert.NotSame(first, second);
+    }
+
+    [Fact]
+    public async Task EvictConnectionAsync_RemovesEveryEntryForThatConnectionId()
+    {
+        var provider = new FakeProvider();
+        var factory = new CloudProviderFactory([provider]);
+        var connectionId = Guid.NewGuid();
+        // Same connection id used across two different shares.
+        var folderA = ConnectionFolder(connectionId);
+        var folderB = ConnectionFolder(connectionId);
+        var a = (FakeConnection)factory.CreateOrLoad(Guid.NewGuid(), folderA);
+        var b = (FakeConnection)factory.CreateOrLoad(Guid.NewGuid(), folderB);
+
+        await factory.EvictConnectionAsync(connectionId);
+
+        Assert.True(a.WasClosed);
+        Assert.True(b.WasClosed);
+        Assert.False(a.WasRevoked);
+        Assert.False(b.WasRevoked);
+    }
+
+    [Fact]
+    public async Task EvictShareAsync_RemovesEveryEntryForThatShare()
+    {
+        var provider = new FakeProvider();
+        var factory = new CloudProviderFactory([provider]);
+        var shareId = Guid.NewGuid();
+        var a = (FakeConnection)factory.CreateOrLoad(shareId, ConnectionFolder(Guid.NewGuid()));
+        var b = (FakeConnection)factory.CreateOrLoad(shareId, ConnectionFolder(Guid.NewGuid()));
+        var other = (FakeConnection)factory.CreateOrLoad(Guid.NewGuid(), ConnectionFolder(Guid.NewGuid()));
+
+        await factory.EvictShareAsync(shareId);
+
+        Assert.True(a.WasClosed);
+        Assert.True(b.WasClosed);
+        Assert.False(other.WasClosed); // a different share is untouched
+    }
+
+    [Fact]
+    public void CreateOrLoad_WhenAnotherThreadWins_ClosesTheLosingConnection()
+    {
+        var provider = new RacingProvider();
+        var factory = new CloudProviderFactory([provider]);
+        provider.Bind(factory);
+        var folder = CreateFolder();
+
+        var result = factory.CreateOrLoad(Guid.NewGuid(), folder);
+
+        // The provider built two connections; the winner is served and the loser closed
+        // (never revoked — that would invalidate the credential the winner uses).
+        Assert.Equal(2, provider.Created.Count);
+        Assert.Same(provider.Created[1], result);      // inner (winner) is returned
+        Assert.True(provider.Created[0].WasClosed);     // outer (loser) is closed
+        Assert.False(provider.Created[0].WasRevoked);
+        Assert.False(provider.Created[1].WasClosed);
     }
 
     [Fact]
@@ -86,6 +160,36 @@ public sealed class CloudProviderFactoryTests
 
     private static SyncedFolder CreateFolder()
         => new("fake", new Dictionary<string, string> { ["credential"] = "secret" });
+
+    private static SyncedFolder ConnectionFolder(Guid connectionId)
+        => new("fake", new Dictionary<string, string> { ["connectionId"] = connectionId.ToString("D") });
+
+    /// <summary>
+    /// Reproduces the CreateOrLoad GetOrAdd race deterministically: the first
+    /// CreateConnection reenters the factory for the same key, which wins the GetOrAdd,
+    /// so the outer call's connection is the loser that must be closed.
+    /// </summary>
+    private sealed class RacingProvider : ICloudProvider
+    {
+        private CloudProviderFactory? _factory;
+        private int _depth;
+        public List<FakeConnection> Created { get; } = [];
+
+        public void Bind(CloudProviderFactory factory) => _factory = factory;
+
+        public string Id => "fake";
+        public string DisplayName => "Racing Cloud";
+        public string AuthorizationEndpoint => "/api/fake/connect";
+
+        public ICloudConnection CreateConnection(Guid shareId, SyncedFolder folder)
+        {
+            var connection = new FakeConnection();
+            Created.Add(connection);
+            if (Interlocked.Increment(ref _depth) == 1)
+                _factory!.CreateOrLoad(shareId, folder); // seed the cache as the "winner"
+            return connection;
+        }
+    }
 
     private sealed class FakeProvider : ICloudProvider
     {
@@ -105,11 +209,19 @@ public sealed class CloudProviderFactoryTests
     private sealed class FakeConnection : ICloudConnection
     {
         public string ServiceName => "Fake Cloud";
-        public bool WasDisposed { get; private set; }
+        public bool WasClosed { get; private set; }
+        public bool WasRevoked { get; private set; }
 
-        public Task Dispose()
+        public ValueTask CloseAsync()
         {
-            WasDisposed = true;
+            WasClosed = true;
+            return ValueTask.CompletedTask;
+        }
+
+        public Task RevokeAndCloseAsync()
+        {
+            WasRevoked = true;
+            WasClosed = true;
             return Task.CompletedTask;
         }
 

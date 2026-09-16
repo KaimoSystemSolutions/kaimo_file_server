@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -93,7 +94,11 @@ public sealed class FilenameSearchService
                 {
                     RecurseSubdirectories = true,
                     IgnoreInaccessible = true,
-                    AttributesToSkip = FileAttributes.System
+                    // Skip reparse points (symlinks/junctions): following one can loop
+                    // forever on a user-created cycle or match a target outside the share.
+                    // Cap recursion at the shared SafeDirectoryWalk depth.
+                    AttributesToSkip = FileAttributes.System | FileAttributes.ReparsePoint,
+                    MaxRecursionDepth = SafeDirectoryWalk.DefaultMaxDepth
                 };
 
                 // Match files by name...

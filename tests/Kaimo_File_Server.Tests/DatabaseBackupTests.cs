@@ -131,6 +131,81 @@ public sealed class DatabaseBackupTests
         Assert.True(File.Exists(manualOld)); // manual never auto-deleted
     }
 
+    // ── Pruning self-heal (plan Phase 6) ──────────────────────────────
+
+    [Fact]
+    public void ShouldPrune_FirstTick_ReturnsTrue()
+        => Assert.True(DatabaseBackupSchedulerService.ShouldPrune(DateTimeOffset.Now, lastPruneLocal: null));
+
+    [Fact]
+    public void ShouldPrune_WithinInterval_ReturnsFalse()
+    {
+        var now = DateTimeOffset.Now;
+        var lastPrune = now - TimeSpan.FromMinutes(30); // < 1h PruneInterval
+        Assert.False(DatabaseBackupSchedulerService.ShouldPrune(now, lastPrune));
+    }
+
+    [Fact]
+    public void ShouldPrune_AfterInterval_ReturnsTrue()
+    {
+        var now = DateTimeOffset.Now;
+        var lastPrune = now - DatabaseBackupSchedulerService.PruneInterval;
+        Assert.True(DatabaseBackupSchedulerService.ShouldPrune(now, lastPrune));
+    }
+
+    [Fact]
+    public async Task PruneAsync_WhenBackupsDisabled_KeepsScheduledBackups()
+    {
+        using var temp = new TempDir();
+        var now = DateTimeOffset.Now;
+
+        // Scheduled backups that WOULD be pruned by count/age if scheduled pruning ran.
+        var newest = WriteBackup(temp.Path, now.AddMinutes(-1), BackupTrigger.Scheduled);
+        var excess = WriteBackup(temp.Path, now.AddDays(-2), BackupTrigger.Scheduled);
+        var old = WriteBackup(temp.Path, now.AddDays(-40), BackupTrigger.Scheduled);
+
+        var service = CreateService(temp.Path);
+        await service.PruneAsync(
+            new BackupSettings { RetentionCount = 1, RetentionDays = 30 }, pruneScheduled: false);
+
+        // Disabling scheduled backups must not delete the ones already taken.
+        Assert.True(File.Exists(newest));
+        Assert.True(File.Exists(excess));
+        Assert.True(File.Exists(old));
+    }
+
+    [Fact]
+    public async Task PruneAsync_WhenBackupsDisabled_StillRemovesExpiredPreMigrationBackups()
+    {
+        using var temp = new TempDir();
+        var now = DateTimeOffset.Now;
+
+        // Pre-migration backups have their own fixed 90-day retention and are the actual
+        // unbounded source, so they must still be pruned even when scheduled pruning is off.
+        var expired = WriteBackup(temp.Path, now.AddDays(-100), BackupTrigger.PreMigration);
+        var recent = WriteBackup(temp.Path, now.AddDays(-10), BackupTrigger.PreMigration);
+
+        var service = CreateService(temp.Path);
+        await service.PruneAsync(
+            new BackupSettings { RetentionCount = 5, RetentionDays = 30 }, pruneScheduled: false);
+
+        Assert.False(File.Exists(expired));
+        Assert.True(File.Exists(recent));
+    }
+
+    [Fact]
+    public async Task PruneAsync_ManualBackups_AreNeverDeleted()
+    {
+        using var temp = new TempDir();
+        var now = DateTimeOffset.Now;
+        var manualOld = WriteBackup(temp.Path, now.AddDays(-400), BackupTrigger.Manual);
+
+        var service = CreateService(temp.Path);
+        await service.PruneAsync(new BackupSettings { RetentionCount = 1, RetentionDays = 30 });
+
+        Assert.True(File.Exists(manualOld));
+    }
+
     [Fact]
     public void ResolveBackupPath_Rejects_Traversal()
     {

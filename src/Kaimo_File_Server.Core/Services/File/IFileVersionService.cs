@@ -2,6 +2,15 @@
 
 namespace Kaimo_File_Server.Core.Services.File
 {
+    /// <summary>Outcome of an age-based version retention sweep.</summary>
+    public readonly record struct VersionRetentionSweepResult(
+        int PathsExamined, int VersionsRemoved, bool MoreWorkPending);
+
+    /// <summary>Outcome of an orphan-blob reclaim pass over a set of storage shards.</summary>
+    public readonly record struct OrphanBlobSweepResult(
+        int BlobsExamined, int BlobsDeleted, long BytesReclaimed,
+        int TempFilesDeleted, int ReadCacheFilesDeleted);
+
     /// <summary>
     /// Business logic for file versioning.
     /// 
@@ -97,5 +106,24 @@ namespace Kaimo_File_Server.Core.Services.File
 
         /// <summary>Deletes all versions for a share and reclaims unused blobs.</summary>
         Task<int> DeleteShareAsync(Guid shareId);
+
+        /// <summary>
+        /// Age-based retention sweep across the whole system: for every file with versions
+        /// older than <paramref name="maxAge"/>, deletes the expired versions while ALWAYS
+        /// keeping the newest <paramref name="minVersionsToKeep"/>. Bounded to
+        /// <paramref name="maxPaths"/> files per call; the result reports whether more work
+        /// is pending. Never empties a file's history.
+        /// </summary>
+        Task<VersionRetentionSweepResult> SweepExpiredVersionsAsync(
+            TimeSpan maxAge, int minVersionsToKeep, int maxPaths, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Reclaims unreferenced version blobs under the given storage shards, plus stale
+        /// write temporaries and read-cache files. Only deletes a blob that is unreferenced,
+        /// older than <paramref name="minimumAge"/>, and still unreferenced on a final
+        /// re-check under the blob lock.
+        /// </summary>
+        Task<OrphanBlobSweepResult> ReclaimOrphanBlobsAsync(
+            IReadOnlyList<string> shardPrefixes, TimeSpan minimumAge, CancellationToken cancellationToken = default);
     }
 }

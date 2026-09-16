@@ -52,6 +52,31 @@ public class FileMetadataLifecycleDatabaseTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task DeleteFileMetadataPaths_RemovesSubtreeAndReturnsCount()
+    {
+        var owner = SeedUser("owner");
+        var share = SeedShare("docs");
+        var folderAcl = new AccessEntry(
+            owner.Id, AclEntryType.Allow, FilePermission.ReadAll, AclInheritance.Everything);
+        SeedFileWithAcl(share.Id, "folder", true, owner.Id, folderAcl);
+        SeedFileWithAcl(share.Id, "folder/a.txt", false, owner.Id);
+        SeedFileWithAcl(share.Id, "folder/nested/b.txt", false, owner.Id);
+        SeedFileWithAcl(share.Id, "keep.txt", false, owner.Id);
+
+        // Now a set-based ExecuteDelete: returns the affected-row count directly and
+        // relies on the DB cascade to remove the ACL rows for the deleted subtree.
+        var deleted = await AclRepo().DeleteFileMetadataPathsAsync(share.Id, "folder");
+
+        Assert.Equal(3, deleted);
+        await using var db = NewContext();
+        Assert.DoesNotContain(db.FileMetadata,
+            m => m.ShareId == share.Id && (m.Path == "folder" || m.Path.StartsWith("folder/")));
+        Assert.Contains(db.FileMetadata, m => m.ShareId == share.Id && m.Path == "keep.txt");
+        // The cascade removed the ACL rows anchored on the deleted subtree.
+        Assert.False(await db.AccessEntries.AnyAsync(e => e.Id == folderAcl.Id));
+    }
+
+    [Fact]
     public async Task DeleteShareMetadataAsync_RemovesOnlySelectedShare()
     {
         var owner = SeedUser("owner");
