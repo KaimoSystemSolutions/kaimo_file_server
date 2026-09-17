@@ -61,7 +61,7 @@ public class ContentProvider
     // ponytail: fixed 25 MB cap, make it a setting if someone needs deeper content.
     private const long MaxContentBytes = 25L * 1024 * 1024;
 
-    public static async Task<string> GetContent(Stream fileStream)
+    public static async Task<string> GetContent(Stream fileStream, string fileName = "")
     {
         using var memoryStream = new MemoryStream();
         // Read at most MaxContentBytes + 1 so we can tell "exactly at cap" from
@@ -77,6 +77,28 @@ public class ContentProvider
         if (bytes.Length > MaxContentBytes)
             return string.Empty;
 
+        // Route PDF/docx by file extension first. Magic-byte sniffing sees a docx
+        // as a generic ZIP ("application/zip") and would skip it as an archive, so
+        // content-based detection alone silently dropped the text of many docx files.
+        string ext = Path.GetExtension(fileName).ToLowerInvariant();
+        if (ext == ".pdf")
+            return TryExtract(ExtractPdfText, bytes);
+        // OOXML (ZIP-boxed) Office formats.
+        if (ext is ".docx" or ".docm")
+            return TryExtract(ExtractDocxText, bytes);
+        if (ext is ".xlsx" or ".xlsm")
+            return TryExtract(ExtractXlsxText, bytes);
+        if (ext is ".pptx" or ".pptm")
+            return TryExtract(ExtractPptxText, bytes);
+        // Legacy binary Office formats (OLE compound files). NPOI's .NET build only
+        // ships HSSF, so .xls works; .doc (HWPF) and .ppt (HSLF) are not supported
+        // by the library and fall through to filename-only indexing.
+        if (ext == ".xls")
+            return TryExtract(ExtractXlsText, bytes);
+        // OpenDocument (ZIP-boxed) formats: text, spreadsheet, presentation.
+        if (ext is ".odt" or ".ods" or ".odp")
+            return TryExtract(ExtractOdfText, bytes);
+
         var results = Inspector.Inspect(bytes);
         var mimeType = results.ByMimeType().FirstOrDefault()?.MimeType.ToLower();
 
@@ -86,10 +108,10 @@ public class ContentProvider
                 return string.Empty;
 
             if (PdfMimeTypes.Contains(mimeType))
-                return ExtractPdfText(bytes);
+                return TryExtract(ExtractPdfText, bytes);
 
             if (DocxMimeTypes.Contains(mimeType))
-                return ExtractDocxText(bytes);
+                return TryExtract(ExtractDocxText, bytes);
         }
 
         // No known binary signature matched — try as text
@@ -135,6 +157,25 @@ public class ContentProvider
         return true;
     }
 
+    /// <summary>
+    /// Runs an extractor, returning empty on failure. A corrupt, encrypted or
+    /// otherwise unparseable PDF/docx then still gets indexed by filename instead
+    /// of throwing and dropping the whole document from the index.
+    /// </summary>
+    private static string TryExtract(Func<byte[], string> extractor, byte[] bytes)
+    {
+        try
+        {
+            return extractor(bytes);
+        }
+        catch
+        {
+            // ponytail: swallow parse errors, filename-only fallback. Add logging
+            // (needs an ILogger passed in) if silent misses become a problem.
+            return string.Empty;
+        }
+    }
+
     private static string ExtractPdfText(byte[] bytes)
     {
         using var doc = UglyToad.PdfPig.PdfDocument.Open(bytes);
@@ -158,5 +199,78 @@ public class ContentProvider
         var texts = doc.Descendants(w + "t").Select(t => t.Value);
         return string.Join("", texts);
     }
-    
+
+    // xlsx and pptx are OOXML packages just like docx (a ZIP of XML parts). The
+    // textual content sits in <t> elements — sharedStrings for a workbook, the
+    // slide parts for a presentation — regardless of the XML namespace, so both
+    // reuse the same local-name "t" scan restricted to the relevant parts.
+    private static string ExtractXlsxText(byte[] bytes)
+        => ExtractOoxmlText(bytes, name => name == "xl/sharedStrings.xml");
+
+    private static string ExtractPptxText(byte[] bytes)
+        => ExtractOoxmlText(bytes, name =>
+            name.StartsWith("ppt/slides/slide", StringComparison.Ordinal)
+            && name.EndsWith(".xml", StringComparison.Ordinal));
+
+    private static string ExtractOoxmlText(byte[] bytes, Func<string, bool> partFilter)
+    {
+        using var stream = new MemoryStream(bytes);
+        using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
+
+        var sb = new StringBuilder();
+        foreach (var entry in zip.Entries)
+        {
+            if (!partFilter(entry.FullName)) continue;
+
+            using var entryStream = entry.Open();
+            var doc = XDocument.Load(entryStream);
+            foreach (var t in doc.Descendants().Where(e => e.Name.LocalName == "t"))
+            {
+                sb.Append(t.Value);
+                sb.Append(' ');
+            }
+        }
+        return sb.ToString();
+    }
+
+    // ── Legacy binary Office format (.xls) via NPOI/HSSF ──
+
+    private static string ExtractXlsText(byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes);
+        var workbook = new NPOI.HSSF.UserModel.HSSFWorkbook(stream);
+        var sb = new StringBuilder();
+        for (int i = 0; i < workbook.NumberOfSheets; i++)
+        {
+            var sheet = workbook.GetSheetAt(i);
+            foreach (NPOI.SS.UserModel.IRow row in sheet)
+            {
+                foreach (NPOI.SS.UserModel.ICell cell in row)
+                {
+                    sb.Append(cell.ToString());
+                    sb.Append(' ');
+                }
+            }
+        }
+        return sb.ToString();
+    }
+
+    // ── OpenDocument formats (ZIP-boxed) ──
+
+    // ODF stores the document body as marked-up XML in content.xml; unlike OOXML
+    // the text is the elements' own content, not <t> nodes. Concatenating every
+    // text node yields the searchable text across odt/ods/odp alike.
+    private static string ExtractOdfText(byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes);
+        using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
+        var entry = zip.GetEntry("content.xml");
+        if (entry == null) return string.Empty;
+
+        using var entryStream = entry.Open();
+        var doc = XDocument.Load(entryStream);
+        var texts = doc.DescendantNodes().OfType<XText>().Select(t => t.Value);
+        return string.Join(" ", texts);
+    }
+
 }

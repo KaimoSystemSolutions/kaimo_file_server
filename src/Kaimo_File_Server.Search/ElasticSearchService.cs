@@ -704,7 +704,7 @@ public class ElasticSearchService : ISearchService
         string content;
         await using (var fileStream = await fileData)
         {
-            content = await ContentProvider.GetContent(fileStream);
+            content = await ContentProvider.GetContent(fileStream, fileName);
         }
 
         string sharePath = Path.GetRelativePath(share.Path, absolutePath);

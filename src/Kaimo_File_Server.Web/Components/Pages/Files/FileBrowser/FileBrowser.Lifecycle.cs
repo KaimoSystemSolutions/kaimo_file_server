@@ -74,10 +74,18 @@ public partial class FileBrowser
         _selectedItems.Clear();
         var item = FindShareItem(itemName);
         if (item is not null)
+        {
             _selectedItems.Add(item);
+            // Scroll the (possibly off-screen, virtualized) row into view after the
+            // next render, so a search hit is always visible, not just selected.
+            _pendingScrollIndex = SortedEntries.IndexOf(item);
+        }
 
         return true;
     }
+
+    // Index of a search-selected entry to scroll to on the next render (-1 = none).
+    private int _pendingScrollIndex = -1;
 
     private void OnVmStateChanged() => InvokeAsync(StateHasChanged);
 
@@ -102,8 +110,15 @@ public partial class FileBrowser
             if (VM.Capabilities.CanMove)
                 await JS.InvokeVoidAsync("initInternalDragDrop");
         }
-        
-        
+
+        if (_pendingScrollIndex >= 0)
+        {
+            var index = _pendingScrollIndex;
+            _pendingScrollIndex = -1;
+            await JS.InvokeVoidAsync(
+                "fileMarquee.scrollToIndex", "#file-selection-area",
+                index, ItemHeightPx, VM.HasParent);
+        }
     }
 
     private void UpdateAclPath() => _aclPath = VM.CurrentPath ?? "";

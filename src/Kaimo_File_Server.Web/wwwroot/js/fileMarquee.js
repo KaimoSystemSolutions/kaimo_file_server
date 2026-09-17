@@ -273,5 +273,51 @@ window.fileMarquee = (() => {
         instances.delete(selector);
     }
 
-    return { initialize, dispose };
+    /**
+     * Scrolls the file list so the entry at `index` is centered. Used after a
+     * global-search hit selects a file: rows are virtualized, so the target row
+     * may not be in the DOM — index math against the uniform row height reaches it
+     * regardless of what is currently rendered. `hasParent` accounts for the ".."
+     * row that precedes the sorted entries.
+     */
+    function scrollToIndex(selector, index, itemHeight, hasParent) {
+        const host = document.querySelector(selector);
+        if (!host || index < 0) return;
+
+        const scroller = findScrollContainer(host);
+        const isPage = scroller === document.scrollingElement;
+        const viewportHeight = isPage ? window.innerHeight : scroller.clientHeight;
+
+        // Coarse jump by index so Virtualize materializes the (possibly off-screen)
+        // target row. Instant, not smooth, so the row is rendered before we center.
+        const header = host.querySelector('.file-grid-header');
+        const viewportTop = isPage ? 0 : scroller.getBoundingClientRect().top;
+        const currentScroll = isPage ? window.scrollY : scroller.scrollTop;
+        const headerBottom = header
+            ? header.getBoundingClientRect().bottom
+            : host.getBoundingClientRect().top;
+        const entriesTop = headerBottom - viewportTop + currentScroll;
+        const rowTop = entriesTop + (index + (hasParent ? 1 : 0)) * itemHeight;
+        const top = Math.max(0, rowTop - viewportHeight / 2 + itemHeight / 2);
+
+        if (isPage) window.scrollTo({ top, behavior: 'auto' });
+        else scroller.scrollTop = top;
+
+        // Then center the real row once it renders. scrollIntoView respects the
+        // actual layout (sticky header, toolbar) that pure index math can't see,
+        // so the entry is never left hidden above the fold. Blazor Server renders
+        // the virtualized row after a scroll round-trip, so poll briefly for it.
+        let tries = 0;
+        const settle = () => {
+            const row = host.querySelector('.file-row--selected');
+            if (row) {
+                row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            } else if (tries++ < 20) {
+                setTimeout(settle, 50);
+            }
+        };
+        setTimeout(settle, 50);
+    }
+
+    return { initialize, dispose, scrollToIndex };
 })();
