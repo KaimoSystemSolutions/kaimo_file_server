@@ -7,6 +7,7 @@ using Kaimo_File_Server.Core.Services.DataServices;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Core.Services.ExternalStorage;
 using Kaimo_File_Server.Infrastructure.ExternalStorage;
+using Kaimo_File_Server.Search;
 
 namespace Kaimo_File_Server.Infrastructure.Clouds;
 
@@ -42,7 +43,8 @@ public sealed class CloudSyncExecutionService(
     ICloudProviderFactory providers,
     IFileServiceFactory fileServices,
     ICloudSyncOperationCoordinator operations,
-    IStorageConnectionProviderCatalog? storageProviderCatalog = null) : ICloudSyncExecutionService
+    IStorageConnectionProviderCatalog? storageProviderCatalog = null,
+    ISearchService? searchService = null) : ICloudSyncExecutionService
 {
     public async Task<CloudSyncExecutionResult> RunAsync(
         Guid shareId,
@@ -253,6 +255,7 @@ public sealed class CloudSyncExecutionService(
             definition.AdvancedSettings.MaxFileSizeBytes,
             transferLimit);
 
+        IReadOnlyList<string> receivedFiles = [];
         IStorageSession? session = null;
         try
         {
@@ -261,7 +264,7 @@ public sealed class CloudSyncExecutionService(
                 ?? throw new NotSupportedException(
                     "The storage provider did not expose its advertised optimized synchronization contract.");
             reportProgress?.Invoke(null, 0);
-            await optimizedSync.SynchronizeAsync(request, cancellationToken);
+            receivedFiles = await optimizedSync.SynchronizeAsync(request, cancellationToken) ?? [];
             reportProgress?.Invoke(null, 100);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -290,6 +293,52 @@ public sealed class CloudSyncExecutionService(
             normalizedLocalPath,
             completedAtUtc,
             new Dictionary<string, string>());
+
+        // rsync writes straight to disk, bypassing FileService, so none of the
+        // per-file search-index hooks fired. Feed exactly the files rsync reported
+        // as received (from --itemize-changes) to the index — no full-share rescan.
+        await IndexReceivedFilesAsync(receivedFiles, cancellationToken);
+    }
+
+    /// <summary>
+    /// Indexes the files a pull just wrote to disk. Best-effort per file: the
+    /// index is a rebuildable projection, so a disabled search backend or a single
+    /// file that vanished between transfer and indexing must never fail a
+    /// completed sync.
+    /// </summary>
+    private async Task IndexReceivedFilesAsync(
+        IReadOnlyList<string> absolutePaths, CancellationToken cancellationToken)
+    {
+        if (searchService is null || absolutePaths.Count == 0)
+            return;
+
+        foreach (string absolutePath in absolutePaths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Stream? content = null;
+            try
+            {
+                content = new FileStream(
+                    absolutePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
+                // The search service takes ownership of the stream (as WriteFileAsync
+                // and reindex do); clear our handle so it is not disposed twice.
+                await searchService.onFileCreated(absolutePath, Task.FromResult<Stream>(content), cancellationToken);
+                content = null;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                // Skip this file; the manual reindex remains the catch-all repair.
+            }
+            finally
+            {
+                if (content is not null)
+                    await content.DisposeAsync();
+            }
+        }
     }
 
     /// <summary>

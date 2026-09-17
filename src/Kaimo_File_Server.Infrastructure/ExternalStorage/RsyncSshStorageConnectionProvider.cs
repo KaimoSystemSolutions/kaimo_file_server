@@ -10,7 +10,13 @@ namespace Kaimo_File_Server.Infrastructure.ExternalStorage;
 public interface IRsyncProcessRunner
 {
     Task<bool> TestSshAsync(RsyncSshConnectionSettings settings, CancellationToken cancellationToken);
-    Task RunRsyncAsync(
+
+    /// <summary>
+    /// Runs rsync and returns the absolute filesystem paths of the regular files
+    /// received into the local tree (pull only), parsed from
+    /// <c>--itemize-changes</c> output. Push returns an empty list.
+    /// </summary>
+    Task<IReadOnlyList<string>> RunRsyncAsync(
         RsyncSshConnectionSettings settings,
         OptimizedSyncRequest request,
         CancellationToken cancellationToken);
@@ -164,7 +170,7 @@ internal sealed class RsyncSshOptimizedSync(
     RsyncSshConnectionSettings settings,
     IRsyncProcessRunner processRunner) : IOptimizedStorageSync
 {
-    public Task SynchronizeAsync(
+    public Task<IReadOnlyList<string>> SynchronizeAsync(
         OptimizedSyncRequest request,
         CancellationToken cancellationToken = default)
         => processRunner.RunRsyncAsync(settings, request, cancellationToken);
@@ -184,7 +190,12 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
         return (await RunAsync("ssh", arguments, cancellationToken, throwOnFailure: false)) == 0;
     }
 
-    public async Task RunRsyncAsync(
+    // ponytail: 100k received paths held in memory per run; a massive first-seed
+    // pull beyond this indexes the first 100k and leaves the rest to a manual
+    // reindex. Raise or stream to the index if that ever bites.
+    private const int MaximumItemizedPaths = 100_000;
+
+    public async Task<IReadOnlyList<string>> RunRsyncAsync(
         RsyncSshConnectionSettings settings,
         OptimizedSyncRequest request,
         CancellationToken cancellationToken)
@@ -199,10 +210,49 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
         // Abort a transfer that stalls with no I/O so a hung remote cannot pin
         // the operation open indefinitely; ssh ConnectTimeout only guards setup.
         arguments.Add("--timeout=300");
+        // Emit one itemized line per changed entry so received files can be fed to
+        // the search index without a full-share rescan (see ReceivedFileAbsolutePath).
+        arguments.Add("--itemize-changes");
         arguments.AddRange(["-e", remoteShell]);
         arguments.Add("--");
         AddEndpoints(arguments, request.Direction, local, remote);
-        await RunAsync("rsync", arguments, cancellationToken, throwOnFailure: true);
+
+        // Only a pull writes into the local tree; a push changes nothing here.
+        var received = request.Direction == OptimizedSyncDirection.Pull ? new List<string>() : null;
+        void CollectReceived(string line)
+        {
+            if (received is null || received.Count >= MaximumItemizedPaths)
+                return;
+            if (ReceivedFileAbsolutePath(localPath, line) is { } absolute)
+                received.Add(absolute);
+        }
+
+        await RunAsync("rsync", arguments, cancellationToken, throwOnFailure: true, CollectReceived);
+        return received ?? (IReadOnlyList<string>)[];
+    }
+
+    /// <summary>
+    /// Maps one <c>--itemize-changes</c> line to the absolute path of a regular
+    /// file received into the local tree, or null for anything else. rsync prints
+    /// eleven flag characters, a space, then the entry path. A received regular
+    /// file starts with <c>&gt;f</c>; directories, attribute-only touches,
+    /// deletions (<c>*deleting</c>) and pushed items (<c>&lt;...</c>) are not local
+    /// content additions and are skipped.
+    /// </summary>
+    internal static string? ReceivedFileAbsolutePath(string localRoot, string itemizeLine)
+    {
+        if (itemizeLine.Length < 13 || itemizeLine[0] != '>' || itemizeLine[1] != 'f')
+            return null;
+        string relative = itemizeLine[12..].Trim();
+        if (relative.Length == 0)
+            return null;
+        string absolute = Path.GetFullPath(
+            Path.Combine(localRoot, relative.Replace('/', Path.DirectorySeparatorChar)));
+        // Defense in depth: never surface a path that escaped the transfer root.
+        return absolute == localRoot
+               || absolute.StartsWith(localRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            ? absolute
+            : null;
     }
 
     private static List<string> BuildTransferArguments(OptimizedSyncRequest request)
@@ -330,7 +380,8 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
         string fileName,
         IReadOnlyCollection<string> arguments,
         CancellationToken cancellationToken,
-        bool throwOnFailure)
+        bool throwOnFailure,
+        Action<string>? onStdoutLine = null)
     {
         var startInfo = new ProcessStartInfo(fileName)
         {
@@ -355,7 +406,12 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
         }
 
         Task<string> stderr = ReadBoundedAsync(process.StandardError, cancellationToken);
-        Task<string> stdout = ReadBoundedAsync(process.StandardOutput, cancellationToken);
+        // When a caller wants the itemized output it must be streamed line by line
+        // (a full sync emits far more than the bounded diagnostic buffer holds);
+        // otherwise the stream is still drained to keep the child from blocking.
+        Task stdout = onStdoutLine is null
+            ? ReadBoundedAsync(process.StandardOutput, cancellationToken)
+            : ReadLinesAsync(process.StandardOutput, onStdoutLine, cancellationToken);
         try
         {
             await process.WaitForExitAsync(cancellationToken);
@@ -376,6 +432,15 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
             throw new IOException($"The rsync helper failed with exit code {process.ExitCode}.");
         }
         return process.ExitCode;
+    }
+
+    private static async Task ReadLinesAsync(
+        StreamReader reader,
+        Action<string> onLine,
+        CancellationToken cancellationToken)
+    {
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+            onLine(line);
     }
 
     private static async Task<string> ReadBoundedAsync(

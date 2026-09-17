@@ -20,6 +20,31 @@ public sealed class ProtocolStorageProviderTests : IDisposable
     public ProtocolStorageProviderTests() => Directory.CreateDirectory(_temporaryRoot);
 
     [Fact]
+    public void RsyncItemize_MapsOnlyReceivedRegularFilesToAbsolutePaths()
+    {
+        string root = _temporaryRoot;
+        string Expected(string relative) =>
+            Path.GetFullPath(Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar)));
+
+        // ">f" = a regular file received into the local tree; path starts at column 12.
+        Assert.Equal(
+            Expected("docs/new file.txt"),
+            RsyncProcessRunner.ReceivedFileAbsolutePath(root, ">f+++++++++ docs/new file.txt"));
+        Assert.Equal(
+            Expected("report.pdf"),
+            RsyncProcessRunner.ReceivedFileAbsolutePath(root, ">f.st...... report.pdf"));
+
+        // Not local content additions → skipped.
+        Assert.Null(RsyncProcessRunner.ReceivedFileAbsolutePath(root, "cd+++++++++ docs/"));
+        Assert.Null(RsyncProcessRunner.ReceivedFileAbsolutePath(root, ".d..t...... docs/"));
+        Assert.Null(RsyncProcessRunner.ReceivedFileAbsolutePath(root, "*deleting   gone.txt"));
+        Assert.Null(RsyncProcessRunner.ReceivedFileAbsolutePath(root, "<f+++++++++ pushed.txt"));
+
+        // A traversal in the reported path never resolves outside the transfer root.
+        Assert.Null(RsyncProcessRunner.ReceivedFileAbsolutePath(root, ">f+++++++++ ../escape.txt"));
+    }
+
+    [Fact]
     public void Catalog_RejectsDuplicateProviderIdsIgnoringCase()
     {
         var first = new Mock<IStorageConnectionProvider>();

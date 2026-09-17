@@ -120,7 +120,14 @@ public sealed record OptimizedSyncRequest(
 /// <summary>Optional native sync transport, for example rsync over pinned SSH.</summary>
 public interface IOptimizedStorageSync
 {
-    Task SynchronizeAsync(
+    /// <summary>
+    /// Runs the native transfer and returns the absolute filesystem paths of the
+    /// regular files that were newly written into the local tree (pull only) so
+    /// the caller can hand exactly those to the search index without a full-share
+    /// rescan. A push, or a transport that cannot itemize its changes, returns an
+    /// empty list.
+    /// </summary>
+    Task<IReadOnlyList<string>> SynchronizeAsync(
         OptimizedSyncRequest request,
         CancellationToken cancellationToken = default);
 }
