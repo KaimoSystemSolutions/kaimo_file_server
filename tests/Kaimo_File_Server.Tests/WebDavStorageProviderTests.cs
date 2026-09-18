@@ -383,6 +383,42 @@ public sealed class WebDavStorageProviderTests
     }
 
     [Fact]
+    public void ParseMultiStatusResponse_SkipsSelfEntryWhenParentPathHasSpaces()
+    {
+        // Nextcloud percent-encodes the collection's own href; the parent path
+        // carries a literal space. The self-entry must still be filtered so the
+        // tree walker does not recurse into "Shared Documents/Shared Documents".
+        const string xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <d:multistatus xmlns:d="DAV:">
+              <d:response>
+                <d:href>/dav/Documents/Shared%20Documents/</d:href>
+                <d:propstat>
+                  <d:status>HTTP/1.1 200 OK</d:status>
+                  <d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop>
+                </d:propstat>
+              </d:response>
+              <d:response>
+                <d:href>/dav/Documents/Shared%20Documents/report.txt</d:href>
+                <d:propstat>
+                  <d:status>HTTP/1.1 200 OK</d:status>
+                  <d:prop>
+                    <d:resourcetype/>
+                    <d:getcontentlength>7</d:getcontentlength>
+                  </d:prop>
+                </d:propstat>
+              </d:response>
+            </d:multistatus>
+            """;
+
+        var store = new WebDavRemoteFileStore(new HttpClient(), "https://example.com/dav");
+        var items = store.ParseMultiStatusResponse(xml, "/Documents/Shared Documents");
+
+        Assert.Single(items);
+        Assert.Equal("report.txt", items[0].Name);
+    }
+
+    [Fact]
     public async Task EnsureSuccessOrThrow_AcceptsSuccessAndMultiStatus()
     {
         var ok = new HttpResponseMessage(HttpStatusCode.OK);

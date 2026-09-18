@@ -231,7 +231,7 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
         XDocument document = XDocument.Parse(xml);
         var items = new List<RemoteStorageItem>();
         Uri parentUri = ResolveUri(parentPath, trailingSlash: true);
-        string parentHref = parentUri.AbsolutePath.TrimEnd('/');
+        string parentHref = Uri.UnescapeDataString(parentUri.AbsolutePath).TrimEnd('/');
 
         foreach (XElement responseElement in document.Descendants(DavNamespace + "response"))
         {
