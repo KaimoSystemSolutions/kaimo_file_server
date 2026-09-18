@@ -70,7 +70,8 @@ public class LoginViewModel
 
                 case LoginOutcome.AccountDisabled:
                     _logger.LogWarning("Login abgelehnt – Konto deaktiviert: {Username}", Username);
-                    ErrorMessage = Resources.Web_Login_AccountDisabled;
+                    // Never disclose the real reason outward — see default below.
+                    ErrorMessage = Resources.Web_Login_InvalidCredentials;
                     return false;
 
                 case LoginOutcome.LockedOut:
@@ -78,10 +79,13 @@ public class LoginViewModel
                     _logger.LogWarning(
                         "Login gesperrt (Brute-Force-Schutz) für {Username}, erneut in {Minutes} min",
                         Username, minutes);
-                    ErrorMessage = string.Format(Resources.Web_Login_TooManyAttempts, minutes);
+                    // Never disclose the real reason outward — see default below.
+                    ErrorMessage = Resources.Web_Login_InvalidCredentials;
                     return false;
 
-                default: // InvalidCredentials
+                default: // InvalidCredentials — the ONLY message ever shown for a
+                         // failed login, so the reason (unknown user, wrong password,
+                         // disabled, locked out) cannot be inferred from the outside.
                     ErrorMessage = Resources.Web_Login_InvalidCredentials;
                     return false;
             }

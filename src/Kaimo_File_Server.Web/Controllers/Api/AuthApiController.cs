@@ -94,7 +94,11 @@ public sealed class AuthApiController : ApiControllerBase
                     new ApiError("locked_out", "Too many attempts. Try again later."));
 
             case LoginOutcome.AccountDisabled:
-                return ApiForbidden("Account is disabled.");
+                // Log the real reason internally, but never disclose it outward:
+                // return the same 401 as invalid credentials so a caller cannot tell
+                // a disabled (but otherwise valid) account from a wrong password.
+                _logger.LogWarning("Login rejected – account disabled: {Username}", request.Username);
+                return ApiUnauthorized("Invalid username or password.");
 
             default:
                 return ApiUnauthorized("Invalid username or password.");
