@@ -246,8 +246,21 @@ public partial class FileBrowser
 
         var toastId = Toast.Show(Resources.Web_Common_Deleting, ToastType.Progress);
 
+        // A large delete can take a while, so surface it in the global job menu
+        // alongside the toast. The job mirrors the upload/transfer pattern: one job
+        // per batch, per-item progress, cancellable from the menu or toast.
+        var jobTitle = string.Format(
+            T("Web_Jobs_Delete_Title"),
+            targets.Count == 1 ? targets[0].Name : string.Format(T("Web_Transfer_Items"), targets.Count));
+        using var job = Jobs.Start(jobTitle, Resources.Web_Common_Deleting, "delete");
+        Toast.Update(toastId, onDismiss: () => { job.Cancel(); return Task.CompletedTask; });
+
+        var done = 0;
         foreach (var target in targets)
         {
+            if (job.CancellationToken.IsCancellationRequested)
+                break;
+
             var result = await VM.DeleteAsync(target);
             if (!result.Success)
             {
@@ -260,6 +273,10 @@ public partial class FileBrowser
             }
 
             deletedNames.Add(target.Name);
+            done++;
+            job.Update(
+                string.Format(T("Web_Jobs_ItemCounter"), done, targets.Count),
+                targets.Count == 0 ? 100 : done * 100 / targets.Count);
         }
 
         Toast.Update(

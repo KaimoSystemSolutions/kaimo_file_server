@@ -552,22 +552,40 @@ public partial class FileBrowser
         }
 
         var toastId = Toast.Show(Resources.Web_EmptyRecycle_Progress, ToastType.Progress);
+
+        // Emptying a full recycle bin can delete many items, so mirror it as a
+        // cancellable job in the global menu next to the toast.
+        using var job = Jobs.Start(
+            T("Web_Jobs_EmptyRecycle_Title"), Resources.Web_EmptyRecycle_Progress, "delete");
+        Toast.Update(toastId, onDismiss: () => { job.Cancel(); return Task.CompletedTask; });
+
         var failed = new List<string>();
+        var done = 0;
         foreach (var child in children)
         {
+            if (job.CancellationToken.IsCancellationRequested)
+                break;
+
             var result = await VM.DeleteAsync(child);
             if (!result.Success)
                 failed.Add(child.Name);
+
+            done++;
+            job.Update(
+                string.Format(T("Web_Jobs_ItemCounter"), done, children.Count),
+                children.Count == 0 ? 100 : done * 100 / children.Count);
         }
 
-        if (failed.Count == 0)
+        // A cancelled run leaves items behind, so only claim full success when the
+        // whole bin was processed without failures; otherwise report what was removed.
+        if (failed.Count == 0 && done == children.Count)
         {
             Toast.Update(toastId, Resources.Web_EmptyRecycle_Success, type: ToastType.Success);
         }
         else
         {
             Toast.Update(toastId,
-                string.Format(Resources.Web_EmptyRecycle_PartialFailure, children.Count - failed.Count, children.Count),
+                string.Format(Resources.Web_EmptyRecycle_PartialFailure, done - failed.Count, children.Count),
                 type: ToastType.Error);
         }
 
