@@ -5,15 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <link rel="icon" type="image/svg+xml" href="/svg/favicon.svg" />
-    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/app.css?v=2" />
     <link href="Kaimo_File_Server.Web.styles.css" rel="stylesheet" />
     <HeadOutlet @rendermode="new InteractiveServerRenderMode(prerender: false)" />
 
-    @* Theme is set immediately to prevent flash *@
+    @* Theme and accent are set immediately to prevent flash *@
     <script>
             (function() {
                 var t = localStorage.getItem('kaimo_theme') || 'dark';
                 document.documentElement.setAttribute('data-theme', t);
+                var a = localStorage.getItem('kaimo_accent') || 'green';
+                document.documentElement.setAttribute('data-accent', a);
             })();
     </script>
 </head>

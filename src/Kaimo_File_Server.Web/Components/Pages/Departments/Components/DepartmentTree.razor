@@ -59,9 +59,10 @@
                                 <span class="dept-tree-icon @(isGlobal ? "dept-tree-icon--global" : "dept-tree-icon--department")">
                                     @if (isGlobal)
                                     {
+                                        var (globalColor, _) = DepartmentPalette.For(dept.Id, dept.Color);
                                         @Icons.SVG("compass.svg", new SvgOptions(
                                             Width: 18, Height: 18,
-                                            Color: "var(--accent-brand)",
+                                            Color: globalColor,
                                             StrokeWidth: 1.8f))
                                     }
                                     else

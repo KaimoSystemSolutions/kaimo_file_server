@@ -96,9 +96,17 @@
     background: var(--bg-secondary);
 }
 
+/* User display and its logout button sit together on one row. */
+.sidebar-user-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 9px;
+}
+
 .sidebar-user {
     min-width: 0;
-    width: 100%;
+    flex: 1 1 auto;
     display: flex;
     align-items: center;
     gap: 9px;
@@ -170,6 +178,47 @@
     background: var(--bg-hover);
     border-color: var(--border-strong);
     color: var(--text-primary);
+}
+
+.accent-picker {
+    position: relative;
+}
+
+/* Opens upward as a vertical, right-aligned column: the footer sits at the
+   bottom of the sidebar on desktop. */
+.accent-popover {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    box-shadow: var(--shadow-lg);
+    z-index: 50;
+}
+
+.accent-swatch {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    background: var(--swatch);
+    cursor: pointer;
+    transition: transform 100ms ease, border-color 100ms ease;
+}
+
+.accent-swatch:hover {
+    transform: scale(1.15);
+}
+
+.accent-swatch--active {
+    border-color: var(--text-primary);
 }
 
 .main {
@@ -289,6 +338,18 @@
 
     .sidebar-actions {
         gap: 3px;
+    }
+
+    /* Let the user row take the free space in the horizontal footer bar. */
+    .sidebar-user-row {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    /* Footer is a top bar on mobile — open the popover downward instead. */
+    .accent-popover {
+        top: calc(100% + 6px);
+        bottom: auto;
     }
 
     .main {

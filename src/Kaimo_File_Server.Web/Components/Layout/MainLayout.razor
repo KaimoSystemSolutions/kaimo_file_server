@@ -17,7 +17,7 @@
 @inject Kaimo_File_Server.Web.Components.ProfileNavigator ProfileNav
 
 
-<div class="app-shell" data-theme="@Theme.Current">
+<div class="app-shell" data-theme="@Theme.Current" data-accent="@Theme.Accent">
     <nav class="sidebar">
         <div class="sidebar-brand">
             @* Don't replace this with an Assets.SVG call, cuz this a lil too complicated for it *@
@@ -70,24 +70,49 @@
                 @Assets.SVG("gear.svg", new SvgOptions())
                 <span class="nav-label">@Resources.Web_Nav_Settings</span>
             </NavLink>
-            @if (!string.IsNullOrEmpty(_displayName))
-            {
-                <button type="button" class="sidebar-user" @onclick="GoToOwnProfile"
-                        title="@Resources.Web_Nav_ViewProfile">
-                    <div class="sidebar-avatar">
-                        @if (_avatarUri is not null)
-                        {
-                            <img src="@_avatarUri" alt="" />
-                        }
-                        else
-                        {
-                            @_initials
-                        }
-                    </div>
-                    <span class="sidebar-username">@_displayName</span>
+            <div class="sidebar-user-row">
+                @if (!string.IsNullOrEmpty(_displayName))
+                {
+                    <button type="button" class="sidebar-user" @onclick="GoToOwnProfile"
+                            title="@Resources.Web_Nav_ViewProfile">
+                        <div class="sidebar-avatar">
+                            @if (_avatarUri is not null)
+                            {
+                                <img src="@_avatarUri" alt="" />
+                            }
+                            else
+                            {
+                                @_initials
+                            }
+                        </div>
+                        <span class="sidebar-username">@_displayName</span>
+                    </button>
+                }
+                <button class="theme-toggle" @onclick="Logout" title="@Resources.Web_Nav_Logout">
+                    @Assets.SVG("logout.svg", new SvgOptions())
                 </button>
-            }
+            </div>
             <div class="sidebar-actions">
+                <div class="accent-picker">
+                    <button class="theme-toggle" @onclick="ToggleAccentMenu"
+                            title="@Text("Web_Nav_AccentColor", "Accent color")">
+                        @Assets.SVG("palette.svg", new SvgOptions())
+                    </button>
+                    @if (_accentOpen)
+                    {
+                        <div class="accent-popover">
+                            @foreach (var accent in ThemeService.Accents)
+                            {
+                                <button type="button"
+                                        class="accent-swatch @(Theme.Accent == accent ? "accent-swatch--active" : "")"
+                                        style="--swatch:@AccentDot(accent)"
+                                        title="@AccentLabel(accent)"
+                                        aria-label="@AccentLabel(accent)"
+                                        @onclick="() => SetAccent(accent)"></button>
+                            }
+                        </div>
+                    }
+                </div>
                 <button class="theme-toggle" @onclick="ToggleTheme" title="@Resources.Web_Nav_ToggleTheme">
                     @if (Theme.IsDark)
                     {
@@ -97,9 +122,6 @@
                     {
                         @Assets.SVG("moon.svg", new SvgOptions())
                     }
-                </button>
-                <button class="theme-toggle" @onclick="Logout" title="@Resources.Web_Nav_Logout">
-                    @Assets.SVG("logout.svg", new SvgOptions())
                 </button>
             </div>
         </div>
@@ -270,6 +292,34 @@
         await Theme.ToggleAsync();
         StateHasChanged();
     }
+
+    private bool _accentOpen;
+
+    private void ToggleAccentMenu() => _accentOpen = !_accentOpen;
+
+    private async Task SetAccent(string accent)
+    {
+        await Theme.SetAccentAsync(accent);
+        _accentOpen = false;
+        StateHasChanged();
+    }
+
+    // Static label color for each swatch dot (independent of the live theme, so the
+    // swatches read as a stable color legend).
+    private static string AccentDot(string accent) => accent switch
+    {
+        "green" => "#3f9e00",
+        "magenta" => "#b01e98",
+        "orange" => "#d9700a",
+        "red" => "#d63a3a",
+        "blue" => "#2f7fe0",
+        "yellow" => "#e0b400",
+        "turquoise" => "#10a898",
+        _ => "#3f9e00",
+    };
+
+    private static string AccentLabel(string accent)
+        => Text($"Web_Accent_{char.ToUpperInvariant(accent[0])}{accent[1..]}", accent);
 
     // Jumps to the user administration page with the actor's own record preselected.
     // Self-view is always permitted, even for users without management permissions.

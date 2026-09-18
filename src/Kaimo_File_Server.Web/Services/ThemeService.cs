@@ -10,6 +10,14 @@ public class ThemeService
 {
     private readonly IJSRuntime _js;
     private string _theme = "dark";
+    private string _accent = "green";
+
+    /// <summary>
+    /// Selectable accent colors. "green" is the default (no CSS override block);
+    /// the others have per-theme token blocks in app.css keyed on data-accent.
+    /// </summary>
+    public static readonly string[] Accents =
+        { "green", "magenta", "orange", "red", "blue", "yellow", "turquoise" };
 
     public ThemeService(IJSRuntime js)
     {
@@ -20,6 +28,8 @@ public class ThemeService
 
     public bool IsDark => _theme == "dark";
 
+    public string Accent => _accent;
+
     public async Task InitializeAsync()
     {
         try
@@ -28,6 +38,12 @@ public class ThemeService
             if (saved is "dark" or "light")
             {
                 _theme = saved;
+            }
+
+            var accent = await _js.InvokeAsync<string?>("localStorage.getItem", "kaimo_accent");
+            if (accent is not null && Array.IndexOf(Accents, accent) >= 0)
+            {
+                _accent = accent;
             }
         }
         catch
@@ -43,6 +59,23 @@ public class ThemeService
         {
             await _js.InvokeVoidAsync("localStorage.setItem", "kaimo_theme", _theme);
             await _js.InvokeVoidAsync("eval", $"document.documentElement.setAttribute('data-theme','{_theme}')");
+        }
+        catch
+        {
+            // Fallback: stay in the current state
+        }
+    }
+
+    public async Task SetAccentAsync(string accent)
+    {
+        if (Array.IndexOf(Accents, accent) < 0)
+            return;
+
+        _accent = accent;
+        try
+        {
+            await _js.InvokeVoidAsync("localStorage.setItem", "kaimo_accent", _accent);
+            await _js.InvokeVoidAsync("eval", $"document.documentElement.setAttribute('data-accent','{_accent}')");
         }
         catch
         {

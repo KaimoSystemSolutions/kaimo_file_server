@@ -75,7 +75,7 @@
     --accent-selected: #223f13;
     --accent-border: var(--color-accent-border);
     --accent-rgb: 63, 158, 0;
-    --text-on-accent: #0e2007;
+    --text-on-accent: #ffffff;
     --danger: #f87171;
     --danger-hover: #fca5a5;
     --danger-subtle: rgba(248, 113, 113, 0.14);
@@ -160,6 +160,122 @@
     --folder-stroke: #9a6700;
     --shadow: 0 2px 8px rgba(27, 32, 28, 0.08);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* -- Accent Color Variants --
+   User-selectable accent, applied via a data-accent attribute that sits next to
+   data-theme (set by ThemeService + the App.razor head script). Only the 11
+   accent tokens are overridden per color/theme; everything else in the UI derives
+   from them. "green" is the default and needs no block (the base [data-theme=...]
+   values are already green). Switching is a pure attribute flip, so it is instant
+   and immune to CSS caching. */
+
+/* Magenta / Purple */
+[data-theme="dark"][data-accent="magenta"] {
+    --color-accent-brand: #c026a8; --color-accent-action: #b01e98;
+    --color-accent-hover: #cf3cb4; --color-accent-active: #8f1a7c;
+    --color-accent-soft: #33112b; --color-accent-border: #7a1e6a;
+    --avatar-ring: #f0aede;
+    --accent-strong: #e04fc6; --accent-selected: #3f1337;
+    --accent-rgb: 176, 30, 152; --text-on-accent: #ffffff;
+}
+[data-theme="light"][data-accent="magenta"] {
+    --color-accent-brand: #b01e98; --color-accent-action: #a01a89;
+    --color-accent-hover: #86156f; --color-accent-active: #6e105c;
+    --color-accent-soft: #f9e2f3; --color-accent-border: #d98fce;
+    --avatar-ring: #6e105c;
+    --accent-strong: #6e105c; --accent-selected: #f2ccec;
+    --accent-rgb: 160, 26, 137; --text-on-accent: #ffffff;
+}
+
+/* Orange */
+[data-theme="dark"][data-accent="orange"] {
+    --color-accent-brand: #e0780f; --color-accent-action: #d9700a;
+    --color-accent-hover: #ec8420; --color-accent-active: #b25a00;
+    --color-accent-soft: #33220f; --color-accent-border: #8a5417;
+    --avatar-ring: #fbc98a;
+    --accent-strong: #f5923a; --accent-selected: #3f2a12;
+    --accent-rgb: 217, 112, 10; --text-on-accent: #ffffff;
+}
+[data-theme="light"][data-accent="orange"] {
+    --color-accent-brand: #c76500; --color-accent-action: #b85c00;
+    --color-accent-hover: #9a4c00; --color-accent-active: #7e3e00;
+    --color-accent-soft: #fbe8d1; --color-accent-border: #e0a86a;
+    --avatar-ring: #7e3e00;
+    --accent-strong: #7e3e00; --accent-selected: #f7dcbd;
+    --accent-rgb: 184, 92, 0; --text-on-accent: #ffffff;
+}
+
+/* Red */
+[data-theme="dark"][data-accent="red"] {
+    --color-accent-brand: #dc4444; --color-accent-action: #d63a3a;
+    --color-accent-hover: #e85555; --color-accent-active: #b02a2a;
+    --color-accent-soft: #331515; --color-accent-border: #8a2f2f;
+    --avatar-ring: #f5a3a3;
+    --accent-strong: #f56a6a; --accent-selected: #3f1a1a;
+    --accent-rgb: 214, 58, 58; --text-on-accent: #ffffff;
+}
+[data-theme="light"][data-accent="red"] {
+    --color-accent-brand: #c73030; --color-accent-action: #bd2b2b;
+    --color-accent-hover: #9e2020; --color-accent-active: #831a1a;
+    --color-accent-soft: #fbdcdc; --color-accent-border: #e09a9a;
+    --avatar-ring: #831a1a;
+    --accent-strong: #831a1a; --accent-selected: #f7c9c9;
+    --accent-rgb: 189, 43, 43; --text-on-accent: #ffffff;
+}
+
+/* Blue */
+[data-theme="dark"][data-accent="blue"] {
+    --color-accent-brand: #3a86e8; --color-accent-action: #2f7fe0;
+    --color-accent-hover: #4f97ec; --color-accent-active: #2265b8;
+    --color-accent-soft: #111f33; --color-accent-border: #2a568a;
+    --avatar-ring: #a3c8f5;
+    --accent-strong: #5aa0f5; --accent-selected: #14243f;
+    --accent-rgb: 47, 127, 224; --text-on-accent: #ffffff;
+}
+[data-theme="light"][data-accent="blue"] {
+    --color-accent-brand: #1f66c2; --color-accent-action: #1a5cb8;
+    --color-accent-hover: #124a9a; --color-accent-active: #0e3d80;
+    --color-accent-soft: #d9e6fb; --color-accent-border: #8fb5e0;
+    --avatar-ring: #0e3d80;
+    --accent-strong: #0e3d80; --accent-selected: #c9dcf7;
+    --accent-rgb: 26, 92, 184; --text-on-accent: #ffffff;
+}
+
+/* Yellow — always dark text-on-accent for contrast. */
+[data-theme="dark"][data-accent="yellow"] {
+    --color-accent-brand: #e6ba00; --color-accent-action: #e0b400;
+    --color-accent-hover: #f5cc1a; --color-accent-active: #b89200;
+    --color-accent-soft: #332a08; --color-accent-border: #8a7017;
+    --avatar-ring: #f5e08a;
+    --accent-strong: #ffd633; --accent-selected: #3f3312;
+    --accent-rgb: 224, 180, 0; --text-on-accent: #241d00;
+}
+[data-theme="light"][data-accent="yellow"] {
+    --color-accent-brand: #c29200; --color-accent-action: #b88a00;
+    --color-accent-hover: #9a7300; --color-accent-active: #7e5e00;
+    --color-accent-soft: #fbf1cf; --color-accent-border: #e0cd6a;
+    --avatar-ring: #6b5200;
+    --accent-strong: #7e5e00; --accent-selected: #f7ecbd;
+    --accent-rgb: 184, 138, 0; --text-on-accent: #241d00;
+}
+
+/* Turquoise / Teal */
+[data-theme="dark"][data-accent="turquoise"] {
+    --color-accent-brand: #14b8a6; --color-accent-action: #10a898;
+    --color-accent-hover: #1ccbb8; --color-accent-active: #0c8578;
+    --color-accent-soft: #0f2f2b; --color-accent-border: #177a6f;
+    --avatar-ring: #8af0e3;
+    --accent-strong: #33e0cd; --accent-selected: #123f39;
+    --accent-rgb: 16, 168, 152; --text-on-accent: #04211d;
+}
+[data-theme="light"][data-accent="turquoise"] {
+    --color-accent-brand: #0d8f80; --color-accent-action: #0b8073;
+    --color-accent-hover: #086a5f; --color-accent-active: #06544b;
+    --color-accent-soft: #d1f3ee; --color-accent-border: #7accc2;
+    --avatar-ring: #06544b;
+    --accent-strong: #06544b; --accent-selected: #bdeee7;
+    --accent-rgb: 11, 128, 115; --text-on-accent: #ffffff;
 }
 
 

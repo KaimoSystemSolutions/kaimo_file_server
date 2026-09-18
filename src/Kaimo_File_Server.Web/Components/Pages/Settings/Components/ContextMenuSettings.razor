@@ -46,7 +46,7 @@
                                 <button class="ctx-box ctx-col-toggle @(full ? "ctx-box--on" : "") @(partial ? "ctx-box--partial" : "")"
                                         title="@T("Web_Settings_Ctx_ToggleColumn")"
                                         @onclick="() => VM.ToggleColumn(s)" @onclick:stopPropagation="true">
-                                    <span class="ctx-check">@Icon("check.svg", 12, 2.5f)</span>
+                                    <span class="ctx-check">@Icon("check.svg", 14, 3.4f)</span>
                                 </button>
                             </th>
                         }
@@ -82,7 +82,7 @@
                                                 aria-pressed="@(on ? "true" : "false")"
                                                 title="@ScopeName(s)"
                                                 @onclick="() => VM.ToggleCell(c.Id, s)">
-                                            <span class="ctx-check">@Icon("check.svg", 12, 2.5f)</span>
+                                            <span class="ctx-check">@Icon("check.svg", 14, 3.4f)</span>
                                         </button>
                                     </td>
                                 }

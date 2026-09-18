@@ -558,6 +558,30 @@
   <data name="Web_Nav_ToggleTheme" xml:space="preserve">
     <value>Theme wechseln</value>
   </data>
+  <data name="Web_Nav_AccentColor" xml:space="preserve">
+    <value>Akzentfarbe</value>
+  </data>
+  <data name="Web_Accent_Green" xml:space="preserve">
+    <value>Grün</value>
+  </data>
+  <data name="Web_Accent_Magenta" xml:space="preserve">
+    <value>Magenta</value>
+  </data>
+  <data name="Web_Accent_Orange" xml:space="preserve">
+    <value>Orange</value>
+  </data>
+  <data name="Web_Accent_Red" xml:space="preserve">
+    <value>Rot</value>
+  </data>
+  <data name="Web_Accent_Blue" xml:space="preserve">
+    <value>Blau</value>
+  </data>
+  <data name="Web_Accent_Yellow" xml:space="preserve">
+    <value>Gelb</value>
+  </data>
+  <data name="Web_Accent_Turquoise" xml:space="preserve">
+    <value>Türkis</value>
+  </data>
   <data name="Web_Nav_Logout" xml:space="preserve">
     <value>Abmelden</value>
   </data>
