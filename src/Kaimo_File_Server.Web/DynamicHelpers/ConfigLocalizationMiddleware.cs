@@ -25,21 +25,41 @@ public class ConfigLocalizationMiddleware
     public async Task InvokeAsync(HttpContext context, IConfigRepository config)
     {
         var lang = await config.GetStringAsync("app.language", "de");
+        var culture = ResolveCulture(lang);
 
+        CultureInfo.CurrentCulture = culture;
+        CultureInfo.CurrentUICulture = culture;
+
+        await _next(context);
+    }
+
+    /// <summary>
+    /// Sets the AppDomain-wide default culture. Threads that never pass through
+    /// the request pipeline — Blazor interactive circuit continuations resuming
+    /// on fresh thread-pool threads, background jobs — inherit this instead of
+    /// the OS default, so resources resolve in the configured language rather
+    /// than intermittently falling back to English.
+    ///
+    /// Called once at startup and again from SettingsViewModel when the
+    /// language changes.
+    /// </summary>
+    public static void ApplyDefaultCulture(string lang)
+    {
+        var culture = ResolveCulture(lang);
+        CultureInfo.DefaultThreadCurrentCulture = culture;
+        CultureInfo.DefaultThreadCurrentUICulture = culture;
+    }
+
+    private static CultureInfo ResolveCulture(string lang)
+    {
         try
         {
-            var culture = new CultureInfo(lang);
-            CultureInfo.CurrentCulture = culture;
-            CultureInfo.CurrentUICulture = culture;
+            return new CultureInfo(lang);
         }
         catch (CultureNotFoundException)
         {
             // Invalid culture code in DB — fall back to default
-            var fallback = new CultureInfo("de");
-            CultureInfo.CurrentCulture = fallback;
-            CultureInfo.CurrentUICulture = fallback;
+            return new CultureInfo("de");
         }
-
-        await _next(context);
     }
 }

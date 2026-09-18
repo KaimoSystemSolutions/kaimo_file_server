@@ -4259,6 +4259,29 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 700;
 }
 
+/* When a count first appears (class flips off --empty), ease it in with a soft
+   accent halo instead of a hard pop, so a new background job is noticeable but
+   not jarring. Plays once; a changing count doesn't retrigger it because the
+   class string stays the same across those re-renders. */
+.job-menu-count:not(.job-menu-count--empty) {
+    animation: job-count-appear .7s ease-out;
+}
+
+@keyframes job-count-appear {
+    from {
+        opacity: 0;
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    55% {
+        opacity: 1;
+        box-shadow: 0 0 9px 3px color-mix(in srgb, var(--accent) 50%, transparent);
+    }
+    to {
+        opacity: 1;
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);
+    }
+}
+
 /* Keeps the reserved slot but hides it when no jobs are running. */
 .job-menu-count--empty {
     visibility: hidden;

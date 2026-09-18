@@ -13,6 +13,7 @@ using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Controllers.WebDav;
 using Kaimo_File_Server.Web.DynamicHelpers;
+using Kaimo_File_Server.Web.Middleware;
 using Kaimo_File_Server.Web.Services;
 using Kaimo_File_Server.Web.Services.Https;
 
@@ -446,6 +447,7 @@ public class SettingsViewModel
         try
         {
             await _config.SetAsync("app.language", SelectedLanguage);
+            ConfigLocalizationMiddleware.ApplyDefaultCulture(SelectedLanguage);
 
             _logger.LogInformation("Language changed to '{Lang}'", SelectedLanguage);
             SuccessMessage = Resources.Web_Settings_LanguageSaved;

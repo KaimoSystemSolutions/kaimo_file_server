@@ -443,5 +443,14 @@ app.MapRazorComponents<App>()
 
 app.UseMiddleware<ConfigLocalizationMiddleware>();
 
+// Seed the AppDomain default culture from the configured language so Blazor
+// interactive circuits (whose continuations run off the request pipeline) don't
+// intermittently fall back to English. Kept in sync by SaveLanguageAsync.
+using (var cultureScope = app.Services.CreateScope())
+{
+    var cultureConfig = cultureScope.ServiceProvider.GetRequiredService<IConfigRepository>();
+    ConfigLocalizationMiddleware.ApplyDefaultCulture(
+        await cultureConfig.GetStringAsync("app.language", "de"));
+}
 
 app.Run();
