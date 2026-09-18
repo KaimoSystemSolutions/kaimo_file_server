@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Backup;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -138,6 +139,34 @@ public sealed class DatabaseBackupTests
         var service = CreateService(temp.Path);
         Assert.Null(service.ResolveBackupPath("../secret.dump"));
         Assert.Null(service.ResolveBackupPath("kaimo_20260820-031542_manual.dump")); // does not exist
+    }
+
+    // ── Startup restore target resolution ─────────────────────────────
+
+    [Fact]
+    public void ResolveRestoreTarget_Accepts_BareName_HostPath_And_MissingExtension()
+    {
+        using var temp = new TempDir();
+        var real = WriteBackup(temp.Path, DateTimeOffset.Now, BackupTrigger.Scheduled);
+        var name = Path.GetFileName(real);
+        var nameNoExt = name[..^BackupFileNaming.Extension.Length];
+
+        // Bare file name inside the backup folder.
+        Assert.Equal(real, ServiceCollectionExtensions.ResolveRestoreTarget(name, temp.Path));
+        // File name without the ".dump" extension.
+        Assert.Equal(real, ServiceCollectionExtensions.ResolveRestoreTarget(nameNoExt, temp.Path));
+        // A stale/wrong host-path prefix — only the file name is used.
+        Assert.Equal(real, ServiceCollectionExtensions.ResolveRestoreTarget("/data/dataset00/backups/" + nameNoExt, temp.Path));
+        // The correct absolute path is honoured as-is.
+        Assert.Equal(real, ServiceCollectionExtensions.ResolveRestoreTarget(real, temp.Path));
+    }
+
+    [Fact]
+    public void ResolveRestoreTarget_ReturnsNull_WhenNothingMatches()
+    {
+        using var temp = new TempDir();
+        Assert.Null(ServiceCollectionExtensions.ResolveRestoreTarget(
+            "kaimo_20260820-031542_manual.dump", temp.Path));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────
