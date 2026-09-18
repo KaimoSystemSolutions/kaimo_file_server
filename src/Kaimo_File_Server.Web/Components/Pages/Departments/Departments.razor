@@ -183,10 +183,11 @@ else
                                 @foreach (var flag in DepartmentViewModel.PermFlags)
                                 {
                                     var isChecked = VM.HasPermFlag(flag.Flag);
-                                    <label class="permission-flag" title="@flag.Description">
+                                    <label class="permission-flag">
                                         <input type="checkbox" checked="@isChecked"
                                                @onchange="e => VM.TogglePermFlag(flag.Flag, (bool)(e.Value ?? false))" />
                                         <span>@flag.Label</span>
+                                        <InfoButton Text="@flag.Description" />
                                     </label>
                                 }
                             </div>

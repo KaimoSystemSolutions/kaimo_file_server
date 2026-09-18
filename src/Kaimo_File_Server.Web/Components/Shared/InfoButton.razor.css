@@ -1,0 +1,126 @@
+/* Shared info button — see InfoButton.razor. Token-driven so it matches the
+   app chrome and both themes without a per-theme block here. */
+
+.info-btn {
+    position: relative;
+    display: inline-flex;
+    vertical-align: middle;
+}
+
+.info-btn__trigger {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--info);
+    cursor: pointer;
+}
+
+    .info-btn__trigger:hover,
+    .info-btn__trigger:focus-visible {
+        background: var(--accent-subtle);
+        outline: none;
+    }
+
+    .info-btn__trigger:focus-visible {
+        box-shadow: 0 0 0 2px var(--accent);
+    }
+
+/* Injected SVG is a MarkupString (no scope attribute) — reach it via ::deep. */
+.info-btn ::deep svg {
+    stroke: currentColor;
+}
+
+/* -- Tooltip mode (short Text) -- */
+.info-btn__tip {
+    position: absolute;
+    z-index: 40;
+    top: calc(100% + 7px);
+    left: 50%;
+    width: max-content;
+    max-width: min(300px, calc(100vw - 32px));
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    box-shadow: var(--shadow);
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    font-weight: 500;
+    font-style: normal;
+    line-height: 1.5;
+    text-align: left;
+    white-space: normal;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(-3px);
+    transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+}
+
+.info-btn__trigger:hover .info-btn__tip,
+.info-btn__trigger:focus-visible .info-btn__tip,
+.info-btn--open .info-btn__tip {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* -- Popover mode (rich ChildContent) -- */
+.info-btn__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: transparent;
+}
+
+.info-btn__pop {
+    position: absolute;
+    z-index: 46;
+    top: calc(100% + 7px);
+    left: 50%;
+    width: max-content;
+    max-width: min(320px, calc(100vw - 32px));
+    padding: 12px 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    box-shadow: var(--shadow-lg);
+    color: var(--text-secondary);
+    text-align: left;
+    transform: translateX(-50%);
+}
+
+.info-btn__pop-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+
+.info-btn__pop-title {
+    color: var(--text-primary);
+    font-size: 12.5px;
+    font-weight: 700;
+}
+
+.info-btn__close {
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
+.info-btn__pop-body {
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+    .info-btn__pop-body ::deep ul {
+        margin: 0;
+        padding-left: 18px;
+        line-height: 1.5;
+    }

@@ -1,0 +1,110 @@
+@*
+    Central info affordance (shared UI library).
+
+    One button that explains a complex input or operation, replacing the
+    hand-rolled "i"/info-circle widgets that were scattered across the app.
+
+    Adaptive by content:
+      * Text only            -> lightweight hover/focus tooltip (also opens on
+                                tap for touch), rendered with role="tooltip".
+      * ChildContent (+Title) -> click-toggled dismissible popover (backdrop
+                                click, the close button, or Escape close it).
+
+    The icon is the shared info.svg tinted with the semantic --info
+    token so info buttons read the same everywhere. The trigger stops click
+    propagation, so it is safe to nest inside a <label> or a form.
+*@
+@inherits AppComponentBase
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.DynamicHelpers
+
+<span class="info-btn @(_open ? "info-btn--open" : null) @Class" @attributes="AdditionalAttributes">
+    <button type="button"
+            class="info-btn__trigger"
+            aria-label="@(AriaLabel ?? DefaultLabel)"
+            @attributes="TriggerAttrs()"
+            @onclick="Toggle"
+            @onclick:stopPropagation="true"
+            @onclick:preventDefault="true"
+            @onkeydown="OnKeyDown">
+        @* Round caps are what make info.svg's zero-length dot render — without them the
+           "i" is just a thin bar. Stroke is deliberately heavy for legibility at this size. *@
+        @Assets.SVG("info.svg", new SvgOptions(Width: IconSize, Height: IconSize, StrokeWidth: 5f,
+            Style: "stroke-linecap:round;stroke-linejoin:round"))
+        @if (IsTooltip)
+        {
+            <span id="@_id" class="info-btn__tip" role="tooltip">@Text</span>
+        }
+    </button>
+
+    @if (!IsTooltip && _open)
+    {
+        <div class="info-btn__backdrop" @onclick="Close"></div>
+        <div class="info-btn__pop" role="dialog" aria-label="@(Title ?? AriaLabel ?? DefaultLabel)">
+            <div class="info-btn__pop-head">
+                @if (!string.IsNullOrEmpty(Title))
+                {
+                    <strong class="info-btn__pop-title">@Title</strong>
+                }
+                <button type="button" class="btn-icon btn-icon--small info-btn__close"
+                        aria-label="@CloseLabel" @onclick="Close" @onclick:stopPropagation="true">
+                    @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2f))
+                </button>
+            </div>
+            <div class="info-btn__pop-body">@ChildContent</div>
+        </div>
+    }
+</span>
+
+@code {
+    /// <summary>Short localized hint. Shown as a hover/focus tooltip. Ignored when <see cref="ChildContent"/> is set.</summary>
+    [Parameter] public string? Text { get; set; }
+
+    /// <summary>Rich body (e.g. a bullet list). Switches the button to click-toggled popover mode.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Optional heading shown at the top of the popover.</summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Accessible label for the trigger. Defaults to the localized "More information".</summary>
+    [Parameter] public string? AriaLabel { get; set; }
+
+    /// <summary>Icon size in pixels. Defaults to 20.</summary>
+    [Parameter] public int IconSize { get; set; } = 20;
+
+    /// <summary>Extra CSS classes appended to the host, for local overrides.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private readonly string _id = "info-" + Guid.NewGuid().ToString("N")[..8];
+    private bool _open;
+
+    private bool IsTooltip => ChildContent is null;
+    private string DefaultLabel => Text2("Web_Common_Info", "More information");
+    private string CloseLabel => Text2("Web_Common_Close", "Close");
+
+    private void Toggle() => _open = !_open;
+    private void Close() => _open = false;
+    private void OnKeyDown(KeyboardEventArgs e) { if (e.Key == "Escape") { _open = false; } }
+
+    // Runtime lookup so newly added keys need no Resources.Designer regeneration.
+    private static string Text2(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    private Dictionary<string, object> TriggerAttrs()
+    {
+        var attrs = new Dictionary<string, object>();
+        if (IsTooltip)
+        {
+            attrs["aria-describedby"] = _id;
+        }
+        else
+        {
+            attrs["aria-haspopup"] = "dialog";
+            attrs["aria-expanded"] = _open ? "true" : "false";
+        }
+        return attrs;
+    }
+}

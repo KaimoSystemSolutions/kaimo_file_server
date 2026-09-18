@@ -2400,6 +2400,9 @@
   <data name="Web_Common_Close" xml:space="preserve">
     <value>Close</value>
   </data>
+  <data name="Web_Common_Info" xml:space="preserve">
+    <value>More information</value>
+  </data>
   <data name="Web_Common_Name" xml:space="preserve">
     <value>Name</value>
   </data>

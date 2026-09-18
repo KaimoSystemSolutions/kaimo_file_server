@@ -3721,51 +3721,6 @@ h1, h2, h3, h4, h5, h6 {
     gap: 6px;
 }
 
-.pw-info-btn {
-    width: 16px;
-    height: 16px;
-    padding: 0;
-    border: 1px solid var(--border-strong, var(--border));
-    border-radius: 50%;
-    background: var(--bg-primary);
-    color: var(--text-secondary, var(--text-tertiary));
-    font-size: 11px;
-    font-style: italic;
-    font-weight: 700;
-    line-height: 1;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-    .pw-info-btn:hover {
-        border-color: var(--accent);
-        color: var(--accent);
-    }
-
-.pw-policy-popover {
-    margin-top: 6px;
-    padding: 8px 10px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-strong, var(--border));
-    border-radius: var(--radius-control);
-    font-size: 12px;
-    color: var(--text-secondary, var(--text-primary));
-}
-
-    .pw-policy-popover .pw-policy-title {
-        display: block;
-        font-weight: 700;
-        margin-bottom: 4px;
-        color: var(--text-primary);
-    }
-
-    .pw-policy-popover ul {
-        margin: 0;
-        padding-left: 18px;
-        line-height: 1.5;
-    }
 
 /* -- Inherited permission indicator -- */
 .inherited-hint {
@@ -4999,31 +4954,6 @@ input[type="radio"] {
 .cloud-schedule-toggle {
     flex: 0 0 auto;
     align-self: center;
-}
-
-.cloud-schedule-info {
-    display: inline-grid;
-    width: 16px;
-    height: 16px;
-    flex: 0 0 16px;
-    place-items: center;
-    border: 1px solid var(--border-strong);
-    border-radius: 50%;
-    background: var(--bg-sunken);
-    color: var(--text-tertiary);
-    font-size: 10px;
-    font-style: normal;
-    font-weight: 700;
-    line-height: 1;
-    cursor: help;
-}
-
-.cloud-schedule-info:hover,
-.cloud-schedule-info:focus-visible {
-    border-color: var(--accent);
-    color: var(--accent);
-    outline: none;
-    box-shadow: 0 0 0 2px var(--accent-subtle);
 }
 
 .cloud-schedule-interval {

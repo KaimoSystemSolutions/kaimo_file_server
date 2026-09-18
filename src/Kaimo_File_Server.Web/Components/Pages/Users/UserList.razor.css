@@ -577,62 +577,6 @@
     font-weight: 700;
 }
 
-.entity-detail ::deep .user-role-scope-help {
-    position: relative;
-    display: grid;
-    width: 26px;
-    height: 26px;
-    padding: 0;
-    place-items: center;
-    border: 0;
-    border-radius: 50%;
-    background: transparent;
-    color: var(--text-tertiary);
-    cursor: help;
-}
-
-.entity-detail ::deep .user-role-scope-help:hover,
-.entity-detail ::deep .user-role-scope-help:focus-visible {
-    background: var(--accent-subtle);
-    color: var(--accent);
-    outline: none;
-}
-
-.entity-detail ::deep .user-role-scope-help svg {
-    stroke: currentColor;
-}
-
-.entity-detail ::deep .user-role-scope-tooltip {
-    position: absolute;
-    z-index: 40;
-    top: calc(100% + 7px);
-    right: 0;
-    width: min(300px, calc(100vw - 54px));
-    padding: 10px 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-surface);
-    background: var(--bg-secondary);
-    box-shadow: var(--shadow);
-    color: var(--text-secondary);
-    font-size: 11.5px;
-    font-style: normal;
-    font-weight: 500;
-    line-height: 1.5;
-    text-align: left;
-    visibility: hidden;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-3px);
-    transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
-}
-
-.entity-detail ::deep .user-role-scope-help:hover .user-role-scope-tooltip,
-.entity-detail ::deep .user-role-scope-help:focus-visible .user-role-scope-tooltip {
-    visibility: visible;
-    opacity: 1;
-    transform: translateY(0);
-}
-
 .entity-detail ::deep .user-role-scope-card {
     overflow: hidden;
     border: 1px solid var(--border);

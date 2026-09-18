@@ -126,7 +126,10 @@
                         {
                             @* Administrator password reset — no current password required. *@
                             <div class="form-group">
-                                <label>@Resources.Web_Admin_Label_NewPassword</label>
+                                <div class="label-with-info">
+                                    <label>@Resources.Web_Admin_Label_NewPassword</label>
+                                    <InfoButton Title="@Resources.Web_Settings_Pw_Title" AriaLabel="@Resources.Web_Settings_Pw_Title" ChildContent="PasswordPolicyList" />
+                                </div>
                                 <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_PasswordEmpty"
                                        @bind="VM.NewPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
                             </div>
@@ -148,7 +151,10 @@
                                        @bind="VM.CurrentPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
                             </div>
                             <div class="form-group">
-                                <label>@Resources.Web_Admin_Label_NewPassword</label>
+                                <div class="label-with-info">
+                                    <label>@Resources.Web_Admin_Label_NewPassword</label>
+                                    <InfoButton Title="@Resources.Web_Settings_Pw_Title" AriaLabel="@Resources.Web_Settings_Pw_Title" ChildContent="PasswordPolicyList" />
+                                </div>
                                 <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_PasswordEmpty"
                                        @bind="VM.NewPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
                             </div>
@@ -300,15 +306,8 @@
             <div class="user-role-access">
                 <div class="user-role-access-heading">
                     <span>@Resources.Web_Admin_Label_Roles</span>
-                    <button type="button"
-                            class="user-role-scope-help"
-                            aria-label="@Resources.Web_Admin_RoleScopes_InfoLabel"
-                            aria-describedby="user-role-scope-tooltip">
-                        @Icons.SVG("circle_info.svg", new SvgOptions(Width: 15, Height: 15, StrokeWidth: 2f))
-                        <span id="user-role-scope-tooltip" class="user-role-scope-tooltip" role="tooltip">
-                            @Resources.Web_Admin_RoleScopes_Info
-                        </span>
-                    </button>
+                    <InfoButton Text="@Resources.Web_Admin_RoleScopes_Info"
+                                AriaLabel="@Resources.Web_Admin_RoleScopes_InfoLabel" />
                 </div>
 
                 <section class="user-role-scope-card user-role-scope-card--global">
@@ -491,6 +490,17 @@
 @code {
     [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
     [Parameter] public EventCallback OnChanged { get; set; }
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+
+    // Active password-complexity rules, shown in the InfoButton next to new-password fields.
+    private RenderFragment PasswordPolicyList => @<ul>
+        <li>@R("Web_Settings_Pw_MinLength"): @VM.PasswordPolicy.MinLength</li>
+        @if (VM.PasswordPolicy.RequireUppercase) { <li>@R("Web_Settings_Pw_RequireUppercase")</li> }
+        @if (VM.PasswordPolicy.RequireLowercase) { <li>@R("Web_Settings_Pw_RequireLowercase")</li> }
+        @if (VM.PasswordPolicy.RequireDigit) { <li>@R("Web_Settings_Pw_RequireDigit")</li> }
+        @if (VM.PasswordPolicy.RequireSpecial) { <li>@R("Web_Settings_Pw_RequireSpecial")</li> }
+    </ul>;
 
     private enum EditTab { General, Security, Assignment }
     private EditTab _editTab = EditTab.General;

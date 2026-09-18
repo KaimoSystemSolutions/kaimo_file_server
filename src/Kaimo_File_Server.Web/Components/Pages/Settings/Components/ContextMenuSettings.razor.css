@@ -17,49 +17,6 @@
    The lead matches the standard .settings-description (12px). */
 .ctx-intro { display: flex; align-items: center; gap: 12px; }
 .ctx-lead { margin: 0; font-size: 12px; line-height: 1.55; color: var(--text-secondary); }
-.ctx-help-btn {
-    flex: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    border: 1px solid var(--border);
-    background: var(--bg-secondary);
-    color: var(--text-tertiary);
-    cursor: pointer;
-    line-height: 0;
-    transition: color .12s, border-color .12s, background .12s;
-}
-.ctx-help-btn:hover, .ctx-help-btn--open {
-    color: var(--accent);
-    border-color: var(--accent-border);
-    background: var(--accent-subtle);
-}
-.ctx-help-pop {
-    background: var(--accent-subtle);
-    border: 1px solid var(--accent-border);
-    border-radius: var(--radius-surface);
-    padding: 14px 18px 16px;
-    color: var(--text-secondary);
-    font-size: 14px;
-    line-height: 1.55;
-}
-.ctx-help-head { display: flex; align-items: center; margin-bottom: 8px; }
-.ctx-help-head strong { color: var(--text-primary); font-size: 15px; }
-.ctx-help-close {
-    margin-left: auto;
-    background: none;
-    border: none;
-    color: var(--text-tertiary);
-    font-size: 20px;
-    line-height: 1;
-    cursor: pointer;
-    padding: 0 2px;
-}
-.ctx-help-close:hover { color: var(--text-primary); }
-.ctx-help-pop ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 
 /* panels */
 .ctx-panel {

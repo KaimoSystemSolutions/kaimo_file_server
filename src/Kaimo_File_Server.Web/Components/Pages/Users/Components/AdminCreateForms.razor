@@ -40,15 +40,7 @@
                 <div class="form-group">
                     <div class="label-with-info">
                         <label>@Resources.Web_Admin_Label_Password</label>
-                        <button type="button" class="pw-info-btn" title="@PasswordPolicyText()"
-                                aria-label="@Resources.Web_Settings_Pw_Title" @onclick="() => _showPwPolicy = !_showPwPolicy">i</button>
-                    </div>
-                    <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Password"
-                           @bind="VM.CreateUserPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
-                    @if (_showPwPolicy)
-                    {
-                        <div class="pw-policy-popover">
-                            <span class="pw-policy-title">@Resources.Web_Settings_Pw_Title</span>
+                        <InfoButton Title="@Resources.Web_Settings_Pw_Title" AriaLabel="@Resources.Web_Settings_Pw_Title">
                             <ul>
                                 <li>@R("Web_Settings_Pw_MinLength"): @VM.PasswordPolicy.MinLength</li>
                                 @if (VM.PasswordPolicy.RequireUppercase) { <li>@R("Web_Settings_Pw_RequireUppercase")</li> }
@@ -56,8 +48,10 @@
                                 @if (VM.PasswordPolicy.RequireDigit) { <li>@R("Web_Settings_Pw_RequireDigit")</li> }
                                 @if (VM.PasswordPolicy.RequireSpecial) { <li>@R("Web_Settings_Pw_RequireSpecial")</li> }
                             </ul>
-                        </div>
-                    }
+                        </InfoButton>
+                    </div>
+                    <input type="password" class="edit-input" placeholder="@Resources.Web_Admin_Placeholder_Password"
+                           @bind="VM.CreateUserPassword" @bind:event="oninput" @attributes="HtmlAttr.NoAutofillPassword" />
                 </div>
                 <div class="create-form-toggles">
                     <div class="toggle-row">
@@ -155,20 +149,8 @@
 @code {
     [Parameter, EditorRequired] public UserListViewModel VM { get; set; } = default!;
     [Parameter] public EventCallback OnChanged { get; set; }
-    private bool _showPwPolicy;
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
 
-    // Plain-text tooltip mirroring the popover (native title attribute, one requirement per line).
-    private string PasswordPolicyText()
-    {
-        var p = VM.PasswordPolicy;
-        var lines = new List<string> { $"{R("Web_Settings_Pw_MinLength")}: {p.MinLength}" };
-        if (p.RequireUppercase) lines.Add(R("Web_Settings_Pw_RequireUppercase"));
-        if (p.RequireLowercase) lines.Add(R("Web_Settings_Pw_RequireLowercase"));
-        if (p.RequireDigit) lines.Add(R("Web_Settings_Pw_RequireDigit"));
-        if (p.RequireSpecial) lines.Add(R("Web_Settings_Pw_RequireSpecial"));
-        return $"{Resources.Web_Settings_Pw_Title}\n" + string.Join("\n", lines);
-    }
     private async Task CreateUser() { await VM.CreateUserAsync(); await OnChanged.InvokeAsync(); }
     private async Task CreateGroup() { await VM.CreateGroupAsync(); await OnChanged.InvokeAsync(); }
     private async Task CreateRole() { await VM.CreateRoleAsync(); await OnChanged.InvokeAsync(); }

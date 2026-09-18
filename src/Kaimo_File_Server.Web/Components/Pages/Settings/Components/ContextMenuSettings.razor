@@ -6,29 +6,16 @@
     <span class="detail-label">@Resources.Web_Settings_ContextMenu_Detail</span>
 
     <div class="ctx-intro">
-        <button class="ctx-help-btn @(_showHelp ? "ctx-help-btn--open" : "")"
-                title="@T("Web_Settings_Ctx_HelpTitle")"
-                @onclick="() => _showHelp = !_showHelp">
-            @Icon("info.svg", 17, 1.8f)
-        </button>
-        <p class="ctx-lead">@T("Web_Settings_Ctx_Lead")</p>
-    </div>
-
-    @if (_showHelp)
-    {
-        <div class="ctx-help-pop">
-            <div class="ctx-help-head">
-                <strong>@T("Web_Settings_Ctx_HelpTitle")</strong>
-                <button class="ctx-help-close" @onclick="() => _showHelp = false">×</button>
-            </div>
+        <InfoButton Title="@T("Web_Settings_Ctx_HelpTitle")" AriaLabel="@T("Web_Settings_Ctx_HelpTitle")">
             <ul>
                 <li>@T("Web_Settings_Ctx_Help1")</li>
                 <li>@T("Web_Settings_Ctx_Help2")</li>
                 <li>@T("Web_Settings_Ctx_Help3")</li>
                 <li>@T("Web_Settings_Ctx_Help4")</li>
             </ul>
-        </div>
-    }
+        </InfoButton>
+        <p class="ctx-lead">@T("Web_Settings_Ctx_Lead")</p>
+    </div>
 
     @* ── 1 · Assignment matrix ── *@
     <div class="ctx-panel">
@@ -216,7 +203,6 @@
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
 
-    private bool _showHelp;
     private string? _dragId;
     private string? _dragOverId;
 
