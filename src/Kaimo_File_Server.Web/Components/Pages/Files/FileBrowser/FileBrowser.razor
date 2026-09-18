@@ -592,3 +592,9 @@ else
 <HashDialog @ref="_hashDialogComponent" VM="VM"/>
 
 <SyncDialog @ref="_syncDialogComponent" />
+
+@* -- Upload name-collision dialog (local share uploads only) -- *@
+@if (VM is FileBrowserViewModel localUploadVm)
+{
+    <UploadConflictDialog VM="localUploadVm" OnResolved="OnConflictResolved" />
+}

@@ -1,0 +1,127 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.Helpers
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inherits AppComponentBase
+@implements IDisposable
+@inject DateFormatService DateFmt
+
+@*
+    Upload name-collision dialog. Shown while the local file browser has staged uploads
+    whose target name already exists (or collides with another in-flight upload). The
+    user keeps the existing file, keeps the new one (overwrite), or keeps both (rename).
+    Identical-content collisions never reach here — they are dropped silently.
+*@
+@{
+    var current = VM.PendingConflicts.FirstOrDefault();
+}
+@if (current is not null)
+{
+    var remaining = VM.PendingConflicts.Count - 1;
+    <div class="modal-backdrop">
+        <div class="modal-dialog upload-conflict-dialog" @onclick:stopPropagation="true">
+            <h3 class="modal-title">@R("Web_UploadConflict_Title")</h3>
+            <p class="modal-text">
+                @((MarkupString)string.Format(R("Web_UploadConflict_Message"),
+                    $"<strong>{System.Net.WebUtility.HtmlEncode(current.FileName)}</strong>"))
+            </p>
+
+            <div class="upload-conflict-compare">
+                <div class="upload-conflict-side">
+                    <div class="upload-conflict-side-label">@R("Web_UploadConflict_Existing")</div>
+                    @if (current.Existing is { } ex)
+                    {
+                        <dl class="upload-conflict-props">
+                            <dt>@Resources.Web_Properties_Size</dt>
+                            <dd>@FormatHelper.FormatFileSize(ex.Size)</dd>
+                            <dt>@Resources.Web_Properties_Modified</dt>
+                            <dd>@DateFmt.FormatDateTime(ex.ModifiedAt)</dd>
+                        </dl>
+                    }
+                    else
+                    {
+                        <div class="upload-conflict-unknown">@R("Web_UploadConflict_Unknown")</div>
+                    }
+                </div>
+                <div class="upload-conflict-side">
+                    <div class="upload-conflict-side-label">@R("Web_UploadConflict_Incoming")</div>
+                    <dl class="upload-conflict-props">
+                        <dt>@Resources.Web_Properties_Size</dt>
+                        <dd>@FormatHelper.FormatFileSize(current.IncomingSize)</dd>
+                        <dt>@Resources.Web_Properties_Modified</dt>
+                        <dd>@DateFmt.FormatDateTime(current.IncomingModifiedUtc)</dd>
+                    </dl>
+                </div>
+            </div>
+
+            @if (remaining > 0)
+            {
+                <label class="upload-conflict-applyall">
+                    <span class="toggle-switch">
+                        <input type="checkbox" @bind="_applyToAll" />
+                        <span class="toggle-slider"></span>
+                    </span>
+                    <span>@R("Web_UploadConflict_ApplyAll")</span>
+                </label>
+                <p class="upload-conflict-remaining">
+                    @string.Format(R("Web_UploadConflict_Remaining"), remaining)
+                </p>
+            }
+
+            <div class="modal-actions">
+                <button class="btn btn-secondary" disabled="@_busy"
+                        @onclick="() => Resolve(current.Id, FileBrowserViewModel.UploadConflictAction.Discard)">
+                    @R("Web_UploadConflict_Discard")
+                </button>
+                <button class="btn btn-secondary" disabled="@_busy"
+                        @onclick="() => Resolve(current.Id, FileBrowserViewModel.UploadConflictAction.Rename)">
+                    @R("Web_UploadConflict_Rename")
+                </button>
+                <button class="btn btn-primary" disabled="@_busy"
+                        @onclick="() => Resolve(current.Id, FileBrowserViewModel.UploadConflictAction.Overwrite)">
+                    @R("Web_UploadConflict_Overwrite")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public FileBrowserViewModel VM { get; set; } = default!;
+
+    // Raised after a resolution writes/removes files so the browser can refresh its listing.
+    [Parameter] public EventCallback OnResolved { get; set; }
+
+    private bool _applyToAll;
+    private bool _busy;
+
+    protected override void OnInitialized()
+    {
+        VM.OnUploadConflictsChanged += OnConflictsChanged;
+    }
+
+    private void OnConflictsChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task Resolve(Guid id, FileBrowserViewModel.UploadConflictAction action)
+    {
+        if (_busy) return;
+        _busy = true;
+        try
+        {
+            await VM.ResolveConflictAsync(id, action, _applyToAll);
+            _applyToAll = false;
+            await OnResolved.InvokeAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+
+    public void Dispose()
+    {
+        VM.OnUploadConflictsChanged -= OnConflictsChanged;
+    }
+}

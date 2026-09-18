@@ -38,26 +38,33 @@ public partial class FileBrowser
     /// job token is shared by the global job menu, toast dismissal callback, and
     /// underlying upload API so cancellation stops the actual transfer.
     /// </summary>
-    private Task OnFileUploaded(InputFileChangeEventArgs e)
+    private Task OnFileUploaded(InputFileChangeEventArgs e, Guid batchId)
     {
         // Do not retain the input-change event for the entire batch. In Blazor
         // Server that can serialize user interactions behind a long upload.
-        // BrowserFile streams remain valid because MainLayout recreates its input
-        // only after ProcessFileUploadAsync signals completion.
-        _ = ProcessFileUploadAsync(e);
+        // BrowserFile streams remain valid because MainLayout keeps this batch's
+        // input element alive until ProcessFileUploadAsync signals completion.
+        _ = ProcessFileUploadAsync(e, batchId);
         return Task.CompletedTask;
     }
 
-    private async Task ProcessFileUploadAsync(InputFileChangeEventArgs e)
+    private async Task ProcessFileUploadAsync(InputFileChangeEventArgs e, Guid batchId)
     {
         try
         {
             var files = e.GetMultipleFiles(int.MaxValue);
             if (files.Count == 0) return;
 
+        // Name-collision handling is a local-share feature; remote/cloud browsers keep
+        // their own overwrite semantics and fall back to the plain upload call below.
+        var local = VM as FileBrowserViewModel;
+        local?.BeginUploadBatch();
+
         long totalBytes = files.Sum(f => f.Size);
         long totalUploadedBytes = 0;
         int completedCount = 0;
+        int skippedCount = 0;   // identical content, discarded silently
+        int heldCount = 0;      // waiting for the user's conflict decision
         var failedFiles = new List<string>();
         var failureReasons = new List<string>();
 
@@ -164,16 +171,34 @@ public partial class FileBrowser
                         }
                     });
 
-                    var result = await VM.UploadFileAsync(
-                        file.Name,
-                        progressStream,
-                        job.CancellationToken);
-
-                    if (!result.Success)
+                    if (local is not null)
                     {
-                        failedFiles.Add(file.Name);
-                        if (!string.IsNullOrWhiteSpace(result.Error))
-                            failureReasons.Add(result.Error);
+                        var outcome = await local.UploadWithConflictHandlingAsync(
+                            file.Name, progressStream, job.CancellationToken);
+                        switch (outcome)
+                        {
+                            case FileBrowserViewModel.UploadResult.SkippedIdentical:
+                                skippedCount++;
+                                break;
+                            case FileBrowserViewModel.UploadResult.Held:
+                                heldCount++;
+                                break;
+                            case FileBrowserViewModel.UploadResult.Failed:
+                                failedFiles.Add(file.Name);
+                                break;
+                            // Uploaded / Discarded need no per-file bookkeeping.
+                        }
+                    }
+                    else
+                    {
+                        var result = await VM.UploadFileAsync(
+                            file.Name, progressStream, job.CancellationToken);
+                        if (!result.Success)
+                        {
+                            failedFiles.Add(file.Name);
+                            if (!string.IsNullOrWhiteSpace(result.Error))
+                                failureReasons.Add(result.Error);
+                        }
                     }
                 }
             }
@@ -194,31 +219,41 @@ public partial class FileBrowser
 
         stopwatch.Stop();
 
+        // Held files are neither done nor failed — the conflict dialog resolves them.
+        var notes = new List<string>();
+        if (skippedCount > 0)
+            notes.Add(string.Format(T("Web_Upload_SkippedIdentical"), skippedCount));
+        if (heldCount > 0)
+            notes.Add(string.Format(T("Web_Upload_ConflictsPending"), heldCount));
+        var suffix = notes.Count > 0 ? " " + string.Join(" ", notes) : "";
+
         if (job.CancellationToken.IsCancellationRequested)
         {
             Toast.Update(toastId, Resources.Web_Upload_BatchCancelled, type: ToastType.Error);
         }
+        else if (failedFiles.Count == 0)
+        {
+            var uploaded = files.Count - skippedCount - heldCount;
+            string baseMsg = uploaded <= 0
+                ? notes.FirstOrDefault() ?? string.Format(Resources.Web_Upload_BatchSuccess, 0)
+                : files.Count == 1
+                    ? string.Format(Resources.Web_Upload_Success, files[0].Name)
+                    : string.Format(Resources.Web_Upload_BatchSuccess, uploaded);
+            // If the only outcome note is already the whole message, don't repeat it.
+            var text = uploaded <= 0 ? baseMsg : (baseMsg + suffix);
+            Toast.Update(toastId, text.Trim(),
+                type: heldCount > 0 ? ToastType.Info : ToastType.Success, progress: 100);
+        }
         else
         {
-            if (failedFiles.Count == 0)
-            {
-                Toast.Update(toastId,
-                    files.Count == 1
-                        ? string.Format(Resources.Web_Upload_Success, files[0].Name)
-                        : string.Format(Resources.Web_Upload_BatchSuccess, files.Count),
-                    type: ToastType.Success, progress: 100);
-            }
-            else
-            {
-                string summary = string.Format(Resources.Web_Upload_BatchPartialFailure,
-                    files.Count - failedFiles.Count, files.Count);
-                string? reason = failureReasons.Distinct(StringComparer.CurrentCulture).FirstOrDefault();
-                Toast.Update(toastId,
-                    files.Count == 1 && reason is not null
-                        ? reason
-                        : reason is null ? summary : $"{summary} {reason}",
-                    type: ToastType.Error);
-            }
+            string summary = string.Format(Resources.Web_Upload_BatchPartialFailure,
+                files.Count - failedFiles.Count, files.Count);
+            string? reason = failureReasons.Distinct(StringComparer.CurrentCulture).FirstOrDefault();
+            Toast.Update(toastId,
+                (files.Count == 1 && reason is not null
+                    ? reason
+                    : reason is null ? summary : $"{summary} {reason}") + suffix,
+                type: ToastType.Error);
         }
 
             await VM.LoadShareAsync(ShareName, VM.CurrentPath);
@@ -232,12 +267,23 @@ public partial class FileBrowser
         }
         finally
         {
-            // The layout can now safely replace the input, allowing the same
-            // files to be selected again without invalidating active streams.
-            UploadCoordinator.NotifyFilesProcessed();
+            // A "apply to all" conflict choice stays in effect only while a batch runs.
+            (VM as FileBrowserViewModel)?.EndUploadBatch();
+
+            // This batch's streams are fully consumed; let the layout release its
+            // input element. Other in-flight batches keep their own elements.
+            UploadCoordinator.NotifyFilesProcessed(batchId);
         }
     }
 
+
+    // Refresh the listing after a held upload conflict is resolved (a write may have
+    // added or replaced a file).
+    private async Task OnConflictResolved()
+    {
+        await VM.LoadShareAsync(ShareName, VM.CurrentPath);
+        StateHasChanged();
+    }
 
     private string BuildProgressText(string currentFileName, int completedCount, int totalCount, double speedBytesPerSec)
     {

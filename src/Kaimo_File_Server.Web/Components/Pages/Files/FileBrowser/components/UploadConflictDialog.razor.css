@@ -1,0 +1,64 @@
+.upload-conflict-dialog {
+    max-width: 460px;
+}
+
+.upload-conflict-compare {
+    display: flex;
+    gap: 12px;
+    margin: 12px 0;
+}
+
+.upload-conflict-side {
+    flex: 1 1 0;
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+}
+
+.upload-conflict-side-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.upload-conflict-props {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 10px;
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+    .upload-conflict-props dt {
+        color: var(--text-tertiary);
+    }
+
+    .upload-conflict-props dd {
+        margin: 0;
+        color: var(--text-primary);
+        text-align: right;
+    }
+
+.upload-conflict-unknown {
+    font-size: 0.85rem;
+    color: var(--text-tertiary);
+    font-style: italic;
+}
+
+.upload-conflict-applyall {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.upload-conflict-remaining {
+    margin: 4px 0 0;
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+}

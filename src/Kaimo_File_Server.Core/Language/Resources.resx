@@ -2502,6 +2502,9 @@
   <data name="Web_Delete_BatchSuccess" xml:space="preserve">
     <value>{0} items deleted successfully</value>
   </data>
+  <data name="Web_Delete_Progress" xml:space="preserve">
+    <value>{0} of {1} deleted</value>
+  </data>
   <data name="Web_Upload_ProgressWithSpeed" xml:space="preserve">
     <value>Uploading {0} ({1})</value>
   </data>
@@ -2513,6 +2516,42 @@
   </data>
   <data name="Web_Upload_BatchProcessing" xml:space="preserve">
     <value>Processing file {0} of {1}: {2}</value>
+  </data>
+  <data name="Web_Upload_SkippedIdentical" xml:space="preserve">
+    <value>{0} identical file(s) skipped.</value>
+  </data>
+  <data name="Web_Upload_ConflictsPending" xml:space="preserve">
+    <value>{0} file(s) waiting for a conflict decision.</value>
+  </data>
+  <data name="Web_UploadConflict_Title" xml:space="preserve">
+    <value>File already exists</value>
+  </data>
+  <data name="Web_UploadConflict_Message" xml:space="preserve">
+    <value>A file named {0} already exists in this folder. What would you like to do?</value>
+  </data>
+  <data name="Web_UploadConflict_Existing" xml:space="preserve">
+    <value>Existing file</value>
+  </data>
+  <data name="Web_UploadConflict_Incoming" xml:space="preserve">
+    <value>New upload</value>
+  </data>
+  <data name="Web_UploadConflict_Unknown" xml:space="preserve">
+    <value>Currently being written by another upload</value>
+  </data>
+  <data name="Web_UploadConflict_Overwrite" xml:space="preserve">
+    <value>Overwrite</value>
+  </data>
+  <data name="Web_UploadConflict_Rename" xml:space="preserve">
+    <value>Keep both</value>
+  </data>
+  <data name="Web_UploadConflict_Discard" xml:space="preserve">
+    <value>Discard new</value>
+  </data>
+  <data name="Web_UploadConflict_ApplyAll" xml:space="preserve">
+    <value>Apply to all following files</value>
+  </data>
+  <data name="Web_UploadConflict_Remaining" xml:space="preserve">
+    <value>{0} more conflict(s) after this</value>
   </data>
   <data name="Web_Error_MoveFailed" xml:space="preserve">
     <value>Failed to move the item.</value>

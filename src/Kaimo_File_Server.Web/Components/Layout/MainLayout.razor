@@ -104,7 +104,14 @@
             </div>
         </div>
     </nav> 
-    <InputFile @key="_fileInputKey" id="global-file-input" OnChange="OnFilesSelected" style="display:none" multiple />
+    @* One live input per in-flight upload batch. Only the active slot carries the well-known
+       id that the drop JS and file dialog target; retained slots keep an earlier batch's
+       browser streams valid until that batch finishes. *@
+    @foreach (var slot in _uploadSlots)
+    {
+        <InputFile @key="slot" id="@(slot == _activeSlot ? "global-file-input" : null)"
+                   OnChange="e => OnSlotChanged(slot, e)" style="display:none" multiple />
+    }
     <main class="main">
         <div class="search-bar-container">
             <GlobalSearch />
@@ -138,7 +145,11 @@
     private string _initials = "";
     private string? _avatarUri;
 
-    private int _fileInputKey;
+    // Each slot is one <InputFile> element identified by a batch id. Exactly one is active
+    // (receives new selections); the rest are retained until their upload signals completion.
+    private sealed record UploadSlot(Guid Id);
+    private readonly List<UploadSlot> _uploadSlots = new();
+    private UploadSlot _activeSlot = new(Guid.NewGuid());
 
     private bool _canManageSyncs;
     private bool _canManageCloudAccess;
@@ -152,8 +163,9 @@
 
     protected override void OnInitialized()
     {
+        _uploadSlots.Add(_activeSlot);
         UploadCoordinator.OnUploadRequested += TriggerFileDialog;
-        UploadCoordinator.OnFilesProcessed += ResetFileInput;
+        UploadCoordinator.OnFilesProcessed += ReleaseSlot;
     }
     private async void TriggerFileDialog()
     {
@@ -161,26 +173,37 @@
         await JS.InvokeVoidAsync("document.getElementById('global-file-input').click");
     }
 
-    private async Task OnFilesSelected(InputFileChangeEventArgs e)
+    private async Task OnSlotChanged(UploadSlot slot, InputFileChangeEventArgs e)
     {
-        // The browser streams belong to this InputFile. The browser page starts
-        // its upload independently and notifies us once all streams are consumed.
-        // Returning now keeps the interactive circuit responsive for large batches.
-        await UploadCoordinator.NotifyFilesSelected(e);
+        // Only the active input accepts new selections; a retained slot never fires.
+        if (slot != _activeSlot) return;
+
+        // Promote a fresh active input BEFORE starting the upload so a second selection
+        // made while this batch still streams lands on a different element and cannot
+        // clobber this batch's browser file streams. This slot's element stays alive
+        // (rendered, non-active) until its upload signals completion via ReleaseSlot.
+        _activeSlot = new UploadSlot(Guid.NewGuid());
+        _uploadSlots.Add(_activeSlot);
+        StateHasChanged();
+
+        // The browser page starts its upload independently and notifies us once all
+        // streams are consumed. Returning keeps the circuit responsive for large batches.
+        await UploadCoordinator.NotifyFilesSelected(e, slot.Id);
     }
 
-    private void ResetFileInput()
+    private void ReleaseSlot(Guid batchId)
         => _ = InvokeAsync(() =>
         {
-            // Browsers do not raise change when the same file is selected twice.
-            _fileInputKey++;
-            StateHasChanged();
+            // The batch consumed all its streams; drop its now-unused input element.
+            // Never remove the active slot (it never carries a completed batch id).
+            if (_uploadSlots.RemoveAll(s => s.Id == batchId && s != _activeSlot) > 0)
+                StateHasChanged();
         });
 
     public void Dispose()
     {
         UploadCoordinator.OnUploadRequested -= TriggerFileDialog;
-        UploadCoordinator.OnFilesProcessed -= ResetFileInput;
+        UploadCoordinator.OnFilesProcessed -= ReleaseSlot;
     }
     
     protected override async Task OnInitializedAsync()

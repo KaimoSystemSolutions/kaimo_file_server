@@ -244,7 +244,9 @@ public partial class FileBrowser
         _selectedItems.Clear();
         await RenderClosedDialogAsync();
 
-        var toastId = Toast.Show(Resources.Web_Common_Deleting, ToastType.Progress);
+        var toastId = Toast.Show(
+            string.Format(T("Web_Delete_Progress"), 0, targets.Count),
+            ToastType.Progress);
 
         // A large delete can take a while, so surface it in the global job menu
         // alongside the toast. The job mirrors the upload/transfer pattern: one job
@@ -274,9 +276,12 @@ public partial class FileBrowser
 
             deletedNames.Add(target.Name);
             done++;
-            job.Update(
-                string.Format(T("Web_Jobs_ItemCounter"), done, targets.Count),
-                targets.Count == 0 ? 100 : done * 100 / targets.Count);
+            var percent = targets.Count == 0 ? 100 : done * 100 / targets.Count;
+            job.Update(string.Format(T("Web_Jobs_ItemCounter"), done, targets.Count), percent);
+            Toast.Update(
+                toastId,
+                string.Format(T("Web_Delete_Progress"), done, targets.Count),
+                progress: percent);
         }
 
         Toast.Update(

@@ -2502,6 +2502,9 @@
   <data name="Web_Delete_BatchSuccess" xml:space="preserve">
     <value>{0} Elemente erfolgreich gelöscht</value>
   </data>
+  <data name="Web_Delete_Progress" xml:space="preserve">
+    <value>{0} von {1} gelöscht</value>
+  </data>
   <data name="Web_Upload_ProgressWithSpeed" xml:space="preserve">
     <value>Lade {0} hoch ({1})</value>
   </data>
@@ -2513,6 +2516,42 @@
   </data>
   <data name="Web_Upload_BatchProcessing" xml:space="preserve">
     <value>Datei {0} von {1} wird verarbeitet: {2}</value>
+  </data>
+  <data name="Web_Upload_SkippedIdentical" xml:space="preserve">
+    <value>{0} identische Datei(en) übersprungen.</value>
+  </data>
+  <data name="Web_Upload_ConflictsPending" xml:space="preserve">
+    <value>{0} Datei(en) warten auf eine Konfliktentscheidung.</value>
+  </data>
+  <data name="Web_UploadConflict_Title" xml:space="preserve">
+    <value>Datei existiert bereits</value>
+  </data>
+  <data name="Web_UploadConflict_Message" xml:space="preserve">
+    <value>Eine Datei namens {0} existiert bereits in diesem Ordner. Was möchtest du tun?</value>
+  </data>
+  <data name="Web_UploadConflict_Existing" xml:space="preserve">
+    <value>Bestehende Datei</value>
+  </data>
+  <data name="Web_UploadConflict_Incoming" xml:space="preserve">
+    <value>Neuer Upload</value>
+  </data>
+  <data name="Web_UploadConflict_Unknown" xml:space="preserve">
+    <value>Wird gerade von einem anderen Upload geschrieben</value>
+  </data>
+  <data name="Web_UploadConflict_Overwrite" xml:space="preserve">
+    <value>Überschreiben</value>
+  </data>
+  <data name="Web_UploadConflict_Rename" xml:space="preserve">
+    <value>Beide behalten</value>
+  </data>
+  <data name="Web_UploadConflict_Discard" xml:space="preserve">
+    <value>Neue verwerfen</value>
+  </data>
+  <data name="Web_UploadConflict_ApplyAll" xml:space="preserve">
+    <value>Für alle folgenden Dateien anwenden</value>
+  </data>
+  <data name="Web_UploadConflict_Remaining" xml:space="preserve">
+    <value>{0} weitere(r) Konflikt(e) danach</value>
   </data>
   <data name="Web_Error_MoveFailed" xml:space="preserve">
     <value>Verschieben des Elements fehlgeschlagen.</value>

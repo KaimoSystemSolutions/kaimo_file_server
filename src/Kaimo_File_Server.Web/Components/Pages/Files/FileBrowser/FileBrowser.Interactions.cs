@@ -217,7 +217,19 @@ public partial class FileBrowser
         // dialog above.
         StateHasChanged();
         await Task.Yield(); // let Blazor render the modal first
-        await _renameModalRef.FocusAsync();
+        await TryFocusAsync(_renameModalRef);
+    }
+
+    /// <summary>
+    /// Focuses a just-shown dialog, tolerating the render race. When the item list
+    /// re-renders as a selected entry is removed, the modal element may not be committed
+    /// to the DOM yet and <see cref="ElementReference.FocusAsync"/> throws "Unable to
+    /// focus an invalid element". Focus is only a keyboard convenience, so ignore it.
+    /// </summary>
+    private static async Task TryFocusAsync(ElementReference element)
+    {
+        try { await element.FocusAsync(); }
+        catch (JSException) { /* element not focusable yet — leave focus where it is */ }
     }
 
     internal async Task PutIntoClipboard(bool deleteOnPaste)
@@ -504,7 +516,7 @@ public partial class FileBrowser
 
         StateHasChanged();
         await Task.Yield(); // let Blazor render the modal first
-        await _deleteModalRef.FocusAsync();
+        await TryFocusAsync(_deleteModalRef);
     }
 
     // ========== Empty recycle bin ==========
