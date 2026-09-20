@@ -65,10 +65,21 @@ public sealed class SyncItemStateEvaluatorTests
     }
 
     [Fact]
-    public void Pull_NoManifestYet_FallsBackToTimestamp_NewItemIsPullBlocked()
+    public void Pull_NoManifestYet_NewItemIsSynced()
     {
+        // Sync not converged (no manifest): a just-pulled item must not be warned as
+        // local-only. Only an explicit manifest miss blocks — see the isRemoteBacked:false case.
         var state = SyncItemStateEvaluator.Evaluate(
             LastRun.AddMinutes(5), LastRun, SyncMode.Pull, isRemoteBacked: null);
-        Assert.Equal(SyncItemState.PullBlocked, state);
+        Assert.Equal(SyncItemState.Synced, state);
+    }
+
+    [Fact]
+    public void Pull_NoManifestAndNoRunYet_IsSynced()
+    {
+        // Mid first run: no successful run, no manifest — every entry must stay quiet.
+        var state = SyncItemStateEvaluator.Evaluate(
+            LastRun, lastSuccessfulRunAtUtc: null, SyncMode.Pull, isRemoteBacked: null);
+        Assert.Equal(SyncItemState.Synced, state);
     }
 }

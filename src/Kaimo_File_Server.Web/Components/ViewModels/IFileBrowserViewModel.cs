@@ -43,13 +43,17 @@ public static class SyncItemStateEvaluator
     public static SyncItemState Evaluate(
         DateTime modifiedAtUtc, DateTime? lastSuccessfulRunAtUtc, SyncMode mode, bool? isRemoteBacked)
     {
-        if (mode == SyncMode.Pull && isRemoteBacked is bool backed)
-            return backed ? SyncItemState.Synced : SyncItemState.PullBlocked;
+        // Pull never uploads, so "local-only" is authoritative only from the manifest.
+        // Without one (sync not yet converged), timestamps cannot tell a just-pulled item
+        // from a genuinely local-only one — so assume in sync rather than warn on every
+        // entry. Only an explicit manifest miss (isRemoteBacked == false) blocks.
+        if (mode == SyncMode.Pull)
+            return isRemoteBacked == false ? SyncItemState.PullBlocked : SyncItemState.Synced;
 
         if (lastSuccessfulRunAtUtc is not null && modifiedAtUtc <= lastSuccessfulRunAtUtc)
             return SyncItemState.Synced;
 
-        return mode == SyncMode.Pull ? SyncItemState.PullBlocked : SyncItemState.PendingUpload;
+        return SyncItemState.PendingUpload;
     }
 }
 
