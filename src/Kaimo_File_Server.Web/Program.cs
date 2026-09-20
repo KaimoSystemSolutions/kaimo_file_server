@@ -241,6 +241,9 @@ builder.Services.AddHostedService<LegacyCloudSyncMigrationHostedService>();
 // Prunes the append-only client-sync tables (change log, request receipts, expired refresh tokens)
 // so they cannot grow without bound.
 builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.ClientSyncRetentionService>();
+// Owns all Elasticsearch index writes by tailing the change log, so file operations never block on
+// ES. Single-owner: registered only here (the web host), never in the SMB/host processes.
+builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.SearchIndexingService>();
 builder.Services.AddScoped<OneDriveStorageConnectionFactory>();
 builder.Services.AddScoped<CredentialRewrapService>();
 builder.Services.AddSingleton<CloudAccessDownloadTicketStore>();

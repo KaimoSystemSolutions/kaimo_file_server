@@ -32,4 +32,18 @@ public sealed class SearchConfigStore : ISearchConfigStore
         var config = scope.ServiceProvider.GetRequiredService<IConfigRepository>();
         await config.SetAsync(SearchConfigKeys.ElasticEnabledKey, enabled);
     }
+
+    public async Task<long> GetIndexCursorAsync()
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var config = scope.ServiceProvider.GetRequiredService<IConfigRepository>();
+        return await config.GetFreshAsync(SearchConfigKeys.IndexCursorKey, 0L);
+    }
+
+    public async Task SetIndexCursorAsync(long seq)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var config = scope.ServiceProvider.GetRequiredService<IConfigRepository>();
+        await config.SetAsync(SearchConfigKeys.IndexCursorKey, seq);
+    }
 }

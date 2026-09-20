@@ -129,6 +129,54 @@ public sealed class FileChangeLogRepositoryTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task GetChangesSinceGlobalAsync_SpansAllShares_InSeqOrder()
+    {
+        var repo = Repo();
+        var shareA = Guid.NewGuid();
+        var shareB = Guid.NewGuid();
+
+        var a1 = Entry(shareA, FileChangeType.Created, "a1.txt");
+        var b1 = Entry(shareB, FileChangeType.Created, "b1.txt");
+        var a2 = Entry(shareA, FileChangeType.Modified, "a2.txt");
+        await repo.AppendAsync(a1);
+        await repo.AppendAsync(b1);
+        await repo.AppendAsync(a2);
+
+        var all = await repo.GetChangesSinceGlobalAsync(0, 10);
+
+        // Both shares, ascending global Seq — the indexer's single total-ordered stream.
+        Assert.Equal(new[] { a1.Seq, b1.Seq, a2.Seq }, all.Select(e => e.Seq).ToArray());
+
+        var afterA1 = await repo.GetChangesSinceGlobalAsync(a1.Seq, 10);
+        Assert.Equal(new[] { b1.Seq, a2.Seq }, afterA1.Select(e => e.Seq).ToArray());
+    }
+
+    [Fact]
+    public async Task GetChangesSinceGlobalAsync_RespectsMaxCount()
+    {
+        var repo = Repo();
+        for (int i = 0; i < 5; i++)
+            await repo.AppendAsync(Entry(Guid.NewGuid(), FileChangeType.Created, $"f{i}.txt"));
+
+        var page = await repo.GetChangesSinceGlobalAsync(0, 3);
+
+        Assert.Equal(3, page.Count);
+    }
+
+    [Fact]
+    public async Task GetHeadSeqGlobalAsync_ReturnsMaxAcrossShares_OrZeroWhenEmpty()
+    {
+        var repo = Repo();
+        Assert.Equal(0, await repo.GetHeadSeqGlobalAsync());
+
+        await repo.AppendAsync(Entry(Guid.NewGuid(), FileChangeType.Created, "a.txt"));
+        var last = Entry(Guid.NewGuid(), FileChangeType.Created, "b.txt");
+        await repo.AppendAsync(last);
+
+        Assert.Equal(last.Seq, await repo.GetHeadSeqGlobalAsync());
+    }
+
+    [Fact]
     public async Task PruneOlderThanAsync_RemovesOldEntriesOnly()
     {
         var repo = Repo();

@@ -219,7 +219,7 @@ public class FileService : IFileService
     public FileService(
     IStorageEngine storage,
     IAclService acl,
-    ISearchService searchService,
+    ISearchService? searchService,
     Guid shareId,
     IFileVersionService? versionService = null,
     IFileOwnershipService? ownershipService = null,

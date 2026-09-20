@@ -26,10 +26,26 @@ namespace Kaimo_File_Server.Core.Repositories
             Guid shareId, long sinceSeq, string? pathPrefix, int maxCount, CancellationToken ct = default);
 
         /// <summary>
+        /// Returns up to <paramref name="maxCount"/> entries across ALL shares with
+        /// <c>Seq &gt; <paramref name="sinceSeq"/></c>, ordered ascending by <c>Seq</c>. Because
+        /// <see cref="FileChangeLogEntry.Seq"/> is globally monotonic this is a single ordered scan,
+        /// used by the background search indexer to tail the whole log from one cursor.
+        /// </summary>
+        Task<IReadOnlyList<FileChangeLogEntry>> GetChangesSinceGlobalAsync(
+            long sinceSeq, int maxCount, CancellationToken ct = default);
+
+        /// <summary>
         /// The highest <c>Seq</c> currently recorded for the share subtree, or <c>0</c> when the
         /// subtree has no logged changes yet. Backs the long-poll change wait.
         /// </summary>
         Task<long> GetHeadSeqAsync(Guid shareId, string? pathPrefix, CancellationToken ct = default);
+
+        /// <summary>
+        /// The highest <c>Seq</c> recorded across ALL shares, or <c>0</c> when the log is empty.
+        /// The background indexer uses it to fast-forward its cursor on first start (existing
+        /// content is already indexed) and after a gap-triggered full reindex.
+        /// </summary>
+        Task<long> GetHeadSeqGlobalAsync(CancellationToken ct = default);
 
         /// <summary>Deletes entries appended before <paramref name="cutoffUtc"/>; returns the count removed.</summary>
         Task<int> PruneOlderThanAsync(DateTime cutoffUtc, CancellationToken ct = default);

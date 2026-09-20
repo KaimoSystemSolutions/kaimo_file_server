@@ -2,7 +2,6 @@
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Infrastructure.Storage;
-using Kaimo_File_Server.Search;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -12,14 +11,10 @@ namespace Kaimo_File_Server.Infrastructure.Services
     {
         private readonly IServiceProvider _serviceProvider;
 
-        private readonly ISearchService _searchService;
-        
-        public FileServiceFactory(IServiceProvider serviceProvider, ISearchService searchService)
+        public FileServiceFactory(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider
                 ?? throw new ArgumentNullException(nameof(serviceProvider));
-
-            _searchService = searchService;
         }
 
         public IFileService CreateForShare(Guid shareId, string sharePath)
@@ -37,8 +32,11 @@ namespace Kaimo_File_Server.Infrastructure.Services
             // Same scoping concern for the per-share change log (appends one row per mutation).
             var changeLog = new ScopedFileChangeLog(_serviceProvider);
 
+            // Elasticsearch is no longer written from the file-operation path: the
+            // SearchIndexingService tails the change log and owns all indexing. Passing
+            // null keeps every ES call in FileService inert (all are null-guarded).
             return new FileService(
-                storage, aclService, _searchService, shareId, versionService,
+                storage, aclService, null, shareId, versionService,
                 ownershipService,
                 _serviceProvider.GetRequiredService<ILogger<FileService>>(),
                 _serviceProvider.GetRequiredService<ICloudSyncPathUpdater>(),

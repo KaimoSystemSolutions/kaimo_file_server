@@ -14,6 +14,12 @@ public static class SearchConfigKeys
     /// nothing is written to the index.
     /// </summary>
     public const string ElasticEnabledKey = "search.elasticsearch.enabled";
+
+    /// <summary>
+    /// The highest change-log <c>Seq</c> the background indexer has already applied to
+    /// the index. Persisted so the indexer resumes where it left off across restarts.
+    /// </summary>
+    public const string IndexCursorKey = "search.index.cursor";
 }
 
 /// <summary>
@@ -28,6 +34,12 @@ public interface ISearchConfigStore
 
     /// <summary>Persists the "use Elasticsearch" flag.</summary>
     Task SetElasticEnabledAsync(bool enabled);
+
+    /// <summary>Reads the background indexer's persisted change-log cursor (0 when unset).</summary>
+    Task<long> GetIndexCursorAsync();
+
+    /// <summary>Persists the background indexer's change-log cursor.</summary>
+    Task SetIndexCursorAsync(long seq);
 }
 
 /// <summary>Effective runtime state of the search engine, for the settings UI.</summary>

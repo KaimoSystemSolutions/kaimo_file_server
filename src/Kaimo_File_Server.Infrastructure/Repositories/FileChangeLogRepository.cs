@@ -40,6 +40,18 @@ public sealed class FileChangeLogRepository : IFileChangeLogRepository
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<FileChangeLogEntry>> GetChangesSinceGlobalAsync(
+        long sinceSeq, int maxCount, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+
+        return await db.FileChangeLog.AsNoTracking()
+            .Where(e => e.Seq > sinceSeq)
+            .OrderBy(e => e.Seq)
+            .Take(maxCount)
+            .ToListAsync(ct);
+    }
+
     public async Task<long> GetHeadSeqAsync(Guid shareId, string? pathPrefix, CancellationToken ct = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
@@ -49,6 +61,13 @@ public sealed class FileChangeLogRepository : IFileChangeLogRepository
 
         // MaxAsync over an empty set throws; the nullable projection returns null instead.
         return await query.MaxAsync(e => (long?)e.Seq, ct) ?? 0L;
+    }
+
+    public async Task<long> GetHeadSeqGlobalAsync(CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        // MaxAsync over an empty set throws; the nullable projection returns null instead.
+        return await db.FileChangeLog.AsNoTracking().MaxAsync(e => (long?)e.Seq, ct) ?? 0L;
     }
 
     public async Task<int> PruneOlderThanAsync(DateTime cutoffUtc, CancellationToken ct = default)
