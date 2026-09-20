@@ -55,6 +55,7 @@ public sealed class FileLogArchiveReader : ILogArchiveReader
         query = Normalize(query);
         var limit = Math.Clamp(query.Limit, 1, MaxViewerRows);
         var sources = await ResolveSourcesAsync(query.Sources, cancellationToken);
+        var prefilter = LinePrefilter.Build(query);
         var entries = new List<LogArchiveEntry>(Math.Min((limit + 1) * Math.Max(sources.Count, 1), 8192));
 
         foreach (var source in sources)
@@ -67,6 +68,10 @@ public sealed class FileLogArchiveReader : ILogArchiveReader
                     await foreach (var line in ReadLinesBackwardAsync(path, cancellationToken))
                     {
                         cancellationToken.ThrowIfCancellationRequested();
+                        // Skip the expensive JSON parse for lines a rare-match filter
+                        // (level allow-list or search) cannot possibly match.
+                        if (prefilter.CanSkip(line))
+                            continue;
                         if (!TryParse(line, out var entry) || !Matches(entry, query))
                             continue;
 
@@ -104,6 +109,7 @@ public sealed class FileLogArchiveReader : ILogArchiveReader
     {
         query = Normalize(query);
         var sources = await ResolveSourcesAsync(query.Sources, cancellationToken);
+        var prefilter = LinePrefilter.Build(query);
         await using var writer = new StreamWriter(
             destination,
             new UTF8Encoding(false),
@@ -118,6 +124,8 @@ public sealed class FileLogArchiveReader : ILogArchiveReader
                 {
                     await foreach (var line in File.ReadLinesAsync(path, cancellationToken))
                     {
+                        if (prefilter.CanSkip(line))
+                            continue;
                         if (!TryParse(line, out var entry) || !Matches(entry, query))
                             continue;
                         var output = readable ? FormatReadable(entry) : line;
@@ -355,4 +363,60 @@ public sealed class FileLogArchiveReader : ILogArchiveReader
 
     private static bool IsUnavailable(Exception exception)
         => exception is IOException or UnauthorizedAccessException;
+
+    /// <summary>
+    /// A cheap raw-line pre-check that lets a query skip the JSON parse for lines a
+    /// rare-match filter cannot match. It is a correct superset of <see cref="Matches"/>:
+    /// any kept line is still confirmed there, so a false positive costs one parse,
+    /// never a wrong result — while a rare search or level now scans the day instead
+    /// of deserializing every info line to find a handful of matches.
+    /// </summary>
+    private readonly struct LinePrefilter
+    {
+        private readonly string[]? _levelTokens; // line must contain one of these
+        private readonly string? _search;        // line must contain this (case-insensitive)
+
+        private LinePrefilter(string[]? levelTokens, string? search)
+        {
+            _levelTokens = levelTokens;
+            _search = search;
+        }
+
+        public bool CanSkip(string line)
+        {
+            if (_levelTokens is not null && !ContainsAny(line, _levelTokens))
+                return true;
+            if (_search is not null && !line.Contains(_search, StringComparison.OrdinalIgnoreCase))
+                return true;
+            return false;
+        }
+
+        private static bool ContainsAny(string line, string[] tokens)
+        {
+            foreach (var token in tokens)
+                if (line.Contains(token, StringComparison.Ordinal))
+                    return true;
+            return false;
+        }
+
+        public static LinePrefilter Build(LogArchiveQuery query)
+        {
+            // Level allow-list of 1–3 of the four on-disk levels: entries are written
+            // compact (no spaces) with the PascalCase enum name, so "level":"Error" is
+            // a stable exact token. All four selected → nothing to exclude, skip it.
+            string[]? levelTokens = null;
+            if (query.Levels is { Count: > 0 and < 4 } levels)
+                levelTokens = levels.Select(level => $"\"level\":\"{level}\"").ToArray();
+
+            // The default JSON encoder escapes non-ASCII and HTML-sensitive characters
+            // (umlauts, <, &, quotes) on disk, so a raw substring match is only valid
+            // for plain ASCII terms; anything else falls back to the full parse+match.
+            string? search = null;
+            var text = query.SearchText;
+            if (!string.IsNullOrEmpty(text) && text.All(c => char.IsAsciiLetterOrDigit(c) || c == ' '))
+                search = text;
+
+            return new LinePrefilter(levelTokens, search);
+        }
+    }
 }

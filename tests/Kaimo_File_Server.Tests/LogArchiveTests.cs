@@ -184,6 +184,36 @@ public sealed class LogArchiveTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Reader_finds_non_ascii_search_term_escaped_on_disk()
+    {
+        // The writer escapes umlauts as \u00.. on disk, so the raw-line search
+        // fast-path must fall back to full parsing for non-ASCII terms.
+        var day = Path.Combine(_root, "web", "2026", "08", "02");
+        Directory.CreateDirectory(day);
+        var json = System.Text.Json.JsonSerializer.Serialize(
+            new LogArchiveEntry
+            {
+                TimestampUtc = new DateTimeOffset(2026, 8, 2, 0, 0, 0, TimeSpan.Zero),
+                Sequence = 1,
+                Level = LogLevel.Error,
+                Service = "web",
+                Instance = "a",
+                Category = "C",
+                Message = "Datei zu groß"
+            },
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)
+            {
+                Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+            });
+        Assert.Contains("\\u00", json); // guard: the umlaut really is escaped on disk
+        await File.WriteAllLinesAsync(Path.Combine(day, "web-test-20260802T000000Z-000.ndjson"), [json]);
+        var reader = new FileLogArchiveReader(Options.Create(new LogArchiveOptions { RootPath = _root }));
+
+        var result = await reader.QueryAsync(new LogArchiveQuery(["web"], SearchText: "groß"));
+        Assert.Equal("Datei zu groß", Assert.Single(result.Entries).Message);
+    }
+
+    [Fact]
     public async Task Reader_returns_empty_result_when_archive_does_not_exist()
     {
         var reader = new FileLogArchiveReader(Options.Create(new LogArchiveOptions { RootPath = _root }));
@@ -233,6 +263,17 @@ public sealed class LogArchiveTests : IAsyncLifetime
         Assert.Contains(boundedResult.Entries, entry => entry.Message == "normal operation");
     }
 
+    [Theory]
+    [InlineData("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Information, false)] // the firehose
+    [InlineData("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning, true)]      // command warnings kept
+    [InlineData("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Error, true)]        // command errors kept
+    [InlineData("Kaimo.File.Server.Worker", LogLevel.Information, true)]                        // normal Information kept
+    [InlineData("Kaimo.File.Server.Worker", LogLevel.Debug, false)]                             // below Information dropped
+    [InlineData("Any.Category", LogLevel.None, false)]
+    public void Archive_filter_caps_db_command_noise_but_keeps_other_information(
+        string category, LogLevel level, bool expected)
+        => Assert.Equal(expected, LogArchiveBuilderExtensions.ShouldArchive(category, level));
+
     [Fact]
     public void Log_viewer_resources_exist_in_default_and_german_cultures()
     {
@@ -263,7 +304,10 @@ public sealed class LogArchiveTests : IAsyncLifetime
             "Web_Settings_LogViewer_Levels",
             "Web_Settings_LogViewer_LevelsNone",
             "Web_Settings_LogViewer_NoSources",
+            "Web_Settings_LogViewer_Next",
+            "Web_Settings_LogViewer_Page",
             "Web_Settings_LogViewer_Paused",
+            "Web_Settings_LogViewer_Prev",
             "Web_Settings_LogViewer_ReadFailed",
             "Web_Settings_LogViewer_Refresh",
             "Web_Settings_LogViewer_ResultCount",

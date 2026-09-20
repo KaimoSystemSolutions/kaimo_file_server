@@ -20,17 +20,34 @@ public sealed class LogViewerViewModel(
     public const int MaxExcludedMessagePrefixes = LogArchiveQueryLimits.MaxExcludedMessagePrefixes;
     public const int MaxExcludedMessagePrefixLength = LogArchiveQueryLimits.MaxExcludedMessagePrefixLength;
 
-    // Keep the live viewer window small: 1,000 rows made every filter change and
-    // every 3-second live tick re-diff a huge Blazor Server render tree, which
-    // lagged the whole page. Full history stays available through the download.
-    public const int ViewerRowLimit = 250;
+    // One rendered page is kept small so every filter change and 3-second live
+    // tick re-diffs only a modest Blazor Server render tree; older entries are
+    // reached by paging. The reader hard-caps at 1,000 rows, so paging is bounded
+    // to MaxPages. Full history stays available through the download.
+    public const int PageSize = 100;
+    private const int MaxFetch = 1000;
+    public static int MaxPages => MaxFetch / PageSize;
 
     private readonly SemaphoreSlim _queryGate = new(1, 1);
     private readonly List<string> _excludedMessagePrefixes = [];
 
     public IReadOnlyList<string> Sources { get; private set; } = [];
     public HashSet<string> SelectedSources { get; } = new(StringComparer.OrdinalIgnoreCase);
-    public ICollection<LogArchiveEntry> Entries { get; private set; } = [];
+
+    // Everything fetched so far (newest first); the visible page is the current
+    // slice of it. Paging forward fetches deeper, paging back reuses what is
+    // already in hand.
+    private List<LogArchiveEntry> _fetched = [];
+    private bool _moreBeyondFetched;
+    public int CurrentPage { get; private set; } = 1;
+    public ICollection<LogArchiveEntry> Entries =>
+        _fetched.Skip((CurrentPage - 1) * PageSize).Take(PageSize).ToArray();
+    public bool HasPreviousPage => CurrentPage > 1;
+    public bool HasNextPage =>
+        _fetched.Count > CurrentPage * PageSize
+        || (_moreBeyondFetched && CurrentPage < MaxPages);
+    // The 1,000-row reader cap is reached while entries are still being truncated.
+    public bool ReachedPageCeiling => _moreBeyondFetched && CurrentPage >= MaxPages;
 
     // Which levels can be toggled in the viewer, and which are currently shown.
     // Mirrors the source filter exactly (a HashSet + Set… + checked/@onchange),
@@ -38,7 +55,10 @@ public sealed class LogViewerViewModel(
     private static readonly LogLevel[] SelectableLevels =
         [LogLevel.Information, LogLevel.Warning, LogLevel.Error, LogLevel.Critical];
     public IReadOnlyList<LogLevel> Levels => SelectableLevels;
-    public HashSet<LogLevel> SelectedLevels { get; } = [.. SelectableLevels];
+    // Information is the high-volume firehose and is off by default; the initial
+    // load shows only Warning and above. Users can enable it via the level filter.
+    public HashSet<LogLevel> SelectedLevels { get; } =
+        [LogLevel.Warning, LogLevel.Error, LogLevel.Critical];
 
     public void SetLevelSelected(LogLevel level, bool selected)
     {
@@ -56,7 +76,6 @@ public sealed class LogViewerViewModel(
     // to today (the common case, and it keeps downloads bounded); null = all days.
     public DateOnly? FilterDateUtc { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);
     public bool IsLivePaused { get; set; }
-    public bool HasMore { get; private set; }
     public bool IsLoading { get; private set; }
     public bool IsAuthorized { get; private set; }
     public string? ErrorMessage { get; private set; }
@@ -64,7 +83,7 @@ public sealed class LogViewerViewModel(
     // Cheap identity of the current result so the live loop can skip a re-render
     // when nothing new arrived (the append-only tail changes its newest row).
     public (long Sequence, int Count) TopSignature
-        => (Entries.Count == 0 ? 0 : Entries.First().Sequence, Entries.Count);
+        => (_fetched.Count == 0 ? 0 : _fetched[0].Sequence, _fetched.Count);
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -116,10 +135,25 @@ public sealed class LogViewerViewModel(
     // action (filter change, exclusion, manual refresh) must not be dropped,
     // so it waits its turn instead.
     public Task RefreshAsync(CancellationToken cancellationToken = default)
-        => RefreshCoreAsync(waitForGate: true, cancellationToken);
+    {
+        // A filter change or manual refresh always returns to the first page.
+        CurrentPage = 1;
+        return RefreshCoreAsync(waitForGate: true, cancellationToken);
+    }
 
     public Task LiveRefreshAsync(CancellationToken cancellationToken = default)
         => RefreshCoreAsync(waitForGate: false, cancellationToken);
+
+    public Task GoToPageAsync(int page, CancellationToken cancellationToken = default)
+    {
+        page = Math.Clamp(page, 1, MaxPages);
+        if (page == CurrentPage)
+            return Task.CompletedTask;
+        // Paging back reuses rows already fetched; only paging past them re-queries.
+        var needsFetch = page * PageSize > _fetched.Count;
+        CurrentPage = page;
+        return needsFetch ? RefreshCoreAsync(waitForGate: true, cancellationToken) : Task.CompletedTask;
+    }
 
     private async Task RefreshCoreAsync(bool waitForGate, CancellationToken cancellationToken)
     {
@@ -139,8 +173,8 @@ public sealed class LogViewerViewModel(
             IsLoading = true;
             ErrorMessage = null;
             var result = await reader.QueryAsync(CreateQuery(), cancellationToken);
-            Entries = result.Entries.ToArray();
-            HasMore = result.HasMore;
+            _fetched = result.Entries.ToList();
+            _moreBeyondFetched = result.HasMore;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -170,7 +204,9 @@ public sealed class LogViewerViewModel(
         => new(
             SelectedSources.ToArray(),
             SearchText: SearchText,
-            Limit: ViewerRowLimit,
+            // Over-fetch to the end of the current page; Entries slices the page,
+            // and the extra row the reader adds signals whether a next page exists.
+            Limit: Math.Min(CurrentPage * PageSize, MaxFetch),
             UtcDate: FilterDateUtc,
             ExcludedMessagePrefixes: _excludedMessagePrefixes.ToArray(),
             Levels: SelectedLevels.ToArray());

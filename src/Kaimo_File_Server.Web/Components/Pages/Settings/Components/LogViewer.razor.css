@@ -160,6 +160,17 @@
     gap: 4px 12px;
 }
 
+.log-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.log-pager-current {
+    min-width: 4.5em;
+    text-align: center;
+}
+
 .log-download {
     display: inline-flex;
     align-items: center;

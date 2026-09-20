@@ -23,7 +23,7 @@ public class LogViewerComponentTests
     // Renders the real LogViewer against a mocked reader that honours the level
     // allow-list, then drives the level dropdown exactly as a user would.
     [Fact]
-    public void Deselecting_a_level_filters_the_visible_list_immediately()
+    public void Information_is_off_by_default_and_toggles_the_visible_list()
     {
         using var ctx = new Bunit.TestContext();
 
@@ -69,16 +69,14 @@ public class LogViewerComponentTests
 
         var cut = ctx.RenderComponent<LogViewer>();
 
-        // Wait for the initial (all-levels) load to render both rows.
-        cut.WaitForAssertion(() => Assert.Contains("info-msg", cut.Markup), TimeSpan.FromSeconds(5));
-        Assert.Contains("err-msg", cut.Markup);
+        // Default excludes Information: only the error loads, the info row does not.
+        cut.WaitForAssertion(() => Assert.Contains("err-msg", cut.Markup), TimeSpan.FromSeconds(5));
+        Assert.DoesNotContain("info-msg", cut.Markup);
 
-        // Open the level dropdown and uncheck "Information" (the first option).
+        // Enable "Information" (the first option) — the info row appears, error stays.
         cut.Find(".multi-select .multi-select-display").Click();
-        cut.FindAll(".multi-select-dropdown .multi-select-option input")[0].Change(false);
-
-        // The Information row must disappear immediately, Error must remain.
-        cut.WaitForAssertion(() => Assert.DoesNotContain("info-msg", cut.Markup), TimeSpan.FromSeconds(5));
+        cut.FindAll(".multi-select-dropdown .multi-select-option input")[0].Change(true);
+        cut.WaitForAssertion(() => Assert.Contains("info-msg", cut.Markup), TimeSpan.FromSeconds(5));
         Assert.Contains("err-msg", cut.Markup);
     }
 }

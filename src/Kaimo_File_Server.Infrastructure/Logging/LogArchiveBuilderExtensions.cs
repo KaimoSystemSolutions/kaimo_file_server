@@ -7,6 +7,11 @@ namespace Kaimo_File_Server.Infrastructure.Logging;
 
 public static class LogArchiveBuilderExtensions
 {
+    // EF Core logs one Information "Executed DbCommand" line per query under this
+    // category. In normal operation that is the large majority of archived volume
+    // and buries the events an operator looks for, so it is capped at Warning below.
+    private const string DbCommandCategory = "Microsoft.EntityFrameworkCore.Database.Command";
+
     /// <summary>Adds the fixed Information+ archive without changing console filter semantics.</summary>
     public static void AddLogArchive(this IHostApplicationBuilder builder, string source)
     {
@@ -26,8 +31,21 @@ public static class LogArchiveBuilderExtensions
         builder.Services.AddSingleton<ILogArchiveReader, FileLogArchiveReader>();
 
         // A provider-specific rule wins over the existing dynamic global default.
-        // Console keeps Settings/KAIMO_LOG_LEVEL; this archive always receives Information+.
-        builder.Logging.AddFilter<LogArchiveLoggerProvider>(
-            (_, level) => level >= LogLevel.Information && level != LogLevel.None);
+        // Console keeps Settings/KAIMO_LOG_LEVEL; this archive receives Information+
+        // for every category except the EF command firehose (see ShouldArchive).
+        builder.Logging.AddFilter<LogArchiveLoggerProvider>(ShouldArchive);
+    }
+
+    // The archive keeps Information+ for every category except the EF "Executed
+    // DbCommand" firehose, which is kept at Warning+ so command errors are still
+    // archived without one Information line per query.
+    internal static bool ShouldArchive(string? category, LogLevel level)
+    {
+        if (level == LogLevel.None)
+            return false;
+        var minimum = category is not null && category.StartsWith(DbCommandCategory, StringComparison.Ordinal)
+            ? LogLevel.Warning
+            : LogLevel.Information;
+        return level >= minimum;
     }
 }

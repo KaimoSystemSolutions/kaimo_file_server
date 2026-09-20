@@ -10076,7 +10076,34 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Settings_LogViewer_HasMore", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Previous ähnelt.
+        /// </summary>
+        public static string Web_Settings_LogViewer_Prev {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Prev", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Next ähnelt.
+        /// </summary>
+        public static string Web_Settings_LogViewer_Next {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Next", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die Page {0} ähnelt.
+        /// </summary>
+        public static string Web_Settings_LogViewer_Page {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_Page", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Instance ähnelt.
         /// </summary>

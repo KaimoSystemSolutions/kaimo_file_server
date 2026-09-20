@@ -1677,6 +1677,15 @@
   <data name="Web_Settings_LogViewer_HasMore" xml:space="preserve">
     <value>More entries match; the display is limited to 1,000 entries.</value>
   </data>
+  <data name="Web_Settings_LogViewer_Prev" xml:space="preserve">
+    <value>Previous</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Next" xml:space="preserve">
+    <value>Next</value>
+  </data>
+  <data name="Web_Settings_LogViewer_Page" xml:space="preserve">
+    <value>Page {0}</value>
+  </data>
   <data name="Web_Settings_LogViewer_Updating" xml:space="preserve">
     <value>Refreshing…</value>
   </data>

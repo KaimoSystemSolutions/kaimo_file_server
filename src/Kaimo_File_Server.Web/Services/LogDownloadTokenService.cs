@@ -29,12 +29,16 @@ public sealed class LogDownloadTokenService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(LogArchiveQueryLimits.MaxExcludedMessagePrefixes)
             .ToArray();
+        // A download is always scoped to a single UTC day (the selected one, or
+        // today when the viewer shows all days) so it never streams the whole
+        // retained archive.
+        var utcDate = query.UtcDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
         var safeQuery = new LogArchiveQuery(
             query.Sources.Take(20).ToArray(),
             query.MinimumLevel,
             search,
             1000,
-            query.UtcDate,
+            utcDate,
             excludedPrefixes,
             query.Levels?.Distinct().ToArray());
         return _protector.Protect(JsonSerializer.Serialize(safeQuery, JsonOptions), TimeSpan.FromMinutes(2));

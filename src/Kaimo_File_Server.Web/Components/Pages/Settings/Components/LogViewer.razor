@@ -16,7 +16,7 @@
                 <input type="checkbox" checked="@(!Viewer.IsLivePaused)" @onchange="LiveChangedAsync" />
                 <span>@Resources.Web_Settings_LogViewer_Live</span>
             </label>
-            <button class="btn-icon" title="@Resources.Web_Settings_LogViewer_Refresh" @onclick="QueueRefreshAsync" disabled="@Viewer.IsLoading">↻</button>
+            <button class="btn-icon" title="@Resources.Web_Settings_LogViewer_Refresh" @onclick="RefreshNowAsync" disabled="@Viewer.IsLoading">↻</button>
         </div>
     </div>
 
@@ -136,7 +136,7 @@
         <div class="log-result-summary">
             <span class="log-result-counts">
                 <span>@string.Format(Resources.Web_Settings_LogViewer_ResultCount, Viewer.Entries.Count)</span>
-                @if (Viewer.HasMore)
+                @if (Viewer.ReachedPageCeiling)
                 {
                     <span>@Resources.Web_Settings_LogViewer_HasMore</span>
                 }
@@ -148,6 +148,21 @@
                 {
                     <span>@Resources.Web_Settings_LogViewer_Paused</span>
                 }
+            </span>
+            <span class="log-pager">
+                <button class="btn-secondary btn-secondary--sm"
+                        type="button"
+                        @onclick="PreviousPageAsync"
+                        disabled="@(!Viewer.HasPreviousPage || Viewer.IsLoading)">
+                    @Resources.Web_Settings_LogViewer_Prev
+                </button>
+                <span class="log-pager-current">@string.Format(Resources.Web_Settings_LogViewer_Page, Viewer.CurrentPage)</span>
+                <button class="btn-secondary btn-secondary--sm"
+                        type="button"
+                        @onclick="NextPageAsync"
+                        disabled="@(!Viewer.HasNextPage || Viewer.IsLoading)">
+                    @Resources.Web_Settings_LogViewer_Next
+                </button>
             </span>
             <span class="log-download">
                 <button class="btn-primary"
@@ -230,10 +245,16 @@
 </div>
 
 @code {
+    private const int FilterDebounceMs = 200;
+    private const int SearchDebounceMs = 350;
+
     private readonly CancellationTokenSource _lifetime = new();
-    private CancellationTokenSource? _searchDelay;
-    // Cancels the in-flight query when a newer filter change arrives, so rapid
-    // toggling supersedes the previous full scan instead of queuing behind it.
+    // Coalesces a burst of filter/search changes into a single query once the
+    // user stops; superseded by the next change.
+    private CancellationTokenSource? _debounceCts;
+    // The single in-flight refresh. A newer refresh cancels it, and only the
+    // refresh that is still current is allowed to render, so rapid toggling can
+    // neither overlay stale results nor storm the renderer.
     private CancellationTokenSource? _refreshCts;
     private Task? _refreshLoop;
     private string _excludedPrefixDraft = "";
@@ -262,22 +283,57 @@
         StateHasChanged();
     }
 
-    private async Task QueueRefreshAsync()
+    // Single entry point for every query. Supersedes any in-flight refresh, and
+    // only the call that is still the current one renders — so a superseded
+    // (cancelled) refresh can never overlay newer results or trigger an extra
+    // render. Each call disposes only its own token, and only after its own work
+    // has finished, so a superseding call never disposes a token still in use.
+    private async Task RunRefreshAsync(Func<CancellationToken, Task> action)
     {
-        var previous = _refreshCts;
+        // An explicit refresh/page action also drops any pending debounced filter.
+        Interlocked.Exchange(ref _debounceCts, null)?.Cancel();
         var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
-        _refreshCts = cts;
-        previous?.Cancel();
-        previous?.Dispose();
+        Interlocked.Exchange(ref _refreshCts, cts)?.Cancel();
         try
         {
-            await Viewer.RefreshAsync(cts.Token);
-            StateHasChanged();
+            await action(cts.Token);
+            if (ReferenceEquals(Volatile.Read(ref _refreshCts), cts))
+                StateHasChanged();
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
         }
+        finally
+        {
+            Interlocked.CompareExchange(ref _refreshCts, null, cts);
+            cts.Dispose();
+        }
     }
+
+    // Coalesces a burst of filter/search changes into one refresh after the user
+    // pauses; the next change cancels the wait and restarts it.
+    private async Task ScheduleRefreshAsync(int delayMs)
+    {
+        var debounce = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        Interlocked.Exchange(ref _debounceCts, debounce)?.Cancel();
+        try
+        {
+            await Task.Delay(delayMs, debounce.Token);
+            await RunRefreshAsync(ct => Viewer.RefreshAsync(ct));
+        }
+        catch (OperationCanceledException) when (debounce.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            Interlocked.CompareExchange(ref _debounceCts, null, debounce);
+            debounce.Dispose();
+        }
+    }
+
+    private Task RefreshNowAsync() => RunRefreshAsync(ct => Viewer.RefreshAsync(ct));
+    private Task NextPageAsync() => RunRefreshAsync(ct => Viewer.GoToPageAsync(Viewer.CurrentPage + 1, ct));
+    private Task PreviousPageAsync() => RunRefreshAsync(ct => Viewer.GoToPageAsync(Viewer.CurrentPage - 1, ct));
 
     private async Task SourceChangedAsync(string source, ChangeEventArgs args)
     {
@@ -285,7 +341,7 @@
             ? value
             : bool.TryParse(args.Value?.ToString(), out var parsed) && parsed;
         Viewer.SetSourceSelected(source, selected);
-        await QueueRefreshAsync();
+        await ScheduleRefreshAsync(FilterDebounceMs);
     }
 
     private async Task LevelChangedAsync(LogLevel level, ChangeEventArgs args)
@@ -294,7 +350,7 @@
             ? value
             : bool.TryParse(args.Value?.ToString(), out var parsed) && parsed;
         Viewer.SetLevelSelected(level, selected);
-        await QueueRefreshAsync();
+        await ScheduleRefreshAsync(FilterDebounceMs);
     }
 
     private string LevelSummary
@@ -313,31 +369,19 @@
             : bool.TryParse(args.Value?.ToString(), out var parsed) && parsed;
         Viewer.IsLivePaused = !enabled;
         if (enabled)
-            await QueueRefreshAsync();
+            await RefreshNowAsync();
     }
 
     private async Task DateChangedAsync(ChangeEventArgs args)
     {
         Viewer.FilterDateUtc = DateOnly.TryParse(args.Value?.ToString(), out var date) ? date : null;
-        await QueueRefreshAsync();
+        await ScheduleRefreshAsync(FilterDebounceMs);
     }
 
     private async Task SearchChangedAsync(ChangeEventArgs args)
     {
         Viewer.SearchText = args.Value?.ToString() ?? "";
-        var previousDelay = _searchDelay;
-        var delay = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
-        _searchDelay = delay;
-        previousDelay?.Cancel();
-        previousDelay?.Dispose();
-        try
-        {
-            await Task.Delay(400, delay.Token);
-            await QueueRefreshAsync();
-        }
-        catch (OperationCanceledException) when (delay.IsCancellationRequested)
-        {
-        }
+        await ScheduleRefreshAsync(SearchDebounceMs);
     }
 
     private async Task AddExcludedPrefixAsync()
@@ -345,13 +389,13 @@
         if (!Viewer.TryAddExcludedMessagePrefix(_excludedPrefixDraft))
             return;
         _excludedPrefixDraft = "";
-        await QueueRefreshAsync();
+        await ScheduleRefreshAsync(FilterDebounceMs);
     }
 
     private async Task RemoveExcludedPrefixAsync(string prefix)
     {
         if (Viewer.RemoveExcludedMessagePrefix(prefix))
-            await QueueRefreshAsync();
+            await ScheduleRefreshAsync(FilterDebounceMs);
     }
 
     private void Download(string format)
@@ -370,7 +414,8 @@
             {
                 // A search may scan the complete retention window. Do not repeat
                 // that work every few seconds; live polling resumes when it is cleared.
-                if (!Viewer.IsLivePaused && string.IsNullOrWhiteSpace(Viewer.SearchText))
+                // Only tail on the first page — do not yank a user browsing history.
+                if (!Viewer.IsLivePaused && string.IsNullOrWhiteSpace(Viewer.SearchText) && Viewer.CurrentPage == 1)
                 {
                     var before = Viewer.TopSignature;
                     await Viewer.LiveRefreshAsync(cancellationToken);
@@ -408,10 +453,8 @@
 
     public async ValueTask DisposeAsync()
     {
-        _searchDelay?.Cancel();
-        _searchDelay?.Dispose();
-        _refreshCts?.Cancel();
-        _refreshCts?.Dispose();
+        Interlocked.Exchange(ref _debounceCts, null)?.Cancel();
+        Interlocked.Exchange(ref _refreshCts, null)?.Cancel();
         _lifetime.Cancel();
         if (_refreshLoop is not null)
         {
