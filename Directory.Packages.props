@@ -65,6 +65,7 @@
     <PackageVersion Include="xunit" Version="2.*" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
     <PackageVersion Include="Moq" Version="4.*" />
+    <PackageVersion Include="bunit" Version="1.*" />
   </ItemGroup>
 
 </Project>

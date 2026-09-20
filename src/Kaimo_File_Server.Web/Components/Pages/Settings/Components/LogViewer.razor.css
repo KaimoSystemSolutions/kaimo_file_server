@@ -51,6 +51,12 @@
     max-width: 190px;
 }
 
+/* Level filter reuses the design-system .multi-select dropdown; just give it a
+   sensible closed width inside the filter row. */
+.log-level-filter .multi-select {
+    min-width: 200px;
+}
+
 /* Filter blocks */
 
 .log-viewer-filters {

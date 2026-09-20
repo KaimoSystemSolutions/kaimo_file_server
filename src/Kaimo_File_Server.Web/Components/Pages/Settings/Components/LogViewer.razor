@@ -52,11 +52,27 @@
 
             <div class="log-filter-block log-level-filter">
                 <span class="log-filter-label">@Resources.Web_Settings_LogViewer_Levels</span>
-                <MultiSelect T="LogLevel"
-                             Items="Viewer.LevelItems"
-                             Label="LevelLabel"
-                             PlaceholderText="@Resources.Web_Settings_LogViewer_LevelsNone"
-                             OnChanged="QueueRefreshAsync" />
+                <div class="multi-select @(_levelMenuOpen ? "open" : "")">
+                    <div class="multi-select-display" @onclick="ToggleLevelMenu">
+                        <span class="multi-select-text">@LevelSummary</span>
+                        <span class="multi-select-chevron" aria-hidden="true">▾</span>
+                    </div>
+                    @if (_levelMenuOpen)
+                    {
+                        <div class="multi-select-backdrop" @onclick="CloseLevelMenu"></div>
+                        <div class="multi-select-dropdown">
+                            @foreach (var level in Viewer.Levels)
+                            {
+                                <label class="multi-select-option">
+                                    <input type="checkbox"
+                                           checked="@Viewer.SelectedLevels.Contains(level)"
+                                           @onchange="args => LevelChangedAsync(level, args)" />
+                                    <span>@LevelLabel(level)</span>
+                                </label>
+                            }
+                        </div>
+                    }
+                </div>
             </div>
 
             <label class="log-filter-block">
@@ -222,6 +238,10 @@
     private Task? _refreshLoop;
     private string _excludedPrefixDraft = "";
     private bool _initialized;
+    private bool _levelMenuOpen;
+
+    private void ToggleLevelMenu() => _levelMenuOpen = !_levelMenuOpen;
+    private void CloseLevelMenu() => _levelMenuOpen = false;
 
     // Load logs after the first render so selecting the Logging tab paints
     // immediately instead of blocking on the (possibly slow) initial query.
@@ -266,6 +286,24 @@
             : bool.TryParse(args.Value?.ToString(), out var parsed) && parsed;
         Viewer.SetSourceSelected(source, selected);
         await QueueRefreshAsync();
+    }
+
+    private async Task LevelChangedAsync(LogLevel level, ChangeEventArgs args)
+    {
+        var selected = args.Value is bool value
+            ? value
+            : bool.TryParse(args.Value?.ToString(), out var parsed) && parsed;
+        Viewer.SetLevelSelected(level, selected);
+        await QueueRefreshAsync();
+    }
+
+    private string LevelSummary
+    {
+        get
+        {
+            var names = Viewer.Levels.Where(Viewer.SelectedLevels.Contains).Select(LevelLabel).ToList();
+            return names.Count > 0 ? string.Join(", ", names) : Resources.Web_Settings_LogViewer_LevelsNone;
+        }
     }
 
     private async Task LiveChangedAsync(ChangeEventArgs args)
@@ -334,8 +372,12 @@
                 // that work every few seconds; live polling resumes when it is cleared.
                 if (!Viewer.IsLivePaused && string.IsNullOrWhiteSpace(Viewer.SearchText))
                 {
+                    var before = Viewer.TopSignature;
                     await Viewer.LiveRefreshAsync(cancellationToken);
-                    await InvokeAsync(StateHasChanged);
+                    // Only re-render (and push a SignalR diff) when the result
+                    // actually changed; an idle tick must not lag the page.
+                    if (Viewer.TopSignature != before)
+                        await InvokeAsync(StateHasChanged);
                 }
             }
         }

@@ -20,6 +20,11 @@ public sealed class LogViewerViewModel(
     public const int MaxExcludedMessagePrefixes = LogArchiveQueryLimits.MaxExcludedMessagePrefixes;
     public const int MaxExcludedMessagePrefixLength = LogArchiveQueryLimits.MaxExcludedMessagePrefixLength;
 
+    // Keep the live viewer window small: 1,000 rows made every filter change and
+    // every 3-second live tick re-diff a huge Blazor Server render tree, which
+    // lagged the whole page. Full history stays available through the download.
+    public const int ViewerRowLimit = 250;
+
     private readonly SemaphoreSlim _queryGate = new(1, 1);
     private readonly List<string> _excludedMessagePrefixes = [];
 
@@ -27,12 +32,23 @@ public sealed class LogViewerViewModel(
     public HashSet<string> SelectedSources { get; } = new(StringComparer.OrdinalIgnoreCase);
     public ICollection<LogArchiveEntry> Entries { get; private set; } = [];
 
-    // Which levels are shown, toggled individually in the viewer. All on by
-    // default (equivalent to the previous "Information and up" minimum).
-    public IReadOnlyList<CheckboxItem<LogLevel>> LevelItems { get; } =
-        new[] { LogLevel.Information, LogLevel.Warning, LogLevel.Error, LogLevel.Critical }
-            .Select(level => new CheckboxItem<LogLevel>(level, true))
-            .ToArray();
+    // Which levels can be toggled in the viewer, and which are currently shown.
+    // Mirrors the source filter exactly (a HashSet + Set… + checked/@onchange),
+    // which is the selection pattern that reliably drives the query here.
+    private static readonly LogLevel[] SelectableLevels =
+        [LogLevel.Information, LogLevel.Warning, LogLevel.Error, LogLevel.Critical];
+    public IReadOnlyList<LogLevel> Levels => SelectableLevels;
+    public HashSet<LogLevel> SelectedLevels { get; } = [.. SelectableLevels];
+
+    public void SetLevelSelected(LogLevel level, bool selected)
+    {
+        if (!SelectableLevels.Contains(level))
+            return;
+        if (selected)
+            SelectedLevels.Add(level);
+        else
+            SelectedLevels.Remove(level);
+    }
 
     public string SearchText { get; set; } = "";
     public IReadOnlyList<string> ExcludedMessagePrefixes => _excludedMessagePrefixes;
@@ -44,6 +60,11 @@ public sealed class LogViewerViewModel(
     public bool IsLoading { get; private set; }
     public bool IsAuthorized { get; private set; }
     public string? ErrorMessage { get; private set; }
+
+    // Cheap identity of the current result so the live loop can skip a re-render
+    // when nothing new arrived (the append-only tail changes its newest row).
+    public (long Sequence, int Count) TopSignature
+        => (Entries.Count == 0 ? 0 : Entries.First().Sequence, Entries.Count);
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -149,10 +170,10 @@ public sealed class LogViewerViewModel(
         => new(
             SelectedSources.ToArray(),
             SearchText: SearchText,
-            Limit: 1000,
+            Limit: ViewerRowLimit,
             UtcDate: FilterDateUtc,
             ExcludedMessagePrefixes: _excludedMessagePrefixes.ToArray(),
-            Levels: LevelItems.Where(item => item.IsChecked).Select(item => item.Item).ToArray());
+            Levels: SelectedLevels.ToArray());
 
     private async Task<bool> AuthorizeAsync()
     {
