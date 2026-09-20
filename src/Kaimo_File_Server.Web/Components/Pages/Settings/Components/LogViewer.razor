@@ -16,15 +16,7 @@
                 <input type="checkbox" checked="@(!Viewer.IsLivePaused)" @onchange="LiveChangedAsync" />
                 <span>@Resources.Web_Settings_LogViewer_Live</span>
             </label>
-            <button class="btn-icon" title="@Resources.Web_Settings_LogViewer_Refresh" @onclick="RefreshAsync" disabled="@Viewer.IsLoading">↻</button>
-            <label class="log-download-date">
-                <span>@Resources.Web_Settings_LogViewer_DownloadDateUtc</span>
-                <input class="edit-input"
-                       type="date"
-                       value="@Viewer.DownloadDateUtc.ToString("yyyy-MM-dd")"
-                       @onchange="DownloadDateChanged" />
-            </label>
-            <button class="btn-primary" @onclick="Download" disabled="@(Viewer.SelectedSources.Count == 0)">@Resources.Web_Settings_LogViewer_Download</button>
+            <button class="btn-icon" title="@Resources.Web_Settings_LogViewer_Refresh" @onclick="QueueRefreshAsync" disabled="@Viewer.IsLoading">↻</button>
         </div>
     </div>
 
@@ -52,20 +44,27 @@
                             <input type="checkbox"
                                    checked="@Viewer.SelectedSources.Contains(source)"
                                    @onchange="args => SourceChangedAsync(source, args)" />
-                            <span>@source</span>
+                            <span>@DisplayName(source)</span>
                         </label>
                     }
                 </div>
             </div>
 
+            <div class="log-filter-block log-level-filter">
+                <span class="log-filter-label">@Resources.Web_Settings_LogViewer_Levels</span>
+                <MultiSelect T="LogLevel"
+                             Items="Viewer.LevelItems"
+                             Label="LevelLabel"
+                             PlaceholderText="@Resources.Web_Settings_LogViewer_LevelsNone"
+                             OnChanged="QueueRefreshAsync" />
+            </div>
+
             <label class="log-filter-block">
-                <span class="log-filter-label">@Resources.Web_Settings_LogViewer_MinimumLevel</span>
-                <select class="edit-input log-level-select" value="@Viewer.MinimumLevel" @onchange="LevelChangedAsync">
-                    <option value="Information">@Resources.Web_Settings_LogViewer_LevelInformation</option>
-                    <option value="Warning">@Resources.Web_Settings_LogViewer_LevelWarning</option>
-                    <option value="Error">@Resources.Web_Settings_LogViewer_LevelError</option>
-                    <option value="Critical">@Resources.Web_Settings_LogViewer_LevelCritical</option>
-                </select>
+                <span class="log-filter-label">@Resources.Web_Settings_LogViewer_DownloadDateUtc</span>
+                <input class="edit-input log-date-input"
+                       type="date"
+                       value="@(Viewer.FilterDateUtc?.ToString("yyyy-MM-dd"))"
+                       @onchange="DateChangedAsync" />
             </label>
 
             <label class="log-filter-block log-search-filter">
@@ -119,19 +118,35 @@
         }
 
         <div class="log-result-summary">
-            <span>@string.Format(Resources.Web_Settings_LogViewer_ResultCount, Viewer.Entries.Count)</span>
-            @if (Viewer.HasMore)
-            {
-                <span>@Resources.Web_Settings_LogViewer_HasMore</span>
-            }
-            @if (Viewer.IsLoading)
-            {
-                <span>@Resources.Web_Settings_LogViewer_Updating</span>
-            }
-            else if (Viewer.IsLivePaused)
-            {
-                <span>@Resources.Web_Settings_LogViewer_Paused</span>
-            }
+            <span class="log-result-counts">
+                <span>@string.Format(Resources.Web_Settings_LogViewer_ResultCount, Viewer.Entries.Count)</span>
+                @if (Viewer.HasMore)
+                {
+                    <span>@Resources.Web_Settings_LogViewer_HasMore</span>
+                }
+                @if (Viewer.IsLoading)
+                {
+                    <span>@Resources.Web_Settings_LogViewer_Updating</span>
+                }
+                else if (Viewer.IsLivePaused)
+                {
+                    <span>@Resources.Web_Settings_LogViewer_Paused</span>
+                }
+            </span>
+            <span class="log-download">
+                <button class="btn-primary"
+                        type="button"
+                        @onclick='() => Download("log")'
+                        disabled="@(Viewer.SelectedSources.Count == 0)">
+                    @Resources.Web_Settings_LogViewer_Download
+                </button>
+                <button class="btn-secondary btn-secondary--sm"
+                        type="button"
+                        @onclick='() => Download("ndjson")'
+                        disabled="@(Viewer.SelectedSources.Count == 0)">
+                    @Resources.Web_Settings_LogViewer_DownloadNdjson
+                </button>
+            </span>
         </div>
 
         <div class="log-table" role="table" aria-label="@Resources.Web_Settings_LogViewer_Title">
@@ -201,6 +216,9 @@
 @code {
     private readonly CancellationTokenSource _lifetime = new();
     private CancellationTokenSource? _searchDelay;
+    // Cancels the in-flight query when a newer filter change arrives, so rapid
+    // toggling supersedes the previous full scan instead of queuing behind it.
+    private CancellationTokenSource? _refreshCts;
     private Task? _refreshLoop;
     private string _excludedPrefixDraft = "";
     private bool _initialized;
@@ -224,10 +242,21 @@
         StateHasChanged();
     }
 
-    private async Task RefreshAsync()
+    private async Task QueueRefreshAsync()
     {
-        await Viewer.RefreshAsync(_lifetime.Token);
-        StateHasChanged();
+        var previous = _refreshCts;
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _refreshCts = cts;
+        previous?.Cancel();
+        previous?.Dispose();
+        try
+        {
+            await Viewer.RefreshAsync(cts.Token);
+            StateHasChanged();
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+        }
     }
 
     private async Task SourceChangedAsync(string source, ChangeEventArgs args)
@@ -236,14 +265,7 @@
             ? value
             : bool.TryParse(args.Value?.ToString(), out var parsed) && parsed;
         Viewer.SetSourceSelected(source, selected);
-        await RefreshAsync();
-    }
-
-    private async Task LevelChangedAsync(ChangeEventArgs args)
-    {
-        if (Enum.TryParse<LogLevel>(args.Value?.ToString(), out var level))
-            Viewer.MinimumLevel = level;
-        await RefreshAsync();
+        await QueueRefreshAsync();
     }
 
     private async Task LiveChangedAsync(ChangeEventArgs args)
@@ -253,13 +275,13 @@
             : bool.TryParse(args.Value?.ToString(), out var parsed) && parsed;
         Viewer.IsLivePaused = !enabled;
         if (enabled)
-            await RefreshAsync();
+            await QueueRefreshAsync();
     }
 
-    private void DownloadDateChanged(ChangeEventArgs args)
+    private async Task DateChangedAsync(ChangeEventArgs args)
     {
-        if (DateOnly.TryParse(args.Value?.ToString(), out var date))
-            Viewer.DownloadDateUtc = date;
+        Viewer.FilterDateUtc = DateOnly.TryParse(args.Value?.ToString(), out var date) ? date : null;
+        await QueueRefreshAsync();
     }
 
     private async Task SearchChangedAsync(ChangeEventArgs args)
@@ -273,7 +295,7 @@
         try
         {
             await Task.Delay(400, delay.Token);
-            await RefreshAsync();
+            await QueueRefreshAsync();
         }
         catch (OperationCanceledException) when (delay.IsCancellationRequested)
         {
@@ -285,18 +307,18 @@
         if (!Viewer.TryAddExcludedMessagePrefix(_excludedPrefixDraft))
             return;
         _excludedPrefixDraft = "";
-        await RefreshAsync();
+        await QueueRefreshAsync();
     }
 
     private async Task RemoveExcludedPrefixAsync(string prefix)
     {
         if (Viewer.RemoveExcludedMessagePrefix(prefix))
-            await RefreshAsync();
+            await QueueRefreshAsync();
     }
 
-    private void Download()
+    private void Download(string format)
     {
-        var url = Viewer.CreateDownloadUrl(Navigation.BaseUri);
+        var url = Viewer.CreateDownloadUrl(Navigation.BaseUri, format);
         if (!string.IsNullOrEmpty(url))
             Navigation.NavigateTo(url, forceLoad: true);
     }
@@ -322,6 +344,11 @@
         }
     }
 
+    // Service ids are lowercase directory names (web, host, …); title-case them
+    // for display without touching the id used for selection and queries.
+    private static string DisplayName(string source)
+        => string.IsNullOrEmpty(source) ? source : char.ToUpperInvariant(source[0]) + source[1..];
+
     private static string ShortCategory(string category)
         => category[(category.LastIndexOf('.') + 1)..];
 
@@ -341,6 +368,8 @@
     {
         _searchDelay?.Cancel();
         _searchDelay?.Dispose();
+        _refreshCts?.Cancel();
+        _refreshCts?.Dispose();
         _lifetime.Cancel();
         if (_refreshLoop is not null)
         {

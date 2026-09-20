@@ -12,18 +12,25 @@ public sealed class LogDownloadController(
     ILogArchiveReader reader) : ControllerBase
 {
     [HttpGet("download")]
-    public async Task<IActionResult> Download([FromQuery] string token, CancellationToken cancellationToken)
+    public async Task<IActionResult> Download(
+        [FromQuery] string token,
+        [FromQuery] string? format,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(token) || !tokenService.TryUnprotect(token, out var query))
             return Unauthorized();
 
-        Response.ContentType = "application/x-ndjson; charset=utf-8";
+        var readable = string.Equals(format, "log", StringComparison.OrdinalIgnoreCase);
+        Response.ContentType = readable
+            ? "text/plain; charset=utf-8"
+            : "application/x-ndjson; charset=utf-8";
+        var extension = readable ? "log" : "ndjson";
         var datePart = query.UtcDate?.ToString("yyyyMMdd") ?? DateTime.UtcNow.ToString("yyyyMMddTHHmmssZ");
         Response.Headers[HeaderNames.ContentDisposition] =
-            $"attachment; filename=\"kaimo-logs-{datePart}.ndjson\"";
+            $"attachment; filename=\"kaimo-logs-{datePart}.{extension}\"";
         Response.Headers[HeaderNames.CacheControl] = "no-store";
         Response.Headers[HeaderNames.XContentTypeOptions] = "nosniff";
-        await reader.WriteDownloadAsync(query, Response.Body, cancellationToken);
+        await reader.WriteDownloadAsync(query, Response.Body, readable, cancellationToken);
         return new EmptyResult();
     }
 }

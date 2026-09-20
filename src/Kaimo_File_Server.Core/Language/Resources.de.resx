@@ -1615,10 +1615,13 @@
     <value>Aktualisieren</value>
   </data>
   <data name="Web_Settings_LogViewer_DownloadDateUtc" xml:space="preserve">
-    <value>Download-Tag (UTC)</value>
+    <value>Datum (UTC)</value>
   </data>
   <data name="Web_Settings_LogViewer_Download" xml:space="preserve">
     <value>Herunterladen</value>
+  </data>
+  <data name="Web_Settings_LogViewer_DownloadNdjson" xml:space="preserve">
+    <value>NDJSON</value>
   </data>
   <data name="Web_Settings_LogViewer_Unauthorized" xml:space="preserve">
     <value>Keine Berechtigung zum Anzeigen der Systemprotokolle.</value>
@@ -1629,8 +1632,11 @@
   <data name="Web_Settings_LogViewer_NoSources" xml:space="preserve">
     <value>Noch keine Protokollquellen vorhanden.</value>
   </data>
-  <data name="Web_Settings_LogViewer_MinimumLevel" xml:space="preserve">
-    <value>Mindeststufe</value>
+  <data name="Web_Settings_LogViewer_Levels" xml:space="preserve">
+    <value>Stufen</value>
+  </data>
+  <data name="Web_Settings_LogViewer_LevelsNone" xml:space="preserve">
+    <value>Keine Stufen</value>
   </data>
   <data name="Web_Settings_LogViewer_LevelInformation" xml:space="preserve">
     <value>Information</value>

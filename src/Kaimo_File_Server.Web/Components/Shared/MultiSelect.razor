@@ -24,7 +24,9 @@
             @foreach (var item in Items)
             {
                 <label class="multi-select-option">
-                    <input type="checkbox" @bind="item.IsChecked" />
+                    <input type="checkbox"
+                           checked="@item.IsChecked"
+                           @onchange="args => ToggleAsync(item, args)" />
                     <span>@Label(item.Item)</span>
                     @if (Hint is not null)
                     {
@@ -59,10 +61,22 @@
     /// <summary>Extra CSS classes for local overrides.</summary>
     [Parameter] public string? Class { get; set; }
 
+    /// <summary>Raised after any option is toggled (optional; e.g. to re-run a query).</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
     private bool _open;
 
     private void Toggle() => _open = !_open;
     private void Close() => _open = false;
+
+    private async Task ToggleAsync(CheckboxItem<T> item, ChangeEventArgs args)
+    {
+        item.IsChecked = args.Value is bool value
+            ? value
+            : bool.TryParse(args.Value?.ToString(), out var parsed) && parsed;
+        if (OnChanged.HasDelegate)
+            await OnChanged.InvokeAsync();
+    }
 
     private string SummaryText
     {

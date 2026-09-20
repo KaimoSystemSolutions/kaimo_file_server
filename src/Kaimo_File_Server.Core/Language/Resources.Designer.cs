@@ -9995,7 +9995,16 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_Settings_LogViewer_DownloadDateUtc", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die NDJSON ähnelt.
+        /// </summary>
+        public static string Web_Settings_LogViewer_DownloadNdjson {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_DownloadNdjson", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die No matching log entries. ähnelt.
         /// </summary>
@@ -10132,11 +10141,20 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Minimum level ähnelt.
+        ///   Sucht eine lokalisierte Zeichenfolge, die Levels ähnelt.
         /// </summary>
-        public static string Web_Settings_LogViewer_MinimumLevel {
+        public static string Web_Settings_LogViewer_Levels {
             get {
-                return ResourceManager.GetString("Web_Settings_LogViewer_MinimumLevel", resourceCulture);
+                return ResourceManager.GetString("Web_Settings_LogViewer_Levels", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Sucht eine lokalisierte Zeichenfolge, die No levels ähnelt.
+        /// </summary>
+        public static string Web_Settings_LogViewer_LevelsNone {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_LevelsNone", resourceCulture);
             }
         }
         

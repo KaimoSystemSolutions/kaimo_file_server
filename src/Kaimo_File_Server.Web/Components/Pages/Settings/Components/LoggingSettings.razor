@@ -2,7 +2,7 @@
 
 @if (VM.CanManageSettings)
 {
-<div class="detail-section">
+<div class="detail-section logging-global-section">
     <span class="detail-label">@Resources.Web_Settings_Logging_Detail</span>
     <p class="settings-description">@Resources.Web_Settings_Logging_Desc</p>
     @if (VM.LogLevelEnvironmentOverride is not null)
@@ -12,7 +12,7 @@
                 VM.LogLevelEnvironmentOverride)
         </p>
     }
-    <div class="settings-row">
+    <div class="settings-row logging-level-row">
         <select class="edit-input settings-select" @bind="VM.LogLevel">
             @foreach (var level in SettingsViewModel.LogLevels) { <option value="@level">@level</option> }
         </select>

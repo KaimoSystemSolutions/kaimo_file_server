@@ -28,13 +28,20 @@ public sealed class LogArchiveEntry
 }
 
 /// <summary>Server-side filters for archive queries and downloads.</summary>
+/// <remarks>
+/// When <paramref name="Levels"/> is provided it is an explicit allow-list (an
+/// empty set matches nothing); otherwise <paramref name="MinimumLevel"/> applies
+/// as a lower bound. This keeps existing minimum-level callers working while the
+/// viewer selects individual levels.
+/// </remarks>
 public sealed record LogArchiveQuery(
     IReadOnlyCollection<string> Sources,
     LogLevel MinimumLevel = LogLevel.Information,
     string? SearchText = null,
     int Limit = 1000,
     DateOnly? UtcDate = null,
-    IReadOnlyCollection<string>? ExcludedMessagePrefixes = null);
+    IReadOnlyCollection<string>? ExcludedMessagePrefixes = null,
+    IReadOnlyCollection<LogLevel>? Levels = null);
 
 public sealed record LogArchiveQueryResult(
     IReadOnlyList<LogArchiveEntry> Entries,
@@ -51,5 +58,6 @@ public interface ILogArchiveReader
     Task WriteDownloadAsync(
         LogArchiveQuery query,
         Stream destination,
+        bool readable = false,
         CancellationToken cancellationToken = default);
 }

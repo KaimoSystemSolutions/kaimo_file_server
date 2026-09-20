@@ -35,7 +35,8 @@ public sealed class LogDownloadTokenService
             search,
             1000,
             query.UtcDate,
-            excludedPrefixes);
+            excludedPrefixes,
+            query.Levels?.Distinct().ToArray());
         return _protector.Protect(JsonSerializer.Serialize(safeQuery, JsonOptions), TimeSpan.FromMinutes(2));
     }
 

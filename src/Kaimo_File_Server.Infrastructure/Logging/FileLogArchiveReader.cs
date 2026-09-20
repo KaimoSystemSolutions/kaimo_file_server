@@ -99,6 +99,7 @@ public sealed class FileLogArchiveReader : ILogArchiveReader
     public async Task WriteDownloadAsync(
         LogArchiveQuery query,
         Stream destination,
+        bool readable = false,
         CancellationToken cancellationToken = default)
     {
         query = Normalize(query);
@@ -117,8 +118,10 @@ public sealed class FileLogArchiveReader : ILogArchiveReader
                 {
                     await foreach (var line in File.ReadLinesAsync(path, cancellationToken))
                     {
-                        if (TryParse(line, out var entry) && Matches(entry, query))
-                            await writer.WriteLineAsync(line.AsMemory(), cancellationToken);
+                        if (!TryParse(line, out var entry) || !Matches(entry, query))
+                            continue;
+                        var output = readable ? FormatReadable(entry) : line;
+                        await writer.WriteLineAsync(output.AsMemory(), cancellationToken);
                     }
                 }
                 catch (Exception exception) when (IsUnavailable(exception))
@@ -290,7 +293,14 @@ public sealed class FileLogArchiveReader : ILogArchiveReader
             && DateOnly.FromDateTime(entry.TimestampUtc.UtcDateTime) != utcDate)
             return false;
 
-        if (entry.Level < query.MinimumLevel || entry.Level == LogLevel.None)
+        if (entry.Level == LogLevel.None)
+            return false;
+        if (query.Levels is not null)
+        {
+            if (!query.Levels.Contains(entry.Level))
+                return false;
+        }
+        else if (entry.Level < query.MinimumLevel)
             return false;
 
         if (query.ExcludedMessagePrefixes?
@@ -311,6 +321,21 @@ public sealed class FileLogArchiveReader : ILogArchiveReader
 
     private static bool Contains(string? value, string search)
         => value?.Contains(search, StringComparison.OrdinalIgnoreCase) == true;
+
+    // One human-readable line per entry for the .log export; an exception (if any)
+    // follows on its own indented lines so it stays greppable but readable.
+    private static string FormatReadable(LogArchiveEntry entry)
+    {
+        var builder = new StringBuilder(160)
+            .Append(entry.TimestampUtc.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss.fff")).Append('Z').Append(' ')
+            .Append(entry.Level.ToString().ToUpperInvariant().PadRight(11)).Append(' ')
+            .Append('[').Append(entry.Service).Append("] ")
+            .Append(entry.Category).Append(" — ")
+            .Append(entry.Message);
+        if (!string.IsNullOrEmpty(entry.Exception))
+            builder.Append('\n').Append("    ").Append(entry.Exception.Replace("\n", "\n    "));
+        return builder.ToString();
+    }
 
     private static LogArchiveQuery Normalize(LogArchiveQuery query)
     {

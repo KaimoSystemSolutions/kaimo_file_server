@@ -138,6 +138,52 @@ public sealed class LogArchiveTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Reader_writes_human_readable_download_with_indented_exception()
+    {
+        var day = Path.Combine(_root, "web", "2026", "08", "02");
+        Directory.CreateDirectory(day);
+        await File.WriteAllTextAsync(
+            Path.Combine(day, "web-test-20260802T000000Z-000.ndjson"),
+            "{\"timestampUtc\":\"2026-08-02T10:11:12.5Z\",\"sequence\":1,\"level\":\"Error\",\"service\":\"web\",\"instance\":\"a\",\"category\":\"App.Worker\",\"eventId\":0,\"message\":\"boom\",\"exception\":\"line1\\nline2\"}\n");
+
+        var reader = new FileLogArchiveReader(Options.Create(new LogArchiveOptions { RootPath = _root }));
+        await using var download = new MemoryStream();
+        await reader.WriteDownloadAsync(new LogArchiveQuery(["web"]), download, readable: true);
+        var text = Encoding.UTF8.GetString(download.ToArray());
+
+        Assert.Contains("2026-08-02 10:11:12.500Z ERROR", text);
+        Assert.Contains("[web] App.Worker — boom", text);
+        Assert.Contains("\n    line1\n    line2", text); // exception indented, not raw JSON
+        Assert.DoesNotContain("\"timestampUtc\"", text);
+    }
+
+    [Fact]
+    public async Task Reader_filters_by_selected_levels_as_allow_list()
+    {
+        var day = Path.Combine(_root, "web", "2026", "08", "02");
+        Directory.CreateDirectory(day);
+        await File.WriteAllLinesAsync(Path.Combine(day, "web-test-20260802T000000Z-000.ndjson"), new[]
+        {
+            "{\"timestampUtc\":\"2026-08-02T00:00:00Z\",\"sequence\":1,\"level\":\"Information\",\"service\":\"web\",\"instance\":\"a\",\"category\":\"C\",\"eventId\":0,\"message\":\"info\"}",
+            "{\"timestampUtc\":\"2026-08-02T00:00:01Z\",\"sequence\":2,\"level\":\"Warning\",\"service\":\"web\",\"instance\":\"a\",\"category\":\"C\",\"eventId\":0,\"message\":\"warn\"}",
+            "{\"timestampUtc\":\"2026-08-02T00:00:02Z\",\"sequence\":3,\"level\":\"Error\",\"service\":\"web\",\"instance\":\"a\",\"category\":\"C\",\"eventId\":0,\"message\":\"err\"}"
+        });
+        var reader = new FileLogArchiveReader(Options.Create(new LogArchiveOptions { RootPath = _root }));
+
+        // Allow-list picks exactly the chosen levels, regardless of order/threshold.
+        var selected = await reader.QueryAsync(new LogArchiveQuery(["web"], Levels: [LogLevel.Information, LogLevel.Error]));
+        Assert.Equal(["err", "info"], selected.Entries.Select(entry => entry.Message));
+
+        // Empty allow-list matches nothing.
+        var none = await reader.QueryAsync(new LogArchiveQuery(["web"], Levels: []));
+        Assert.Empty(none.Entries);
+
+        // Without a level set, MinimumLevel still applies as a lower bound.
+        var minimum = await reader.QueryAsync(new LogArchiveQuery(["web"], MinimumLevel: LogLevel.Warning));
+        Assert.Equal(["err", "warn"], minimum.Entries.Select(entry => entry.Message));
+    }
+
+    [Fact]
     public async Task Reader_returns_empty_result_when_archive_does_not_exist()
     {
         var reader = new FileLogArchiveReader(Options.Create(new LogArchiveOptions { RootPath = _root }));
@@ -198,6 +244,7 @@ public sealed class LogArchiveTests : IAsyncLifetime
             "Web_Settings_LogViewer_Details",
             "Web_Settings_LogViewer_Download",
             "Web_Settings_LogViewer_DownloadDateUtc",
+            "Web_Settings_LogViewer_DownloadNdjson",
             "Web_Settings_LogViewer_Empty",
             "Web_Settings_LogViewer_Event",
             "Web_Settings_LogViewer_ExcludeAdd",
@@ -213,7 +260,8 @@ public sealed class LogArchiveTests : IAsyncLifetime
             "Web_Settings_LogViewer_LevelWarning",
             "Web_Settings_LogViewer_Live",
             "Web_Settings_LogViewer_LiveTitle",
-            "Web_Settings_LogViewer_MinimumLevel",
+            "Web_Settings_LogViewer_Levels",
+            "Web_Settings_LogViewer_LevelsNone",
             "Web_Settings_LogViewer_NoSources",
             "Web_Settings_LogViewer_Paused",
             "Web_Settings_LogViewer_ReadFailed",

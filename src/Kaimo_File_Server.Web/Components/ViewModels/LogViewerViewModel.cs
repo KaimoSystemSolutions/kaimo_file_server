@@ -26,10 +26,19 @@ public sealed class LogViewerViewModel(
     public IReadOnlyList<string> Sources { get; private set; } = [];
     public HashSet<string> SelectedSources { get; } = new(StringComparer.OrdinalIgnoreCase);
     public ICollection<LogArchiveEntry> Entries { get; private set; } = [];
-    public LogLevel MinimumLevel { get; set; } = LogLevel.Information;
+
+    // Which levels are shown, toggled individually in the viewer. All on by
+    // default (equivalent to the previous "Information and up" minimum).
+    public IReadOnlyList<CheckboxItem<LogLevel>> LevelItems { get; } =
+        new[] { LogLevel.Information, LogLevel.Warning, LogLevel.Error, LogLevel.Critical }
+            .Select(level => new CheckboxItem<LogLevel>(level, true))
+            .ToArray();
+
     public string SearchText { get; set; } = "";
     public IReadOnlyList<string> ExcludedMessagePrefixes => _excludedMessagePrefixes;
-    public DateOnly DownloadDateUtc { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);
+    // Scopes both the visible list and the download to a single UTC day. Defaults
+    // to today (the common case, and it keeps downloads bounded); null = all days.
+    public DateOnly? FilterDateUtc { get; set; } = DateOnly.FromDateTime(DateTime.UtcNow);
     public bool IsLivePaused { get; set; }
     public bool HasMore { get; private set; }
     public bool IsLoading { get; private set; }
@@ -127,22 +136,23 @@ public sealed class LogViewerViewModel(
         }
     }
 
-    public string CreateDownloadUrl(string baseUri)
+    // format: "log" for the human-readable text export, otherwise raw NDJSON.
+    public string CreateDownloadUrl(string baseUri, string format)
     {
         if (!IsAuthorized)
             return "";
-        var token = Uri.EscapeDataString(downloadTokens.Protect(CreateQuery(DownloadDateUtc)));
-        return $"{baseUri.TrimEnd('/')}/api/system-logs/download?token={token}";
+        var token = Uri.EscapeDataString(downloadTokens.Protect(CreateQuery()));
+        return $"{baseUri.TrimEnd('/')}/api/system-logs/download?token={token}&format={Uri.EscapeDataString(format)}";
     }
 
-    private LogArchiveQuery CreateQuery(DateOnly? utcDate = null)
+    private LogArchiveQuery CreateQuery()
         => new(
             SelectedSources.ToArray(),
-            MinimumLevel,
-            SearchText,
-            1000,
-            utcDate,
-            _excludedMessagePrefixes.ToArray());
+            SearchText: SearchText,
+            Limit: 1000,
+            UtcDate: FilterDateUtc,
+            ExcludedMessagePrefixes: _excludedMessagePrefixes.ToArray(),
+            Levels: LevelItems.Where(item => item.IsChecked).Select(item => item.Item).ToArray());
 
     private async Task<bool> AuthorizeAsync()
     {

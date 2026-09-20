@@ -2355,6 +2355,12 @@ namespace Kaimo_File_Server.Core.Language {
             }
         }
 
+        internal static string Web_Settings_LogViewer_DownloadNdjson {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_DownloadNdjson", resourceCulture);
+            }
+        }
+
         internal static string Web_Settings_LogViewer_Empty {
             get {
                 return ResourceManager.GetString("Web_Settings_LogViewer_Empty", resourceCulture);
@@ -2445,9 +2451,15 @@ namespace Kaimo_File_Server.Core.Language {
             }
         }
 
-        internal static string Web_Settings_LogViewer_MinimumLevel {
+        internal static string Web_Settings_LogViewer_Levels {
             get {
-                return ResourceManager.GetString("Web_Settings_LogViewer_MinimumLevel", resourceCulture);
+                return ResourceManager.GetString("Web_Settings_LogViewer_Levels", resourceCulture);
+            }
+        }
+
+        internal static string Web_Settings_LogViewer_LevelsNone {
+            get {
+                return ResourceManager.GetString("Web_Settings_LogViewer_LevelsNone", resourceCulture);
             }
         }
 

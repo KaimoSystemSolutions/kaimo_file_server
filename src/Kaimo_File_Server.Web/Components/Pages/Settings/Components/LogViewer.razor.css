@@ -42,17 +42,13 @@
 .log-source-chip {
     padding: 4px 10px;
     border: 1px solid var(--border);
-    border-radius: 999px;
+    border-radius: var(--radius-control);
     background: var(--bg-tertiary);
     font-size: 12px;
 }
 
-.log-download-date {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: var(--text-secondary);
+.log-date-input {
+    max-width: 190px;
 }
 
 /* Filter blocks */
@@ -143,10 +139,25 @@
 .log-result-summary {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px 12px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
     margin-bottom: 8px;
     font-size: 12px;
     color: var(--text-tertiary);
+}
+
+.log-result-counts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+}
+
+.log-download {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
 /* Tabular log console — a fixed-column grid shared by the header and every

@@ -1615,10 +1615,13 @@
     <value>Refresh</value>
   </data>
   <data name="Web_Settings_LogViewer_DownloadDateUtc" xml:space="preserve">
-    <value>Download date (UTC)</value>
+    <value>Date (UTC)</value>
   </data>
   <data name="Web_Settings_LogViewer_Download" xml:space="preserve">
     <value>Download</value>
+  </data>
+  <data name="Web_Settings_LogViewer_DownloadNdjson" xml:space="preserve">
+    <value>NDJSON</value>
   </data>
   <data name="Web_Settings_LogViewer_Unauthorized" xml:space="preserve">
     <value>You do not have permission to view system logs.</value>
@@ -1629,8 +1632,11 @@
   <data name="Web_Settings_LogViewer_NoSources" xml:space="preserve">
     <value>No log sources are available yet.</value>
   </data>
-  <data name="Web_Settings_LogViewer_MinimumLevel" xml:space="preserve">
-    <value>Minimum level</value>
+  <data name="Web_Settings_LogViewer_Levels" xml:space="preserve">
+    <value>Levels</value>
+  </data>
+  <data name="Web_Settings_LogViewer_LevelsNone" xml:space="preserve">
+    <value>No levels</value>
   </data>
   <data name="Web_Settings_LogViewer_LevelInformation" xml:space="preserve">
     <value>Information</value>

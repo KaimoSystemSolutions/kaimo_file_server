@@ -280,6 +280,18 @@
     max-width: none;
 }
 
+/* The global log-level section shares the tab with the full-width log console,
+   so let its divider span the whole content width instead of the 780px reading
+   measure the form sections use. The control inside keeps its own narrow width. */
+.settings-content ::deep .logging-global-section {
+    max-width: none;
+}
+
+/* Save button matches the select height so the row reads as one control pair. */
+.settings-page ::deep .logging-level-row .btn-primary {
+    min-height: 36px;
+}
+
 .settings-content ::deep .detail-label,
 .settings-content ::deep h3,
 .settings-content ::deep h4 {
