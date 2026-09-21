@@ -416,6 +416,22 @@
     color: var(--warning);
 }
 
+/* Clickable emblem (actor may manage the backing sync): jumps to its overview entry. */
+.sync-indicator--clickable {
+    cursor: pointer;
+    border-radius: var(--radius-surface);
+    padding: 1px 3px;
+    transition: background 0.15s;
+}
+
+    .sync-indicator--clickable:hover {
+        background: var(--accent-subtle);
+    }
+
+    .sync-indicator--clickable:hover .sync-indicator-icon {
+        filter: brightness(1.2);
+    }
+
 /* Share emblem: marks an entry that is (or lives beneath) a folder shared via a public link. */
 .share-indicator {
     display: inline-flex;
@@ -430,6 +446,22 @@
     color: var(--accent-color, var(--info));
     flex-shrink: 0;
 }
+
+/* Clickable emblem (actor may manage share links): jumps to its overview entry. */
+.share-indicator--clickable {
+    cursor: pointer;
+    border-radius: var(--radius-surface);
+    padding: 1px 3px;
+    transition: background 0.15s;
+}
+
+    .share-indicator--clickable:hover {
+        background: var(--accent-subtle);
+    }
+
+    .share-indicator--clickable:hover .share-indicator-icon {
+        filter: brightness(1.2);
+    }
 
 /* ══════════════════════════════════════════════════════════
    File Upload Drag-Over

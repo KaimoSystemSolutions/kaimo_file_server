@@ -50,9 +50,10 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     private readonly ISyncDefinitionRepository _syncRepo;
     private readonly IShareLinkRepository _shareLinkRepo;
 
-    // Normalized root paths of the loaded share's public links, so the browser can mark a
-    // shared folder (and everything beneath it). Loaded per share; empty for the public browser.
-    private List<string> _sharedRoots = [];
+    // Normalized root paths of the loaded share's public links (with the owning link's id, so
+    // an emblem can jump to it), so the browser can mark a shared folder (and everything beneath
+    // it). Loaded per share; empty for the public browser.
+    private List<(string Root, Guid LinkId)> _sharedRoots = [];
 
     private readonly ISearchService _searchService;
 
@@ -136,7 +137,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     // Sync local destinations for the loaded share, ordered most-specific (longest
     // LocalPath) first so a nested sync wins over an ancestor one. Loaded per share,
     // not per directory, and reused across in-place directory refreshes.
-    private List<(string LocalPath, SyncMode Mode, string Name, DateTime? LastSuccessfulRunAtUtc, HashSet<string>? RemotePaths)> _shareSyncs = [];
+    private List<(string LocalPath, SyncMode Mode, string Name, DateTime? LastSuccessfulRunAtUtc, HashSet<string>? RemotePaths, Guid Id)> _shareSyncs = [];
 
     public List<FileMetadata> Items { get; private set; } = [];
     public string CurrentPath { get; private set; } = "";
@@ -321,8 +322,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             _sharedRoots = AllowShareLinkManagement
                 ? (await _shareLinkRepo.ListForSharesAsync(new[] { CurrentShare.Id }))
                     .Where(l => l.IsEnabled)
-                    .Select(l => ShareRelativePath.Normalize(l.RootRelativePath))
-                    .Distinct()
+                    .GroupBy(l => ShareRelativePath.Normalize(l.RootRelativePath))
+                    .Select(g => (Root: g.Key, LinkId: g.First().Id))
                     .ToList()
                 : [];
 
@@ -1069,7 +1070,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
                 // actually backs); other modes never look at it, so skip the parse.
                 RemotePaths: entry.Definition.Mode == SyncMode.Pull
                     ? RemoteBackedPaths(entry.Runtime?.LastSyncManifest)
-                    : null))
+                    : null,
+                entry.Definition.Id))
             .OrderByDescending(sync => sync.LocalPath.Length)
             .ToList();
     }
@@ -1101,12 +1103,36 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         if (_sharedRoots.Count == 0) return false;
 
         var rel = ShareRelativePath.Normalize(ShareRelativeOf(entry));
-        foreach (var root in _sharedRoots)
+        foreach (var (root, _) in _sharedRoots)
         {
             if (string.Equals(rel, root, StringComparison.OrdinalIgnoreCase)) return true;
             if (root.Length == 0 || rel.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase)) return true;
         }
         return false;
+    }
+
+    /// <inheritdoc />
+    public Guid? GetShareLinkId(FileMetadata entry)
+    {
+        if (_sharedRoots.Count == 0) return null;
+
+        var rel = ShareRelativePath.Normalize(ShareRelativeOf(entry));
+        Guid? best = null;
+        var bestLength = -1;
+        // Nearest (longest) matching root wins, so an entry with its own link jumps to that
+        // link rather than an ancestor's.
+        foreach (var (root, linkId) in _sharedRoots)
+        {
+            var matches = string.Equals(rel, root, StringComparison.OrdinalIgnoreCase)
+                          || root.Length == 0
+                          || rel.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase);
+            if (matches && root.Length > bestLength)
+            {
+                best = linkId;
+                bestLength = root.Length;
+            }
+        }
+        return best;
     }
 
     /// <summary>
@@ -1125,7 +1151,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             // anchors the sync and must never inherit a warning from a stray child (it is
             // never recorded in its own manifest, and its write time moves with any child).
             if (sync.LocalPath.Length > 0 && rel == sync.LocalPath)
-                return new SyncFolderMarker(sync.Mode, sync.Name, SyncItemState.Synced);
+                return new SyncFolderMarker(sync.Mode, sync.Name, SyncItemState.Synced, sync.Id);
 
             if (sync.LocalPath.Length == 0
                 || rel.StartsWith(sync.LocalPath + "/", StringComparison.Ordinal))
@@ -1135,7 +1161,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
                 bool? isRemoteBacked = sync.RemotePaths?.Contains(rel);
                 var state = SyncItemStateEvaluator.Evaluate(
                     entry.ModifiedAt, sync.LastSuccessfulRunAtUtc, sync.Mode, isRemoteBacked);
-                return new SyncFolderMarker(sync.Mode, sync.Name, state);
+                return new SyncFolderMarker(sync.Mode, sync.Name, state, sync.Id);
             }
         }
 

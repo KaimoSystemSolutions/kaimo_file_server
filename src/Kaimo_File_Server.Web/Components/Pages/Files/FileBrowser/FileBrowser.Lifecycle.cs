@@ -514,6 +514,20 @@ public partial class FileBrowser
             OpenFileAcl(entry);
     }
 
+    /// <summary>Jump to the external-storage sync overview, selecting the sync behind this emblem.</summary>
+    private void OpenSyncOverview(SyncFolderMarker marker)
+    {
+        if (!CanManageSyncs() || marker.SyncId == Guid.Empty) return;
+        Nav.NavigateTo($"/external-storage?sync={marker.SyncId}");
+    }
+
+    /// <summary>Jump to the share-link overview, selecting the link behind this emblem.</summary>
+    private void OpenShareLinkOverview(FileMetadata entry)
+    {
+        if (!CanManageShareLinks() || VM.GetShareLinkId(entry) is not Guid linkId) return;
+        Nav.NavigateTo($"/share-links?select={linkId}");
+    }
+
     internal void NavigateTo(FileMetadata dir)
         => NavigateToRoutePath(VM.RouteSubPathOf(VM.ShareRelativeOf(dir)));
 

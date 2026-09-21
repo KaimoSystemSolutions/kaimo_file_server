@@ -322,6 +322,7 @@ else
     private static readonly DayOfWeek[] ScheduleDays = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
 
     [Parameter] public Guid? InitialConnectionId { get; set; }
+    [Parameter] public Guid? InitialSyncId { get; set; }
     private bool _editing;
     private bool _busy;
     private bool _runSucceeded;
@@ -353,7 +354,9 @@ else
         if (firstRender)
         {
             await VM.LoadAsync();
-            if (InitialConnectionId is Guid connectionId && ReadyConnections.Any(c => c.Id == connectionId))
+            if (InitialSyncId is Guid syncId && VM.Syncs.Any(sync => sync.Definition.Id == syncId))
+                _selectedId = syncId;
+            else if (InitialConnectionId is Guid connectionId && ReadyConnections.Any(c => c.Id == connectionId))
                 StartCreate(connectionId);
             StateHasChanged();
         }

@@ -213,6 +213,10 @@ else
 }
 
 @code {
+    [SupplyParameterFromQuery(Name = "select")]
+    [Parameter]
+    public Guid? SelectId { get; set; }
+
     private Guid? _selectedId;
     private bool _editing;
 
@@ -237,6 +241,10 @@ else
     {
         VM.OnStateChanged += OnStateChanged;
         await VM.LoadAsync();
+
+        // Preselect the link named in the query (e.g. arriving from a file-browser emblem).
+        if (SelectId is Guid id && VM.Links.Any(r => r.Link.Id == id))
+            _selectedId = id;
     }
 
     private void OnStateChanged() => InvokeAsync(StateHasChanged);

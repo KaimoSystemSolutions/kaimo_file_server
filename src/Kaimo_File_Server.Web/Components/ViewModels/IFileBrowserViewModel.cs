@@ -20,7 +20,7 @@ public enum SyncItemState
 /// Marks a browsed entry that lives at (or beneath) the local destination folder of
 /// a sync. Drives the sync emblem and its tooltip in the file browser.
 /// </summary>
-public sealed record SyncFolderMarker(SyncMode Mode, string SyncName, SyncItemState State = SyncItemState.Synced);
+public sealed record SyncFolderMarker(SyncMode Mode, string SyncName, SyncItemState State = SyncItemState.Synced, Guid SyncId = default);
 
 /// <summary>Decides a browsed entry's sync state from timestamps and direction.</summary>
 public static class SyncItemStateEvaluator
@@ -103,6 +103,13 @@ public interface IFileBrowserViewModel
 
     /// <summary>Whether the entry is shared via a public link (or lives beneath a shared folder).</summary>
     bool IsShared(FileMetadata entry) => false;
+
+    /// <summary>
+    /// The public share link responsible for an entry's shared emblem (its own link, or the
+    /// nearest shared ancestor); <c>null</c> when none applies. Lets the browser jump to the
+    /// link's overview entry.
+    /// </summary>
+    Guid? GetShareLinkId(FileMetadata entry) => null;
     IEnumerable<FileMetadata> Directories { get; }
     IEnumerable<FileMetadata> Files { get; }
     bool HasParent { get; }

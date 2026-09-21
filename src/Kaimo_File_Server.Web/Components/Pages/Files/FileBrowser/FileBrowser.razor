@@ -494,14 +494,19 @@ else
                     <span>@entry.Name</span>
                     @if (syncMarker is not null)
                     {
-                        <span class="sync-indicator @SyncIndicatorClass(syncMarker.State)"
-                              title="@SyncMarkerTooltip(syncMarker)">
+                        <span class="sync-indicator @SyncIndicatorClass(syncMarker.State) @(CanManageSyncs() && syncMarker.SyncId != Guid.Empty ? "sync-indicator--clickable" : "")"
+                              title="@SyncMarkerTooltip(syncMarker)"
+                              @onclick="() => OpenSyncOverview(syncMarker)"
+                              @onclick:stopPropagation="true">
                             @Assets.SVG(SyncMarkerIcon(syncMarker), new SvgOptions(Width: 20, Height: 20, Color: SyncMarkerColor(syncMarker.State), StrokeWidth: 2, CssClass: "sync-indicator-icon"))
                         </span>
                     }
                     @if (VM.IsShared(entry))
                     {
-                        <span class="share-indicator" title="@T("Web_ShareLinks_Shared")">
+                        <span class="share-indicator @(CanManageShareLinks() ? "share-indicator--clickable" : "")"
+                              title="@T("Web_ShareLinks_Shared")"
+                              @onclick="() => OpenShareLinkOverview(entry)"
+                              @onclick:stopPropagation="true">
                             @Assets.SVG("share.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2, CssClass: "share-indicator-icon"))
                         </span>
                     }
