@@ -1,0 +1,175 @@
+/* Two-pane layout mirroring the external-storage sync list. */
+.sharelink-workspace {
+    display: grid;
+    grid-template-columns: minmax(360px, 1fr) minmax(390px, 480px);
+    min-height: min(640px, calc(100vh - 230px));
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+}
+
+.sharelink-list-pane { min-width: 0; overflow: hidden auto; background: var(--bg-secondary); }
+.sharelink-list { min-width: 0; }
+
+.sharelink-list-header,
+.sharelink-row {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: minmax(180px, 2fr) minmax(120px, 1fr) minmax(120px, 1fr);
+    width: 100%;
+    align-items: center;
+    gap: 14px;
+}
+
+.sharelink-list-header {
+    min-height: 36px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .045em;
+}
+
+.sharelink-row {
+    min-height: 64px;
+    padding: 9px 14px;
+    border: 0;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 110ms ease, box-shadow 110ms ease;
+}
+
+.sharelink-row:last-child { border-bottom: 0; }
+.sharelink-row:hover { background: var(--bg-hover); }
+.sharelink-row--selected { background: var(--accent-subtle); box-shadow: inset 3px 0 0 var(--accent); }
+.sharelink-row--selected:hover { background: var(--accent-selected); }
+
+.sharelink-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.sharelink-item-icon {
+    display: flex;
+    flex: 0 0 30px;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-control);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.sharelink-name-text { min-width: 0; }
+.sharelink-name-text small {
+    display: block;
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-tertiary);
+    font-size: 11.5px;
+}
+
+.sharelink-name-link {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-decoration: none;
+    color: var(--text-primary);
+}
+.sharelink-name-link:hover strong { color: var(--accent); text-decoration: underline; }
+.sharelink-name-link strong { color: var(--text-primary); font-size: 13.5px; font-weight: 650; }
+
+.sharelink-row ::deep .sharelink-state { justify-self: start; }
+.sharelink-meta { min-width: 0; color: var(--text-secondary); font-size: 12px; }
+
+/* Detail / edit pane. */
+.sharelink-detail-pane {
+    min-width: 0;
+    padding: 17px 18px 20px;
+    border-left: 1px solid var(--border);
+    background: var(--bg-tertiary);
+}
+
+.storage-editor-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; margin-bottom: 13px; }
+.storage-editor-heading h3 { overflow: hidden; margin: 0; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-heading); font-size: 18px; }
+.storage-editor-heading span { color: var(--text-tertiary); font-size: 12px; }
+
+.storage-enabled { display: inline-flex; flex: 0 0 auto; align-items: center; gap: .45rem; color: var(--text-secondary); font-size: 12px; }
+
+.storage-form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.storage-form-grid label { display: grid; gap: 5px; color: var(--text-secondary); font-size: 12px; }
+/* Higher specificity than ".storage-form-grid label" so the checkbox row stays a
+   left-aligned horizontal flex instead of a stacked grid. */
+.storage-form-grid label.storage-form-checkbox { display: flex; align-items: center; gap: 8px; }
+.storage-form-checkbox input { flex: 0 0 auto; }
+.storage-wide { grid-column: 1 / -1; }
+
+.sharelink-detail-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+.sharelink-detail-title { min-width: 0; }
+.sharelink-title-row { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.sharelink-detail-icon {
+    display: flex;
+    flex: 0 0 34px;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+.sharelink-detail-title h3 { overflow: hidden; margin: 0; color: var(--text-primary); font-family: var(--font-heading); font-size: 18px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.sharelink-detail-header ::deep .sharelink-state { flex: 0 0 auto; }
+
+.sharelink-detail-grid { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+.sharelink-detail-group { padding: 15px 0; border-bottom: 1px solid var(--border); }
+.sharelink-detail-group h4 { margin: 0 0 10px; color: var(--text-tertiary); font-size: 11px; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; }
+.sharelink-detail-group dl { display: grid; grid-template-columns: minmax(110px, .42fr) minmax(0, 1fr); gap: 8px 14px; margin: 0; }
+.sharelink-detail-group dt { color: var(--text-tertiary); font-size: 11.5px; }
+.sharelink-detail-group dd { min-width: 0; margin: 0; color: var(--text-primary); font-size: 12.5px; line-height: 1.4; overflow-wrap: anywhere; }
+
+.sharelink-url-row { display: flex; gap: 8px; }
+.sharelink-url { flex: 1; min-width: 0; }
+.sharelink-note { margin: 8px 0 0; color: var(--text-tertiary); font-size: 11.5px; }
+
+.sharelink-summary-actions { display: flex; gap: 7px; margin-top: 16px; }
+.sharelink-summary-actions > button { flex: 0 0 auto; width: auto; }
+
+/* Password field with an inline show/hide toggle. */
+.sharelink-password { display: flex; gap: 8px; }
+.sharelink-password input { flex: 1; min-width: 0; }
+
+/* Form controls use the app font, not the browser default (controls do not inherit it). */
+.sharelink-detail-pane input,
+.sharelink-detail-pane select {
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+/* Dark mode: the native calendar-picker indicator is black and invisible on a dark input. */
+:root[data-theme="dark"] .sharelink-detail-pane input[type="datetime-local"] { color-scheme: dark; }
+
+.empty-state { color: var(--text-secondary); padding: 24px; }
+
+@media (max-width: 1180px) {
+    .sharelink-workspace { grid-template-columns: 1fr; overflow: visible; }
+    .sharelink-detail-pane { min-height: 390px; border-top: 1px solid var(--border); border-left: 0; }
+}
+
+@media (max-width: 760px) {
+    .sharelink-workspace { margin-inline: -16px; border-right: 0; border-left: 0; border-radius: 0; }
+    .sharelink-list-header { display: none; }
+    .sharelink-row { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 13px 16px; }
+    .sharelink-row ::deep .sharelink-state { grid-row: 2; }
+    .sharelink-meta { grid-row: 3; }
+    .sharelink-detail-group dl { grid-template-columns: 1fr; gap: 3px; }
+}

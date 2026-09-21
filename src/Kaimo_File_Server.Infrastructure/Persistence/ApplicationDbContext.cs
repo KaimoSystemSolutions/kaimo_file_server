@@ -29,6 +29,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<StorageConnection> StorageConnections { get; set; }
         public DbSet<CloudAccessShare> CloudAccessShares { get; set; }
         public DbSet<CloudAccessGrant> CloudAccessGrants { get; set; }
+        public DbSet<ShareLink> ShareLinks { get; set; }
         public DbSet<StorageAuthorizationTransaction> StorageAuthorizationTransactions { get; set; }
         public DbSet<StorageConnectionCredentialLease> StorageConnectionCredentialLeases { get; set; }
         public DbSet<StorageDeviceAuthorizationSession> StorageDeviceAuthorizationSessions { get; set; }
@@ -260,6 +261,23 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(x => x.PrincipalId);
                 entity.HasOne<CloudAccessShare>().WithMany().HasForeignKey(x => x.ShareId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<ShareLink>(entity =>
+            {
+                entity.ToTable("share_links");
+                entity.HasKey(x => x.Id);
+                entity.Property(x => x.Token).IsRequired().HasMaxLength(128);
+                entity.HasIndex(x => x.Token).IsUnique();
+                entity.Property(x => x.RootRelativePath).IsRequired().HasMaxLength(2000);
+                entity.Property(x => x.DisplayName).IsRequired().HasMaxLength(400);
+                entity.Property(x => x.PasswordHash).HasMaxLength(200);
+                entity.Property(x => x.BaseAddress).HasMaxLength(2000);
+                entity.Property(x => x.ShareId).IsRequired();
+                entity.Property(x => x.CreatedByUserId).IsRequired();
+                entity.HasIndex(x => x.ShareId);
+                // No FK cascade from shares: links are pruned through their own admin flow, and a
+                // dangling link simply resolves to not-found when its share or path is gone.
             });
 
             modelBuilder.Entity<StorageAuthorizationTransaction>(entity =>

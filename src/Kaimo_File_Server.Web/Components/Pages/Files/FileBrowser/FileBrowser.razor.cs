@@ -27,6 +27,20 @@ public partial class FileBrowser
     [Parameter] public string? ShareRoute { get; set; }
 
     /// <summary>
+    /// When true, folder navigation and breadcrumbs stay on the current URL and reload the
+    /// listing in place instead of routing to a sub-path URL. Used by the public share link
+    /// browser so no folder name is ever appended after the link token in the address bar.
+    /// </summary>
+    [Parameter] public bool InPlaceNavigation { get; set; }
+
+    // The folder currently shown when navigating in place (null before the first hop).
+    private string? _inPlaceSubPath;
+
+    // The sub-path to load: the in-place location when set, otherwise the routed one.
+    private string EffectiveLoadSubPath =>
+        InPlaceNavigation ? (_inPlaceSubPath ?? SubPath ?? "") : (SubPath ?? "");
+
+    /// <summary>
     /// Human-friendly name of the share for the breadcrumb, used before the share has
     /// finished loading (and its real name is known). Callers that address the share by
     /// an opaque key — e.g. Cloud Access virtual shares, identified by a GUID — leave this

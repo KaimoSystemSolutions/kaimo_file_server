@@ -15,7 +15,11 @@
                 <NotAuthorized>
                     @{
                         var path = new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
-                        if (string.Equals(path, "/login", StringComparison.OrdinalIgnoreCase))
+                        // The login page and anonymous public share links render without a session;
+                        // everything else redirects to login.
+                        if (string.Equals(path, "/login", StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(path, "/shared", StringComparison.OrdinalIgnoreCase)
+                            || path.StartsWith("/shared/", StringComparison.OrdinalIgnoreCase))
                         {
                             <RouteView RouteData="@routeData" DefaultLayout="@typeof(EmptyLayout)" />
                         }

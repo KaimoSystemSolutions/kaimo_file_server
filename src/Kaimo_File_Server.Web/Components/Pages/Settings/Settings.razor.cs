@@ -110,6 +110,7 @@ internal enum SettingsTab
     DataServices,
     Search,
     CloudAccess,
+    ShareLinks,
     Logging,
     Certificate,
     Backup,

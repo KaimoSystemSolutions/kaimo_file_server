@@ -35,7 +35,7 @@ public partial class FileBrowser
 
         _contextMenuComponent?.CloseContextMenu();
 
-        await VM.LoadShareAsync(ShareName, SubPath ?? "");
+        await VM.LoadShareAsync(ShareName, EffectiveLoadSubPath);
         UpdateAclPath();
         await LoadAclCounts();
         VM.OnStateChanged -= OnVmStateChanged;
@@ -394,6 +394,9 @@ public partial class FileBrowser
     public async Task OpenHashDialog(FileMetadata item)
         => await _hashDialogComponent.Open(item);
 
+    public async Task OpenShareLinkDialog(FileMetadata item)
+        => await _shareLinkDialogComponent.Open(item);
+
     /// <summary>After a restore the live file changed — reload the listing.</summary>
     private async Task OnVersionRestored()
     {
@@ -512,17 +515,38 @@ public partial class FileBrowser
     }
 
     internal void NavigateTo(FileMetadata dir)
-    {
-        var relativePath = VM.ShareRelativeOf(dir);
-        Nav.NavigateTo($"{CurrentShareRoute}/{relativePath}");
-    }
+        => NavigateToRoutePath(VM.RouteSubPathOf(VM.ShareRelativeOf(dir)));
 
     private void NavigateUp()
+        => NavigateToRoutePath(VM.RouteSubPathOf(VM.ParentPath ?? ""));
+
+    // Navigate to a route-relative sub-path either by routing (default) or, when
+    // InPlaceNavigation is set, by reloading the listing without changing the URL — so a
+    // public share link never grows a folder name after its token.
+    internal void NavigateToRoutePath(string routeSubPath)
     {
-        if (string.IsNullOrEmpty(VM.ParentPath))
-            Nav.NavigateTo(CurrentShareRoute);
-        else
-            Nav.NavigateTo($"{CurrentShareRoute}/{VM.ParentPath}");
+        if (InPlaceNavigation)
+        {
+            _ = NavigateInPlaceAsync(routeSubPath);
+            return;
+        }
+
+        Nav.NavigateTo(string.IsNullOrEmpty(routeSubPath)
+            ? CurrentShareRoute
+            : $"{CurrentShareRoute}/{routeSubPath}");
+    }
+
+    private async Task NavigateInPlaceAsync(string routeSubPath)
+    {
+        _inPlaceSubPath = routeSubPath;
+        _selectedItems.Clear();
+        _sortColumn = null;
+        _sortDirection = 0;
+        _contextMenuComponent?.CloseContextMenu();
+
+        await VM.LoadShareAsync(ShareName, routeSubPath);
+        UpdateAclPath();
+        StateHasChanged();
     }
 
     /// <summary>
@@ -541,6 +565,15 @@ public partial class FileBrowser
            && !VM.IsLoading
            && VM.ErrorMessage is null
            && VM.CanManageSyncs;
+
+    /// <summary>
+    /// Scoped right to create public share links on the current share
+    /// (ManagementPermission.ManageShareLinks). Gates the "share" context-menu entry.
+    /// </summary>
+    public bool CanManageShareLinks()
+        => !VM.IsLoading
+           && VM.ErrorMessage is null
+           && VM.CanManageShareLinks;
 
     // ========== Virtual (Cloud Access) share ACLs ==========
 

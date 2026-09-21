@@ -45,12 +45,23 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     private readonly ILogger<FileBrowserViewModel> _logger;
     private readonly IUserRepository _userRepo;
     private readonly FileDownloadTicketStore _downloadTickets;
+    private readonly ZipDownloadTicketStore _zipTickets;
     private readonly DemoModeOptions _demo;
     private readonly ISyncDefinitionRepository _syncRepo;
+    private readonly IShareLinkRepository _shareLinkRepo;
+
+    // Normalized root paths of the loaded share's public links, so the browser can mark a
+    // shared folder (and everything beneath it). Loaded per share; empty for the public browser.
+    private List<string> _sharedRoots = [];
 
     private readonly ISearchService _searchService;
 
-    private IFileService? _fileService;
+    // Not readonly: a derived view model (e.g. the public share browser) binds its own
+    // file service to a fixed target instead of resolving it from a share name.
+    protected IFileService? _fileService;
+
+    // Exposed to derived view models so they can reuse the base file-operation methods.
+    protected IUserContextFactory UserContextFactory => _userContextFactory;
 
     public FileBrowserViewModel(
         IFileServiceFactory fileServiceFactory,
@@ -63,8 +74,10 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         ISearchService searchService,
         IUserRepository userRepo,
         FileDownloadTicketStore downloadTickets,
+        ZipDownloadTicketStore zipTickets,
         DemoModeOptions demo,
-        ISyncDefinitionRepository syncRepo)
+        ISyncDefinitionRepository syncRepo,
+        IShareLinkRepository shareLinkRepo)
     {
         _fileServiceFactory = fileServiceFactory;
         _shareRepo = shareRepo;
@@ -76,16 +89,32 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         _searchService = searchService;
         _userRepo = userRepo;
         _downloadTickets = downloadTickets;
+        _zipTickets = zipTickets;
         _demo = demo;
         _syncRepo = syncRepo;
+        _shareLinkRepo = shareLinkRepo;
     }
 
     // -- State --
 
     public event Action? OnStateChanged;
 
-    public BrowserCapabilities Capabilities =>
+    public virtual BrowserCapabilities Capabilities =>
         _demo.ReadOnly ? BrowserCapabilities.Local.AsReadOnly() : BrowserCapabilities.Local;
+
+    /// <summary>
+    /// When false, share-link management is never offered regardless of the actor's
+    /// permissions. Overridden by the anonymous public browser so a link never exposes a
+    /// "share" action of its own. Default (true) keeps the normal per-share permission check.
+    /// </summary>
+    protected virtual bool AllowShareLinkManagement => true;
+
+    /// <summary>
+    /// The navigation root the browser is confined to (share-relative, no leading/trailing
+    /// slash). "" = the whole share (normal behaviour). A derived browser can pin this to a
+    /// sub-folder so navigation, the ".." action and the breadcrumb cannot climb above it.
+    /// </summary>
+    protected virtual string RootPath => "";
 
     public BrowserShareInfo? CurrentBrowserShare => CurrentShare is null
         ? null
@@ -124,6 +153,13 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     public bool CanManageAcls { get; private set; }
     public bool CanManageSyncs { get; private set; }
 
+    /// <summary>
+    /// Scoped right to create/manage public share links on the loaded share
+    /// (<see cref="ManagementPermission.ManageShareLinks"/>). Resolved per load, reset on
+    /// every error/reset path — same pattern as <see cref="CanManageAcls"/>.
+    /// </summary>
+    public bool CanManageShareLinks { get; private set; }
+
     // -- Computed --
 
     public IEnumerable<FileMetadata> Directories
@@ -132,15 +168,40 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     public IEnumerable<FileMetadata> Files
         => Items.Where(f => !f.IsDirectory).OrderBy(f => f.Name);
 
-    public bool HasParent => !string.IsNullOrEmpty(CurrentPath);
+    /// <summary>
+    /// Maps a URL sub-path to a share-relative path. Identity for the default browser; the
+    /// public share VM overrides it to treat URL sub-paths as relative to the confined root.
+    /// </summary>
+    protected virtual string ResolveSubPath(string subPath) => subPath;
+
+    /// <summary>
+    /// Maps a share-relative path to the sub-path shown in the URL. Identity for the default
+    /// browser; the public share VM strips the confined-root prefix so it never leaks.
+    /// </summary>
+    public virtual string RouteSubPathOf(string shareRelativePath) => shareRelativePath;
+
+    // True when the given share-relative path is the confined root or lives beneath it.
+    private bool IsWithinRoot(string path)
+        => RootPath.Length == 0
+           || string.Equals(path, RootPath, StringComparison.OrdinalIgnoreCase)
+           || path.StartsWith(RootPath + "/", StringComparison.OrdinalIgnoreCase);
+
+    public bool HasParent
+        => !string.IsNullOrEmpty(CurrentPath)
+           && !string.Equals(CurrentPath, RootPath, StringComparison.OrdinalIgnoreCase);
 
     public string ParentPath
     {
         get
         {
-            if (string.IsNullOrEmpty(CurrentPath)) return "";
+            if (string.IsNullOrEmpty(CurrentPath)
+                || string.Equals(CurrentPath, RootPath, StringComparison.OrdinalIgnoreCase))
+                return RootPath;
+
             var lastSlash = CurrentPath.LastIndexOf('/');
-            return lastSlash <= 0 ? "" : CurrentPath[..lastSlash];
+            var parent = lastSlash <= 0 ? "" : CurrentPath[..lastSlash];
+            // Never climb above the confined root.
+            return IsWithinRoot(parent) ? parent : RootPath;
         }
     }
 
@@ -149,11 +210,27 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         get
         {
             if (string.IsNullOrEmpty(CurrentPath)) return [];
-            var parts = CurrentPath.Split('/');
+
+            // Only show the portion below the confined root; the share-root breadcrumb link
+            // (rendered by the component) already stands in for the root folder itself.
+            var relative = CurrentPath;
+            if (RootPath.Length > 0)
+            {
+                if (string.Equals(CurrentPath, RootPath, StringComparison.OrdinalIgnoreCase))
+                    return [];
+                if (CurrentPath.StartsWith(RootPath + "/", StringComparison.OrdinalIgnoreCase))
+                    relative = CurrentPath[(RootPath.Length + 1)..];
+            }
+
+            var parts = relative.Split('/');
             var result = new List<(string, string)>();
             for (int i = 0; i < parts.Length; i++)
             {
-                result.Add((parts[i], string.Join('/', parts[..(i + 1)])));
+                // FullPath stays absolute share-relative so navigation still targets the
+                // real path (the confined-root prefix is preserved).
+                var below = string.Join('/', parts[..(i + 1)]);
+                var full = RootPath.Length > 0 ? $"{RootPath}/{below}" : below;
+                result.Add((parts[i], full));
             }
 
             return result;
@@ -170,7 +247,9 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             ErrorMessage = null;
             CanManageAcls = false;
             CanManageSyncs = false;
+            CanManageShareLinks = false;
             _shareSyncs = [];
+            _sharedRoots = [];
             _fileService = null;
 
             // Clear the previously loaded location up front so the breadcrumb does
@@ -206,7 +285,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             else if (cleanSub.StartsWith(sharePath + "/", StringComparison.OrdinalIgnoreCase))
                 cleanSub = cleanSub[(sharePath.Length + 1)..];
 
-            CurrentPath = cleanSub;
+            CurrentPath = ResolveSubPath(cleanSub);
 
             if (!ShareRelativePath.IsValid(CurrentPath))
             {
@@ -214,6 +293,11 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
                 Items = [];
                 return;
             }
+
+            // Confine navigation to the browser's root (default "" = whole share). A path that
+            // would escape the shared folder is clamped back to the root, never followed.
+            if (!IsWithinRoot(CurrentPath))
+                CurrentPath = RootPath;
 
             var userContext = await GetCurrentUserContextAsync();
             if (userContext is null)
@@ -227,6 +311,20 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             // reused by the view. Same authority source the ACL editor enforces on write.
             CanManageAcls = await _mgmtAuth.CanManageShareAsync(
                 userContext, CurrentShare.Id, ManagementPermission.ManageShareAcls);
+
+            CanManageShareLinks = AllowShareLinkManagement
+                && await _mgmtAuth.CanManageShareAsync(
+                    userContext, CurrentShare.Id, ManagementPermission.ManageShareLinks);
+
+            // Which items in this share carry a public link, so the browser can mark them.
+            // Skipped for the public browser (AllowShareLinkManagement == false).
+            _sharedRoots = AllowShareLinkManagement
+                ? (await _shareLinkRepo.ListForSharesAsync(new[] { CurrentShare.Id }))
+                    .Where(l => l.IsEnabled)
+                    .Select(l => ShareRelativePath.Normalize(l.RootRelativePath))
+                    .Distinct()
+                    .ToList()
+                : [];
 
             CanManageSyncs = await _mgmtAuth.HasAnyPermissionAsync(userContext, ManagementPermission.SyncAdmin);
 
@@ -247,6 +345,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             ErrorMessage = Resources.Web_Error_FileOrFolderNotFound;
             CanManageAcls = false;
             CanManageSyncs = false;
+            CanManageShareLinks = false;
             Items = [];
         }
         catch (UnauthorizedAccessException)
@@ -254,6 +353,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             ErrorMessage = Resources.Web_Error_AccessDenied;
             CanManageAcls = false;
             CanManageSyncs = false;
+            CanManageShareLinks = false;
             Items = [];
         }
         catch (Exception ex)
@@ -261,6 +361,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             ErrorMessage = Resources.Web_Error_LoadFilesFailed;
             CanManageAcls = false;
             CanManageSyncs = false;
+            CanManageShareLinks = false;
             _logger.LogError(ex, "Error loading share {ShareName} path {SubPath}", shareName, subPath);
             Items = [];
         }
@@ -511,7 +612,12 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         }
     }
 
-    private async Task<UserContext?> GetCurrentUserContextAsync()
+    /// <summary>
+    /// Resolves the identity every file operation runs under. The default binds to the
+    /// signed-in circuit user; the anonymous public browser overrides this to run under the
+    /// link creator's fixed identity.
+    /// </summary>
+    protected virtual async Task<UserContext?> GetCurrentUserContextAsync()
     {
         var state = await _authState.GetAuthenticationStateAsync();
         var username = state.User.Identity?.Name;
@@ -705,7 +811,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     /// Returns null when no file is addressable or the user is not authenticated;
     /// the controller re-checks ACL access before streaming.
     /// </summary>
-    public async Task<string?> GetDownloadUrlAsync(FileMetadata file)
+    public virtual async Task<string?> GetDownloadUrlAsync(FileMetadata file)
     {
         if (_fileService is null || CurrentShare is null || file.IsDirectory) return null;
 
@@ -718,6 +824,36 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         var ticket = _downloadTickets.Issue(new FileDownloadTicket(
             CurrentShare.Id, userContext.User.Id, relative, file.Name));
         return "/api/files/download?ticket=" + Uri.EscapeDataString(ticket);
+    }
+
+    /// <summary>
+    /// Builds a download URL for a whole selection: one plain file streams directly, a folder
+    /// or a multi-item selection streams as a ZIP via <c>ShareZipDownloadController</c>.
+    /// </summary>
+    public virtual async Task<string?> GetSelectionDownloadUrlAsync(IReadOnlyList<FileMetadata> items)
+    {
+        if (_fileService is null || CurrentShare is null || items.Count == 0) return null;
+
+        // A single plain file needs no archive.
+        if (items.Count == 1 && !items[0].IsDirectory)
+            return await GetDownloadUrlAsync(items[0]);
+
+        var userContext = await GetCurrentUserContextAsync();
+        if (userContext is null) return null;
+
+        var relatives = new List<string>();
+        foreach (var item in items)
+            if (ShareRelativePath.TryNormalizeStrict(ToShareRelative(item.Path), out var rel, allowRoot: false))
+                relatives.Add(rel);
+        if (relatives.Count == 0) return null;
+
+        var archiveName = items.Count == 1
+            ? items[0].Name + ".zip"
+            : CurrentShare.Name + ".zip";
+
+        var ticket = _zipTickets.Issue(new ZipDownloadTicket(
+            CurrentShare.Id, userContext.User.Id, relatives.ToArray(), archiveName));
+        return "/api/files/download-zip?ticket=" + Uri.EscapeDataString(ticket);
     }
 
     /// <summary>
@@ -954,6 +1090,23 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         foreach (var path in manifest.Paths)
             paths.Add(ShareRelativePath.Normalize(path));
         return paths;
+    }
+
+    /// <summary>
+    /// Whether the entry carries a public share link, or lives beneath a shared folder — so the
+    /// browser can flag it (and everything under a shared folder) as shared.
+    /// </summary>
+    public bool IsShared(FileMetadata entry)
+    {
+        if (_sharedRoots.Count == 0) return false;
+
+        var rel = ShareRelativePath.Normalize(ShareRelativeOf(entry));
+        foreach (var root in _sharedRoots)
+        {
+            if (string.Equals(rel, root, StringComparison.OrdinalIgnoreCase)) return true;
+            if (root.Length == 0 || rel.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
     }
 
     /// <summary>

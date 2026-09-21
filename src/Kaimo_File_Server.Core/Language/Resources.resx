@@ -4368,4 +4368,202 @@
   <data name="Web_Demo_ReadOnlyNotice" xml:space="preserve">
     <value>Read-only demo — your changes are not saved.</value>
   </data>
+  <data name="Context_Menu_Share" xml:space="preserve">
+    <value>Share link</value>
+  </data>
+  <data name="Web_Nav_ShareLinks" xml:space="preserve">
+    <value>Share Links</value>
+  </data>
+  <data name="Web_Perm_ManageShareLinks" xml:space="preserve">
+    <value>Manage share links</value>
+  </data>
+  <data name="Web_Settings_Tab_ShareLinks" xml:space="preserve">
+    <value>Share Links</value>
+  </data>
+  <data name="Web_Button_Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Web_Button_Delete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="Web_ShareLink_Name" xml:space="preserve">
+    <value>Link name</value>
+  </data>
+  <data name="Web_ShareLink_NamePlaceholder" xml:space="preserve">
+    <value>Name shown to visitors</value>
+  </data>
+  <data name="Web_ShareLink_NameRequired" xml:space="preserve">
+    <value>A link name is required.</value>
+  </data>
+  <data name="Web_ShareLink_Password" xml:space="preserve">
+    <value>Password (optional)</value>
+  </data>
+  <data name="Web_ShareLink_PasswordPlaceholder" xml:space="preserve">
+    <value>Leave empty for no password</value>
+  </data>
+  <data name="Web_ShareLink_BaseAddress" xml:space="preserve">
+    <value>Address</value>
+  </data>
+  <data name="Web_ShareLink_DefaultAddress" xml:space="preserve">
+    <value>Default</value>
+  </data>
+  <data name="Web_ShareLink_Start" xml:space="preserve">
+    <value>Start</value>
+  </data>
+  <data name="Web_ShareLink_End" xml:space="preserve">
+    <value>End</value>
+  </data>
+  <data name="Web_ShareLink_MaxAccess" xml:space="preserve">
+    <value>Max downloads</value>
+  </data>
+  <data name="Web_ShareLink_MaxRate" xml:space="preserve">
+    <value>Max rate</value>
+  </data>
+  <data name="Web_ShareLink_Unlimited" xml:space="preserve">
+    <value>Unlimited</value>
+  </data>
+  <data name="Web_ShareLink_Create" xml:space="preserve">
+    <value>Create link</value>
+  </data>
+  <data name="Web_ShareLink_Url" xml:space="preserve">
+    <value>Public link</value>
+  </data>
+  <data name="Web_ShareLink_Copy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="Web_ShareLink_Copied" xml:space="preserve">
+    <value>Copied</value>
+  </data>
+  <data name="Web_ShareLink_Error" xml:space="preserve">
+    <value>Could not create the link.</value>
+  </data>
+  <data name="Web_ShareLink_NoPermission" xml:space="preserve">
+    <value>You are not allowed to create a link for this item.</value>
+  </data>
+  <data name="Web_ShareLinks_Empty" xml:space="preserve">
+    <value>No share links yet.</value>
+  </data>
+  <data name="Web_ShareLinks_Col_Item" xml:space="preserve">
+    <value>Item</value>
+  </data>
+  <data name="Web_ShareLinks_Col_Share" xml:space="preserve">
+    <value>Share</value>
+  </data>
+  <data name="Web_ShareLinks_Col_CreatedBy" xml:space="preserve">
+    <value>Created by</value>
+  </data>
+  <data name="Web_ShareLinks_Col_Access" xml:space="preserve">
+    <value>Downloads</value>
+  </data>
+  <data name="Web_ShareLinks_Col_Status" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="Web_ShareLinks_Enable" xml:space="preserve">
+    <value>Enable</value>
+  </data>
+  <data name="Web_ShareLinks_Disable" xml:space="preserve">
+    <value>Disable</value>
+  </data>
+  <data name="Web_ShareLinks_Copy" xml:space="preserve">
+    <value>Copy link</value>
+  </data>
+  <data name="Web_ShareLinks_NewPassword" xml:space="preserve">
+    <value>New password (leave empty to keep)</value>
+  </data>
+  <data name="Web_ShareLinks_ClearPassword" xml:space="preserve">
+    <value>Remove password</value>
+  </data>
+  <data name="Web_ShareLinks_Status_Active" xml:space="preserve">
+    <value>Active</value>
+  </data>
+  <data name="Web_ShareLinks_Status_Disabled" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="Web_ShareLinks_Status_Expired" xml:space="preserve">
+    <value>Expired</value>
+  </data>
+  <data name="Web_ShareLinks_Status_Pending" xml:space="preserve">
+    <value>Not started</value>
+  </data>
+  <data name="Web_ShareLinks_Status_Exhausted" xml:space="preserve">
+    <value>Exhausted</value>
+  </data>
+  <data name="Web_ShareLinkSettings_Hint" xml:space="preserve">
+    <value>Addresses the server is reachable under. A link URL is built from the default address (or the one the creator picks). DNS and TLS for these addresses are configured outside the app.</value>
+  </data>
+  <data name="Web_ShareLinkSettings_Default" xml:space="preserve">
+    <value>Default</value>
+  </data>
+  <data name="Web_ShareLinkSettings_Add" xml:space="preserve">
+    <value>Add address</value>
+  </data>
+  <data name="Web_ShareLinkSettings_AllowCustom" xml:space="preserve">
+    <value>Allow link creators to choose a non-default address</value>
+  </data>
+  <data name="Web_PublicShare_Unavailable_Title" xml:space="preserve">
+    <value>Link unavailable</value>
+  </data>
+  <data name="Web_PublicShare_Unavailable_Body" xml:space="preserve">
+    <value>This link does not exist, or is no longer available.</value>
+  </data>
+  <data name="Web_PublicShare_Password_Body" xml:space="preserve">
+    <value>This link is password-protected.</value>
+  </data>
+  <data name="Web_PublicShare_Password_Placeholder" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Web_PublicShare_Unlock" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="Web_PublicShare_Password_Wrong" xml:space="preserve">
+    <value>Wrong password.</value>
+  </data>
+  <data name="Web_PublicShare_Password_Locked" xml:space="preserve">
+    <value>Too many attempts. Try again in {0} minutes.</value>
+  </data>
+  <data name="Web_PublicShare_Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="Web_ShareLinks_Shared" xml:space="preserve">
+    <value>Shared via public link</value>
+  </data>
+  <data name="Web_ShareLink_PasswordSet" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Web_Action_Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="Web_Action_DownloadAll" xml:space="preserve">
+    <value>Download all</value>
+  </data>
+  <data name="Web_ShareLink_ShowPassword" xml:space="preserve">
+    <value>Show / hide</value>
+  </data>
+  <data name="Web_ShareLinks_Edit" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="Web_ShareLinks_OpenInBrowser" xml:space="preserve">
+    <value>Open in file browser</value>
+  </data>
+  <data name="Web_ShareLinks_Subtitle" xml:space="preserve">
+    <value>Public download links for files and folders.</value>
+  </data>
+  <data name="Web_ShareLinks_Path" xml:space="preserve">
+    <value>Path</value>
+  </data>
+  <data name="Web_ShareLinks_Group_Target" xml:space="preserve">
+    <value>Target</value>
+  </data>
+  <data name="Web_ShareLinks_Group_Limits" xml:space="preserve">
+    <value>Limits</value>
+  </data>
+  <data name="Web_ShareLinks_SelectHint" xml:space="preserve">
+    <value>Select a link to see its details.</value>
+  </data>
+  <data name="Web_ShareLinks_Enabled" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="Web_ShareLinks_PasswordProtected" xml:space="preserve">
+    <value>Password-protected</value>
+  </data>
 </root>

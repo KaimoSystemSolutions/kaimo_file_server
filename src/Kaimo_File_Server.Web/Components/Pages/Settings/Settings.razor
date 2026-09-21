@@ -35,6 +35,7 @@ else
                     <Tab Active="@(_activeTab == SettingsTab.Memory)" Icon="gear.svg" Label="@Resources.Web_Settings_Tab_Ram" OnClick="() => SwitchTab(SettingsTab.Memory)" />
                     <Tab Active="@(_activeTab == SettingsTab.Search)" Icon="search.svg" Label="@Resources.Web_Settings_Tab_Search" OnClick="() => SwitchTab(SettingsTab.Search)" />
                     <Tab Active="@(_activeTab == SettingsTab.CloudAccess)" Icon="cloud-download.svg" Label="@R("Web_Settings_Tab_CloudAccess")" OnClick="() => SwitchTab(SettingsTab.CloudAccess)" />
+                    <Tab Active="@(_activeTab == SettingsTab.ShareLinks)" Icon="share.svg" Label="@R("Web_Settings_Tab_ShareLinks")" OnClick="() => SwitchTab(SettingsTab.ShareLinks)" />
                 }
                 @if (VM.CanManageSettings || VM.CanViewLogs)
                 {
@@ -72,6 +73,7 @@ else
                     case SettingsTab.Memory when VM.CanManageSettings: <MemorySettings VM="VM" /> break;
                     case SettingsTab.Search when VM.CanManageSettings: <SearchSettings VM="VM" /> break;
                     case SettingsTab.CloudAccess when VM.CanManageSettings: <CloudAccessSettings VM="VM" /> break;
+                    case SettingsTab.ShareLinks when VM.CanManageSettings: <ShareLinkSettingsTab /> break;
                     case SettingsTab.Logging when VM.CanManageSettings || VM.CanViewLogs: <LoggingSettings VM="VM" /> break;
                     case SettingsTab.DataServices when VM.CanManageDataServices: <DataServiceSettings VM="VM" /> break;
                     case SettingsTab.Certificate when VM.CanManageCertificates: <CertificateSettings VM="VM" /> break;

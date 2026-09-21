@@ -67,11 +67,17 @@ public class FileBrowserViewModelAclScopeTests
             .Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<SyncDefinitionAdminEntry>());
 
+        var shareLinkRepo = new Mock<IShareLinkRepository>();
+        shareLinkRepo
+            .Setup(r => r.ListForSharesAsync(It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync(new List<ShareLink>());
+
         _sut = new FileBrowserViewModel(
             _fileServiceFactory.Object, _shareRepo.Object, _dbFactory.Object,
             _userContextFactory.Object, _mgmtAuth.Object, _authState.Object,
             NullLogger<FileBrowserViewModel>.Instance, _searchService.Object, _userRepo.Object,
-            new FileDownloadTicketStore(), new DemoModeOptions(), _syncRepo.Object);
+            new FileDownloadTicketStore(), new ZipDownloadTicketStore(), new DemoModeOptions(), _syncRepo.Object,
+            shareLinkRepo.Object);
     }
 
     private void Authorize(bool allowed) =>

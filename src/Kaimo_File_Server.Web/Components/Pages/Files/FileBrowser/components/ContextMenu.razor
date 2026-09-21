@@ -117,6 +117,8 @@
             "newfolder" => FileBrowser.VM.Capabilities.CanCreateDirectory,
             // Permissions stay manager-only regardless of configuration.
             "permissions" => FileBrowser.CanManageAcls(),
+            // Sharing a public link requires the scoped ManageShareLinks permission.
+            "sharelink" => FileBrowser.CanManageShareLinks(),
             // Bulk extract only makes sense when every selected item is an archive.
             "extract" when scope == ContextMenuScope.MultiSelection
                 => FileBrowser.VM.Capabilities.CanExtract
@@ -138,8 +140,14 @@
         "open"
             => async () => {  CloseContextMenu(); await FilePreviewComponent.OpenFilePreview(target!); },
 
+        // Folder / multi-selection downloads stream as a ZIP; a single file streams directly.
+        "download" when scope is ContextMenuScope.Folder or ContextMenuScope.MultiSelection
+            => async () => { CloseContextMenu(); await FileBrowser.DownloadSelectionAsync(); },
         "download"
             => async () => {  CloseContextMenu(); await FileBrowser.DownloadFileAsync(target!); },
+
+        "sharelink"
+            => async () => { CloseContextMenu(); await FileBrowser.OpenShareLinkDialog(target!); },
 
         "hash"
             => async () => {  CloseContextMenu(); await FileBrowser.OpenHashDialog(target!); },

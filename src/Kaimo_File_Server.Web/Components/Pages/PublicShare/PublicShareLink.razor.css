@@ -1,0 +1,62 @@
+.public-share-shell {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--bg-primary, #1e1e1e);
+}
+
+.public-share-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    text-align: center;
+    max-width: 380px;
+    width: 100%;
+    padding: 32px 28px;
+    border-radius: 12px;
+    background: var(--bg-secondary, #262626);
+    border: 1px solid var(--border-color, #3a3a3a);
+}
+
+.public-share-card h1 {
+    font-size: 1.25rem;
+    margin: 0;
+    word-break: break-word;
+}
+
+.public-share-card p {
+    margin: 0;
+    color: var(--text-secondary, #b0b0b0);
+}
+
+.public-share-icon {
+    color: var(--text-tertiary, #888);
+}
+
+.public-share-card .edit-input {
+    width: 100%;
+}
+
+.public-share-card .btn-primary {
+    width: 100%;
+}
+
+/* Mirror the authenticated content area's spacing (.main in app.css) so the reused
+   file browser gets its normal gutters instead of sitting flush against the edges. */
+.public-share-browser {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 16px 32px 24px;
+}
+
+@media (max-width: 720px) {
+    .public-share-browser {
+        padding: 12px 16px 16px;
+    }
+}

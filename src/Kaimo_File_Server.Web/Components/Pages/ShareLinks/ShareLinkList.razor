@@ -1,0 +1,338 @@
+@page "/share-links"
+@using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Helpers
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Services
+@inherits AppComponentBase
+@inject ShareLinkListViewModel VM
+@inject ShareLinkService ShareLinks
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject DateFormatService DateFmt
+@implements IDisposable
+
+@*
+    Admin overview of public share links, laid out like the external-storage sync list:
+    a list pane on the left and a detail / edit pane on the right. Only the item name is a
+    hyperlink into the file browser; clicking elsewhere on a row opens its details. Gated by
+    ManagementPermission.ManageShareLinks.
+*@
+
+<div class="page-header">
+    <div>
+        <h1>@T("Web_Nav_ShareLinks", "Share Links")</h1>
+        <p class="subtitle">@T("Web_ShareLinks_Subtitle", "Public download links for files and folders.")</p>
+    </div>
+</div>
+
+@if (VM.IsLoading)
+{
+    <div class="loading-state"><div class="spinner"></div><p>@Resources.Web_Common_Loading</p></div>
+}
+else if (!VM.CanAccessPage)
+{
+    <div class="error-banner">@Resources.Web_Admin_NoPermission</div>
+}
+else if (VM.ErrorMessage is not null)
+{
+    <div class="error-banner">@VM.ErrorMessage</div>
+}
+else
+{
+    <div class="sharelink-workspace">
+        <section class="sharelink-list-pane">
+            @if (VM.Links.Count == 0)
+            {
+                <div class="empty-state"><p>@T("Web_ShareLinks_Empty", "No share links yet.")</p></div>
+            }
+            else
+            {
+                <div class="sharelink-list">
+                    <div class="sharelink-list-header" aria-hidden="true">
+                        <span>@T("Web_ShareLinks_Col_Item", "Item")</span>
+                        <span>@T("Web_ShareLinks_Col_Status", "Status")</span>
+                        <span>@T("Web_ShareLinks_Col_Access", "Downloads")</span>
+                    </div>
+                    @foreach (var row in VM.Links)
+                    {
+                        <div class="sharelink-row @(row.Link.Id == _selectedId ? "sharelink-row--selected" : "")"
+                             @onclick="() => Select(row.Link.Id)">
+                            <span class="sharelink-name">
+                                <span class="sharelink-item-icon">
+                                    @Assets.SVG(row.Link.IsDirectory ? "folder.svg" : "download.svg", new SvgOptions(Width: 18, Height: 18))
+                                </span>
+                                <span class="sharelink-name-text">
+                                    <a class="sharelink-name-link" href="@BrowserHref(row)"
+                                       title="@T("Web_ShareLinks_OpenInBrowser", "Open in file browser")"
+                                       @onclick:stopPropagation="true">
+                                        <strong>@row.Link.DisplayName</strong>
+                                    </a>
+                                    <small>@row.ShareName · @row.CreatedBy</small>
+                                </span>
+                            </span>
+                            <StatusBadge Tone="StatusToneFor(row.StatusKey)" Class="sharelink-state" Label="@StatusLabel(row.StatusKey)" />
+                            <span class="sharelink-meta">@row.Link.AccessCount@(row.Link.MaxAccessCount is { } m ? $" / {m}" : "")</span>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+
+        <aside class="storage-editor sharelink-detail-pane">
+            @if (SelectedRow is { } sel)
+            {
+                var link = sel.Link;
+                @if (_editing)
+                {
+                    <div class="storage-editor-heading">
+                        <div><h3>@(string.IsNullOrWhiteSpace(_editName) ? link.DisplayName : _editName)</h3><span>@sel.ShareName</span></div>
+                        <div class="storage-enabled">
+                            <label class="toggle-switch" title="@T("Web_ShareLinks_Enabled", "Enabled")">
+                                <input type="checkbox" @bind="_editEnabled" />
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span>@T("Web_ShareLinks_Enabled", "Enabled")</span>
+                        </div>
+                    </div>
+
+                    <div class="storage-form-grid sharelink-edit-grid">
+                        <label class="storage-wide">
+                            <span>@T("Web_ShareLink_Name", "Link name")</span>
+                            <input type="text" class="edit-input"
+                                   placeholder="@T("Web_ShareLink_NamePlaceholder", "Name shown to visitors")"
+                                   @bind="_editName" @bind:event="oninput" />
+                        </label>
+                        <label>
+                            <span>@T("Web_ShareLink_Start", "Start")</span>
+                            <input type="datetime-local" class="edit-input" @bind="_editStart" />
+                        </label>
+                        <label>
+                            <span>@T("Web_ShareLink_End", "End")</span>
+                            <input type="datetime-local" class="edit-input" @bind="_editEnd" />
+                        </label>
+                        <label>
+                            <span>@T("Web_ShareLink_MaxAccess", "Max downloads")</span>
+                            <input type="number" min="1" class="edit-input"
+                                   placeholder="@T("Web_ShareLink_Unlimited", "Unlimited")" @bind="_editMaxAccess" />
+                        </label>
+                        <label>
+                            <span>@T("Web_ShareLink_MaxRate", "Max rate (KB/s)")</span>
+                            <input type="number" min="1" class="edit-input"
+                                   placeholder="@T("Web_ShareLink_Unlimited", "Unlimited")" @bind="_editRateKb" />
+                        </label>
+                        <label class="storage-wide">
+                            <span>@T("Web_ShareLinks_NewPassword", "New password (leave empty to keep)")</span>
+                            <span class="sharelink-password">
+                                <input type="@(_showEditPassword ? "text" : "password")" class="edit-input"
+                                       autocomplete="new-password" @bind="_editPassword" @bind:event="oninput" />
+                                <button type="button" class="btn-secondary" title="@T("Web_ShareLink_ShowPassword", "Show / hide")"
+                                        @onclick="() => _showEditPassword = !_showEditPassword">
+                                    @Assets.SVG(_showEditPassword ? "eye-off.svg" : "eye.svg", new SvgOptions(Width: 16, Height: 16))
+                                </button>
+                            </span>
+                        </label>
+                        <label class="storage-form-checkbox storage-wide">
+                            <input type="checkbox" @bind="_clearPassword" />
+                            <span>@T("Web_ShareLinks_ClearPassword", "Remove password")</span>
+                        </label>
+                    </div>
+
+                    @if (_editError is not null)
+                    {
+                        <div class="error-banner">@_editError</div>
+                    }
+
+                    <div class="detail-actions">
+                        <button class="btn-secondary" @onclick="() => _editing = false">@Resources.Web_Button_Cancel</button>
+                        <button class="btn-primary" disabled="@string.IsNullOrWhiteSpace(_editName)" @onclick="SaveAsync">@T("Web_Button_Save", "Save")</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="detail-header sharelink-detail-header">
+                        <div class="sharelink-detail-title">
+                            <div class="sharelink-title-row">
+                                <span class="sharelink-detail-icon">
+                                    @Assets.SVG(link.IsDirectory ? "folder.svg" : "download.svg", new SvgOptions(Width: 22, Height: 22))
+                                </span>
+                                <h3>@link.DisplayName</h3>
+                            </div>
+                            <span class="detail-subtitle">@sel.ShareName · @sel.CreatedBy</span>
+                        </div>
+                        <StatusBadge Tone="StatusToneFor(sel.StatusKey)" Class="sharelink-state" Label="@StatusLabel(sel.StatusKey)" />
+                    </div>
+
+                    <div class="sharelink-detail-grid">
+                        <section class="sharelink-detail-group">
+                            <h4>@T("Web_ShareLinks_Group_Target", "Target")</h4>
+                            <dl>
+                                <dt>@T("Web_ShareLinks_Col_Share", "Share")</dt><dd>@sel.ShareName</dd>
+                                <dt>@T("Web_ShareLinks_Path", "Path")</dt><dd>@DisplayPath(link.RootRelativePath)</dd>
+                            </dl>
+                        </section>
+                        <section class="sharelink-detail-group">
+                            <h4>@T("Web_ShareLinks_Group_Limits", "Limits")</h4>
+                            <dl>
+                                <dt>@T("Web_ShareLink_Start", "Start")</dt><dd>@DateFmt.FormatDateTime(link.StartsAtUtc, nullText: "—")</dd>
+                                <dt>@T("Web_ShareLink_End", "End")</dt><dd>@DateFmt.FormatDateTime(link.ExpiresAtUtc, nullText: "—")</dd>
+                                <dt>@T("Web_ShareLinks_Col_Access", "Downloads")</dt>
+                                <dd>@link.AccessCount@(link.MaxAccessCount is { } m ? $" / {m}" : $" / {T("Web_ShareLink_Unlimited", "Unlimited")}")</dd>
+                                <dt>@T("Web_ShareLink_MaxRate", "Max rate")</dt><dd>@RateText(link)</dd>
+                            </dl>
+                        </section>
+                        <section class="sharelink-detail-group sharelink-detail-group--wide">
+                            <h4>@T("Web_ShareLink_Url", "Public link")</h4>
+                            <div class="sharelink-url-row">
+                                <input class="edit-input sharelink-url" readonly value="@sel.Url" />
+                                <button class="btn-secondary" @onclick="() => CopyAsync(sel.Url)">@T("Web_ShareLink_Copy", "Copy")</button>
+                            </div>
+                            @if (link.PasswordHash is not null)
+                            {
+                                <p class="sharelink-note">@T("Web_ShareLinks_PasswordProtected", "Password-protected")</p>
+                            }
+                        </section>
+                    </div>
+
+                    <div class="detail-actions sharelink-summary-actions">
+                        <button class="btn-secondary" @onclick="StartEdit">@T("Web_ShareLinks_Edit", "Edit")</button>
+                        <button class="btn-danger-outline" @onclick="() => DeleteAsync(link.Id)">@Resources.Web_Action_Delete</button>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="detail-empty">
+                    <p>@T("Web_ShareLinks_SelectHint", "Select a link to see its details.")</p>
+                </div>
+            }
+        </aside>
+    </div>
+}
+
+@code {
+    private Guid? _selectedId;
+    private bool _editing;
+
+    private string _editName = "";
+    private bool _editEnabled;
+    private DateTime? _editStart;
+    private DateTime? _editEnd;
+    private int? _editMaxAccess;
+    private long? _editRateKb;
+    private string? _editPassword;
+    private bool _showEditPassword;
+    private bool _clearPassword;
+    private string? _editError;
+
+    private ShareLinkRow? SelectedRow
+        => _selectedId is Guid id ? VM.Links.FirstOrDefault(r => r.Link.Id == id) : null;
+
+    private static string T(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    protected override async Task OnInitializedAsync()
+    {
+        VM.OnStateChanged += OnStateChanged;
+        await VM.LoadAsync();
+    }
+
+    private void OnStateChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => VM.OnStateChanged -= OnStateChanged;
+
+    private static string BrowserPath(ShareLinkRow row)
+    {
+        var path = ShareRelativePath.Normalize(row.Link.RootRelativePath);
+        // A file link opens its containing folder; a folder link opens the folder itself.
+        return row.Link.IsDirectory ? path : ShareRelativePath.GetParent(path);
+    }
+
+    private static string BrowserHref(ShareLinkRow row)
+    {
+        var target = BrowserPath(row);
+        return string.IsNullOrEmpty(target) ? $"/files/{row.ShareName}" : $"/files/{row.ShareName}/{target}";
+    }
+
+    private void Select(Guid id)
+    {
+        _selectedId = id;
+        _editing = false;
+        _editError = null;
+    }
+
+    private void StartEdit()
+    {
+        if (SelectedRow is not { } row) return;
+        var link = row.Link;
+        _editing = true;
+        _editError = null;
+        _clearPassword = false;
+        _editPassword = null;
+        _showEditPassword = false;
+        _editName = link.DisplayName;
+        _editEnabled = link.IsEnabled;
+        _editStart = link.StartsAtUtc?.ToLocalTime();
+        _editEnd = link.ExpiresAtUtc?.ToLocalTime();
+        _editMaxAccess = link.MaxAccessCount;
+        _editRateKb = link.MaxBytesPerSecond is { } bps ? bps / 1000 : null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (SelectedRow is not { } row) return;
+        var link = row.Link;
+
+        if (string.IsNullOrWhiteSpace(_editName)) { _editError = T("Web_ShareLink_NameRequired", "A link name is required."); return; }
+        link.DisplayName = _editName.Trim();
+        link.IsEnabled = _editEnabled;
+        link.StartsAtUtc = _editStart?.ToUniversalTime();
+        link.ExpiresAtUtc = _editEnd?.ToUniversalTime();
+        link.MaxAccessCount = _editMaxAccess is > 0 ? _editMaxAccess : null;
+        link.MaxBytesPerSecond = _editRateKb is > 0 ? _editRateKb * 1000 : null;
+
+        if (_clearPassword)
+            ShareLinks.ApplyPassword(link, null);
+        else if (!string.IsNullOrEmpty(_editPassword))
+            ShareLinks.ApplyPassword(link, _editPassword);
+
+        if (await VM.SaveAsync(link))
+            _editing = false;
+        else
+            _editError = Resources.Web_Error_LoadFilesFailed;
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        await VM.DeleteAsync(id);
+        if (_selectedId == id) { _selectedId = null; _editing = false; }
+    }
+
+    private async Task CopyAsync(string url) => await JS.InvokeVoidAsync("navigator.clipboard.writeText", url);
+
+    private string RateText(ShareLink link)
+        => link.MaxBytesPerSecond is { } bps
+            ? $"{bps / 1000} KB/s"
+            : T("Web_ShareLink_Unlimited", "Unlimited");
+
+    private static string DisplayPath(string path) => string.IsNullOrEmpty(path) ? "/" : $"/{path}";
+
+    private static StatusTone StatusToneFor(string key) => key switch
+    {
+        "active" => StatusTone.Positive,
+        "disabled" => StatusTone.Neutral,
+        "pending" => StatusTone.Warning,
+        _ => StatusTone.Negative,
+    };
+
+    private string StatusLabel(string key) => key switch
+    {
+        "active" => T("Web_ShareLinks_Status_Active", "Active"),
+        "disabled" => T("Web_ShareLinks_Status_Disabled", "Disabled"),
+        "expired" => T("Web_ShareLinks_Status_Expired", "Expired"),
+        "pending" => T("Web_ShareLinks_Status_Pending", "Not started"),
+        "exhausted" => T("Web_ShareLinks_Status_Exhausted", "Exhausted"),
+        _ => key,
+    };
+}

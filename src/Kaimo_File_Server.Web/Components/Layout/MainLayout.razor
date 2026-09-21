@@ -62,6 +62,14 @@
                 </NavLink>
             }
 
+            @if (_canManageShareLinks)
+            {
+                <NavLink class="nav-item" href="/share-links" Match="NavLinkMatch.Prefix">
+                    @Assets.SVG("share.svg", new SvgOptions())
+                    <span class="nav-label">@Text("Web_Nav_ShareLinks", "Share Links")</span>
+                </NavLink>
+            }
+
         </div>
 
 
@@ -178,6 +186,7 @@
     private bool _canManageSettings;
     private bool _canManageUsers;
     private bool _canViewDepartments;
+    private bool _canManageShareLinks;
     private UserContext? _currentUser;
     
     [Inject] private IJSRuntime JS { get; set; } = default!;
@@ -271,6 +280,9 @@
                                          _currentUser,
                                          ManagementPermission.ViewDepartment
                                          | ManagementPermission.EditDepartment);
+            _canManageShareLinks = _currentUser != null
+                                   && await ManagementAuthService.HasAnyPermissionAsync(
+                                          _currentUser, ManagementPermission.ManageShareLinks);
         }
 
         // Load the global date-display format once for the whole circuit (uses the

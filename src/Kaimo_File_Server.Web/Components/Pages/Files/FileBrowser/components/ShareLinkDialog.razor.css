@@ -1,0 +1,72 @@
+.sharelink-dialog {
+    width: min(460px, 92vw);
+}
+
+.sharelink-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sharelink-row {
+    display: flex;
+    gap: 12px;
+}
+
+.sharelink-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.sharelink-rate {
+    display: flex;
+    gap: 8px;
+}
+
+/* Wide value field, compact unit dropdown. */
+.sharelink-rate input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.sharelink-rate select {
+    flex: 0 0 76px;
+    width: 76px;
+}
+
+/* Form controls must use the app font, not the browser default (which controls do
+   not inherit). Excludes the monospace URL/password readouts. */
+.sharelink-body input:not(.properties-mono),
+.sharelink-body select {
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+/* Dark mode: the native calendar-picker indicator is black and invisible on a dark input. */
+:root[data-theme="dark"] .sharelink-body input[type="datetime-local"] { color-scheme: dark; }
+
+/* Password field with an inline show/hide toggle. */
+.sharelink-password {
+    display: flex;
+    gap: 8px;
+}
+
+.sharelink-password input {
+    flex: 1;
+    min-width: 0;
+}
+
+.sharelink-reveal {
+    flex: 0 0 auto;
+}
+
+.sharelink-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}

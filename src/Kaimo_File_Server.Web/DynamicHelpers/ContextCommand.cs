@@ -52,12 +52,19 @@ public static class ContextCommandCatalog
     private static readonly ContextMenuScope[] SingleAndMulti =
         AllSingle.Append(ContextMenuScope.MultiSelection).ToArray();
 
-    // Single files only — a directory can't be streamed as one download.
+    // Single files only — used by hashing, which cannot apply to a directory.
     private static readonly ContextMenuScope[] DownloadableFiles =
     {
         ContextMenuScope.Archive, ContextMenuScope.Image, ContextMenuScope.Video,
         ContextMenuScope.Audio, ContextMenuScope.Document, ContextMenuScope.OtherFile,
     };
+
+    // Download covers single files, folders (streamed as a ZIP) and multi-selections.
+    private static readonly ContextMenuScope[] Downloadable =
+        DownloadableFiles
+            .Append(ContextMenuScope.Folder)
+            .Append(ContextMenuScope.MultiSelection)
+            .ToArray();
 
     private static readonly ContextMenuScope[] EveryScope =
         Enum.GetValues<ContextMenuScope>();
@@ -68,7 +75,10 @@ public static class ContextCommandCatalog
             ValidScopes: AllSingle),
 
         new ContextCommand("download", () => Resources.Context_Menu_Download, "download.svg",
-            ValidScopes: DownloadableFiles),
+            ValidScopes: Downloadable),
+
+        new ContextCommand("sharelink", () => Resources.ResourceManager.GetString("Context_Menu_Share") ?? "Share link",
+            "share.svg", ValidScopes: AllSingle),
 
         new ContextCommand("hash", () => Resources.Context_Menu_CreateHash, "hash.svg",
             ValidScopes: DownloadableFiles),

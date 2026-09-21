@@ -81,6 +81,13 @@ public interface IFileBrowserViewModel
     bool CanManageSyncs => false;
 
     /// <summary>
+    /// True when the current user may create/manage public share links on the loaded share
+    /// (scoped <see cref="Kaimo_File_Server.Core.Security.ManagementPermission.ManageShareLinks"/>).
+    /// Gates the "share" context-menu action. Backends that do not offer links keep the default.
+    /// </summary>
+    bool CanManageShareLinks => false;
+
+    /// <summary>
     /// True when the current backend is a virtual (Cloud Access) share whose root-level
     /// ACLs the actor may manage. Local backends keep the safe default; the file browser
     /// uses it to offer the "manage permissions" action at the virtual share's root.
@@ -93,6 +100,9 @@ public interface IFileBrowserViewModel
     /// syncs (Cloud Access, remote) keep the safe default.
     /// </summary>
     SyncFolderMarker? GetSyncMarker(FileMetadata entry) => null;
+
+    /// <summary>Whether the entry is shared via a public link (or lives beneath a shared folder).</summary>
+    bool IsShared(FileMetadata entry) => false;
     IEnumerable<FileMetadata> Directories { get; }
     IEnumerable<FileMetadata> Files { get; }
     bool HasParent { get; }
@@ -117,7 +127,22 @@ public interface IFileBrowserViewModel
     long GetMaxUploadSizeBytes();
     string ShareRelativeOf(FileMetadata item);
 
+    /// <summary>
+    /// Maps a share-relative path to the sub-path shown in the address bar. The default
+    /// browser exposes the full share-relative path; a confined browser (public share link)
+    /// overrides this to hide the shared root, so the real folder name never appears in the URL.
+    /// </summary>
+    string RouteSubPathOf(string shareRelativePath) => shareRelativePath;
+
     Task<string?> GetDownloadUrlAsync(FileMetadata file)
+        => Task.FromResult<string?>(null);
+
+    /// <summary>
+    /// Returns a URL that downloads the given selection: a single file streams directly, while
+    /// a folder or a multi-item selection streams as a ZIP. Null when the backend cannot serve
+    /// the selection or nothing is addressable.
+    /// </summary>
+    Task<string?> GetSelectionDownloadUrlAsync(IReadOnlyList<FileMetadata> items)
         => Task.FromResult<string?>(null);
 
     /// <summary>

@@ -44,6 +44,7 @@ public partial class FileBrowser
     private VersionDialog _versionDialogComponent = default!;
     private PropertiesDialog _propertiesDialogComponent = default!;
     private HashDialog _hashDialogComponent = default!;
+    private ShareLinkDialog _shareLinkDialogComponent = default!;
 
     private ElementReference _fileDropZone;
     private bool _jsInitialized = false;

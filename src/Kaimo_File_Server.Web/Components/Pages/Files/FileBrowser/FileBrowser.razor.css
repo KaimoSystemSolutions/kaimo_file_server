@@ -3,6 +3,16 @@
    File Table Grid, Column Sorting, ACL Indicators, Responsive
    ══════════════════════════════════════════════════════════ */
 
+/* In-place breadcrumb hops (public share browser) are buttons, not links:
+   strip the native button chrome so they match the anchor breadcrumbs. */
+.breadcrumb-button {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+}
+
 /* -- File Table – CSS Grid (5 columns, without actions) ----- */
 
 .file-table-wrap {
@@ -404,6 +414,21 @@
 /* Not-yet-synced entries (pending upload, or pull-only so never uploaded). */
 .sync-indicator--warn .sync-indicator-icon {
     color: var(--warning);
+}
+
+/* Share emblem: marks an entry that is (or lives beneath) a folder shared via a public link. */
+.share-indicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+    cursor: default;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+.share-indicator-icon {
+    color: var(--accent-color, var(--info));
+    flex-shrink: 0;
 }
 
 /* ══════════════════════════════════════════════════════════

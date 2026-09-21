@@ -1,0 +1,170 @@
+@page "/shared"
+@page "/shared/{Token}"
+@page "/shared/{Token}/{*SubPath}"
+@layout EmptyLayout
+@inherits AppComponentBase
+@attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+
+@using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Helpers
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Repositories
+@using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Services
+
+@inject ShareLinkService ShareLinks
+@inject IShareRepository Shares
+@inject PublicShareFileBrowserViewModel Vm
+@inject IJSRuntime JS
+
+@*
+    Anonymous landing page for a public share link ("/shared/{token}"). Folder links open the
+    normal file browser confined to the shared folder (read-only, multi-select download); file
+    links show a download card. Optional password unlock happens on the circuit, never in the URL.
+*@
+
+@if (_state == State.NotFound || _state == State.Unavailable)
+{
+    <div class="public-share-shell">
+        <div class="public-share-card">
+            <div class="public-share-icon">@Assets.SVG("share.svg", new SvgOptions(Width: 32, Height: 32))</div>
+            <h1>@T("Web_PublicShare_Unavailable_Title", "Link unavailable")</h1>
+            <p>@T("Web_PublicShare_Unavailable_Body", "This link does not exist, or is no longer available.")</p>
+        </div>
+    </div>
+}
+else if (_state == State.Password)
+{
+    <div class="public-share-shell">
+        <div class="public-share-card">
+            <div class="public-share-icon">@Assets.SVG("share.svg", new SvgOptions(Width: 32, Height: 32))</div>
+            <h1>@_link!.DisplayName</h1>
+            <p>@T("Web_PublicShare_Password_Body", "This link is password-protected.")</p>
+            <input type="password" class="edit-input" autocomplete="current-password"
+                   placeholder="@T("Web_PublicShare_Password_Placeholder", "Password")"
+                   @bind="_passwordInput" @bind:event="oninput" @onkeydown="OnPasswordKeyDown" />
+            @if (_passwordError is not null)
+            {
+                <div class="error-banner">@_passwordError</div>
+            }
+            <button class="btn-primary" @onclick="UnlockAsync">@T("Web_PublicShare_Unlock", "Open")</button>
+        </div>
+    </div>
+}
+else if (_state == State.Folder)
+{
+    <div class="public-share-browser">
+        <FileBrowser VM="Vm"
+                     ShareName="@_shareName"
+                     InPlaceNavigation="true"
+                     ShareRoute="@($"/shared/{Token}")"
+                     OverviewRoute="@($"/shared/{Token}")"
+                     ShareDisplayName="@_link!.DisplayName" />
+    </div>
+}
+else if (_state == State.File)
+{
+    <div class="public-share-shell">
+        <div class="public-share-card">
+            <div class="public-share-icon">@Assets.SVG("download.svg", new SvgOptions(Width: 32, Height: 32))</div>
+            <h1>@_link!.DisplayName</h1>
+            <button class="btn-primary" @onclick="DownloadFileAsync">@T("Web_PublicShare_Download", "Download")</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Token { get; set; } = "";
+    [Parameter] public string? SubPath { get; set; }
+
+    private enum State { Loading, NotFound, Unavailable, Password, Folder, File }
+    private State _state = State.Loading;
+
+    private ShareLink? _link;
+    private string _shareName = "";
+    private bool _unlocked;
+    private string? _passwordInput;
+    private string? _passwordError;
+
+    private static string T(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Anything not found under /shared (missing/blank token, unknown token, a resolution
+        // error, or a missing/disabled share) always lands on the "link unavailable" page.
+        try
+        {
+            if (string.IsNullOrWhiteSpace(Token)) { _state = State.NotFound; return; }
+
+            // Nothing may follow the token: a share link is addressed only by "/shared/{token}".
+            // Any trailing path (a guessed folder name, tampering) is always unavailable — the
+            // browser navigates folders in place, so a legitimate visit never carries one.
+            if (!string.IsNullOrWhiteSpace(SubPath)) { _state = State.NotFound; return; }
+
+            _link = await ShareLinks.GetByTokenAsync(Token);
+            if (_link is null) { _state = State.NotFound; return; }
+
+            if (!_link.IsWindowOpen(DateTime.UtcNow)) { _state = State.Unavailable; return; }
+
+            var share = await Shares.GetByIdAsync(_link.ShareId);
+            if (share is null || !share.IsEnabled) { _state = State.Unavailable; return; }
+            _shareName = share.Name;
+
+            if (_link.PasswordHash is not null && !_unlocked) { _state = State.Password; return; }
+
+            if (_link.IsDirectory)
+            {
+                Vm.Initialize(_link);
+                _state = State.Folder;
+            }
+            else
+            {
+                _state = State.File;
+            }
+        }
+        catch
+        {
+            _state = State.NotFound;
+        }
+    }
+
+    private async Task OnPasswordKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await UnlockAsync();
+    }
+
+    private Task UnlockAsync()
+    {
+        if (_link is null) return Task.CompletedTask;
+
+        var (ok, retryAfter) = ShareLinks.VerifyPassword(_link, _passwordInput);
+        if (ok)
+        {
+            _unlocked = true;
+            _passwordError = null;
+            _passwordInput = null;
+            _state = _link.IsDirectory ? State.Folder : State.File;
+            if (_link.IsDirectory) Vm.Initialize(_link);
+        }
+        else
+        {
+            _passwordError = retryAfter > TimeSpan.Zero
+                ? string.Format(T("Web_PublicShare_Password_Locked", "Too many attempts. Try again in {0} minutes."),
+                    Math.Max(1, (int)Math.Ceiling(retryAfter.TotalMinutes)))
+                : T("Web_PublicShare_Password_Wrong", "Wrong password.");
+        }
+        return Task.CompletedTask;
+    }
+
+    private async Task DownloadFileAsync()
+    {
+        if (_link is null) return;
+        var rel = ShareRelativePath.Normalize(_link.RootRelativePath);
+        var ticket = ShareLinks.IssueTicket(_link, new[] { rel }, zip: false, downloadName: _link.DisplayName);
+        var url = "/api/public/download?ticket=" + Uri.EscapeDataString(ticket);
+        await JS.InvokeVoidAsync("filePreview.downloadFromUrl", url, _link.DisplayName);
+    }
+}

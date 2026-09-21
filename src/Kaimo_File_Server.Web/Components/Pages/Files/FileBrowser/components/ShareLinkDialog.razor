@@ -1,0 +1,262 @@
+@using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Services
+@inherits AppComponentBase
+@inject IJSRuntime JS
+@inject ShareLinkService ShareLinks
+
+@*
+    "Share as public link" dialog. Opened from the file-browser context menu for a single file
+    or folder when the user may manage share links. Collects the link policy (optional password,
+    base address, start/end, max accesses, max download rate), creates the link, then shows the
+    resulting URL with a copy button.
+*@
+@if (_show && _target is not null)
+{
+    <div class="modal-backdrop" @onclick="Close">
+        <div class="properties-dialog sharelink-dialog" @onclick:stopPropagation="true">
+
+            <div class="properties-header">
+                <span class="properties-header-icon">
+                    @Assets.SVG("share.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)"))
+                </span>
+                <span class="properties-header-name" title="@_target.Name">@_target.Name</span>
+                <button class="btn-icon" title="@Resources.Web_Button_Close" @onclick="Close">
+                    @Assets.SVG("close.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                </button>
+            </div>
+
+            <div class="properties-body sharelink-body">
+                @if (_createdUrl is null)
+                {
+                    <label class="hash-field-label">@T("Web_ShareLink_Name", "Link name")</label>
+                    <input type="text" class="edit-input"
+                           placeholder="@T("Web_ShareLink_NamePlaceholder", "Name shown to visitors")"
+                           @bind="_name" @bind:event="oninput" />
+
+                    <label class="hash-field-label">@T("Web_ShareLink_Password", "Password (optional)")</label>
+                    <div class="sharelink-password">
+                        <input type="@(_showPassword ? "text" : "password")" class="edit-input" autocomplete="new-password"
+                               placeholder="@T("Web_ShareLink_PasswordPlaceholder", "Leave empty for no password")"
+                               @bind="_password" @bind:event="oninput" />
+                        <button type="button" class="btn-secondary sharelink-reveal"
+                                title="@T("Web_ShareLink_ShowPassword", "Show / hide")"
+                                @onclick="() => _showPassword = !_showPassword">
+                            @Assets.SVG(_showPassword ? "eye-off.svg" : "eye.svg", new SvgOptions(Width: 16, Height: 16))
+                        </button>
+                    </div>
+
+                    @if (_settings.BaseAddresses.Count > 0)
+                    {
+                        <label class="hash-field-label">@T("Web_ShareLink_BaseAddress", "Address")</label>
+                        <select class="edit-input" value="@_baseAddress" @onchange="OnBaseChanged"
+                                disabled="@(!_settings.AllowUserChosenAddress)">
+                            <option value="">@($"{T("Web_ShareLink_DefaultAddress", "Default")}: {_settings.DefaultAddress}")</option>
+                            @if (_settings.AllowUserChosenAddress)
+                            {
+                                @foreach (var address in _settings.BaseAddresses)
+                                {
+                                    <option value="@address">@address</option>
+                                }
+                            }
+                        </select>
+                    }
+
+                    <div class="sharelink-row">
+                        <div class="sharelink-col">
+                            <label class="hash-field-label">@T("Web_ShareLink_Start", "Start")</label>
+                            <input type="datetime-local" class="edit-input" @bind="_startsAt" />
+                        </div>
+                        <div class="sharelink-col">
+                            <label class="hash-field-label">@T("Web_ShareLink_End", "End")</label>
+                            <input type="datetime-local" class="edit-input" @bind="_endsAt" />
+                        </div>
+                    </div>
+
+                    <div class="sharelink-row">
+                        <div class="sharelink-col">
+                            <label class="hash-field-label">@T("Web_ShareLink_MaxAccess", "Max downloads")</label>
+                            <input type="number" min="1" class="edit-input"
+                                   placeholder="@T("Web_ShareLink_Unlimited", "Unlimited")" @bind="_maxAccess" />
+                        </div>
+                        <div class="sharelink-col">
+                            <label class="hash-field-label">@T("Web_ShareLink_MaxRate", "Max rate")</label>
+                            <div class="sharelink-rate">
+                                <input type="number" min="1" class="edit-input"
+                                       placeholder="@T("Web_ShareLink_Unlimited", "Unlimited")" @bind="_rateValue" />
+                                <select class="edit-input" @bind="_rateUnit">
+                                    <option value="KB">KB/s</option>
+                                    <option value="MB">MB/s</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <label class="hash-field-label">@T("Web_ShareLink_Url", "Public link")</label>
+                    <div class="hash-value-row">
+                        <textarea class="edit-input properties-mono hash-value" readonly rows="2">@PreviewUrl()</textarea>
+                        <button class="btn-secondary hash-copy" type="button" @onclick="() => CopyTextAsync(PreviewUrl())">
+                            @(_copied ? T("Web_ShareLink_Copied", "Copied") : T("Web_ShareLink_Copy", "Copy"))
+                        </button>
+                    </div>
+
+                    @if (_error is not null)
+                    {
+                        <div class="error-banner">@_error</div>
+                    }
+
+                    <div class="sharelink-actions">
+                        <button class="btn-secondary" @onclick="Close">@Resources.Web_Button_Cancel</button>
+                        <button class="btn-primary" disabled="@(_busy || string.IsNullOrWhiteSpace(_name))" @onclick="CreateAsync">
+                            @T("Web_ShareLink_Create", "Create link")
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <label class="hash-field-label">@T("Web_ShareLink_Url", "Public link")</label>
+                    <div class="hash-value-row">
+                        <textarea class="edit-input properties-mono hash-value" readonly rows="2">@_createdUrl</textarea>
+                        <button class="btn-secondary hash-copy" type="button" @onclick="() => CopyTextAsync(_createdUrl!)">
+                            @(_copied ? T("Web_ShareLink_Copied", "Copied") : T("Web_ShareLink_Copy", "Copy"))
+                        </button>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(_password))
+                    {
+                        <label class="hash-field-label">@T("Web_ShareLink_PasswordSet", "Password")</label>
+                        <div class="hash-value-row">
+                            <input type="text" class="edit-input properties-mono hash-value" readonly value="@_password" />
+                            <button class="btn-secondary hash-copy" type="button" @onclick="() => CopyTextAsync(_password!)">
+                                @T("Web_ShareLink_Copy", "Copy")
+                            </button>
+                        </div>
+                    }
+
+                    <div class="sharelink-actions">
+                        <button class="btn-primary" @onclick="Close">@Resources.Web_Button_Close</button>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IFileBrowserViewModel VM { get; set; } = default!;
+
+    private bool _show;
+    public bool IsOpen => _show;
+
+    private FileMetadata? _target;
+    private ShareLinkSettings _settings = ShareLinkSettings.Default();
+
+    // Reserved when the dialog opens so the URL is known before "Create" is pressed.
+    private string _token = "";
+
+    private string _name = "";
+    private string? _password;
+    private bool _showPassword;
+    private string _baseAddress = "";
+    private DateTime? _startsAt;
+    private DateTime? _endsAt;
+    private int? _maxAccess;
+    private double? _rateValue;
+    private string _rateUnit = "MB";
+
+    private string? _createdUrl;
+    private bool _copied;
+    private bool _busy;
+    private string? _error;
+
+    private static string T(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    public async Task Open(FileMetadata target)
+    {
+        _target = target;
+        _name = "";
+        _password = null;
+        _showPassword = false;
+        _baseAddress = "";
+        _startsAt = null;
+        _endsAt = null;
+        _maxAccess = null;
+        _rateValue = null;
+        _rateUnit = "MB";
+        _createdUrl = null;
+        _copied = false;
+        _busy = false;
+        _error = null;
+        _settings = await ShareLinks.GetSettingsAsync();
+        _token = ShareLinks.GenerateToken();
+        _show = true;
+        StateHasChanged();
+    }
+
+    // Live URL preview, so the link is known before the link is created.
+    private string PreviewUrl()
+        => ShareLinks.BuildUrl(_token, string.IsNullOrEmpty(_baseAddress) ? null : _baseAddress, _settings);
+
+    public void Close()
+    {
+        _show = false;
+        _target = null;
+        StateHasChanged();
+    }
+
+    private void OnBaseChanged(ChangeEventArgs e) => _baseAddress = e.Value?.ToString() ?? "";
+
+    private async Task CreateAsync()
+    {
+        if (_target is null || VM.CurrentBrowserShare is null) return;
+
+        _busy = true;
+        _error = null;
+
+        long? maxBps = _rateValue is > 0
+            ? (long)(_rateValue.Value * (_rateUnit == "MB" ? 1_000_000 : 1_000))
+            : null;
+
+        var request = new CreateShareLinkRequest(
+            ShareId: VM.CurrentBrowserShare.Id,
+            RootRelativePath: VM.ShareRelativeOf(_target),
+            IsDirectory: _target.IsDirectory,
+            DisplayName: _name.Trim(),
+            Password: string.IsNullOrWhiteSpace(_password) ? null : _password,
+            BaseAddress: string.IsNullOrEmpty(_baseAddress) ? null : _baseAddress,
+            StartsAtUtc: _startsAt?.ToUniversalTime(),
+            ExpiresAtUtc: _endsAt?.ToUniversalTime(),
+            MaxAccessCount: _maxAccess is > 0 ? _maxAccess : null,
+            MaxBytesPerSecond: maxBps,
+            Token: _token);
+
+        try
+        {
+            var link = await ShareLinks.CreateAsync(request);
+            if (link is null)
+                _error = T("Web_ShareLink_NoPermission", "You are not allowed to create a link for this item.");
+            else
+                _createdUrl = ShareLinks.BuildUrl(link, _settings);
+        }
+        catch
+        {
+            _error = T("Web_ShareLink_Error", "Could not create the link.");
+        }
+        finally
+        {
+            _busy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CopyTextAsync(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+        _copied = true;
+        StateHasChanged();
+    }
+}

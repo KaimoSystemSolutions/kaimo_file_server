@@ -36,6 +36,7 @@
         EditShareSettings = 1L << 26,
         ManageShareAccess = 1L << 27,  // share-level access: enable/disable + visibility (hidden)
         ManageShareAcls = 1L << 28,  // manage file/folder ACLs within shares (incl. share root)
+        ManageShareLinks = 1L << 56,  // create/manage anonymous public download links for share content
 
         // -- Department Management --
         EditDepartment = 1L << 32,
@@ -74,7 +75,7 @@
         GroupAdmin = CreateGroups | DeleteGroups | ManageGroupMembers,
 
         ShareAdmin = CreateShares | DeleteShares | EditShareSettings
-                   | ManageShareAccess | ManageShareAcls,
+                   | ManageShareAccess | ManageShareAcls | ManageShareLinks,
 
         DepartmentAdmin = UserAdmin | GroupAdmin | AssignGroups
                         | ManageShareAccess | ManageShareAcls
