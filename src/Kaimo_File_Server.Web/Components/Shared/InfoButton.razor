@@ -17,10 +17,12 @@
 @inherits AppComponentBase
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.DynamicHelpers
+@inject IJSRuntime JS
 
 <span class="info-btn @(_open ? "info-btn--open" : null) @Class" @attributes="AdditionalAttributes">
     <button type="button"
             class="info-btn__trigger"
+            @ref="_triggerRef"
             aria-label="@(AriaLabel ?? DefaultLabel)"
             @attributes="TriggerAttrs()"
             @onclick="Toggle"
@@ -28,8 +30,8 @@
             @onclick:preventDefault="true"
             @onkeydown="OnKeyDown">
         @* Round caps are what make info.svg's zero-length dot render — without them the
-           "i" is just a thin bar. Stroke is deliberately heavy for legibility at this size. *@
-        @Assets.SVG("info.svg", new SvgOptions(Width: IconSize, Height: IconSize, StrokeWidth: 5f,
+           "i" is just a thin bar. Stroke 2 matches the icon's 24×24 grid for a thin outline. *@
+        @Assets.SVG("info.svg", new SvgOptions(Width: IconSize, Height: IconSize, StrokeWidth: 2f,
             Style: "stroke-linecap:round;stroke-linejoin:round"))
         @if (IsTooltip)
         {
@@ -40,7 +42,7 @@
     @if (!IsTooltip && _open)
     {
         <div class="info-btn__backdrop" @onclick="Close"></div>
-        <div class="info-btn__pop" role="dialog" aria-label="@(Title ?? AriaLabel ?? DefaultLabel)">
+        <div class="info-btn__pop" @ref="_popRef" role="dialog" aria-label="@(Title ?? AriaLabel ?? DefaultLabel)">
             <div class="info-btn__pop-head">
                 @if (!string.IsNullOrEmpty(Title))
                 {
@@ -80,14 +82,28 @@
 
     private readonly string _id = "info-" + Guid.NewGuid().ToString("N")[..8];
     private bool _open;
+    private bool _placed;
+    private ElementReference _triggerRef;
+    private ElementReference _popRef;
 
     private bool IsTooltip => ChildContent is null;
     private string DefaultLabel => Text2("Web_Common_Info", "More information");
     private string CloseLabel => Text2("Web_Common_Close", "Close");
 
-    private void Toggle() => _open = !_open;
-    private void Close() => _open = false;
-    private void OnKeyDown(KeyboardEventArgs e) { if (e.Key == "Escape") { _open = false; } }
+    private void Toggle() { _open = !_open; if (!_open) _placed = false; }
+    private void Close() { _open = false; _placed = false; }
+    private void OnKeyDown(KeyboardEventArgs e) { if (e.Key == "Escape") { Close(); } }
+
+    // Position the popover into the viewport once it has rendered (top layer +
+    // flip/clamp). Tooltips are positioned by infoPopover.js on hover/focus.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!IsTooltip && _open && !_placed)
+        {
+            _placed = true;
+            await JS.InvokeVoidAsync("infoPopover.place", _popRef, _triggerRef);
+        }
+    }
 
     // Runtime lookup so newly added keys need no Resources.Designer regeneration.
     private static string Text2(string key, string fallback)
