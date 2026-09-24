@@ -145,18 +145,12 @@ builder.Services
 builder.Services.AddSingleton<WebDavOptions>();
 builder.Services.AddSingleton<WebDavLockManager>();
 
-// Honor X-Forwarded-Proto so `services.webdav.requireHttps` sees the real scheme
-// behind a TLS-terminating reverse proxy. Trust is scoped to the deployment's
-// front proxy (see the admin guide); the known-proxy list is cleared so a
-// containerized proxy on an arbitrary address is honored.
-builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders =
-        Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
-        | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor;
-    options.KnownNetworks.Clear();
-    options.KnownProxies.Clear();
-});
+// Honor X-Forwarded-Proto/-For so `services.webdav.requireHttps` sees the real
+// scheme and the login lockout sees the real client behind a reverse proxy.
+// Only peers in ForwardedHeaders:KnownNetworks/KnownProxies are trusted
+// (default: loopback + private ranges, i.e. a proxy in the same Docker network).
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(
+    options => ForwardedHeadersSetup.Configure(options, builder.Configuration));
 
 // Issues/rotates client-API access + refresh tokens.
 builder.Services.AddScoped<ApiTokenService>();
@@ -272,6 +266,7 @@ builder.Services.AddScoped<FileBrowserClipboardService>();
 
 builder.Services.AddScoped<SettingsViewModel>();
 builder.Services.AddScoped<LogViewerViewModel>();
+builder.Services.AddScoped<ClientConnectionInfo>();
 builder.Services.AddScoped<LoginViewModel>();
 builder.Services.AddScoped<ShareBrowserViewModel>();
 builder.Services.AddScoped<FileBrowserViewModel>();

@@ -50,6 +50,8 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <summary>
         /// Merges runtime-only cloud-sync state into the latest persisted share
         /// aggregate without overwriting concurrent share or mapping edits.
+        /// Secret credential values (refresh/access tokens) are never written to
+        /// the plaintext mapping; they belong to the credential vault only.
         /// </summary>
         /// <returns>False when the share or local mapping no longer exists.</returns>
         Task<bool> UpdateCloudSyncRuntimeStateAsync(

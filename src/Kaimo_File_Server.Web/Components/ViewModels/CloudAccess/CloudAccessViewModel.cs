@@ -345,8 +345,10 @@ public sealed class CloudAccessViewModel
     /// Updates a configured protocol connection in place: display name, connection
     /// settings, and — for username/password providers — the stored credentials.
     /// Leaving the password empty preserves the existing one so the operator can
-    /// adjust the username, domain, or settings without re-entering it. The
-    /// provider, department, and any SSH key material stay unchanged.
+    /// adjust the username or domain without re-entering it — but only while the
+    /// connection settings (host, URL, share, …) are unchanged: otherwise the stored
+    /// password would be sent to a target it was never meant for. The provider,
+    /// department, and any SSH key material stay unchanged.
     /// </summary>
     public async Task UpdateConfiguredConnectionAsync(
         Guid connectionId,
@@ -370,6 +372,11 @@ public sealed class CloudAccessViewModel
             throw new ArgumentException(R("Web_CloudAccess_InvalidConnectionName"));
         if (string.IsNullOrWhiteSpace(settingsJson) || settingsJson.Length > 64 * 1024)
             throw new ArgumentException(R("Web_ExternalStorage_InvalidSettings"));
+
+        if (connection.AuthorizationMode == StorageAuthorizationMode.UsernamePassword
+            && string.IsNullOrEmpty(password)
+            && !SameSettings(connection.SettingsJson, settingsJson))
+            throw new ArgumentException(R("Web_ExternalStorage_PasswordRequiredForChangedTarget"));
 
         connection.Name = normalizedName;
         connection.SettingsJson = settingsJson;
@@ -407,6 +414,21 @@ public sealed class CloudAccessViewModel
         connection.LastErrorCode = health.IsHealthy ? null : health.Code;
         await _connections.SaveAsync(connection);
         await LoadAsync();
+    }
+
+    /// <summary>Compares settings semantically, so reformatted but equal JSON is not a change.</summary>
+    internal static bool SameSettings(string? stored, string submitted)
+    {
+        try
+        {
+            return System.Text.Json.Nodes.JsonNode.DeepEquals(
+                System.Text.Json.Nodes.JsonNode.Parse(stored ?? "null"),
+                System.Text.Json.Nodes.JsonNode.Parse(submitted));
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return string.Equals(stored, submitted, StringComparison.Ordinal);
+        }
     }
 
     /// <summary>

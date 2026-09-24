@@ -75,7 +75,7 @@ public class LogViewerComponentTests
 
         // Enable "Information" (the first option) — the info row appears, error stays.
         cut.Find(".multi-select .multi-select-display").Click();
-        cut.FindAll(".multi-select-dropdown .multi-select-option input")[0].Change(true);
+        cut.Find(".multi-select-dropdown .multi-select-option input").Change(true);
         cut.WaitForAssertion(() => Assert.Contains("info-msg", cut.Markup), TimeSpan.FromSeconds(5));
         Assert.Contains("err-msg", cut.Markup);
     }

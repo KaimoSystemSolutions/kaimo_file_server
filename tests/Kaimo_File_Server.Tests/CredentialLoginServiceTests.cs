@@ -186,4 +186,86 @@ public class CredentialLoginServiceTests
         var result = await _sut.AuthenticateAsync(Username, CorrectPassword);
         Assert.Equal(LoginOutcome.Success, result.Outcome);
     }
+
+    // ─────────────── Parallel attempts ───────────────
+
+    [Fact]
+    public async Task ParallelWrongPasswords_VerifyAtMostMaxAttemptsHashes()
+    {
+        ArrangeExistingUser();
+        // Hold every request inside the user lookup, i.e. after the lockout
+        // gate, so all of them race the gate before the first failure lands.
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var user = MakeUser();
+        _users.Setup(r => r.GetByUsernameAsync(Username))
+            .Returns(async () => { await gate.Task; return user; });
+        int verifications = 0;
+        _passwords.Setup(p => p.VerifyPassword("wrong", UserHash))
+            .Returns(() => { Interlocked.Increment(ref verifications); return false; });
+
+        var attempts = Enumerable.Range(0, 20)
+            .Select(_ => _sut.AuthenticateAsync(Username, "wrong", "198.51.100.7"))
+            .ToList();
+        gate.SetResult();
+        var results = await Task.WhenAll(attempts);
+
+        Assert.True(verifications <= MaxAttempts, $"{verifications} hashes verified");
+        Assert.True(results.Count(r => r.Outcome == LoginOutcome.LockedOut) >= 20 - MaxAttempts);
+    }
+
+    // ─────────────── Lockout per (user, client address) ───────────────
+
+    [Fact]
+    public async Task FailuresFromOneAddress_DoNotLockOutOtherAddresses()
+    {
+        ArrangeExistingUser();
+
+        for (int i = 0; i < MaxAttempts; i++)
+            await _sut.AuthenticateAsync(Username, "wrong", "203.0.113.9");
+        Assert.Equal(LoginOutcome.LockedOut,
+            (await _sut.AuthenticateAsync(Username, CorrectPassword, "203.0.113.9")).Outcome);
+
+        // The real user on another address is not affected by the attacker.
+        Assert.Equal(LoginOutcome.Success,
+            (await _sut.AuthenticateAsync(Username, CorrectPassword, "192.0.2.44")).Outcome);
+    }
+
+    [Fact]
+    public void ThrottleKey_IsCaseInsensitiveUserPlusAddress()
+    {
+        Assert.Equal("alice|10.0.0.1", CredentialLoginService.ThrottleKey("Alice", "10.0.0.1"));
+        Assert.Equal("alice", CredentialLoginService.ThrottleKey("ALICE", null));
+        Assert.Equal("alice", CredentialLoginService.ThrottleKey("alice", " "));
+    }
+
+    // ─────────────── Reservations never leak ───────────────
+
+    [Fact]
+    public async Task DisabledAccount_WithCorrectPassword_NeverLocksOut()
+    {
+        ArrangeExistingUser(enabled: false);
+
+        for (int i = 0; i < MaxAttempts * 3; i++)
+            Assert.Equal(LoginOutcome.AccountDisabled,
+                (await _sut.AuthenticateAsync(Username, CorrectPassword)).Outcome);
+    }
+
+    [Fact]
+    public async Task RepositoryFailure_DoesNotConsumeLockoutBudget()
+    {
+        ArrangeExistingUser();
+        var user = MakeUser();
+        int calls = 0;
+        _users.Setup(r => r.GetByUsernameAsync(Username))
+            .Returns(() => ++calls <= MaxAttempts * 2
+                ? Task.FromException<User?>(new InvalidOperationException("db down"))
+                : Task.FromResult<User?>(user));
+
+        for (int i = 0; i < MaxAttempts * 2; i++)
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => _sut.AuthenticateAsync(Username, CorrectPassword));
+
+        Assert.Equal(LoginOutcome.Success,
+            (await _sut.AuthenticateAsync(Username, CorrectPassword)).Outcome);
+    }
 }

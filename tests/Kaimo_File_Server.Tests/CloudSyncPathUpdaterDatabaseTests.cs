@@ -80,7 +80,8 @@ public sealed class CloudSyncPathUpdaterDatabaseTests : DatabaseTestBase
         var folder = persisted.CloudSettings.Folders["projects"];
         Assert.Equal(SyncMode.Pull, folder.Mode);
         Assert.Equal(completedAt, folder.LastSync);
-        Assert.Equal("rotated", folder.Data["refreshToken"]);
+        // Rotated tokens go to the credential vault only, never to plaintext JSON.
+        Assert.False(folder.Data.ContainsKey("refreshToken"));
     }
 
     [Fact]

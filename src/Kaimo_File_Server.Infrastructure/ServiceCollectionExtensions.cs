@@ -306,6 +306,8 @@ namespace Kaimo_File_Server.Infrastructure
         /// migration state (no pending migrations) until the Host is done. This is
         /// the single, orchestration-independent readiness guarantee — it works
         /// regardless of Docker Compose ordering. Times out after 10 minutes.
+        /// Then verifies this process holds the same NT-hash key as the stored
+        /// data (<see cref="Security.NtHashKeyCanary"/>) and throws otherwise.
         /// </summary>
         public static async Task WaitForDatabaseReadyAsync(this IHost host)
         {
@@ -325,7 +327,7 @@ namespace Kaimo_File_Server.Infrastructure
                     if (pending.Count == 0)
                     {
                         logger.LogInformation(LogEvents.DatabaseReady, LogMessages.DatabaseReady);
-                        return;
+                        break;
                     }
 
                     logger.LogInformation(
@@ -344,6 +346,15 @@ namespace Kaimo_File_Server.Infrastructure
                         "Ensure the Host process is running and able to migrate.");
 
                 await Task.Delay(pollDelay);
+            }
+
+            // Outside the retry loop: a key mismatch must stop the process, not be retried.
+            using (var scope = host.Services.CreateScope())
+            {
+                await Security.NtHashKeyCanary.VerifyAsync(
+                    scope.ServiceProvider.GetRequiredService<ApplicationDbContext>(),
+                    scope.ServiceProvider.GetRequiredService<INtHashProtector>(),
+                    logger);
             }
         }
 

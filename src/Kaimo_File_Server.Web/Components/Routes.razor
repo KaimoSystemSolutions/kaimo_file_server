@@ -36,4 +36,10 @@
 
 @code {
     [Inject] private NavigationManager Nav { get; set; } = default!;
+    [Inject] private ClientConnectionInfo ClientConnection { get; set; } = default!;
+
+    /// <summary>Client address captured by App.razor; see <see cref="ClientConnectionInfo"/>.</summary>
+    [Parameter] public string? ClientAddress { get; set; }
+
+    protected override void OnInitialized() => ClientConnection.RemoteAddress = ClientAddress;
 }

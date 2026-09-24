@@ -392,6 +392,23 @@ internal sealed class ProtocolStorageSession(
 internal static class ProtocolTemporaryFile
 {
     public static string CreatePath() => Path.Combine(Path.GetTempPath(), $"kaimo-protocol-{Guid.NewGuid():N}");
+
+    /// <summary>A read/write owner-only temp file that deletes itself on dispose.</summary>
+    public static FileStream CreateSpool()
+    {
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.ReadWrite,
+            Share = FileShare.None,
+            BufferSize = 65536,
+            Options = FileOptions.Asynchronous | FileOptions.DeleteOnClose
+        };
+        // The setter itself throws on Windows, even for null.
+        if (!OperatingSystem.IsWindows())
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        return new FileStream(CreatePath(), options);
+    }
     public static FileStream OpenDeleteOnClose(string path)
         => new(path, FileMode.Open, FileAccess.Read, FileShare.Read, 65536,
             FileOptions.Asynchronous | FileOptions.SequentialScan | FileOptions.DeleteOnClose);

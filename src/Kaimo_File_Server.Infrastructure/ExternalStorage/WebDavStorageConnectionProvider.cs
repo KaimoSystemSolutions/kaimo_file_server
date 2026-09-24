@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Text;
 using System.Xml.Linq;
 using Kaimo_File_Server.Core.Domain;
@@ -93,21 +94,79 @@ public sealed class WebDavStorageConnectionProvider(
         string username,
         string password)
     {
-        var handler = new SocketsHttpHandler
+        // No whole-request timeout: it would also cap large uploads. The store
+        // applies WebDavRemoteFileStore.DefaultIdleTimeout per request instead.
+        var client = new HttpClient(CreateHandler(), disposeHandler: true)
         {
-            ConnectTimeout = TimeSpan.FromSeconds(15),
-            PooledConnectionLifetime = TimeSpan.FromMinutes(10),
-            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
-        };
-        var client = new HttpClient(handler, disposeHandler: true)
-        {
-            Timeout = TimeSpan.FromSeconds(120)
+            Timeout = Timeout.InfiniteTimeSpan
         };
         byte[] credentialBytes = Encoding.UTF8.GetBytes($"{username}:{password}");
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Basic", Convert.ToBase64String(credentialBytes));
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
         return client;
+    }
+
+    /// <summary>
+    /// The server URL is operator input, so the client must not become a proxy
+    /// into this host: the address is checked when the socket connects (after DNS,
+    /// so a rebinding name cannot slip through), and redirects are not followed
+    /// because they would bypass that check. Private LAN addresses stay allowed —
+    /// a NAS on the local network is the typical WebDAV target.
+    /// </summary>
+    internal static SocketsHttpHandler CreateHandler() => new()
+    {
+        ConnectTimeout = TimeSpan.FromSeconds(15),
+        PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+        AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+        AllowAutoRedirect = false,
+        ConnectCallback = ConnectToAllowedAddressAsync
+    };
+
+    private static async ValueTask<Stream> ConnectToAllowedAddressAsync(
+        SocketsHttpConnectionContext context, CancellationToken cancellationToken)
+    {
+        IPAddress[] addresses = IPAddress.TryParse(context.DnsEndPoint.Host, out IPAddress? literal)
+            ? [literal]
+            : await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken);
+        IPAddress[] allowed = addresses.Where(address => !IsBlockedAddress(address)).ToArray();
+        if (allowed.Length == 0)
+            throw new HttpRequestException(
+                "The WebDAV server resolves only to loopback, link-local or otherwise non-routable addresses.");
+
+        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+        try
+        {
+            await socket.ConnectAsync(allowed, context.DnsEndPoint.Port, cancellationToken);
+            return new NetworkStream(socket, ownsSocket: true);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Loopback reaches this container's own services, link-local includes the
+    /// cloud metadata endpoint (169.254.169.254); neither is a WebDAV server.
+    /// </summary>
+    internal static bool IsBlockedAddress(IPAddress address)
+    {
+        if (address.IsIPv4MappedToIPv6)
+            address = address.MapToIPv4();
+        if (IPAddress.IsLoopback(address)
+            || address.Equals(IPAddress.Any)
+            || address.Equals(IPAddress.IPv6Any)
+            || address.IsIPv6LinkLocal
+            || address.IsIPv6Multicast)
+            return true;
+        if (address.AddressFamily != AddressFamily.InterNetwork)
+            return false;
+        byte[] bytes = address.GetAddressBytes();
+        return bytes[0] == 0                         // 0.0.0.0/8 "this network"
+               || (bytes[0] == 169 && bytes[1] == 254) // link-local / metadata
+               || bytes[0] >= 224;                    // multicast and reserved
     }
 }
 
@@ -130,9 +189,18 @@ internal sealed class WebDavStorageSession(
     }
 }
 
-internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl) : IRemoteFileStore
+internal sealed class WebDavRemoteFileStore(
+    HttpClient client, string serverUrl, TimeSpan? idleTimeout = null) : IRemoteFileStore
 {
     private static readonly XNamespace DavNamespace = "DAV:";
+
+    /// <summary>
+    /// Longest silence tolerated from the server: for plain requests until the
+    /// response arrives, for uploads between two chunks read from the source, so
+    /// a multi-GB PUT is not cut off while a stalled connection still fails.
+    /// </summary>
+    internal static readonly TimeSpan DefaultIdleTimeout = TimeSpan.FromSeconds(120);
+    private readonly TimeSpan _idleTimeout = idleTimeout ?? DefaultIdleTimeout;
 
     public async Task<IReadOnlyList<RemoteStorageItem>> ListAsync(
         string path, CancellationToken cancellationToken = default)
@@ -158,7 +226,7 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
         };
         request.Headers.Add("Depth", "1");
 
-        using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken);
         await EnsureSuccessOrThrowAsync(response, cancellationToken);
 
         string xml = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -168,7 +236,8 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
     public async Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
     {
         Uri requestUri = ResolveFileUri(path);
-        HttpResponseMessage response = await client.GetAsync(requestUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        HttpResponseMessage response = await SendAsync(
+            new HttpRequestMessage(HttpMethod.Get, requestUri), cancellationToken, HttpCompletionOption.ResponseHeadersRead);
         try
         {
             await EnsureSuccessOrThrowAsync(response, cancellationToken);
@@ -186,13 +255,15 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
         string path, Stream content, bool overwrite, CancellationToken cancellationToken = default)
     {
         Uri requestUri = ResolveFileUri(path);
+        using var idle = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        idle.CancelAfter(_idleTimeout);
         using var request = new HttpRequestMessage(HttpMethod.Put, requestUri)
         {
-            Content = new StreamContent(content)
+            Content = new StreamContent(new IdleTimeoutReadStream(content, idle, _idleTimeout))
         };
         if (!overwrite)
             request.Headers.Add("If-None-Match", "*");
-        using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken, idle: idle);
         await EnsureSuccessOrThrowAsync(response, cancellationToken);
     }
 
@@ -200,7 +271,7 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
     {
         Uri requestUri = ResolveFileUri(path, trailingSlash: true);
         using var request = new HttpRequestMessage(new HttpMethod("MKCOL"), requestUri);
-        using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken);
         await EnsureSuccessOrThrowAsync(response, cancellationToken);
     }
 
@@ -210,7 +281,7 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
         using var request = new HttpRequestMessage(HttpMethod.Delete, requestUri);
         if (!recursive)
             request.Headers.Add("Depth", "0");
-        using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken);
         await EnsureSuccessOrThrowAsync(response, cancellationToken);
     }
 
@@ -222,8 +293,28 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
         using var request = new HttpRequestMessage(new HttpMethod("MOVE"), sourceUri);
         request.Headers.Add("Destination", destinationUri.AbsoluteUri);
         request.Headers.Add("Overwrite", "F");
-        using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken);
         await EnsureSuccessOrThrowAsync(response, cancellationToken);
+    }
+
+    private async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken,
+        HttpCompletionOption completion = HttpCompletionOption.ResponseContentRead,
+        CancellationTokenSource? idle = null)
+    {
+        using var timeout = idle is null ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken) : null;
+        timeout?.CancelAfter(_idleTimeout);
+        try
+        {
+            return await client.SendAsync(request, completion, (idle ?? timeout!).Token);
+        }
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Classified as connection_failed by the sync, not as a user cancel.
+            throw new TimeoutException(
+                $"The WebDAV server did not respond within {_idleTimeout.TotalSeconds:0} seconds.", exception);
+        }
     }
 
     internal IReadOnlyList<RemoteStorageItem> ParseMultiStatusResponse(string xml, string parentPath)
@@ -319,7 +410,8 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
         if (response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.MultiStatus)
             return;
 
-        string body = await response.Content.ReadAsStringAsync(cancellationToken);
+        // The response body is deliberately not included: it would echo content
+        // of whatever the configured URL points at into logs and the UI.
         throw response.StatusCode switch
         {
             HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden =>
@@ -334,9 +426,38 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
             HttpStatusCode.InsufficientStorage =>
                 new IOException("WebDAV server returned 507 Insufficient Storage."),
             _ => new IOException(
-                $"WebDAV request failed with status {(int)response.StatusCode}: {body[..Math.Min(body.Length, 500)]}")
+                $"WebDAV request failed with status {(int)response.StatusCode}.")
         };
     }
+}
+
+/// <summary>Restarts the idle timer each time the upload pulls the next chunk.</summary>
+internal sealed class IdleTimeoutReadStream(Stream inner, CancellationTokenSource idle, TimeSpan timeout) : Stream
+{
+    public override bool CanRead => inner.CanRead;
+    public override bool CanSeek => inner.CanSeek;
+    public override bool CanWrite => false;
+    public override long Length => inner.Length;
+    public override long Position { get => inner.Position; set => inner.Position = value; }
+    public override void Flush() { }
+    public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
+    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        idle.CancelAfter(timeout);
+        return inner.Read(buffer, offset, count);
+    }
+
+    public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        idle.CancelAfter(timeout);
+        return inner.ReadAsync(buffer, cancellationToken);
+    }
+
+    public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        => ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
 }
 
 internal sealed class ResponseOwningStream(Stream inner, HttpResponseMessage response) : Stream

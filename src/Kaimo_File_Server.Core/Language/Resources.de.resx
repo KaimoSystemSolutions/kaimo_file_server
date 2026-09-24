@@ -3763,7 +3763,10 @@
     <value>Geben Sie nur die dokumentierten Anbietereinstellungen ein. Secrets müssen im Zugangsdaten-Tresor gespeichert oder über einen absoluten Secret-Dateipfad referenziert werden.</value>
   </data>
   <data name="Web_ExternalStorage_PasswordKeepHint" xml:space="preserve">
-    <value>Leer lassen, um das aktuelle Passwort beizubehalten.</value>
+    <value>Leer lassen, um das aktuelle Passwort beizubehalten. Nach einer Änderung von Server oder Verbindungseinstellungen muss es erneut eingegeben werden.</value>
+  </data>
+  <data name="Web_ExternalStorage_PasswordRequiredForChangedTarget" xml:space="preserve">
+    <value>Die Verbindungseinstellungen wurden geändert. Geben Sie das Passwort erneut ein, damit das gespeicherte Passwort nicht an das neue Ziel gesendet wird.</value>
   </data>
   <data name="Web_ExternalStorage_SshKeyEditHint" xml:space="preserve">
     <value>Der SSH-Schlüssel und die Host-Verifizierung bleiben unverändert. Erstellen Sie die Verbindung neu, um den Schlüssel zu ersetzen.</value>

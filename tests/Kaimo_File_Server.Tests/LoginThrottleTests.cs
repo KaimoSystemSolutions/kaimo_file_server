@@ -110,6 +110,114 @@ public class LoginThrottleTests
         Assert.True(_sut.Check("alice").IsLockedOut);
     }
 
+    // ─────────────── Reservations (parallel attempts) ───────────────
+
+    [Fact]
+    public void BeginAttempt_OutstandingReservationsCannotExceedBudget()
+    {
+        // Three requests are inside the slow hash verify at the same time …
+        for (int i = 0; i < 3; i++)
+            Assert.False(_sut.BeginAttempt("alice", Policy).IsLockedOut);
+
+        // … so a fourth must not get past the gate, and the key is now locked.
+        var fourth = _sut.BeginAttempt("alice", Policy);
+        Assert.True(fourth.IsLockedOut);
+        Assert.True(_sut.Check("alice").IsLockedOut);
+    }
+
+    [Fact]
+    public void RegisterFailure_ConsumesReservationInsteadOfCountingTwice()
+    {
+        _sut.BeginAttempt("alice", Policy);
+        Assert.False(_sut.RegisterFailure("alice", Policy).IsLockedOut);
+        _sut.BeginAttempt("alice", Policy);
+        Assert.False(_sut.RegisterFailure("alice", Policy).IsLockedOut);
+
+        Assert.False(_sut.BeginAttempt("alice", Policy).IsLockedOut);
+        Assert.True(_sut.RegisterFailure("alice", Policy).IsLockedOut);
+    }
+
+    [Fact]
+    public void EndAttempt_ReleasesReservationWithoutCounting()
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            Assert.False(_sut.BeginAttempt("alice", Policy).IsLockedOut);
+            _sut.EndAttempt("alice");
+        }
+    }
+
+    [Fact]
+    public void Reset_AfterReservation_ClearsState()
+    {
+        _sut.RegisterFailure("alice", Policy);
+        _sut.RegisterFailure("alice", Policy);
+        _sut.BeginAttempt("alice", Policy);
+        _sut.Reset("alice");
+
+        Assert.False(_sut.BeginAttempt("alice", Policy).IsLockedOut);
+        Assert.False(_sut.RegisterFailure("alice", Policy).IsLockedOut);
+    }
+
+    [Fact]
+    public void BeginAttempt_ParallelCallers_OnlyBudgetPasses()
+    {
+        int passed = 0;
+        Parallel.For(0, 200, _ =>
+        {
+            if (!_sut.BeginAttempt("alice", Policy).IsLockedOut)
+                Interlocked.Increment(ref passed);
+        });
+        Assert.Equal(Policy.MaxAttempts, passed);
+    }
+
+    // ─────────────── Decay and memory bound ───────────────
+
+    [Fact]
+    public void FailuresOlderThanWindow_Decay()
+    {
+        _sut.RegisterFailure("alice", Policy);
+        _sut.RegisterFailure("alice", Policy);
+
+        _time.Advance(TimeSpan.FromMinutes(10));
+
+        // Two stale failures + one fresh one must not reach the threshold of 3.
+        Assert.False(_sut.RegisterFailure("alice", Policy).IsLockedOut);
+        Assert.False(_sut.RegisterFailure("alice", Policy).IsLockedOut);
+    }
+
+    [Fact]
+    public void ManyIdleKeys_AreSweptOnceExpired()
+    {
+        for (int i = 0; i < LoginThrottle.SweepThreshold; i++)
+            _sut.RegisterFailure($"guess-{i}", Policy);
+        Assert.Equal(LoginThrottle.SweepThreshold, _sut.TrackedKeyCount);
+
+        _time.Advance(TimeSpan.FromMinutes(11));
+        _sut.RegisterFailure("trigger", Policy);
+
+        Assert.True(_sut.TrackedKeyCount < 10, $"{_sut.TrackedKeyCount} keys left");
+    }
+
+    [Fact]
+    public void Sweep_KeepsLockedAndReservedKeys()
+    {
+        var longLock = new LoginThrottlePolicy(1, TimeSpan.FromHours(1));
+        _sut.RegisterFailure("locked", longLock);
+        _sut.BeginAttempt("reserved", Policy);
+        for (int i = 0; i < LoginThrottle.SweepThreshold; i++)
+            _sut.RegisterFailure($"guess-{i}", Policy);
+
+        _time.Advance(TimeSpan.FromMinutes(11));
+        _sut.RegisterFailure("trigger", Policy);
+
+        Assert.True(_sut.Check("locked").IsLockedOut);
+        // The reservation survived: two more reserve the rest of the budget.
+        _sut.BeginAttempt("reserved", Policy);
+        _sut.BeginAttempt("reserved", Policy);
+        Assert.True(_sut.BeginAttempt("reserved", Policy).IsLockedOut);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

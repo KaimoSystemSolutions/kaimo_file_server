@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +10,8 @@ namespace Kaimo_File_Server.Web.Controllers;
 [Route("api/system-logs")]
 public sealed class LogDownloadController(
     LogDownloadTokenService tokenService,
-    ILogArchiveReader reader) : ControllerBase
+    ILogArchiveReader reader,
+    DemoModeOptions demo) : ControllerBase
 {
     [HttpGet("download")]
     public async Task<IActionResult> Download(
@@ -17,6 +19,9 @@ public sealed class LogDownloadController(
         [FromQuery] string? format,
         CancellationToken cancellationToken)
     {
+        // Logs of a public demo contain other visitors' names and addresses.
+        if (demo.ReadOnly)
+            return StatusCode(StatusCodes.Status403Forbidden);
         if (string.IsNullOrWhiteSpace(token) || !tokenService.TryUnprotect(token, out var query))
             return Unauthorized();
 

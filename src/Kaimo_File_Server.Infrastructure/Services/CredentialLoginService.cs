@@ -45,56 +45,86 @@ public sealed class CredentialLoginService : ILoginService
         _config = config;
     }
 
-    public async Task<LoginResult> AuthenticateAsync(string username, string password)
+    public async Task<LoginResult> AuthenticateAsync(
+        string username, string password, string? remoteAddress = null)
     {
         var trimmed = (username ?? string.Empty).Trim();
-        var key = trimmed.ToLowerInvariant();
+        var key = ThrottleKey(trimmed, remoteAddress);
         password ??= string.Empty;
-
-        // 1. Reject early if already locked — without a DB lookup, so a locked
-        //    response is identical for existing and non-existing usernames.
-        var status = _throttle.Check(key);
-        if (status.IsLockedOut)
-            return LoginResult.LockedOut(status.RetryAfter);
 
         var policy = await ResolvePolicyAsync();
 
-        // No login without a password. An empty password is universally invalid and reveals
-        // nothing about whether the user exists, so reject it before any DB lookup but still
-        // count it as a failed attempt toward lockout.
-        if (password.Length == 0)
+        // 1. Reject early if already locked — without a DB lookup, so a locked
+        //    response is identical for existing and non-existing usernames. The
+        //    attempt is reserved atomically, so parallel requests cannot all pass
+        //    this gate while earlier ones are still inside the slow hash verify.
+        var status = _throttle.BeginAttempt(key, policy);
+        if (status.IsLockedOut)
+            return LoginResult.LockedOut(status.RetryAfter);
+
+        bool settled = false;
+        try
         {
-            var emptyPwFailure = _throttle.RegisterFailure(key, policy);
-            return emptyPwFailure.IsLockedOut
-                ? LoginResult.LockedOut(emptyPwFailure.RetryAfter)
-                : LoginResult.InvalidCredentials;
+            // No login without a password. An empty password is universally invalid and reveals
+            // nothing about whether the user exists, so reject it before any DB lookup but still
+            // count it as a failed attempt toward lockout.
+            if (password.Length == 0)
+            {
+                settled = true;
+                var emptyPwFailure = _throttle.RegisterFailure(key, policy);
+                return emptyPwFailure.IsLockedOut
+                    ? LoginResult.LockedOut(emptyPwFailure.RetryAfter)
+                    : LoginResult.InvalidCredentials;
+            }
+
+            var user = await _users.GetByUsernameAsync(trimmed);
+
+            // 2. Always verify against *some* hash so timing is independent of
+            //    whether the user exists.
+            var passwordOk = user is null
+                ? VerifyDummy(password)
+                : _passwords.VerifyPassword(password, user.PasswordHash);
+
+            if (user is null || !passwordOk)
+            {
+                settled = true;
+                var failure = _throttle.RegisterFailure(key, policy);
+                return failure.IsLockedOut
+                    ? LoginResult.LockedOut(failure.RetryAfter)
+                    : LoginResult.InvalidCredentials;
+            }
+
+            // 3. Valid credentials but the account is locked/disabled. Not a
+            //    brute-force signal, so it does not count toward the lockout
+            //    (the reservation is released in finally).
+            if (!user.IsEnabled)
+                return LoginResult.AccountDisabled;
+
+            // 4. Success — clear any accumulated failures for this key.
+            settled = true;
+            _throttle.Reset(key);
+            var context = await _contextFactory.CreateAsync(user);
+            return LoginResult.ForSuccess(context);
         }
-
-        var user = await _users.GetByUsernameAsync(trimmed);
-
-        // 2. Always verify against *some* hash so timing is independent of
-        //    whether the user exists.
-        var passwordOk = user is null
-            ? VerifyDummy(password)
-            : _passwords.VerifyPassword(password, user.PasswordHash);
-
-        if (user is null || !passwordOk)
+        finally
         {
-            var failure = _throttle.RegisterFailure(key, policy);
-            return failure.IsLockedOut
-                ? LoginResult.LockedOut(failure.RetryAfter)
-                : LoginResult.InvalidCredentials;
+            // Disabled accounts and infrastructure errors neither count nor leak
+            // a reservation that would otherwise shrink the budget forever.
+            if (!settled)
+                _throttle.EndAttempt(key);
         }
+    }
 
-        // 3. Valid credentials but the account is locked/disabled. Not a
-        //    brute-force signal, so it does not count toward the lockout.
-        if (!user.IsEnabled)
-            return LoginResult.AccountDisabled;
-
-        // 4. Success — clear any accumulated failures for this key.
-        _throttle.Reset(key);
-        var context = await _contextFactory.CreateAsync(user);
-        return LoginResult.ForSuccess(context);
+    /// <summary>
+    /// Lockout is tracked per (username, client address): a stranger failing
+    /// logins for "admin" only locks out their own address, not the real admin.
+    /// Without a known address (e.g. a caller that cannot see the client) the
+    /// key falls back to the username alone.
+    /// </summary>
+    internal static string ThrottleKey(string username, string? remoteAddress)
+    {
+        var user = username.ToLowerInvariant();
+        return string.IsNullOrWhiteSpace(remoteAddress) ? user : $"{user}|{remoteAddress.Trim()}";
     }
 
     private bool VerifyDummy(string password)

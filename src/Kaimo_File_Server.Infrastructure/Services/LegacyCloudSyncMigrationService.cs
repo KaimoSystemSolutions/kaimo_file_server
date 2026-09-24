@@ -14,7 +14,9 @@ namespace Kaimo_File_Server.Infrastructure.Services;
 /// <summary>
 /// Imports legacy CloudSettings mappings into the first-class model. The import
 /// is safe to repeat and intentionally retains the source JSON as a read-only
-/// compatibility fallback until the later verified cleanup package.
+/// compatibility fallback until the later verified cleanup package. Credential
+/// secrets are the exception: once they are protected in the credential vault
+/// they are removed from the plaintext JSON in the same transaction.
 /// </summary>
 public sealed class LegacyCloudSyncMigrationService(
     IDbContextFactory<ApplicationDbContext> dbFactory,
@@ -22,6 +24,14 @@ public sealed class LegacyCloudSyncMigrationService(
     ILogger<LegacyCloudSyncMigrationService> logger) : ILegacyCloudSyncMigrationService
 {
     private static readonly SemaphoreSlim Gate = new(1, 1);
+
+    /// <summary>
+    /// <see cref="SyncedFolder.Data"/> keys that hold secrets. They may only
+    /// transit through CloudSettings (legacy OAuth callbacks) and are scrubbed
+    /// from the plaintext JSON as soon as they are protected in the vault.
+    /// </summary>
+    internal static readonly IReadOnlySet<string> SecretDataKeys =
+        new HashSet<string>(StringComparer.Ordinal) { "refreshToken", "accessToken" };
 
     public async Task EnsureMigratedAsync(CancellationToken cancellationToken = default)
     {
@@ -103,7 +113,12 @@ public sealed class LegacyCloudSyncMigrationService(
                 if (definition.MigrationSource != SyncDefinition.LegacyCloudSettingsSource)
                     continue;
 
-                if (definition.MigrationSourceChecksum == checksum && definition.Enabled)
+                // Secrets are excluded from the checksum (they are scrubbed after
+                // import), so a secret still present in the JSON is a fresh grant
+                // written by a legacy OAuth callback and must be imported.
+                if (definition.MigrationSourceChecksum == checksum
+                    && definition.Enabled
+                    && !HasSecrets(folder))
                     continue;
 
                 Guid? existingRunAsUserId = await ResolveRunAsUserIdAsync(
@@ -112,18 +127,28 @@ public sealed class LegacyCloudSyncMigrationService(
                 var connectionToUpdate = await db.StorageConnections.SingleAsync(
                     connection => connection.Id == definition.ConnectionId,
                     cancellationToken);
+                // The JSON no longer carries the secrets of an earlier import, so
+                // start from the vault payload and overlay the legacy values.
+                var credentials = LoadExistingCredentials(connectionToUpdate, folder.Provider);
+                foreach (var (dataKey, dataValue) in folder.Data)
+                    credentials[dataKey] = dataValue;
                 connectionToUpdate.ProviderId = folder.Provider;
                 connectionToUpdate.AuthorizationMode = GetAuthorizationMode(folder.Provider);
                 connectionToUpdate.EffectiveScopes = folder.Data.TryGetValue(
                     "scope", out string? effectiveScope) ? effectiveScope : null;
                 connectionToUpdate.EncryptedCredentialPayload = credentialVault.ProtectConnectionCredentials(
-                    connectionToUpdate,
-                    new Dictionary<string, string>(folder.Data, StringComparer.Ordinal));
+                    connectionToUpdate, credentials);
                 connectionToUpdate.CredentialUpdatedAtUtc = DateTime.UtcNow;
                 connectionToUpdate.UpdatedAtUtc = DateTime.UtcNow;
                 connectionToUpdate.ConcurrencyVersion = checked(connectionToUpdate.ConcurrencyVersion + 1);
                 updatedCount++;
             }
+
+            // Runs after every mapping of the share was processed, including
+            // mappings now owned by the first-class editor: those have their own
+            // vault copy, so the plaintext rollback copy is never needed.
+            if (ScrubSecrets(share.CloudSettings))
+                db.Entry(share).Property(item => item.CloudSettings).IsModified = true;
         }
 
         foreach (var definition in allDefinitions.Where(sync =>
@@ -146,6 +171,44 @@ public sealed class LegacyCloudSyncMigrationService(
                 "Imported {CreatedCount} and refreshed {UpdatedCount} legacy cloud-sync definitions.",
                 createdCount,
                 updatedCount);
+        }
+    }
+
+    private static bool HasSecrets(SyncedFolder folder)
+        => folder.Data.Keys.Any(SecretDataKeys.Contains);
+
+    private static bool ScrubSecrets(CloudSettings settings)
+    {
+        bool changed = false;
+        foreach (var folder in settings.Folders.Values)
+        {
+            foreach (string key in SecretDataKeys)
+                changed |= folder.Data.Remove(key);
+        }
+        return changed;
+    }
+
+    private Dictionary<string, string> LoadExistingCredentials(
+        StorageConnection connection, string providerId)
+    {
+        // Credentials of another provider are never carried over.
+        if (!string.Equals(connection.ProviderId, providerId, StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(connection.EncryptedCredentialPayload))
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        try
+        {
+            return new Dictionary<string, string>(
+                credentialVault.UnprotectConnectionCredentials(connection), StringComparer.Ordinal);
+        }
+        catch (Exception exception) when (
+            exception is CryptographicException or InvalidOperationException)
+        {
+            // Unreadable payload (lost key): continue with the legacy values only,
+            // exactly as the import behaved before secrets were scrubbed.
+            logger.LogWarning(exception,
+                "Could not read the protected credentials of storage connection {ConnectionId}.",
+                connection.Id);
+            return new Dictionary<string, string>(StringComparer.Ordinal);
         }
     }
 
@@ -244,7 +307,9 @@ public sealed class LegacyCloudSyncMigrationService(
         var canonical = new
         {
             folder.Provider,
-            Data = folder.Data.OrderBy(item => item.Key, StringComparer.Ordinal),
+            Data = folder.Data
+                .Where(item => !SecretDataKeys.Contains(item.Key))
+                .OrderBy(item => item.Key, StringComparer.Ordinal),
             RemotePath = NormalizeRemotePath(folder.RemotePath),
             folder.RequiresRemoteFolderSelection,
             folder.Mode,

@@ -55,7 +55,7 @@ example placeholders.
 | Secret | Purpose | If changed / lost |
 | --- | --- | --- |
 | `JWT_SECRET` | Signs login tokens (min. 32 characters). | All existing login sessions are invalidated. |
-| `NT_HASH_ENCRYPTION_KEY` | Encrypts the SMB password hashes stored in the database. | Existing hashes become unreadable; affected SMB passwords must be set again. **Keep this key permanently.** |
+| `NT_HASH_ENCRYPTION_KEY` | Encrypts the SMB password hashes stored in the database. | `host`, `web` and `smb-bridge` refuse to start (see [NT hash key mismatch](#nt-hash-key-mismatch)). **Keep this key permanently and back it up together with the database.** |
 | `POSTGRES_PASSWORD` | Database password. | The database can no longer be opened with the old value. |
 | `SEED_ADMIN_PASSWORD` | Password for the first administrator, created only in an empty database. | No effect after the admin exists — change it in the web UI instead. |
 
@@ -124,6 +124,84 @@ to a container only when `docker-compose.yml` references it.
 
 Additional service-specific overrides are documented in
 [`OPTIONAL_ENVIRONMENT_VARIABLES.md`](OPTIONAL_ENVIRONMENT_VARIABLES.md).
+
+## 🌐 Behind a reverse proxy
+
+If a reverse proxy (nginx, Traefik, Caddy, …) terminates TLS in front of `web`,
+the server takes the client address and scheme from the `X-Forwarded-For` and
+`X-Forwarded-Proto` headers — but **only from trusted proxies**. Headers from
+any other peer are ignored so a client cannot fake its address.
+
+**Trusted without any setting:** loopback and private networks
+(`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`). This covers a
+proxy running in the same Docker network or on the same LAN — no action needed.
+
+**Proxy with a public address** (for example a proxy on another server that
+reaches `web` over the internet, or a cloud load balancer): list it explicitly
+on the `web` service:
+
+```yaml
+services:
+  web:
+    environment:
+      <<: *dotnet-environment
+      # ... existing web variables ...
+      ForwardedHeaders__KnownProxies__0: 203.0.113.10      # single proxy address
+      # ForwardedHeaders__KnownProxies__1: 203.0.113.11    # more proxies: __1, __2, …
+      # ForwardedHeaders__KnownNetworks__0: 203.0.113.0/24 # or a whole range (CIDR)
+```
+
+Setting either list **replaces** the private-network default, so also list your
+internal proxies if you use both. Recreate the service afterwards:
+`docker compose up -d web`.
+
+Signs that your proxy is not trusted:
+
+- WebDAV clients get `426 Upgrade Required` although you connect via `https://`
+  (the server sees plain HTTP from the proxy).
+- A few failed logins lock out *every* user of an account at once, because all
+  requests appear to come from the proxy's address. Login lockout is tracked per
+  user **and** client address, so with a trusted proxy a stranger guessing a
+  password only locks out their own address.
+
+## 🩺 Troubleshooting
+
+### NT hash key mismatch
+
+`host`, `web` and `smb-bridge` check at startup that `NT_HASH_ENCRYPTION_KEY`
+matches the key the stored SMB password hashes were encrypted with. On a
+mismatch the service stops (and Docker keeps restarting it) with:
+
+```text
+NtHash:EncryptionKey does not match the key the stored SMB NT hashes were encrypted with. ...
+```
+
+Check with `docker compose logs host web smb-bridge`. Common causes:
+
+- **`.env` was changed or recreated** with a new `NT_HASH_ENCRYPTION_KEY` →
+  put the original value back and run `docker compose up -d`.
+- **Database restored on a new machine** without the original `.env` → copy the
+  original `NT_HASH_ENCRYPTION_KEY` from the old installation.
+- **Services started with different values** (e.g. an override for only one
+  service) → all three services must receive the identical key; the example
+  `docker-compose.yml` already passes the same `.env` value to each of them.
+
+**Only if the original key is irrecoverably lost:** reset all stored SMB
+password hashes. Web logins are not affected, but **every user must set their
+password again** (profile or user management in the web UI) before SMB access
+works. Stop the application services, clear the hashes and the key check, then
+start again with the new key:
+
+```bash
+docker compose stop host web smb-bridge samba
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
+UPDATE users SET "NtHash" = '';
+DELETE FROM config_settings WHERE "Key" = 'security.ntHash.keyCanary';
+SQL
+docker compose up -d
+```
+
+Take a database backup first. The next `host` start records the new key.
 
 ## 🔧 Operating the stack
 

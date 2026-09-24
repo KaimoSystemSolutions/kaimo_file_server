@@ -111,6 +111,7 @@ else if (_state == State.File)
 
             var share = await Shares.GetByIdAsync(_link.ShareId);
             if (share is null || !share.IsEnabled) { _state = State.Unavailable; return; }
+            if (await ShareLinks.ResolveCreatorAsync(_link) is null) { _state = State.Unavailable; return; }
             _shareName = share.Name;
 
             if (_link.PasswordHash is not null && !_unlocked) { _state = State.Password; return; }

@@ -40,7 +40,8 @@
             <button type="button" class="reconnect-reload" onclick="location.reload()">@R("Web_Reconnect_Reload")</button>
         </div>
     </div>
-    <Routes @rendermode="new InteractiveServerRenderMode(prerender: false)" />
+    <Routes @rendermode="new InteractiveServerRenderMode(prerender: false)"
+            ClientAddress="@HttpContext?.Connection.RemoteIpAddress?.ToString()" />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="js/columnResize.js"></script>
     <script src="js/contextMenu.js"></script>
@@ -56,6 +57,8 @@
 </html>
 
 @code {
+    [CascadingParameter] private Microsoft.AspNetCore.Http.HttpContext? HttpContext { get; set; }
+
     // New resource keys are resolved at runtime (no strongly-typed Designer.cs entry),
     // matching how the rest of the app looks up recently added strings.
     private static string R(string key)

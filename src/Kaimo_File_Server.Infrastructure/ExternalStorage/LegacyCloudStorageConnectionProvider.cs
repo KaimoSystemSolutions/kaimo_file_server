@@ -115,6 +115,8 @@ internal sealed class LegacyCloudRemoteFileStore(
     ICredentialVault credentialVault,
     IStorageConnectionRepository repository) : IRemoteFileStore
 {
+    private long _expectedVersion = connection.ConcurrencyVersion;
+
     public async Task<IReadOnlyList<RemoteStorageItem>> ListAsync(
         string path,
         CancellationToken cancellationToken = default)
@@ -127,11 +129,21 @@ internal sealed class LegacyCloudRemoteFileStore(
 
     public async Task<Stream> OpenReadAsync(string path, CancellationToken cancellationToken = default)
     {
-        var stream = new MemoryStream();
-        await cloudConnection.DownloadAsync(path, stream, cancellationToken);
-        stream.Position = 0;
-        await PersistRotationAsync(cancellationToken);
-        return stream;
+        // Spooled to an owner-only temp file, not memory: a multi-GB cloud file
+        // must not exhaust the process heap shared by every user.
+        var stream = ProtocolTemporaryFile.CreateSpool();
+        try
+        {
+            await cloudConnection.DownloadAsync(path, stream, cancellationToken);
+            stream.Position = 0;
+            await PersistRotationAsync(cancellationToken);
+            return stream;
+        }
+        catch
+        {
+            await stream.DisposeAsync();
+            throw;
+        }
     }
 
     public async Task WriteAsync(
@@ -172,14 +184,19 @@ internal sealed class LegacyCloudRemoteFileStore(
             credentials[key] = value;
         credentials.Remove("connectionId");
         string protectedGrant = credentialVault.ProtectConnectionCredentials(connection, credentials);
-        await repository.UpdateRuntimeAsync(
-            connection.Id,
-            protectedGrant,
-            connection.AccountDisplayName,
-            connection.AccountEmail,
-            StorageConnectionState.Ready,
-            null,
-            cancellationToken);
-        cloudConnection.AcknowledgeCredentialChanges();
+        // Conditional on the version this session loaded: a connection disabled or
+        // re-authorized meanwhile keeps that newer state and grant.
+        if (await repository.TryUpdateCredentialAsync(
+                connection.Id,
+                _expectedVersion,
+                protectedGrant,
+                protectedGrant.StartsWith("dp:v2:", StringComparison.Ordinal)
+                    ? StorageConnection.CurrentProtectorPurposeVersion
+                    : 1,
+                cancellationToken))
+        {
+            _expectedVersion++;
+            cloudConnection.AcknowledgeCredentialChanges();
+        }
     }
 }

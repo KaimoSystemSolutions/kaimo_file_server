@@ -40,7 +40,8 @@ public sealed class PublicDownloadController(
 
         var share = await shares.GetByIdAsync(link.ShareId);
         var actor = await userContextFactory.CreateByUserIdAsync(link.CreatedByUserId);
-        if (share is null || !share.IsEnabled || actor is null)
+        // Re-checked per download: a link stops working once its creator is disabled.
+        if (share is null || !share.IsEnabled || actor is null || !actor.User.IsEnabled)
             return NotFound();
 
         // Defense in depth: every requested path must sit within the shared item's subtree.

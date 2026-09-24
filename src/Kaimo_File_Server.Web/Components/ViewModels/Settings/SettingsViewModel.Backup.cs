@@ -21,15 +21,19 @@ public partial class SettingsViewModel
     public void RefreshBackups() => Backups = _backupService.ListBackups();
 
     /// <summary>
-    /// Builds a short-lived capability URL to download a backup. Authorization is
-    /// enforced here (in the authenticated circuit); the token embeds the file
-    /// name and the controller re-validates it. Returns "" without permission.
+    /// Builds a single-use capability URL to download a backup; call it on click.
+    /// Authorization is enforced here (in the authenticated circuit); the token
+    /// embeds the file name and the user, and the controller re-validates both.
+    /// Returns "" without permission.
     /// </summary>
-    public string CreateBackupDownloadUrl(string baseUri, string fileName)
+    public async Task<string> CreateBackupDownloadUrlAsync(string baseUri, string fileName)
     {
         if (!CanManageBackups)
             return "";
-        var token = Uri.EscapeDataString(_backupDownloadTokens.Protect(fileName));
+        var actor = await BuildActorContextAsync();
+        if (actor is null)
+            return "";
+        var token = Uri.EscapeDataString(_backupDownloadTokens.Protect(fileName, actor.User.Id));
         return $"{baseUri.TrimEnd('/')}/api/database-backups/download?token={token}";
     }
 
@@ -85,6 +89,11 @@ public partial class SettingsViewModel
             RefreshBackups();
             SuccessMessage = R("Web_Settings_Backup_Created");
             return true;
+        }
+        catch (Kaimo_File_Server.Core.Security.ReadOnlyDemoException)
+        {
+            ErrorMessage = R("Web_Demo_ReadOnlyNotice");
+            return false;
         }
         catch (Exception ex)
         {

@@ -44,6 +44,8 @@ Add these variables to `web`.
 | `Jwt__ExpirationHours` | `24` | Login-token lifetime in hours. |
 | `GoogleOAuth__ClientId` | Image default | Overrides the Google OAuth client ID. |
 | `GoogleOAuth__ClientSecret` | Image default | Overrides the Google OAuth client secret. |
+| `ForwardedHeaders__KnownProxies__0` | Empty | Address of a reverse proxy allowed to set `X-Forwarded-For`/`-Proto`. Add `__1`, `__2`, … for more. Needed only for a proxy with a **public** address — see [Behind a reverse proxy](README.md#-behind-a-reverse-proxy). |
+| `ForwardedHeaders__KnownNetworks__0` | Empty (= loopback + private networks) | Trusted proxy range in CIDR notation, e.g. `203.0.113.0/24`. Setting this or `KnownProxies` replaces the private-network default. |
 
 ## SMB bridge only
 

@@ -213,7 +213,58 @@ public sealed class CloudAccessViewModelTests
     }
 
     [Fact]
-    public async Task UpdateConfiguredConnectionAsync_KeepsStoredPassword_WhenPasswordBlank()
+    public async Task UpdateConfiguredConnectionAsync_KeepsStoredPassword_WhenPasswordBlankAndTargetUnchanged()
+    {
+        var (viewModel, connection, provider, captured) = ArrangePasswordConnectionEdit();
+
+        // Same settings, only reformatted: the target is unchanged.
+        await viewModel.UpdateConfiguredConnectionAsync(
+            connection.Id, "  New name  ", "{ \"Server\" : \"old\" }", username: "newuser", password: "");
+
+        Assert.Equal("New name", connection.Name);
+        Assert.Equal("newuser", connection.AccountDisplayName);
+        Assert.Equal("reprotected", connection.EncryptedCredentialPayload);
+        Assert.Equal("newuser", captured()?["username"]);
+        Assert.Equal("secret", captured()?["password"]);
+    }
+
+    [Fact]
+    public async Task UpdateConfiguredConnectionAsync_ChangedTargetWithBlankPassword_IsRejected()
+    {
+        var (viewModel, connection, provider, captured) = ArrangePasswordConnectionEdit();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => viewModel.UpdateConfiguredConnectionAsync(
+            connection.Id, "Old name", "{\"Server\":\"attacker.example\"}", username: "olduser", password: ""));
+
+        // The stored password was neither re-protected for nor tested against the new host.
+        Assert.Null(captured());
+        provider.Verify(x => x.TestAsync(It.IsAny<StorageConnection>(), default), Times.Never);
+        Assert.Equal("{\"Server\":\"old\"}", connection.SettingsJson);
+    }
+
+    [Fact]
+    public async Task UpdateConfiguredConnectionAsync_ChangedTargetWithNewPassword_Succeeds()
+    {
+        var (viewModel, connection, _, captured) = ArrangePasswordConnectionEdit();
+
+        await viewModel.UpdateConfiguredConnectionAsync(
+            connection.Id, "Old name", "{\"Server\":\"new\"}", username: "olduser", password: "fresh");
+
+        Assert.Equal("{\"Server\":\"new\"}", connection.SettingsJson);
+        Assert.Equal("fresh", captured()?["password"]);
+    }
+
+    [Theory]
+    [InlineData("{\"a\":1,\"b\":\"x\"}", "{ \"a\": 1, \"b\": \"x\" }", true)]
+    [InlineData("{\"a\":1}", "{\"a\":2}", false)]
+    [InlineData(null, "{}", false)]
+    [InlineData("not json", "not json", true)]
+    public void SameSettings_ComparesJsonSemantically(string? stored, string submitted, bool expected)
+        => Assert.Equal(expected, CloudAccessViewModel.SameSettings(stored, submitted));
+
+    private (CloudAccessViewModel ViewModel, StorageConnection Connection,
+        Mock<IStorageConnectionProvider> Provider, Func<IReadOnlyDictionary<string, string>?> Captured)
+        ArrangePasswordConnectionEdit()
     {
         var departmentId = Guid.NewGuid();
         var user = new User(Guid.NewGuid(), "Alice", "alice", "hash", "nt");
@@ -271,15 +322,7 @@ public sealed class CloudAccessViewModelTests
             NullLogger<CloudAccessViewModel>.Instance,
             new StorageConnectionProviderCatalog([provider.Object]), vault.Object);
 
-        await viewModel.UpdateConfiguredConnectionAsync(
-            connection.Id, "  New name  ", "{\"Server\":\"new\"}", username: "newuser", password: "");
-
-        Assert.Equal("New name", connection.Name);
-        Assert.Equal("{\"Server\":\"new\"}", connection.SettingsJson);
-        Assert.Equal("newuser", connection.AccountDisplayName);
-        Assert.Equal("reprotected", connection.EncryptedCredentialPayload);
-        Assert.Equal("newuser", protectedCredentials?["username"]);
-        Assert.Equal("secret", protectedCredentials?["password"]);
+        return (viewModel, connection, provider, () => protectedCredentials);
     }
 
     [Fact]

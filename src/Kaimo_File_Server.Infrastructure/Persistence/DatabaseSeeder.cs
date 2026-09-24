@@ -5,6 +5,7 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Infrastructure.Security;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -85,6 +86,10 @@ public class DatabaseSeeder
         await BackfillEveryoneMembershipAsync();
 
         await SeedConfigAsync();
+
+        // After SeedConfigAsync, which only seeds defaults into an empty config table.
+        await using (var db = await _dbFactory.CreateDbContextAsync())
+            await NtHashKeyCanary.EnsureAsync(db, _ntHashProtector, _logger);
     }
 
     // ══════════════════════════════════════════

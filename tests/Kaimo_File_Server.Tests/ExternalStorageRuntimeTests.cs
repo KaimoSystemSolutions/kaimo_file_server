@@ -54,6 +54,40 @@ public sealed class ExternalStorageRuntimeTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task CredentialLease_FailedRelease_DoesNotFailCompletedWork_AndLeaseExpires()
+    {
+        var connection = await SeedConnectionAsync();
+        var flaky = new FlakyDbFactory(DbFactory);
+        var manager = new DatabaseStorageConnectionCredentialLeaseManager(flaky, TimeProvider.System);
+        var lease = await manager.TryAcquireAsync(connection.Id);
+        Assert.NotNull(lease);
+
+        flaky.Fail = true;
+        await lease.DisposeAsync(); // must not throw into the caller's successful refresh
+
+        // The row stays until it expires, then another owner reclaims it.
+        await using (var db = await DbFactory.CreateDbContextAsync())
+        {
+            var row = await db.StorageConnectionCredentialLeases.SingleAsync();
+            row.ExpiresAtUtc = DateTime.UtcNow.AddSeconds(-1);
+            await db.SaveChangesAsync();
+        }
+        var next = await new DatabaseStorageConnectionCredentialLeaseManager(DbFactory, TimeProvider.System)
+            .TryAcquireAsync(connection.Id);
+        Assert.NotNull(next);
+        await next.DisposeAsync();
+    }
+
+    private sealed class FlakyDbFactory(IDbContextFactory<Kaimo_File_Server.Infrastructure.Persistence.ApplicationDbContext> inner)
+        : IDbContextFactory<Kaimo_File_Server.Infrastructure.Persistence.ApplicationDbContext>
+    {
+        public bool Fail { get; set; }
+
+        public Kaimo_File_Server.Infrastructure.Persistence.ApplicationDbContext CreateDbContext()
+            => Fail ? throw new InvalidOperationException("database unavailable") : inner.CreateDbContext();
+    }
+
+    [Fact]
     public async Task RewrapBatch_UpgradesLegacyPayloadWithoutChangingPlaintext()
     {
         var provider = new EphemeralDataProtectionProvider();

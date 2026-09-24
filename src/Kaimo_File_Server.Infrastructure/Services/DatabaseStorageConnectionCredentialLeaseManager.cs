@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Infrastructure.Persistence;
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 
 namespace Kaimo_File_Server.Infrastructure.Services;
@@ -60,11 +61,12 @@ public sealed class DatabaseStorageConnectionCredentialLeaseManager(
         return new DatabaseLease(this, connectionId, leaseId);
     }
 
-    private async Task RenewAsync(Guid connectionId, Guid leaseId, CancellationToken cancellationToken)
+    /// <returns>False when the lease no longer belongs to this owner.</returns>
+    private async Task<bool> RenewAsync(Guid connectionId, Guid leaseId, CancellationToken cancellationToken)
     {
         var expiresAt = timeProvider.GetUtcNow().UtcDateTime.Add(LeaseLifetime);
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        _ = await db.StorageConnectionCredentialLeases
+        return 0 < await db.StorageConnectionCredentialLeases
             .Where(lease => lease.ConnectionId == connectionId && lease.LeaseId == leaseId)
             .ExecuteUpdateAsync(
                 update => update.SetProperty(lease => lease.ExpiresAtUtc, expiresAt),
@@ -73,10 +75,18 @@ public sealed class DatabaseStorageConnectionCredentialLeaseManager(
 
     private async Task ReleaseAsync(Guid connectionId, Guid leaseId)
     {
-        await using var db = await dbFactory.CreateDbContextAsync();
-        _ = await db.StorageConnectionCredentialLeases
-            .Where(lease => lease.ConnectionId == connectionId && lease.LeaseId == leaseId)
-            .ExecuteDeleteAsync();
+        try
+        {
+            await using var db = await dbFactory.CreateDbContextAsync();
+            _ = await db.StorageConnectionCredentialLeases
+                .Where(lease => lease.ConnectionId == connectionId && lease.LeaseId == leaseId)
+                .ExecuteDeleteAsync();
+        }
+        catch (Exception exception) when (exception is DbException or InvalidOperationException or TimeoutException)
+        {
+            // Releasing is an optimization: the row expires after LeaseLifetime and
+            // is then reclaimed. A failed delete must not fail the completed work.
+        }
     }
 
     private sealed class DatabaseLease : IStorageConnectionCredentialLease
@@ -102,9 +112,9 @@ public sealed class DatabaseStorageConnectionCredentialLeaseManager(
         public async ValueTask DisposeAsync()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-            await _renewalCancellation.CancelAsync();
             try
             {
+                await _renewalCancellation.CancelAsync();
                 await _renewalTask;
             }
             catch (OperationCanceledException)
@@ -114,15 +124,27 @@ public sealed class DatabaseStorageConnectionCredentialLeaseManager(
             finally
             {
                 _renewalCancellation.Dispose();
+                await _owner.ReleaseAsync(_connectionId, _leaseId);
             }
-            await _owner.ReleaseAsync(_connectionId, _leaseId);
         }
 
         private async Task RenewLoopAsync()
         {
             using var timer = new PeriodicTimer(RenewalInterval);
             while (await timer.WaitForNextTickAsync(_renewalCancellation.Token))
-                await _owner.RenewAsync(_connectionId, _leaseId, _renewalCancellation.Token);
+            {
+                try
+                {
+                    // Lost (expired and reclaimed by another owner): nothing left to renew.
+                    if (!await _owner.RenewAsync(_connectionId, _leaseId, _renewalCancellation.Token))
+                        return;
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    // A transient database error must not end the heartbeat; the
+                    // next tick retries well before the lease lifetime runs out.
+                }
+            }
         }
     }
 }

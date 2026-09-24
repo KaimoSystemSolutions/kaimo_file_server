@@ -78,7 +78,8 @@ public sealed class AuthApiController : ApiControllerBase
             string.IsNullOrWhiteSpace(request.Password))
             return ApiBadRequest("credentials_required", "Username and password are required.");
 
-        var result = await _loginService.AuthenticateAsync(request.Username, request.Password);
+        var result = await _loginService.AuthenticateAsync(
+            request.Username, request.Password, HttpContext.Connection.RemoteIpAddress?.ToString());
         switch (result.Outcome)
         {
             case LoginOutcome.Success:

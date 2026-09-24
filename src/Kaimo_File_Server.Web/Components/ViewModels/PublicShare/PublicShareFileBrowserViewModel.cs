@@ -96,7 +96,10 @@ public sealed class PublicShareFileBrowserViewModel : FileBrowserViewModel
     protected override async Task<UserContext?> GetCurrentUserContextAsync()
     {
         if (_link is null) return null;
-        return _creatorContext ??= await _userContexts.CreateByUserIdAsync(_link.CreatedByUserId);
+        if (_creatorContext is not null) return _creatorContext;
+        var creator = await _userContexts.CreateByUserIdAsync(_link.CreatedByUserId);
+        // A disabled creator must not keep serving files through their links.
+        return _creatorContext = creator is { User.IsEnabled: true } ? creator : null;
     }
 
     public override async Task<string?> GetDownloadUrlAsync(FileMetadata file)

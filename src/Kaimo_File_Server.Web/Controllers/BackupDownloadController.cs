@@ -1,3 +1,6 @@
+using Kaimo_File_Server.Core.Repositories;
+using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Infrastructure.Backup;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -9,13 +12,33 @@ namespace Kaimo_File_Server.Web.Controllers;
 [Route("api/database-backups")]
 public sealed class BackupDownloadController(
     BackupDownloadTokenService tokenService,
-    IDatabaseBackupService backupService) : ControllerBase
+    IDatabaseBackupService backupService,
+    IUserRepository users,
+    IUserContextFactory userContexts,
+    IManagementAuthService managementAuth,
+    DemoModeOptions demo) : ControllerBase
 {
     [HttpGet("download")]
-    public IActionResult Download([FromQuery] string token)
+    public async Task<IActionResult> Download([FromQuery] string token)
     {
-        if (string.IsNullOrWhiteSpace(token) || !tokenService.TryUnprotect(token, out var fileName))
+        // A public read-only demo must never hand out a dump of its database.
+        if (demo.ReadOnly)
+            return StatusCode(StatusCodes.Status403Forbidden);
+
+        if (string.IsNullOrWhiteSpace(token)
+            || !tokenService.TryConsume(token, out var fileName, out var userId))
             return Unauthorized();
+
+        // The token was issued by an authorized circuit; re-check that the user
+        // still exists, is enabled and still holds the permission right now.
+        var user = await users.GetByIdAsync(userId);
+        if (user is null || !user.IsEnabled)
+            return Unauthorized();
+        var actor = await userContexts.CreateAsync(user);
+        var permissions = await managementAuth.GetEffectivePermissionsAtAsync(
+            actor, ScopeType.Global, Guid.Empty);
+        if (!permissions.HasFlag(ManagementPermission.ManageBackups))
+            return StatusCode(StatusCodes.Status403Forbidden);
 
         // ResolveBackupPath rejects path traversal and non-backup names and
         // returns null when the file no longer exists.

@@ -111,7 +111,10 @@ namespace Kaimo_File_Server.Infrastructure.Repositories;
                 return false;
 
             foreach (var (key, value) in credentialChanges)
-                folder.Data[key] = value;
+            {
+                if (!LegacyCloudSyncMigrationService.SecretDataKeys.Contains(key))
+                    folder.Data[key] = value;
+            }
             if (lastSync.HasValue)
                 folder.LastSync = lastSync.Value;
 

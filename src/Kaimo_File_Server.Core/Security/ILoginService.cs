@@ -45,5 +45,10 @@ public sealed record LoginResult(
 /// </summary>
 public interface ILoginService
 {
-    Task<LoginResult> AuthenticateAsync(string username, string password);
+    /// <param name="remoteAddress">
+    /// Client address, when the transport knows it. Lockout is then tracked per
+    /// (username, address), so failed attempts from one client cannot lock the
+    /// account out for everyone else.
+    /// </param>
+    Task<LoginResult> AuthenticateAsync(string username, string password, string? remoteAddress = null);
 }

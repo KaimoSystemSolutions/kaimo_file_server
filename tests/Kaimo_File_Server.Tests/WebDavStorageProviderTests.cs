@@ -177,7 +177,9 @@ public sealed class WebDavStorageProviderTests
         Assert.Equal("alice:s3cret", decoded);
         Assert.Contains(client.DefaultRequestHeaders.Accept,
             header => header.MediaType == "application/xml");
-        Assert.Equal(TimeSpan.FromSeconds(120), client.Timeout);
+        // No whole-request cap (it would abort large uploads); the store applies
+        // per-request and idle timeouts instead.
+        Assert.Equal(Timeout.InfiniteTimeSpan, client.Timeout);
     }
 
     [Theory]
@@ -517,6 +519,151 @@ public sealed class WebDavStorageProviderTests
             () => WebDavRemoteFileStore.EnsureSuccessOrThrowAsync(error, CancellationToken.None));
 
         Assert.True(exception.Message.Length < 600);
+    }
+
+    // ── Timeouts ──
+
+    [Fact]
+    public async Task Upload_LongerThanIdleTimeout_SucceedsWhileDataKeepsFlowing()
+    {
+        var store = TimedStore(new DrainingHandler(), TimeSpan.FromMilliseconds(300));
+
+        // 8 chunks x 100 ms = 800 ms total, far beyond the 300 ms idle timeout.
+        await store.WriteAsync("/big.bin", new SlowStream(chunks: 8, delay: TimeSpan.FromMilliseconds(100)), overwrite: true);
+    }
+
+    [Fact]
+    public async Task Upload_StalledSource_TimesOut()
+    {
+        var store = TimedStore(new DrainingHandler(), TimeSpan.FromMilliseconds(200));
+
+        await Assert.ThrowsAsync<TimeoutException>(() => store.WriteAsync(
+            "/big.bin", new SlowStream(chunks: 2, delay: TimeSpan.FromSeconds(5)), overwrite: true));
+    }
+
+    [Fact]
+    public async Task MetadataRequest_UnresponsiveServer_TimesOut()
+    {
+        var store = TimedStore(new DrainingHandler(responseDelay: TimeSpan.FromSeconds(5)), TimeSpan.FromMilliseconds(200));
+
+        await Assert.ThrowsAsync<TimeoutException>(() => store.CreateDirectoryAsync("/folder"));
+    }
+
+    [Fact]
+    public async Task CallerCancellation_IsNotReportedAsTimeout()
+    {
+        var store = TimedStore(new DrainingHandler(responseDelay: TimeSpan.FromSeconds(5)), TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => store.CreateDirectoryAsync("/folder", cts.Token));
+        Assert.IsNotType<TimeoutException>(exception);
+    }
+
+    private static WebDavRemoteFileStore TimedStore(HttpMessageHandler handler, TimeSpan idleTimeout)
+        => new(new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan }, "https://nas.example/dav", idleTimeout);
+
+    /// <summary>Consumes the request body like a server would, then answers 201.</summary>
+    private sealed class DrainingHandler(TimeSpan? responseDelay = null) : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.Content is not null)
+                await request.Content.CopyToAsync(Stream.Null, cancellationToken);
+            if (responseDelay is { } delay)
+                await Task.Delay(delay, cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.Created);
+        }
+    }
+
+    /// <summary>Yields one 1 KiB chunk per <c>delay</c>; not seekable, like a network source.</summary>
+    private sealed class SlowStream(int chunks, TimeSpan delay) : Stream
+    {
+        private int _remaining = chunks;
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => 0; set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (_remaining-- <= 0)
+                return 0;
+            await Task.Delay(delay, cancellationToken);
+            int size = Math.Min(1024, buffer.Length);
+            buffer.Span[..size].Fill(0x42);
+            return size;
+        }
+    }
+
+    // ── SSRF hardening ──
+
+    [Fact]
+    public async Task EnsureSuccessOrThrow_DoesNotEchoResponseBody()
+    {
+        var error = new HttpResponseMessage(HttpStatusCode.InternalServerError)
+        {
+            Content = new StringContent("{\"internal\":\"secret-metadata-token\"}")
+        };
+
+        var exception = await Assert.ThrowsAsync<IOException>(
+            () => WebDavRemoteFileStore.EnsureSuccessOrThrowAsync(error, CancellationToken.None));
+
+        Assert.DoesNotContain("secret-metadata-token", exception.Message);
+        Assert.Contains("500", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1", true)]
+    [InlineData("127.8.9.10", true)]
+    [InlineData("::1", true)]
+    [InlineData("::ffff:127.0.0.1", true)]
+    [InlineData("0.0.0.0", true)]
+    [InlineData("::", true)]
+    [InlineData("169.254.169.254", true)]
+    [InlineData("::ffff:169.254.169.254", true)]
+    [InlineData("fe80::1", true)]
+    [InlineData("224.0.0.1", true)]
+    [InlineData("192.168.1.20", false)]   // NAS on the LAN stays reachable
+    [InlineData("10.0.0.5", false)]
+    [InlineData("172.20.0.3", false)]
+    [InlineData("fd00::5", false)]
+    [InlineData("203.0.113.10", false)]
+    [InlineData("2001:db8::1", false)]
+    public void IsBlockedAddress_BlocksOnlyLocalAndNonRoutable(string address, bool blocked)
+        => Assert.Equal(blocked, WebDavStorageConnectionProvider.IsBlockedAddress(IPAddress.Parse(address)));
+
+    [Fact]
+    public void Handler_DoesNotFollowRedirects()
+    {
+        using var handler = WebDavStorageConnectionProvider.CreateHandler();
+        Assert.False(handler.AllowAutoRedirect);
+        Assert.NotNull(handler.ConnectCallback);
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1")]
+    [InlineData("localhost")]
+    public async Task Client_RefusesToConnectToLoopback(string host)
+    {
+        using var listener = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        using var client = WebDavStorageConnectionProvider.CreateHttpClient(
+            new WebDavConnectionSettings($"http://{host}:{port}/"), "alice", "s3cret");
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.GetAsync($"http://{host}:{port}/"));
+
+        // The Basic credentials never left the process.
+        Assert.False(listener.Pending());
     }
 
     [Fact]

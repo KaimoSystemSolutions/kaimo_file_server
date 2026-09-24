@@ -11,13 +11,16 @@ public class LoginViewModel
     private readonly JwtTokenService _jwtService;
     private readonly JwtAuthenticationStateProvider _authState;
     private readonly ILogger<LoginViewModel> _logger;
+    private readonly ClientConnectionInfo _client;
 
     public LoginViewModel(
         ILoginService loginService,
         JwtTokenService jwtService,
         JwtAuthenticationStateProvider authState,
-        ILogger<LoginViewModel> logger)
+        ILogger<LoginViewModel> logger,
+        ClientConnectionInfo client)
     {
+        _client = client;
         _loginService = loginService;
         _jwtService = jwtService;
         _authState = authState;
@@ -50,7 +53,7 @@ public class LoginViewModel
             // Credential verification, brute-force lockout, and enumeration
             // resistance all live in the login service — the view model only
             // maps the outcome to UI state.
-            var result = await _loginService.AuthenticateAsync(Username, Password);
+            var result = await _loginService.AuthenticateAsync(Username, Password, _client.RemoteAddress);
 
             switch (result.Outcome)
             {

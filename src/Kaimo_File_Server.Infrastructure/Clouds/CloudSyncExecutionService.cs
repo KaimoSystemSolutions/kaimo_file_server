@@ -168,6 +168,8 @@ public sealed class CloudSyncExecutionService(
                     DateTime.UtcNow,
                     ClassifyError(exception),
                     cancellationToken);
+                if (exception is ProviderRequestException { Category: ProviderErrorCategory.Authentication } authError)
+                    await MarkNeedsReauthorizationAsync(storageConnection.Id, authError.ErrorCode, cancellationToken);
                 throw;
             }
             finally
@@ -188,15 +190,19 @@ public sealed class CloudSyncExecutionService(
                 credentials.Remove("connectionId");
                 string protectedCredentials = credentialVault.ProtectConnectionCredentials(
                     storageConnection, credentials);
-                await storageConnections.UpdateRuntimeAsync(
+                // Conditional on the version this run started from: a connection that
+                // was disabled or re-authorized meanwhile must keep that newer state and
+                // credential, and the connection state itself is never touched here.
+                bool persisted = await storageConnections.TryUpdateCredentialAsync(
                     storageConnection.Id,
+                    storageConnection.ConcurrencyVersion,
                     protectedCredentials,
-                    storageConnection.AccountDisplayName,
-                    storageConnection.AccountEmail,
-                    StorageConnectionState.Ready,
-                    null,
+                    protectedCredentials.StartsWith("dp:v2:", StringComparison.Ordinal)
+                        ? StorageConnection.CurrentProtectorPurposeVersion
+                        : 1,
                     cancellationToken);
-                connection.AcknowledgeCredentialChanges();
+                if (persisted)
+                    connection.AcknowledgeCredentialChanges();
             }
 
             // A run that copied everything it could but hit individual-item
@@ -223,6 +229,30 @@ public sealed class CloudSyncExecutionService(
             return failures.Count > 0
                 ? CloudSyncExecutionResult.CompletedWithErrors
                 : CloudSyncExecutionResult.Completed;
+        }
+    }
+
+    /// <summary>
+    /// A revoked or expired grant cannot heal by retrying. Parking the connection
+    /// in <see cref="StorageConnectionState.NeedsReauthorization"/> stops the
+    /// scheduler from hammering the provider (runs require <c>Ready</c>) and tells
+    /// the operator what to do.
+    /// </summary>
+    private async Task MarkNeedsReauthorizationAsync(
+        Guid connectionId, string errorCode, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var current = await storageConnections.GetAsync(connectionId, cancellationToken);
+            if (current is null || current.State != StorageConnectionState.Ready)
+                return;
+            current.State = StorageConnectionState.NeedsReauthorization;
+            current.LastErrorCode = errorCode;
+            await storageConnections.SaveAsync(current, cancellationToken);
+        }
+        catch (StorageConnectionConcurrencyException)
+        {
+            // Changed concurrently (e.g. just re-authorized); that state wins.
         }
     }
 

@@ -123,7 +123,9 @@ public sealed class ShareLinkService(
         if (link.PasswordHash is null) return (true, TimeSpan.Zero);
 
         var key = "sharelink:" + link.Token;
-        var status = throttle.Check(key);
+        // Reserve the attempt before the (slow) BCrypt verify so parallel guesses
+        // cannot all slip past the lockout check.
+        var status = throttle.BeginAttempt(key, PasswordPolicy);
         if (status.IsLockedOut) return (false, status.RetryAfter);
 
         if (!string.IsNullOrEmpty(candidate) && passwords.VerifyPassword(candidate, link.PasswordHash))
@@ -142,6 +144,16 @@ public sealed class ShareLinkService(
     /// </summary>
     public string IssueTicket(ShareLink link, IReadOnlyList<string> relativePaths, bool zip, string downloadName)
         => tickets.Issue(new PublicDownloadTicket(link.Token, relativePaths.ToArray(), downloadName, zip));
+
+    /// <summary>
+    /// The identity anonymous access runs under, or null when the creator no longer
+    /// exists or was disabled — a disabled account must not keep serving files.
+    /// </summary>
+    public async Task<UserContext?> ResolveCreatorAsync(ShareLink link)
+    {
+        var creator = await userContexts.CreateByUserIdAsync(link.CreatedByUserId);
+        return creator is { User.IsEnabled: true } ? creator : null;
+    }
 
     private async Task<UserContext?> ResolveActorAsync()
     {

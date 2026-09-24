@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Core.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -19,6 +20,7 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
     private readonly IProcessRunner _runner;
     private readonly TimeProvider _time;
     private readonly ILogger<DatabaseBackupService> _logger;
+    private readonly DemoModeOptions? _demo;
 
     public string BackupRootPath { get; }
 
@@ -26,8 +28,10 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
         IConfiguration configuration,
         IProcessRunner runner,
         TimeProvider time,
-        ILogger<DatabaseBackupService> logger)
+        ILogger<DatabaseBackupService> logger,
+        DemoModeOptions? demo = null)
     {
+        _demo = demo;
         var connectionString = configuration.GetConnectionString("Default")
             ?? "Host=kaimo_file_server_db;Database=kaimo_file_server;Username=kaimo_test_user;Password=change_me";
         _connection = new NpgsqlConnectionStringBuilder(connectionString);
@@ -40,6 +44,11 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
     public async Task<BackupFileInfo> CreateBackupAsync(
         BackupTrigger trigger, CancellationToken cancellationToken = default)
     {
+        // A public demo must not let visitors produce dumps on demand. Automatic
+        // (scheduled / pre-migration) backups are unaffected.
+        if (_demo?.ReadOnly == true && trigger == BackupTrigger.Manual)
+            throw new ReadOnlyDemoException();
+
         EnsureBackupDirectoryWritable();
 
         var createdAt = _time.GetLocalNow();
@@ -69,10 +78,29 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
                 $"pg_dump failed with exit code {result.ExitCode}: {result.StandardError.Trim()}");
         }
 
+        RestrictToOwner(targetPath);
         var size = new FileInfo(targetPath).Length;
         _logger.LogInformation(
             "Database backup {FileName} created ({Size} bytes).", fileName, size);
         return new BackupFileInfo(fileName, size, createdAt, trigger);
+    }
+
+    /// <summary>
+    /// A dump holds every password hash and protected credential; pg_dump creates
+    /// it with the umask default (typically 0644), so tighten it to owner-only.
+    /// </summary>
+    internal void RestrictToOwner(string path)
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+        try
+        {
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(exception, "Could not restrict permissions of backup {Path}.", path);
+        }
     }
 
     public IReadOnlyList<BackupFileInfo> ListBackups()

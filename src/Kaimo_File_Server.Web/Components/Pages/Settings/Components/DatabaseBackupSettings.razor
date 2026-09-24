@@ -73,7 +73,7 @@
                         <td>@DateFmt.FormatDateTimeLocal(backup.CreatedAtLocal.DateTime)</td>
                         <td>@TriggerLabel(backup.Trigger)</td>
                         <td>@FormatSize(backup.SizeBytes)</td>
-                        <td><a class="btn-secondary" href="@VM.CreateBackupDownloadUrl(Nav.BaseUri, backup.FileName)">@R("Web_Settings_Backup_Download")</a></td>
+                        <td><button type="button" class="btn-secondary" @onclick="() => DownloadAsync(backup.FileName)">@R("Web_Settings_Backup_Download")</button></td>
                     </tr>
                 }
             </tbody>
@@ -91,6 +91,15 @@
         StateHasChanged();               // show the disabled/creating state immediately
         await VM.CreateBackupNowAsync();
         StateHasChanged();
+    }
+
+    // The URL carries a single-use token, so it is created per click, never
+    // rendered into the page where a second click or a copy would reuse it.
+    private async Task DownloadAsync(string fileName)
+    {
+        var url = await VM.CreateBackupDownloadUrlAsync(Nav.BaseUri, fileName);
+        if (!string.IsNullOrEmpty(url))
+            Nav.NavigateTo(url, forceLoad: true);
     }
 
     private static string TriggerLabel(BackupTrigger trigger) => trigger switch
