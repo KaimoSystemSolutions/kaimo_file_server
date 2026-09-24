@@ -4569,4 +4569,16 @@
   <data name="Web_ShareLinks_PasswordProtected" xml:space="preserve">
     <value>Password-protected</value>
   </data>
+  <data name="Context_Menu_Cut" xml:space="preserve">
+    <value>Cut</value>
+  </data>
+  <data name="Context_Menu_Copy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="Web_Properties_Varies" xml:space="preserve">
+    <value>Varies</value>
+  </data>
+  <data name="Web_Properties_SizeTotal" xml:space="preserve">
+    <value>Size (total)</value>
+  </data>
 </root>

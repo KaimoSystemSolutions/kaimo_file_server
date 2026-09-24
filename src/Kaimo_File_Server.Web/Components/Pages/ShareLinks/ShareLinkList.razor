@@ -61,8 +61,8 @@ else
                         <div class="sharelink-row @(row.Link.Id == _selectedId ? "sharelink-row--selected" : "")"
                              @onclick="() => Select(row.Link.Id)">
                             <span class="sharelink-name">
-                                <span class="sharelink-item-icon">
-                                    @Assets.SVG(row.Link.IsDirectory ? "folder.svg" : "download.svg", new SvgOptions(Width: 18, Height: 18))
+                                <span class="sharelink-item-icon @IconTone(row.Link)">
+                                    @ItemIcon(row.Link, 18)
                                 </span>
                                 <span class="sharelink-name-text">
                                     <a class="sharelink-name-link" href="@BrowserHref(row)"
@@ -155,8 +155,8 @@ else
                     <div class="detail-header sharelink-detail-header">
                         <div class="sharelink-detail-title">
                             <div class="sharelink-title-row">
-                                <span class="sharelink-detail-icon">
-                                    @Assets.SVG(link.IsDirectory ? "folder.svg" : "download.svg", new SvgOptions(Width: 22, Height: 22))
+                                <span class="sharelink-detail-icon @IconTone(link)">
+                                    @ItemIcon(link, 22)
                                 </span>
                                 <h3>@link.DisplayName</h3>
                             </div>
@@ -236,6 +236,15 @@ else
 
     private static string T(string key, string fallback)
         => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    // Folders use the file browser's folder colors; files show their type icon in the accent color.
+    private static string IconTone(ShareLink link)
+        => link.IsDirectory ? "sharelink-icon--folder" : "sharelink-icon--file";
+
+    private MarkupString ItemIcon(ShareLink link, int size)
+        => link.IsDirectory
+            ? Assets.SVG("folder.svg", new SvgOptions(Width: size, Height: size, Color: "var(--folder-stroke)", Fill: "var(--folder-fill)"))
+            : Assets.SVG(FileHelper.GetIcon(link.RootRelativePath), new SvgOptions(Width: size, Height: size, Color: "var(--accent)"));
 
     protected override async Task OnInitializedAsync()
     {

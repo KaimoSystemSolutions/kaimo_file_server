@@ -173,3 +173,6 @@
     .sharelink-meta { grid-row: 3; }
     .sharelink-detail-group dl { grid-template-columns: 1fr; gap: 3px; }
 }
+
+.sharelink-icon--folder { background: var(--folder-fill); }
+.sharelink-icon--file { background: var(--accent-subtle); }

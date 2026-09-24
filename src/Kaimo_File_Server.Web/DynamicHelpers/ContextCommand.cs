@@ -77,6 +77,12 @@ public static class ContextCommandCatalog
         new ContextCommand("download", () => Resources.Context_Menu_Download, "download.svg",
             ValidScopes: Downloadable),
 
+        new ContextCommand("cut", () => Resources.ResourceManager.GetString("Context_Menu_Cut") ?? "Cut",
+            "scissors.svg", ValidScopes: SingleAndMulti),
+
+        new ContextCommand("copy", () => Resources.ResourceManager.GetString("Context_Menu_Copy") ?? "Copy",
+            "copy.svg", ValidScopes: SingleAndMulti),
+
         new ContextCommand("sharelink", () => Resources.ResourceManager.GetString("Context_Menu_Share") ?? "Share link",
             "share.svg", ValidScopes: AllSingle),
 
@@ -111,7 +117,7 @@ public static class ContextCommandCatalog
             ValidScopes: AllSingle),
 
         new ContextCommand("properties", () => Resources.Context_Menu_Properties, "info.svg",
-            ValidScopes: AllSingle),
+            ValidScopes: SingleAndMulti),
 
         new ContextCommand("newfolder", () => Resources.Context_Menu_NewFolder, "folder.svg",
             ValidScopes: EveryScope),

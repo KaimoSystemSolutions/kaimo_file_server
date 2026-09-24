@@ -227,9 +227,9 @@ public partial class FileBrowser
     /// to the DOM yet and <see cref="ElementReference.FocusAsync"/> throws "Unable to
     /// focus an invalid element". Focus is only a keyboard convenience, so ignore it.
     /// </summary>
-    private static async Task TryFocusAsync(ElementReference element)
+    private static async Task TryFocusAsync(ElementReference element, bool preventScroll = false)
     {
-        try { await element.FocusAsync(); }
+        try { await element.FocusAsync(preventScroll); }
         catch (JSException) { /* element not focusable yet — leave focus where it is */ }
     }
 

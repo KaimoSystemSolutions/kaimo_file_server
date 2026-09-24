@@ -238,7 +238,7 @@
     <value>Dateien</value>
   </data>
   <data name="Web_Breadcrumb_Shares" xml:space="preserve">
-    <value>Freigaben</value>
+    <value>Shares</value>
   </data>
   <data name="Web_Action_Open" xml:space="preserve">
     <value>Öffnen</value>
@@ -2524,7 +2524,7 @@
     <value>Besitzer</value>
   </data>
   <data name="Web_Properties_Share" xml:space="preserve">
-    <value>Freigabe</value>
+    <value>Share</value>
   </data>
   <data name="Web_Properties_ItemId" xml:space="preserve">
     <value>Objekt-ID</value>
@@ -4502,5 +4502,17 @@
   </data>
   <data name="Web_ShareLinks_PasswordProtected" xml:space="preserve">
     <value>Passwortgeschützt</value>
+  </data>
+  <data name="Context_Menu_Cut" xml:space="preserve">
+    <value>Ausschneiden</value>
+  </data>
+  <data name="Context_Menu_Copy" xml:space="preserve">
+    <value>Kopieren</value>
+  </data>
+  <data name="Web_Properties_Varies" xml:space="preserve">
+    <value>Variiert</value>
+  </data>
+  <data name="Web_Properties_SizeTotal" xml:space="preserve">
+    <value>Größe (gesamt)</value>
   </data>
 </root>

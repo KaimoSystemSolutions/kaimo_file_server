@@ -115,7 +115,7 @@
         {
             <button class="toolbar-btn" title="@T("Web_Transfer_Copy")"
                     disabled="@(_selectedItems.Count == 0)" @onclick="() => PutIntoClipboard(false)">
-                @Assets.SVG("download.svg", new SvgOptions(Width: 16, Height: 16))
+                @Assets.SVG("copy.svg", new SvgOptions(Width: 16, Height: 16))
                 <span>@T("Web_Transfer_Copy")</span>
             </button>
         }
@@ -123,7 +123,7 @@
         {
             <button class="toolbar-btn" title="@T("Web_Transfer_Cut")"
                     disabled="@(_selectedItems.Count == 0)" @onclick="() => PutIntoClipboard(true)">
-                @Assets.SVG("edit.svg", new SvgOptions(Width: 16, Height: 16))
+                @Assets.SVG("scissors.svg", new SvgOptions(Width: 16, Height: 16))
                 <span>@T("Web_Transfer_Cut")</span>
             </button>
         }

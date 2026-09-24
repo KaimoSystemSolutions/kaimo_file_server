@@ -106,6 +106,8 @@
         {
             "open" => FileBrowser.VM.Capabilities.CanOpen,
             "rename" => FileBrowser.VM.Capabilities.CanRename,
+            "copy" => FileBrowser.VM.Capabilities.CanCopy,
+            "cut" => FileBrowser.VM.Capabilities.CanCopy && FileBrowser.VM.Capabilities.CanCut,
             "delete" => FileBrowser.VM.Capabilities.CanDelete,
             // "Empty recycle bin" only applies to the recycle-bin root folder itself.
             "recycle.empty" => scope == ContextMenuScope.Folder
@@ -187,7 +189,12 @@
 
         "permissions" => () => { ContextAcl(target!); return Task.CompletedTask; },
 
+        "properties" when scope == ContextMenuScope.MultiSelection
+            => async () => { CloseContextMenu(); await FileBrowser.OpenPropertiesDialog(selected.ToList()); },
         "properties" => async () => { CloseContextMenu(); await FileBrowser.OpenPropertiesDialog(target!); },
+
+        "copy" => async () => { CloseContextMenu(); await FileBrowser.PutIntoClipboard(false); },
+        "cut" => async () => { CloseContextMenu(); await FileBrowser.PutIntoClipboard(true); },
 
         "newfolder" => () => { ContextNewFolder(); return Task.CompletedTask; },
         "refresh" => async () => { await ContextRefresh(); },

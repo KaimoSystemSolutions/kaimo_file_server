@@ -35,6 +35,15 @@ public partial class FileBrowser
 
         _contextMenuComponent?.CloseContextMenu();
 
+        // Entering another directory moves keyboard focus to the item list, so Ctrl+V/C/X,
+        // Delete and F2 work right away without clicking into the list first.
+        var location = $"{ShareName}/{EffectiveLoadSubPath}";
+        if (location != _lastLoadedLocation)
+        {
+            _lastLoadedLocation = location;
+            _focusItemListAfterRender = true;
+        }
+
         await VM.LoadShareAsync(ShareName, EffectiveLoadSubPath);
         UpdateAclPath();
         await LoadAclCounts();
@@ -87,6 +96,9 @@ public partial class FileBrowser
     // Index of a search-selected entry to scroll to on the next render (-1 = none).
     private int _pendingScrollIndex = -1;
 
+    private string? _lastLoadedLocation;
+    private bool _focusItemListAfterRender;
+
     private void OnVmStateChanged() => InvokeAsync(StateHasChanged);
 
     public void Dispose()
@@ -109,6 +121,13 @@ public partial class FileBrowser
             await JS.InvokeVoidAsync("fileMarquee.initialize", "#file-selection-area", _dotNetRef);
             if (VM.Capabilities.CanMove)
                 await JS.InvokeVoidAsync("initInternalDragDrop");
+        }
+
+        // The list is only in the DOM once loading finished; until then the reference is stale.
+        if (_focusItemListAfterRender && !VM.IsLoading && VM.ErrorMessage is null && _fileDropZone.Id is not null)
+        {
+            _focusItemListAfterRender = false;
+            await TryFocusAsync(_fileDropZone, preventScroll: true);
         }
 
         if (_pendingScrollIndex >= 0)
@@ -389,6 +408,10 @@ public partial class FileBrowser
     /// <summary>Opens the properties dialog (metadata + optional ACL tab) for a file or folder.</summary>
     public async Task OpenPropertiesDialog(FileMetadata item)
         => await _propertiesDialogComponent.Open(item);
+
+    /// <summary>Opens the properties dialog for a multi-selection (combined values, no ACL tab).</summary>
+    public async Task OpenPropertiesDialog(IReadOnlyList<FileMetadata> items)
+        => await _propertiesDialogComponent.Open(items);
 
     /// <summary>Opens the "create hash" dialog for a single file.</summary>
     public async Task OpenHashDialog(FileMetadata item)

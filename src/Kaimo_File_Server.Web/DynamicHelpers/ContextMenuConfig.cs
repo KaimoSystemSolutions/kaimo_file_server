@@ -27,7 +27,7 @@ public class ContextMenuConfig
     /// </summary>
     public static readonly IReadOnlyList<string> DefaultOrder = new[]
     {
-        "open", "download", "sharelink", "hash", "extract", "compress.zip", "compress.targz",
+        "open", "download", "cut", "copy", "sharelink", "hash", "extract", "compress.zip", "compress.targz",
         "rename", "versions", "delete", "recycle.empty", "permissions", "properties",
         "newfolder", "refresh",
     };
@@ -66,7 +66,7 @@ public class ContextMenuConfig
             { "open", "download", "sharelink", "hash", "extract", "rename", "versions", "delete", "permissions", "properties", "newfolder", "refresh" },
 
         ContextMenuScope.MultiSelection => new()
-            { "download", "extract", "compress.zip", "compress.targz", "delete", "newfolder", "refresh" },
+            { "download", "cut", "copy", "extract", "compress.zip", "compress.targz", "delete", "properties", "newfolder", "refresh" },
 
         // Image / Video / Audio / Document / OtherFile share the regular-file layout.
         _ => new()
