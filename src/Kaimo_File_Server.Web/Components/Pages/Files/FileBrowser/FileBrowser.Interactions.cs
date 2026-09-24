@@ -161,7 +161,7 @@ public partial class FileBrowser
 
         foreach (var item in availableItems)
         {
-            if (selectedPaths.Contains(item.Path))
+            if (selectedPaths.Contains(RowKey(item)))
                 _selectedItems.Add(item);
         }
 

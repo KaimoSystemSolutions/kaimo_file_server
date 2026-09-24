@@ -117,7 +117,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     /// </summary>
     protected virtual string RootPath => "";
 
-    public BrowserShareInfo? CurrentBrowserShare => CurrentShare is null
+    public virtual BrowserShareInfo? CurrentBrowserShare => CurrentShare is null
         ? null
         : new BrowserShareInfo(CurrentShare.Id, CurrentShare.Name, BrowserShareKind.Local);
 
@@ -327,9 +327,13 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
                     .ToList()
                 : [];
 
-            CanManageSyncs = await _mgmtAuth.HasAnyPermissionAsync(userContext, ManagementPermission.SyncAdmin);
-
-            await LoadShareSyncsAsync(CurrentShare.Id);
+            // Sync state is internal configuration: a browser without cloud-sync support (the
+            // anonymous public-link browser) never loads it, so no sync marker can be rendered.
+            if (Capabilities.HasCloudSync)
+            {
+                CanManageSyncs = await _mgmtAuth.HasAnyPermissionAsync(userContext, ManagementPermission.SyncAdmin);
+                await LoadShareSyncsAsync(CurrentShare.Id);
+            }
 
             _logger.LogDebug("Loading path: '{CurrentPath}' (share={ShareName}, user={User})",
                 CurrentPath, shareName, userContext.User.Username);

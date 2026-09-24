@@ -101,7 +101,8 @@ else
                     <label><span>@R("Web_ExternalStorage_Name")</span><input class="edit-input" maxlength="200" @bind="_model.DisplayName" /></label>
                     <label><span>@R("Web_ExternalStorage_Connection")</span><select class="edit-input" @bind="_model.ConnectionId" @bind:after="ConnectionChanged">
                         <option value="@Guid.Empty">@R("Web_ExternalStorage_Select")</option>
-                        @foreach (var connection in ReadyConnections)
+                        @* Keep a broken sync's current connection selectable so it can still be edited and disabled. *@
+                        @foreach (var connection in VM.Connections.Where(c => c.Id == _model.ConnectionId || ReadyConnections.Contains(c)))
                         {
                             <option value="@connection.Id">@connection.Name (@ProviderName(connection.ProviderId))</option>
                         }

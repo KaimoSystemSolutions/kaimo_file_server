@@ -463,7 +463,7 @@ else
             }
             <div
                 class="file-grid-row @(entry.IsDirectory ? "file-row-dir" : "") @(isSelected ? "file-row--selected" : "")"
-                data-path="@entry.Path"
+                data-path="@RowKey(entry)"
                 data-is-dir="@(entry.IsDirectory ? "true" : "false")"
                 @onclick="(e) => OnItemClick(e, entry)"
                 @onclick:stopPropagation="true"
@@ -476,7 +476,7 @@ else
 
                 <div class="col-name"
                      draggable="@VM.Capabilities.CanMove"
-                     data-path="@entry.Path"
+                     data-path="@RowKey(entry)"
                      @ondragstart="() => OnDragStart(entry)"
                      @ondragend="OnDragEnd">
                     @if (IsRecycleBinEntry(entry))

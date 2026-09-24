@@ -72,6 +72,13 @@ public sealed class PublicShareFileBrowserViewModel : FileBrowserViewModel
 
     protected override string RootPath => _rootPath;
 
+    // The internal share name must never reach an external visitor: everything that shows
+    // the share (breadcrumb, page title) sees only the link's display name.
+    public override BrowserShareInfo? CurrentBrowserShare
+        => base.CurrentBrowserShare is { } share && _link is not null
+            ? share with { Name = _link.DisplayName }
+            : null;
+
     // URL sub-paths for a public link are relative to the shared root, so the real folder
     // name is never part of the address. Map both directions around that root.
     protected override string ResolveSubPath(string subPath)

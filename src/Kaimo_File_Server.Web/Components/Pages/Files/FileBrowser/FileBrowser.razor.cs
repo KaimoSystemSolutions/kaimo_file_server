@@ -58,6 +58,13 @@ public partial class FileBrowser
     /// when even that is missing — to a loading placeholder or the raw share key. This keeps
     /// a previously opened share from lingering in the breadcrumb during a load.
     /// </summary>
+    /// <summary>
+    /// DOM key for a listing row (<c>data-path</c>, used by marquee selection and drag/drop).
+    /// Route-relative rather than the absolute server path, so no internal folder name ever
+    /// reaches the page markup — the public-link browser strips its confined root here too.
+    /// </summary>
+    private string RowKey(FileMetadata entry) => VM.RouteSubPathOf(VM.ShareRelativeOf(entry));
+
     private string CurrentShareDisplayName =>
         VM.CurrentBrowserShare?.Name
         ?? ShareDisplayName

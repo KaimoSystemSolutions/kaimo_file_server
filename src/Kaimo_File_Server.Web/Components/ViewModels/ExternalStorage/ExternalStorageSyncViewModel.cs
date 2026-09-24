@@ -147,14 +147,30 @@ public sealed class ExternalStorageSyncViewModel(
                          ?? throw new InvalidOperationException(Text(
                              "Web_ExternalStorage_SyncMissing", "The sync no longer exists."));
         var share = await GetAuthorizedShareAsync(definition.LocalShareId, ManagementPermission.ConfigureSyncs);
-        var connection = await GetUsableConnectionAsync(model.ConnectionId);
-        EnsureCapability(connection, StorageProviderCapabilities.Sync, "Web_ExternalStorage_SyncUnsupported",
-            "This provider does not support synchronization.");
-        EnsureDirectionSupported(connection, model.Mode);
-        if (providerCatalog.GetRequired(connection.ProviderId).Capabilities
-            .HasFlag(StorageProviderCapabilities.Browse))
-            model.RemotePath = (await directoryTargets.ResolveDirectoryAsync(connection, model.RemotePath)).Path;
-        await ValidateModelAsync(model, share, definition.Id);
+        StorageConnection connection;
+        if (model.Enabled)
+        {
+            connection = await GetUsableConnectionAsync(model.ConnectionId);
+            EnsureCapability(connection, StorageProviderCapabilities.Sync, "Web_ExternalStorage_SyncUnsupported",
+                "This provider does not support synchronization.");
+            EnsureDirectionSupported(connection, model.Mode);
+            if (providerCatalog.GetRequired(connection.ProviderId).Capabilities
+                .HasFlag(StorageProviderCapabilities.Browse))
+                model.RemotePath = (await directoryTargets.ResolveDirectoryAsync(connection, model.RemotePath)).Path;
+            await ValidateModelAsync(model, share, definition.Id);
+        }
+        else
+        {
+            // A disabled sync is inert (never scheduled or executed), so it must always be
+            // savable — even when its connection, remote folder or local folder is broken.
+            // That is exactly how a misconfigured sync gets switched off. Only the form fields
+            // are validated here; the full environment checks run again once it is re-enabled.
+            connection = await GetUsableConnectionAsync(model.ConnectionId, requireReady: false);
+            ValidateFields(model);
+            if (!ShareRelativePath.IsValid(ShareRelativePath.Normalize(model.LocalPath)))
+                throw new InvalidOperationException(Text(
+                    "Web_CloudSync_Error_LocalFolder", "Select an existing local folder."));
+        }
 
         string newLocalPath = ShareRelativePath.Normalize(model.LocalPath);
         var mutationLease = await syncOperations.TryBeginPathMutationAsync(
@@ -300,16 +316,7 @@ public sealed class ExternalStorageSyncViewModel(
         ShareDefinition share,
         Guid? existingId)
     {
-        if (string.IsNullOrWhiteSpace(model.DisplayName) || model.DisplayName.Trim().Length > 200)
-            throw new ArgumentException(Text("Web_ExternalStorage_InvalidName", "Enter a name of at most 200 characters."));
-        if (model.Description.Length > 2000)
-            throw new ArgumentException(Text("Web_ExternalStorage_InvalidDescription", "The description is too long."));
-        if (model.IntervalSeconds is < CloudSyncSchedule.MinIntervalSeconds or > CloudSyncSchedule.MaxIntervalSeconds)
-            throw new ArgumentException(Text("Web_CloudSync_Schedule_Error_Interval", "Enter an interval between 1 and 86400 seconds."));
-        if (model.ScheduleEnabled && !model.ActiveScheduleSlots.Any(CloudSyncSchedule.IsValidSlot))
-            throw new ArgumentException(Text("Web_CloudSync_Schedule_Error_Empty", "Select at least one hour before enabling the timer."));
-        if (model.MaxFileSizeMb is < 0 || model.MaxUploadRateKbps is < 0 || model.MaxDownloadRateKbps is < 0)
-            throw new ArgumentException(Text("Web_CloudSync_Advanced_Error_Negative", "Advanced limits cannot be negative."));
+        ValidateFields(model);
 
         string localPath = ShareRelativePath.Normalize(model.LocalPath);
         var conflict = (await syncDefinitions.GetAllAsync())
@@ -328,6 +335,21 @@ public sealed class ExternalStorageSyncViewModel(
         if (!metadata.IsDirectory)
             throw new InvalidOperationException(Text(
                 "Web_CloudSync_Error_LocalFolder", "Select an existing local folder."));
+    }
+
+    // Form-only checks that need no connection, remote or filesystem access.
+    private static void ValidateFields(ExternalStorageSyncEditModel model)
+    {
+        if (string.IsNullOrWhiteSpace(model.DisplayName) || model.DisplayName.Trim().Length > 200)
+            throw new ArgumentException(Text("Web_ExternalStorage_InvalidName", "Enter a name of at most 200 characters."));
+        if (model.Description.Length > 2000)
+            throw new ArgumentException(Text("Web_ExternalStorage_InvalidDescription", "The description is too long."));
+        if (model.IntervalSeconds is < CloudSyncSchedule.MinIntervalSeconds or > CloudSyncSchedule.MaxIntervalSeconds)
+            throw new ArgumentException(Text("Web_CloudSync_Schedule_Error_Interval", "Enter an interval between 1 and 86400 seconds."));
+        if (model.ScheduleEnabled && !model.ActiveScheduleSlots.Any(CloudSyncSchedule.IsValidSlot))
+            throw new ArgumentException(Text("Web_CloudSync_Schedule_Error_Empty", "Select at least one hour before enabling the timer."));
+        if (model.MaxFileSizeMb is < 0 || model.MaxUploadRateKbps is < 0 || model.MaxDownloadRateKbps is < 0)
+            throw new ArgumentException(Text("Web_CloudSync_Advanced_Error_Negative", "Advanced limits cannot be negative."));
     }
 
     private async Task<ShareDefinition> GetAuthorizedShareAsync(Guid id, ManagementPermission permission)
@@ -356,7 +378,7 @@ public sealed class ExternalStorageSyncViewModel(
         return share;
     }
 
-    private async Task<StorageConnection> GetUsableConnectionAsync(Guid id)
+    private async Task<StorageConnection> GetUsableConnectionAsync(Guid id, bool requireReady = true)
     {
         var connection = await connections.GetAsync(id)
                          ?? throw new InvalidOperationException(Text(
@@ -365,7 +387,7 @@ public sealed class ExternalStorageSyncViewModel(
                 _actor!, ManagementPermission.UseConnections))
             throw new UnauthorizedAccessException(Text(
                 "Web_StorageConnection_UseDenied", "You may not use connections."));
-        if (connection.State != StorageConnectionState.Ready
+        if (requireReady && connection.State != StorageConnectionState.Ready
             || (RequiresProtectedCredential(connection.AuthorizationMode)
                 && string.IsNullOrWhiteSpace(connection.EncryptedCredentialPayload)))
             throw new InvalidOperationException(Text(
