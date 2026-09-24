@@ -188,12 +188,23 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         public async Task UpdatePasswordAsync(Guid userId, string passwordHash, string ntHash)
         {
             await using var db = await dbFactory.CreateDbContextAsync();
+            await using var tx = await db.Database.BeginTransactionAsync();
 
             await db.Users
                 .Where(u => u.Id == userId)
                 .ExecuteUpdateAsync(u => u
                     .SetProperty(x => x.PasswordHash, passwordHash)
                     .SetProperty(x => x.NtHash, ntHash));
+
+            // A password change/reset is the standard response to a compromise, so every
+            // client-API refresh token of the account is revoked with it. Otherwise a stolen
+            // refresh token would keep rotating indefinitely despite the new password.
+            var now = DateTime.UtcNow;
+            await db.RefreshTokens
+                .Where(t => t.UserId == userId && t.RevokedAtUtc == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAtUtc, now));
+
+            await tx.CommitAsync();
         }
 
         /// <inheritdoc />

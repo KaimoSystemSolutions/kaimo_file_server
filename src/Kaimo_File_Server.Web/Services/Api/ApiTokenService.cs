@@ -167,7 +167,15 @@ public sealed class ApiTokenService
         };
         existing.RevokedAtUtc = now;
         existing.ReplacedByTokenId = replacement.Id;
-        await _refreshTokens.RotateAsync(existing, replacement);
+        if (!await _refreshTokens.RotateAsync(existing, replacement))
+        {
+            // A concurrent refresh rotated this token first. Same handling as the
+            // benign-race branch above: reject, the winner's chain stays intact.
+            _logger.LogInformation(
+                "Refresh token for device {DeviceId} was rotated concurrently; rejecting this attempt",
+                existing.DeviceId);
+            return new RefreshResult(RefreshOutcome.Invalid);
+        }
 
         await _devices.TouchLastSeenAsync(device.Id, now);
 

@@ -83,6 +83,27 @@ public sealed class DropboxConnectionTests
         await connection.Dispose();
     }
 
+    [Theory]
+    [InlineData("""{"error_summary":"path/not_found/..","error":{}}""", true)]
+    [InlineData("""{"error_summary":"path/restricted_content/.","error":{}}""", false)]
+    [InlineData("""{"error_summary":"path/malformed_path/","error":{}}""", false)]
+    public async Task ListAsync_Conflict_OnlyNotFoundIsEmpty(string errorBody, bool expectEmpty)
+    {
+        // Every Dropbox endpoint error is a 409. Reporting e.g. restricted_content as an empty
+        // folder would let a two-way sync with deletions delete the local copy.
+        var handler = new StubHandler(request => Task.FromResult(
+            request.RequestUri!.AbsolutePath == "/oauth2/token"
+                ? Json(HttpStatusCode.OK, """{"access_token":"t","expires_in":14400}""")
+                : Json(HttpStatusCode.Conflict, errorBody)));
+        using var http = new HttpClient(handler);
+        await using var connection = new DropboxConnection(CreateData(), http, Identity);
+
+        if (expectEmpty)
+            Assert.Empty(await connection.ListAsync("/Team"));
+        else
+            await Assert.ThrowsAsync<ProviderRequestException>(() => connection.ListAsync("/Team"));
+    }
+
     [Fact]
     public async Task ProviderFailure_DoesNotExposeRawResponseBody()
     {

@@ -58,6 +58,24 @@ public class JwtTokenServiceTests
     public void Ctor_EmptySecret_Throws()
         => Assert.Throws<InvalidOperationException>(() => Create(""));
 
+    private const string DevComposeSecret = "DevOnly-LocalDevelopment-DoNotUseInProduction-JwtSecret";
+
+    [Fact]
+    public void ValidateSecret_DevelopmentSecretOutsideDevelopment_Throws()
+        => Assert.Throws<InvalidOperationException>(
+            () => JwtTokenService.ValidateSecret(DevComposeSecret, allowDevelopmentSecret: false));
+
+    [Fact]
+    public void ValidateSecret_DevelopmentSecretInDevelopment_Accepted()
+        => Assert.Equal(DevComposeSecret,
+            JwtTokenService.ValidateSecret(DevComposeSecret, allowDevelopmentSecret: true));
+
+    [Fact]
+    public void ValidateSecret_WeakSecret_ThrowsEvenInDevelopment()
+        => Assert.Throws<InvalidOperationException>(
+            () => JwtTokenService.ValidateSecret("KaimoFileServer_SuperSecret_Key_ChangeThis_Min32Chars!!",
+                allowDevelopmentSecret: true));
+
     [Fact]
     public void Ctor_StrongSecret_Succeeds()
     {

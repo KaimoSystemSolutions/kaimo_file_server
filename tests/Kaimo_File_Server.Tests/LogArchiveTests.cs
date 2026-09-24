@@ -38,6 +38,8 @@ public sealed class LogArchiveTests : IAsyncLifetime
         using (logger.BeginScope("inner-scope"))
             logger.LogInformation(new EventId(42, "ArchiveTest"), "stored value {Value}", 123);
         logger.LogError(new InvalidOperationException("broken"), "failure");
+        // The generated bootstrap admin password must never be persisted in the archive.
+        logger.LogWarning(LogEvents.SeedBootstrapAdminPassword, "one-time password: {Password}", "s3cret-bootstrap");
         await provider.StopAsync(CancellationToken.None);
 
         var reader = new FileLogArchiveReader(options);
@@ -52,6 +54,7 @@ public sealed class LogArchiveTests : IAsyncLifetime
         Assert.Contains(result.Entries, entry =>
             entry.Level == LogLevel.Error
             && entry.Exception?.Contains("InvalidOperationException") == true);
+        Assert.DoesNotContain(result.Entries, entry => entry.Message.Contains("s3cret-bootstrap"));
     }
 
     [Fact]

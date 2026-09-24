@@ -197,6 +197,9 @@ public class GoogleOAuthController : ControllerBase
     {
         var normalizedPath = CloudSyncPaths.Normalize(path);
 
+        if (await AuthorizeShareSyncAsync(shareId) is { } denied)
+            return denied;
+
         var share = await _shareRepository.GetByIdAsync(shareId);
         if (share is null)
             return NotFound("Share not found");
@@ -218,11 +221,14 @@ public class GoogleOAuthController : ControllerBase
     {
         var normalizedPath = CloudSyncPaths.Normalize(path);
 
+        if (await AuthorizeShareSyncAsync(shareId) is { } denied)
+            return denied;
+
         var share = await _shareRepository.GetByIdAsync(shareId);
         if (share is null)
             return NotFound("Share not found");
 
-        var settings = share.CloudSettings ?? new CloudSettings(new Dictionary<string, SyncedFolder>());
+        var settings = share.CloudSettings ??new CloudSettings(new Dictionary<string, SyncedFolder>());
 
         if (settings.Folders.TryGetValue(normalizedPath, out var exact))
             return Ok(new { path = normalizedPath, relation = "exact", provider = exact.Provider });
@@ -246,6 +252,20 @@ public class GoogleOAuthController : ControllerBase
         return Ok(new { path = normalizedPath, relation = "none" });
     }
 
+
+    /// <summary>
+    /// Same guard as <see cref="Connect"/>: an authenticated actor with the CreateSyncs
+    /// permission on the share. Returns null when access is granted.
+    /// </summary>
+    private async Task<IActionResult?> AuthorizeShareSyncAsync(Guid shareId)
+    {
+        var actor = await GetActorAsync();
+        if (actor is null)
+            return Unauthorized();
+        if (!await _managementAuth.CanManageShareAsync(actor, shareId, ManagementPermission.CreateSyncs))
+            return Forbid();
+        return null;
+    }
 
     private async Task<Kaimo_File_Server.Core.Domain.Identity.UserContext?> GetActorAsync()
     {

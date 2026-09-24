@@ -59,6 +59,26 @@ $samba_output/samba.crt
 $samba_output/samba.key
 "
 
+# Leaf keys are readable only by their consumer: Samba's control-plane clients
+# (authd and the *sync helpers) run as root; the bridge runs as the .NET app UID.
+# Applied on every run so installations created with the former world-readable
+# mode (0644) are tightened too. If the bridge key cannot be handed to its UID
+# (script not run as root), fall back to the previous mode rather than breaking
+# the bridge, and say so.
+restrict_leaf_keys() {
+    chmod 700 "$authority_output"
+    chmod 755 "$bridge_output" "$samba_output"
+    chmod 600 "$authority_output/ca.key"
+    chmod 644 "$bridge_output"/*.crt "$samba_output"/*.crt
+    chmod 600 "$samba_output/samba.key"
+    if chown "${KAIMO_BRIDGE_UID:-1654}" "$bridge_output/server.key" 2>/dev/null; then
+        chmod 600 "$bridge_output/server.key"
+    else
+        chmod 644 "$bridge_output/server.key"
+        echo "warning: could not assign $bridge_output/server.key to UID ${KAIMO_BRIDGE_UID:-1654}; left world-readable" >&2
+    fi
+}
+
 missing=0
 present=0
 for path in $required_files; do
@@ -70,6 +90,7 @@ for path in $required_files; do
 done
 
 if [ "$missing" -eq 0 ]; then
+    restrict_leaf_keys
     echo "SMB control-plane PKI already present in $output"
     exit 0
 fi
@@ -111,11 +132,5 @@ rm -f \
     "$samba_output/config-sync.crt" "$samba_output/config-sync.key" \
     "$samba_output/runtime.crt" "$samba_output/runtime.key"
 
-# Leaf keys must be readable by the unprivileged processes in their narrowly
-# scoped read-only mounts. The CA key remains owner-only and is never mounted.
-chmod 700 "$authority_output"
-chmod 755 "$bridge_output" "$samba_output"
-chmod 600 "$authority_output/ca.key"
-chmod 644 "$bridge_output/server.key" "$samba_output/samba.key"
-chmod 644 "$bridge_output"/*.crt "$samba_output"/*.crt
+restrict_leaf_keys
 echo "SMB control-plane PKI generated in $output"

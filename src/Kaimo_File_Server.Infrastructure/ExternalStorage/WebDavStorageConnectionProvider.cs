@@ -295,9 +295,13 @@ internal sealed class WebDavRemoteFileStore(HttpClient client, string serverUrl)
     internal Uri ResolveUri(string normalizedPath, bool trailingSlash = false)
     {
         string baseUrl = serverUrl.TrimEnd('/');
+        // Store paths are decoded names; each segment must be percent-encoded, otherwise
+        // '#', '?' or '%' in a file name would be parsed as URL syntax and the request
+        // (e.g. a DELETE during sync) would target a different remote resource.
         string resolved = normalizedPath == "/"
             ? baseUrl + "/"
-            : baseUrl + normalizedPath + (trailingSlash ? "/" : "");
+            : baseUrl + string.Join('/', normalizedPath.Split('/').Select(Uri.EscapeDataString))
+              + (trailingSlash ? "/" : "");
         return new Uri(resolved);
     }
 

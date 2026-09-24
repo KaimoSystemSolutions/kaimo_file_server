@@ -539,6 +539,17 @@ public sealed class WebDavStorageProviderTests
     }
 
     [Fact]
+    public void ResolveUri_EscapesUrlSyntaxInSegments()
+    {
+        var store = new WebDavRemoteFileStore(new HttpClient(), "https://cloud.example.com/dav");
+
+        // Unescaped, "dir/a#b" would address "dir/a" (fragment dropped) — a DELETE would hit the wrong item.
+        Assert.Equal(
+            "https://cloud.example.com/dav/dir/a%23b%3Fc%25d%20e",
+            store.ResolveUri("/dir/a#b?c%d e").AbsoluteUri);
+    }
+
+    [Fact]
     public void ResolveUri_HandlesTrailingSlashOnServerUrl()
     {
         var store = new WebDavRemoteFileStore(new HttpClient(), "https://cloud.example.com/dav/");

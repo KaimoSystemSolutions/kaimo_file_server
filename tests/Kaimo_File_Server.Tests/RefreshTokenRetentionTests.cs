@@ -72,4 +72,63 @@ public sealed class RefreshTokenRetentionTests : DatabaseTestBase
         await using var db = NewContext();
         Assert.Equal(2, await db.RefreshTokens.CountAsync(t => t.DeviceId == device));
     }
+
+    /// <summary>
+    /// Two concurrent refreshes read the same active token. Only the first rotation may
+    /// succeed; the second must be refused and must not insert its replacement, otherwise
+    /// a stolen refresh token could fork a second valid chain.
+    /// </summary>
+    [Fact]
+    public async Task Rotate_SameTokenTwice_OnlyFirstWins()
+    {
+        var user = SeedUser("bob");
+        var device = SeedDevice(user.Id);
+        SeedToken(user.Id, device, expiresAtUtc: Now.AddDays(20));
+
+        RefreshToken current;
+        await using (var db = NewContext())
+            current = await db.RefreshTokens.AsNoTracking().SingleAsync(t => t.DeviceId == device);
+
+        RefreshToken NewReplacement() => new()
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            DeviceId = device,
+            TokenHash = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"),
+            CreatedAtUtc = Now,
+            ExpiresAtUtc = Now.AddDays(30),
+        };
+
+        current.RevokedAtUtc = Now;
+        var first = NewReplacement();
+        var second = NewReplacement();
+
+        Assert.True(await Repo().RotateAsync(current, first));
+        Assert.False(await Repo().RotateAsync(current, second));
+
+        await using var check = NewContext();
+        Assert.Equal(2, await check.RefreshTokens.CountAsync(t => t.DeviceId == device));
+        var rotated = await check.RefreshTokens.SingleAsync(t => t.Id == current.Id);
+        Assert.Equal(first.Id, rotated.ReplacedByTokenId);
+        Assert.False(await check.RefreshTokens.AnyAsync(t => t.Id == second.Id));
+    }
+
+    /// <summary>A password change must revoke every live refresh token of that user only.</summary>
+    [Fact]
+    public async Task UpdatePassword_RevokesRefreshTokensOfThatUser()
+    {
+        var carol = SeedUser("carol");
+        var other = SeedUser("dave");
+        var carolDevice = SeedDevice(carol.Id);
+        var otherDevice = SeedDevice(other.Id);
+        SeedToken(carol.Id, carolDevice, expiresAtUtc: Now.AddDays(20));
+        SeedToken(carol.Id, carolDevice, expiresAtUtc: Now.AddDays(25));
+        SeedToken(other.Id, otherDevice, expiresAtUtc: Now.AddDays(20));
+
+        await new UserRepository(DbFactory).UpdatePasswordAsync(carol.Id, "bcrypt-hash", "enc:nt");
+
+        await using var db = NewContext();
+        Assert.False(await db.RefreshTokens.AnyAsync(t => t.UserId == carol.Id && t.RevokedAtUtc == null));
+        Assert.True(await db.RefreshTokens.AnyAsync(t => t.UserId == other.Id && t.RevokedAtUtc == null));
+    }
 }

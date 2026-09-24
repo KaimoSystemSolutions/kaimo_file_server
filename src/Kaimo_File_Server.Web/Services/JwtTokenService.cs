@@ -42,18 +42,39 @@ public class JwtTokenService
     public JwtTokenService(IConfiguration config, ILogger<JwtTokenService> logger)
     {
         _logger = logger;
-        _secret = config["Jwt:Secret"] ?? throw new InvalidOperationException("Jwt:Secret not configured");
+        // Environment-specific gating (development-only secrets) happens once at startup in
+        // Program.cs; here only the environment-independent rules apply.
+        _secret = ValidateSecret(config["Jwt:Secret"], allowDevelopmentSecret: true);
         _issuer = config["Jwt:Issuer"] ?? "KaimoFileServer";
         _expirationHours = config.GetValue<int>("Jwt:ExpirationHours", 24);
 
-        if (_secret.Length < MinSecretLength)
+        _logger.LogInformation("JWT initialisiert: Issuer={Issuer}, Expiration={Hours}h", _issuer, _expirationHours);
+    }
+
+    /// <summary>
+    /// Single gate for the signing secret, used by this service AND the REST API's JWT
+    /// bearer handler (Program.cs), so a weak or public secret can never be accepted by
+    /// one path while the other refuses it. Returns the secret when it is acceptable.
+    /// </summary>
+    /// <param name="allowDevelopmentSecret">
+    /// False outside the Development environment: secrets starting with
+    /// <see cref="DevelopmentSecretPrefix"/> ship in the dev compose override and are public.
+    /// </param>
+    public static string ValidateSecret(string? secret, bool allowDevelopmentSecret)
+    {
+        if (secret is null)
+            throw new InvalidOperationException("Jwt:Secret not configured");
+
+        if (secret.Length < MinSecretLength)
         {
             throw new InvalidOperationException(
-                $"Jwt:Secret muss mindestens {MinSecretLength} Zeichen lang sein (aktuell: {_secret.Length}). " +
+                $"Jwt:Secret muss mindestens {MinSecretLength} Zeichen lang sein (aktuell: {secret.Length}). " +
                 "Ein kürzerer Secret ist unsicher für HMAC-SHA256.");
         }
 
-        if (ForbiddenSecrets.Contains(_secret.Trim()))
+        if (ForbiddenSecrets.Contains(secret.Trim())
+            || (!allowDevelopmentSecret
+                && secret.TrimStart().StartsWith(DevelopmentSecretPrefix, StringComparison.OrdinalIgnoreCase)))
         {
             throw new InvalidOperationException(
                 "Jwt:Secret ist ein bekannter Default-/Beispielwert und gilt als kompromittiert. " +
@@ -61,8 +82,11 @@ public class JwtTokenService
                 "(Jwt__Secret) oder User-Secrets setzen — niemals im Repository ablegen.");
         }
 
-        _logger.LogInformation("JWT initialisiert: Issuer={Issuer}, Expiration={Hours}h", _issuer, _expirationHours);
+        return secret;
     }
+
+    /// <summary>Prefix of the public secrets used by docker-compose.override.yml for local development.</summary>
+    public const string DevelopmentSecretPrefix = "DevOnly";
 
     /// <param name="deviceId">
     /// When set, stamps a <see cref="DeviceIdClaim"/> so the client API can bind the

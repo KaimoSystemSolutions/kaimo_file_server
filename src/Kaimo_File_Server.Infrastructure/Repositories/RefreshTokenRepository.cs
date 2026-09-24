@@ -39,16 +39,30 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
         await db.SaveChangesAsync();
     }
 
-    public async Task RotateAsync(RefreshToken current, RefreshToken replacement)
+    public async Task<bool> RotateAsync(RefreshToken current, RefreshToken replacement)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
         await using var tx = await db.Database.BeginTransactionAsync();
 
-        db.RefreshTokens.Update(current);
+        // Insert first so the FK-style link target exists, then revoke conditionally:
+        // only the rotation that still sees RevokedAtUtc == null may win.
         db.RefreshTokens.Add(replacement);
         await db.SaveChangesAsync();
 
+        int revoked = await db.RefreshTokens
+            .Where(t => t.Id == current.Id && t.RevokedAtUtc == null)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(t => t.RevokedAtUtc, current.RevokedAtUtc)
+                .SetProperty(t => t.ReplacedByTokenId, replacement.Id));
+
+        if (revoked != 1)
+        {
+            await tx.RollbackAsync();
+            return false;
+        }
+
         await tx.CommitAsync();
+        return true;
     }
 
     public async Task RevokeAllForDeviceAsync(Guid deviceId, DateTime whenUtc)

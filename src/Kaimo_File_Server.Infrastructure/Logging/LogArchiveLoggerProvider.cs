@@ -94,6 +94,12 @@ public sealed class LogArchiveLoggerProvider : ILoggerProvider, ISupportExternal
         if (level < LogLevel.Information || level == LogLevel.None)
             return;
 
+        // The generated bootstrap admin password is delivered on the console (docker logs)
+        // only. The archive is retained for days and can be viewed/downloaded by any user
+        // with log access, so the secret must never be persisted here.
+        if (eventId.Id == LogEvents.SeedBootstrapAdminPassword.Id)
+            return;
+
         Dictionary<string, string?>? properties = null;
         if (state is IEnumerable<KeyValuePair<string, object?>> structuredState)
         {

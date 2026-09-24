@@ -111,8 +111,11 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
 //    validation parameters as the Blazor token path (JwtTokenService) so the two
 //    can never drift apart. The Blazor localStorage flow is unaffected — it does
 //    not depend on this handler. --
-var apiJwtSecret = builder.Configuration["Jwt:Secret"]
-    ?? throw new InvalidOperationException("Jwt:Secret not configured");
+// Validated eagerly here (not only in the lazily created JwtTokenService) so the bearer
+// handler can never run with a weak, well-known or development-only signing secret.
+var apiJwtSecret = JwtTokenService.ValidateSecret(
+    builder.Configuration["Jwt:Secret"],
+    allowDevelopmentSecret: builder.Environment.IsDevelopment());
 var apiJwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "KaimoFileServer";
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

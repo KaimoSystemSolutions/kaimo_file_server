@@ -86,7 +86,8 @@ namespace Kaimo_File_Server.Core.Repositories
 
         /// <summary>
         /// Updates the user's password hash and NT hash.
-        /// Both values must already be hashed by the caller.
+        /// Both values must already be hashed by the caller. All active client-API
+        /// refresh tokens of the user are revoked in the same transaction.
         /// </summary>
         /// <param name="userId">The user to update.</param>
         /// <param name="passwordHash">The new bcrypt/argon2 password hash.</param>

@@ -88,7 +88,7 @@ public sealed class DropboxConnection : ICloudConnection, IAsyncDisposable
         while (true)
         {
             using var response = await SendRpcAsync(url, body, cancellationToken);
-            if (response.StatusCode == HttpStatusCode.Conflict)
+            if (await IsNotFoundConflictAsync(response, cancellationToken))
                 return []; // path/not_found for a missing directory.
             using var json = await ParseSuccessAsync(response, cancellationToken);
             var root = json.RootElement;
@@ -190,8 +190,8 @@ public sealed class DropboxConnection : ICloudConnection, IAsyncDisposable
     {
         var body = JsonSerializer.Serialize(new { path = DropboxPath(RequireFilePath(path)) });
         using var response = await SendRpcAsync("/2/files/delete_v2", body, cancellationToken);
-        if (response.StatusCode == HttpStatusCode.Conflict)
-            return; // path/not_found: already gone.
+        if (await IsNotFoundConflictAsync(response, cancellationToken))
+            return; // path_lookup/not_found: already gone.
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
@@ -407,6 +407,32 @@ public sealed class DropboxConnection : ICloudConnection, IAsyncDisposable
     }
 
     /// <summary>Converts unsuccessful Dropbox responses into a sanitized exception.</summary>
+    /// <summary>
+    /// Dropbox reports every endpoint error as HTTP 409 (e.g. <c>path/restricted_content</c>,
+    /// <c>path/malformed_path</c>). Only a <c>…/not_found</c> summary means the item is absent;
+    /// treating any other 409 as "missing" would make an unreadable folder look empty and let a
+    /// two-way sync with deletions remove its local copy.
+    /// </summary>
+    private static async Task<bool> IsNotFoundConflictAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        if (response.StatusCode != HttpStatusCode.Conflict)
+            return false;
+        try
+        {
+            using var json = JsonDocument.Parse(
+                await response.Content.ReadAsStringAsync(cancellationToken));
+            var summary = GetOptionalString(json.RootElement, "error_summary") ?? string.Empty;
+            var parts = summary.Split('/');
+            return parts.Length > 1 && parts[1] == "not_found";
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
     private static async Task EnsureSuccessAsync(
         HttpResponseMessage response,
         CancellationToken cancellationToken = default)

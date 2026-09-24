@@ -257,7 +257,13 @@ public sealed class RsyncProcessRunner : IRsyncProcessRunner
 
     private static List<string> BuildTransferArguments(OptimizedSyncRequest request)
     {
-        var arguments = new List<string> { "--archive", "--protect-args" };
+        // --archive implies -l/-D: a remote symlink (e.g. "x -> /data/kaimo-system") or device
+        // node would be recreated inside the local share, and the path-containment checks only
+        // look at the textual path. Skip symlinks and special files in both directions.
+        var arguments = new List<string>
+        {
+            "--archive", "--protect-args", "--no-links", "--no-devices", "--no-specials"
+        };
         if (request.DeleteExtraneousFiles)
             arguments.Add("--delete");
         if (request.MaximumFileSizeBytes is > 0)

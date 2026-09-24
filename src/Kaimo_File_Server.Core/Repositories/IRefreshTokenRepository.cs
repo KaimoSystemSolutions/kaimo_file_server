@@ -24,9 +24,12 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <summary>
         /// Atomically rotates a token: revokes <paramref name="current"/> (linking
         /// it to the replacement) and inserts <paramref name="replacement"/> in one
-        /// transaction, so a crash cannot leave the chain half-updated.
+        /// transaction, so a crash cannot leave the chain half-updated. The revoke is
+        /// conditional on <paramref name="current"/> still being unrevoked, so of two
+        /// concurrent rotations of the same token exactly one wins.
         /// </summary>
-        Task RotateAsync(RefreshToken current, RefreshToken replacement);
+        /// <returns><c>false</c> when the token was already revoked (lost race); nothing is written.</returns>
+        Task<bool> RotateAsync(RefreshToken current, RefreshToken replacement);
 
         /// <summary>Revokes every active token for a device (device logout/revocation).</summary>
         Task RevokeAllForDeviceAsync(Guid deviceId, DateTime whenUtc);

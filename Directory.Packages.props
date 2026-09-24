@@ -8,6 +8,8 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <!-- Allow the floating xunit/Moq versions (2.* / 4.*) that the test project already used. -->
     <CentralPackageFloatingVersionsEnabled>true</CentralPackageFloatingVersionsEnabled>
+    <!-- Let PackageVersion entries pin transitive dependencies too (e.g. AngleSharp via bunit). -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
   <ItemGroup>
@@ -66,6 +68,8 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
     <PackageVersion Include="Moq" Version="4.*" />
     <PackageVersion Include="bunit" Version="1.*" />
+    <!-- Pin the transitive AngleSharp bunit pulls in. -->
+    <PackageVersion Include="AngleSharp" Version="1.8.2" />
   </ItemGroup>
 
 </Project>
