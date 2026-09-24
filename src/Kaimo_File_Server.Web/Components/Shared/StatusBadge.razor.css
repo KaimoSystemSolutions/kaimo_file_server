@@ -10,6 +10,10 @@
 .status-badge {
     display: inline-flex;
     width: fit-content;
+    /* Uniform footprint so short states (Healthy, Disabled, Active, …) line up
+       as equal-sized pills in table columns; longer labels still grow. */
+    min-width: 88px;
+    justify-content: center;
     align-items: center;
     gap: 6px;
     min-height: 22px;

@@ -112,12 +112,12 @@ else
                         <span class="detail-subtitle">@VM.Selected.Name</span>
                     </div>
 
-                    <Tabs aria-label="Abteilungseinstellungen">
-                        <Tab Active="@(_activeTab == DepartmentDetailTab.General)" Icon="settings.svg" Label="Allgemein"
+                    <Tabs aria-label="@Resources.Web_Dept_EditDepartment">
+                        <Tab Active="@(_activeTab == DepartmentDetailTab.General)" Icon="settings.svg" Label="@Resources.Web_Admin_EditTab_General"
                              OnClick="() => SwitchTab(DepartmentDetailTab.General)" />
-                        <Tab Active="@(_activeTab == DepartmentDetailTab.Permissions)" Icon="shield.svg" Label="Berechtigungen"
+                        <Tab Active="@(_activeTab == DepartmentDetailTab.Permissions)" Icon="shield.svg" Label="@Resources.Web_Admin_Label_Permissions"
                              OnClick="() => SwitchTab(DepartmentDetailTab.Permissions)" />
-                        <Tab Active="@(_activeTab == DepartmentDetailTab.Assignments)" Icon="users.svg" Label="Zuordnungen"
+                        <Tab Active="@(_activeTab == DepartmentDetailTab.Assignments)" Icon="users.svg" Label="@Resources.Web_Admin_EditTab_Assignment"
                              OnClick="() => SwitchTab(DepartmentDetailTab.Assignments)" />
                     </Tabs>
 
@@ -167,7 +167,6 @@ else
                     <div class="detail-section" style="margin-top: 16px;">
                         <span class="detail-label">@Resources.Web_Dept_DefaultFilePerm</span>
                         <p class="form-hint" style="margin-bottom: 8px;">
-                            Wird als virtueller Allow-Layer im ACL-System ausgewertet.
                         @Resources.Web_Dept_DefaultFilePermHint
                         </p>
                         <div class="toggle-row" style="margin-bottom: 12px;">
@@ -194,7 +193,7 @@ else
                         }
                         else if (VM.EditParentId.HasValue)
                         {
-                            <span class="detail-field-value detail-field-value--empty">Wird von Elternabteilung geerbt.</span>
+                            <span class="detail-field-value detail-field-value--empty">@Resources.Web_Dept_InheritedFromParent</span>
                         }
                         else
                         {
@@ -272,12 +271,12 @@ else
                         </span>
                     </div>
 
-                    <Tabs aria-label="Abteilungsdetails">
-                        <Tab Active="@(_activeTab == DepartmentDetailTab.General)" Icon="settings.svg" Label="Allgemein"
+                    <Tabs aria-label="@Resources.Web_Admin_Label_Department">
+                        <Tab Active="@(_activeTab == DepartmentDetailTab.General)" Icon="settings.svg" Label="@Resources.Web_Admin_EditTab_General"
                              OnClick="() => SwitchTab(DepartmentDetailTab.General)" />
-                        <Tab Active="@(_activeTab == DepartmentDetailTab.Permissions)" Icon="shield.svg" Label="Berechtigungen"
+                        <Tab Active="@(_activeTab == DepartmentDetailTab.Permissions)" Icon="shield.svg" Label="@Resources.Web_Admin_Label_Permissions"
                              OnClick="() => SwitchTab(DepartmentDetailTab.Permissions)" />
-                        <Tab Active="@(_activeTab == DepartmentDetailTab.Assignments)" Icon="users.svg" Label="Zuordnungen"
+                        <Tab Active="@(_activeTab == DepartmentDetailTab.Assignments)" Icon="users.svg" Label="@Resources.Web_Admin_EditTab_Assignment"
                              OnClick="() => SwitchTab(DepartmentDetailTab.Assignments)" />
                     </Tabs>
 
@@ -419,7 +418,7 @@ else
 <p>@Resources.Web_Dept_ConfirmDelete</p>
                                     <div style="display: flex; gap: 8px;">
                                         <button class="btn-danger-outline" @onclick="ConfirmDelete" disabled="@VM.IsSaving">
-                                            @(VM.IsSaving ? "Löscht…" : "Ja, löschen")
+                                            @(VM.IsSaving ? Resources.Web_Common_Deleting : Resources.Web_Common_YesDelete)
                                         </button>
 <button class="btn-secondary" @onclick="() => VM.IsConfirmingDelete = false">@Resources.Web_Common_Cancel</button>
                                     </div>

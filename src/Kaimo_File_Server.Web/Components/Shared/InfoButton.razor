@@ -28,7 +28,9 @@
             @onclick="Toggle"
             @onclick:stopPropagation="true"
             @onclick:preventDefault="true"
-            @onkeydown="OnKeyDown">
+            @onkeydown="OnKeyDown"
+            @onmouseleave="CloseTooltip"
+            @onfocusout="CloseTooltip">
         @* Round caps are what make info.svg's zero-length dot render — without them the
            "i" is just a thin bar. Stroke 2 matches the icon's 24×24 grid for a thin outline. *@
         @Assets.SVG("info.svg", new SvgOptions(Width: IconSize, Height: IconSize, StrokeWidth: 2f,
@@ -93,6 +95,10 @@
     private void Toggle() { _open = !_open; if (!_open) _placed = false; }
     private void Close() { _open = false; _placed = false; }
     private void OnKeyDown(KeyboardEventArgs e) { if (e.Key == "Escape") { Close(); } }
+
+    // A tap/click pins the tooltip open (touch support); release it as soon as the
+    // pointer or focus leaves, otherwise it stays visible after hovering away.
+    private void CloseTooltip() { if (IsTooltip && _open) { Close(); } }
 
     // Position the popover into the viewport once it has rendered (top layer +
     // flip/clamp). Tooltips are positioned by infoPopover.js on hover/focus.

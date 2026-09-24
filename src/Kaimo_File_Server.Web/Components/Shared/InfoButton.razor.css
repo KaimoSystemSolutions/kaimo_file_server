@@ -68,7 +68,6 @@
 .info-btn--open .info-btn__tip {
     visibility: visible;
     opacity: 1;
-    pointer-events: auto;
 }
 
 /* -- Popover mode (rich ChildContent) -- */
