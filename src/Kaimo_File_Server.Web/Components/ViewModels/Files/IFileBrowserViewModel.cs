@@ -122,6 +122,12 @@ public interface IFileBrowserViewModel
     /// can show the matching icon; <c>null</c> when none applies.
     /// </summary>
     ShareLinkKind? GetShareLinkKind(FileMetadata entry) => null;
+
+    /// <summary>
+    /// The nearest public link of the given kind covering an entry, so download and upload
+    /// links on the same folder can each show their own emblem; <c>null</c> when none applies.
+    /// </summary>
+    Guid? GetShareLinkId(FileMetadata entry, ShareLinkKind kind) => null;
     IEnumerable<FileMetadata> Directories { get; }
     IEnumerable<FileMetadata> Files { get; }
     bool HasParent { get; }

@@ -1136,8 +1136,11 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     /// <inheritdoc />
     public ShareLinkKind? GetShareLinkKind(FileMetadata entry) => FindShareLink(entry)?.Kind;
 
-    // The nearest (longest-root) link covering the entry, or null.
-    private (Guid LinkId, ShareLinkKind Kind)? FindShareLink(FileMetadata entry)
+    /// <inheritdoc />
+    public Guid? GetShareLinkId(FileMetadata entry, ShareLinkKind kind) => FindShareLink(entry, kind)?.LinkId;
+
+    // The nearest (longest-root) link covering the entry, optionally of one kind only, or null.
+    private (Guid LinkId, ShareLinkKind Kind)? FindShareLink(FileMetadata entry, ShareLinkKind? onlyKind = null)
     {
         if (_sharedRoots.Count == 0) return null;
 
@@ -1148,6 +1151,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         // link rather than an ancestor's.
         foreach (var (root, linkId, kind) in _sharedRoots)
         {
+            if (onlyKind is not null && kind != onlyKind) continue;
             var matches = string.Equals(rel, root, StringComparison.OrdinalIgnoreCase)
                           || root.Length == 0
                           || rel.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase);

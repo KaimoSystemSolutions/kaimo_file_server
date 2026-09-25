@@ -548,15 +548,17 @@ public partial class FileBrowser
     }
 
     /// <summary>Jump to the share-link overview, selecting the link behind this emblem.</summary>
-    private void OpenShareLinkOverview(FileMetadata entry)
+    private static readonly ShareLinkKind[] ShareLinkEmblemOrder = [ShareLinkKind.Download, ShareLinkKind.Upload];
+
+    private void OpenShareLinkOverview(Guid linkId, ShareLinkKind kind)
     {
-        if (!CanManageLinkBehind(entry) || VM.GetShareLinkId(entry) is not Guid linkId) return;
+        if (!CanManageLink(kind)) return;
         Nav.NavigateTo($"/share-links?select={linkId}");
     }
 
-    // Whether the user may open the overview entry of the link behind an entry's emblem.
-    private bool CanManageLinkBehind(FileMetadata entry)
-        => VM.GetShareLinkKind(entry) == ShareLinkKind.Upload ? CanManageUploadLinks() : CanManageShareLinks();
+    // Whether the user may open the overview entry of a link of the given kind.
+    private bool CanManageLink(ShareLinkKind kind)
+        => kind == ShareLinkKind.Upload ? CanManageUploadLinks() : CanManageShareLinks();
 
     internal void NavigateTo(FileMetadata dir)
         => NavigateToRoutePath(VM.RouteSubPathOf(VM.ShareRelativeOf(dir)));

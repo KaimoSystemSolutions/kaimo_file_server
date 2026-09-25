@@ -501,12 +501,14 @@ else
                             @Assets.SVG(SyncMarkerIcon(syncMarker), new SvgOptions(Width: 20, Height: 20, Color: SyncMarkerColor(syncMarker.State), StrokeWidth: 2, CssClass: "sync-indicator-icon"))
                         </span>
                     }
-                    @if (VM.IsShared(entry))
+                    @* Download link first, then upload link — both show when a folder has both. *@
+                    @foreach (var kind in ShareLinkEmblemOrder)
                     {
-                        var uploadLink = VM.GetShareLinkKind(entry) == ShareLinkKind.Upload;
-                        <span class="share-indicator @(CanManageLinkBehind(entry) ? "share-indicator--clickable" : "")"
+                        if (VM.GetShareLinkId(entry, kind) is not Guid linkId) continue;
+                        var uploadLink = kind == ShareLinkKind.Upload;
+                        <span class="share-indicator @(CanManageLink(kind) ? "share-indicator--clickable" : "")"
                               title="@(uploadLink ? T("Web_ShareLinks_UploadShared") : T("Web_ShareLinks_Shared"))"
-                              @onclick="() => OpenShareLinkOverview(entry)"
+                              @onclick="() => OpenShareLinkOverview(linkId, kind)"
                               @onclick:stopPropagation="true">
                             @Assets.SVG(uploadLink ? "upload.svg" : "share.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2, CssClass: "share-indicator-icon"))
                         </span>
