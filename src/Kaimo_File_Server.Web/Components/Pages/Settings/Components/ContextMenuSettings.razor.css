@@ -8,14 +8,16 @@
 .ctx-editor {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 12px;
 }
 /* Heading uses the shared settings section-label styling (11px uppercase),
    matching every other settings tab — no size override here. */
 
-/* intro: an info button (left, so it's seen first) + one lead line.
+/* intro: heading with the info button beside it, then one lead line.
    The lead matches the standard .settings-description (12px). */
-.ctx-intro { display: flex; align-items: center; gap: 12px; }
+.ctx-intro { display: flex; flex-direction: column; gap: 4px; }
+.ctx-title { display: flex; align-items: center; gap: 8px; margin-top: 15px; }
+.ctx-title .detail-label { margin-top: 0; }
 .ctx-lead { margin: 0; font-size: 12px; line-height: 1.55; color: var(--text-secondary); }
 
 /* panels */
@@ -28,36 +30,30 @@
 .ctx-panel-head {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 16px 18px;
+    gap: 8px;
+    padding: 10px 14px;
     border-bottom: 1px solid var(--border);
 }
-/* numbered step badge, aligned to the two-line title */
+/* small, low-key step number sitting inline with a single-line title */
 .ctx-step {
     flex: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
-    border-radius: var(--radius-surface);
-    background: var(--accent-subtle);
-    border: 1px solid var(--accent-border);
-    color: var(--accent);
-    font-size: 15px;
-    font-weight: 700;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-control);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-family: var(--font-heading); /* same face as the h3 title beside it */
+    font-size: 13px;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
-.ctx-head-titles { display: flex; flex-direction: column; gap: 1px; }
-.ctx-panel-head h3 { font-size: 17px; font-weight: 650; margin: 0; letter-spacing: -0.01em; }
-.ctx-eyebrow {
-    font-size: 11.5px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--accent);
-    font-weight: 700;
-}
-.ctx-hint { margin-left: auto; font-size: 12.5px; color: var(--text-tertiary); }
+.ctx-head-titles { display: flex; align-items: baseline; gap: 8px; }
+.ctx-panel-head h3 { font-size: 13px; font-weight: 600; margin: 0; color: var(--text-primary); }
+.ctx-hint { margin-left: auto; font-size: 12px; color: var(--text-tertiary); }
 
 /* ── matrix ── */
 .ctx-matrix-scroll { overflow-x: auto; }
@@ -76,7 +72,7 @@
 .ctx-corner {
     left: 0; top: 0; z-index: 3;
     /*text-align: left;*/
-    padding: 0 18px 16px;
+    padding: 0 14px 8px;
     /*vertical-align: bottom;*/
     /* uppercase header-label styling, matching .user-list-header on the main pages */
     font-size: 11px;
@@ -90,9 +86,8 @@
 }
 
 th.ctx-col {
-    padding-bottom: 10px;
-    padding-top: 10px;
-
+    padding-bottom: 8px;
+    padding-top: 8px;
 }
 
 .ctx-col {
@@ -107,9 +102,9 @@ th.ctx-col {
 }
 .ctx-col:hover { background: var(--bg-hover); }
 .ctx-col--sel { background: var(--accent-subtle); box-shadow: inset 0 -2px 0 var(--accent); }
-.ctx-col-ico { color: var(--text-secondary); display: block; line-height: 0; margin: 0 auto 8px; }
+.ctx-col-ico { color: var(--text-secondary); display: block; line-height: 0; margin: 0 auto 4px; }
 .ctx-col--sel .ctx-col-ico { color: var(--accent); }
-.ctx-col-nm { font-size: 12.5px; font-weight: 600; display: block; line-height: 1.2; margin-bottom: 12px; }
+.ctx-col-nm { font-size: 12.5px; font-weight: 600; display: block; line-height: 1.2; margin-bottom: 6px; }
 /* the "toggle whole category" control is a state box: filled = all on,
    dash = some on, empty = none — always visible, so it reads as a real control */
 .ctx-col-toggle { margin: 0 auto; }
@@ -139,13 +134,13 @@ th.ctx-col {
 .ctx-rowlabel-inner {
     display: flex;
     align-items: center;
-    gap: 11px;
-    height: 46px;
-    padding: 0 18px;
+    gap: 10px;
+    height: 34px;
+    padding: 0 14px;
 }
 .ctx-row-ico { color: var(--text-secondary); display: inline-flex; line-height: 0; flex: none; }
 .ctx-rowlabel.ctx-danger .ctx-row-ico { color: var(--danger); }
-.ctx-row-lab { font-size: 14px; }
+.ctx-row-lab { font-size: 13px; }
 .ctx-row-id {
     margin-left: auto;
     font-size: 10.5px;
@@ -156,7 +151,7 @@ th.ctx-col {
 .ctx-rowlabel:hover .ctx-row-id { opacity: .8; }
 
 .ctx-cell {
-    height: 46px;
+    height: 34px;
     text-align: center;
     vertical-align: middle; /* without this, td defaults to baseline and the box sits on the divider */
     border-bottom: 1px solid var(--border);
@@ -193,20 +188,20 @@ tr.ctx-danger .ctx-box--on { background: var(--danger); border-color: var(--dang
 .ctx-lower {
     display: grid;
     grid-template-columns: 1fr 290px;
-    gap: 16px;
+    gap: 12px;
     align-items: start;
 }
 @media (max-width: 860px) {
     .ctx-lower { grid-template-columns: 1fr; }
 }
 
-.ctx-order { list-style: none; margin: 0; padding: 10px; display: flex; flex-direction: column; gap: 2px; }
+.ctx-order { list-style: none; margin: 0; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
 .ctx-order-item {
     position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 7px 10px;
+    padding: 4px 10px;
     border-radius: var(--radius-surface);
     border: 1px solid transparent;
     cursor: grab;
@@ -242,7 +237,7 @@ tr.ctx-danger .ctx-box--on { background: var(--danger); border-color: var(--dang
 .ctx-order-item:hover .ctx-grip { color: var(--text-secondary); }
 .ctx-order-ico { color: var(--text-secondary); line-height: 0; flex: none; }
 .ctx-order-item.ctx-danger .ctx-order-ico { color: var(--danger); }
-.ctx-order-lab { font-size: 14px; }
+.ctx-order-lab { font-size: 13px; }
 .ctx-order-btns { margin-left: auto; display: inline-flex; gap: 2px; }
 
 /* fixed divider between the reorderable main block and the pinned general items
@@ -250,8 +245,8 @@ tr.ctx-danger .ctx-box--on { background: var(--danger); border-color: var(--dang
 .ctx-order-sep { height: 1px; background: var(--border); margin: 6px 6px; list-style: none; }
 
 /* ── live preview ── */
-.ctx-preview { padding: 16px 18px 20px; }
-.ctx-preview-cap { font-size: 13px; color: var(--text-tertiary); margin: 0 0 12px; }
+.ctx-preview { padding: 12px 14px 14px; }
+.ctx-preview-cap { font-size: 13px; color: var(--text-tertiary); margin: 0 0 8px; }
 .ctx-menu {
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
@@ -263,9 +258,9 @@ tr.ctx-danger .ctx-box--on { background: var(--danger); border-color: var(--dang
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 11px;
+    padding: 6px 10px;
     border-radius: var(--radius-surface);
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-primary);
     cursor: pointer;
 }

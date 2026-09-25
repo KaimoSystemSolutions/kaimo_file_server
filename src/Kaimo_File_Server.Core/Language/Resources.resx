@@ -1231,7 +1231,7 @@
     <value>Order</value>
   </data>
   <data name="Web_Settings_Ctx_MembershipTitle" xml:space="preserve">
-    <value>Which action in which category</value>
+    <value>Available actions per item type</value>
   </data>
   <data name="Web_Settings_Ctx_MembershipHint" xml:space="preserve">
     <value>Invalid combinations are locked</value>

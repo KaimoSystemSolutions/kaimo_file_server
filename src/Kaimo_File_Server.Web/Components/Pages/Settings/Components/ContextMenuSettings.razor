@@ -3,17 +3,18 @@
 @inject AssetProvider Icons
 
 <div class="detail-section ctx-editor">
-    <span class="detail-label">@Resources.Web_Settings_ContextMenu_Detail</span>
-
     <div class="ctx-intro">
-        <InfoButton Title="@T("Web_Settings_Ctx_HelpTitle")" AriaLabel="@T("Web_Settings_Ctx_HelpTitle")">
-            <ul>
-                <li>@T("Web_Settings_Ctx_Help1")</li>
-                <li>@T("Web_Settings_Ctx_Help2")</li>
-                <li>@T("Web_Settings_Ctx_Help3")</li>
-                <li>@T("Web_Settings_Ctx_Help4")</li>
-            </ul>
-        </InfoButton>
+        <div class="ctx-title">
+            <span class="detail-label">@Resources.Web_Settings_ContextMenu_Detail</span>
+            <InfoButton Title="@T("Web_Settings_Ctx_HelpTitle")" AriaLabel="@T("Web_Settings_Ctx_HelpTitle")">
+                <ul>
+                    <li>@T("Web_Settings_Ctx_Help1")</li>
+                    <li>@T("Web_Settings_Ctx_Help2")</li>
+                    <li>@T("Web_Settings_Ctx_Help3")</li>
+                    <li>@T("Web_Settings_Ctx_Help4")</li>
+                </ul>
+            </InfoButton>
+        </div>
         <p class="ctx-lead">@T("Web_Settings_Ctx_Lead")</p>
     </div>
 
@@ -22,7 +23,6 @@
         <div class="ctx-panel-head">
             <span class="ctx-step">1</span>
             <div class="ctx-head-titles">
-                <span class="ctx-eyebrow">@T("Web_Settings_Ctx_Step1")</span>
                 <h3>@T("Web_Settings_Ctx_MembershipTitle")</h3>
             </div>
         </div>
@@ -100,7 +100,6 @@
             <div class="ctx-panel-head">
                 <span class="ctx-step">2</span>
                 <div class="ctx-head-titles">
-                    <span class="ctx-eyebrow">@T("Web_Settings_Ctx_Step2")</span>
                     <h3>@T("Web_Settings_Ctx_OrderTitle")</h3>
                 </div>
                 <span class="ctx-hint">@T("Web_Settings_Ctx_OrderHint")</span>
