@@ -4563,4 +4563,124 @@
   <data name="Web_User_MustChangePasswordNotice" xml:space="preserve">
     <value>Your initial password must be changed. Please set a new password to continue.</value>
   </data>
+  <data name="Web_Nav_Security" xml:space="preserve">
+    <value>Security</value>
+  </data>
+  <data name="Web_Perm_ViewSecurityMonitor" xml:space="preserve">
+    <value>View security overview</value>
+  </data>
+  <data name="Web_Security_Subtitle" xml:space="preserve">
+    <value>Login attempts and API / WebDAV activity per account and client.</value>
+  </data>
+  <data name="Web_Security_Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Web_Security_Stat_Successful" xml:space="preserve">
+    <value>Successful logins</value>
+  </data>
+  <data name="Web_Security_Stat_Failed" xml:space="preserve">
+    <value>Failed logins</value>
+  </data>
+  <data name="Web_Security_Stat_Locked" xml:space="preserve">
+    <value>Active lockouts</value>
+  </data>
+  <data name="Web_Security_Stat_Requests" xml:space="preserve">
+    <value>API / WebDAV requests</value>
+  </data>
+  <data name="Web_Security_Stat_Rejected" xml:space="preserve">
+    <value>Rejected requests</value>
+  </data>
+  <data name="Web_Security_Tab_Accounts" xml:space="preserve">
+    <value>Accounts</value>
+  </data>
+  <data name="Web_Security_Tab_Attempts" xml:space="preserve">
+    <value>Login attempts</value>
+  </data>
+  <data name="Web_Security_Tab_Clients" xml:space="preserve">
+    <value>Clients</value>
+  </data>
+  <data name="Web_Security_Col_Account" xml:space="preserve">
+    <value>Account</value>
+  </data>
+  <data name="Web_Security_Col_Successes" xml:space="preserve">
+    <value>Successful</value>
+  </data>
+  <data name="Web_Security_Col_Failures" xml:space="preserve">
+    <value>Failed</value>
+  </data>
+  <data name="Web_Security_Col_Lockouts" xml:space="preserve">
+    <value>Locked</value>
+  </data>
+  <data name="Web_Security_Col_Addresses" xml:space="preserve">
+    <value>Addresses</value>
+  </data>
+  <data name="Web_Security_Col_LastAttempt" xml:space="preserve">
+    <value>Last attempt</value>
+  </data>
+  <data name="Web_Security_Col_Result" xml:space="preserve">
+    <value>Result</value>
+  </data>
+  <data name="Web_Security_Col_Time" xml:space="preserve">
+    <value>Time</value>
+  </data>
+  <data name="Web_Security_Col_Address" xml:space="preserve">
+    <value>Address</value>
+  </data>
+  <data name="Web_Security_Col_Channel" xml:space="preserve">
+    <value>Channel</value>
+  </data>
+  <data name="Web_Security_Col_Rejected" xml:space="preserve">
+    <value>Rejected</value>
+  </data>
+  <data name="Web_Security_Col_LastSeen" xml:space="preserve">
+    <value>Last seen</value>
+  </data>
+  <data name="Web_Security_Col_LastPath" xml:space="preserve">
+    <value>Last path</value>
+  </data>
+  <data name="Web_Security_Outcome_Success" xml:space="preserve">
+    <value>Success</value>
+  </data>
+  <data name="Web_Security_Outcome_Invalid" xml:space="preserve">
+    <value>Invalid credentials</value>
+  </data>
+  <data name="Web_Security_Outcome_Disabled" xml:space="preserve">
+    <value>Account disabled</value>
+  </data>
+  <data name="Web_Security_Outcome_Locked" xml:space="preserve">
+    <value>Locked out</value>
+  </data>
+  <data name="Web_Security_LockedUntil" xml:space="preserve">
+    <value>Locked until {0}</value>
+  </data>
+  <data name="Web_Security_UnknownAccount" xml:space="preserve">
+    <value>Unknown account</value>
+  </data>
+  <data name="Web_Security_Filter" xml:space="preserve">
+    <value>Filter by account or address</value>
+  </data>
+  <data name="Web_Security_FailedOnly" xml:space="preserve">
+    <value>Failed only</value>
+  </data>
+  <data name="Web_Security_Empty" xml:space="preserve">
+    <value>Nothing recorded yet.</value>
+  </data>
+  <data name="Web_Security_Period" xml:space="preserve">
+    <value>Period</value>
+  </data>
+  <data name="Web_Security_Period_Day" xml:space="preserve">
+    <value>Last 24 hours</value>
+  </data>
+  <data name="Web_Security_Period_Week" xml:space="preserve">
+    <value>Last 7 days</value>
+  </data>
+  <data name="Web_Security_Period_Month" xml:space="preserve">
+    <value>Last 30 days</value>
+  </data>
+  <data name="Web_Security_Period_Year" xml:space="preserve">
+    <value>Last 365 days</value>
+  </data>
+  <data name="Web_Security_ListNote" xml:space="preserve">
+    <value>Each list shows up to {0} entries. Entries are kept for {1} days.</value>
+  </data>
 </root>

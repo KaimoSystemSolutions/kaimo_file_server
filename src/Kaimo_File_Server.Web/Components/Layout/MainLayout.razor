@@ -71,6 +71,14 @@
                 </NavLink>
             }
 
+            @if (_canViewSecurity)
+            {
+                <NavLink class="nav-item" href="/security" Match="NavLinkMatch.Prefix">
+                    @Assets.SVG("shield.svg", new SvgOptions())
+                    <span class="nav-label">@Text("Web_Nav_Security", "Security")</span>
+                </NavLink>
+            }
+
         </div>
 
 
@@ -195,6 +203,7 @@
     private bool _canManageUsers;
     private bool _canViewDepartments;
     private bool _canManageShareLinks;
+    private bool _canViewSecurity;
     private UserContext? _currentUser;
     
     [Inject] private IJSRuntime JS { get; set; } = default!;
@@ -339,6 +348,9 @@
             _canManageShareLinks = _currentUser != null
                                    && await ManagementAuthService.HasAnyPermissionAsync(
                                           _currentUser, ManagementPermission.ManageShareLinks);
+            _canViewSecurity = _currentUser != null
+                               && await ManagementAuthService.HasAnyPermissionAsync(
+                                      _currentUser, ManagementPermission.ViewSecurityMonitor);
         }
 
         if (_currentUser?.User.MustChangePassword == true)

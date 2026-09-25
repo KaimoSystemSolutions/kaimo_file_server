@@ -48,6 +48,7 @@
         ManageCertificates = 1L << 42,  // view/download/replace the HTTPS server certificate
         ViewSystemLogs = 1L << 43,  // view and download retained service logs
         ManageBackups = 1L << 44,  // configure/create/download database backups
+        ViewSecurityMonitor = 1L << 45,  // view login attempts and API/WebDAV request activity per client
 
         // -- Sync --
         CreateSyncs = 1L << 48, // sync a folder with an external cloud
@@ -87,7 +88,7 @@
                   | AssignGroups | AssignRoles | AssignDepartments
                   | EditDepartment | ViewDepartment
                   | SystemAdmin | SyncAdmin | CloudAccessAdmin
-                  | ManageClientDevices,
+                  | ManageClientDevices | ViewSecurityMonitor,
         
         SyncAdmin = CreateSyncs | DeleteSyncs | ConfigureSyncs | SyncManually,
 

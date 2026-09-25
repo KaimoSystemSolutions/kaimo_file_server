@@ -155,6 +155,18 @@ builder.Services.AddSingleton<WebDavLockManager>();
 builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(
     options => ForwardedHeadersSetup.Configure(options, builder.Configuration));
 
+// Security overview: records every credential check (web, API, WebDAV) and counts
+// API/WebDAV requests per client, persisted in batches by the flush service.
+// Wraps the login service registered by AddInfrastructure.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<SecurityMonitor>();
+builder.Services.AddHostedService<SecurityMonitorFlushService>();
+builder.Services.AddScoped<CredentialLoginService>();
+builder.Services.AddScoped<ILoginService>(sp => new MonitoredLoginService(
+    sp.GetRequiredService<CredentialLoginService>(),
+    sp.GetRequiredService<SecurityMonitor>(),
+    sp.GetRequiredService<IHttpContextAccessor>()));
+
 // Issues/rotates client-API access + refresh tokens.
 builder.Services.AddScoped<ApiTokenService>();
 
@@ -277,6 +289,7 @@ builder.Services.AddScoped<PublicShareFileBrowserViewModel>();
 builder.Services.AddScoped<Kaimo_File_Server.Web.Services.ShareLinkService>();
 builder.Services.AddSingleton<ShareLinkTokenProtector>();
 builder.Services.AddScoped<ShareLinkListViewModel>();
+builder.Services.AddScoped<SecurityMonitorViewModel>();
 builder.Services.AddScoped<UserListViewModel>();
 builder.Services.AddScoped<Kaimo_File_Server.Web.Components.ProfileNavigator>();
 builder.Services.AddScoped<AclEditorViewModel>();
@@ -460,6 +473,9 @@ else
 // Resolve the real client scheme/IP from the reverse proxy before anything reads
 // Request.IsHttps (the WebDAV Basic handler's HTTPS requirement depends on it).
 app.UseForwardedHeaders();
+
+// Count API/WebDAV requests per real client address (after the forwarded headers).
+app.UseMiddleware<SecurityMonitorMiddleware>();
 
 // Authenticate/authorize before antiforgery and endpoints so [Authorize] API
 // controllers see the JWT-derived principal. Blazor keeps its own cascading auth.

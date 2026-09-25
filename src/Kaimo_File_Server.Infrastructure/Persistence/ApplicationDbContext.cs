@@ -19,6 +19,8 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<Role> Roles { get; set; }
         public DbSet<UserGroup> UserGroups { get; set; }
         public DbSet<RevokedWebToken> RevokedWebTokens { get; set; }
+        public DbSet<LoginAttemptRecord> LoginAttempts { get; set; }
+        public DbSet<ClientActivityBucket> ClientActivityBuckets { get; set; }
 
         // -- Files & Shares --
         public DbSet<FileMetadata> FileMetadata { get; set; }
@@ -92,6 +94,34 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.Jti).HasMaxLength(64);
                 // Drives retention pruning of expired entries.
                 entity.HasIndex(e => e.ExpiresAtUtc);
+            });
+
+            // -- Security overview: login attempts and hourly API/WebDAV activity per client --
+            modelBuilder.Entity<LoginAttemptRecord>(entity =>
+            {
+                entity.ToTable("login_attempts");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id).ValueGeneratedOnAdd();
+                entity.Property(e => e.Username).IsRequired().HasMaxLength(256);
+                entity.Property(e => e.Address).HasMaxLength(64);
+                // Stored as text so the table stays readable for ad-hoc SQL analysis.
+                entity.Property(e => e.Channel).IsRequired().HasConversion<string>().HasMaxLength(16);
+                entity.Property(e => e.Outcome).IsRequired().HasConversion<string>().HasMaxLength(32);
+                // Period filter and retention pruning; per-account history.
+                entity.HasIndex(e => e.AtUtc);
+                entity.HasIndex(e => new { e.Username, e.AtUtc });
+                entity.HasIndex(e => e.LockedUntilUtc);
+            });
+
+            modelBuilder.Entity<ClientActivityBucket>(entity =>
+            {
+                entity.ToTable("client_activity");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id).ValueGeneratedOnAdd();
+                entity.Property(e => e.Address).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.LastPath).IsRequired().HasMaxLength(512);
+                entity.HasIndex(e => new { e.Address, e.HourUtc }).IsUnique();
+                entity.HasIndex(e => e.LastSeenUtc);
             });
 
             modelBuilder.Entity<Group>(entity =>

@@ -142,6 +142,9 @@ public static class SearchDestinations
         new("Web_Nav_DeviceAdmin",
             ["client devices", "geräte", "clients", "device", "mobile app"],
             "/settings?tab=clientdevices", "refresh.svg", ManagementPermission.ManageClientDevices),
+        new("Web_Nav_Security",
+            ["security", "sicherheit", "login attempts", "anmeldeversuche", "lockout", "sperre", "api requests"],
+            "/security", "shield.svg", ManagementPermission.ViewSecurityMonitor),
     };
 
     /// <summary>

@@ -1,0 +1,303 @@
+@page "/security"
+@using Kaimo_File_Server.Core.Domain.Identity
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Security
+@using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Services
+@inherits AppComponentBase
+@inject SecurityMonitorViewModel VM
+@inject DateFormatService DateFmt
+@implements IDisposable
+
+@*
+    Security overview: who tried to sign in (web, REST API, WebDAV), from which address, and
+    which clients sent the most API / WebDAV requests within the selected period. Data comes
+    from the persisted security events (login_attempts, client_activity). Gated by
+    ManagementPermission.ViewSecurityMonitor.
+*@
+
+<div class="page-header">
+    <div>
+        <h1>@T("Web_Nav_Security", "Security")</h1>
+        <p class="subtitle">@T("Web_Security_Subtitle", "Login attempts and API / WebDAV activity per account and client.")</p>
+    </div>
+    @if (VM.CanAccessPage)
+    {
+        <div class="security-header-actions">
+            <select class="edit-input security-period" aria-label="@T("Web_Security_Period", "Period")"
+                    value="@VM.PeriodDays" @onchange="e => VM.SetPeriodAsync(int.Parse((string)e.Value!))">
+                @foreach (var days in SecurityMonitorViewModel.PeriodOptions)
+                {
+                    <option value="@days">@PeriodLabel(days)</option>
+                }
+            </select>
+            <button class="btn-secondary security-refresh" type="button" @onclick="VM.RefreshAsync">
+                @Assets.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                <span>@T("Web_Security_Refresh", "Refresh")</span>
+            </button>
+        </div>
+    }
+</div>
+
+@if (VM.IsLoading)
+{
+    <div class="loading-state"><div class="spinner"></div><p>@Resources.Web_Common_Loading</p></div>
+}
+else if (!VM.CanAccessPage)
+{
+    <div class="error-banner">@Resources.Web_Admin_NoPermission</div>
+}
+else if (VM.ErrorMessage is not null)
+{
+    <div class="error-banner">@VM.ErrorMessage</div>
+}
+else
+{
+    <div class="security-stats">
+        <div class="security-stat">
+            <span class="security-stat__label">@T("Web_Security_Stat_Successful", "Successful logins")</span>
+            <span class="security-stat__value">@VM.Totals.Successes</span>
+        </div>
+        <div class="security-stat @(VM.Totals.Failures > 0 ? "security-stat--negative" : "")">
+            <span class="security-stat__label">@T("Web_Security_Stat_Failed", "Failed logins")</span>
+            <span class="security-stat__value">@VM.Totals.Failures</span>
+        </div>
+        <div class="security-stat @(VM.Totals.ActiveLockouts > 0 ? "security-stat--warning" : "")">
+            <span class="security-stat__label">@T("Web_Security_Stat_Locked", "Active lockouts")</span>
+            <span class="security-stat__value">@VM.Totals.ActiveLockouts</span>
+        </div>
+        <div class="security-stat">
+            <span class="security-stat__label">@T("Web_Security_Stat_Requests", "API / WebDAV requests")</span>
+            <span class="security-stat__value">@VM.Totals.Requests</span>
+        </div>
+        <div class="security-stat @(VM.Totals.Rejected > 0 ? "security-stat--warning" : "")">
+            <span class="security-stat__label">@T("Web_Security_Stat_Rejected", "Rejected requests")</span>
+            <span class="security-stat__value">@VM.Totals.Rejected</span>
+        </div>
+    </div>
+
+    <div class="security-panel">
+        <Tabs Class="detail-tabs--panel" aria-label="@T("Web_Nav_Security", "Security")">
+            <Tab Active="_tab == Tab.Accounts" Icon="user.svg" OnClick="() => _tab = Tab.Accounts"
+                 Label="@T("Web_Security_Tab_Accounts", "Accounts")" />
+            <Tab Active="_tab == Tab.Attempts" Icon="shield.svg" OnClick="() => _tab = Tab.Attempts"
+                 Label="@T("Web_Security_Tab_Attempts", "Login attempts")" />
+            <Tab Active="_tab == Tab.Clients" Icon="globe.svg" OnClick="() => _tab = Tab.Clients"
+                 Label="@T("Web_Security_Tab_Clients", "Clients")" />
+        </Tabs>
+
+        @switch (_tab)
+        {
+            case Tab.Accounts:
+                @if (VM.Accounts.Count == 0)
+                {
+                    <div class="empty-state"><p>@T("Web_Security_Empty", "Nothing recorded yet.")</p></div>
+                }
+                else
+                {
+                    <div class="security-table-wrap">
+                        <table class="security-table">
+                            <thead>
+                                <tr>
+                                    <th>@T("Web_Security_Col_Account", "Account")</th>
+                                    <th class="num">@T("Web_Security_Col_Successes", "Successful")</th>
+                                    <th class="num">@T("Web_Security_Col_Failures", "Failed")</th>
+                                    <th class="num">@T("Web_Security_Col_Lockouts", "Locked")</th>
+                                    <th class="num">@T("Web_Security_Col_Addresses", "Addresses")</th>
+                                    <th>@T("Web_Security_Col_LastAttempt", "Last attempt")</th>
+                                    <th>@T("Web_Security_Col_Result", "Result")</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in VM.Accounts)
+                                {
+                                    <tr class="security-row--clickable" @onclick="() => ShowAttempts(row.Username)">
+                                        <td>
+                                            <strong>@(string.IsNullOrEmpty(row.Username) ? "—" : row.Username)</strong>
+                                            @if (!VM.KnownAccounts.Contains(row.Username))
+                                            {
+                                                <small class="security-muted">@T("Web_Security_UnknownAccount", "Unknown account")</small>
+                                            }
+                                        </td>
+                                        <td class="num">@row.Successes</td>
+                                        <td class="num @(row.Failures > 0 ? "security-negative" : "")">@row.Failures</td>
+                                        <td class="num @(row.Lockouts > 0 ? "security-warning" : "")">@row.Lockouts</td>
+                                        <td class="num">@row.Addresses</td>
+                                        <td>
+                                            @DateFmt.FormatDateTime(row.LastAttemptUtc)
+                                            <small class="security-muted">@(row.LastAddress ?? "—")</small>
+                                        </td>
+                                        <td>
+                                            @if (row.LockedUntilUtc is { } until)
+                                            {
+                                                <StatusBadge Tone="StatusTone.Warning"
+                                                             Label="@string.Format(T("Web_Security_LockedUntil", "Locked until {0}"), DateFmt.FormatDateTime(until))" />
+                                            }
+                                            else if (row.Failures + row.Lockouts > 0)
+                                            {
+                                                <StatusBadge Tone="StatusTone.Negative" Label="@T("Web_Security_Col_Failures", "Failed")" />
+                                            }
+                                            else
+                                            {
+                                                <StatusBadge Tone="StatusTone.Positive" Label="@T("Web_Security_Outcome_Success", "Success")" />
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                break;
+
+            case Tab.Attempts:
+                <div class="security-toolbar">
+                    <input class="edit-input security-filter" type="search"
+                           @bind="_filter" @bind:event="oninput" @bind:after="ApplyFilterAsync"
+                           placeholder="@T("Web_Security_Filter", "Filter by account or address")" />
+                    <label class="security-toggle">
+                        <input type="checkbox" @bind="_failedOnly" @bind:after="ApplyFilterAsync" />
+                        <span>@T("Web_Security_FailedOnly", "Failed only")</span>
+                    </label>
+                </div>
+                @if (VM.Attempts.Count == 0)
+                {
+                    <div class="empty-state"><p>@T("Web_Security_Empty", "Nothing recorded yet.")</p></div>
+                }
+                else
+                {
+                    <div class="security-table-wrap">
+                        <table class="security-table">
+                            <thead>
+                                <tr>
+                                    <th>@T("Web_Security_Col_Time", "Time")</th>
+                                    <th>@T("Web_Security_Col_Account", "Account")</th>
+                                    <th>@T("Web_Security_Col_Address", "Address")</th>
+                                    <th>@T("Web_Security_Col_Channel", "Channel")</th>
+                                    <th>@T("Web_Security_Col_Result", "Result")</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var a in VM.Attempts)
+                                {
+                                    <tr>
+                                        <td>@DateFmt.FormatDateTime(a.AtUtc)</td>
+                                        <td><strong>@(string.IsNullOrEmpty(a.Username) ? "—" : a.Username)</strong></td>
+                                        <td class="security-mono">@(a.Address ?? "—")</td>
+                                        <td>@ChannelLabel(a.Channel)</td>
+                                        <td><StatusBadge Tone="OutcomeTone(a.Outcome)" Label="@OutcomeLabel(a.Outcome)" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                break;
+
+            case Tab.Clients:
+                @if (VM.Clients.Count == 0)
+                {
+                    <div class="empty-state"><p>@T("Web_Security_Empty", "Nothing recorded yet.")</p></div>
+                }
+                else
+                {
+                    <div class="security-table-wrap">
+                        <table class="security-table">
+                            <thead>
+                                <tr>
+                                    <th>@T("Web_Security_Col_Address", "Address")</th>
+                                    <th class="num">API</th>
+                                    <th class="num">WebDAV</th>
+                                    <th class="num">@T("Web_Security_Col_Rejected", "Rejected")</th>
+                                    <th>@T("Web_Security_Col_LastSeen", "Last seen")</th>
+                                    <th>@T("Web_Security_Col_LastPath", "Last path")</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var c in VM.Clients)
+                                {
+                                    <tr class="security-row--clickable" @onclick="() => ShowAttempts(c.Address)">
+                                        <td class="security-mono"><strong>@c.Address</strong></td>
+                                        <td class="num">@c.ApiRequests</td>
+                                        <td class="num">@c.WebDavRequests</td>
+                                        <td class="num @(c.RejectedRequests > 0 ? "security-negative" : "")">@c.RejectedRequests</td>
+                                        <td>@DateFmt.FormatDateTime(c.LastSeenUtc)</td>
+                                        <td class="security-mono security-path" title="@c.LastPath">@c.LastPath</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                break;
+        }
+    </div>
+
+    <p class="security-note">
+        @string.Format(T("Web_Security_ListNote", "Each list shows up to {0} entries. Entries are kept for {1} days."),
+            SecurityMonitorViewModel.ListLimit, VM.RetentionDays)
+    </p>
+}
+
+@code {
+    private enum Tab { Accounts, Attempts, Clients }
+
+    private Tab _tab = Tab.Accounts;
+    private string _filter = "";
+    private bool _failedOnly;
+
+    private static string T(string key, string fallback)
+        => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    protected override async Task OnInitializedAsync()
+    {
+        VM.OnStateChanged += OnStateChanged;
+        await VM.LoadAsync();
+    }
+
+    private void OnStateChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => VM.OnStateChanged -= OnStateChanged;
+
+    // Jumps from an account or client row to its individual attempts.
+    private async Task ShowAttempts(string filter)
+    {
+        _filter = filter;
+        _tab = Tab.Attempts;
+        await ApplyFilterAsync();
+    }
+
+    private Task ApplyFilterAsync() => VM.SetAttemptFilterAsync(_filter, _failedOnly);
+
+    private static string PeriodLabel(int days) => days switch
+    {
+        1 => T("Web_Security_Period_Day", "Last 24 hours"),
+        7 => T("Web_Security_Period_Week", "Last 7 days"),
+        30 => T("Web_Security_Period_Month", "Last 30 days"),
+        _ => T("Web_Security_Period_Year", "Last 365 days"),
+    };
+
+    private static string ChannelLabel(SecurityChannel channel) => channel switch
+    {
+        SecurityChannel.Api => "API",
+        SecurityChannel.WebDav => "WebDAV",
+        _ => "Web",
+    };
+
+    private static StatusTone OutcomeTone(LoginOutcome outcome) => outcome switch
+    {
+        LoginOutcome.Success => StatusTone.Positive,
+        LoginOutcome.LockedOut => StatusTone.Warning,
+        LoginOutcome.AccountDisabled => StatusTone.Neutral,
+        _ => StatusTone.Negative,
+    };
+
+    private static string OutcomeLabel(LoginOutcome outcome) => outcome switch
+    {
+        LoginOutcome.Success => T("Web_Security_Outcome_Success", "Success"),
+        LoginOutcome.LockedOut => T("Web_Security_Outcome_Locked", "Locked out"),
+        LoginOutcome.AccountDisabled => T("Web_Security_Outcome_Disabled", "Account disabled"),
+        _ => T("Web_Security_Outcome_Invalid", "Invalid credentials"),
+    };
+}

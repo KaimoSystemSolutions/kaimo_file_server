@@ -413,6 +413,8 @@ public class UserListViewModel
             new(ManagementPermission.ManageCertificates, Resources.Web_Perm_ManageCertificates),
             new(ManagementPermission.ViewSystemLogs, Resources.Web_Perm_ViewSystemLogs),
             new(ManagementPermission.ManageBackups, Resources.Web_Perm_ManageBackups),
+            new(ManagementPermission.ViewSecurityMonitor,
+                Resources.ResourceManager.GetString("Web_Perm_ViewSecurityMonitor") ?? "View security overview"),
         ]),
         new(Resources.Web_PermGroup_ExternalStorage,
         [
