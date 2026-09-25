@@ -140,6 +140,20 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
         return File.Exists(fullPath) ? fullPath : null;
     }
 
+    public bool DeleteBackup(string fileName)
+    {
+        if (_demo?.ReadOnly == true)
+            throw new ReadOnlyDemoException();
+
+        var path = ResolveBackupPath(fileName);
+        if (path is null)
+            return false;
+
+        File.Delete(path);
+        _logger.LogInformation("Deleted backup {FileName}.", fileName);
+        return true;
+    }
+
     public async Task RestoreAsync(string path, CancellationToken cancellationToken = default)
     {
         if (!File.Exists(path))

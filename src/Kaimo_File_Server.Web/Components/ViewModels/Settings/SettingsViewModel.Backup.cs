@@ -37,6 +37,45 @@ public partial class SettingsViewModel
         return $"{baseUri.TrimEnd('/')}/api/database-backups/download?token={token}";
     }
 
+    /// <summary>Deletes an existing backup file and refreshes the list.</summary>
+    public bool DeleteBackup(string fileName)
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!CanManageBackups)
+        {
+            ErrorMessage = Resources.Web_Settings_NoPermissionChange;
+            return false;
+        }
+
+        try
+        {
+            if (!_backupService.DeleteBackup(fileName))
+            {
+                ErrorMessage = R("Web_Settings_Backup_DeleteFailed");
+                return false;
+            }
+            SuccessMessage = R("Web_Settings_Backup_Deleted");
+            return true;
+        }
+        catch (Kaimo_File_Server.Core.Security.ReadOnlyDemoException)
+        {
+            ErrorMessage = R("Web_Demo_ReadOnlyNotice");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to delete backup {FileName}", fileName);
+            ErrorMessage = R("Web_Settings_Backup_DeleteFailed");
+            return false;
+        }
+        finally
+        {
+            RefreshBackups();
+        }
+    }
+
     /// <summary>Saves the backup schedule/retention settings.</summary>
     public async Task<bool> SaveBackupAsync()
     {

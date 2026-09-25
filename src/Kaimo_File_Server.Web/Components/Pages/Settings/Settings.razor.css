@@ -311,6 +311,94 @@
     line-height: 1.55;
 }
 
+/* Breathing room between a service toggle row and the option checkbox below it
+   (e.g. WebDAV -> "Require HTTPS"). */
+.settings-page ::deep .service-row + .pw-rule {
+    margin-top: 14px;
+}
+
+/* Certificate forms: the longest (German) labels exceed the default 200px label
+   column, so widen it there to keep every control and button in one column. */
+@media (min-width: 621px) {
+    .settings-page ::deep .cert-form .settings-field-label {
+        flex: 0 0 280px;
+    }
+}
+
+/* -- Shared data table (client devices, backups) -- */
+
+.settings-page ::deep .data-table-wrap {
+    overflow-x: auto;
+}
+
+.settings-page ::deep .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.settings-page ::deep .data-table thead th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-tertiary);
+    background: var(--bg-sunken);
+    padding: 8px 12px;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+}
+
+.settings-page ::deep .data-table thead th:first-child {
+    border-top-left-radius: 6px;
+}
+
+.settings-page ::deep .data-table thead th:last-child {
+    border-top-right-radius: 6px;
+}
+
+.settings-page ::deep .data-table tbody td {
+    padding: 8px 12px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    word-break: break-word;
+}
+
+.settings-page ::deep .data-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.settings-page ::deep .data-table tbody tr:hover td {
+    background: var(--bg-hover);
+}
+
+/* Backup rows are short single-line values; keep them on one line and centered. */
+.settings-page ::deep .backup-table tbody td {
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.settings-page ::deep .backup-table__size {
+    text-align: right;
+}
+
+.settings-page ::deep .backup-table__actions {
+    text-align: right;
+    width: 1%;
+}
+
+.settings-page ::deep .backup-table__actions > * + * {
+    margin-left: 6px;
+}
+
+.settings-page ::deep .backup-table__confirm {
+    color: var(--danger);
+    font-size: 12px;
+    font-weight: 600;
+}
+
 @media (max-width: 800px) {
     /* Single column: let the whole page scroll normally instead of trapping
        content inside a fixed-height pane. */

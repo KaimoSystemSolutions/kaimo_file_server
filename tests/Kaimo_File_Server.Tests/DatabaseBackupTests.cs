@@ -141,6 +141,20 @@ public sealed class DatabaseBackupTests
         Assert.Null(service.ResolveBackupPath("kaimo_20260820-031542_manual.dump")); // does not exist
     }
 
+    [Fact]
+    public void DeleteBackup_Removes_ValidFile_And_Rejects_Traversal()
+    {
+        using var temp = new TempDir();
+        var service = CreateService(temp.Path);
+        var outside = Path.Combine(Path.GetDirectoryName(temp.Path)!, "kaimo_20260820-031542_manual.dump");
+        var real = WriteBackup(temp.Path, DateTimeOffset.Now, BackupTrigger.Manual);
+
+        Assert.False(service.DeleteBackup("../" + Path.GetFileName(outside)));
+        Assert.True(service.DeleteBackup(Path.GetFileName(real)));
+        Assert.False(File.Exists(real));
+        Assert.False(service.DeleteBackup(Path.GetFileName(real))); // already gone
+    }
+
     // ── Startup restore target resolution ─────────────────────────────
 
     [Fact]

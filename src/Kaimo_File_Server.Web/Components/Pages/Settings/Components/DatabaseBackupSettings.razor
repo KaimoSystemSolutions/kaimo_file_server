@@ -57,32 +57,55 @@
     }
     else
     {
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>@R("Web_Settings_Backup_Col_Created")</th>
-                    <th>@R("Web_Settings_Backup_Col_Type")</th>
-                    <th>@R("Web_Settings_Backup_Col_Size")</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var backup in VM.Backups)
-                {
+        <div class="data-table-wrap">
+            <table class="data-table backup-table">
+                <thead>
                     <tr>
-                        <td>@DateFmt.FormatDateTimeLocal(backup.CreatedAtLocal.DateTime)</td>
-                        <td>@TriggerLabel(backup.Trigger)</td>
-                        <td>@FormatSize(backup.SizeBytes)</td>
-                        <td><button type="button" class="btn-secondary" @onclick="() => DownloadAsync(backup.FileName)">@R("Web_Settings_Backup_Download")</button></td>
+                        <th>@R("Web_Settings_Backup_Col_Created")</th>
+                        <th>@R("Web_Settings_Backup_Col_Type")</th>
+                        <th class="backup-table__size">@R("Web_Settings_Backup_Col_Size")</th>
+                        <th></th>
                     </tr>
-                }
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach (var backup in VM.Backups)
+                    {
+                        <tr>
+                            <td>@DateFmt.FormatDateTimeLocal(backup.CreatedAtLocal.DateTime)</td>
+                            <td>@TriggerLabel(backup.Trigger)</td>
+                            <td class="backup-table__size">@FormatSize(backup.SizeBytes)</td>
+                            <td class="backup-table__actions">
+                                @if (_pendingDelete == backup.FileName)
+                                {
+                                    <span class="backup-table__confirm">@R("Web_Settings_Backup_DeleteConfirm")</span>
+                                    <button type="button" class="btn-danger btn-secondary--sm" @onclick="() => Delete(backup.FileName)">@R("Web_Button_Delete")</button>
+                                    <button type="button" class="btn-secondary btn-secondary--sm" @onclick="() => _pendingDelete = null">@R("Web_Button_Cancel")</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn-secondary btn-secondary--sm" @onclick="() => DownloadAsync(backup.FileName)">@R("Web_Settings_Backup_Download")</button>
+                                    <button type="button" class="btn-danger-outline btn-secondary--sm" @onclick="() => _pendingDelete = backup.FileName">@R("Web_Button_Delete")</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     }
 </div>
 
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
+
+    // File name of the backup whose inline delete confirmation is open.
+    private string? _pendingDelete;
+
+    private void Delete(string fileName)
+    {
+        _pendingDelete = null;
+        VM.DeleteBackup(fileName);
+    }
 
     private async Task Save() { await VM.SaveBackupAsync(); StateHasChanged(); }
 

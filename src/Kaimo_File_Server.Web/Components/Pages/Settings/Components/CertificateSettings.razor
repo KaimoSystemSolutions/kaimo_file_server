@@ -27,16 +27,16 @@
     else { <p class="settings-empty">@R("Web_Settings_Cert_None")</p> }
 </div>
 
-<div class="detail-section">
+<div class="detail-section cert-form">
     <span class="detail-label">@R("Web_Settings_Cert_AutoTitle")</span>
     <p class="settings-description">@R("Web_Settings_Cert_AutoDesc")</p>
     <div class="settings-row settings-row-spaced"><label class="settings-field-label">@R("Web_Settings_Cert_Lifetime")</label><select class="edit-input settings-select" @bind="VM.CertSettings.LifetimeDays"><option value="@HttpsCertificateSettings.LifetimeOneMonth">@R("Web_Settings_Cert_Lifetime1M")</option><option value="@HttpsCertificateSettings.LifetimeThreeMonths">@R("Web_Settings_Cert_Lifetime3M")</option></select></div>
     <div class="settings-row settings-row-spaced"><label class="settings-field-label">@R("Web_Settings_Cert_CommonName")</label><input type="text" class="edit-input settings-text" placeholder="@R("Web_Settings_Cert_CommonNamePlaceholder")" @bind="VM.CertSettings.CommonName" /></div>
     <div class="settings-row settings-row-spaced"><label class="settings-field-label">@R("Web_Settings_Cert_AdditionalNames")</label><input type="text" class="edit-input settings-text" placeholder="fileserver.local, 10.0.0.5" @bind="VM.CertAdditionalSansText" /></div>
-    <div class="settings-row"><button class="btn-primary" @onclick="SaveSettings">@R("Web_Settings_Cert_SaveRegenerate")</button><button class="btn-icon" title="@R("Web_Settings_Cert_RegenerateNow")" @onclick="Regenerate">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button></div>
+    <div class="settings-row settings-actions"><button class="btn-primary" @onclick="SaveSettings">@R("Web_Settings_Cert_SaveRegenerate")</button><button class="btn-icon" title="@R("Web_Settings_Cert_RegenerateNow")" @onclick="Regenerate">@Icons.SVG("refresh.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))</button></div>
 </div>
 
-<div class="detail-section">
+<div class="detail-section cert-form">
     <span class="detail-label">@R("Web_Settings_Cert_UploadTitle")</span>
     <p class="settings-description">@((MarkupString)R("Web_Settings_Cert_UploadDesc"))</p>
     <div class="settings-row settings-row-spaced"><label class="settings-field-label">@R("Web_Settings_Cert_FileCert")</label>
@@ -54,7 +54,7 @@
         </label>
     </div>
     <div class="settings-row settings-row-spaced"><label class="settings-field-label">@R("Web_Settings_Cert_Password")</label><input type="password" class="edit-input settings-select" @bind="VM.CustomCertPassword" /></div>
-    <button class="btn-primary" disabled="@(_pendingCert is null)" @onclick="Import">@R("Web_Settings_Cert_Apply")</button>
+    <div class="settings-row settings-actions"><button class="btn-primary" disabled="@(_pendingCert is null)" @onclick="Import">@R("Web_Settings_Cert_Apply")</button></div>
 </div>
 
 @code {

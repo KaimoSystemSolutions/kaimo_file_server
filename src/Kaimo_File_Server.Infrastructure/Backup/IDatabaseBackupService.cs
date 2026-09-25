@@ -30,6 +30,12 @@ public interface IDatabaseBackupService
     string? ResolveBackupPath(string fileName);
 
     /// <summary>
+    /// Deletes the backup with the given plain file name (validated like
+    /// <see cref="ResolveBackupPath"/>). Returns <c>false</c> when it does not exist.
+    /// </summary>
+    bool DeleteBackup(string fileName);
+
+    /// <summary>
     /// Restores the dump at <paramref name="path"/> into the live database
     /// (<c>pg_restore --clean --if-exists</c>). Destructive — Host only.
     /// </summary>

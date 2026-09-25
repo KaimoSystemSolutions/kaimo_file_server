@@ -1518,6 +1518,15 @@
   <data name="Web_Settings_Backup_Download" xml:space="preserve">
     <value>Herunterladen</value>
   </data>
+  <data name="Web_Settings_Backup_DeleteConfirm" xml:space="preserve">
+    <value>Dieses Backup endgültig löschen?</value>
+  </data>
+  <data name="Web_Settings_Backup_Deleted" xml:space="preserve">
+    <value>Backup gelöscht.</value>
+  </data>
+  <data name="Web_Settings_Backup_DeleteFailed" xml:space="preserve">
+    <value>Das Backup konnte nicht gelöscht werden.</value>
+  </data>
   <data name="Web_Settings_Backup_Trigger_Scheduled" xml:space="preserve">
     <value>Geplant</value>
   </data>
