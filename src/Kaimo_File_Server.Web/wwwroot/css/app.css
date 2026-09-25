@@ -3951,13 +3951,19 @@ h1, h2, h3, h4, h5, h6 {
     flex: 0 0 auto;
     height: var(--topbar-control-h);
     max-width: 200px;
-    padding: 0 10px;
+    padding: 0 30px 0 10px;
     font-size: 13px;
+    line-height: normal;
     border: 1px solid var(--border);
     border-radius: var(--radius-surface);
     background: var(--bg-secondary);
     color: var(--text-primary);
     cursor: pointer;
+    /* Custom chevron: vertically centered, inset from the edge, with room before it. */
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236e7788' stroke-width='2' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
 }
 
 .search-scope-select:focus {

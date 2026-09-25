@@ -96,7 +96,7 @@
 
 .settings-page ::deep .settings-row { display: flex; align-items: center; gap: 8px; }
 .settings-page ::deep .settings-row-spaced { margin-bottom: 16px; }
-.settings-page ::deep .settings-actions { margin-top: 16px; }
+.settings-page ::deep .settings-actions { margin-top: 24px; }
 .settings-page ::deep .settings-wrap { flex-wrap: wrap; }
 .settings-page ::deep .settings-description { margin-bottom: 16px; color: var(--text-tertiary); font-size: 12px; }
 .settings-page ::deep .settings-select { max-width: 240px; }
@@ -250,8 +250,9 @@
     background: var(--bg-secondary);
 }
 
+/* Sections span the full content width so their dividers reach edge to edge;
+   individual controls keep their own max-widths. */
 .settings-content ::deep .detail-section {
-    max-width: 780px;
     margin-bottom: 24px;
     padding-bottom: 22px;
     border-bottom: 1px solid var(--border);
@@ -272,19 +273,6 @@
 
 .settings-content ::deep .region-settings > .detail-section:first-child .settings-row {
     margin-top: 12px;
-}
-
-/* The log viewer is a full console; let it use the whole content width
-   instead of the narrow reading measure applied to form sections. */
-.settings-content ::deep .log-viewer-section {
-    max-width: none;
-}
-
-/* The global log-level section shares the tab with the full-width log console,
-   so let its divider span the whole content width instead of the 780px reading
-   measure the form sections use. The control inside keeps its own narrow width. */
-.settings-content ::deep .logging-global-section {
-    max-width: none;
 }
 
 /* Save button matches the select height so the row reads as one control pair. */
@@ -310,6 +298,11 @@
     padding: 9px 0;
     margin: 0;
     border-bottom: 1px solid var(--border-light);
+}
+
+/* Breathing room between a row divider and the checkbox list that follows it. */
+.settings-page ::deep .settings-row-spaced + .pw-rule {
+    margin-top: 16px;
 }
 
 .settings-page ::deep .settings-description {
