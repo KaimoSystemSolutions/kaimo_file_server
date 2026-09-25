@@ -5,16 +5,16 @@ namespace Kaimo_File_Server.Core.Security;
 /// <summary>
 /// Configurable, globally enforced password requirements. Persisted under
 /// <see cref="ConfigKey"/> via the config repository and edited from the
-/// settings page ("Passwort-Anforderungen" tab). The defaults reproduce the
-/// previously hard-coded behaviour (minimum length 6, no character classes),
-/// so an unconfigured system keeps working unchanged.
+/// settings page ("Passwort-Anforderungen" tab). The default requires 12 characters
+/// and no character classes (length adds more strength than composition rules).
+/// The policy only applies when a password is set; existing passwords stay valid.
 /// </summary>
 public class PasswordPolicy
 {
     public const string ConfigKey = "security.password.policy";
 
     /// <summary>Minimum number of characters. Must be at least 1.</summary>
-    public int MinLength { get; set; } = 6;
+    public int MinLength { get; set; } = 12;
 
     public bool RequireUppercase { get; set; }
     public bool RequireLowercase { get; set; }

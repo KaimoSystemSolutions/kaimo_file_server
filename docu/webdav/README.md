@@ -26,12 +26,11 @@ deployment. Hosting `/dav` on a separate hostname from the web UI is recommended
 but not required.
 
 `X-Forwarded-Proto`/`X-Forwarded-For` are only honored from trusted peers:
-by default loopback and private ranges (`10.0.0.0/8`, `172.16.0.0/12`,
-`192.168.0.0/16`, `fc00::/7`), which covers a proxy in the same Docker network.
-If your proxy has a public address, list it via
-`ForwardedHeaders__KnownProxies__0=<ip>` or
+by default loopback only. Private ranges are not trusted by default, because
+any LAN client could otherwise forge its address. List your proxy — also one in
+the same Docker network — via `ForwardedHeaders__KnownProxies__0=<ip>` or
 `ForwardedHeaders__KnownNetworks__0=<cidr>` (setting either replaces the
-defaults). The forwarded client address also keys the login lockout, so a
+default). The forwarded client address also keys the login lockout, so a
 proxy that is not trusted makes all clients share one lockout counter.
 
 ## Clients

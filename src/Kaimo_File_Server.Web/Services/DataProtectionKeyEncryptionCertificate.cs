@@ -23,6 +23,26 @@ public static class DataProtectionKeyEncryptionCertificate
         if (!File.Exists(path))
             CreateAtomically(path);
 
+        return Load(path);
+    }
+
+    /// <summary>
+    /// Loads an existing, password-less PKCS#12 file supplied separately from the
+    /// application data (e.g. a Docker secret), so a copy of the data volume or of its
+    /// backups alone does not contain both the key ring and the key that decrypts it.
+    /// Never creates a certificate: a missing file is a configuration error.
+    /// </summary>
+    public static X509Certificate2 LoadFromFile(string path)
+    {
+        if (!File.Exists(path))
+            throw new FileNotFoundException(
+                "DataProtection:CertificatePath points to a file that does not exist. Provide the " +
+                "key-encryption certificate there (e.g. as a Docker secret) or unset the setting.", path);
+        return Load(path);
+    }
+
+    private static X509Certificate2 Load(string path)
+    {
         var certificate = X509CertificateLoader.LoadPkcs12FromFile(
             path,
             password: null,

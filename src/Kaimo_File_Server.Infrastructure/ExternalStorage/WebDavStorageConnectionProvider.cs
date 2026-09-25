@@ -74,6 +74,11 @@ public sealed class WebDavStorageConnectionProvider(
             || !Uri.TryCreate(settings.ServerUrl, UriKind.Absolute, out Uri? uri)
             || uri.Scheme is not ("https" or "http"))
             throw new ProtocolConfigurationException("server_url_invalid", "The WebDAV server URL is invalid.");
+        // Basic authentication over plain HTTP exposes the remote credentials on the
+        // network; it needs the administrator's explicit, per-connection consent.
+        if (uri.Scheme == "http" && !settings.AllowInsecureHttp)
+            throw new ProtocolConfigurationException(
+                "server_url_insecure", "Plain HTTP requires the explicit AllowInsecureHttp opt-in.");
         return settings;
     }
 

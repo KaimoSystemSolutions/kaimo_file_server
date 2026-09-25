@@ -74,6 +74,7 @@ namespace Kaimo_File_Server.Infrastructure
             //    tokens, per-device sync selections, and the change cursor --
             services.AddScoped<ISyncDeviceRepository, SyncDeviceRepository>();
             services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+            services.AddScoped<IRevokedWebTokenRepository, RevokedWebTokenRepository>();
             services.AddScoped<IDeviceSyncProfileRepository, DeviceSyncProfileRepository>();
             services.AddScoped<IClientRequestReceiptRepository, ClientRequestReceiptRepository>();
             services.AddScoped<IFileChangeCursorRepository, FileChangeCursorRepository>();
@@ -272,6 +273,13 @@ namespace Kaimo_File_Server.Infrastructure
                         await db.Database.MigrateAsync();
                         logger.LogInformation(LogEvents.DatabaseReady, LogMessages.DatabaseReady);
 
+                        // Before the seeder stores the first NT hashes with the configured key.
+                        Security.AesGcmNtHashProtector.ValidateKeyStrength(
+                            host.Services.GetRequiredService<IConfiguration>()["NtHash:EncryptionKey"],
+                            allowDevelopmentKey: host.Services.GetRequiredService<IHostEnvironment>().IsDevelopment(),
+                            isFreshInstall: !await db.Users.AnyAsync(u => u.NtHash != ""),
+                            logger);
+
                         var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
                         await seeder.SeedAsync();
                     }
@@ -349,6 +357,11 @@ namespace Kaimo_File_Server.Infrastructure
             }
 
             // Outside the retry loop: a key mismatch must stop the process, not be retried.
+            Security.AesGcmNtHashProtector.ValidateKeyStrength(
+                host.Services.GetRequiredService<IConfiguration>()["NtHash:EncryptionKey"],
+                allowDevelopmentKey: host.Services.GetRequiredService<IHostEnvironment>().IsDevelopment(),
+                isFreshInstall: false, // the Host enforces the fresh-install length rule
+                logger);
             using (var scope = host.Services.CreateScope())
             {
                 await Security.NtHashKeyCanary.VerifyAsync(

@@ -11,7 +11,20 @@ public interface IShareLinkRepository
     Task UpdateAsync(ShareLink link);
     Task DeleteAsync(Guid id);
     Task<ShareLink?> GetByIdAsync(Guid id);
+    /// <summary>
+    /// Resolves a link by its presented plain token (matched via <see cref="ShareLink.TokenHash"/>).
+    /// The returned link carries the presented token in <see cref="ShareLink.Token"/>.
+    /// </summary>
     Task<ShareLink?> GetByTokenAsync(string token);
+
+    /// <summary>Up to <paramref name="maxCount"/> links still holding a plain-text <see cref="ShareLink.LegacyToken"/>.</summary>
+    Task<List<ShareLink>> ListWithLegacyTokenAsync(int maxCount);
+
+    /// <summary>
+    /// Replaces a link's plain-text legacy token by its hash and encrypted form, only if the
+    /// row still holds exactly <paramref name="legacyToken"/>. Returns whether it was replaced.
+    /// </summary>
+    Task<bool> TryProtectLegacyTokenAsync(Guid id, string legacyToken, string protectedToken);
 
     /// <summary>All links whose target share is in <paramref name="shareIds"/>, newest first.</summary>
     Task<List<ShareLink>> ListForSharesAsync(IEnumerable<Guid> shareIds);

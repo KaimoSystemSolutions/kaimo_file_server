@@ -9,15 +9,8 @@
     <link href="Kaimo_File_Server.Web.styles.css" rel="stylesheet" />
     <HeadOutlet @rendermode="new InteractiveServerRenderMode(prerender: false)" />
 
-    @* Theme and accent are set immediately to prevent flash *@
-    <script>
-            (function() {
-                var t = localStorage.getItem('kaimo_theme') || 'dark';
-                document.documentElement.setAttribute('data-theme', t);
-                var a = localStorage.getItem('kaimo_accent') || 'green';
-                document.documentElement.setAttribute('data-accent', a);
-            })();
-    </script>
+    @* Theme and accent are set immediately to prevent flash (external file: the CSP forbids inline script) *@
+    <script src="js/themeInit.js"></script>
 </head>
 <body>
     @* Custom, theme-aware reconnect dialog. Because an element with this id exists,
@@ -37,7 +30,7 @@
             <p class="reconnect-text reconnect-text--paused">@R("Web_Reconnect_Paused")</p>
             <p class="reconnect-text reconnect-text--failed">@R("Web_Reconnect_Failed")</p>
             <p class="reconnect-text reconnect-text--rejected">@R("Web_Reconnect_Rejected")</p>
-            <button type="button" class="reconnect-reload" onclick="location.reload()">@R("Web_Reconnect_Reload")</button>
+            <button type="button" class="reconnect-reload">@R("Web_Reconnect_Reload")</button>
         </div>
     </div>
     <Routes @rendermode="new InteractiveServerRenderMode(prerender: false)"

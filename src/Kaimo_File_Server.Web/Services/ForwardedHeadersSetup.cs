@@ -15,15 +15,13 @@ public static class ForwardedHeadersSetup
 
     /// <summary>
     /// Used when <c>ForwardedHeaders:KnownNetworks</c> and <c>KnownProxies</c>
-    /// are both empty: loopback plus private ranges, which covers a reverse proxy
-    /// in the same Docker network or LAN while ignoring headers sent directly
-    /// from public addresses.
+    /// are both empty: loopback only. Private ranges are deliberately not trusted
+    /// by default — every machine in the LAN (and, with Docker's userland proxy,
+    /// every published-port connection via the bridge gateway) comes from one, so
+    /// trusting them would let any client forge its address. A reverse proxy in
+    /// the Docker network or LAN must be configured explicitly.
     /// </summary>
-    public static readonly string[] DefaultKnownNetworks =
-    [
-        "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
-        "::1/128", "fc00::/7"
-    ];
+    public static readonly string[] DefaultKnownNetworks = ["127.0.0.0/8", "::1/128"];
 
     public static void Configure(ForwardedHeadersOptions options, IConfiguration configuration)
     {

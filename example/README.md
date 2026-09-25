@@ -42,9 +42,12 @@ Elasticsearch stay on the internal Compose network.
    docker compose up -d
    ```
 
-The web UI is then available at `http://localhost:8081` and
-`https://localhost:8443`; SMB listens on port `445`. Sign in with user
-`admin` and the `SEED_ADMIN_PASSWORD` you set.
+The web UI is then available at `https://localhost:8443` and — unencrypted, see
+[Plain HTTP port 8081](#-plain-http-port-8081) — at `http://localhost:8081`; SMB
+listens on port `445`. Sign in with user
+`admin` and the `SEED_ADMIN_PASSWORD` you set; you are then asked to choose a new
+password (at least 12 characters by default), because the initial one is stored
+in `.env`.
 
 ## 🔐 Secrets
 
@@ -58,6 +61,29 @@ example placeholders.
 | `NT_HASH_ENCRYPTION_KEY` | Encrypts the SMB password hashes stored in the database. | `host`, `web` and `smb-bridge` refuse to start (see [NT hash key mismatch](#nt-hash-key-mismatch)). **Keep this key permanently and back it up together with the database.** |
 | `POSTGRES_PASSWORD` | Database password. | The database can no longer be opened with the old value. |
 | `SEED_ADMIN_PASSWORD` | Password for the first administrator, created only in an empty database. | No effect after the admin exists — change it in the web UI instead. |
+
+### Protecting stored credentials
+
+Passwords and tokens of external storage connections are encrypted with ASP.NET
+Data Protection. By default both the key ring (`.dp-keys`) **and** the
+certificate that encrypts it (`.dp-certificate/key-encryption.pfx`) live in
+`./data/kaimo-system`, so anyone with a copy of that directory or of its backups
+can decrypt them (`web` logs a warning at startup). Keep the certificate
+separately:
+
+```bash
+mkdir -p secrets/dp-certificate
+sudo mv data/kaimo-system/.dp-certificate/key-encryption.pfx secrets/dp-certificate/
+sudo chown 1654:1654 secrets/dp-certificate/key-encryption.pfx
+sudo chmod 0400 secrets/dp-certificate/key-encryption.pfx
+```
+
+Then uncomment `DataProtection__CertificatePath` and the two `secrets:` blocks in
+`docker-compose.yml` and run `docker compose up -d web`. On a fresh installation,
+start once without the setting so the certificate is generated, then move it.
+Back up `secrets/` separately from `data/` — **without the certificate the stored
+credentials cannot be recovered**. `web` refuses to start if the configured file
+is missing.
 
 ## 💾 Data & persistence
 
@@ -129,16 +155,16 @@ Additional service-specific overrides are documented in
 
 If a reverse proxy (nginx, Traefik, Caddy, …) terminates TLS in front of `web`,
 the server takes the client address and scheme from the `X-Forwarded-For` and
-`X-Forwarded-Proto` headers — but **only from trusted proxies**. Headers from
-any other peer are ignored so a client cannot fake its address.
+`X-Forwarded-Proto` headers — but **only from proxies you list explicitly**.
+Headers from any other peer are ignored.
 
-**Trusted without any setting:** loopback and private networks
-(`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`). This covers a
-proxy running in the same Docker network or on the same LAN — no action needed.
+**Trusted without any setting:** loopback only (`127.0.0.0/8`, `::1`). Private
+networks are deliberately **not** trusted by default: every machine in your LAN
+has such an address, so trusting them would let any LAN client choose its own
+"client address" per request and sidestep the login lockout.
 
-**Proxy with a public address** (for example a proxy on another server that
-reaches `web` over the internet, or a cloud load balancer): list it explicitly
-on the `web` service:
+**Any other proxy** — in the same Docker network, on the LAN, or with a public
+address — must be listed on the `web` service:
 
 ```yaml
 services:
@@ -146,13 +172,14 @@ services:
     environment:
       <<: *dotnet-environment
       # ... existing web variables ...
-      ForwardedHeaders__KnownProxies__0: 203.0.113.10      # single proxy address
+      ForwardedHeaders__KnownProxies__0: 172.18.0.10       # single proxy address
       # ForwardedHeaders__KnownProxies__1: 203.0.113.11    # more proxies: __1, __2, …
-      # ForwardedHeaders__KnownNetworks__0: 203.0.113.0/24 # or a whole range (CIDR)
+      # ForwardedHeaders__KnownNetworks__0: 172.18.0.0/16  # or a whole range (CIDR)
 ```
 
-Setting either list **replaces** the private-network default, so also list your
-internal proxies if you use both. Recreate the service afterwards:
+For a proxy container in the same Compose project, give the Docker network a
+fixed subnet (or the proxy a fixed address) and list that. Only list networks
+in which **every** host is a trusted proxy. Recreate the service afterwards:
 `docker compose up -d web`.
 
 Signs that your proxy is not trusted:
@@ -163,6 +190,24 @@ Signs that your proxy is not trusted:
   requests appear to come from the proxy's address. Login lockout is tracked per
   user **and** client address, so with a trusted proxy a stranger guessing a
   password only locks out their own address.
+
+The same applies without a proxy when Docker forwards published ports through its
+userland proxy (e.g. IPv6 or hairpin connections): all clients then appear with
+the bridge gateway address. The lockout still works, just per user instead of per
+client address.
+
+Independently of client addresses, each account also has an account-wide ceiling
+of ten times the per-address attempt limit. Guessing spread over many (real or
+forged) addresses therefore locks the account temporarily instead of going on
+indefinitely.
+
+## 🔓 Plain HTTP port 8081
+
+Port `8081` serves the web UI, API and WebDAV **without encryption**: passwords
+and login tokens cross the network in clear text. Use it only behind a reverse
+proxy that terminates TLS, or in a network you fully trust. For direct access
+use `https://<host>:8443`, or remove the `8081` mapping from
+`docker-compose.yml` if you do not need it.
 
 ## 🩺 Troubleshooting
 

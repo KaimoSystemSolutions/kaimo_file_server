@@ -1,4 +1,4 @@
-﻿using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Infrastructure.Persistence;
@@ -185,16 +185,21 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
         }
 
         /// <inheritdoc />
-        public async Task UpdatePasswordAsync(Guid userId, string passwordHash, string ntHash)
+        public async Task UpdatePasswordAsync(Guid userId, string passwordHash, string ntHash, bool changedByUser = false)
         {
             await using var db = await dbFactory.CreateDbContextAsync();
             await using var tx = await db.Database.BeginTransactionAsync();
 
+            // A new security stamp invalidates every web and client-API JWT issued before
+            // this change (the stamp is embedded in each token and compared on validation).
+            var securityStamp = User.NewSecurityStamp();
             await db.Users
                 .Where(u => u.Id == userId)
                 .ExecuteUpdateAsync(u => u
                     .SetProperty(x => x.PasswordHash, passwordHash)
-                    .SetProperty(x => x.NtHash, ntHash));
+                    .SetProperty(x => x.NtHash, ntHash)
+                    .SetProperty(x => x.SecurityStamp, securityStamp)
+                    .SetProperty(x => x.MustChangePassword, x => !changedByUser && x.MustChangePassword));
 
             // A password change/reset is the standard response to a compromise, so every
             // client-API refresh token of the account is revoked with it. Otherwise a stolen

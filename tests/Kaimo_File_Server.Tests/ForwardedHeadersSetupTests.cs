@@ -18,13 +18,40 @@ namespace Kaimo_File_Server.Tests;
 public class ForwardedHeadersSetupTests
 {
     [Theory]
-    [InlineData("172.18.0.5")]          // reverse proxy in the Docker network
-    [InlineData("::ffff:172.18.0.5")]   // same peer as seen on a dual-stack socket
     [InlineData("127.0.0.1")]
-    [InlineData("192.168.1.10")]
-    public async Task DefaultTrust_HonorsPrivateProxy(string peer)
+    [InlineData("::1")]
+    public async Task DefaultTrust_HonorsLoopbackProxy(string peer)
     {
         var context = await RunAsync(Config(), peer, "198.51.100.23", "https");
+
+        Assert.Equal(IPAddress.Parse("198.51.100.23"), context.Connection.RemoteIpAddress);
+        Assert.True(context.Request.IsHttps);
+    }
+
+    /// <summary>
+    /// Any LAN machine (or the Docker bridge gateway of the userland proxy) is a private
+    /// address; by default it must not be able to pick its own client address per request,
+    /// otherwise the per-(user, address) login lockout is trivially bypassed.
+    /// </summary>
+    [Theory]
+    [InlineData("172.18.0.5")]
+    [InlineData("::ffff:172.18.0.5")]
+    [InlineData("192.168.1.10")]
+    [InlineData("10.0.0.7")]
+    public async Task DefaultTrust_IgnoresHeadersFromPrivatePeer(string peer)
+    {
+        var context = await RunAsync(Config(), peer, "198.51.100.23", "https");
+
+        Assert.NotEqual(IPAddress.Parse("198.51.100.23"), context.Connection.RemoteIpAddress);
+        Assert.False(context.Request.IsHttps);
+    }
+
+    [Fact]
+    public async Task ConfiguredDockerNetwork_HonorsProxyInThatNetwork()
+    {
+        var config = Config(("ForwardedHeaders:KnownNetworks:0", "172.18.0.0/16"));
+
+        var context = await RunAsync(config, "172.18.0.5", "198.51.100.23", "https");
 
         Assert.Equal(IPAddress.Parse("198.51.100.23"), context.Connection.RemoteIpAddress);
         Assert.True(context.Request.IsHttps);
@@ -43,7 +70,7 @@ public class ForwardedHeadersSetupTests
     public async Task OnlyLastHopIsUsed()
     {
         // The client prepends a fake address; the proxy appends the real one.
-        var context = await RunAsync(Config(), "172.18.0.5", "1.1.1.1, 198.51.100.23", "https");
+        var context = await RunAsync(Config(), "127.0.0.1", "1.1.1.1, 198.51.100.23", "https");
 
         Assert.Equal(IPAddress.Parse("198.51.100.23"), context.Connection.RemoteIpAddress);
     }

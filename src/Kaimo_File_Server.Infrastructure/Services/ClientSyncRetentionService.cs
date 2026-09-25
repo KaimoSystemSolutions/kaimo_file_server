@@ -44,12 +44,16 @@ public sealed class ClientSyncRetentionService(
                     .PruneOlderThanAsync(now.AddDays(-receiptDays));
                 int refreshTokens = await sp.GetRequiredService<IRefreshTokenRepository>()
                     .PruneExpiredBeforeAsync(now.AddDays(-refreshTokenDays));
+                // A revoked web token is unusable past its own expiry, so the entry can go then.
+                int revokedWebTokens = await sp.GetRequiredService<IRevokedWebTokenRepository>()
+                    .PruneExpiredBeforeAsync(now);
 
-                if (changeLog > 0 || receipts > 0 || refreshTokens > 0)
+                if (changeLog > 0 || receipts > 0 || refreshTokens > 0 || revokedWebTokens > 0)
                     logger.LogInformation(
                         "Client-sync retention pruned {ChangeLog} change-log entries, " +
-                        "{Receipts} request receipts, {RefreshTokens} expired refresh tokens.",
-                        changeLog, receipts, refreshTokens);
+                        "{Receipts} request receipts, {RefreshTokens} expired refresh tokens, " +
+                        "{RevokedWebTokens} expired web-token revocations.",
+                        changeLog, receipts, refreshTokens, revokedWebTokens);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

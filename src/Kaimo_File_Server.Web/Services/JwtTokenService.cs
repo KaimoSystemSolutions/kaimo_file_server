@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -21,6 +22,13 @@ public class JwtTokenService
     /// token. The API's per-request auth uses it to reject a revoked device at once.
     /// </summary>
     public const string DeviceIdClaim = "device_id";
+
+    /// <summary>
+    /// Claim carrying the account's <c>SecurityStamp</c> at issue time. Every validation
+    /// path compares it with the current stamp, so a password change invalidates all
+    /// tokens issued before it. Tokens without the claim are rejected.
+    /// </summary>
+    public const string SecurityStampClaim = "sstamp";
 
     /// <summary>
     /// Secrets that have shipped in source control / documentation and are
@@ -58,7 +66,7 @@ public class JwtTokenService
     /// </summary>
     /// <param name="allowDevelopmentSecret">
     /// False outside the Development environment: secrets starting with
-    /// <see cref="DevelopmentSecretPrefix"/> ship in the dev compose override and are public.
+    /// <see cref="DevelopmentSecretPrefix"/> ship in docker-compose.dev.yml and are public.
     /// </param>
     public static string ValidateSecret(string? secret, bool allowDevelopmentSecret)
     {
@@ -85,7 +93,7 @@ public class JwtTokenService
         return secret;
     }
 
-    /// <summary>Prefix of the public secrets used by docker-compose.override.yml for local development.</summary>
+    /// <summary>Prefix of the public secrets used by docker-compose.dev.yml for local development.</summary>
     public const string DevelopmentSecretPrefix = "DevOnly";
 
     /// <param name="deviceId">
@@ -93,9 +101,11 @@ public class JwtTokenService
     /// token to a device and reject it the moment that device is revoked. Left null
     /// for the Blazor web login, whose tokens are not device-scoped.
     /// </param>
+    /// <param name="securityStamp">The account's current security stamp (see <see cref="SecurityStampClaim"/>).</param>
+    /// <param name="lifetime">Token lifetime; defaults to <c>Jwt:ExpirationHours</c>.</param>
     public string GenerateToken(
         Guid userId, string username, string displayName, IEnumerable<string> roles,
-        Guid? deviceId = null)
+        Guid? deviceId = null, string? securityStamp = null, TimeSpan? lifetime = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -111,6 +121,9 @@ public class JwtTokenService
         if (deviceId is { } id)
             claims.Add(new Claim(DeviceIdClaim, id.ToString()));
 
+        if (!string.IsNullOrEmpty(securityStamp))
+            claims.Add(new Claim(SecurityStampClaim, securityStamp));
+
         foreach (var role in roles)
             claims.Add(new Claim(ClaimTypes.Role, role));
 
@@ -118,7 +131,7 @@ public class JwtTokenService
             issuer: _issuer,
             audience: _issuer,
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(_expirationHours),
+            expires: DateTime.UtcNow.Add(lifetime ?? TimeSpan.FromHours(_expirationHours)),
             signingCredentials: credentials
         );
 
@@ -150,6 +163,18 @@ public class JwtTokenService
             ValidAlgorithms = new[] { SecurityAlgorithms.HmacSha256 },
             ClockSkew = TimeSpan.FromMinutes(2)
         };
+    }
+
+    /// <summary>
+    /// Whether the token's <see cref="SecurityStampClaim"/> matches the account's current
+    /// stamp. A token without the claim (issued before stamps existed) never matches.
+    /// </summary>
+    public static bool HasCurrentSecurityStamp(ClaimsPrincipal principal, Kaimo_File_Server.Core.Domain.Identity.User user)
+    {
+        var stamp = principal.FindFirst(SecurityStampClaim)?.Value;
+        return !string.IsNullOrEmpty(stamp)
+               && CryptographicOperations.FixedTimeEquals(
+                   Encoding.UTF8.GetBytes(stamp), Encoding.UTF8.GetBytes(user.SecurityStamp));
     }
 
     /// <summary>Validation parameters for this instance's configured secret/issuer.</summary>

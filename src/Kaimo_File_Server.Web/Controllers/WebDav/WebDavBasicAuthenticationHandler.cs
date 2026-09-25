@@ -76,8 +76,13 @@ public sealed class WebDavBasicAuthenticationHandler : AuthenticationHandler<Aut
             return AuthenticateResult.Fail("Malformed Basic credentials.");
 
         var cacheKey = FingerprintCacheKey(username, password);
-        if (_cache.TryGetValue<Guid>(cacheKey, out var cachedUserId))
-            return Success(cachedUserId, username);
+        // A cached login only counts while it belongs to the user's current cache generation;
+        // Invalidate drops the generation on a password change, disable or delete, so every
+        // login cached before it (including the old password) stops working at once.
+        if (_cache.TryGetValue<CachedLogin>(cacheKey, out var cached)
+            && _cache.TryGetValue<Guid>(GenerationKey(cached.UserId), out var generation)
+            && generation == cached.Generation)
+            return Success(cached.UserId, username);
 
         var result = await _loginService.AuthenticateAsync(
             username, password, Context.Connection.RemoteIpAddress?.ToString());
@@ -85,9 +90,26 @@ public sealed class WebDavBasicAuthenticationHandler : AuthenticationHandler<Aut
             return AuthenticateResult.Fail("Invalid credentials.");
 
         var userId = result.UserContext.User.Id;
-        _cache.Set(cacheKey, userId, TimeSpan.FromSeconds(PositiveCacheTtlSeconds));
+        var ttl = TimeSpan.FromSeconds(PositiveCacheTtlSeconds);
+        var currentGeneration = _cache.GetOrCreate(GenerationKey(userId), entry =>
+        {
+            // Outlives every login cached under it.
+            entry.AbsoluteExpirationRelativeToNow = ttl * 2;
+            return Guid.NewGuid();
+        });
+        _cache.Set(cacheKey, new CachedLogin(userId, currentGeneration), ttl);
         return Success(userId, username);
     }
+
+    /// <summary>
+    /// Drops every cached WebDAV login of the user. Call after changing the password,
+    /// disabling or deleting the account (same process as this handler's cache).
+    /// </summary>
+    public static void Invalidate(IMemoryCache cache, Guid userId) => cache.Remove(GenerationKey(userId));
+
+    private static string GenerationKey(Guid userId) => $"webdav-basic-generation:{userId:N}";
+
+    private readonly record struct CachedLogin(Guid UserId, Guid Generation);
 
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)
     {

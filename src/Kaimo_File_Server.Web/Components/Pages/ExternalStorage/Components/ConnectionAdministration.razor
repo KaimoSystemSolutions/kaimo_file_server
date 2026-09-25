@@ -207,6 +207,7 @@ else
     private int _port = 445;
     private string _minimumDialect = "3.1.1";
     private string _serverUrl = string.Empty;
+    private bool _allowInsecureHttp;
     private string _remoteRoot = "/";
     private string _sshHostFingerprint = string.Empty;
     private string _privateKeySecretReference = string.Empty;
@@ -249,6 +250,7 @@ else
     private bool IsRsyncSshProvider => string.Equals(_provider, "rsync-ssh", StringComparison.OrdinalIgnoreCase);
     private bool IsSftpProvider => string.Equals(_provider, "sftp", StringComparison.OrdinalIgnoreCase);
     private bool IsWebDavProvider => string.Equals(_provider, "webdav", StringComparison.OrdinalIgnoreCase);
+    private bool IsInsecureWebDavUrl => _serverUrl.TrimStart().StartsWith("http://", StringComparison.OrdinalIgnoreCase);
     // rsync-over-SSH and SFTP share the identical pinned-SSH setup (key + host key).
     private bool UsesPinnedSshSetup => IsRsyncSshProvider || IsSftpProvider;
     private bool CanCreate => !string.IsNullOrWhiteSpace(_name)
@@ -342,6 +344,7 @@ else
         _port = IsSmbProvider ? 445 : UsesPinnedSshSetup ? 22 : _port;
         _remoteRoot = "/";
         _serverUrl = string.Empty;
+        _allowInsecureHttp = false;
         // The available tabs depend on the provider; keep the selection valid.
         _activeConnectionTab = ConnectionTab.General;
     }
@@ -358,10 +361,10 @@ else
     private string BuildSettingsJson()
     {
         if (IsWebDavProvider)
-            return System.Text.Json.JsonSerializer.Serialize(new
-            {
-                ServerUrl = _serverUrl.Trim()
-            });
+            // The opt-in is only written when set, so existing HTTPS settings stay byte-identical.
+            return _allowInsecureHttp && IsInsecureWebDavUrl
+                ? System.Text.Json.JsonSerializer.Serialize(new { ServerUrl = _serverUrl.Trim(), AllowInsecureHttp = true })
+                : System.Text.Json.JsonSerializer.Serialize(new { ServerUrl = _serverUrl.Trim() });
         if (IsSmbProvider)
             return System.Text.Json.JsonSerializer.Serialize(new
             {
@@ -390,6 +393,7 @@ else
         await ResetGuidedSshStateAsync();
         _creating = false;
         _name = _settingsJson = _server = _username = _password = _domain = _serverUrl = string.Empty;
+        _allowInsecureHttp = false;
         _sshHostFingerprint = _privateKeySecretReference = _knownHostsSecretReference = string.Empty;
         _remoteRoot = "/";
         _port = 445;
@@ -630,6 +634,11 @@ else
             {
                 <label class="storage-wide"><span>@R("Web_ExternalStorage_WebDavServerUrl")</span><input class="edit-input" maxlength="2048" placeholder="https://cloud.example.com/remote.php/dav/files/user/" @bind="_serverUrl" /></label>
                 <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_WebDavHelp")</p>
+                @if (IsInsecureWebDavUrl)
+                {
+                    <label class="storage-wide storage-check"><input type="checkbox" @bind="_allowInsecureHttp" /> <span>@R("Web_ExternalStorage_WebDavAllowInsecureHttp")</span></label>
+                    <p class="storage-wide connection-form-hint">@R("Web_ExternalStorage_WebDavAllowInsecureHttpWarning")</p>
+                }
             }
             else if (UsesPinnedSshSetup)
             {
@@ -744,6 +753,7 @@ else
         _provider = _selected.ProviderId;
         _name = _selected.Name;
         _password = _username = _domain = _server = _serverUrl = string.Empty;
+        _allowInsecureHttp = false;
         _remoteRoot = "/";
         _port = IsSmbProvider ? 445 : UsesPinnedSshSetup ? 22 : _port;
         _minimumDialect = "3.1.1";
@@ -766,6 +776,8 @@ else
                 else if (IsWebDavProvider)
                 {
                     _serverUrl = ReadJsonString(root, "ServerUrl") ?? string.Empty;
+                    _allowInsecureHttp = root.TryGetProperty("AllowInsecureHttp", out var insecure)
+                        && insecure.ValueKind == System.Text.Json.JsonValueKind.True;
                 }
                 else if (UsesPinnedSshSetup)
                 {

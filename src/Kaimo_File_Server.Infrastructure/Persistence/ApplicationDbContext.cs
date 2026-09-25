@@ -18,6 +18,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
         public DbSet<Group> Groups { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<UserGroup> UserGroups { get; set; }
+        public DbSet<RevokedWebToken> RevokedWebTokens { get; set; }
 
         // -- Files & Shares --
         public DbSet<FileMetadata> FileMetadata { get; set; }
@@ -80,6 +81,17 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.PhotoContentType).HasMaxLength(100);
                 entity.Property(e => e.IsEnabled).IsRequired().HasDefaultValue(true);
                 entity.Property(e => e.CanChangePassword).IsRequired().HasDefaultValue(true);
+                entity.Property(e => e.SecurityStamp).IsRequired().HasMaxLength(64);
+                entity.Property(e => e.MustChangePassword).IsRequired();
+            });
+
+            modelBuilder.Entity<RevokedWebToken>(entity =>
+            {
+                entity.ToTable("revoked_web_tokens");
+                entity.HasKey(e => e.Jti);
+                entity.Property(e => e.Jti).HasMaxLength(64);
+                // Drives retention pruning of expired entries.
+                entity.HasIndex(e => e.ExpiresAtUtc);
             });
 
             modelBuilder.Entity<Group>(entity =>
@@ -267,8 +279,14 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
             {
                 entity.ToTable("share_links");
                 entity.HasKey(x => x.Id);
-                entity.Property(x => x.Token).IsRequired().HasMaxLength(128);
-                entity.HasIndex(x => x.Token).IsUnique();
+                // The plain token is never persisted; lookups go through its hash.
+                entity.Ignore(x => x.Token);
+                entity.Property(x => x.TokenHash).IsRequired().HasMaxLength(64);
+                entity.HasIndex(x => x.TokenHash).IsUnique();
+                entity.Property(x => x.ProtectedToken).HasColumnType("text");
+                // Pre-hashing column, kept under its original name until the backfill empties it.
+                entity.Property(x => x.LegacyToken).HasColumnName("Token").HasMaxLength(128);
+                entity.HasIndex(x => x.LegacyToken).IsUnique();
                 entity.Property(x => x.RootRelativePath).IsRequired().HasMaxLength(2000);
                 entity.Property(x => x.DisplayName).IsRequired().HasMaxLength(400);
                 entity.Property(x => x.PasswordHash).HasMaxLength(200);

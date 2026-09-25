@@ -1,4 +1,4 @@
-﻿using Microsoft.JSInterop;
+using Microsoft.JSInterop;
 
 namespace Kaimo_File_Server.Web.Services;
 
@@ -58,7 +58,7 @@ public class ThemeService
         try
         {
             await _js.InvokeVoidAsync("localStorage.setItem", "kaimo_theme", _theme);
-            await _js.InvokeVoidAsync("eval", $"document.documentElement.setAttribute('data-theme','{_theme}')");
+            await _js.InvokeVoidAsync("document.documentElement.setAttribute", "data-theme", _theme);
         }
         catch
         {
@@ -75,7 +75,7 @@ public class ThemeService
         try
         {
             await _js.InvokeVoidAsync("localStorage.setItem", "kaimo_accent", _accent);
-            await _js.InvokeVoidAsync("eval", $"document.documentElement.setAttribute('data-accent','{_accent}')");
+            await _js.InvokeVoidAsync("document.documentElement.setAttribute", "data-accent", _accent);
         }
         catch
         {

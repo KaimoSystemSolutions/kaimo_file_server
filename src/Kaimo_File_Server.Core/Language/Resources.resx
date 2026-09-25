@@ -2904,9 +2904,6 @@
   <data name="Web_CloudSync_Error_ProviderRequired" xml:space="preserve">
     <value>Select an available cloud provider.</value>
   </data>
-  <data name="Web_CloudSync_Error_Conflict" xml:space="preserve">
-    <value>This folder overlaps an existing cloud sync.</value>
-  </data>
   <data name="Web_CloudSync_Error_NotAuthorized" xml:space="preserve">
     <value>You are not authorized for this action.</value>
   </data>
@@ -3434,36 +3431,6 @@
   </data>
   <data name="Web_Settings_CloudAccess_CacheSaveFailed" xml:space="preserve">
     <value>Cloud Access cache settings could not be saved.</value>
-  </data>
-  <data name="Web_GoogleOAuth_ShareNotFound" xml:space="preserve">
-    <value>The share no longer exists.</value>
-  </data>
-  <data name="Web_GoogleOAuth_InvalidTransaction" xml:space="preserve">
-    <value>The Google authorization request is invalid or has expired.</value>
-  </data>
-  <data name="Web_GoogleOAuth_FolderAlreadySynced" xml:space="preserve">
-    <value>This folder is already synchronized.</value>
-  </data>
-  <data name="Web_GoogleOAuth_FolderConflict" xml:space="preserve">
-    <value>This folder conflicts with the synchronized folder “{0}”.</value>
-  </data>
-  <data name="Web_GoogleOAuth_NotConfigured" xml:space="preserve">
-    <value>Google authorization is not configured for this installation.</value>
-  </data>
-  <data name="Web_GoogleOAuth_InvalidScopeProfile" xml:space="preserve">
-    <value>The selected Google Drive access profile is invalid.</value>
-  </data>
-  <data name="Web_GoogleOAuth_ConsentDenied" xml:space="preserve">
-    <value>Google authorization was cancelled or denied.</value>
-  </data>
-  <data name="Web_GoogleOAuth_InvalidCallback" xml:space="preserve">
-    <value>Google returned an invalid authorization callback.</value>
-  </data>
-  <data name="Web_GoogleOAuth_ExchangeFailed" xml:space="preserve">
-    <value>Google authorization could not be completed. No credentials were stored.</value>
-  </data>
-  <data name="Web_GoogleOAuth_CallbackConflict" xml:space="preserve">
-    <value>“{0}” now conflicts with the synchronized folder “{1}”. Nothing was connected.</value>
   </data>
   <data name="Web_ExternalStorage_Title" xml:space="preserve">
     <value>External Storage</value>
@@ -4580,5 +4547,20 @@
   </data>
   <data name="Web_Properties_SizeTotal" xml:space="preserve">
     <value>Size (total)</value>
+  </data>
+  <data name="Web_User_CurrentPasswordLockedOut" xml:space="preserve">
+    <value>Too many failed attempts. Please try again in {0} minute(s).</value>
+  </data>
+  <data name="Web_ExternalStorage_WebDavAllowInsecureHttp" xml:space="preserve">
+    <value>Allow unencrypted HTTP for this connection</value>
+  </data>
+  <data name="Web_ExternalStorage_WebDavAllowInsecureHttpWarning" xml:space="preserve">
+    <value>Username and password are then sent to the server in clear text. Only enable this for a server in a network you fully trust.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_server_url_insecure" xml:space="preserve">
+    <value>The server URL uses unencrypted HTTP. Use HTTPS or explicitly allow HTTP for this connection.</value>
+  </data>
+  <data name="Web_User_MustChangePasswordNotice" xml:space="preserve">
+    <value>Your initial password must be changed. Please set a new password to continue.</value>
   </data>
 </root>

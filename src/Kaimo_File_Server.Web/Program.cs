@@ -110,7 +110,7 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
 // -- JWT bearer authentication for the client REST API (/api/v1). Uses the SAME
 //    validation parameters as the Blazor token path (JwtTokenService) so the two
 //    can never drift apart. The Blazor localStorage flow is unaffected — it does
-//    not depend on this handler. --
+//    not depend on this handler, and its token is not accepted here. --
 // Validated eagerly here (not only in the lazily created JwtTokenService) so the bearer
 // handler can never run with a weak, well-known or development-only signing secret.
 var apiJwtSecret = JwtTokenService.ValidateSecret(
@@ -129,6 +129,9 @@ builder.Services
         // there. Bearer authentication itself still works on /dav.
         options.Events = new JwtBearerEvents
         {
+            // Single choke point for every bearer-authenticated endpoint (/api/v1, /dav):
+            // device-scoped tokens only, active device, enabled account, current security stamp.
+            OnTokenValidated = BearerTokenValidation.ValidateAsync,
             OnChallenge = context =>
             {
                 if (context.Request.Path.StartsWithSegments(WebDavPathResolver.Prefix))
@@ -272,6 +275,7 @@ builder.Services.AddScoped<ShareBrowserViewModel>();
 builder.Services.AddScoped<FileBrowserViewModel>();
 builder.Services.AddScoped<PublicShareFileBrowserViewModel>();
 builder.Services.AddScoped<Kaimo_File_Server.Web.Services.ShareLinkService>();
+builder.Services.AddSingleton<ShareLinkTokenProtector>();
 builder.Services.AddScoped<ShareLinkListViewModel>();
 builder.Services.AddScoped<UserListViewModel>();
 builder.Services.AddScoped<Kaimo_File_Server.Web.Components.ProfileNavigator>();
@@ -312,8 +316,12 @@ builder.Services.AddScoped<ShareListViewModel>(sp =>
 var dataProtection = builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(applicationDataPath, ".dp-keys")))
     .SetApplicationName("KaimoFiles");
-var dataProtectionCertificate =
-    DataProtectionKeyEncryptionCertificate.LoadOrCreate(applicationDataPath);
+// Preferably kept apart from the key ring (DataProtection:CertificatePath, e.g. a Docker
+// secret); otherwise generated next to it in the application data (legacy default).
+var dataProtectionCertificatePath = builder.Configuration["DataProtection:CertificatePath"];
+var dataProtectionCertificate = string.IsNullOrWhiteSpace(dataProtectionCertificatePath)
+    ? DataProtectionKeyEncryptionCertificate.LoadOrCreate(applicationDataPath)
+    : DataProtectionKeyEncryptionCertificate.LoadFromFile(dataProtectionCertificatePath);
 dataProtection.ProtectKeysWithCertificate(dataProtectionCertificate);
 
 
@@ -354,6 +362,12 @@ var app = builder.Build();
 // Skipped in Development so local runs work without the container's mount layout.
 var preflightLogger = app.Services.GetRequiredService<ILoggerFactory>()
     .CreateLogger("Kaimo_File_Server.Infrastructure.Startup");
+if (string.IsNullOrWhiteSpace(dataProtectionCertificatePath) && !app.Environment.IsDevelopment())
+    preflightLogger.LogWarning(
+        "The Data Protection key-encryption certificate is stored next to the key ring in the application " +
+        "data, so a copy of that volume or its backups can decrypt all stored external-storage credentials. " +
+        "Move it to a separate secret and set DataProtection:CertificatePath (see the deployment README).");
+
 if (app.Environment.IsDevelopment())
     preflightLogger.LogInformation("Skipping writable-directory preflight in Development.");
 else
@@ -388,11 +402,31 @@ catch (Exception exception)
         "The bounded external-storage credential rewrap pass could not complete; existing ciphertext was retained");
 }
 
+// Share links created before tokens were hashed still hold their token in plain text;
+// replace it by the encrypted form (Data Protection lives here, not in the Host).
+try
+{
+    await using var shareLinkScope = app.Services.CreateAsyncScope();
+    int protectedLinks = await app.Services.GetRequiredService<ShareLinkTokenProtector>()
+        .ProtectLegacyTokensAsync(shareLinkScope.ServiceProvider.GetRequiredService<IShareLinkRepository>());
+    if (protectedLinks > 0)
+        app.Logger.LogInformation("Encrypted the plain-text tokens of {Count} share links", protectedLinks);
+}
+catch (Exception exception)
+{
+    app.Logger.LogWarning(exception,
+        "Legacy share-link tokens could not be encrypted; they stay usable and are retried on the next start");
+}
+
 // Load or generate the HTTPS certificate before the first TLS connection is served.
 await app.Services.GetRequiredService<HttpsCertificateProvider>().InitializeAsync();
 
 var search = app.Services.GetRequiredService<ISearchService>();
 await search.InitializeAsync();
+
+// First in the pipeline so every response — pages, static assets, API, errors —
+// carries the security headers (CSP, nosniff, referrer and framing policy).
+app.UseMiddleware<SecurityHeadersMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {

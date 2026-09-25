@@ -4,6 +4,13 @@ Package 4 replaces Kaimo's manual Google token exchange with the maintained Goog
 
 ## Delegated OAuth
 
+> **Currently not wired up.** The legacy per-share endpoints `/api/google/connect`
+> and `/api/google/callback` were removed: they were unreachable (the UI never
+> issued tickets for them and a browser redirect carries no API bearer token) and
+> wrote refresh tokens in clear text into `share_definitions`. `GoogleOAuthService`
+> and this configuration remain for a future first-class Google connection flow;
+> until then Google Drive is available through a Workspace service account.
+
 Create a Web application OAuth client in the installation owner's Google Cloud project. Register the exact HTTPS callback URI shown by the configured external base URL:
 
 ```text

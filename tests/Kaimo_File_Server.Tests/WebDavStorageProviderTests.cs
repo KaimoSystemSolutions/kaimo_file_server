@@ -21,13 +21,39 @@ public sealed class WebDavStorageProviderTests
     }
 
     [Fact]
-    public void ParseAndValidate_AcceptsHttpUrl()
+    public void ParseAndValidate_AcceptsHttpUrl_OnlyWithExplicitOptIn()
     {
-        var connection = WebDavConnection("http://192.168.1.10:8080/webdav");
+        var connection = WebDavConnection("http://192.168.1.10:8080/webdav", allowInsecureHttp: true);
 
         var settings = WebDavStorageConnectionProvider.ParseAndValidate(connection);
 
         Assert.Equal("http://192.168.1.10:8080/webdav", settings.ServerUrl);
+        Assert.True(settings.AllowInsecureHttp);
+    }
+
+    /// <summary>Basic credentials must not go over plain HTTP unless the admin opted in.</summary>
+    [Fact]
+    public void ParseAndValidate_RejectsHttpUrl_WithoutOptIn()
+    {
+        var connection = WebDavConnection("http://192.168.1.10:8080/webdav");
+
+        var exception = Assert.Throws<ProtocolConfigurationException>(
+            () => WebDavStorageConnectionProvider.ParseAndValidate(connection));
+
+        Assert.Equal("server_url_insecure", exception.Code);
+    }
+
+    [Fact]
+    public void ParseAndValidate_SettingsWithoutOptInProperty_DefaultToHttpsOnly()
+    {
+        var https = WebDavConnection("https://cloud.example.com/dav/");
+        https.SettingsJson = """{"ServerUrl":"https://cloud.example.com/dav/"}""";
+        var http = WebDavConnection("http://nas.local/dav/");
+        http.SettingsJson = """{"ServerUrl":"http://nas.local/dav/"}""";
+
+        Assert.False(WebDavStorageConnectionProvider.ParseAndValidate(https).AllowInsecureHttp);
+        Assert.Equal("server_url_insecure", Assert.Throws<ProtocolConfigurationException>(
+            () => WebDavStorageConnectionProvider.ParseAndValidate(http)).Code);
     }
 
     [Theory]
@@ -772,11 +798,11 @@ public sealed class WebDavStorageProviderTests
         Assert.Equal([StorageAuthorizationMode.UsernamePassword], provider.AuthorizationModes);
     }
 
-    private static StorageConnection WebDavConnection(string serverUrl) => new()
+    private static StorageConnection WebDavConnection(string serverUrl, bool allowInsecureHttp = false) => new()
     {
         ProviderId = "webdav",
         AuthorizationMode = StorageAuthorizationMode.UsernamePassword,
-        SettingsJson = JsonSerializer.Serialize(new WebDavConnectionSettings(serverUrl)),
+        SettingsJson = JsonSerializer.Serialize(new WebDavConnectionSettings(serverUrl, allowInsecureHttp)),
         State = StorageConnectionState.Ready
     };
 

@@ -230,6 +230,38 @@ public class CredentialLoginServiceTests
             (await _sut.AuthenticateAsync(Username, CorrectPassword, "192.0.2.44")).Outcome);
     }
 
+    /// <summary>
+    /// Guessing spread over many client addresses (distributed, or with forged
+    /// X-Forwarded-For values) hits the account-wide ceiling: once reached, even the
+    /// correct password from a fresh address is refused until the lockout expires.
+    /// </summary>
+    [Fact]
+    public async Task FailuresSpreadOverManyAddresses_HitAccountWideCeiling()
+    {
+        ArrangeExistingUser();
+        int ceiling = MaxAttempts * CredentialLoginService.AccountWideAttemptFactor;
+
+        for (int i = 0; i < ceiling; i++)
+        {
+            var result = await _sut.AuthenticateAsync(Username, "wrong", $"198.51.100.{i + 1}");
+            Assert.NotEqual(LoginOutcome.Success, result.Outcome);
+        }
+
+        Assert.Equal(LoginOutcome.LockedOut,
+            (await _sut.AuthenticateAsync(Username, CorrectPassword, "192.0.2.200")).Outcome);
+
+        _time.Advance(TimeSpan.FromMinutes(LockoutMinutes + 1));
+        Assert.Equal(LoginOutcome.Success,
+            (await _sut.AuthenticateAsync(Username, CorrectPassword, "192.0.2.200")).Outcome);
+    }
+
+    [Fact]
+    public void AccountThrottleKey_CannotCollideWithAddressKey()
+    {
+        Assert.Equal("|account|alice", CredentialLoginService.AccountThrottleKey("Alice"));
+        Assert.StartsWith("|", CredentialLoginService.AccountThrottleKey("account"));
+    }
+
     [Fact]
     public void ThrottleKey_IsCaseInsensitiveUserPlusAddress()
     {

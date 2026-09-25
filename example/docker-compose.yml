@@ -143,6 +143,12 @@ services:
       <<: *dotnet-environment
       KAIMO_LOG_SOURCE: web
       Jwt__Secret: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      # Recommended: keep the key-encryption certificate outside ./data/kaimo-system
+      # (see README "Protecting stored credentials"), together with the secrets block below.
+      # DataProtection__CertificatePath: /run/secrets/kaimo-dp-certificate
+    # secrets:
+    #   - source: kaimo-dp-certificate
+    #     target: kaimo-dp-certificate
     volumes:
       - *storage-pool-01
       - *app-data
@@ -179,6 +185,10 @@ services:
       start_period: 30s
     networks:
       - default
+
+# secrets:
+#   kaimo-dp-certificate:
+#     file: ./secrets/dp-certificate/key-encryption.pfx
 
 networks:
   smb-control:

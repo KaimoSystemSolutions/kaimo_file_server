@@ -4,6 +4,7 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Infrastructure.Clouds;
+using Kaimo_File_Server.Web.Middleware;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Net.Http.Headers;
@@ -90,7 +91,7 @@ public sealed class CloudAccessOneDriveController(
         try
         {
             var authorization = await deviceAuthorization.StartAsync(connectionId, string.Empty, ticket);
-            return Content(RenderPage(authorization), "text/html; charset=utf-8");
+            return Content(RenderPage(authorization, SecurityHeadersMiddleware.GetNonce(HttpContext)), "text/html; charset=utf-8");
         }
         catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
         {
@@ -147,7 +148,7 @@ public sealed class CloudAccessOneDriveController(
         }
     }
 
-    private static string RenderPage(OneDriveDeviceAuthorization authorization)
+    private static string RenderPage(OneDriveDeviceAuthorization authorization, string cspNonce)
     {
         var html = HtmlEncoder.Default;
         var language = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
@@ -168,7 +169,7 @@ public sealed class CloudAccessOneDriveController(
             a.button{display:inline-block;padding:11px 18px;border-radius:9px;background:#2878d0;color:white;text-decoration:none;font-weight:650}a.cancel{display:block;margin-top:20px;color:#aab6ca}.error{color:#ff9c9c}
             </style></head><body><main><h1>{{{title}}}</h1><p>{{{instructions}}}</p>
             <code>{{{html.Encode(authorization.UserCode)}}}</code><a class="button" href="{{{html.Encode(authorization.VerificationUri)}}}" target="_blank" rel="noopener noreferrer">{{{openMicrosoft}}}</a>
-            <p id="status">{{{waiting}}}</p><a class="cancel" href="/cloud-access">{{{cancel}}}</a></main><script>
+            <p id="status">{{{waiting}}}</p><a class="cancel" href="/cloud-access">{{{cancel}}}</a></main><script nonce="{{{cspNonce}}}">
             const u={{{statusUrl}}},s=document.getElementById('status'),f={{{failed}}};async function p(){try{const r=await fetch(u,{cache:'no-store',credentials:'same-origin'}),j=await r.json();if(j.state==='complete'){location.replace(j.redirect);return}if(j.state==='failed'){s.textContent=j.message||f;s.className='error';return}setTimeout(p,Math.max(1,j.retryAfterSeconds||{{{authorization.PollIntervalSeconds}}})*1000)}catch(e){s.textContent=f;s.className='error'}}setTimeout(p,{{{authorization.PollIntervalSeconds}}}*1000)
             </script></body></html>
             """;

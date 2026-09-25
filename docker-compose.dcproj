@@ -5,8 +5,14 @@
     <DockerTargetOS>Linux</DockerTargetOS>
     <ProjectGuid>81dded9d-158b-e303-5f62-77a2896d2a5a</ProjectGuid>
   </PropertyGroup>
+  <PropertyGroup>
+    <!-- Development settings (Development environment, public DevOnly keys) live in an
+         explicitly referenced file instead of docker-compose.override.yml, which a plain
+         `docker compose up` would merge automatically. -->
+    <AdditionalComposeFilePaths>docker-compose.dev.yml</AdditionalComposeFilePaths>
+  </PropertyGroup>
   <ItemGroup>
-    <None Include="docker-compose.override.yml">
+    <None Include="docker-compose.dev.yml">
       <DependentUpon>docker-compose.yml</DependentUpon>
     </None>
     <None Include="docker-compose.yml" />

@@ -8,6 +8,7 @@ using Kaimo_File_Server.Infrastructure;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Tests.Infrastructure;
 using Kaimo_File_Server.Web.Components.ViewModels;
+using Kaimo_File_Server.Web.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -104,7 +105,7 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
 
         sut.CreateUserName = "Charlie";
         sut.CreateUserUsername = "charlie";
-        sut.CreateUserPassword = "Passw0rd!";
+        sut.CreateUserPassword = "Passw0rd!Long";
         sut.CreateUserEmail = "charlie@example.com";
         sut.CreateUserIsEnabled = true;
         sut.CreateUserDepartmentId = dept.Id;
@@ -115,7 +116,7 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
         Assert.NotNull(row);
         Assert.Equal("Charlie", row!.Name);
         Assert.Equal("charlie@example.com", row.Email);
-        Assert.True(_passwords.VerifyPassword("Passw0rd!", row.PasswordHash)); // real hash stored
+        Assert.True(_passwords.VerifyPassword("Passw0rd!Long", row.PasswordHash)); // real hash stored
         // And the user was attached to the chosen department.
         Assert.True(await db.DepartmentUsers.AnyAsync(du => du.UserId == row.Id && du.DepartmentId == dept.Id));
     }
@@ -131,7 +132,7 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
 
         sut.CreateUserName = "Charlie";
         sut.CreateUserUsername = "charlie";
-        sut.CreateUserPassword = "Passw0rd!";
+        sut.CreateUserPassword = "Passw0rd!Long";
         sut.CreateUserDepartmentId = dept.Id;
         await sut.CreateUserAsync();
 
@@ -150,7 +151,7 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
 
         sut.CreateUserName = "Charlie";
         sut.CreateUserUsername = "charlie";
-        sut.CreateUserPassword = "abc"; // below min length 6
+        sut.CreateUserPassword = "abc"; // below the default min length 12
         sut.CreateUserDepartmentId = dept.Id;
         await sut.CreateUserAsync();
 
@@ -223,13 +224,91 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
         await sut.SelectUserAsync(sut.Users.Single(u => u.Id == target.Id));
         await sut.StartEditUserAsync();
 
-        sut.NewPassword = "N3wSecret!";
-        sut.ConfirmPassword = "N3wSecret!";
+        sut.NewPassword = "N3wSecret!2026";
+        sut.ConfirmPassword = "N3wSecret!2026";
         await sut.SaveUserAsync();
 
         await using var db = NewContext();
         var row = await db.Users.FindAsync(target.Id);
-        Assert.True(_passwords.VerifyPassword("N3wSecret!", row!.PasswordHash));
+        Assert.True(_passwords.VerifyPassword("N3wSecret!2026", row!.PasswordHash));
+    }
+
+    // ─────────────── Self-service password change ───────────────
+
+    private UserListViewModel BuildSelfServiceSut(User self, ILoginService login)
+    {
+        // No management permissions: the user may only edit their own profile.
+        _mgmtAuth.Setup(m => m.GetAuthorizedDepartmentIdsAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(AuthorizedScopeResult.None());
+        _mgmtAuth.Setup(m => m.GetAuthorizedDepartmentIdsAnyAsync(It.IsAny<UserContext>(), It.IsAny<ManagementPermission>()))
+            .ReturnsAsync(AuthorizedScopeResult.None());
+        return new UserListViewModel(
+            UserRepo(), GroupRepo(), RoleRepo(), DepartmentRepo(), ScopedRoleRepo(),
+            _passwords, _ntHash.Object, _mgmtAuth.Object,
+            UserContextFactoryFor((self.Username, ContextFor(self))).Object,
+            AuthStateFor(self.Username),
+            NullLogger<UserListViewModel>.Instance,
+            ShareRepo(), _config.Object,
+            loginService: login,
+            client: new ClientConnectionInfo { RemoteAddress = "198.51.100.7" });
+    }
+
+    private async Task<UserListViewModel> StartSelfPasswordChangeAsync(User self, ILoginService login)
+    {
+        var sut = BuildSelfServiceSut(self, login);
+        await sut.LoadAsync();
+        await sut.SelectUserAsync(sut.Users.Single(u => u.Id == self.Id));
+        await sut.StartEditUserAsync();
+        sut.CurrentPassword = "current-password";
+        sut.NewPassword = "Brand-new-secret-42";
+        sut.ConfirmPassword = "Brand-new-secret-42";
+        return sut;
+    }
+
+    /// <summary>
+    /// The "current password" check goes through the login service, so it is throttled
+    /// and locked out like a sign-in instead of being an unlimited password oracle.
+    /// </summary>
+    [Fact]
+    public async Task SelfPasswordChange_LockedOutCurrentPasswordCheck_DoesNotChangePassword()
+    {
+        var self = SeedUser("carol");
+        var login = new Mock<ILoginService>();
+        login.Setup(l => l.AuthenticateAsync("carol", "current-password", "198.51.100.7"))
+            .ReturnsAsync(LoginResult.LockedOut(TimeSpan.FromMinutes(7)));
+        var sut = await StartSelfPasswordChangeAsync(self, login.Object);
+
+        await sut.SaveUserAsync();
+
+        Assert.Contains("7", sut.ErrorMessage);
+        await using var db = NewContext();
+        Assert.Equal("pw-hash", (await db.Users.FindAsync(self.Id))!.PasswordHash);
+        login.Verify(l => l.AuthenticateAsync("carol", "current-password", "198.51.100.7"), Times.Once);
+    }
+
+    [Fact]
+    public async Task SelfPasswordChange_Verified_ChangesPassword_AndClearsMustChange()
+    {
+        var self = SeedUser("carol");
+        await using (var db = NewContext())
+        {
+            var row = await db.Users.FindAsync(self.Id);
+            row!.MustChangePassword = true;
+            await db.SaveChangesAsync();
+        }
+        var login = new Mock<ILoginService>();
+        login.Setup(l => l.AuthenticateAsync("carol", "current-password", It.IsAny<string?>()))
+            .ReturnsAsync(LoginResult.ForSuccess(ContextFor(self)));
+        var sut = await StartSelfPasswordChangeAsync(self, login.Object);
+
+        await sut.SaveUserAsync();
+
+        Assert.Null(sut.ErrorMessage);
+        await using var check = NewContext();
+        var updated = (await check.Users.FindAsync(self.Id))!;
+        Assert.True(_passwords.VerifyPassword("Brand-new-secret-42", updated.PasswordHash));
+        Assert.False(updated.MustChangePassword);
+        Assert.NotEqual(self.SecurityStamp, updated.SecurityStamp);
     }
 
     [Fact]
@@ -243,7 +322,7 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
         await sut.SelectUserAsync(sut.Users.Single(u => u.Id == target.Id));
         await sut.StartEditUserAsync();
 
-        sut.NewPassword = "N3wSecret!";
+        sut.NewPassword = "N3wSecret!2026";
         sut.ConfirmPassword = "different";
         await sut.SaveUserAsync();
 
@@ -775,7 +854,7 @@ public class UserListViewModelDatabaseTests : DatabaseTestBase
         await sut.LoadAsync();
         sut.CreateUserName = "Dana";
         sut.CreateUserUsername = "dana";
-        sut.CreateUserPassword = "Passw0rd!";
+        sut.CreateUserPassword = "Passw0rd!Long";
         sut.CreateUserDepartmentId = dept.Id;
         await sut.CreateUserAsync();
 

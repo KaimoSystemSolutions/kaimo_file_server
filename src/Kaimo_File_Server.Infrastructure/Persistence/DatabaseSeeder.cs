@@ -129,6 +129,9 @@ public class DatabaseSeeder
         var admin = MakeUser(
             "Administrator", "admin", password,
             "Built-in administrator account", "admin@kaimo.local");
+        // The initial password sits in the logs or in the deployment's .env/compose file,
+        // so the administrator must replace it after the first sign-in.
+        admin.MustChangePassword = true;
 
         db.Users.Add(admin);
         await db.SaveChangesAsync();

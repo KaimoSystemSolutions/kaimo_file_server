@@ -126,6 +126,25 @@ public class DatabaseSeederTests : IDisposable
         Assert.True(_passwords.VerifyPassword(pw, admin.PasswordHash));
     }
 
+    /// <summary>
+    /// The bootstrap password is visible in docker logs or the deployment's .env,
+    /// so the administrator must replace it after the first sign-in.
+    /// </summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Configured#Bootstrap_Pw_42")]
+    public async Task SeedAsync_BootstrapAdmin_MustChangePassword(string? configuredPassword)
+    {
+        if (configuredPassword is null)
+            await SeedAsync(("Seed:DemoData", "false"));
+        else
+            await SeedAsync(("Seed:DemoData", "false"), ("Seed:AdminPassword", configuredPassword));
+
+        var admin = await _db.Users.SingleAsync(u => u.Username == "admin");
+        Assert.True(admin.MustChangePassword);
+        Assert.False(string.IsNullOrEmpty(admin.SecurityStamp));
+    }
+
     // ─────────────── Demo mode ───────────────
 
     [Fact]

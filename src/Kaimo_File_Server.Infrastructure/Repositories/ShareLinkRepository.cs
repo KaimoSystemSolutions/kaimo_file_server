@@ -15,6 +15,10 @@ public sealed class ShareLinkRepository : IShareLinkRepository
 
     public async Task<ShareLink> CreateAsync(ShareLink link)
     {
+        // Only the hash is stored for lookups; the plain token stays in memory.
+        if (!string.IsNullOrEmpty(link.Token))
+            link.TokenHash = ShareLink.HashToken(link.Token);
+
         await using var db = await _dbFactory.CreateDbContextAsync();
         db.ShareLinks.Add(link);
         await db.SaveChangesAsync();
@@ -46,8 +50,39 @@ public sealed class ShareLinkRepository : IShareLinkRepository
 
     public async Task<ShareLink?> GetByTokenAsync(string token)
     {
+        if (string.IsNullOrEmpty(token))
+            return null;
+
+        var hash = ShareLink.HashToken(token);
         await using var db = await _dbFactory.CreateDbContextAsync();
-        return await db.ShareLinks.FirstOrDefaultAsync(l => l.Token == token);
+        var link = await db.ShareLinks.FirstOrDefaultAsync(l => l.TokenHash == hash);
+        if (link is not null)
+            link.Token = token; // the caller presented it; keep it for URLs/tickets
+        return link;
+    }
+
+    public async Task<List<ShareLink>> ListWithLegacyTokenAsync(int maxCount)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.ShareLinks
+            .Where(l => l.LegacyToken != null)
+            .OrderBy(l => l.CreatedAtUtc)
+            .Take(maxCount)
+            .ToListAsync();
+    }
+
+    public async Task<bool> TryProtectLegacyTokenAsync(Guid id, string legacyToken, string protectedToken)
+    {
+        var hash = ShareLink.HashToken(legacyToken);
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        // Conditional so a concurrent run (or edit) is never overwritten.
+        int affected = await db.ShareLinks
+            .Where(l => l.Id == id && l.LegacyToken == legacyToken)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(l => l.TokenHash, hash)
+                .SetProperty(l => l.ProtectedToken, protectedToken)
+                .SetProperty(l => l.LegacyToken, (string?)null));
+        return affected == 1;
     }
 
     public async Task<List<ShareLink>> ListForSharesAsync(IEnumerable<Guid> shareIds)
@@ -70,14 +105,18 @@ public sealed class ShareLinkRepository : IShareLinkRepository
 
     public async Task<ShareLink?> TryConsumeAccessAsync(string token)
     {
+        if (string.IsNullOrEmpty(token))
+            return null;
+
         var now = DateTime.UtcNow;
+        var hash = ShareLink.HashToken(token);
         await using var db = await _dbFactory.CreateDbContextAsync();
 
         // Single atomic, guarded UPDATE: the database evaluates the window + count
         // predicate and the increment together, so concurrent downloads can never
         // push AccessCount past MaxAccessCount. Portable across PostgreSQL and SQLite.
         int affected = await db.ShareLinks
-            .Where(l => l.Token == token
+            .Where(l => l.TokenHash == hash
                         && l.IsEnabled
                         && (l.StartsAtUtc == null || l.StartsAtUtc <= now)
                         && (l.ExpiresAtUtc == null || l.ExpiresAtUtc >= now)

@@ -71,6 +71,22 @@ namespace Kaimo_File_Server.Core.Domain.Identity
         /// </summary>
         public string NtHash { get; init; } = string.Empty;
 
+        /// <summary>
+        /// Random value embedded in every issued JWT (claim <c>sstamp</c>) and compared on
+        /// each validation. Replacing it — on every password change/reset — invalidates all
+        /// previously issued web and client-API tokens of the account at once.
+        /// </summary>
+        public string SecurityStamp { get; set; } = NewSecurityStamp();
+
+        /// <summary>
+        /// When <c>true</c> the user must set a new password after signing in (set for the
+        /// bootstrap administrator, whose initial password is visible in logs/config).
+        /// </summary>
+        public bool MustChangePassword { get; set; }
+
+        /// <summary>Creates a fresh, unpredictable <see cref="SecurityStamp"/> value.</summary>
+        public static string NewSecurityStamp() => Guid.NewGuid().ToString("N");
+
         /// <summary>EF Core / serialization constructor.</summary>
         protected User() { }
 

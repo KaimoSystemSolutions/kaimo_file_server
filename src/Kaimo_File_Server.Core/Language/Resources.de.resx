@@ -2904,9 +2904,6 @@
   <data name="Web_CloudSync_Error_ProviderRequired" xml:space="preserve">
     <value>Bitte einen verfügbaren Cloud-Anbieter auswählen.</value>
   </data>
-  <data name="Web_CloudSync_Error_Conflict" xml:space="preserve">
-    <value>Dieser Ordner überschneidet sich mit einer bestehenden Cloud-Synchronisierung.</value>
-  </data>
   <data name="Web_CloudSync_Error_NotAuthorized" xml:space="preserve">
     <value>Für diese Aktion besteht keine Berechtigung.</value>
   </data>
@@ -3368,36 +3365,6 @@
   </data>
   <data name="Web_Settings_CloudAccess_CacheSaveFailed" xml:space="preserve">
     <value>Cloud-Zugriff-Cache-Einstellungen konnten nicht gespeichert werden.</value>
-  </data>
-  <data name="Web_GoogleOAuth_ShareNotFound" xml:space="preserve">
-    <value>Der Share existiert nicht mehr.</value>
-  </data>
-  <data name="Web_GoogleOAuth_InvalidTransaction" xml:space="preserve">
-    <value>Die Google-Autorisierungsanfrage ist ungültig oder abgelaufen.</value>
-  </data>
-  <data name="Web_GoogleOAuth_FolderAlreadySynced" xml:space="preserve">
-    <value>Dieser Ordner wird bereits synchronisiert.</value>
-  </data>
-  <data name="Web_GoogleOAuth_FolderConflict" xml:space="preserve">
-    <value>Dieser Ordner überschneidet sich mit dem synchronisierten Ordner „{0}“.</value>
-  </data>
-  <data name="Web_GoogleOAuth_NotConfigured" xml:space="preserve">
-    <value>Die Google-Autorisierung ist für diese Installation nicht konfiguriert.</value>
-  </data>
-  <data name="Web_GoogleOAuth_InvalidScopeProfile" xml:space="preserve">
-    <value>Das ausgewählte Google-Drive-Zugriffsprofil ist ungültig.</value>
-  </data>
-  <data name="Web_GoogleOAuth_ConsentDenied" xml:space="preserve">
-    <value>Die Google-Autorisierung wurde abgebrochen oder abgelehnt.</value>
-  </data>
-  <data name="Web_GoogleOAuth_InvalidCallback" xml:space="preserve">
-    <value>Google hat einen ungültigen Autorisierungsrückruf gesendet.</value>
-  </data>
-  <data name="Web_GoogleOAuth_ExchangeFailed" xml:space="preserve">
-    <value>Die Google-Autorisierung konnte nicht abgeschlossen werden. Es wurden keine Zugangsdaten gespeichert.</value>
-  </data>
-  <data name="Web_GoogleOAuth_CallbackConflict" xml:space="preserve">
-    <value>„{0}“ überschneidet sich jetzt mit dem synchronisierten Ordner „{1}“. Es wurde keine Verbindung hergestellt.</value>
   </data>
   <data name="Web_ExternalStorage_Title" xml:space="preserve">
     <value>Externer Speicher</value>
@@ -4514,5 +4481,20 @@
   </data>
   <data name="Web_Properties_SizeTotal" xml:space="preserve">
     <value>Größe (gesamt)</value>
+  </data>
+  <data name="Web_User_CurrentPasswordLockedOut" xml:space="preserve">
+    <value>Zu viele Fehlversuche. Bitte in {0} Minute(n) erneut versuchen.</value>
+  </data>
+  <data name="Web_ExternalStorage_WebDavAllowInsecureHttp" xml:space="preserve">
+    <value>Unverschlüsseltes HTTP für diese Verbindung erlauben</value>
+  </data>
+  <data name="Web_ExternalStorage_WebDavAllowInsecureHttpWarning" xml:space="preserve">
+    <value>Benutzername und Passwort werden dann im Klartext an den Server gesendet. Nur für einen Server in einem vollständig vertrauenswürdigen Netz aktivieren.</value>
+  </data>
+  <data name="Web_ExternalStorage_ErrorCode_server_url_insecure" xml:space="preserve">
+    <value>Die Server-URL verwendet unverschlüsseltes HTTP. Verwenden Sie HTTPS oder erlauben Sie HTTP für diese Verbindung ausdrücklich.</value>
+  </data>
+  <data name="Web_User_MustChangePasswordNotice" xml:space="preserve">
+    <value>Ihr Anfangspasswort muss geändert werden. Bitte legen Sie ein neues Passwort fest, um fortzufahren.</value>
   </data>
 </root>

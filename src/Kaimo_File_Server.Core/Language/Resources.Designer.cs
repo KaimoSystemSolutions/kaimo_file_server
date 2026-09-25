@@ -3139,15 +3139,6 @@ namespace Kaimo_File_Server.Core.Language {
         }
         
         /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die This folder overlaps an existing cloud sync. ähnelt.
-        /// </summary>
-        public static string Web_CloudSync_Error_Conflict {
-            get {
-                return ResourceManager.GetString("Web_CloudSync_Error_Conflict", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die The cloud syncs could not be loaded. ähnelt.
         /// </summary>
         public static string Web_CloudSync_Error_Load {
@@ -7122,96 +7113,6 @@ namespace Kaimo_File_Server.Core.Language {
         public static string Web_Folder_Size {
             get {
                 return ResourceManager.GetString("Web_Folder_Size", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die “{0}” now conflicts with the synchronized folder “{1}”. Nothing was connected. ähnelt.
-        /// </summary>
-        public static string Web_GoogleOAuth_CallbackConflict {
-            get {
-                return ResourceManager.GetString("Web_GoogleOAuth_CallbackConflict", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Google authorization was cancelled or denied. ähnelt.
-        /// </summary>
-        public static string Web_GoogleOAuth_ConsentDenied {
-            get {
-                return ResourceManager.GetString("Web_GoogleOAuth_ConsentDenied", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Google authorization could not be completed. No credentials were stored. ähnelt.
-        /// </summary>
-        public static string Web_GoogleOAuth_ExchangeFailed {
-            get {
-                return ResourceManager.GetString("Web_GoogleOAuth_ExchangeFailed", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die This folder is already synchronized. ähnelt.
-        /// </summary>
-        public static string Web_GoogleOAuth_FolderAlreadySynced {
-            get {
-                return ResourceManager.GetString("Web_GoogleOAuth_FolderAlreadySynced", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die This folder conflicts with the synchronized folder “{0}”. ähnelt.
-        /// </summary>
-        public static string Web_GoogleOAuth_FolderConflict {
-            get {
-                return ResourceManager.GetString("Web_GoogleOAuth_FolderConflict", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Google returned an invalid authorization callback. ähnelt.
-        /// </summary>
-        public static string Web_GoogleOAuth_InvalidCallback {
-            get {
-                return ResourceManager.GetString("Web_GoogleOAuth_InvalidCallback", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die The selected Google Drive access profile is invalid. ähnelt.
-        /// </summary>
-        public static string Web_GoogleOAuth_InvalidScopeProfile {
-            get {
-                return ResourceManager.GetString("Web_GoogleOAuth_InvalidScopeProfile", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die The Google authorization request is invalid or has expired. ähnelt.
-        /// </summary>
-        public static string Web_GoogleOAuth_InvalidTransaction {
-            get {
-                return ResourceManager.GetString("Web_GoogleOAuth_InvalidTransaction", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die Google authorization is not configured for this installation. ähnelt.
-        /// </summary>
-        public static string Web_GoogleOAuth_NotConfigured {
-            get {
-                return ResourceManager.GetString("Web_GoogleOAuth_NotConfigured", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Sucht eine lokalisierte Zeichenfolge, die The share no longer exists. ähnelt.
-        /// </summary>
-        public static string Web_GoogleOAuth_ShareNotFound {
-            get {
-                return ResourceManager.GetString("Web_GoogleOAuth_ShareNotFound", resourceCulture);
             }
         }
         

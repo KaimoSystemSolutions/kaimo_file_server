@@ -9,6 +9,9 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Infrastructure.Configuration;
+using Kaimo_File_Server.Web.Controllers.WebDav;
+using Kaimo_File_Server.Web.Services;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -29,6 +32,10 @@ public class UserListViewModel
     private readonly ILogger<UserListViewModel> _logger;
     private readonly IShareRepository _shareRepo;
     private readonly IConfigRepository _config;
+    private readonly ILoginService? _loginService;
+    private readonly ClientConnectionInfo? _client;
+    private readonly JwtTokenService? _jwt;
+    private readonly IMemoryCache? _cache;
 
     public UserListViewModel(
         IUserRepository userRepo,
@@ -43,8 +50,16 @@ public class UserListViewModel
         AuthenticationStateProvider authState,
         ILogger<UserListViewModel> logger,
         IShareRepository shareRepo,
-        IConfigRepository config)
+        IConfigRepository config,
+        ILoginService? loginService = null,
+        ClientConnectionInfo? client = null,
+        JwtTokenService? jwt = null,
+        IMemoryCache? cache = null)
     {
+        _loginService = loginService;
+        _client = client;
+        _jwt = jwt;
+        _cache = cache;
         _userRepo = userRepo;
         _groupRepo = groupRepo;
         _roleRepo = roleRepo;
@@ -58,6 +73,54 @@ public class UserListViewModel
         _logger = logger;
         _shareRepo = shareRepo;
         _config = config;
+    }
+
+    /// <summary>
+    /// Checks the "current password" of a self-service password change through the login
+    /// service, so it is throttled and locked out exactly like a sign-in attempt (otherwise
+    /// this form would be an unthrottled password oracle). Returns an error text or <c>null</c>.
+    /// </summary>
+    private async Task<string?> VerifyCurrentPasswordAsync(User user)
+    {
+        if (_loginService is null)
+            return _passwordService.VerifyPassword(CurrentPassword, user.PasswordHash)
+                ? null
+                : Resources.Web_User_CurrentPasswordWrong;
+
+        var result = await _loginService.AuthenticateAsync(user.Username, CurrentPassword, _client?.RemoteAddress);
+        return result.Outcome switch
+        {
+            LoginOutcome.Success when result.UserContext?.User.Id == user.Id => null,
+            LoginOutcome.LockedOut => string.Format(
+                Resources.ResourceManager.GetString("Web_User_CurrentPasswordLockedOut") ?? "{0}",
+                Math.Max(1, (int)Math.Ceiling(result.RetryAfter.TotalMinutes))),
+            _ => Resources.Web_User_CurrentPasswordWrong,
+        };
+    }
+
+    /// <summary>
+    /// After the user changed their own password the security stamp is new, which ends every
+    /// session including this one. Re-issues the session token so only the other sessions end.
+    /// </summary>
+    private async Task RenewOwnSessionAsync(Guid userId)
+    {
+        if (_jwt is null || _authState is not JwtAuthenticationStateProvider provider)
+            return;
+
+        var context = await _userContextFactory.CreateByUserIdAsync(userId);
+        if (context is null)
+            return;
+
+        var token = _jwt.GenerateToken(
+            context.User.Id, context.User.Username, context.User.Name,
+            context.Roles.Select(r => r.Name), securityStamp: context.User.SecurityStamp);
+        await provider.StoreTokenInLocalStorageAsync(token);
+    }
+
+    private void InvalidateCachedWebDavLogins(Guid userId)
+    {
+        if (_cache is not null)
+            WebDavBasicAuthenticationHandler.Invalidate(_cache, userId);
     }
 
     /// <summary>Loads the globally configured password requirements.</summary>
@@ -736,7 +799,14 @@ public class UserListViewModel
                 await _userRepo.UpdatePasswordAsync(SelectedUser.Id,
                     _passwordService.HashPassword(NewPassword),
                     _ntHashProtector.Protect(_passwordService.ComputeNtHash(NewPassword)));
+                // An admin resetting their own password keeps this session (others end).
+                if (SelectedUser.Id == _actorContext?.User.Id)
+                    await RenewOwnSessionAsync(SelectedUser.Id);
             }
+
+            // The edit may have disabled the account or reset its password: drop cached
+            // WebDAV logins so neither the old password nor a disabled account stays usable.
+            InvalidateCachedWebDavLogins(SelectedUser.Id);
 
             // Department membership — diff against the picker's authorized subset only, so
             // memberships in departments the actor cannot manage are never touched. Each change
@@ -827,15 +897,19 @@ public class UserListViewModel
             {
                 if (!SelectedUser.CanChangePassword)
                 { ErrorMessage = Resources.Web_User_NoPermissionPasswordReset; return; }
-                if (!_passwordService.VerifyPassword(CurrentPassword, SelectedUser.PasswordHash))
-                { ErrorMessage = Resources.Web_User_CurrentPasswordWrong; return; }
                 var pwError = (await GetPasswordPolicyAsync()).Validate(NewPassword);
                 if (pwError is not null) { ErrorMessage = pwError; return; }
                 if (NewPassword != ConfirmPassword)
                 { ErrorMessage = Resources.Web_User_PasswordsDoNotMatch; return; }
+                var currentPasswordError = await VerifyCurrentPasswordAsync(SelectedUser);
+                if (currentPasswordError is not null) { ErrorMessage = currentPasswordError; return; }
                 await _userRepo.UpdatePasswordAsync(SelectedUser.Id,
                     _passwordService.HashPassword(NewPassword),
-                    _ntHashProtector.Protect(_passwordService.ComputeNtHash(NewPassword)));
+                    _ntHashProtector.Protect(_passwordService.ComputeNtHash(NewPassword)),
+                    changedByUser: true);
+                InvalidateCachedWebDavLogins(SelectedUser.Id);
+                // The new security stamp ended every other session; keep this one.
+                await RenewOwnSessionAsync(SelectedUser.Id);
             }
 
             await _userRepo.UpdatePersonalNamesAsync(
@@ -1402,6 +1476,7 @@ public class UserListViewModel
         {
             IsSaving = true;
             await _userRepo.DeleteAsync(SelectedUser.Id);
+            InvalidateCachedWebDavLogins(SelectedUser.Id);
             SelectedUser = null; IsConfirmingDelete = false;
             await LoadTabDataAsync();
             SuccessMessage = Resources.Web_User_Deleted;

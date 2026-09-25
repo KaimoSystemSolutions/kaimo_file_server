@@ -1,4 +1,4 @@
-﻿using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Domain.Identity;
 
 namespace Kaimo_File_Server.Core.Repositories
 {
@@ -86,13 +86,18 @@ namespace Kaimo_File_Server.Core.Repositories
 
         /// <summary>
         /// Updates the user's password hash and NT hash.
-        /// Both values must already be hashed by the caller. All active client-API
-        /// refresh tokens of the user are revoked in the same transaction.
+        /// Both values must already be hashed by the caller. In the same transaction all
+        /// active client-API refresh tokens of the user are revoked and the security stamp
+        /// is replaced, which invalidates every previously issued web and API token.
         /// </summary>
         /// <param name="userId">The user to update.</param>
         /// <param name="passwordHash">The new bcrypt/argon2 password hash.</param>
         /// <param name="ntHash">The new MD4-based NT hash (required for SMB/NTLM).</param>
-        Task UpdatePasswordAsync(Guid userId, string passwordHash, string ntHash);
+        /// <param name="changedByUser">
+        /// True when the account holder chose the password themselves; clears a pending
+        /// <c>MustChangePassword</c> requirement.
+        /// </param>
+        Task UpdatePasswordAsync(Guid userId, string passwordHash, string ntHash, bool changedByUser = false);
 
         /// <summary>
         /// Updates the user's profile fields in a single round-trip.

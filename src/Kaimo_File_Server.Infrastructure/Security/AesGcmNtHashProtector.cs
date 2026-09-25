@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Kaimo_File_Server.Core.Security;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Kaimo_File_Server.Infrastructure.Security;
 
@@ -40,6 +41,47 @@ public sealed class AesGcmNtHashProtector : INtHashProtector
         {
             CryptographicOperations.ZeroMemory(secretBytes);
         }
+    }
+
+    /// <summary>Minimum length of <c>NtHash:EncryptionKey</c>, matching the JWT secret requirement.</summary>
+    public const int MinKeyLength = 32;
+
+    /// <summary>Prefix of the public keys used by the development compose file.</summary>
+    public const string DevelopmentKeyPrefix = "DevOnly";
+
+    /// <summary>
+    /// Rejects a public development key outside Development and a key shorter than
+    /// <see cref="MinKeyLength"/> on a fresh installation. An existing installation with a
+    /// short key only gets a warning: replacing the key makes every stored NT hash unreadable,
+    /// so that decision is left to the administrator.
+    /// </summary>
+    /// <param name="isFreshInstall">True when no NT hash has been stored with any key yet.</param>
+    public static void ValidateKeyStrength(
+        string? secret, bool allowDevelopmentKey, bool isFreshInstall, ILogger logger)
+    {
+        if (string.IsNullOrWhiteSpace(secret))
+            return; // The constructor already refuses to start without a key.
+
+        if (!allowDevelopmentKey
+            && secret.TrimStart().StartsWith(DevelopmentKeyPrefix, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                "NtHash:EncryptionKey is the public development key from the repository's dev compose " +
+                "file, so the stored SMB password hashes are effectively unprotected. Set a random, secret " +
+                $"key (>= {MinKeyLength} characters) via env NtHash__EncryptionKey. Existing users must then " +
+                "set their password again for SMB (see the deployment README, 'NT hash key mismatch').");
+
+        if (secret.Length >= MinKeyLength)
+            return;
+
+        if (isFreshInstall)
+            throw new InvalidOperationException(
+                $"NtHash:EncryptionKey must be at least {MinKeyLength} characters long (currently " +
+                $"{secret.Length}). Generate one with e.g. 'openssl rand -hex 32'.");
+
+        logger.LogWarning(
+            "NtHash:EncryptionKey is only {Length} characters long (recommended: at least {Minimum}). " +
+            "Changing it makes the stored SMB password hashes unreadable, so every user would have to " +
+            "set their password again.", secret.Length, MinKeyLength);
     }
 
     /// <summary>Test/explicit-key constructor. The key must be exactly 32 bytes.</summary>

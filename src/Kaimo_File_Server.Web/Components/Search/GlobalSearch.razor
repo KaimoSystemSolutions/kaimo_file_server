@@ -42,7 +42,19 @@
                                         <span class="search-result-meta">
                                             @if (!string.IsNullOrEmpty(result.HighlightSnippet))
                                             {
-                                                @((MarkupString)result.HighlightSnippet)
+                                                @* Rendered as encoded text segments — the snippet contains
+                                                   user-controlled file names/content and must never be raw HTML. *@
+                                                @foreach (var segment in SearchSnippet.Split(result.HighlightSnippet))
+                                                {
+                                                    if (segment.Highlighted)
+                                                    {
+                                                        <mark>@segment.Text</mark>
+                                                    }
+                                                    else
+                                                    {
+                                                        @segment.Text
+                                                    }
+                                                }
                                             }
                                             else
                                             {

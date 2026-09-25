@@ -12,6 +12,7 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject FileUploadCoordinator UploadCoordinator
 @inject IUserContextFactory UserContextFactory
+@inject IUserRepository UserRepository
 @inject IManagementAuthService ManagementAuthService
 @inject DemoModeOptions Demo
 @inject Kaimo_File_Server.Web.Components.ProfileNavigator ProfileNav
@@ -154,6 +155,13 @@
                 <span>@Text("Web_Demo_ReadOnlyNotice", "Read-only demo — your changes are not saved.")</span>
             </div>
         }
+        @if (_mustChangePassword)
+        {
+            <div class="demo-readonly-notice" role="alert">
+                @Assets.SVG("info.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                <span>@Text("Web_User_MustChangePasswordNotice", "Please set a new password before continuing.")</span>
+            </div>
+        }
         @Body
         
     </main>
@@ -235,6 +243,54 @@
     {
         UploadCoordinator.OnUploadRequested -= TriggerFileDialog;
         UploadCoordinator.OnFilesProcessed -= ReleaseSlot;
+        StopPasswordChangeEnforcement();
+    }
+
+    // ── Mandatory password change (bootstrap administrator) ──
+    // While the account still has to replace its initial password, every navigation leads
+    // back to the own profile, where the password can be changed. The flag is re-read from
+    // the database on each navigation, so the redirect stops right after the change.
+
+    private bool _mustChangePassword;
+
+    private async Task StartPasswordChangeEnforcementAsync()
+    {
+        _mustChangePassword = true;
+        Nav.LocationChanged += EnforcePasswordChangeOnNavigation;
+        // The own password change re-issues the session token; re-check right then.
+        AuthStateProvider.AuthenticationStateChanged += EnforcePasswordChangeOnSessionRenewal;
+        await EnforcePasswordChangeAsync(Nav.Uri);
+    }
+
+    private void EnforcePasswordChangeOnNavigation(object? sender, LocationChangedEventArgs e)
+        => _ = InvokeAsync(() => EnforcePasswordChangeAsync(e.Location));
+
+    private void EnforcePasswordChangeOnSessionRenewal(Task<AuthenticationState> state)
+        => _ = InvokeAsync(() => EnforcePasswordChangeAsync(Nav.Uri));
+
+    private void StopPasswordChangeEnforcement()
+    {
+        Nav.LocationChanged -= EnforcePasswordChangeOnNavigation;
+        AuthStateProvider.AuthenticationStateChanged -= EnforcePasswordChangeOnSessionRenewal;
+    }
+
+    private async Task EnforcePasswordChangeAsync(string location)
+    {
+        if (_currentUser is null || !_mustChangePassword)
+            return;
+
+        var user = await UserRepository.GetByIdAsync(_currentUser.User.Id);
+        if (user is not { MustChangePassword: true })
+        {
+            _mustChangePassword = false;
+            StopPasswordChangeEnforcement();
+            StateHasChanged();
+            return;
+        }
+
+        var path = new Uri(location).AbsolutePath.TrimEnd('/');
+        if (!string.Equals(path, "/users", StringComparison.OrdinalIgnoreCase))
+            await GoToOwnProfile();
     }
     
     protected override async Task OnInitializedAsync()
@@ -284,6 +340,9 @@
                                    && await ManagementAuthService.HasAnyPermissionAsync(
                                           _currentUser, ManagementPermission.ManageShareLinks);
         }
+
+        if (_currentUser?.User.MustChangePassword == true)
+            await StartPasswordChangeEnforcementAsync();
 
         // Load the global date-display format once for the whole circuit (uses the
         // DbContext, which is available here — unlike the theme init in OnAfterRender).

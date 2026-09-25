@@ -26,6 +26,12 @@ public class FileDocument
     public string? Author { get; set; }
     public List<string> Tags { get; set; } = [];
 
+    /// <summary>Search hit excerpt with the matched terms wrapped in <c>&lt;mark&gt;</c> tags.</summary>
+    /// <remarks>
+    /// Raw, unencoded text: file names and content are user-controlled. Consumers must
+    /// never render it as HTML — split it on the markers and emit encoded text instead
+    /// (see <c>Kaimo_File_Server.Web.Components.Search.SearchSnippet</c>).
+    /// </remarks>
     [JsonIgnore]
     public string? HighlightSnippet { get; set; }
 }

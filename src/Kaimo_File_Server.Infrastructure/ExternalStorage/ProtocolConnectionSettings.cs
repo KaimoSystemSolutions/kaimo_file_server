@@ -11,8 +11,13 @@ public sealed record SmbConnectionSettings(
     bool RequireSigning = true,
     bool RequireEncryption = true);
 
+/// <param name="AllowInsecureHttp">
+/// Explicit administrator opt-in for an unencrypted <c>http://</c> server URL: the Basic
+/// credentials then cross the network in clear text. Without it only <c>https://</c> is accepted.
+/// </param>
 public sealed record WebDavConnectionSettings(
-    string ServerUrl);
+    string ServerUrl,
+    bool AllowInsecureHttp = false);
 
 public sealed record RsyncSshConnectionSettings(
     string Host,

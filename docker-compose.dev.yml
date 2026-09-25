@@ -1,3 +1,10 @@
+# LOCAL DEVELOPMENT ONLY: Development environment, demo data and PUBLIC "DevOnly" keys.
+# Deliberately not named docker-compose.override.yml, so a plain `docker compose up`
+# never picks it up. Visual Studio loads it via docker-compose.dcproj
+# (AdditionalComposeFilePaths); on the CLI use
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# or set COMPOSE_FILE=docker-compose.yml:docker-compose.dev.yml in your local .env
+# (use ";" instead of ":" as separator on Windows).
 services:
   kaimo_file_server.host:
     environment:

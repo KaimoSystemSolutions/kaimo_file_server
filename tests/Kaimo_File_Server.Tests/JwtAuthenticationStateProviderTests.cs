@@ -22,6 +22,10 @@ namespace Kaimo_File_Server.Tests;
 public class JwtAuthenticationStateProviderTests
 {
     private static readonly Guid UserId = Guid.NewGuid();
+    private const string Stamp = "stamp-at-login";
+
+    private readonly Mock<IRevokedWebTokenRepository> _revoked = new();
+    private string? _token;
 
     private User? _dbUser;
     private bool _dbThrows;
@@ -39,7 +43,7 @@ public class JwtAuthenticationStateProviderTests
             })
             .Build();
         var jwt = new JwtTokenService(config, NullLogger<JwtTokenService>.Instance);
-        var token = jwt.GenerateToken(UserId, "alice", "Alice", new[] { "User" });
+        var token = _token ?? jwt.GenerateToken(UserId, "alice", "Alice", new[] { "User" }, securityStamp: Stamp);
 
         var repo = new Mock<IUserRepository>();
         repo.Setup(r => r.GetByIdAsync(It.IsAny<Guid>()))
@@ -49,6 +53,7 @@ public class JwtAuthenticationStateProviderTests
 
         var services = new ServiceCollection();
         services.AddScoped(_ => repo.Object);
+        services.AddSingleton(_revoked.Object);
         if (_configuredSeconds is not null)
         {
             var configRepo = new Mock<IConfigRepository>();
@@ -71,8 +76,8 @@ public class JwtAuthenticationStateProviderTests
         };
     }
 
-    private static User MakeUser(bool enabled)
-        => new(UserId, "Alice", "alice", "pw-hash", "nt-hash", isEnabled: enabled);
+    private static User MakeUser(bool enabled, string stamp = Stamp)
+        => new(UserId, "Alice", "alice", "pw-hash", "nt-hash", isEnabled: enabled) { SecurityStamp = stamp };
 
     private static bool IsAuthenticated(AuthenticationState state)
         => state.User.Identity?.IsAuthenticated == true;
@@ -184,6 +189,87 @@ public class JwtAuthenticationStateProviderTests
 
         Assert.False(notified);
     }
+
+    // ─────────────── Security stamp / logout / expiry ───────────────
+
+    [Fact]
+    public async Task PasswordChange_NewStamp_RejectsExistingToken()
+    {
+        using var f = CreateProvider(enabled: true);
+        _dbUser = MakeUser(enabled: true, stamp: "stamp-after-password-change");
+
+        Assert.False(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+    }
+
+    [Fact]
+    public async Task PasswordChange_DuringSession_InterruptsOnRevalidation()
+    {
+        using var f = CreateProvider(enabled: true);
+        Assert.True(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+
+        _dbUser = MakeUser(enabled: true, stamp: "stamp-after-password-change");
+        await f.RevalidateOnceAsync();
+
+        Assert.False(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+    }
+
+    [Fact]
+    public async Task TokenWithoutStamp_IsRejected()
+    {
+        var legacy = new JwtTokenService(TestConfig(), NullLogger<JwtTokenService>.Instance)
+            .GenerateToken(UserId, "alice", "Alice", new[] { "User" });
+        _token = legacy;
+        using var f = CreateProvider(enabled: true);
+
+        Assert.False(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+    }
+
+    [Fact]
+    public async Task Logout_RevokesToken_SoItCannotEstablishASessionAgain()
+    {
+        var revoked = new HashSet<string>();
+        _revoked.Setup(r => r.RevokeAsync(It.IsAny<string>(), It.IsAny<DateTime>()))
+            .Callback<string, DateTime>((jti, _) => revoked.Add(jti))
+            .Returns(Task.CompletedTask);
+        _revoked.Setup(r => r.IsRevokedAsync(It.IsAny<string>()))
+            .Returns<string>(jti => Task.FromResult(revoked.Contains(jti)));
+        _token = new JwtTokenService(TestConfig(), NullLogger<JwtTokenService>.Instance)
+            .GenerateToken(UserId, "alice", "Alice", new[] { "User" }, securityStamp: Stamp);
+
+        using (var first = CreateProvider(enabled: true))
+        {
+            Assert.True(IsAuthenticated(await first.GetAuthenticationStateAsync()));
+            await first.LogoutAsync();
+        }
+
+        // Same token replayed (e.g. copied out of the browser before logout).
+        using var second = CreateProvider(enabled: true);
+        Assert.Single(revoked);
+        Assert.False(IsAuthenticated(await second.GetAuthenticationStateAsync()));
+    }
+
+    [Fact]
+    public async Task ExpiredTokenDuringSession_InterruptsOnRevalidation()
+    {
+        _token = new JwtTokenService(TestConfig(), NullLogger<JwtTokenService>.Instance)
+            .GenerateToken(UserId, "alice", "Alice", new[] { "User" },
+                securityStamp: Stamp, lifetime: TimeSpan.FromSeconds(3));
+        using var f = CreateProvider(enabled: true);
+        Assert.True(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+
+        await Task.Delay(TimeSpan.FromSeconds(3.5)); // past exp; within the validator's clock skew
+        await f.RevalidateOnceAsync();
+
+        Assert.False(IsAuthenticated(await f.GetAuthenticationStateAsync()));
+    }
+
+    private static IConfiguration TestConfig() => new ConfigurationBuilder()
+        .AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Jwt:Secret"] = "unit-test-jwt-secret-at-least-32-characters-long!!",
+            ["Jwt:Issuer"] = "KaimoFileServer",
+        })
+        .Build();
 
     // ─────────────── Configurable interval ───────────────
 

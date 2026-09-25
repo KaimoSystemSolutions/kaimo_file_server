@@ -38,7 +38,8 @@ public sealed class ShareLinkService(
     IManagementAuthService mgmtAuth,
     IUserContextFactory userContexts,
     AuthenticationStateProvider authState,
-    PublicDownloadTicketStore tickets)
+    PublicDownloadTicketStore tickets,
+    ShareLinkTokenProtector? tokenProtector = null)
 {
     private static readonly LoginThrottlePolicy PasswordPolicy = new(10, TimeSpan.FromMinutes(15));
 
@@ -61,7 +62,14 @@ public sealed class ShareLinkService(
 
     /// <summary>Builds the shareable URL for a link, honouring the configured base addresses.</summary>
     public string BuildUrl(ShareLink link, ShareLinkSettings settings)
-        => BuildUrl(link.Token, link.BaseAddress, settings);
+        => BuildUrl(RevealToken(link) ?? string.Empty, link.BaseAddress, settings);
+
+    /// <summary>
+    /// The plain token of a link (tokens are stored only hashed + encrypted); null when it
+    /// cannot be recovered.
+    /// </summary>
+    public string? RevealToken(ShareLink link)
+        => tokenProtector?.Reveal(link) ?? (string.IsNullOrEmpty(link.Token) ? link.LegacyToken : link.Token);
 
     /// <summary>Builds a shareable URL from a token + chosen base address (for a live preview).</summary>
     public string BuildUrl(string token, string? chosenBase, ShareLinkSettings settings)
@@ -110,6 +118,8 @@ public sealed class ShareLinkService(
             MaxAccessCount = request.MaxAccessCount is > 0 ? request.MaxAccessCount : null,
             MaxBytesPerSecond = request.MaxBytesPerSecond is > 0 ? request.MaxBytesPerSecond : null,
         };
+        // Stored encrypted so the link can be shown again; the repository adds the lookup hash.
+        link.ProtectedToken = tokenProtector?.Protect(link.Token);
 
         return await repository.CreateAsync(link);
     }
@@ -122,7 +132,7 @@ public sealed class ShareLinkService(
     {
         if (link.PasswordHash is null) return (true, TimeSpan.Zero);
 
-        var key = "sharelink:" + link.Token;
+        var key = "sharelink:" + link.Id;
         // Reserve the attempt before the (slow) BCrypt verify so parallel guesses
         // cannot all slip past the lockout check.
         var status = throttle.BeginAttempt(key, PasswordPolicy);

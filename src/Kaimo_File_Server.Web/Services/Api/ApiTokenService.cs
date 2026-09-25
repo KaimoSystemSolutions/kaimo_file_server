@@ -57,7 +57,9 @@ public sealed class ApiTokenService
         _userContextFactory = userContextFactory;
         _clock = clock;
         _logger = logger;
-        _accessTokenSeconds = config.GetValue("Jwt:ExpirationHours", 24) * 3600;
+        // Deliberately short and separate from the web login lifetime (Jwt:ExpirationHours):
+        // a leaked access token expires quickly, and clients renew it via the refresh token.
+        _accessTokenSeconds = Math.Clamp(config.GetValue("Jwt:AccessTokenMinutes", 15), 1, 24 * 60) * 60;
         _refreshTokenDays = config.GetValue("Jwt:RefreshTokenDays", 30);
         // Grace window in which a replay of a just-rotated token is treated as a
         // benign concurrent-refresh race rather than theft (see RefreshAsync).
@@ -74,7 +76,9 @@ public sealed class ApiTokenService
             user.User.Username,
             user.User.Name,
             user.Roles.Select(r => r.Name),
-            deviceId);
+            deviceId,
+            user.User.SecurityStamp,
+            TimeSpan.FromSeconds(_accessTokenSeconds));
 
         (string secret, string hash) = GenerateOpaqueToken();
         var now = _clock.GetUtcNow().UtcDateTime;
@@ -181,7 +185,8 @@ public sealed class ApiTokenService
 
         string accessToken = _jwt.GenerateToken(
             user.User.Id, user.User.Username, user.User.Name,
-            user.Roles.Select(r => r.Name), device.Id);
+            user.Roles.Select(r => r.Name), device.Id,
+            user.User.SecurityStamp, TimeSpan.FromSeconds(_accessTokenSeconds));
 
         return new RefreshResult(
             RefreshOutcome.Success,

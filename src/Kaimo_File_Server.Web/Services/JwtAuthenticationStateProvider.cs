@@ -1,3 +1,4 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
@@ -13,8 +14,9 @@ namespace Kaimo_File_Server.Web.Services;
 /// Blazor AuthenticationStateProvider that reads and validates the JWT token directly from
 /// localStorage (via IJSRuntime).
 ///
-/// A valid, unexpired token is not sufficient on its own: an account that is disabled (or deleted)
-/// after the token was issued must lose its active session quickly. To that end the provider
+/// A valid, unexpired token is not sufficient on its own: when the account is disabled (or deleted),
+/// its password changes (security stamp) or the token is signed out after it was issued, the
+/// active session must end quickly. To that end the provider
 /// re-checks the account's <c>IsEnabled</c> flag in the database
 ///   • once when a session is (re)established in <see cref="GetAuthenticationStateAsync"/>, and
 ///   • periodically for the lifetime of the circuit (<see cref="RevalidationInterval"/>).
@@ -140,6 +142,7 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider, IDisp
     {
         _logger.LogInformation("Logout performed");
         StopRevalidationLoop();
+        await RevokeCurrentTokenAsync(_cachedPrincipal);
         try { await _js.InvokeVoidAsync("localStorage.removeItem", "auth_token"); } catch { }
         _cachedPrincipal = null;
         NotifyAuthenticationStateChanged(Task.FromResult(_anonymous));
@@ -178,17 +181,55 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider, IDisp
         }
     }
 
-    /// <summary>Looks up the account by its NameIdentifier claim and returns whether it exists and is enabled.</summary>
+    /// <summary>
+    /// Whether the session's token is still acceptable: not expired, not signed out, the
+    /// account exists and is enabled, and the token carries the account's current security
+    /// stamp (so a password change ends every session established before it).
+    /// </summary>
     private async Task<bool> IsAccountActiveAsync(ClaimsPrincipal principal)
     {
         var idValue = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!Guid.TryParse(idValue, out var userId))
             return false; // malformed/foreign token → not a valid session
 
+        // The circuit outlives the token check at connect time; end it once the token expires.
+        if (long.TryParse(principal.FindFirst(JwtRegisteredClaimNames.Exp)?.Value, out var exp)
+            && DateTimeOffset.FromUnixTimeSeconds(exp) <= DateTimeOffset.UtcNow)
+            return false;
+
         using var scope = _scopeFactory.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
         var user = await users.GetByIdAsync(userId);
-        return user is { IsEnabled: true };
+        if (user is not { IsEnabled: true } || !JwtTokenService.HasCurrentSecurityStamp(principal, user))
+            return false;
+
+        var jti = principal.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+        return string.IsNullOrEmpty(jti)
+            || !await scope.ServiceProvider.GetRequiredService<IRevokedWebTokenRepository>().IsRevokedAsync(jti);
+    }
+
+    /// <summary>
+    /// Records the session token as signed out on the server, so a copy of it (e.g. taken
+    /// from the browser) cannot establish a session again before it expires.
+    /// </summary>
+    private async Task RevokeCurrentTokenAsync(ClaimsPrincipal? principal)
+    {
+        var jti = principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+        if (string.IsNullOrEmpty(jti)
+            || !long.TryParse(principal!.FindFirst(JwtRegisteredClaimNames.Exp)?.Value, out var exp))
+            return;
+
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            await scope.ServiceProvider.GetRequiredService<IRevokedWebTokenRepository>()
+                .RevokeAsync(jti, DateTimeOffset.FromUnixTimeSeconds(exp).UtcDateTime);
+        }
+        catch (Exception ex)
+        {
+            // The local sign-out still proceeds; the token then only expires naturally.
+            _logger.LogWarning(ex, "Could not revoke the web token on logout");
+        }
     }
 
     /// <summary>Drops the session to anonymous. The token is left in localStorage on purpose.</summary>

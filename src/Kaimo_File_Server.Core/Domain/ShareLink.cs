@@ -11,8 +11,34 @@ public sealed class ShareLink
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    /// <summary>URL-safe, cryptographically random, unique public token (the "/shared/{token}" segment).</summary>
+    /// <summary>
+    /// URL-safe, cryptographically random, unique public token (the "/shared/{token}" segment).
+    /// In memory only — never stored in plain text: the database keeps <see cref="TokenHash"/>
+    /// for lookups and <see cref="ProtectedToken"/> for showing the link again. Set on a new
+    /// link and on a link resolved by its token; empty on links loaded for listing.
+    /// </summary>
     public string Token { get; set; } = string.Empty;
+
+    /// <summary>Lowercase hex SHA-256 of <see cref="Token"/>; the lookup key (see <see cref="HashToken"/>).</summary>
+    public string TokenHash { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The token encrypted with the web host's Data Protection keys, so the link can still be
+    /// displayed and copied. A database dump alone reveals neither usable tokens nor links.
+    /// </summary>
+    public string? ProtectedToken { get; set; }
+
+    /// <summary>
+    /// Plain-text token of links created before tokens were hashed. Cleared by the web host's
+    /// startup backfill once <see cref="ProtectedToken"/> is written.
+    /// </summary>
+    public string? LegacyToken { get; set; }
+
+    /// <summary>The lookup hash of a presented token.</summary>
+    public static string HashToken(string token)
+        => Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token)))
+            .ToLowerInvariant();
 
     /// <summary>Target network share.</summary>
     public Guid ShareId { get; set; }

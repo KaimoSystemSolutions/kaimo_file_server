@@ -6,6 +6,7 @@ using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Infrastructure.Clouds;
+using Kaimo_File_Server.Web.Middleware;
 using Kaimo_File_Server.Web.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -47,7 +48,7 @@ public sealed class CloudAccessDropboxController(
         try
         {
             var start = await dropboxAuthorization.StartAsync(connectionId, ticket);
-            return Content(RenderPage(start), "text/html; charset=utf-8");
+            return Content(RenderPage(start, SecurityHeadersMiddleware.GetNonce(HttpContext)), "text/html; charset=utf-8");
         }
         catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
         {
@@ -125,7 +126,7 @@ public sealed class CloudAccessDropboxController(
         }
     }
 
-    private static string RenderPage(DropboxAuthorizationStart start)
+    private static string RenderPage(DropboxAuthorizationStart start, string cspNonce)
     {
         var html = HtmlEncoder.Default;
         var language = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
@@ -154,7 +155,7 @@ public sealed class CloudAccessDropboxController(
             <a class="button" href="{{{html.Encode(start.AuthorizeUrl)}}}" target="_blank" rel="noopener noreferrer">{{{open}}}</a>
             <label>{{{codeLabel}}}<input id="code" autocomplete="off" spellcheck="false" /></label>
             <button class="submit" id="submit" type="button">{{{submit}}}</button>
-            <p id="status"></p><a class="cancel" href="/cloud-access">{{{cancel}}}</a></main><script>
+            <p id="status"></p><a class="cancel" href="/cloud-access">{{{cancel}}}</a></main><script nonce="{{{cspNonce}}}">
             const url={{{submitUrl}}},session={{{sessionId}}},s=document.getElementById('status'),b=document.getElementById('submit'),i=document.getElementById('code'),f={{{failed}}},w={{{waiting}}},req={{{codeRequired}}};
             b.addEventListener('click',async()=>{const code=i.value.trim();if(!code){s.textContent=req;s.className='error';return}b.disabled=true;s.className='';s.textContent=w;try{const q=url+'?session='+encodeURIComponent(session)+'&code='+encodeURIComponent(code);const r=await fetch(q,{cache:'no-store',credentials:'same-origin'});const j=await r.json();if(j.state==='complete'){location.replace(j.redirect);return}s.textContent=j.message||f;s.className='error';b.disabled=false}catch(e){s.textContent=f;s.className='error';b.disabled=false}});
             i.addEventListener('keydown',e=>{if(e.key==='Enter')b.click()});
