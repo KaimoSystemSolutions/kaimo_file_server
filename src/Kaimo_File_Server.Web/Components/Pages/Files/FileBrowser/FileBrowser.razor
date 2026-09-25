@@ -503,11 +503,12 @@ else
                     }
                     @if (VM.IsShared(entry))
                     {
-                        <span class="share-indicator @(CanManageShareLinks() ? "share-indicator--clickable" : "")"
-                              title="@T("Web_ShareLinks_Shared")"
+                        var uploadLink = VM.GetShareLinkKind(entry) == ShareLinkKind.Upload;
+                        <span class="share-indicator @(CanManageLinkBehind(entry) ? "share-indicator--clickable" : "")"
+                              title="@(uploadLink ? T("Web_ShareLinks_UploadShared") : T("Web_ShareLinks_Shared"))"
                               @onclick="() => OpenShareLinkOverview(entry)"
                               @onclick:stopPropagation="true">
-                            @Assets.SVG("share.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2, CssClass: "share-indicator-icon"))
+                            @Assets.SVG(uploadLink ? "upload.svg" : "share.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2, CssClass: "share-indicator-icon"))
                         </span>
                     }
                     @if (aclCount > 0)

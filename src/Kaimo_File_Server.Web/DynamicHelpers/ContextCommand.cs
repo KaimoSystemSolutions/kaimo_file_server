@@ -86,6 +86,10 @@ public static class ContextCommandCatalog
         new ContextCommand("sharelink", () => Resources.ResourceManager.GetString("Context_Menu_Share") ?? "Share link",
             "share.svg", ValidScopes: AllSingle),
 
+        // Upload links target folders only (visitors upload into them).
+        new ContextCommand("uploadlink", () => Resources.ResourceManager.GetString("Context_Menu_UploadLink") ?? "Upload link",
+            "upload.svg", ValidScopes: new[] { ContextMenuScope.Folder }),
+
         new ContextCommand("hash", () => Resources.Context_Menu_CreateHash, "hash.svg",
             ValidScopes: DownloadableFiles),
 

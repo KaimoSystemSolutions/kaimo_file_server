@@ -176,3 +176,8 @@
 
 .sharelink-icon--folder { background: var(--folder-fill); }
 .sharelink-icon--file { background: var(--accent-subtle); }
+
+/* Download / Upload tab strip above the workspace. */
+.sharelink-tabs-bar {
+    margin-bottom: 12px;
+}

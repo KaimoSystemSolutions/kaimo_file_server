@@ -400,6 +400,8 @@ public class UserListViewModel
             new(ManagementPermission.ManageShareAcls, Resources.Web_Perm_ManageAcls),
             new(ManagementPermission.ManageShareLinks,
                 Resources.ResourceManager.GetString("Web_Perm_ManageShareLinks") ?? "Manage share links"),
+            new(ManagementPermission.ManageUploadLinks,
+                Resources.ResourceManager.GetString("Web_Perm_ManageUploadLinks") ?? "Manage upload links"),
         ]),
         new(Resources.Web_PermGroup_DeptMgmt,
         [

@@ -27,7 +27,7 @@ public class ContextMenuConfig
     /// </summary>
     public static readonly IReadOnlyList<string> DefaultOrder = new[]
     {
-        "open", "download", "cut", "copy", "sharelink", "hash", "extract", "compress.zip", "compress.targz",
+        "open", "download", "cut", "copy", "sharelink", "uploadlink", "hash", "extract", "compress.zip", "compress.targz",
         "rename", "versions", "delete", "recycle.empty", "permissions", "properties",
         "newfolder", "refresh",
     };
@@ -60,7 +60,7 @@ public class ContextMenuConfig
         ContextMenuScope.Background => new() { "newfolder", "refresh" },
 
         ContextMenuScope.Folder => new()
-            { "open", "download", "sharelink", "compress.zip", "compress.targz", "rename", "versions", "delete", "recycle.empty", "permissions", "properties", "newfolder", "refresh" },
+            { "open", "download", "sharelink", "uploadlink", "compress.zip", "compress.targz", "rename", "versions", "delete", "recycle.empty", "permissions", "properties", "newfolder", "refresh" },
 
         ContextMenuScope.Archive => new()
             { "open", "download", "sharelink", "hash", "extract", "rename", "versions", "delete", "permissions", "properties", "newfolder", "refresh" },

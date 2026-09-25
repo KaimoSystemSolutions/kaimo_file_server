@@ -3,7 +3,7 @@ using Kaimo_File_Server.Core.Domain;
 namespace Kaimo_File_Server.Core.Repositories;
 
 /// <summary>
-/// Persistence for anonymous public download links (<see cref="ShareLink"/>).
+/// Persistence for anonymous public download and upload links (<see cref="ShareLink"/>).
 /// </summary>
 public interface IShareLinkRepository
 {
@@ -33,10 +33,25 @@ public interface IShareLinkRepository
     Task<List<ShareLink>> ListAllAsync();
 
     /// <summary>
-    /// Atomically records one access against the link identified by <paramref name="token"/>,
+    /// Atomically records one download access against the link identified by <paramref name="token"/>,
     /// but only while it is enabled, within its time window, and below its access-count cap.
     /// Returns the (post-increment) link when access was granted, or null when the link is
     /// missing, inactive, or exhausted. Race-free under concurrent downloads.
     /// </summary>
     Task<ShareLink?> TryConsumeAccessAsync(string token);
+
+    /// <summary>
+    /// Atomically reserves one file slot and <paramref name="bytes"/> of quota on the upload link
+    /// identified by <paramref name="token"/>, but only while it is an enabled upload link within
+    /// its time window, below its file-count cap and with enough byte quota left. Returns the
+    /// (post-reservation) link, or null when the upload is refused. Race-free under concurrent
+    /// uploads.
+    /// </summary>
+    Task<ShareLink?> TryReserveUploadAsync(string token, long bytes);
+
+    /// <summary>
+    /// Gives back a reservation made by <see cref="TryReserveUploadAsync"/> whose upload failed or
+    /// was cancelled (one file slot and <paramref name="bytes"/>; never drops below zero).
+    /// </summary>
+    Task ReleaseUploadAsync(Guid id, long bytes);
 }

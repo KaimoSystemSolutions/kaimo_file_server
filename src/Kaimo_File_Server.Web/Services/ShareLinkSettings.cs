@@ -11,6 +11,9 @@ public sealed class ShareLinkSettings
     public const string ConfigKey = "sharelinks.settings";
     public const int MaxAddresses = 5;
 
+    /// <summary>Default and hard upper bound for a single file uploaded through an upload link (4 GiB).</summary>
+    public const long DefaultMaxUploadFileSizeBytes = 4L * 1024 * 1024 * 1024;
+
     /// <summary>Up to <see cref="MaxAddresses"/> absolute base URLs (no trailing slash).</summary>
     public List<string> BaseAddresses { get; set; } = new();
 
@@ -20,8 +23,28 @@ public sealed class ShareLinkSettings
     /// <summary>Whether a link creator may choose a non-default address from the allowlist.</summary>
     public bool AllowUserChosenAddress { get; set; } = true;
 
+    /// <summary>
+    /// Whether anonymous upload links are enabled at all. Off by default: while off, no upload
+    /// link can be created and existing upload links accept no files.
+    /// </summary>
+    public bool AllowUploadLinks { get; set; }
+
+    /// <summary>
+    /// Global ceiling for a single file uploaded through an upload link (a link may only lower
+    /// it). Clamped to 1 byte … <see cref="DefaultMaxUploadFileSizeBytes"/>.
+    /// </summary>
+    public long MaxUploadFileSizeBytes { get; set; } = DefaultMaxUploadFileSizeBytes;
+
+    /// <summary>The effective per-file limit for <paramref name="link"/>: its own cap, bounded by the global one.</summary>
+    public long EffectiveMaxFileSize(Kaimo_File_Server.Core.Domain.ShareLink link)
+        => link.MaxFileSizeBytes is long own and > 0 ? Math.Min(own, MaxUploadFileSizeBytes) : MaxUploadFileSizeBytes;
+
     public void Normalize()
     {
+        MaxUploadFileSizeBytes = MaxUploadFileSizeBytes <= 0
+            ? DefaultMaxUploadFileSizeBytes
+            : Math.Min(MaxUploadFileSizeBytes, DefaultMaxUploadFileSizeBytes);
+
         BaseAddresses = (BaseAddresses ?? new())
             .Select(a => (a ?? string.Empty).Trim().TrimEnd('/'))
             .Where(a => a.Length > 0 && Uri.TryCreate(a, UriKind.Absolute, out _))

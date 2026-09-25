@@ -420,6 +420,9 @@ public partial class FileBrowser
     public async Task OpenShareLinkDialog(FileMetadata item)
         => await _shareLinkDialogComponent.Open(item);
 
+    public async Task OpenUploadLinkDialog(FileMetadata folder)
+        => await _shareLinkDialogComponent.Open(folder, ShareLinkKind.Upload);
+
     /// <summary>After a restore the live file changed — reload the listing.</summary>
     private async Task OnVersionRestored()
     {
@@ -547,9 +550,13 @@ public partial class FileBrowser
     /// <summary>Jump to the share-link overview, selecting the link behind this emblem.</summary>
     private void OpenShareLinkOverview(FileMetadata entry)
     {
-        if (!CanManageShareLinks() || VM.GetShareLinkId(entry) is not Guid linkId) return;
+        if (!CanManageLinkBehind(entry) || VM.GetShareLinkId(entry) is not Guid linkId) return;
         Nav.NavigateTo($"/share-links?select={linkId}");
     }
+
+    // Whether the user may open the overview entry of the link behind an entry's emblem.
+    private bool CanManageLinkBehind(FileMetadata entry)
+        => VM.GetShareLinkKind(entry) == ShareLinkKind.Upload ? CanManageUploadLinks() : CanManageShareLinks();
 
     internal void NavigateTo(FileMetadata dir)
         => NavigateToRoutePath(VM.RouteSubPathOf(VM.ShareRelativeOf(dir)));
@@ -611,6 +618,15 @@ public partial class FileBrowser
         => !VM.IsLoading
            && VM.ErrorMessage is null
            && VM.CanManageShareLinks;
+
+    /// <summary>
+    /// Scoped right to create public upload links on the current share
+    /// (ManagementPermission.ManageUploadLinks). Gates the "upload link" context-menu entry.
+    /// </summary>
+    public bool CanManageUploadLinks()
+        => !VM.IsLoading
+           && VM.ErrorMessage is null
+           && VM.CanManageUploadLinks;
 
     // ========== Virtual (Cloud Access) share ACLs ==========
 

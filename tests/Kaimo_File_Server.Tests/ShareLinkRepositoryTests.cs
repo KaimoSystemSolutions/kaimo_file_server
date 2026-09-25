@@ -146,4 +146,72 @@ public sealed class ShareLinkRepositoryTests : DatabaseTestBase
         Assert.Equal(token, protector.Reveal(row));
         Assert.NotNull(await Repo().TryConsumeAccessAsync(token));
     }
+
+    // ---- Upload links ----
+
+    private async Task<ShareLink> SeedUploadLink(int? maxFiles = null, long? maxBytes = null, string token = "up")
+        => await Repo().CreateAsync(new ShareLink
+        {
+            Token = token,
+            Kind = ShareLinkKind.Upload,
+            ShareId = Guid.NewGuid(),
+            RootRelativePath = "inbox",
+            IsDirectory = true,
+            DisplayName = "inbox",
+            CreatedByUserId = Guid.NewGuid(),
+            MaxAccessCount = maxFiles,
+            MaxTotalBytes = maxBytes,
+        });
+
+    [Fact]
+    public async Task TryReserveUpload_EnforcesFileCount()
+    {
+        await SeedUploadLink(maxFiles: 2);
+        var repo = Repo();
+
+        Assert.NotNull(await repo.TryReserveUploadAsync("up", 1));
+        Assert.NotNull(await repo.TryReserveUploadAsync("up", 1));
+        Assert.Null(await repo.TryReserveUploadAsync("up", 1));
+        Assert.Equal(2, (await repo.GetByTokenAsync("up"))!.AccessCount);
+    }
+
+    [Fact]
+    public async Task TryReserveUpload_EnforcesByteQuota_AndReleaseGivesItBack()
+    {
+        var link = await SeedUploadLink(maxBytes: 100);
+        var repo = Repo();
+
+        var first = await repo.TryReserveUploadAsync("up", 60);
+        Assert.Equal(60, first!.UploadedBytes);
+        Assert.Null(await repo.TryReserveUploadAsync("up", 41)); // would exceed 100
+
+        await repo.ReleaseUploadAsync(link.Id, 60);
+        var released = await repo.GetByTokenAsync("up");
+        Assert.Equal(0, released!.UploadedBytes);
+        Assert.Equal(0, released.AccessCount);
+        Assert.NotNull(await repo.TryReserveUploadAsync("up", 100));
+    }
+
+    [Fact]
+    public async Task TryReserveUpload_ParallelReservationsNeverExceedQuota()
+    {
+        await SeedUploadLink(maxBytes: 50);
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 20)
+            .Select(_ => Repo().TryReserveUploadAsync("up", 10)));
+
+        Assert.Equal(5, results.Count(r => r is not null));
+        Assert.Equal(50, (await Repo().GetByTokenAsync("up"))!.UploadedBytes);
+    }
+
+    [Fact]
+    public async Task LinkKinds_AreNotInterchangeable()
+    {
+        await SeedUploadLink(token: "up");
+        await SeedLink(token: "down");
+        var repo = Repo();
+
+        Assert.Null(await repo.TryConsumeAccessAsync("up"));        // no downloads through an upload link
+        Assert.Null(await repo.TryReserveUploadAsync("down", 1));   // no uploads through a download link
+    }
 }

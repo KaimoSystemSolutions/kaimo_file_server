@@ -117,6 +117,7 @@ public sealed class ShareLinkRepository : IShareLinkRepository
         // push AccessCount past MaxAccessCount. Portable across PostgreSQL and SQLite.
         int affected = await db.ShareLinks
             .Where(l => l.TokenHash == hash
+                        && l.Kind == ShareLinkKind.Download
                         && l.IsEnabled
                         && (l.StartsAtUtc == null || l.StartsAtUtc <= now)
                         && (l.ExpiresAtUtc == null || l.ExpiresAtUtc >= now)
@@ -124,5 +125,43 @@ public sealed class ShareLinkRepository : IShareLinkRepository
             .ExecuteUpdateAsync(s => s.SetProperty(l => l.AccessCount, l => l.AccessCount + 1));
 
         return affected == 0 ? null : await GetByTokenAsync(token);
+    }
+
+    public async Task<ShareLink?> TryReserveUploadAsync(string token, long bytes)
+    {
+        if (string.IsNullOrEmpty(token) || bytes < 0)
+            return null;
+
+        var now = DateTime.UtcNow;
+        var hash = ShareLink.HashToken(token);
+        await using var db = await _dbFactory.CreateDbContextAsync();
+
+        // Same single guarded UPDATE as TryConsumeAccessAsync, extended by the byte quota, so
+        // parallel uploads can never exceed the file-count or byte caps.
+        int affected = await db.ShareLinks
+            .Where(l => l.TokenHash == hash
+                        && l.Kind == ShareLinkKind.Upload
+                        && l.IsEnabled
+                        && (l.StartsAtUtc == null || l.StartsAtUtc <= now)
+                        && (l.ExpiresAtUtc == null || l.ExpiresAtUtc >= now)
+                        && (l.MaxAccessCount == null || l.AccessCount < l.MaxAccessCount)
+                        && (l.MaxTotalBytes == null || l.UploadedBytes + bytes <= l.MaxTotalBytes))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(l => l.AccessCount, l => l.AccessCount + 1)
+                .SetProperty(l => l.UploadedBytes, l => l.UploadedBytes + bytes));
+
+        return affected == 0 ? null : await GetByTokenAsync(token);
+    }
+
+    public async Task ReleaseUploadAsync(Guid id, long bytes)
+    {
+        if (bytes < 0) bytes = 0;
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        await db.ShareLinks
+            .Where(l => l.Id == id && l.AccessCount > 0)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(l => l.AccessCount, l => l.AccessCount - 1)
+                .SetProperty(l => l.UploadedBytes,
+                    l => l.UploadedBytes >= bytes ? l.UploadedBytes - bytes : 0));
     }
 }

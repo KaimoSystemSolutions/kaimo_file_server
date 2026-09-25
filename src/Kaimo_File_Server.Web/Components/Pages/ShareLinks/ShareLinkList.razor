@@ -5,6 +5,7 @@
 @using Kaimo_File_Server.Web.Components.Shared
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Helpers
 @using Kaimo_File_Server.Web.Services
 @inherits AppComponentBase
 @inject ShareLinkListViewModel VM
@@ -16,15 +17,16 @@
 
 @*
     Admin overview of public share links, laid out like the external-storage sync list:
-    a list pane on the left and a detail / edit pane on the right. Only the item name is a
-    hyperlink into the file browser; clicking elsewhere on a row opens its details. Gated by
-    ManagementPermission.ManageShareLinks.
+    a list pane on the left and a detail / edit pane on the right. Two tabs separate download
+    links (ManagementPermission.ManageShareLinks) from upload links
+    (ManagementPermission.ManageUploadLinks); a tab is shown only with its permission. Only the
+    item name is a hyperlink into the file browser; clicking elsewhere on a row opens its details.
 *@
 
 <div class="page-header">
     <div>
         <h1>@T("Web_Nav_ShareLinks", "Share Links")</h1>
-        <p class="subtitle">@T("Web_ShareLinks_Subtitle", "Public download links for files and folders.")</p>
+        <p class="subtitle">@T("Web_ShareLinks_Subtitle", "Public download and upload links for files and folders.")</p>
     </div>
 </div>
 
@@ -42,11 +44,30 @@ else if (VM.ErrorMessage is not null)
 }
 else
 {
+    <div class="sharelink-tabs-bar">
+        <Tabs aria-label="@T("Web_Nav_ShareLinks", "Share Links")">
+            @if (VM.CanManageDownloadLinks)
+            {
+                <Tab Active="@(_tab == ShareLinkKind.Download)" Icon="download.svg"
+                     Label="@($"{T("Web_ShareLinks_Tab_Download", "Download")} ({CountOf(ShareLinkKind.Download)})")"
+                     OnClick="() => SwitchTab(ShareLinkKind.Download)" />
+            }
+            @if (VM.CanManageUploadLinks)
+            {
+                <Tab Active="@(_tab == ShareLinkKind.Upload)" Icon="upload.svg"
+                     Label="@($"{T("Web_ShareLinks_Tab_Upload", "Upload")} ({CountOf(ShareLinkKind.Upload)})")"
+                     OnClick="() => SwitchTab(ShareLinkKind.Upload)" />
+            }
+        </Tabs>
+    </div>
+
     <div class="sharelink-workspace">
         <section class="sharelink-list-pane">
-            @if (VM.Links.Count == 0)
+            @if (!VisibleLinks.Any())
             {
-                <div class="empty-state"><p>@T("Web_ShareLinks_Empty", "No share links yet.")</p></div>
+                <div class="empty-state"><p>@(IsUploadTab
+                    ? T("Web_ShareLinks_EmptyUpload", "No upload links yet. Create one from a folder's context menu.")
+                    : T("Web_ShareLinks_Empty", "No share links yet."))</p></div>
             }
             else
             {
@@ -54,9 +75,9 @@ else
                     <div class="sharelink-list-header" aria-hidden="true">
                         <span>@T("Web_ShareLinks_Col_Item", "Item")</span>
                         <span>@T("Web_ShareLinks_Col_Status", "Status")</span>
-                        <span>@T("Web_ShareLinks_Col_Access", "Downloads")</span>
+                        <span>@AccessLabel</span>
                     </div>
-                    @foreach (var row in VM.Links)
+                    @foreach (var row in VisibleLinks)
                     {
                         <div class="sharelink-row @(row.Link.Id == _selectedId ? "sharelink-row--selected" : "")"
                              @onclick="() => Select(row.Link.Id)">
@@ -114,15 +135,34 @@ else
                             <input type="datetime-local" class="edit-input" @bind="_editEnd" />
                         </label>
                         <label>
-                            <span>@T("Web_ShareLink_MaxAccess", "Max downloads")</span>
+                            <span>@(IsUploadTab ? T("Web_ShareLink_MaxFiles", "Max files") : T("Web_ShareLink_MaxAccess", "Max downloads"))</span>
                             <input type="number" min="1" class="edit-input"
                                    placeholder="@T("Web_ShareLink_Unlimited", "Unlimited")" @bind="_editMaxAccess" />
                         </label>
                         <label>
-                            <span>@T("Web_ShareLink_MaxRate", "Max rate (KB/s)")</span>
+                            <span>@(IsUploadTab ? T("Web_ShareLink_MaxUploadRate", "Max upload rate") : T("Web_ShareLink_MaxRate", "Max rate")) (KB/s)</span>
                             <input type="number" min="1" class="edit-input"
                                    placeholder="@T("Web_ShareLink_Unlimited", "Unlimited")" @bind="_editRateKb" />
                         </label>
+                        @if (link.Kind == ShareLinkKind.Upload)
+                        {
+                            <label>
+                                <span>@T("Web_ShareLink_MaxFileSize", "Max file size") (MB)</span>
+                                <input type="number" min="1" class="edit-input"
+                                       placeholder="@FormatHelper.FormatFileSize(VM.Settings.MaxUploadFileSizeBytes)" @bind="_editMaxFileSizeMb" />
+                            </label>
+                            <label>
+                                <span>@T("Web_ShareLink_MaxTotal", "Total quota") (MB)</span>
+                                <input type="number" min="1" class="edit-input"
+                                       placeholder="@T("Web_ShareLink_Unlimited", "Unlimited")" @bind="_editMaxTotalMb" />
+                            </label>
+                            <label class="storage-wide">
+                                <span>@T("Web_ShareLink_AllowedTypes", "Allowed file types")</span>
+                                <input type="text" class="edit-input"
+                                       placeholder="@T("Web_ShareLink_AllowedTypesPlaceholder", "e.g. pdf, jpg, png — empty = any")"
+                                       @bind="_editExtensions" @bind:event="oninput" />
+                            </label>
+                        }
                         <label class="storage-wide">
                             <span>@T("Web_ShareLinks_NewPassword", "New password (leave empty to keep)")</span>
                             <span class="sharelink-password">
@@ -178,9 +218,18 @@ else
                             <dl>
                                 <dt>@T("Web_ShareLink_Start", "Start")</dt><dd>@DateFmt.FormatDateTime(link.StartsAtUtc, nullText: "—")</dd>
                                 <dt>@T("Web_ShareLink_End", "End")</dt><dd>@DateFmt.FormatDateTime(link.ExpiresAtUtc, nullText: "—")</dd>
-                                <dt>@T("Web_ShareLinks_Col_Access", "Downloads")</dt>
+                                <dt>@AccessLabel</dt>
                                 <dd>@link.AccessCount@(link.MaxAccessCount is { } m ? $" / {m}" : $" / {T("Web_ShareLink_Unlimited", "Unlimited")}")</dd>
-                                <dt>@T("Web_ShareLink_MaxRate", "Max rate")</dt><dd>@RateText(link)</dd>
+                                <dt>@(link.Kind == ShareLinkKind.Upload ? T("Web_ShareLink_MaxUploadRate", "Max upload rate") : T("Web_ShareLink_MaxRate", "Max rate"))</dt><dd>@RateText(link)</dd>
+                                @if (link.Kind == ShareLinkKind.Upload)
+                                {
+                                    <dt>@T("Web_ShareLink_MaxFileSize", "Max file size")</dt>
+                                    <dd>@FormatHelper.FormatFileSize(VM.Settings.EffectiveMaxFileSize(link))</dd>
+                                    <dt>@T("Web_ShareLinks_UsedQuota", "Uploaded")</dt>
+                                    <dd>@FormatHelper.FormatFileSize(link.UploadedBytes)@(link.MaxTotalBytes is { } q ? $" / {FormatHelper.FormatFileSize(q)}" : $" / {T("Web_ShareLink_Unlimited", "Unlimited")}")</dd>
+                                    <dt>@T("Web_ShareLink_AllowedTypes", "Allowed file types")</dt>
+                                    <dd>@(link.AllowedExtensionList.Count > 0 ? string.Join(", ", link.AllowedExtensionList) : T("Web_ShareLinks_AnyType", "Any"))</dd>
+                                }
                             </dl>
                         </section>
                         <section class="sharelink-detail-group sharelink-detail-group--wide">
@@ -192,6 +241,10 @@ else
                             @if (link.PasswordHash is not null)
                             {
                                 <p class="sharelink-note">@T("Web_ShareLinks_PasswordProtected", "Password-protected")</p>
+                            }
+                            @if (link.Kind == ShareLinkKind.Upload && !VM.Settings.AllowUploadLinks)
+                            {
+                                <p class="sharelink-note">@T("Web_ShareLinks_UploadsDisabled", "Upload links are disabled in the settings; this link currently accepts no files.")</p>
                             }
                         </section>
                     </div>
@@ -219,6 +272,7 @@ else
 
     private Guid? _selectedId;
     private bool _editing;
+    private ShareLinkKind _tab = ShareLinkKind.Download;
 
     private string _editName = "";
     private bool _editEnabled;
@@ -229,10 +283,34 @@ else
     private string? _editPassword;
     private bool _showEditPassword;
     private bool _clearPassword;
+    private long? _editMaxFileSizeMb;
+    private long? _editMaxTotalMb;
+    private string? _editExtensions;
     private string? _editError;
 
+    private const long Mb = 1024 * 1024;
+
     private ShareLinkRow? SelectedRow
-        => _selectedId is Guid id ? VM.Links.FirstOrDefault(r => r.Link.Id == id) : null;
+        => _selectedId is Guid id ? VisibleLinks.FirstOrDefault(r => r.Link.Id == id) : null;
+
+    private bool IsUploadTab => _tab == ShareLinkKind.Upload;
+
+    private IEnumerable<ShareLinkRow> VisibleLinks => VM.Links.Where(r => r.Link.Kind == _tab);
+
+    private int CountOf(ShareLinkKind kind) => VM.Links.Count(r => r.Link.Kind == kind);
+
+    private string AccessLabel => IsUploadTab
+        ? T("Web_ShareLinks_Col_Uploads", "Uploads")
+        : T("Web_ShareLinks_Col_Access", "Downloads");
+
+    private void SwitchTab(ShareLinkKind kind)
+    {
+        if (_tab == kind) return;
+        _tab = kind;
+        _selectedId = null;
+        _editing = false;
+        _editError = null;
+    }
 
     private static string T(string key, string fallback)
         => Resources.ResourceManager.GetString(key) ?? fallback;
@@ -251,9 +329,16 @@ else
         VM.OnStateChanged += OnStateChanged;
         await VM.LoadAsync();
 
-        // Preselect the link named in the query (e.g. arriving from a file-browser emblem).
-        if (SelectId is Guid id && VM.Links.Any(r => r.Link.Id == id))
+        // Open the first tab the actor may use.
+        _tab = VM.CanManageDownloadLinks ? ShareLinkKind.Download : ShareLinkKind.Upload;
+
+        // Preselect the link named in the query (e.g. arriving from a file-browser emblem),
+        // switching to the tab of its kind.
+        if (SelectId is Guid id && VM.Links.FirstOrDefault(r => r.Link.Id == id) is { } preselected)
+        {
+            _tab = preselected.Link.Kind;
             _selectedId = id;
+        }
     }
 
     private void OnStateChanged() => InvokeAsync(StateHasChanged);
@@ -294,6 +379,9 @@ else
         _editEnd = link.ExpiresAtUtc?.ToLocalTime();
         _editMaxAccess = link.MaxAccessCount;
         _editRateKb = link.MaxBytesPerSecond is { } bps ? bps / 1000 : null;
+        _editMaxFileSizeMb = link.MaxFileSizeBytes is { } fs ? Math.Max(1, fs / Mb) : null;
+        _editMaxTotalMb = link.MaxTotalBytes is { } tb ? Math.Max(1, tb / Mb) : null;
+        _editExtensions = link.AllowedExtensions?.Replace(";", ", ");
     }
 
     private async Task SaveAsync()
@@ -308,6 +396,12 @@ else
         link.ExpiresAtUtc = _editEnd?.ToUniversalTime();
         link.MaxAccessCount = _editMaxAccess is > 0 ? _editMaxAccess : null;
         link.MaxBytesPerSecond = _editRateKb is > 0 ? _editRateKb * 1000 : null;
+        if (link.Kind == ShareLinkKind.Upload)
+        {
+            link.MaxFileSizeBytes = _editMaxFileSizeMb is > 0 ? _editMaxFileSizeMb * Mb : null;
+            link.MaxTotalBytes = _editMaxTotalMb is > 0 ? _editMaxTotalMb * Mb : null;
+            link.AllowedExtensions = ShareLinkService.NormalizeExtensions(_editExtensions);
+        }
 
         if (_clearPassword)
             ShareLinks.ApplyPassword(link, null);

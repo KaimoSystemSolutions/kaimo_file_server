@@ -3,13 +3,15 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.File;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Kaimo_File_Server.Web.Services;
 
-/// <summary>Fields needed to mint a new public share link.</summary>
+/// <summary>Fields needed to mint a new public share link (download or upload).</summary>
 public sealed record CreateShareLinkRequest(
     Guid ShareId,
     string RootRelativePath,
@@ -23,7 +25,12 @@ public sealed record CreateShareLinkRequest(
     long? MaxBytesPerSecond,
     // A token reserved up-front so the dialog can show the final URL before the link is
     // persisted. Falls back to a freshly generated one when empty.
-    string? Token = null);
+    string? Token = null,
+    ShareLinkKind Kind = ShareLinkKind.Download,
+    // Upload-link policy; ignored for download links.
+    long? MaxFileSizeBytes = null,
+    long? MaxTotalBytes = null,
+    string? AllowedExtensions = null);
 
 /// <summary>
 /// Circuit-side coordination for public share links: settings, URL building, creation
@@ -39,7 +46,9 @@ public sealed class ShareLinkService(
     IUserContextFactory userContexts,
     AuthenticationStateProvider authState,
     PublicDownloadTicketStore tickets,
-    ShareLinkTokenProtector? tokenProtector = null)
+    ShareLinkTokenProtector? tokenProtector = null,
+    IShareRepository? shares = null,
+    IFileServiceFactory? fileServices = null)
 {
     private static readonly LoginThrottlePolicy PasswordPolicy = new(10, TimeSpan.FromMinutes(15));
 
@@ -86,9 +95,17 @@ public sealed class ShareLinkService(
     public void ApplyPassword(ShareLink link, string? newPassword)
         => link.PasswordHash = string.IsNullOrEmpty(newPassword) ? null : passwords.HashPassword(newPassword);
 
+    /// <summary>The management permission that governs links of <paramref name="kind"/>.</summary>
+    public static ManagementPermission PermissionFor(ShareLinkKind kind)
+        => kind == ShareLinkKind.Upload
+            ? ManagementPermission.ManageUploadLinks
+            : ManagementPermission.ManageShareLinks;
+
     /// <summary>
-    /// Creates a link after re-checking that the signed-in user may manage share links on the
-    /// target share. Returns null when there is no actor or the permission check fails.
+    /// Creates a link after re-checking that the signed-in user may manage links of the requested
+    /// kind on the target share. An upload link additionally requires upload links to be enabled
+    /// in the settings, a folder target, and write access of the creator to that folder (the
+    /// identity uploads run under). Returns null when any check fails.
     /// </summary>
     public async Task<ShareLink?> CreateAsync(CreateShareLinkRequest request)
     {
@@ -96,8 +113,12 @@ public sealed class ShareLinkService(
         if (actor is null) return null;
 
         var allowed = await mgmtAuth.CanManageShareAsync(
-            actor, request.ShareId, ManagementPermission.ManageShareLinks);
+            actor, request.ShareId, PermissionFor(request.Kind));
         if (!allowed) return null;
+
+        if (request.Kind == ShareLinkKind.Upload
+            && !await CanCreateUploadLinkAsync(actor, request))
+            return null;
 
         var link = new ShareLink
         {
@@ -117,7 +138,14 @@ public sealed class ShareLinkService(
             ExpiresAtUtc = request.ExpiresAtUtc,
             MaxAccessCount = request.MaxAccessCount is > 0 ? request.MaxAccessCount : null,
             MaxBytesPerSecond = request.MaxBytesPerSecond is > 0 ? request.MaxBytesPerSecond : null,
+            Kind = request.Kind,
         };
+        if (request.Kind == ShareLinkKind.Upload)
+        {
+            link.MaxFileSizeBytes = request.MaxFileSizeBytes is > 0 ? request.MaxFileSizeBytes : null;
+            link.MaxTotalBytes = request.MaxTotalBytes is > 0 ? request.MaxTotalBytes : null;
+            link.AllowedExtensions = NormalizeExtensions(request.AllowedExtensions);
+        }
         // Stored encrypted so the link can be shown again; the repository adds the lookup hash.
         link.ProtectedToken = tokenProtector?.Protect(link.Token);
 
@@ -163,6 +191,39 @@ public sealed class ShareLinkService(
     {
         var creator = await userContexts.CreateByUserIdAsync(link.CreatedByUserId);
         return creator is { User.IsEnabled: true } ? creator : null;
+    }
+
+    /// <summary>
+    /// Normalizes a user-entered extension list for storage (".pdf;.jpg"); null when empty.
+    /// </summary>
+    public static string? NormalizeExtensions(string? raw)
+    {
+        var list = ShareLink.ParseExtensions(raw);
+        return list.Count == 0 ? null : string.Join(";", list);
+    }
+
+    private async Task<bool> CanCreateUploadLinkAsync(UserContext actor, CreateShareLinkRequest request)
+    {
+        if (!request.IsDirectory) return false;
+        if (!(await GetSettingsAsync()).AllowUploadLinks) return false;
+        if (shares is null || fileServices is null) return false;
+
+        var share = await shares.GetByIdAsync(request.ShareId);
+        if (share is null || !share.IsEnabled) return false;
+
+        // Uploads run as the creator, so a link the creator could not write through is useless.
+        var fs = fileServices.CreateForShare(share.Id, share.Path);
+        try
+        {
+            // Probe a child path: checks create rights on the folder and the reserved-path policy
+            // (e.g. the recycle bin) exactly like a real upload into it.
+            var folder = ShareRelativePath.Normalize(request.RootRelativePath);
+            return await fs.CanCreateAsync(folder.Length == 0 ? "upload.probe" : folder + "/upload.probe", actor);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private async Task<UserContext?> ResolveActorAsync()

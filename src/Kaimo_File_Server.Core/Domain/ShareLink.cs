@@ -1,7 +1,17 @@
 namespace Kaimo_File_Server.Core.Domain;
 
+/// <summary>Direction of a public link: visitors either download from, or upload into, the target.</summary>
+public enum ShareLinkKind
+{
+    /// <summary>Visitors browse and download the shared file or folder.</summary>
+    Download = 0,
+
+    /// <summary>Visitors upload files into the shared folder (drop box); they never see its content.</summary>
+    Upload = 1,
+}
+
 /// <summary>
-/// An anonymous, tokenised public download link for a single file or folder inside a
+/// An anonymous, tokenised public download (or upload, see <see cref="Kind"/>) link for a single file or folder inside a
 /// network share. The link is opened by an unauthenticated visitor; all file access runs
 /// under the creating user's identity (<see cref="CreatedByUserId"/>) and is re-checked
 /// against ACLs at access time. Policy fields (window, access count, rate cap, password)
@@ -40,6 +50,9 @@ public sealed class ShareLink
                 System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token)))
             .ToLowerInvariant();
 
+    /// <summary>Whether visitors download from or upload into the target. Existing links are downloads.</summary>
+    public ShareLinkKind Kind { get; set; } = ShareLinkKind.Download;
+
     /// <summary>Target network share.</summary>
     public Guid ShareId { get; set; }
 
@@ -73,14 +86,35 @@ public sealed class ShareLink
     /// <summary>Link is inactive after this instant; null = never expires.</summary>
     public DateTime? ExpiresAtUtc { get; set; }
 
-    /// <summary>Maximum number of download operations; null = unlimited.</summary>
+    /// <summary>
+    /// Maximum number of download operations (download link) or uploaded files (upload link);
+    /// null = unlimited.
+    /// </summary>
     public int? MaxAccessCount { get; set; }
 
-    /// <summary>Number of download operations performed so far (a page view does not count).</summary>
+    /// <summary>
+    /// Number of download operations (a page view does not count) or accepted uploaded files
+    /// performed so far.
+    /// </summary>
     public int AccessCount { get; set; }
 
-    /// <summary>Download bandwidth cap in bytes per second; null = unlimited.</summary>
+    /// <summary>Transfer bandwidth cap (download or upload) in bytes per second; null = unlimited.</summary>
     public long? MaxBytesPerSecond { get; set; }
+
+    /// <summary>Upload link only: maximum size of a single uploaded file; null = global ceiling.</summary>
+    public long? MaxFileSizeBytes { get; set; }
+
+    /// <summary>Upload link only: total byte quota across all uploads; null = unlimited.</summary>
+    public long? MaxTotalBytes { get; set; }
+
+    /// <summary>Upload link only: bytes reserved by accepted uploads so far.</summary>
+    public long UploadedBytes { get; set; }
+
+    /// <summary>
+    /// Upload link only: allowed file extensions separated by ';' or ',' (e.g. ".pdf;.jpg");
+    /// null or empty = any extension.
+    /// </summary>
+    public string? AllowedExtensions { get; set; }
 
     /// <summary>Admin/creator on-off switch, independent of the time window.</summary>
     public bool IsEnabled { get; set; } = true;
@@ -105,5 +139,32 @@ public sealed class ShareLink
     /// </summary>
     public bool IsCurrentlyActive(DateTime nowUtc)
         => IsWindowOpen(nowUtc)
-           && (MaxAccessCount is null || AccessCount < MaxAccessCount);
+           && (MaxAccessCount is null || AccessCount < MaxAccessCount)
+           && (Kind != ShareLinkKind.Upload || MaxTotalBytes is null || UploadedBytes < MaxTotalBytes);
+
+    /// <summary>The normalized allowed extensions (lowercase, leading dot); empty = any.</summary>
+    public IReadOnlyList<string> AllowedExtensionList
+        => ParseExtensions(AllowedExtensions);
+
+    /// <summary>Whether <paramref name="fileName"/> passes the upload extension allowlist.</summary>
+    public bool IsExtensionAllowed(string fileName)
+    {
+        var allowed = AllowedExtensionList;
+        if (allowed.Count == 0) return true;
+        var ext = Path.GetExtension(fileName);
+        return !string.IsNullOrEmpty(ext) && allowed.Contains(ext.ToLowerInvariant());
+    }
+
+    /// <summary>
+    /// Parses a user-entered extension list ("pdf, .JPG;png") into normalized entries
+    /// (".pdf", ".jpg", ".png"). Blank input yields an empty list.
+    /// </summary>
+    public static IReadOnlyList<string> ParseExtensions(string? raw)
+        => string.IsNullOrWhiteSpace(raw)
+            ? []
+            : raw.Split([';', ',', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(e => "." + e.TrimStart('.').ToLowerInvariant())
+                .Where(e => e.Length > 1)
+                .Distinct()
+                .ToList();
 }

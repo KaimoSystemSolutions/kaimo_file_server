@@ -1,6 +1,6 @@
 # Public Upload Links — Implementation Plan
 
-Status: proposal (2026-09-25)
+Status: implemented (2026-09-25)
 
 ## Goal
 
@@ -105,7 +105,7 @@ share / creator / password checks, which apply unchanged):
 - **No listing of the folder's existing content** (drop-box semantics — visitors must not see
   what others uploaded).
 
-Upload flow per file (new `PublicUploadService` method, or a small method on `ShareLinkService`):
+Upload flow per file (`Services/PublicUploadService.cs`):
 
 1. Validate name: strip any path, `WindowsFileNameHelper.IsValid`, extension allowlist.
 2. `size = file.Size`; reject if `> MaxFileSizeBytes` (or the global upload limit).
@@ -113,11 +113,13 @@ Upload flow per file (new `PublicUploadService` method, or a small method on `Sh
 4. `file.OpenReadStream(maxAllowedSize: size)` — the client-claimed size becomes a hard cap,
    so a lying client cannot exceed its reservation.
 5. Wrap with `RateLimitedStream.Wrap(stream, link.MaxBytesPerSecond)`.
-6. Target name = `NextAvailableNameAsync(...)` — **never overwrite** (make the existing private
-   helper in `FileBrowserViewModel` reusable, e.g. move it to a small static/helper next to it).
+6. Target name = first free "name (n).ext" in the folder listing, claimed in an in-process set
+   against parallel visitors — **never overwrite**. If the creator cannot list the folder, a
+   random suffix is used.
 7. `IFileService.WriteFileAsync(target, stream, creatorContext, ct)` — ACL enforced, change log
    → search indexing, versioning as usual.
-8. On failure/cancel: `ReleaseUploadAsync(id, size)` and delete the partial file.
+8. On failure/cancel: `ReleaseUploadAsync(id, size)`. The storage layer writes to a temp file
+   and publishes only complete files, so nothing partial remains.
 
 Why the circuit (`InputFile`) and not an HTTP `POST` endpoint: the whole upload stack already
 streams over the Blazor circuit (up to 1.1 GB), the password unlock already lives on the
@@ -128,16 +130,16 @@ resumable uploads are ever needed.
 ## 5. Settings & security
 
 - **Admin setting** in `ShareLinkSettings`: `AllowUploadLinks` (default **false**) and
-  `MaxUploadLinkFileSizeBytes` (global ceiling). The context-menu entry, dialog and public page
+  `MaxUploadFileSizeBytes` (global per-file ceiling, default and maximum 4 GiB). The context-menu entry, dialog and public page
   honour it; existing upload links stop accepting files when it is switched off.
-- **Permission**: reuse `ManageShareLinks` (+ the admin switch above). A separate
-  `ManageUploadLinks` flag (`1L << 57`) is a one-line addition if download-only delegation is
-  needed later.
+- **Permission**: separate flag `ManageUploadLinks` (`1L << 57`, part of `ShareAdmin`), so
+  download and upload links can be delegated independently. The overview shows each tab only
+  with its permission; the nav entry appears with either.
 - Creator disabled / share disabled / link disabled → upload refused (same checks as download,
   re-evaluated per file, not only at page load).
 - Read-only demo mode: public upload state shows "unavailable" (writes are blocked anyway).
-- Log each accepted/refused anonymous upload (link id, file name, size, client IP) via the
-  existing `SecurityMonitor`; the file itself is attributed to the creator in the change log.
+- Each accepted upload is logged (link id, path, size, creator) via `ILogger`; the file itself is
+  attributed to the creator in the change log. (`SecurityMonitor` has no channel for this yet.)
 - Rate limiting of anonymous circuits beyond the per-link limits (per-IP) is out of scope;
   the byte/file quotas bound the damage per link.
 

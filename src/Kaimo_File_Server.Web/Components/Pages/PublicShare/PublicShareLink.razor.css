@@ -60,3 +60,115 @@
         padding: 12px 16px 16px;
     }
 }
+
+/* ---- Upload link (drop box) ---- */
+
+.public-upload-card {
+    max-width: 480px;
+}
+
+.public-upload-drop {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 28px 16px;
+    border: 2px dashed var(--border-color, #3a3a3a);
+    border-radius: 10px;
+    color: var(--text-secondary, #b0b0b0);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.public-upload-drop:hover,
+.public-upload-drop:focus-within {
+    border-color: var(--accent);
+    background: var(--bg-hover, rgba(255, 255, 255, 0.03));
+}
+
+.public-upload-drop--busy {
+    cursor: progress;
+    opacity: 0.7;
+}
+
+/* The native file input covers the whole zone, so clicking and dropping files both work. */
+.public-upload-drop ::deep input[type="file"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: inherit;
+}
+
+.public-upload-limits {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 14px;
+    font-size: 0.8rem;
+    color: var(--text-tertiary, #888);
+}
+
+.public-upload-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    max-height: 260px;
+    overflow-y: auto;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.public-upload-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--bg-primary, #1e1e1e);
+    font-size: 0.85rem;
+}
+
+.public-upload-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.public-upload-state {
+    color: var(--text-tertiary, #888);
+    white-space: nowrap;
+}
+
+.public-upload-item--done .public-upload-state {
+    color: var(--success, #3fb950);
+}
+
+.public-upload-item--error .public-upload-state {
+    color: var(--danger, #f85149);
+}
+
+.public-upload-bar {
+    grid-column: 1 / -1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border-color, #3a3a3a);
+    overflow: hidden;
+}
+
+.public-upload-bar > span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.2s ease;
+}

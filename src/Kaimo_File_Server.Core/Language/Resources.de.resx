@@ -4459,7 +4459,7 @@
     <value>Im Dateibrowser öffnen</value>
   </data>
   <data name="Web_ShareLinks_Subtitle" xml:space="preserve">
-    <value>Öffentliche Download-Links für Dateien und Ordner.</value>
+    <value>Öffentliche Download- und Upload-Links für Dateien und Ordner.</value>
   </data>
   <data name="Web_ShareLinks_Path" xml:space="preserve">
     <value>Pfad</value>
@@ -4637,5 +4637,125 @@
   </data>
   <data name="Web_Settings_Net_RevealIp" xml:space="preserve">
     <value>Zum Anzeigen klicken</value>
+  </data>
+  <data name="Context_Menu_UploadLink" xml:space="preserve">
+    <value>Upload-Link erstellen</value>
+  </data>
+  <data name="Web_Perm_ManageUploadLinks" xml:space="preserve">
+    <value>Upload-Links verwalten</value>
+  </data>
+  <data name="Web_ShareLinks_UploadShared" xml:space="preserve">
+    <value>Empfängt Dateien über Upload-Link</value>
+  </data>
+  <data name="Web_ShareLinks_Tab_Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="Web_ShareLinks_Tab_Upload" xml:space="preserve">
+    <value>Upload</value>
+  </data>
+  <data name="Web_ShareLinks_EmptyUpload" xml:space="preserve">
+    <value>Noch keine Upload-Links. Erstelle einen über das Kontextmenü eines Ordners.</value>
+  </data>
+  <data name="Web_ShareLinks_Col_Uploads" xml:space="preserve">
+    <value>Uploads</value>
+  </data>
+  <data name="Web_ShareLinks_UsedQuota" xml:space="preserve">
+    <value>Hochgeladen</value>
+  </data>
+  <data name="Web_ShareLinks_AnyType" xml:space="preserve">
+    <value>Alle</value>
+  </data>
+  <data name="Web_ShareLinks_UploadsDisabled" xml:space="preserve">
+    <value>Upload-Links sind in den Einstellungen deaktiviert; dieser Link nimmt derzeit keine Dateien an.</value>
+  </data>
+  <data name="Web_ShareLink_MaxFiles" xml:space="preserve">
+    <value>Max. Dateien</value>
+  </data>
+  <data name="Web_ShareLink_MaxUploadRate" xml:space="preserve">
+    <value>Max. Upload-Rate</value>
+  </data>
+  <data name="Web_ShareLink_MaxFileSize" xml:space="preserve">
+    <value>Max. Dateigröße</value>
+  </data>
+  <data name="Web_ShareLink_MaxTotal" xml:space="preserve">
+    <value>Gesamtkontingent</value>
+  </data>
+  <data name="Web_ShareLink_AllowedTypes" xml:space="preserve">
+    <value>Erlaubte Dateitypen</value>
+  </data>
+  <data name="Web_ShareLink_AllowedTypesPlaceholder" xml:space="preserve">
+    <value>z. B. pdf, jpg, png — leer = alle</value>
+  </data>
+  <data name="Web_ShareLink_UploadNotPossible" xml:space="preserve">
+    <value>Der Upload-Link konnte nicht erstellt werden. Upload-Links sind eventuell deaktiviert, oder dir fehlt das Schreibrecht für diesen Ordner.</value>
+  </data>
+  <data name="Web_ShareLinkSettings_UploadTitle" xml:space="preserve">
+    <value>Upload-Links</value>
+  </data>
+  <data name="Web_ShareLinkSettings_UploadHint" xml:space="preserve">
+    <value>Mit Upload-Links können anonyme Besucher Dateien in einen Ordner hochladen. Solange deaktiviert, können keine Upload-Links erstellt werden und bestehende nehmen keine Dateien an.</value>
+  </data>
+  <data name="Web_Settings_AllowUploadLinks" xml:space="preserve">
+    <value>Upload-Links aktivieren</value>
+  </data>
+  <data name="Web_ShareLinkSettings_MaxUploadSize" xml:space="preserve">
+    <value>Max. Dateigröße pro Upload (MB, bis 4096)</value>
+  </data>
+  <data name="Web_PublicUpload_Body" xml:space="preserve">
+    <value>Lade Dateien für den Besitzer dieses Links hoch. Von anderen hochgeladene Dateien sind nicht sichtbar.</value>
+  </data>
+  <data name="Web_PublicUpload_Busy" xml:space="preserve">
+    <value>Wird hochgeladen...</value>
+  </data>
+  <data name="Web_PublicUpload_Drop" xml:space="preserve">
+    <value>Dateien hierher ziehen oder klicken zum Auswählen</value>
+  </data>
+  <data name="Web_PublicUpload_MaxSize" xml:space="preserve">
+    <value>Max. {0} pro Datei</value>
+  </data>
+  <data name="Web_PublicUpload_AllowedTypes" xml:space="preserve">
+    <value>Erlaubt: {0}</value>
+  </data>
+  <data name="Web_PublicUpload_FilesLeft" xml:space="preserve">
+    <value>Noch {0} Datei(en) erlaubt</value>
+  </data>
+  <data name="Web_PublicUpload_SpaceLeft" xml:space="preserve">
+    <value>Noch {0} frei</value>
+  </data>
+  <data name="Web_PublicUpload_TooManyFiles" xml:space="preserve">
+    <value>Wähle höchstens {0} Dateien auf einmal.</value>
+  </data>
+  <data name="Web_PublicUpload_Queued" xml:space="preserve">
+    <value>Wartet</value>
+  </data>
+  <data name="Web_PublicUpload_Done" xml:space="preserve">
+    <value>Hochgeladen</value>
+  </data>
+  <data name="Web_PublicUpload_DoneRenamed" xml:space="preserve">
+    <value>Hochgeladen als {0}</value>
+  </data>
+  <data name="Web_PublicUpload_InvalidName" xml:space="preserve">
+    <value>Ungültiger Dateiname</value>
+  </data>
+  <data name="Web_PublicUpload_TypeNotAllowed" xml:space="preserve">
+    <value>Dateityp nicht erlaubt</value>
+  </data>
+  <data name="Web_PublicUpload_TooLarge" xml:space="preserve">
+    <value>Datei zu groß</value>
+  </data>
+  <data name="Web_PublicUpload_QuotaExceeded" xml:space="preserve">
+    <value>Upload-Limit erreicht</value>
+  </data>
+  <data name="Web_PublicUpload_Unavailable" xml:space="preserve">
+    <value>Dieser Link nimmt keine Uploads mehr an</value>
+  </data>
+  <data name="Web_PublicUpload_Cancelled" xml:space="preserve">
+    <value>Abgebrochen</value>
+  </data>
+  <data name="Web_PublicUpload_Failed" xml:space="preserve">
+    <value>Upload fehlgeschlagen</value>
+  </data>
+  <data name="Web_ShareLink_UploadDisabled" xml:space="preserve">
+    <value>Upload-Links sind deaktiviert. Ein Administrator kann sie unter Einstellungen → Freigabelinks aktivieren.</value>
   </data>
 </root>

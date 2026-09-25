@@ -2,16 +2,18 @@
 @using Kaimo_File_Server.Core.Language
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Helpers
 @using Kaimo_File_Server.Web.Services
 @inherits AppComponentBase
 @inject IJSRuntime JS
 @inject ShareLinkService ShareLinks
 
 @*
-    "Share as public link" dialog. Opened from the file-browser context menu for a single file
-    or folder when the user may manage share links. Collects the link policy (optional password,
-    base address, start/end, max accesses, max download rate), creates the link, then shows the
-    resulting URL with a copy button.
+    "Share as public link" / "Create upload link" dialog. Opened from the file-browser context
+    menu for a single file or folder (upload: folders only) when the user may manage links of that
+    kind. Collects the link policy (optional password, base address, start/end, max accesses or
+    files, max rate; for uploads also max file size, total quota and allowed types), creates the
+    link, then shows the resulting URL with a copy button.
 *@
 @if (_show && _target is not null)
 {
@@ -20,7 +22,7 @@
 
             <div class="properties-header">
                 <span class="properties-header-icon">
-                    @Assets.SVG("share.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)"))
+                    @Assets.SVG(IsUpload ? "upload.svg" : "share.svg", new SvgOptions(Width: 20, Height: 20, Color: "var(--text-tertiary)"))
                 </span>
                 <span class="properties-header-name" title="@_target.Name">@_target.Name</span>
                 <button class="btn-icon" title="@Resources.Web_Button_Close" @onclick="Close">
@@ -29,7 +31,16 @@
             </div>
 
             <div class="properties-body sharelink-body">
-                @if (_createdUrl is null)
+                @if (IsUpload && !_settings.AllowUploadLinks)
+                {
+                    <div class="error-banner">
+                        @T("Web_ShareLink_UploadDisabled", "Upload links are disabled. An administrator can enable them under Settings → Share Links.")
+                    </div>
+                    <div class="sharelink-actions">
+                        <button class="btn-primary" @onclick="Close">@Resources.Web_Button_Close</button>
+                    </div>
+                }
+                else if (_createdUrl is null)
                 {
                     <label class="hash-field-label">@T("Web_ShareLink_Name", "Link name")</label>
                     <input type="text" class="edit-input"
@@ -77,12 +88,12 @@
 
                     <div class="sharelink-row">
                         <div class="sharelink-col">
-                            <label class="hash-field-label">@T("Web_ShareLink_MaxAccess", "Max downloads")</label>
+                            <label class="hash-field-label">@(IsUpload ? T("Web_ShareLink_MaxFiles", "Max files") : T("Web_ShareLink_MaxAccess", "Max downloads"))</label>
                             <input type="number" min="1" class="edit-input"
                                    placeholder="@T("Web_ShareLink_Unlimited", "Unlimited")" @bind="_maxAccess" />
                         </div>
                         <div class="sharelink-col">
-                            <label class="hash-field-label">@T("Web_ShareLink_MaxRate", "Max rate")</label>
+                            <label class="hash-field-label">@(IsUpload ? T("Web_ShareLink_MaxUploadRate", "Max upload rate") : T("Web_ShareLink_MaxRate", "Max rate"))</label>
                             <div class="sharelink-rate">
                                 <input type="number" min="1" class="edit-input"
                                        placeholder="@T("Web_ShareLink_Unlimited", "Unlimited")" @bind="_rateValue" />
@@ -93,6 +104,39 @@
                             </div>
                         </div>
                     </div>
+
+                    @if (IsUpload)
+                    {
+                        <div class="sharelink-row">
+                            <div class="sharelink-col">
+                                <label class="hash-field-label">@T("Web_ShareLink_MaxFileSize", "Max file size")</label>
+                                <div class="sharelink-rate">
+                                    <input type="number" min="1" class="edit-input"
+                                           placeholder="@FormatHelper.FormatFileSize(_settings.MaxUploadFileSizeBytes)" @bind="_maxFileSizeValue" />
+                                    <select class="edit-input" @bind="_maxFileSizeUnit">
+                                        <option value="MB">MB</option>
+                                        <option value="GB">GB</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="sharelink-col">
+                                <label class="hash-field-label">@T("Web_ShareLink_MaxTotal", "Total quota")</label>
+                                <div class="sharelink-rate">
+                                    <input type="number" min="1" class="edit-input"
+                                           placeholder="@T("Web_ShareLink_Unlimited", "Unlimited")" @bind="_maxTotalValue" />
+                                    <select class="edit-input" @bind="_maxTotalUnit">
+                                        <option value="MB">MB</option>
+                                        <option value="GB">GB</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <label class="hash-field-label">@T("Web_ShareLink_AllowedTypes", "Allowed file types")</label>
+                        <input type="text" class="edit-input"
+                               placeholder="@T("Web_ShareLink_AllowedTypesPlaceholder", "e.g. pdf, jpg, png — empty = any")"
+                               @bind="_allowedExtensions" @bind:event="oninput" />
+                    }
 
                     <label class="hash-field-label">@T("Web_ShareLink_Url", "Public link")</label>
                     <div class="hash-value-row">
@@ -151,7 +195,10 @@
     public bool IsOpen => _show;
 
     private FileMetadata? _target;
+    private ShareLinkKind _kind = ShareLinkKind.Download;
     private ShareLinkSettings _settings = ShareLinkSettings.Default();
+
+    private bool IsUpload => _kind == ShareLinkKind.Upload;
 
     // Reserved when the dialog opens so the URL is known before "Create" is pressed.
     private string _token = "";
@@ -165,6 +212,11 @@
     private int? _maxAccess;
     private double? _rateValue;
     private string _rateUnit = "MB";
+    private double? _maxFileSizeValue;
+    private string _maxFileSizeUnit = "MB";
+    private double? _maxTotalValue;
+    private string _maxTotalUnit = "GB";
+    private string? _allowedExtensions;
 
     private string? _createdUrl;
     private bool _copied;
@@ -174,9 +226,15 @@
     private static string T(string key, string fallback)
         => Resources.ResourceManager.GetString(key) ?? fallback;
 
-    public async Task Open(FileMetadata target)
+    public async Task Open(FileMetadata target, ShareLinkKind kind = ShareLinkKind.Download)
     {
         _target = target;
+        _kind = kind;
+        _maxFileSizeValue = null;
+        _maxFileSizeUnit = "MB";
+        _maxTotalValue = null;
+        _maxTotalUnit = "GB";
+        _allowedExtensions = null;
         _name = "";
         _password = null;
         _showPassword = false;
@@ -231,13 +289,19 @@
             ExpiresAtUtc: _endsAt?.ToUniversalTime(),
             MaxAccessCount: _maxAccess is > 0 ? _maxAccess : null,
             MaxBytesPerSecond: maxBps,
-            Token: _token);
+            Token: _token,
+            Kind: _kind,
+            MaxFileSizeBytes: IsUpload ? ToBytes(_maxFileSizeValue, _maxFileSizeUnit) : null,
+            MaxTotalBytes: IsUpload ? ToBytes(_maxTotalValue, _maxTotalUnit) : null,
+            AllowedExtensions: IsUpload ? _allowedExtensions : null);
 
         try
         {
             var link = await ShareLinks.CreateAsync(request);
             if (link is null)
-                _error = T("Web_ShareLink_NoPermission", "You are not allowed to create a link for this item.");
+                _error = IsUpload
+                    ? T("Web_ShareLink_UploadNotPossible", "The upload link could not be created. Upload links may be disabled, or you lack write access to this folder.")
+                    : T("Web_ShareLink_NoPermission", "You are not allowed to create a link for this item.");
             else
                 _createdUrl = ShareLinks.BuildUrl(link, _settings);
         }
@@ -251,6 +315,11 @@
             StateHasChanged();
         }
     }
+
+    private static long? ToBytes(double? value, string unit)
+        => value is > 0
+            ? (long)(value.Value * (unit == "GB" ? 1024d * 1024 * 1024 : 1024d * 1024))
+            : null;
 
     private async Task CopyTextAsync(string text)
     {

@@ -53,7 +53,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     // Normalized root paths of the loaded share's public links (with the owning link's id, so
     // an emblem can jump to it), so the browser can mark a shared folder (and everything beneath
     // it). Loaded per share; empty for the public browser.
-    private List<(string Root, Guid LinkId)> _sharedRoots = [];
+    private List<(string Root, Guid LinkId, ShareLinkKind Kind)> _sharedRoots = [];
 
     private readonly ISearchService _searchService;
 
@@ -161,6 +161,13 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     /// </summary>
     public bool CanManageShareLinks { get; private set; }
 
+    /// <summary>
+    /// Scoped right to create/manage public upload links on the loaded share
+    /// (<see cref="ManagementPermission.ManageUploadLinks"/>). Same lifecycle as
+    /// <see cref="CanManageShareLinks"/>.
+    /// </summary>
+    public bool CanManageUploadLinks { get; private set; }
+
     // -- Computed --
 
     public IEnumerable<FileMetadata> Directories
@@ -249,6 +256,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             CanManageAcls = false;
             CanManageSyncs = false;
             CanManageShareLinks = false;
+            CanManageUploadLinks = false;
+            CanManageUploadLinks = false;
             _shareSyncs = [];
             _sharedRoots = [];
             _fileService = null;
@@ -316,14 +325,17 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             CanManageShareLinks = AllowShareLinkManagement
                 && await _mgmtAuth.CanManageShareAsync(
                     userContext, CurrentShare.Id, ManagementPermission.ManageShareLinks);
+            CanManageUploadLinks = AllowShareLinkManagement
+                && await _mgmtAuth.CanManageShareAsync(
+                    userContext, CurrentShare.Id, ManagementPermission.ManageUploadLinks);
 
             // Which items in this share carry a public link, so the browser can mark them.
             // Skipped for the public browser (AllowShareLinkManagement == false).
             _sharedRoots = AllowShareLinkManagement
                 ? (await _shareLinkRepo.ListForSharesAsync(new[] { CurrentShare.Id }))
                     .Where(l => l.IsEnabled)
-                    .GroupBy(l => ShareRelativePath.Normalize(l.RootRelativePath))
-                    .Select(g => (Root: g.Key, LinkId: g.First().Id))
+                    .GroupBy(l => (Root: ShareRelativePath.Normalize(l.RootRelativePath), l.Kind))
+                    .Select(g => (Root: g.Key.Root, LinkId: g.First().Id, g.Key.Kind))
                     .ToList()
                 : [];
 
@@ -351,6 +363,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             CanManageAcls = false;
             CanManageSyncs = false;
             CanManageShareLinks = false;
+            CanManageUploadLinks = false;
             Items = [];
         }
         catch (UnauthorizedAccessException)
@@ -359,6 +372,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             CanManageAcls = false;
             CanManageSyncs = false;
             CanManageShareLinks = false;
+            CanManageUploadLinks = false;
             Items = [];
         }
         catch (Exception ex)
@@ -367,6 +381,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             CanManageAcls = false;
             CanManageSyncs = false;
             CanManageShareLinks = false;
+            CanManageUploadLinks = false;
             _logger.LogError(ex, "Error loading share {ShareName} path {SubPath}", shareName, subPath);
             Items = [];
         }
@@ -1107,7 +1122,7 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         if (_sharedRoots.Count == 0) return false;
 
         var rel = ShareRelativePath.Normalize(ShareRelativeOf(entry));
-        foreach (var (root, _) in _sharedRoots)
+        foreach (var (root, _, _) in _sharedRoots)
         {
             if (string.Equals(rel, root, StringComparison.OrdinalIgnoreCase)) return true;
             if (root.Length == 0 || rel.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase)) return true;
@@ -1116,23 +1131,29 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     }
 
     /// <inheritdoc />
-    public Guid? GetShareLinkId(FileMetadata entry)
+    public Guid? GetShareLinkId(FileMetadata entry) => FindShareLink(entry)?.LinkId;
+
+    /// <inheritdoc />
+    public ShareLinkKind? GetShareLinkKind(FileMetadata entry) => FindShareLink(entry)?.Kind;
+
+    // The nearest (longest-root) link covering the entry, or null.
+    private (Guid LinkId, ShareLinkKind Kind)? FindShareLink(FileMetadata entry)
     {
         if (_sharedRoots.Count == 0) return null;
 
         var rel = ShareRelativePath.Normalize(ShareRelativeOf(entry));
-        Guid? best = null;
+        (Guid LinkId, ShareLinkKind Kind)? best = null;
         var bestLength = -1;
         // Nearest (longest) matching root wins, so an entry with its own link jumps to that
         // link rather than an ancestor's.
-        foreach (var (root, linkId) in _sharedRoots)
+        foreach (var (root, linkId, kind) in _sharedRoots)
         {
             var matches = string.Equals(rel, root, StringComparison.OrdinalIgnoreCase)
                           || root.Length == 0
                           || rel.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase);
             if (matches && root.Length > bestLength)
             {
-                best = linkId;
+                best = (linkId, kind);
                 bestLength = root.Length;
             }
         }

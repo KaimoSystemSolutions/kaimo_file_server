@@ -12,17 +12,22 @@
 @using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser
 @using Kaimo_File_Server.Web.Components.ViewModels
 @using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Helpers
 @using Kaimo_File_Server.Web.Services
 
 @inject ShareLinkService ShareLinks
+@inject PublicUploadService Uploads
 @inject IShareRepository Shares
 @inject PublicShareFileBrowserViewModel Vm
 @inject IJSRuntime JS
+@implements IDisposable
 
 @*
     Anonymous landing page for a public share link ("/shared/{token}"). Folder links open the
     normal file browser confined to the shared folder (read-only, multi-select download); file
-    links show a download card. Optional password unlock happens on the circuit, never in the URL.
+    links show a download card; upload links show a drop zone that uploads into the linked
+    folder without revealing its content. Optional password unlock happens on the circuit,
+    never in the URL.
 *@
 
 @if (_state == State.NotFound || _state == State.Unavailable)
@@ -75,11 +80,83 @@ else if (_state == State.File)
     </div>
 }
 
+else if (_state == State.Upload)
+{
+    <div class="public-share-shell">
+        <div class="public-share-card public-upload-card">
+            <div class="public-share-icon">@Assets.SVG("upload.svg", new SvgOptions(Width: 32, Height: 32))</div>
+            <h1>@_link!.DisplayName</h1>
+            <p>@T("Web_PublicUpload_Body", "Upload files for the owner of this link. Files uploaded by others are not visible.")</p>
+
+            <label class="public-upload-drop @(_busy ? "public-upload-drop--busy" : "")">
+                <InputFile multiple class="public-upload-input" disabled="@_busy" OnChange="OnFilesSelected"
+                           accept="@(_link.AllowedExtensionList.Count > 0 ? string.Join(",", _link.AllowedExtensionList) : null)" />
+                @Assets.SVG("upload.svg", new SvgOptions(Width: 22, Height: 22, Color: "var(--accent)"))
+                <span>@(_busy ? T("Web_PublicUpload_Busy", "Uploading...") : T("Web_PublicUpload_Drop", "Drop files here or click to choose"))</span>
+            </label>
+
+            <ul class="public-upload-limits">
+                <li>@string.Format(T("Web_PublicUpload_MaxSize", "Max. {0} per file"), FormatHelper.FormatFileSize(_maxFileSize))</li>
+                @if (_link.AllowedExtensionList.Count > 0)
+                {
+                    <li>@string.Format(T("Web_PublicUpload_AllowedTypes", "Allowed: {0}"), string.Join(", ", _link.AllowedExtensionList))</li>
+                }
+                @if (_link.MaxAccessCount is { } maxFiles)
+                {
+                    <li>@string.Format(T("Web_PublicUpload_FilesLeft", "{0} more file(s) allowed"), Math.Max(0, maxFiles - _link.AccessCount))</li>
+                }
+                @if (_link.MaxTotalBytes is { } maxTotal)
+                {
+                    <li>@string.Format(T("Web_PublicUpload_SpaceLeft", "{0} space left"), FormatHelper.FormatFileSize(Math.Max(0, maxTotal - _link.UploadedBytes)))</li>
+                }
+            </ul>
+
+            @if (_uploads.Count > 0)
+            {
+                <ul class="public-upload-list">
+                    @foreach (var item in _uploads)
+                    {
+                        <li class="public-upload-item public-upload-item--@item.Tone">
+                            <span class="public-upload-name" title="@item.Name">@item.Name</span>
+                            <span class="public-upload-state">@item.StateText</span>
+                            @if (item.Tone == "running")
+                            {
+                                <span class="public-upload-bar"><span style="width: @(item.Percent)%"></span></span>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+
+            @if (_busy)
+            {
+                <button class="btn-secondary" @onclick="CancelUploads">@Resources.Web_Button_Cancel</button>
+            }
+        </div>
+    </div>
+}
+
 @code {
     [Parameter] public string Token { get; set; } = "";
     [Parameter] public string? SubPath { get; set; }
 
-    private enum State { Loading, NotFound, Unavailable, Password, Folder, File }
+    private enum State { Loading, NotFound, Unavailable, Password, Folder, File, Upload }
+
+    // Most files a visitor may pick in one go; the link's own file cap is enforced per file.
+    private const int MaxFilesPerSelection = 100;
+
+    private sealed class UploadItem(string name)
+    {
+        public string Name { get; } = name;
+        public int Percent { get; set; }
+        public string Tone { get; set; } = "queued";   // queued / running / done / error
+        public string StateText { get; set; } = "";
+    }
+
+    private readonly List<UploadItem> _uploads = new();
+    private CancellationTokenSource? _uploadCts;
+    private bool _busy;
+    private long _maxFileSize;
     private State _state = State.Loading;
 
     private ShareLink? _link;
@@ -114,9 +191,17 @@ else if (_state == State.File)
             if (await ShareLinks.ResolveCreatorAsync(_link) is null) { _state = State.Unavailable; return; }
             _shareName = share.Name;
 
+            // Upload links honour the global switch (and demo mode) already on the landing page.
+            if (_link.Kind == ShareLinkKind.Upload && !await Uploads.IsUploadEnabledAsync())
+            { _state = State.Unavailable; return; }
+
             if (_link.PasswordHash is not null && !_unlocked) { _state = State.Password; return; }
 
-            if (_link.IsDirectory)
+            if (_link.Kind == ShareLinkKind.Upload)
+            {
+                await EnterUploadStateAsync();
+            }
+            else if (_link.IsDirectory)
             {
                 Vm.Initialize(_link);
                 _state = State.Folder;
@@ -137,9 +222,9 @@ else if (_state == State.File)
         if (e.Key == "Enter") await UnlockAsync();
     }
 
-    private Task UnlockAsync()
+    private async Task UnlockAsync()
     {
-        if (_link is null) return Task.CompletedTask;
+        if (_link is null) return;
 
         var (ok, retryAfter) = ShareLinks.VerifyPassword(_link, _passwordInput);
         if (ok)
@@ -147,6 +232,11 @@ else if (_state == State.File)
             _unlocked = true;
             _passwordError = null;
             _passwordInput = null;
+            if (_link.Kind == ShareLinkKind.Upload)
+            {
+                await EnterUploadStateAsync();
+                return;
+            }
             _state = _link.IsDirectory ? State.Folder : State.File;
             if (_link.IsDirectory) Vm.Initialize(_link);
         }
@@ -157,8 +247,110 @@ else if (_state == State.File)
                     Math.Max(1, (int)Math.Ceiling(retryAfter.TotalMinutes)))
                 : T("Web_PublicShare_Password_Wrong", "Wrong password.");
         }
-        return Task.CompletedTask;
     }
+
+    private async Task EnterUploadStateAsync()
+    {
+        var settings = await ShareLinks.GetSettingsAsync();
+        _maxFileSize = settings.EffectiveMaxFileSize(_link!);
+        _state = State.Upload;
+    }
+
+    private async Task OnFilesSelected(InputFileChangeEventArgs e)
+    {
+        if (_link is null || _busy) return;
+
+        IReadOnlyList<IBrowserFile> files;
+        try
+        {
+            files = e.GetMultipleFiles(MaxFilesPerSelection);
+        }
+        catch (InvalidOperationException)
+        {
+            _uploads.Insert(0, new UploadItem("—")
+            {
+                Tone = "error",
+                StateText = string.Format(T("Web_PublicUpload_TooManyFiles", "Choose at most {0} files at once."), MaxFilesPerSelection),
+            });
+            return;
+        }
+        if (files.Count == 0) return;
+
+        _busy = true;
+        _uploadCts = new CancellationTokenSource();
+        var ct = _uploadCts.Token;
+        var batch = files
+            .Select(f => (File: f, Item: new UploadItem(f.Name) { StateText = T("Web_PublicUpload_Queued", "Waiting") }))
+            .ToList();
+        _uploads.InsertRange(0, batch.Select(b => b.Item));
+        StateHasChanged();
+
+        try
+        {
+            foreach (var (file, item) in batch)
+            {
+                if (ct.IsCancellationRequested)
+                {
+                    SetResult(item, PublicUploadStatus.Cancelled);
+                    continue;
+                }
+
+                item.Tone = "running";
+                item.StateText = "0 %";
+                StateHasChanged();
+
+                // The reserved size becomes the stream's hard cap (see PublicUploadService).
+                var lastRender = DateTime.UtcNow;
+                var result = await Uploads.UploadAsync(_link, file.Name, file.Size,
+                    max => new ProgressStream(file.OpenReadStream(max, ct), file.Size, (read, total) =>
+                    {
+                        item.Percent = total > 0 ? (int)(read * 100 / total) : 100;
+                        item.StateText = $"{item.Percent} %";
+                        if ((DateTime.UtcNow - lastRender).TotalMilliseconds < 400) return;
+                        lastRender = DateTime.UtcNow;
+                        _ = InvokeAsync(StateHasChanged);
+                    }),
+                    ct);
+
+                SetResult(item, result.Status, result.StoredName);
+                StateHasChanged();
+            }
+
+            // Refresh the remaining file/space counters shown to the visitor.
+            if (await ShareLinks.GetByTokenAsync(Token) is { } fresh)
+                _link = fresh;
+        }
+        finally
+        {
+            _busy = false;
+            _uploadCts?.Dispose();
+            _uploadCts = null;
+            StateHasChanged();
+        }
+    }
+
+    private void SetResult(UploadItem item, PublicUploadStatus status, string? storedName = null)
+    {
+        item.Tone = status == PublicUploadStatus.Uploaded ? "done" : "error";
+        if (status == PublicUploadStatus.Uploaded) item.Percent = 100;
+        item.StateText = status switch
+        {
+            PublicUploadStatus.Uploaded when storedName is not null && storedName != item.Name
+                => string.Format(T("Web_PublicUpload_DoneRenamed", "Uploaded as {0}"), storedName),
+            PublicUploadStatus.Uploaded => T("Web_PublicUpload_Done", "Uploaded"),
+            PublicUploadStatus.InvalidName => T("Web_PublicUpload_InvalidName", "Invalid file name"),
+            PublicUploadStatus.TypeNotAllowed => T("Web_PublicUpload_TypeNotAllowed", "File type not allowed"),
+            PublicUploadStatus.TooLarge => T("Web_PublicUpload_TooLarge", "File too large"),
+            PublicUploadStatus.QuotaExceeded => T("Web_PublicUpload_QuotaExceeded", "Upload limit reached"),
+            PublicUploadStatus.Unavailable => T("Web_PublicUpload_Unavailable", "This link no longer accepts uploads"),
+            PublicUploadStatus.Cancelled => T("Web_PublicUpload_Cancelled", "Cancelled"),
+            _ => T("Web_PublicUpload_Failed", "Upload failed"),
+        };
+    }
+
+    private void CancelUploads() => _uploadCts?.Cancel();
+
+    public void Dispose() => _uploadCts?.Cancel();
 
     private async Task DownloadFileAsync()
     {

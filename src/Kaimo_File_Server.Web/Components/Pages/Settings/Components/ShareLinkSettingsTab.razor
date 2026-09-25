@@ -7,7 +7,7 @@
 @*
     Settings tab for public share links: the allowlist of base addresses (e.g. reverse-proxy
     URLs) a link URL may be built from, which is the default, and whether a link creator may
-    pick a non-default one.
+    pick a non-default one; plus the global switch and per-file size ceiling for upload links.
 *@
 
 <div class="settings-section">
@@ -46,6 +46,22 @@
         <span>@T("Web_ShareLinkSettings_AllowCustom", "Allow link creators to choose a non-default address")</span>
     </label>
 
+    <h3>@T("Web_ShareLinkSettings_UploadTitle", "Upload links")</h3>
+    <p class="settings-hint">
+        @T("Web_ShareLinkSettings_UploadHint", "Upload links let anonymous visitors upload files into a folder. While disabled, no upload link can be created and existing ones accept no files.")
+    </p>
+
+    <label class="sharelink-check">
+        <input type="checkbox" @bind="_allowUploadLinks" />
+        <span>@T("Web_Settings_AllowUploadLinks", "Enable upload links")</span>
+    </label>
+
+    <label class="sharelink-check">
+        <span>@T("Web_ShareLinkSettings_MaxUploadSize", "Max. file size per upload (MB, up to 4096)")</span>
+        <input type="number" min="1" max="@(ShareLinkSettings.DefaultMaxUploadFileSizeBytes / Mb)" class="edit-input sharelink-size-input"
+               @bind="_maxUploadMb" />
+    </label>
+
     <div class="sharelink-actions">
         <button class="btn-primary" @onclick="SaveAsync">@T("Web_Button_Save", "Save")</button>
     </div>
@@ -55,7 +71,11 @@
     private List<string> _addresses = new();
     private int _defaultIndex;
     private bool _allowUserChosen = true;
+    private bool _allowUploadLinks;
+    private long _maxUploadMb = ShareLinkSettings.DefaultMaxUploadFileSizeBytes / Mb;
     private bool _saved;
+
+    private const long Mb = 1024 * 1024;
 
     private static string T(string key, string fallback)
         => Resources.ResourceManager.GetString(key) ?? fallback;
@@ -66,6 +86,8 @@
         _addresses = settings.BaseAddresses.ToList();
         _defaultIndex = settings.DefaultIndex;
         _allowUserChosen = settings.AllowUserChosenAddress;
+        _allowUploadLinks = settings.AllowUploadLinks;
+        _maxUploadMb = settings.MaxUploadFileSizeBytes / Mb;
     }
 
     private void Add()
@@ -88,6 +110,8 @@
             BaseAddresses = _addresses.ToList(),
             DefaultIndex = _defaultIndex,
             AllowUserChosenAddress = _allowUserChosen,
+            AllowUploadLinks = _allowUploadLinks,
+            MaxUploadFileSizeBytes = _maxUploadMb * Mb,
         };
         await ShareLinks.SaveSettingsAsync(settings);
 
@@ -96,6 +120,8 @@
         _addresses = reloaded.BaseAddresses.ToList();
         _defaultIndex = reloaded.DefaultIndex;
         _allowUserChosen = reloaded.AllowUserChosenAddress;
+        _allowUploadLinks = reloaded.AllowUploadLinks;
+        _maxUploadMb = reloaded.MaxUploadFileSizeBytes / Mb;
         _saved = true;
     }
 }

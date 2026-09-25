@@ -321,6 +321,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(x => x.DisplayName).IsRequired().HasMaxLength(400);
                 entity.Property(x => x.PasswordHash).HasMaxLength(200);
                 entity.Property(x => x.BaseAddress).HasMaxLength(2000);
+                entity.Property(x => x.AllowedExtensions).HasMaxLength(1000);
                 entity.Property(x => x.ShareId).IsRequired();
                 entity.Property(x => x.CreatedByUserId).IsRequired();
                 entity.HasIndex(x => x.ShareId);

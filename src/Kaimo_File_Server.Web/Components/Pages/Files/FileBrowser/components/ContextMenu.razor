@@ -121,6 +121,10 @@
             "permissions" => FileBrowser.CanManageAcls(),
             // Sharing a public link requires the scoped ManageShareLinks permission.
             "sharelink" => FileBrowser.CanManageShareLinks(),
+            // Upload links need their own scoped permission. The global settings switch is not
+            // checked here on purpose: the dialog explains when upload links are disabled, instead
+            // of the entry silently vanishing.
+            "uploadlink" => FileBrowser.CanManageUploadLinks(),
             // Bulk extract only makes sense when every selected item is an archive.
             "extract" when scope == ContextMenuScope.MultiSelection
                 => FileBrowser.VM.Capabilities.CanExtract
@@ -150,6 +154,9 @@
 
         "sharelink"
             => async () => { CloseContextMenu(); await FileBrowser.OpenShareLinkDialog(target!); },
+
+        "uploadlink"
+            => async () => { CloseContextMenu(); await FileBrowser.OpenUploadLinkDialog(target!); },
 
         "hash"
             => async () => {  CloseContextMenu(); await FileBrowser.OpenHashDialog(target!); },

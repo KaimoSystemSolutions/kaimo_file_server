@@ -4525,7 +4525,7 @@
     <value>Open in file browser</value>
   </data>
   <data name="Web_ShareLinks_Subtitle" xml:space="preserve">
-    <value>Public download links for files and folders.</value>
+    <value>Public download and upload links for files and folders.</value>
   </data>
   <data name="Web_ShareLinks_Path" xml:space="preserve">
     <value>Path</value>
@@ -4703,5 +4703,125 @@
   </data>
   <data name="Web_Settings_Net_RevealIp" xml:space="preserve">
     <value>Click to reveal</value>
+  </data>
+  <data name="Context_Menu_UploadLink" xml:space="preserve">
+    <value>Create upload link</value>
+  </data>
+  <data name="Web_Perm_ManageUploadLinks" xml:space="preserve">
+    <value>Manage upload links</value>
+  </data>
+  <data name="Web_ShareLinks_UploadShared" xml:space="preserve">
+    <value>Receives files via upload link</value>
+  </data>
+  <data name="Web_ShareLinks_Tab_Download" xml:space="preserve">
+    <value>Download</value>
+  </data>
+  <data name="Web_ShareLinks_Tab_Upload" xml:space="preserve">
+    <value>Upload</value>
+  </data>
+  <data name="Web_ShareLinks_EmptyUpload" xml:space="preserve">
+    <value>No upload links yet. Create one from a folder's context menu.</value>
+  </data>
+  <data name="Web_ShareLinks_Col_Uploads" xml:space="preserve">
+    <value>Uploads</value>
+  </data>
+  <data name="Web_ShareLinks_UsedQuota" xml:space="preserve">
+    <value>Uploaded</value>
+  </data>
+  <data name="Web_ShareLinks_AnyType" xml:space="preserve">
+    <value>Any</value>
+  </data>
+  <data name="Web_ShareLinks_UploadsDisabled" xml:space="preserve">
+    <value>Upload links are disabled in the settings; this link currently accepts no files.</value>
+  </data>
+  <data name="Web_ShareLink_MaxFiles" xml:space="preserve">
+    <value>Max files</value>
+  </data>
+  <data name="Web_ShareLink_MaxUploadRate" xml:space="preserve">
+    <value>Max upload rate</value>
+  </data>
+  <data name="Web_ShareLink_MaxFileSize" xml:space="preserve">
+    <value>Max file size</value>
+  </data>
+  <data name="Web_ShareLink_MaxTotal" xml:space="preserve">
+    <value>Total quota</value>
+  </data>
+  <data name="Web_ShareLink_AllowedTypes" xml:space="preserve">
+    <value>Allowed file types</value>
+  </data>
+  <data name="Web_ShareLink_AllowedTypesPlaceholder" xml:space="preserve">
+    <value>e.g. pdf, jpg, png — empty = any</value>
+  </data>
+  <data name="Web_ShareLink_UploadNotPossible" xml:space="preserve">
+    <value>The upload link could not be created. Upload links may be disabled, or you lack write access to this folder.</value>
+  </data>
+  <data name="Web_ShareLinkSettings_UploadTitle" xml:space="preserve">
+    <value>Upload links</value>
+  </data>
+  <data name="Web_ShareLinkSettings_UploadHint" xml:space="preserve">
+    <value>Upload links let anonymous visitors upload files into a folder. While disabled, no upload link can be created and existing ones accept no files.</value>
+  </data>
+  <data name="Web_Settings_AllowUploadLinks" xml:space="preserve">
+    <value>Enable upload links</value>
+  </data>
+  <data name="Web_ShareLinkSettings_MaxUploadSize" xml:space="preserve">
+    <value>Max. file size per upload (MB, up to 4096)</value>
+  </data>
+  <data name="Web_PublicUpload_Body" xml:space="preserve">
+    <value>Upload files for the owner of this link. Files uploaded by others are not visible.</value>
+  </data>
+  <data name="Web_PublicUpload_Busy" xml:space="preserve">
+    <value>Uploading...</value>
+  </data>
+  <data name="Web_PublicUpload_Drop" xml:space="preserve">
+    <value>Drop files here or click to choose</value>
+  </data>
+  <data name="Web_PublicUpload_MaxSize" xml:space="preserve">
+    <value>Max. {0} per file</value>
+  </data>
+  <data name="Web_PublicUpload_AllowedTypes" xml:space="preserve">
+    <value>Allowed: {0}</value>
+  </data>
+  <data name="Web_PublicUpload_FilesLeft" xml:space="preserve">
+    <value>{0} more file(s) allowed</value>
+  </data>
+  <data name="Web_PublicUpload_SpaceLeft" xml:space="preserve">
+    <value>{0} space left</value>
+  </data>
+  <data name="Web_PublicUpload_TooManyFiles" xml:space="preserve">
+    <value>Choose at most {0} files at once.</value>
+  </data>
+  <data name="Web_PublicUpload_Queued" xml:space="preserve">
+    <value>Waiting</value>
+  </data>
+  <data name="Web_PublicUpload_Done" xml:space="preserve">
+    <value>Uploaded</value>
+  </data>
+  <data name="Web_PublicUpload_DoneRenamed" xml:space="preserve">
+    <value>Uploaded as {0}</value>
+  </data>
+  <data name="Web_PublicUpload_InvalidName" xml:space="preserve">
+    <value>Invalid file name</value>
+  </data>
+  <data name="Web_PublicUpload_TypeNotAllowed" xml:space="preserve">
+    <value>File type not allowed</value>
+  </data>
+  <data name="Web_PublicUpload_TooLarge" xml:space="preserve">
+    <value>File too large</value>
+  </data>
+  <data name="Web_PublicUpload_QuotaExceeded" xml:space="preserve">
+    <value>Upload limit reached</value>
+  </data>
+  <data name="Web_PublicUpload_Unavailable" xml:space="preserve">
+    <value>This link no longer accepts uploads</value>
+  </data>
+  <data name="Web_PublicUpload_Cancelled" xml:space="preserve">
+    <value>Cancelled</value>
+  </data>
+  <data name="Web_PublicUpload_Failed" xml:space="preserve">
+    <value>Upload failed</value>
+  </data>
+  <data name="Web_ShareLink_UploadDisabled" xml:space="preserve">
+    <value>Upload links are disabled. An administrator can enable them under Settings → Share Links.</value>
   </data>
 </root>

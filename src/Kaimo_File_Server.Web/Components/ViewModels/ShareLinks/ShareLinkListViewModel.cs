@@ -22,15 +22,18 @@ public sealed record ShareLinkRow(ShareLink Link, string ShareName, string Creat
             if (Link.ExpiresAtUtc is { } e && now > e) return "expired";
             if (Link.StartsAtUtc is { } s && now < s) return "pending";
             if (Link.MaxAccessCount is { } m && Link.AccessCount >= m) return "exhausted";
+            if (Link.Kind == ShareLinkKind.Upload && Link.MaxTotalBytes is { } q && Link.UploadedBytes >= q) return "exhausted";
             return "active";
         }
     }
 }
 
 /// <summary>
-/// Admin overview of public share links. Lists the links the actor may manage (all links for a
-/// global admin, otherwise only those on shares in scope) and supports enable/disable, edit and
-/// delete. Gated by <see cref="ManagementPermission.ManageShareLinks"/>.
+/// Admin overview of public download and upload links. Lists the links the actor may manage (all
+/// links for a global admin, otherwise only those on shares in scope — per kind, by
+/// <see cref="ManagementPermission.ManageShareLinks"/> for download links and
+/// <see cref="ManagementPermission.ManageUploadLinks"/> for upload links) and supports
+/// enable/disable, edit and delete.
 /// </summary>
 public sealed class ShareLinkListViewModel(
     IShareLinkRepository repo,
@@ -44,6 +47,12 @@ public sealed class ShareLinkListViewModel(
 {
     public bool IsLoading { get; private set; }
     public bool CanAccessPage { get; private set; }
+
+    /// <summary>Whether the actor manages download links anywhere (shows the Download tab).</summary>
+    public bool CanManageDownloadLinks { get; private set; }
+
+    /// <summary>Whether the actor manages upload links anywhere (shows the Upload tab).</summary>
+    public bool CanManageUploadLinks { get; private set; }
     public string? ErrorMessage { get; private set; }
     public List<ShareLinkRow> Links { get; private set; } = new();
     public ShareLinkSettings Settings { get; private set; } = ShareLinkSettings.Default();
@@ -60,17 +69,22 @@ public sealed class ShareLinkListViewModel(
             var actor = await ResolveActorAsync();
             if (actor is null) { CanAccessPage = false; return; }
 
-            CanAccessPage = await mgmtAuth.HasAnyPermissionAsync(actor, ManagementPermission.ManageShareLinks);
+            CanManageDownloadLinks = await mgmtAuth.HasAnyPermissionAsync(actor, ManagementPermission.ManageShareLinks);
+            CanManageUploadLinks = await mgmtAuth.HasAnyPermissionAsync(actor, ManagementPermission.ManageUploadLinks);
+            CanAccessPage = CanManageDownloadLinks || CanManageUploadLinks;
             if (!CanAccessPage) return;
 
             Settings = await shareLinks.GetSettingsAsync();
 
-            var scope = await mgmtAuth.GetAuthorizedShareIdsAnyAsync(actor, ManagementPermission.ManageShareLinks);
-            var links = scope.IsUnrestricted
-                ? await repo.ListAllAsync()
-                : await repo.ListForSharesAsync(scope.ScopeIds);
+            var links = new List<ShareLink>();
+            if (CanManageDownloadLinks)
+                links.AddRange((await ListInScopeAsync(actor, ManagementPermission.ManageShareLinks))
+                    .Where(l => l.Kind == ShareLinkKind.Download));
+            if (CanManageUploadLinks)
+                links.AddRange((await ListInScopeAsync(actor, ManagementPermission.ManageUploadLinks))
+                    .Where(l => l.Kind == ShareLinkKind.Upload));
 
-            Links = await BuildRowsAsync(links);
+            Links = await BuildRowsAsync(links.OrderByDescending(l => l.CreatedAtUtc).ToList());
         }
         catch (Exception ex)
         {
@@ -116,6 +130,14 @@ public sealed class ShareLinkListViewModel(
     }
 
     public string BuildUrl(ShareLink link) => shareLinks.BuildUrl(link, Settings);
+
+    private async Task<List<ShareLink>> ListInScopeAsync(UserContext actor, ManagementPermission permission)
+    {
+        var scope = await mgmtAuth.GetAuthorizedShareIdsAnyAsync(actor, permission);
+        return scope.IsUnrestricted
+            ? await repo.ListAllAsync()
+            : await repo.ListForSharesAsync(scope.ScopeIds);
+    }
 
     private async Task ReloadRowAsync(Guid id)
     {

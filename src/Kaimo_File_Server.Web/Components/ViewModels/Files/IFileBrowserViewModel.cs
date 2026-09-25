@@ -88,6 +88,12 @@ public interface IFileBrowserViewModel
     bool CanManageShareLinks => false;
 
     /// <summary>
+    /// True when the current user may create/manage public upload links on the loaded share
+    /// (scoped <see cref="Kaimo_File_Server.Core.Security.ManagementPermission.ManageUploadLinks"/>).
+    /// </summary>
+    bool CanManageUploadLinks => false;
+
+    /// <summary>
     /// True when the current backend is a virtual (Cloud Access) share whose root-level
     /// ACLs the actor may manage. Local backends keep the safe default; the file browser
     /// uses it to offer the "manage permissions" action at the virtual share's root.
@@ -110,6 +116,12 @@ public interface IFileBrowserViewModel
     /// link's overview entry.
     /// </summary>
     Guid? GetShareLinkId(FileMetadata entry) => null;
+
+    /// <summary>
+    /// Kind (download/upload) of the link returned by <see cref="GetShareLinkId"/>, so the emblem
+    /// can show the matching icon; <c>null</c> when none applies.
+    /// </summary>
+    ShareLinkKind? GetShareLinkKind(FileMetadata entry) => null;
     IEnumerable<FileMetadata> Directories { get; }
     IEnumerable<FileMetadata> Files { get; }
     bool HasParent { get; }
