@@ -42,6 +42,22 @@ public class DomainModelTests
         Assert.Equal(username, user.Username);
     }
 
+    [Theory]
+    [InlineData("1234", false)]
+    [InlineData("0", false)]
+    [InlineData("alice.", false)]
+    [InlineData("con", false)]
+    [InlineData("NUL.bob", false)]
+    [InlineData("com1", false)]
+    [InlineData("lpt9.x", false)]
+    [InlineData("user1234", true)]
+    [InlineData("1234a", true)]
+    [InlineData("console", true)]
+    [InlineData("com10", true)]
+    [InlineData("a.b", true)]
+    public void SambaName_RejectsUsernamesThatAreNotValidFolderNames(string username, bool expected) =>
+        Assert.Equal(expected, SambaName.IsValidUsername(username));
+
     [Fact] public void Group_Constructor_SetsIdAndName() { var id = Guid.NewGuid(); var g = new Group(id, "Admins"); Assert.Equal(id, g.Id); Assert.Equal("Admins", g.Name); }
     [Fact] public void Role_Constructor_SetsIdAndName() { var id = Guid.NewGuid(); var r = new Role(id, "Administrator"); Assert.Equal(id, r.Id); Assert.Equal("Administrator", r.Name); }
     [Fact] public void UserGroup_Constructor_SetsBothIds() { var u = Guid.NewGuid(); var g = Guid.NewGuid(); var ug = new UserGroup(u, g); Assert.Equal(u, ug.UserId); Assert.Equal(g, ug.GroupId); }

@@ -12173,6 +12173,15 @@ namespace Kaimo_File_Server.Core.Language {
                 return ResourceManager.GetString("Web_User_NameRequired", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Looks up a localized string for an invalid Samba username.
+        /// </summary>
+        public static string Web_User_UsernameInvalid {
+            get {
+                return ResourceManager.GetString("Web_User_UsernameInvalid", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Sucht eine lokalisierte Zeichenfolge, die Username is already taken. ähnelt.

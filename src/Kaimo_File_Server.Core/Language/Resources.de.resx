@@ -1023,6 +1023,9 @@
   <data name="Web_User_NameRequired" xml:space="preserve">
     <value>Benutzername erforderlich.</value>
   </data>
+  <data name="Web_User_UsernameInvalid" xml:space="preserve">
+    <value>Der Benutzername muss 1-{0} ASCII-Zeichen lang sein, mit einem Buchstaben oder einer Ziffer beginnen, darf nur Buchstaben, Ziffern, '.', '_' oder '-' enthalten, nicht auf '.' enden und weder rein numerisch noch ein reservierter Windows-Gerätename (z. B. CON, NUL, COM1) sein.</value>
+  </data>
   <data name="Web_User_NoPermissionEdit" xml:space="preserve">
     <value>Keine Berechtigung, diesen Benutzer zu bearbeiten.</value>
   </data>

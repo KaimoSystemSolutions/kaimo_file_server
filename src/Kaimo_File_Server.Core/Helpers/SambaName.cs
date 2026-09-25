@@ -13,10 +13,16 @@ public static class SambaName
     {
         if (string.IsNullOrEmpty(value) ||
             value.Length > MaxUsernameBytes ||
-            !IsAsciiAlphaNumeric(value[0]))
+            !IsAsciiAlphaNumeric(value[0]) ||
+            value[^1] == '.' ||
+            IsReservedDeviceName(value))
             return false;
 
-        return value.All(IsAsciiNameCharacter);
+        // Purely numeric names are rejected: POSIX tools (useradd, id, chown)
+        // interpret them as UIDs, so the Samba host cannot provision them.
+        // Trailing dots and device names are rejected so every username is
+        // also a valid Windows/SMB folder name.
+        return value.All(IsAsciiNameCharacter) && !value.All(char.IsAsciiDigit);
     }
 
     public static bool IsValidShareName(string? value)
@@ -40,7 +46,8 @@ public static class SambaName
             throw new ArgumentException(
                 $"Samba username must be 1-{MaxUsernameBytes} ASCII bytes, " +
                 "start with an alphanumeric character, and contain only " +
-                "letters, digits, '.', '_' or '-'.",
+                "letters, digits, '.', '_' or '-', not end with '.', and not " +
+                "be purely numeric or a reserved Windows device name.",
                 parameterName);
     }
 
@@ -59,6 +66,16 @@ public static class SambaName
 
     private static bool IsAsciiNameCharacter(char value) =>
         IsAsciiAlphaNumeric(value) || value is '.' or '_' or '-';
+
+    // Windows reserves these names regardless of extension ("con.txt").
+    private static bool IsReservedDeviceName(string value)
+    {
+        string baseName = value.Split('.', 2)[0].ToUpperInvariant();
+        return baseName is "CON" or "PRN" or "AUX" or "NUL"
+            || (baseName.Length == 4
+                && baseName[3] is >= '0' and <= '9'
+                && baseName[..3] is "COM" or "LPT");
+    }
 
     private static bool IsReservedShareName(string value) =>
         value.Equals("global", StringComparison.OrdinalIgnoreCase) ||
