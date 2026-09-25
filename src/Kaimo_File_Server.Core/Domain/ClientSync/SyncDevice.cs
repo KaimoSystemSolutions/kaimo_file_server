@@ -27,6 +27,13 @@ namespace Kaimo_File_Server.Core.Domain.ClientSync
         public string DisplayName { get; set; } = string.Empty;
 
         /// <summary>
+        /// True once an administrator has renamed the device. The admin-assigned
+        /// <see cref="DisplayName"/> then takes precedence: a later sign-in from the
+        /// client no longer overwrites it with the name the app reports.
+        /// </summary>
+        public bool DisplayNameSetByAdmin { get; set; }
+
+        /// <summary>
         /// Free-form platform hint reported by the client
         /// (e.g. "android", "ios", "windows", "linux", "macos"). Advisory only.
         /// </summary>

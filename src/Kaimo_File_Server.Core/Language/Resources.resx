@@ -4692,4 +4692,16 @@
   <data name="Web_Security_ListNote" xml:space="preserve">
     <value>Each list shows up to {0} entries. Entries are kept for {1} days.</value>
   </data>
+  <data name="Web_DeviceAdmin_Name" xml:space="preserve">
+    <value>Device name</value>
+  </data>
+  <data name="Web_DeviceAdmin_RenameFailed" xml:space="preserve">
+    <value>Could not rename the device.</value>
+  </data>
+  <data name="Web_DeviceAdmin_NoneSelected" xml:space="preserve">
+    <value>Select a device to see its details.</value>
+  </data>
+  <data name="Web_Settings_Net_RevealIp" xml:space="preserve">
+    <value>Click to reveal</value>
+  </data>
 </root>

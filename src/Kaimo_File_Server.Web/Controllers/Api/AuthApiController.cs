@@ -147,7 +147,8 @@ public sealed class AuthApiController : ApiControllerBase
             if (existing is { IsActive: true } && existing.UserId == userId)
             {
                 existing.LastSeenUtc = now;
-                if (!string.IsNullOrWhiteSpace(request.DeviceName))
+                // An admin-assigned name wins over the name the client reports.
+                if (!existing.DisplayNameSetByAdmin && !string.IsNullOrWhiteSpace(request.DeviceName))
                     existing.DisplayName = request.DeviceName!;
                 if (!string.IsNullOrWhiteSpace(request.Platform))
                     existing.Platform = request.Platform!;

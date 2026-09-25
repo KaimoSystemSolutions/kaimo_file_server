@@ -6,10 +6,29 @@
 <div class="detail-section">
     <span class="detail-label">@R("Web_Settings_Net_Title")</span>
     <p class="settings-description">@R("Web_Settings_Net_Description")</p>
-    <div class="stat-hero"><span class="stat-hero-value">@(VM.PublicIpLoading ? "…" : (VM.PublicIp ?? "—"))</span><span class="stat-hero-unit">@(VM.PublicIpLoading ? R("Web_Settings_Net_ResolvingGlobal") : VM.PublicIp is not null ? R("Web_Settings_Net_GlobalPublic") : R("Web_Settings_Net_GlobalUnavailable"))</span></div>
+    <div class="stat-hero">
+        @if (_ipRevealed)
+        {
+            <span class="stat-hero-value">@(VM.PublicIpLoading ? "…" : (VM.PublicIp ?? "—"))</span><span class="stat-hero-unit">@(VM.PublicIpLoading ? R("Web_Settings_Net_ResolvingGlobal") : VM.PublicIp is not null ? R("Web_Settings_Net_GlobalPublic") : R("Web_Settings_Net_GlobalUnavailable"))</span>
+        }
+        else
+        {
+            <span class="stat-hero-value ip-concealed" role="button" tabindex="0" title="@R("Web_Settings_Net_RevealIp")" aria-label="@R("Web_Settings_Net_RevealIp")" @onclick="RevealIpAsync" @onkeydown="OnIpKeyDown">@IpPlaceholder</span><span class="stat-hero-unit">@R("Web_Settings_Net_RevealIp")</span>
+        }
+    </div>
     <div class="info-card">
         <div class="info-row"><span class="info-key">@R("Web_Settings_Net_Hostname")</span><span class="info-val">@VM.HostName</span></div>
-        <div class="info-row"><span class="info-key">@R("Web_Settings_Net_GlobalIp")</span><span class="info-val @(VM.PublicIp is null ? "is-muted" : "")">@(VM.PublicIpLoading ? R("Web_Settings_Net_Resolving") : (VM.PublicIp ?? R("Web_Settings_Net_NotAvailable")))</span></div>
+        <div class="info-row">
+            <span class="info-key">@R("Web_Settings_Net_GlobalIp")</span>
+            @if (_ipRevealed)
+            {
+                <span class="info-val @(VM.PublicIp is null ? "is-muted" : "")">@(VM.PublicIpLoading ? R("Web_Settings_Net_Resolving") : (VM.PublicIp ?? R("Web_Settings_Net_NotAvailable")))</span>
+            }
+            else
+            {
+                <span class="info-val ip-concealed" title="@R("Web_Settings_Net_RevealIp")" @onclick="RevealIpAsync">@IpPlaceholder</span>
+            }
+        </div>
     </div>
     <span class="detail-label settings-subheading">@R("Web_Settings_Net_LocalAddresses")</span>
     @if (VM.NetworkAddresses.Count == 0) { <p class="settings-empty">@R("Web_Settings_Net_NoLocalAddresses")</p> }
@@ -23,5 +42,29 @@
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
     private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
-    private async Task Refresh() { VM.RefreshNetworkInfo(); await VM.LoadPublicIpAsync(force: true); StateHasChanged(); }
+
+    // The public IP is neither resolved nor rendered until the user clicks it once, so it
+    // cannot leak on screenshots, presentations, or simply by opening the settings page.
+    // Until then a generic, blurred placeholder stands in for it. The reveal is per visit:
+    // leaving the tab recreates this component and conceals the IP again.
+    private const string IpPlaceholder = "000.000.000.000";
+    private bool _ipRevealed;
+
+    private async Task RevealIpAsync()
+    {
+        if (_ipRevealed) return;
+        _ipRevealed = true;
+        await VM.LoadPublicIpAsync();
+    }
+
+    private async Task OnIpKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or " ") await RevealIpAsync();
+    }
+
+    private async Task Refresh()
+    {
+        VM.RefreshNetworkInfo();
+        if (_ipRevealed) await VM.LoadPublicIpAsync(force: true);
+    }
 }

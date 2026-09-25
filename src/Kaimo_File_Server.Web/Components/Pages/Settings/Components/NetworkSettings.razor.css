@@ -1,0 +1,12 @@
+/* Public IP is blurred until clicked once (privacy on screenshots/presentations). */
+.ip-concealed {
+    filter: blur(6px);
+    user-select: none;
+    cursor: pointer;
+    transition: filter 150ms ease;
+}
+
+.ip-concealed:hover,
+.ip-concealed:focus-visible {
+    filter: blur(4px);
+}

@@ -14,7 +14,7 @@ namespace Kaimo_File_Server.Web.Components.ViewModels;
 /// registered devices (their connected apps and instances, plus each device's
 /// synced-folder selections) and revoke stale or unused ones.
 ///
-/// Revoking a device is the single mutation offered: it marks the device revoked,
+/// Mutations offered: rename, revoke, and delete (revoked devices only). Revoking marks the device revoked,
 /// revokes all of its refresh tokens, and drops its sync selections. Combined with
 /// the per-request device check in the client API, this invalidates both the
 /// refresh token and any outstanding access token at once.
@@ -225,6 +225,46 @@ public sealed class ClientDeviceAdminViewModel
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to delete client device {DeviceId}", deviceId);
+            return false;
+        }
+    }
+
+    /// <summary>Maximum device name length, matching the <c>sync_devices.DisplayName</c> column.</summary>
+    public const int MaxDisplayNameLength = 200;
+
+    /// <summary>
+    /// Renames a device. The name is trimmed and must be non-empty and at most
+    /// <see cref="MaxDisplayNameLength"/> characters. Re-checks the permission so a stale
+    /// page cannot mutate. Returns true on success; caller should reload.
+    /// </summary>
+    public async Task<bool> RenameDeviceAsync(Guid deviceId, string? newName)
+    {
+        var name = newName?.Trim();
+        if (string.IsNullOrEmpty(name) || name.Length > MaxDisplayNameLength)
+            return false;
+
+        if (_actor is null
+            || !await _mgmtAuth.HasAnyPermissionAsync(_actor, ManagementPermission.ManageClientDevices))
+            return false;
+
+        var device = await _devices.GetByIdAsync(deviceId);
+        if (device is null)
+            return false;
+
+        try
+        {
+            var oldName = device.DisplayName;
+            device.DisplayName = name;
+            device.DisplayNameSetByAdmin = true;
+            await _devices.UpdateAsync(device);
+            _logger.LogInformation(
+                "Client device {DeviceId} renamed from {OldName} to {NewName} by {Actor}",
+                device.Id, oldName, name, _actor.User.Username);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to rename client device {DeviceId}", deviceId);
             return false;
         }
     }

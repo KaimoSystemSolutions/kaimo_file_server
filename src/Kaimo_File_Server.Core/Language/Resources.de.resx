@@ -4626,4 +4626,16 @@
   <data name="Web_Security_ListNote" xml:space="preserve">
     <value>Jede Liste zeigt bis zu {0} Einträge. Einträge werden {1} Tage aufbewahrt.</value>
   </data>
+  <data name="Web_DeviceAdmin_Name" xml:space="preserve">
+    <value>Gerätename</value>
+  </data>
+  <data name="Web_DeviceAdmin_RenameFailed" xml:space="preserve">
+    <value>Das Gerät konnte nicht umbenannt werden.</value>
+  </data>
+  <data name="Web_DeviceAdmin_NoneSelected" xml:space="preserve">
+    <value>Wählen Sie ein Gerät aus, um die Details anzuzeigen.</value>
+  </data>
+  <data name="Web_Settings_Net_RevealIp" xml:space="preserve">
+    <value>Zum Anzeigen klicken</value>
+  </data>
 </root>

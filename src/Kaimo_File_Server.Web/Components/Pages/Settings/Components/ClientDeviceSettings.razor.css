@@ -1,4 +1,4 @@
-/* Client-devices settings tab: a card per registered device with a clearly
+/* Client-devices settings tab: a device table with a detail panel showing a clearly
    labelled metadata grid and its synced-folder table. */
 
 .client-devices__retention {
@@ -22,31 +22,139 @@
     font-size: 13px;
 }
 
-/* ── Device card ── */
+/* ── Device table + detail panel (modelled on the external-storage connection list) ── */
 
-.device-card {
+.device-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 440px);
+    margin-top: 16px;
+    overflow: hidden;
     border: 1px solid var(--border);
     border-radius: var(--radius-surface);
     background: var(--bg-secondary);
-    padding: 16px 18px;
-    margin-top: 16px;
+}
+
+.device-list {
+    min-width: 0;
+    overflow: hidden auto;
+}
+
+/* fr tracks so column boundaries line up across rows (each row is its own grid).
+   Columns: name + owner, platform, last seen, state. */
+.device-list-header,
+.device-row {
+    display: grid;
+    grid-template-columns: minmax(160px, 2fr) minmax(80px, 1fr) minmax(130px, 1.2fr) minmax(90px, 1fr);
+    align-items: center;
+    gap: 14px;
+}
+
+.device-list-header {
+    min-height: 36px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .045em;
+    text-transform: uppercase;
+}
+
+.device-row {
+    width: 100%;
+    min-height: 56px;
+    padding: 9px 14px;
+    border: 0;
+    border-bottom: 1px solid var(--border-light);
+    border-radius: 0;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 110ms ease, box-shadow 110ms ease;
+}
+
+.device-row:last-child { border-bottom: 0; }
+.device-row:hover { background: var(--bg-hover); }
+.device-row--selected { background: var(--accent-subtle); box-shadow: inset 3px 0 0 var(--accent); }
+.device-row--selected:hover { background: var(--accent-selected); }
+
+.device-row__name {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.device-row__name strong,
+.device-row__name small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.device-row__name strong { font-size: 13px; font-weight: 600; }
+.device-row__name small,
+.device-row__cell { font-size: 12px; color: var(--text-secondary); }
+
+.device-detail {
+    min-width: 0;
+    padding: 16px 18px 20px;
+    border-left: 1px solid var(--border);
+    background: var(--bg-tertiary);
+}
+
+.device-detail__empty {
+    margin: 40px 0;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--text-tertiary);
+}
+
+@media (max-width: 1100px) {
+    .device-layout { grid-template-columns: minmax(0, 1fr); }
+    .device-detail { border-left: 0; border-top: 1px solid var(--border); }
 }
 
 .device-card__header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    gap: 8px;
     padding-bottom: 12px;
     border-bottom: 1px solid var(--border);
 }
 
 .device-card__name {
-    margin: 0;
+    margin: 0 auto 0 0;
     font-size: 16px;
     font-weight: 600;
     color: var(--text-primary);
     word-break: break-word;
+}
+
+/* Rename field: same compact field + action row as the share and cloud-access detail
+   panels. margin-top:0 cancels the global rename-button offset. */
+.device-rename {
+    margin-top: 14px;
+}
+
+.detail-rename-row .edit-input {
+    flex: 1;
+    min-width: 0;
+    min-height: 28px;
+    padding: 5px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.detail-rename-row .btn-primary {
+    flex-shrink: 0;
+    margin-top: 0;
+    padding: 5px 12px;
+    font-size: 12px;
+    min-height: 28px;
 }
 
 /* ── Metadata grid: label above value, each pair grouped ── */

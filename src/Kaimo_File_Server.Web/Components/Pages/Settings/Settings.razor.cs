@@ -84,9 +84,9 @@ public partial class Settings
         _activeTab = tab;
         VM.ClearMessages();
 
-        if (tab == SettingsTab.Network)
-            await VM.LoadPublicIpAsync();
-        else if (tab == SettingsTab.Search)
+        // The Network tab resolves the public IP only on demand, once the user reveals it
+        // (see NetworkSettings), so it never lands in the page before that.
+        if (tab == SettingsTab.Search)
         {
             var loadTask = VM.LoadSearchStateAsync();
             StateHasChanged();
