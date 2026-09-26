@@ -16,7 +16,7 @@
                 <input type="checkbox" checked="@(!Viewer.IsLivePaused)" @onchange="LiveChangedAsync" />
                 <span>@Resources.Web_Settings_LogViewer_Live</span>
             </label>
-            <button class="btn-icon" title="@Resources.Web_Settings_LogViewer_Refresh" @onclick="RefreshNowAsync" disabled="@Viewer.IsLoading">↻</button>
+            <button class="btn-icon log-refresh" title="@Resources.Web_Settings_LogViewer_Refresh" @onclick="RefreshNowAsync" disabled="@Viewer.IsLoading">↻</button>
         </div>
     </div>
 
@@ -171,7 +171,7 @@
                         disabled="@(Viewer.SelectedSources.Count == 0)">
                     @Resources.Web_Settings_LogViewer_Download
                 </button>
-                <button class="btn-secondary btn-secondary--sm"
+                <button class="btn-secondary"
                         type="button"
                         @onclick='() => Download("ndjson")'
                         disabled="@(Viewer.SelectedSources.Count == 0)">
@@ -198,7 +198,7 @@
                 {
                     @foreach (var entry in Viewer.Entries)
                     {
-                        <details @key='$"{entry.Instance}:{entry.Sequence}"' class="log-row @(HasDetails(entry) ? "log-row--expandable" : "log-row--static")" role="row">
+                        <details @key="LogViewerViewModel.RowKey(entry)" class="log-row @(HasDetails(entry) ? "log-row--expandable" : "log-row--static")" role="row">
                             <summary class="log-row-summary">
                                 <time title="@entry.TimestampUtc.ToString("O")">@entry.TimestampUtc.ToLocalTime().ToString("HH:mm:ss.fff")<span class="log-date">@entry.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd")</span></time>
                                 <span class="log-level log-level-@entry.Level.ToString().ToLowerInvariant()">@LevelLabel(entry.Level)</span>
@@ -374,7 +374,10 @@
 
     private async Task DateChangedAsync(ChangeEventArgs args)
     {
-        Viewer.FilterDateUtc = DateOnly.TryParse(args.Value?.ToString(), out var date) ? date : null;
+        // <input type="date"> always posts ISO yyyy-MM-dd regardless of UI culture.
+        Viewer.FilterDateUtc = DateOnly.TryParseExact(args.Value?.ToString(), "yyyy-MM-dd",
+            System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date)
+            ? date : null;
         await ScheduleRefreshAsync(FilterDebounceMs);
     }
 

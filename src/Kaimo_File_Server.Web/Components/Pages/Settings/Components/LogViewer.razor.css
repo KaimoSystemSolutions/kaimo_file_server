@@ -51,6 +51,21 @@
     max-width: 190px;
 }
 
+/* Native calendar picker icon follows color-scheme; without it the icon stays
+   black on the dark surface. */
+:root[data-theme="dark"] .log-date-input { color-scheme: dark; }
+
+/* Only the ↻ glyph turns white in dark mode; the button surface is unchanged. */
+:root[data-theme="dark"] .log-refresh { color: #fff; }
+
+/* Source chips, level dropdown, date and search share one control height. */
+.log-source-chip,
+.log-viewer-filters .edit-input,
+.log-viewer-filters .multi-select-display {
+    box-sizing: border-box;
+    height: 36px;
+}
+
 /* Level filter reuses the design-system .multi-select dropdown; just give it a
    sensible closed width inside the filter row. */
 .log-level-filter .multi-select {
@@ -171,9 +186,10 @@
     text-align: center;
 }
 
+/* Stretch so the bordered NDJSON button matches the Download button height. */
 .log-download {
     display: inline-flex;
-    align-items: center;
+    align-items: stretch;
     gap: 8px;
 }
 

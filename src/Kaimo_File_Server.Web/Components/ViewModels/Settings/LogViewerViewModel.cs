@@ -173,7 +173,9 @@ public sealed class LogViewerViewModel(
             IsLoading = true;
             ErrorMessage = null;
             var result = await reader.QueryAsync(CreateQuery(), cancellationToken);
-            _fetched = result.Entries.ToList();
+            // The row key must be unique or the Blazor diff throws and kills the
+            // circuit; drop exact duplicates so a repeated line can never do that.
+            _fetched = result.Entries.DistinctBy(RowKey).ToList();
             _moreBeyondFetched = result.HasMore;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -190,6 +192,12 @@ public sealed class LogViewerViewModel(
             _queryGate.Release();
         }
     }
+
+    // Stable per-row identity for @key. Sequence is a per-process counter that
+    // restarts at 1 on every restart while Instance (the container hostname)
+    // stays the same, so Instance:Sequence alone repeats within a single day.
+    public static string RowKey(LogArchiveEntry entry)
+        => $"{entry.Service}:{entry.Instance}:{entry.TimestampUtc.UtcTicks}:{entry.Sequence}";
 
     // format: "log" for the human-readable text export, otherwise raw NDJSON.
     public string CreateDownloadUrl(string baseUri, string format)
