@@ -19,7 +19,12 @@
 
 
 <div class="app-shell" data-theme="@Theme.Current" data-accent="@Theme.Accent">
-    <nav class="sidebar">
+    @* On phones the sidebar is an off-canvas drawer; the backdrop closes it. *@
+    @if (_navOpen)
+    {
+        <div class="sidebar-backdrop" @onclick="CloseNav"></div>
+    }
+    <nav id="app-sidebar" class="sidebar @(_navOpen ? "sidebar--open" : "")">
         <div class="sidebar-brand">
             @* Don't replace this with an Assets.SVG call, cuz this a lil too complicated for it *@
             @* <svg width="28" height="28" viewBox="0 0 48 48" fill="none">
@@ -153,6 +158,12 @@
     }
     <main class="main">
         <div class="search-bar-container">
+            <button type="button" class="btn-icon nav-toggle" @onclick="ToggleNav"
+                    aria-controls="app-sidebar" aria-expanded="@(_navOpen ? "true" : "false")"
+                    title="@Text("Web_Nav_OpenMenu", "Open navigation")"
+                    aria-label="@Text("Web_Nav_OpenMenu", "Open navigation")">
+                @Assets.SVG("menu.svg", new SvgOptions())
+            </button>
             <GlobalSearch />
             <JobMenu CanSeeReindex="_canManageSettings" />
         </div>
@@ -214,7 +225,32 @@
         _uploadSlots.Add(_activeSlot);
         UploadCoordinator.OnUploadRequested += TriggerFileDialog;
         UploadCoordinator.OnFilesProcessed += ReleaseSlot;
+        Nav.LocationChanged += CloseNavOnNavigation;
     }
+
+    // ── Mobile navigation drawer ──
+    private bool _navOpen;
+
+    private void ToggleNav()
+    {
+        _navOpen = !_navOpen;
+        _accentOpen = false;
+    }
+
+    private void CloseNav()
+    {
+        _navOpen = false;
+        _accentOpen = false;
+    }
+
+    // Any navigation (nav link, search result, programmatic redirect) closes the drawer.
+    private void CloseNavOnNavigation(object? sender, LocationChangedEventArgs e)
+        => _ = InvokeAsync(() =>
+        {
+            if (!_navOpen) return;
+            CloseNav();
+            StateHasChanged();
+        });
     private async void TriggerFileDialog()
     {
         // Click the hidden input to open the file dialog
@@ -252,6 +288,7 @@
     {
         UploadCoordinator.OnUploadRequested -= TriggerFileDialog;
         UploadCoordinator.OnFilesProcessed -= ReleaseSlot;
+        Nav.LocationChanged -= CloseNavOnNavigation;
         StopPasswordChangeEnforcement();
     }
 
@@ -411,6 +448,8 @@
     // the page is already open, and so a Groups/Roles view switches back to Users.
     private async Task GoToOwnProfile()
     {
+        // Already on /users does not raise LocationChanged, so close the drawer here.
+        CloseNav();
         await ProfileNav.RequestSelfAsync();
         Nav.NavigateTo("/users");
     }

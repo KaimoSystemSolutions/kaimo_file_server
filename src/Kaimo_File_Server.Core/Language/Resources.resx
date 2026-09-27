@@ -558,6 +558,9 @@
   <data name="Web_Nav_ToggleTheme" xml:space="preserve">
     <value>Toggle theme</value>
   </data>
+  <data name="Web_Nav_OpenMenu" xml:space="preserve">
+    <value>Open navigation</value>
+  </data>
   <data name="Web_Nav_AccentColor" xml:space="preserve">
     <value>Accent color</value>
   </data>

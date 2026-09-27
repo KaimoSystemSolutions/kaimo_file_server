@@ -4822,9 +4822,43 @@ input[type="radio"] {
 
     .modal-dialog {
         width: calc(100vw - 24px);
+        min-width: 0;
+        max-width: none;
+    }
+
+    .modal-actions {
+        flex-wrap: wrap;
+    }
+
+    /* File preview uses the whole phone screen instead of an 85vw frame. */
+    .preview-dialog {
+        width: 100vw;
+        height: 100dvh;
+        border: 0;
+        border-radius: 0;
+    }
+
+    /* Toasts span the width instead of overflowing the left edge (max-width 380px). */
+    .toast-container {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+    }
+
+    .toast {
         max-width: none;
     }
 }
+
+/* A dialog taller than the viewport (small phones, open on-screen keyboard) scrolls
+   inside the backdrop instead of being clipped at top and bottom by the centering. */
+.modal-backdrop {
+    overflow-y: auto;
+}
+
+    .modal-backdrop > * {
+        margin: auto;
+    }
 
 /* ============================================================================
    Cloud sync administration

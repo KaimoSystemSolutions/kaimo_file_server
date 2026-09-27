@@ -163,6 +163,8 @@ window.fileMarquee = (() => {
 
         host.addEventListener('pointerdown', event => {
             if (event.button !== 0 && event.button !== 2) return;
+            // A finger drag scrolls the list; rubber-band selection is mouse/pen only.
+            if (event.pointerType === 'touch') return;
 
             // File rows own their complete width. Only the surrounding gutters
             // and the empty area below the list may begin a marquee gesture.
