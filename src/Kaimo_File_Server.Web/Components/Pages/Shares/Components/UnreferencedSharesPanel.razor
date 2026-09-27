@@ -1,0 +1,148 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Helpers
+@using Kaimo_File_Server.Web.Services
+@inherits AppComponentBase
+@inject JobService Jobs
+@inject DateFormatService DateFmt
+
+@*
+    Folders directly in a storage pool that no share points at: data kept after a share
+    was deleted, or folders copied in by hand. Each can become a share again or be
+    deleted permanently. The list is a folder scan; Reload re-runs it.
+*@
+
+<section class="unref-panel" aria-labelledby="unref-title">
+    <div class="unref-header">
+        <div class="unref-title">
+            <h3 id="unref-title">@T("Web_ShareList_UnreferencedShares", "Deleted / unreferenced shares")</h3>
+            <InfoButton Title="@T("Web_ShareList_UnreferencedShares", "Deleted / unreferenced shares")"
+                        AriaLabel="@T("Web_ShareList_UnreferencedShares", "Deleted / unreferenced shares")">
+                <p>@T("Web_Unreferenced_Hint", "Folders in the storage pools that no share uses. Create a share from a folder to keep its data, or delete the data permanently. The files must be readable by the server (UID 1654).")</p>
+            </InfoButton>
+        </div>
+        <button class="btn-secondary unref-reload" type="button"
+                disabled="@VM.IsScanning" @onclick="Reload">
+            @Assets.SVG("refresh.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+            <span>@T("Web_Unreferenced_Reload", "Reload")</span>
+        </button>
+    </div>
+
+    @if (VM.UnreferencedErrorMessage is not null)
+    {
+        <div class="error-banner unref-error">@VM.UnreferencedErrorMessage</div>
+    }
+
+    @if (VM.IsScanning && !VM.UnreferencedShares.Any())
+    {
+        <div class="loading-state"><div class="spinner"></div><p>@Resources.Web_Common_Loading</p></div>
+    }
+    else if (!VM.UnreferencedShares.Any())
+    {
+        <div class="empty-state unref-empty">
+            @Assets.SVG("folder.svg", new SvgOptions(Width: 40, Height: 40, Color: "var(--text-tertiary)"))
+            <p>@T("Web_Unreferenced_Empty", "No unreferenced folders in the storage pools.")</p>
+        </div>
+    }
+    else
+    {
+        <div class="unref-list" aria-busy="@VM.IsScanning">
+            <div class="unref-row unref-row--header" aria-hidden="true">
+                <span>@Resources.Web_Common_Name</span>
+                <span>@Resources.Web_ShareList_Label_StoragePool</span>
+                <span class="unref-cell-num">@Resources.Web_Folder_Size</span>
+                <span>@T("Web_Unreferenced_Column_Modified", "Last modified")</span>
+                <span></span>
+            </div>
+            @foreach (var folder in VM.UnreferencedShares)
+            {
+                var busy = VM.BusyPath is not null;
+                <div class="unref-row">
+                    <span class="unref-cell-name" title="@folder.Path">
+                        @Assets.SVG("folder.svg", new SvgOptions(Width: 16, Height: 16, Color: "var(--text-secondary)"))
+                        <strong>@folder.Name</strong>
+                    </span>
+                    <span class="unref-cell-muted">@folder.PoolName</span>
+                    <span class="unref-cell-num">@FormatHelper.FormatFileSize(folder.SizeBytes)</span>
+                    <span class="unref-cell-muted">@DateFmt.FormatDateTime(folder.LastWriteUtc)</span>
+                    <span class="unref-actions">
+                        @if (VM.CanCreateShare)
+                        {
+                            <button class="btn-secondary" type="button" disabled="@busy"
+                                    @onclick="() => Adopt(folder)">
+                                @Assets.SVG("plus.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                                <span>@T("Web_Unreferenced_Adopt", "Create share")</span>
+                            </button>
+                        }
+                        <button class="btn-danger-outline" type="button" disabled="@busy"
+                                @onclick="() => _confirmPurge = folder">
+                            @Assets.SVG("trash.svg", new SvgOptions(Width: 14, Height: 14, StrokeWidth: 2))
+                            <span>@T("Web_Unreferenced_Purge", "Delete data")</span>
+                        </button>
+                    </span>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+@if (_confirmPurge is { } target)
+{
+    <div class="modal-backdrop" @onclick="CancelPurge">
+        <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="unref-purge-title"
+             @onclick:stopPropagation="true">
+            <h3 class="modal-title" id="unref-purge-title">@T("Web_Unreferenced_PurgeConfirmTitle", "Delete data permanently?")</h3>
+            <p class="modal-text">
+                @string.Format(T("Web_Unreferenced_PurgeConfirmText", "The folder \"{0}\" in storage pool {1} and all its contents ({2}) are deleted from disk."),
+                    target.Name, target.PoolName, FormatHelper.FormatFileSize(target.SizeBytes))
+            </p>
+            <p class="modal-warning">@T("Web_Homes_DeleteIrreversible", "This cannot be undone.")</p>
+            <div class="modal-actions">
+                <button class="btn-secondary" type="button" disabled="@(VM.BusyPath is not null)" @onclick="CancelPurge">@Resources.Web_Common_Cancel</button>
+                <button class="btn-danger" type="button" disabled="@(VM.BusyPath is not null)" @onclick="() => Purge(target)">
+                    @T("Web_Unreferenced_Purge", "Delete data")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public ShareListViewModel VM { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+    /// <summary>Raised after a folder became a share (the VM already selected it).</summary>
+    [Parameter] public EventCallback OnAdopted { get; set; }
+
+    private UnreferencedFolder? _confirmPurge;
+
+    protected override Task OnInitializedAsync() => VM.LoadUnreferencedSharesAsync();
+
+    private Task Reload() => VM.LoadUnreferencedSharesAsync();
+
+    private void CancelPurge()
+    {
+        if (VM.BusyPath is null)
+            _confirmPurge = null;
+    }
+
+    private async Task Purge(UnreferencedFolder folder)
+    {
+        // A large folder can take a while: show it in the running-jobs menu.
+        using var job = Jobs.Start(
+            string.Format(T("Web_Jobs_Delete_Title", "Delete {0}"), folder.Name),
+            Resources.Web_Common_Deleting, "delete");
+        try { await VM.PurgeUnreferencedFolderAsync(folder.Path); }
+        finally { _confirmPurge = null; }
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task Adopt(UnreferencedFolder folder)
+    {
+        if (await VM.AdoptUnreferencedFolderAsync(folder.Path))
+            await OnAdopted.InvokeAsync();
+        else
+            await OnChanged.InvokeAsync();
+    }
+
+    private static string T(string key, string fallback) => Resources.ResourceManager.GetString(key) ?? fallback;
+}

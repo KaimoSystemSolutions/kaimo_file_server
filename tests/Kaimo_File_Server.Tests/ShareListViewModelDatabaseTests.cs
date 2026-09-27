@@ -512,6 +512,117 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
         Assert.Empty(await db.FileMetadata.ToListAsync());
     }
 
+    // ─────────────────────── Deleted / unreferenced shares ───────────────────────
+
+    [Fact]
+    public async Task LoadUnreferencedSharesAsync_ListsOnlyFoldersNoShareUses()
+    {
+        var actor = SeedUser("admin");
+        var live = SeedPoolShare("live");
+        var disabled = SeedPoolShare("off", isEnabled: false);
+        Directory.CreateDirectory(live.Path);
+        Directory.CreateDirectory(disabled.Path);
+        Directory.CreateDirectory(Path.Combine(_storagePools[0], ".kaimo-moving-x"));
+        Directory.CreateDirectory(Path.Combine(_storagePools[0], "lost+found"));
+        var orphan = Path.Combine(_storagePools[1], "old");
+        Directory.CreateDirectory(orphan);
+        await File.WriteAllTextAsync(Path.Combine(orphan, "a.txt"), "12345");
+
+        var sut = BuildAdminSut(actor);
+        await sut.LoadAsync();
+        await sut.LoadUnreferencedSharesAsync();
+
+        var folder = Assert.Single(sut.UnreferencedShares);
+        Assert.Equal("old", folder.Name);
+        Assert.Equal(5, folder.SizeBytes);
+        CleanupPools();
+    }
+
+    [Fact]
+    public async Task PurgeUnreferencedFolderAsync_RefusesShareAndOutsidePaths_DeletesOrphan()
+    {
+        var actor = SeedUser("admin");
+        var disabled = SeedPoolShare("off", isEnabled: false);
+        Directory.CreateDirectory(disabled.Path);
+        var outside = Path.Combine(Path.GetDirectoryName(_storagePath)!, "outside");
+        Directory.CreateDirectory(outside);
+        var orphan = Path.Combine(_storagePools[0], "old");
+        Directory.CreateDirectory(Path.Combine(orphan, "sub"));
+        await File.WriteAllTextAsync(Path.Combine(orphan, "sub", "a.txt"), "x");
+
+        var sut = BuildAdminSut(actor);
+        await sut.LoadAsync();
+
+        Assert.False(await sut.PurgeUnreferencedFolderAsync(disabled.Path));
+        Assert.True(Directory.Exists(disabled.Path));
+        Assert.False(await sut.PurgeUnreferencedFolderAsync(outside));
+        Assert.True(Directory.Exists(outside));
+
+        Assert.True(await sut.PurgeUnreferencedFolderAsync(orphan));
+        Assert.False(Directory.Exists(orphan));
+        Assert.Empty(sut.UnreferencedShares);
+        CleanupPools();
+    }
+
+    [Fact]
+    public async Task AdoptUnreferencedFolderAsync_CreatesShareKeepingData()
+    {
+        var actor = SeedUser("admin");
+        var orphan = Path.Combine(_storagePools[1], "restored");
+        Directory.CreateDirectory(orphan);
+        await File.WriteAllTextAsync(Path.Combine(orphan, "keep.txt"), "data");
+
+        var sut = BuildAdminSut(actor);
+        await sut.LoadAsync();
+
+        Assert.True(await sut.AdoptUnreferencedFolderAsync(orphan));
+
+        Assert.Equal("data", await File.ReadAllTextAsync(Path.Combine(orphan, "keep.txt")));
+        await using var db = NewContext();
+        var share = await db.ShareDefinitions.SingleAsync(s => s.Name == "restored");
+        Assert.Equal(orphan, share.Path);
+        var rootMeta = await db.FileMetadata.Include(m => m.Acl)
+            .SingleAsync(m => m.ShareId == share.Id && m.Path == "");
+        Assert.Contains(rootMeta.Acl, a => a.PrincipalId == actor.Id);
+        Assert.Contains(rootMeta.Acl, a => a.PrincipalId == WellKnownGUIDs.ROLE_ADMIN);
+        Assert.Equal(share.Id, sut.SelectedShare?.Id);
+        Assert.Empty(sut.UnreferencedShares);
+        CleanupPools();
+    }
+
+    [Fact]
+    public async Task AdoptUnreferencedFolderAsync_WithInvalidFolderName_IsRejected()
+    {
+        var actor = SeedUser("admin");
+        var orphan = Path.Combine(_storagePools[0], "bad name");
+        Directory.CreateDirectory(orphan);
+
+        var sut = BuildAdminSut(actor);
+        await sut.LoadAsync();
+
+        Assert.False(await sut.AdoptUnreferencedFolderAsync(orphan));
+        Assert.NotNull(sut.UnreferencedErrorMessage);
+        Assert.True(Directory.Exists(orphan));
+        await using var db = NewContext();
+        Assert.Empty(await db.ShareDefinitions.ToListAsync());
+        CleanupPools();
+    }
+
+    [Fact]
+    public async Task CreateShareAsync_WhenFolderAlreadyExists_IsRejected()
+    {
+        var actor = SeedUser("admin");
+        Directory.CreateDirectory(Path.Combine(_storagePools[0], "docs"));
+        var sut = BuildAdminSut(actor);
+        sut.NewShareName = "docs";
+
+        Assert.False(await sut.CreateShareAsync());
+        Assert.Equal(Resources.Web_Error_StoragePoolDestinationExists, sut.CreateErrorMessage);
+        await using var db = NewContext();
+        Assert.Empty(await db.ShareDefinitions.ToListAsync());
+        CleanupPools();
+    }
+
     // ─────────────────────── Load scoping ───────────────────────
 
     [Fact]

@@ -12,6 +12,7 @@ using Kaimo_File_Server.Core.Storage;
 using Kaimo_File_Server.Infrastructure.Configuration;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.DynamicHelpers;
+using Kaimo_File_Server.Web.Helpers;
 using Microsoft.AspNetCore.Components.Authorization;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
@@ -434,13 +435,31 @@ public partial class ShareListViewModel
     {
         CreateErrorMessage = null;
         var name = NewShareName.Trim();
+        if (!await CreateShareCoreAsync(name, NewSharePoolPath, adoptExistingFolder: false))
+            return false;
 
+        NewShareName = "";
+        NewSharePoolPath = _storagePools.FirstOrDefault() ?? string.Empty;
+        IsCreating = false;
+        await LoadAsync();
+        return true;
+    }
+
+    /// <summary>
+    /// Creates the share row, its root metadata and the owner/admin ACLs. With
+    /// <paramref name="adoptExistingFolder"/> the folder must already exist in the pool
+    /// (an unreferenced folder becomes a share and keeps its data); otherwise it must
+    /// not exist and is created. Errors go to <see cref="CreateErrorMessage"/>.
+    /// </summary>
+    private async Task<bool> CreateShareCoreAsync(
+        string name, string poolCandidate, bool adoptExistingFolder)
+    {
         if (!ValidateShareName(name, out var error))
         { CreateErrorMessage = error; return false; }
 
         try
         {
-            var poolPath = GetConfiguredPoolPath(NewSharePoolPath);
+            var poolPath = GetConfiguredPoolPath(poolCandidate);
             if (poolPath is null)
             {
                 CreateErrorMessage = Resources.Web_Error_StoragePoolRequired;
@@ -469,7 +488,15 @@ public partial class ShareListViewModel
             }
 
             var sharePath = BuildSharePath(poolPath, name);
-            if (Directory.Exists(sharePath) || File.Exists(sharePath))
+            if (adoptExistingFolder)
+            {
+                if (!Directory.Exists(sharePath))
+                {
+                    CreateErrorMessage = Resources.Web_Error_SharePathMissing;
+                    return false;
+                }
+            }
+            else if (Directory.Exists(sharePath) || File.Exists(sharePath))
             {
                 CreateErrorMessage = Resources.Web_Error_StoragePoolDestinationExists;
                 return false;
@@ -513,12 +540,9 @@ public partial class ShareListViewModel
 
             await _aclRepo.AddAsync(adminAcl);
 
-            _logger.LogInformation("Share '{ShareName}' created", name);
-
-            NewShareName = "";
-            NewSharePoolPath = _storagePools.FirstOrDefault() ?? string.Empty;
-            IsCreating = false;
-            await LoadAsync();
+            _logger.LogInformation(adoptExistingFolder
+                ? "Share '{ShareName}' created from existing folder"
+                : "Share '{ShareName}' created", name);
             return true;
         }
         catch (Exception ex)
@@ -847,6 +871,18 @@ public partial class ShareListViewModel
                 shareLock.Release();
             }
         }
+        catch (InsufficientPoolSpaceException ex)
+        {
+            _logger.LogWarning(
+                "Share '{ShareName}' not moved: target pool '{PoolPath}' has {Available} bytes free, {Required} bytes required",
+                SelectedShare.Name, targetPoolPath, ex.Available, ex.Required);
+            EditErrorMessage = string.Format(
+                Resources.ResourceManager.GetString("Web_Error_StoragePoolInsufficientSpace")
+                    ?? "Not enough free space in the target storage pool: {0} required, {1} available.",
+                FormatHelper.FormatFileSize(ex.Required),
+                FormatHelper.FormatFileSize(ex.Available));
+            return false;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex,
@@ -883,10 +919,45 @@ public partial class ShareListViewModel
             // target pool, then remove the old share only after the copy exists.
         }
 
+        var targetPool = Path.GetDirectoryName(destinationPath)!;
+        var required = GetDirectorySize(sourcePath);
+        // ponytail: fixed headroom (block overhead + never fill a pool to 0 bytes);
+        // make it configurable if pools differ a lot in size.
+        var headroom = Math.Max(1L << 30, required / 50);
+        var available = new DriveInfo(targetPool).AvailableFreeSpace;
+        if (required + headroom > available)
+            throw new InsufficientPoolSpaceException(required + headroom, available);
+
+        var reserved = required + headroom;
+        var reservation = ReservePoolSpace(targetPool, reserved, available);
+        // Bytes already released from the reservation but not yet copied.
+        var credit = 0L;
+        var chunk = Math.Max(256L << 20, required / 20);
+
         var stagingPath = destinationPath + ".kaimo-moving-" + Guid.NewGuid().ToString("N");
         try
         {
-            await CopyDirectoryAsync(sourcePath, stagingPath);
+            // Hand reserved space over to the copy BEFORE it is written, so the copy
+            // never needs twice the space and nobody else can fill the pool meanwhile.
+            // Released in chunks by closing and re-reserving smaller: shrinking an open
+            // file frees nothing on 9p/drvfs (Docker Desktop) until it is closed.
+            await CopyDirectoryAsync(sourcePath, stagingPath, length =>
+            {
+                if (credit < length)
+                {
+                    var release = Math.Min(Math.Max(chunk, length - credit), reserved - headroom);
+                    if (release > 0)
+                    {
+                        reserved -= release;
+                        credit += release;
+                        reservation.Dispose();
+                        reservation = ReservePoolSpace(targetPool, reserved,
+                            new DriveInfo(targetPool).AvailableFreeSpace);
+                    }
+                }
+                // Clamped: files that grew since sizing are covered by the headroom.
+                credit = Math.Max(0, credit - length);
+            });
             Directory.Move(stagingPath, destinationPath);
             return true;
         }
@@ -896,9 +967,93 @@ public partial class ShareListViewModel
                 Directory.Delete(stagingPath, recursive: true);
             throw;
         }
+        finally
+        {
+            reservation.Dispose();
+        }
     }
 
-    private static async Task CopyDirectoryAsync(string sourcePath, string destinationPath)
+    private const string ReservationFilePrefix =
+        ShareEntryPolicy.InternalNamespacePrefix + "reserve-";
+
+    /// <summary>
+    /// Allocates <paramref name="bytes"/> in the target pool through a placeholder
+    /// file in the pool root. On Linux the preallocation is a real <c>fallocate</c>, so
+    /// the space is taken from every other writer (other moves, uploads, SMB) at once
+    /// and an overbooked pool fails here atomically. The file is deleted on close.
+    /// It deliberately stays visible while open: unlinking it early breaks on 9p/drvfs
+    /// bind mounts (Docker Desktop), where an unlinked file's handle returns ENOENT.
+    /// Leftovers from a crash are removed by <see cref="DeleteStaleReservations"/>.
+    /// ponytail: on filesystems without fallocate the file stays sparse and only the
+    /// free-space check protects the pool.
+    /// </summary>
+    private static FileStream ReservePoolSpace(string poolPath, long bytes, long available)
+    {
+        var path = Path.Combine(poolPath, ReservationFilePrefix + Guid.NewGuid().ToString("N"));
+        FileStream? stream = null;
+        try
+        {
+            stream = new FileStream(path, new FileStreamOptions
+            {
+                Mode = FileMode.CreateNew,
+                Access = FileAccess.Write,
+                Share = FileShare.None,
+                Options = FileOptions.DeleteOnClose,
+                PreallocationSize = bytes
+            });
+            stream.SetLength(bytes);
+            return stream;
+        }
+        catch (IOException ex)
+        {
+            stream?.Dispose();
+            File.Delete(path);
+            // Someone else took the space between the check and the allocation.
+            throw new InsufficientPoolSpaceException(bytes, available, ex);
+        }
+    }
+
+    /// <summary>
+    /// Removes reservation files a crashed move left in the pool roots. Call once at
+    /// startup, before any move can run: moves only happen inside this process.
+    /// </summary>
+    public static void DeleteStaleReservations(IEnumerable<string> poolPaths)
+    {
+        foreach (var pool in poolPaths)
+        {
+            try
+            {
+                foreach (var file in Directory.EnumerateFiles(pool, ReservationFilePrefix + "*"))
+                    File.Delete(file);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Best effort: a leftover only costs space until the next start.
+            }
+        }
+    }
+
+    // Same set of files CopyDirectoryAsync copies: links are recreated, not followed.
+    private static long GetDirectorySize(string path)
+        => new DirectoryInfo(path)
+            .EnumerateFiles("*", new EnumerationOptions
+            {
+                RecurseSubdirectories = true,
+                AttributesToSkip = FileAttributes.ReparsePoint,
+                IgnoreInaccessible = false
+            })
+            .Sum(file => file.Length);
+
+    private sealed class InsufficientPoolSpaceException(
+        long required, long available, Exception? inner = null)
+        : IOException("Not enough free space in the target storage pool.", inner)
+    {
+        public long Required { get; } = required;
+        public long Available { get; } = available;
+    }
+
+    private static async Task CopyDirectoryAsync(
+        string sourcePath, string destinationPath, Action<long> beforeFileCopy)
     {
         Directory.CreateDirectory(destinationPath);
 
@@ -919,10 +1074,11 @@ public partial class ShareListViewModel
 
             if (entry is DirectoryInfo directory)
             {
-                await CopyDirectoryAsync(directory.FullName, destinationEntry);
+                await CopyDirectoryAsync(directory.FullName, destinationEntry, beforeFileCopy);
                 continue;
             }
 
+            beforeFileCopy(((FileInfo)entry).Length);
             await using var source = new FileStream(
                 entry.FullName, FileMode.Open, FileAccess.Read, FileShare.Read,
                 bufferSize: 1024 * 1024, useAsync: true);

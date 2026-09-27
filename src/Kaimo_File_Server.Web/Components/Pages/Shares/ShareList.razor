@@ -46,6 +46,16 @@ else
                     : Resources.Web_ShareList_Card_ShowDetails)</span>
             </button>
         }
+        @if (VM.CanManageUnreferencedShares)
+        {
+            <button class="btn-secondary share-info-toggle @(_showUnreferenced ? "share-info-toggle--active" : "")"
+                    type="button"
+                    aria-pressed="@_showUnreferenced"
+                    @onclick="ToggleUnreferenced">
+                @Assets.SVG("archive.svg", new SvgOptions(Width: 16, Height: 16, StrokeWidth: 2))
+                <span>@Text("Web_ShareList_UnreferencedShares", "Deleted / unreferenced shares")</span>
+            </button>
+        }
         @if (VM.CanCreateShare)
         {
             <button class="btn-primary share-create-button" type="button" @onclick="ToggleCreate">
@@ -59,6 +69,11 @@ else
 @if (VM.IsCreating && VM.CanCreateShare)
 {
     <ShareCreateForm VM="VM" OnChanged="StateHasChanged"/>
+}
+
+@if (_showUnreferenced && VM.CanManageUnreferencedShares)
+{
+    <UnreferencedSharesPanel VM="VM" OnChanged="StateHasChanged" OnAdopted="HandleShareAdopted"/>
 }
 
 @if (VM.IsLoading)

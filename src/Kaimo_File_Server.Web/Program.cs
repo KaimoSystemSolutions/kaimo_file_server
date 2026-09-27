@@ -77,6 +77,7 @@ builder.Services.AddElasticSearch(builder.Configuration);
 var baseStoragePath = builder.Configuration.GetValue<string>("Storage:RootPath") ?? "/data/storage";
 var applicationDataPath = builder.Configuration.GetValue<string>("Storage:ApplicationDataPath") ?? "/data/kaimo-system";
 var poolStoragePaths = Directory.GetDirectories(baseStoragePath).Select(path => path).ToList();
+ShareListViewModel.DeleteStaleReservations(poolStoragePaths);
 
 builder.Services.AddCoreServices(poolStoragePaths, applicationDataPath);
 

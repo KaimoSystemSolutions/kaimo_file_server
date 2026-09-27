@@ -24,6 +24,7 @@ public partial class ShareList
     private ShareDetailTab _activeTab = ShareDetailTab.Settings;
     private string _aclEditorKey = "";
     private bool _showExtendedShareInfo;
+    private bool _showUnreferenced;
 
     protected override void OnParametersSet()
         => _shareKind = string.Equals(View, "virtual", StringComparison.OrdinalIgnoreCase)
@@ -95,6 +96,17 @@ public partial class ShareList
 
     private void ToggleExtendedShareInfo()
         => _showExtendedShareInfo = !_showExtendedShareInfo;
+
+    private void ToggleUnreferenced()
+        => _showUnreferenced = !_showUnreferenced;
+
+    // The VM already selected the new share; show its settings so department and
+    // ACLs can be set right away.
+    private void HandleShareAdopted()
+    {
+        _activeTab = ShareDetailTab.Settings;
+        StateHasChanged();
+    }
 
     private void SelectShareKind(ShareKind kind) => _shareKind = kind;
 

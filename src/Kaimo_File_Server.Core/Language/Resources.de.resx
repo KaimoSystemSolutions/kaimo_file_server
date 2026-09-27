@@ -517,7 +517,7 @@
     <value>Share löschen</value>
   </data>
   <data name="Web_ShareList_DeleteConfirm" xml:space="preserve">
-    <value>Share „{0}" wirklich löschen? Dateien bleiben erhalten.</value>
+    <value>Share „{0}" wirklich löschen? Die Dateien bleiben erhalten und können unter „Gelöschte / unreferenzierte Shares" gelöscht oder wieder als Share eingebunden werden.</value>
   </data>
   <data name="Web_ShareList_DeletePermanently" xml:space="preserve">
     <value>Endgültig löschen</value>
@@ -4880,5 +4880,35 @@
   </data>
   <data name="Web_Homes_Deleted" xml:space="preserve">
     <value>Home-Ordner gelöscht.</value>
+  </data>
+  <data name="Web_Error_StoragePoolInsufficientSpace" xml:space="preserve">
+    <value>Nicht genug freier Speicher im Ziel-Speicherpool: {0} benötigt (inklusive Sicherheitsreserve), {1} verfügbar. Es wurde nichts kopiert.</value>
+  </data>
+  <data name="Web_ShareList_UnreferencedShares" xml:space="preserve">
+    <value>Gelöschte / unreferenzierte Shares</value>
+  </data>
+  <data name="Web_Unreferenced_Hint" xml:space="preserve">
+    <value>Ordner in den Speicherpools, die von keinem Share verwendet werden, z. B. Daten gelöschter Shares oder von Hand hineinkopierte Ordner. Aus einem Ordner kann ein Share erstellt werden (die Daten bleiben erhalten), oder die Daten werden endgültig gelöscht. Im Ordnernamen sind nur Buchstaben, Ziffern, '-', '_' und '.' erlaubt; die Dateien müssen für den Server lesbar sein (UID 1654).</value>
+  </data>
+  <data name="Web_Unreferenced_Reload" xml:space="preserve">
+    <value>Neu laden</value>
+  </data>
+  <data name="Web_Unreferenced_Empty" xml:space="preserve">
+    <value>Keine unreferenzierten Ordner in den Speicherpools.</value>
+  </data>
+  <data name="Web_Unreferenced_Column_Modified" xml:space="preserve">
+    <value>Zuletzt geändert</value>
+  </data>
+  <data name="Web_Unreferenced_Adopt" xml:space="preserve">
+    <value>Share erstellen</value>
+  </data>
+  <data name="Web_Unreferenced_Purge" xml:space="preserve">
+    <value>Daten löschen</value>
+  </data>
+  <data name="Web_Unreferenced_PurgeConfirmTitle" xml:space="preserve">
+    <value>Daten endgültig löschen?</value>
+  </data>
+  <data name="Web_Unreferenced_PurgeConfirmText" xml:space="preserve">
+    <value>Der Ordner „{0}" im Speicherpool {1} wird mit seinem gesamten Inhalt ({2}) von der Festplatte gelöscht.</value>
   </data>
 </root>

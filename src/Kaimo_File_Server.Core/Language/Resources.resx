@@ -517,7 +517,7 @@
     <value>Delete share</value>
   </data>
   <data name="Web_ShareList_DeleteConfirm" xml:space="preserve">
-    <value>Really delete share "{0}"? Files will be preserved.</value>
+    <value>Really delete share "{0}"? The files are kept and can be deleted or turned into a share again under "Deleted / unreferenced shares".</value>
   </data>
   <data name="Web_ShareList_DeletePermanently" xml:space="preserve">
     <value>Delete permanently</value>
@@ -4946,5 +4946,35 @@
   </data>
   <data name="Web_Homes_Deleted" xml:space="preserve">
     <value>Home folder deleted.</value>
+  </data>
+  <data name="Web_Error_StoragePoolInsufficientSpace" xml:space="preserve">
+    <value>Not enough free space in the target storage pool: {0} required (including a safety margin), {1} available. Nothing was copied.</value>
+  </data>
+  <data name="Web_ShareList_UnreferencedShares" xml:space="preserve">
+    <value>Deleted / unreferenced shares</value>
+  </data>
+  <data name="Web_Unreferenced_Hint" xml:space="preserve">
+    <value>Folders in the storage pools that no share uses, e.g. data of deleted shares or folders copied in by hand. Create a share from a folder to keep its data, or delete the data permanently. Only letters, digits, '-', '_' and '.' are allowed in the folder name; files must be readable by the server (UID 1654).</value>
+  </data>
+  <data name="Web_Unreferenced_Reload" xml:space="preserve">
+    <value>Reload</value>
+  </data>
+  <data name="Web_Unreferenced_Empty" xml:space="preserve">
+    <value>No unreferenced folders in the storage pools.</value>
+  </data>
+  <data name="Web_Unreferenced_Column_Modified" xml:space="preserve">
+    <value>Last modified</value>
+  </data>
+  <data name="Web_Unreferenced_Adopt" xml:space="preserve">
+    <value>Create share</value>
+  </data>
+  <data name="Web_Unreferenced_Purge" xml:space="preserve">
+    <value>Delete data</value>
+  </data>
+  <data name="Web_Unreferenced_PurgeConfirmTitle" xml:space="preserve">
+    <value>Delete data permanently?</value>
+  </data>
+  <data name="Web_Unreferenced_PurgeConfirmText" xml:space="preserve">
+    <value>The folder "{0}" in storage pool {1} and all its contents ({2}) are deleted from disk.</value>
   </data>
 </root>
