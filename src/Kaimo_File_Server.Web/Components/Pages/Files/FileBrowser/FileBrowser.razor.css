@@ -443,7 +443,7 @@
 }
 
 .share-indicator-icon {
-    color: var(--accent-color, var(--info));
+    color: var(--info);
     flex-shrink: 0;
 }
 

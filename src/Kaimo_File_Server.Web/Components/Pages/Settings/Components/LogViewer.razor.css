@@ -56,7 +56,7 @@
 :root[data-theme="dark"] .log-date-input { color-scheme: dark; }
 
 /* Only the ↻ glyph turns white in dark mode; the button surface is unchanged. */
-:root[data-theme="dark"] .log-refresh { color: #fff; }
+:root[data-theme="dark"] .log-refresh { color: var(--text-primary); }
 
 /* Source chips, level dropdown, date and search share one control height. */
 .log-source-chip,
@@ -294,9 +294,9 @@
 }
 
 .log-level-information { color: var(--text-secondary); background: var(--bg-active); }
-.log-level-warning { color: var(--warning, #d1a000); background: var(--warning-subtle, rgba(209,160,0,0.14)); }
+.log-level-warning { color: var(--warning); background: var(--warning-subtle); }
 .log-level-error,
-.log-level-critical { color: var(--danger); background: var(--danger-subtle, rgba(209,67,67,0.14)); }
+.log-level-critical { color: var(--danger); background: var(--danger-subtle); }
 
 .log-source { color: var(--accent); font-weight: 600; }
 .log-category { color: var(--text-tertiary); }

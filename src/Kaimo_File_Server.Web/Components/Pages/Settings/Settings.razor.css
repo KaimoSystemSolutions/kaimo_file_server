@@ -28,7 +28,7 @@
 }
 
 .settings-page ::deep .service-status--running {
-    color: var(--success, #2e9e5b);
+    color: var(--success);
 }
 
 .settings-page ::deep .service-status--stopped {
@@ -36,7 +36,7 @@
 }
 
 .settings-page ::deep .service-status--faulted {
-    color: var(--danger, #d14343);
+    color: var(--danger);
 }
 
 /* Toggle switches use the shared global .toggle-switch styles in app.css (same as share

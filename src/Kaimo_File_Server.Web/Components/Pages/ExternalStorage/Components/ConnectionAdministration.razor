@@ -414,13 +414,13 @@ else
     };
     private static string ProviderColor(string id) => id.ToLowerInvariant() switch
     {
-        "smb" => "var(--provider-smb, #5b7fa4)",
-        "rsync-ssh" => "var(--provider-rsync, #6a9a5b)",
-        "sftp" => "var(--provider-sftp, #8b6baf)",
-        "webdav" => "var(--provider-webdav, #2e8b57)",
-        "onedrive" => "var(--provider-onedrive, #0078d4)",
-        "google" or "googledrive" => "var(--provider-google, #e67c35)",
-        "dropbox" => "var(--provider-dropbox, #0061ff)",
+        "smb" => "var(--provider-smb)",
+        "rsync-ssh" => "var(--provider-rsync)",
+        "sftp" => "var(--provider-sftp)",
+        "webdav" => "var(--provider-webdav)",
+        "onedrive" => "var(--provider-onedrive)",
+        "google" or "googledrive" => "var(--provider-google)",
+        "dropbox" => "var(--provider-dropbox)",
         _ => "var(--text-secondary)"
     };
     private bool Supports(StorageConnection connection, StorageProviderCapabilities capability)

@@ -4,7 +4,7 @@
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: var(--bg-primary, #1e1e1e);
+    background: var(--bg-primary);
 }
 
 .public-share-card {
@@ -16,9 +16,9 @@
     max-width: 380px;
     width: 100%;
     padding: 32px 28px;
-    border-radius: 12px;
-    background: var(--bg-secondary, #262626);
-    border: 1px solid var(--border-color, #3a3a3a);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
 }
 
 .public-share-card h1 {
@@ -29,11 +29,11 @@
 
 .public-share-card p {
     margin: 0;
-    color: var(--text-secondary, #b0b0b0);
+    color: var(--text-secondary);
 }
 
 .public-share-icon {
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary);
 }
 
 .public-share-card .edit-input {
@@ -76,9 +76,9 @@
     width: 100%;
     box-sizing: border-box;
     padding: 28px 16px;
-    border: 2px dashed var(--border-color, #3a3a3a);
-    border-radius: 10px;
-    color: var(--text-secondary, #b0b0b0);
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-surface);
+    color: var(--text-secondary);
     cursor: pointer;
     transition: border-color 0.15s ease, background 0.15s ease;
 }
@@ -86,7 +86,7 @@
 .public-upload-drop:hover,
 .public-upload-drop:focus-within {
     border-color: var(--accent);
-    background: var(--bg-hover, rgba(255, 255, 255, 0.03));
+    background: var(--bg-hover);
 }
 
 .public-upload-drop--busy {
@@ -113,7 +113,7 @@
     justify-content: center;
     gap: 4px 14px;
     font-size: 0.8rem;
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary);
 }
 
 .public-upload-list {
@@ -134,8 +134,8 @@
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 4px 10px;
     padding: 8px 10px;
-    border-radius: 8px;
-    background: var(--bg-primary, #1e1e1e);
+    border-radius: var(--radius-control);
+    background: var(--bg-primary);
     font-size: 0.85rem;
 }
 
@@ -146,23 +146,23 @@
 }
 
 .public-upload-state {
-    color: var(--text-tertiary, #888);
+    color: var(--text-tertiary);
     white-space: nowrap;
 }
 
 .public-upload-item--done .public-upload-state {
-    color: var(--success, #3fb950);
+    color: var(--success);
 }
 
 .public-upload-item--error .public-upload-state {
-    color: var(--danger, #f85149);
+    color: var(--danger);
 }
 
 .public-upload-bar {
     grid-column: 1 / -1;
     height: 4px;
-    border-radius: 2px;
-    background: var(--border-color, #3a3a3a);
+    border-radius: var(--radius-control);
+    background: var(--border);
     overflow: hidden;
 }
 

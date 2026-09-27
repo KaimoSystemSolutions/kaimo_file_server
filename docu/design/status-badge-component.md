@@ -23,8 +23,8 @@ its use case.
 - One pill recipe (border, subtle tinted fill, optional leading dot).
 - Four semantic **tones**, each mapped to theme tokens so light and dark are
   handled automatically. The dot inherits the tone colour via `currentColor`.
-- Radius `4px` (not a full pill) per the design spec: pill shapes are reserved,
-  moderate radii are the norm for controls and indicators.
+- Radius `var(--radius-control)` (crisp 2px, not a full pill) per the design spec:
+  pill shapes are not used for badges or controls.
 
 | Tone | Meaning | Tokens | Example labels |
 |---|---|---|---|

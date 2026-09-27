@@ -383,7 +383,7 @@
     color: var(--text-secondary);
     padding: 3px 9px;
     border: 1px solid var(--border-light);
-    border-radius: 2px;
+    border-radius: var(--radius-control);
     background: var(--bg-secondary);
     color: var(--text-secondary);
     font-size: 11.5px;

@@ -1,5 +1,5 @@
 .settings-hint {
-    color: var(--text-secondary, #b0b0b0);
+    color: var(--text-secondary);
     margin: 4px 0 12px;
     max-width: 640px;
 }
