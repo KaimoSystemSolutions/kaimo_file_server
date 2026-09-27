@@ -1,4 +1,5 @@
 using Grpc.Core;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.SmbBridge.Grpc;
 
@@ -12,19 +13,23 @@ namespace Kaimo_File_Server.SmbBridge.Services;
 /// <see cref="IShareRepository.GetAllEnabledAsync"/>; no share logic is
 /// duplicated (the repository already filters disabled shares).
 ///
-/// Visibility (ABE): only the hidden flag is transported
-/// (<see cref="ShareEntry.IsHidden"/> → <c>browseable = no</c>). Hard share
-/// access is unchanged and decided by the VFS connect hook based on real Kaimo ACLs
-/// (<see cref="AuthzGrpcService.AuthorizeConnect"/>).
+/// Visibility (ABE): the hidden flag (<see cref="ShareEntry.IsHidden"/> →
+/// <c>browseable = no</c>) for every share, plus a per-user allow list for the
+/// home-folder share only (users with an enabled home), so other users never see
+/// it in the share list. Hard share access is unchanged and decided by the VFS
+/// connect hook based on real Kaimo ACLs (<see cref="AuthzGrpcService.AuthorizeConnect"/>).
 /// </summary>
 public sealed class ShareGrpcService : ShareService.ShareServiceBase
 {
     private readonly IShareRepository _shares;
+    private readonly IUserRepository _users;
     private readonly ILogger<ShareGrpcService> _logger;
 
-    public ShareGrpcService(IShareRepository shares, ILogger<ShareGrpcService> logger)
+    public ShareGrpcService(
+        IShareRepository shares, IUserRepository users, ILogger<ShareGrpcService> logger)
     {
         _shares = shares;
+        _users = users;
         _logger = logger;
     }
 
@@ -40,12 +45,21 @@ public sealed class ShareGrpcService : ShareService.ShareServiceBase
         foreach (var def in defs)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            reply.Shares.Add(new ShareEntry
+            var entry = new ShareEntry
             {
                 Name = def.Name,
                 Path = def.Path,
                 IsHidden = def.IsShareHidden,
-            });
+            };
+            if (def.IsUserHomes)
+            {
+                // Mirrors the per-user root entries HomeDirectoryService grants.
+                entry.Restricted = true;
+                entry.AllowedUsers.Add((await _users.GetAllAsync().WaitAsync(cancellationToken))
+                    .Where(u => u.IsEnabled && u.HomeDirectoryEnabled && SambaName.IsValidUsername(u.Username))
+                    .Select(u => u.Username));
+            }
+            reply.Shares.Add(entry);
         }
 
         _logger.LogInformation("ListShares -> {Count} enabled shares.", reply.Shares.Count);

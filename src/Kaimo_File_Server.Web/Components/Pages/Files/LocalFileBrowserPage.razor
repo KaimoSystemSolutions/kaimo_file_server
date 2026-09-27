@@ -3,7 +3,9 @@
 @page "/files"
 @using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser
 @using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser.components
+@using Kaimo_File_Server.Infrastructure.Services
 @inject FileBrowserViewModel LocalViewModel
+@inject NavigationManager Nav
 
 @if (string.IsNullOrWhiteSpace(ShareName))
 {
@@ -17,4 +19,12 @@ else
 @code {
     [Parameter] public string ShareName { get; set; } = "";
     [Parameter] public string? SubPath { get; set; }
+
+    // The home-folder share is never browsed as a share in the web UI: users only see their
+    // own folder as "user" (/files/user), and /files/users is the metadata-only overview.
+    protected override void OnParametersSet()
+    {
+        if (string.Equals(ShareName, HomeDirectoryService.ShareName, StringComparison.OrdinalIgnoreCase))
+            Nav.NavigateTo("/files/user", replace: true);
+    }
 }

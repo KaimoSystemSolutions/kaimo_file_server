@@ -79,23 +79,6 @@ public sealed class PublicShareFileBrowserViewModel : FileBrowserViewModel
             ? share with { Name = _link.DisplayName }
             : null;
 
-    // URL sub-paths for a public link are relative to the shared root, so the real folder
-    // name is never part of the address. Map both directions around that root.
-    protected override string ResolveSubPath(string subPath)
-        => _rootPath.Length == 0 ? subPath
-           : string.IsNullOrEmpty(subPath) ? _rootPath
-           : $"{_rootPath}/{subPath}";
-
-    public override string RouteSubPathOf(string shareRelativePath)
-    {
-        if (_rootPath.Length == 0) return shareRelativePath;
-        if (string.Equals(shareRelativePath, _rootPath, StringComparison.OrdinalIgnoreCase))
-            return "";
-        return shareRelativePath.StartsWith(_rootPath + "/", StringComparison.OrdinalIgnoreCase)
-            ? shareRelativePath[(_rootPath.Length + 1)..]
-            : shareRelativePath;
-    }
-
     // A public link never offers a "share" action of its own.
     protected override bool AllowShareLinkManagement => false;
 

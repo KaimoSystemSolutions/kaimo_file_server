@@ -232,7 +232,9 @@ public class AclService : IAclService
     {
         var shareRepo = sp.GetRequiredService<IShareRepository>();
         var share = await shareRepo.GetByIdAsync(shareId);
-        if (share == null)
+        // Home folders are private: only explicit per-user entries may grant access there,
+        // otherwise every member of the share's department would reach every home.
+        if (share == null || share.IsUserHomes)
             return FilePermission.None;
 
         var deptRepo = sp.GetRequiredService<IDepartmentRepository>();

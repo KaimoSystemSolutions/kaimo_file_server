@@ -1,0 +1,4 @@
+/* Global home-folder switch: separated from the read-only pool/share fields above it. */
+.homes-global-toggle {
+    margin-top: var(--space-4);
+}

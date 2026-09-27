@@ -392,6 +392,8 @@ public class ShareListViewModelDatabaseTests : DatabaseTestBase
     [InlineData("bad name")]      // space
     [InlineData("bad/name")]      // slash
     [InlineData(".hidden")]       // leading dot
+    [InlineData("users")]         // reserved: home-folder share
+    [InlineData("User")]          // reserved: web route of the own home
     public async Task CreateShareAsync_WithInvalidName_IsRejectedAndPersistsNothing(string name)
     {
         var actor = SeedUser("admin");

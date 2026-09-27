@@ -3,7 +3,12 @@ using Kaimo_File_Server.Core.Domain;
 namespace Kaimo_File_Server.Web.Controllers.Api;
 
 /// <summary>A share the caller may access.</summary>
-public sealed record ShareDto(Guid Id, string Name, bool IsRecycleEnabled);
+/// <param name="RootPath">
+/// Share-relative folder the client must treat as this entry's root (prefix it to every path it
+/// sends and hide it from the user). Set only for the caller's home folder ("user"), whose
+/// backing share holds all homes; <c>null</c> for regular shares.
+/// </param>
+public sealed record ShareDto(Guid Id, string Name, bool IsRecycleEnabled, string? RootPath = null);
 
 /// <summary>A file or directory entry in a listing.</summary>
 public sealed record FileEntryDto(

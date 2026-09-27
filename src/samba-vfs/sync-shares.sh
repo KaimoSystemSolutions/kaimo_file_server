@@ -4,9 +4,13 @@
 # appear/disappear immediately. Replaces the FileSystemWatcher/SyncFromDb
 # mechanism from src/Kaimo_File_Server.Smb/SmbServer.cs. Idempotent.
 #
-# Visibility (ABE): ONLY the hidden flag. IsShareHidden -> browseable = no
-# (the share remains directly reachable via \\host\share). Hard access control
-# is still decided by the VFS connect hook based on actual Kaimo ACLs.
+# Visibility (ABE): the hidden flag for every share (IsShareHidden -> browseable
+# = no; the share remains directly reachable via \\host\share). A share that
+# carries an `allowed_users` list (only the home-folder share "users") also gets a
+# share security descriptor (sharesec) granting exactly those users, so
+# `access based share enum` hides it from everyone else. Shares without a list
+# keep Samba's default descriptor. Hard access control is still decided by the
+# VFS connect hook based on actual Kaimo ACLs.
 #
 # Exit 0 only on successful retrieval from bridge (for retry loop in entrypoint).
 set -uo pipefail
@@ -52,7 +56,8 @@ if ! SHARE_RECORDS="$(printf '%s' "$OUT" | jq -s -e -r '
        or (.shares | length) > 100000
        or (all(.shares[]; . as $share
             | ($share | type) == "object"
-            and ($share | exact_keys(["name", "path", "hidden"]))
+            and (($share | exact_keys(["name", "path", "hidden"]))
+                 or ($share | exact_keys(["name", "path", "hidden", "allowed_users"])))
             and (($share.name | type) == "string")
             and ($share.name | test("^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"))
             and ($share.name | endswith(".") | not)
@@ -61,7 +66,12 @@ if ! SHARE_RECORDS="$(printf '%s' "$OUT" | jq -s -e -r '
             and (($share.path | length) > 0 and ($share.path | length) <= 4096)
             and ($share.path | startswith("/"))
             and ($share.path | explode | all(.[]; . >= 32 and . != 127))
-            and (($share.hidden | type) == "boolean")) | not)
+            and (($share.hidden | type) == "boolean")
+            and (($share | has("allowed_users") | not)
+                 or ((($share.allowed_users | type) == "array")
+                     and ($share.allowed_users | length) <= 100000
+                     and all($share.allowed_users[]; (type == "string")
+                         and test("^[A-Za-z0-9][A-Za-z0-9_.-]{0,31}$"))))) | not)
        or (([.shares[].name | ascii_downcase] | length)
            != ([.shares[].name | ascii_downcase] | unique | length))
     then error("invalid share sync schema")
@@ -69,7 +79,9 @@ if ! SHARE_RECORDS="$(printf '%s' "$OUT" | jq -s -e -r '
     # empty desired state. `join("\n")` becomes an empty string for zero
     # shares and a newline-separated TSV document otherwise.
     else ([.shares[]
-           | [.name, .path, (if .hidden then "1" else "0" end)]
+           | [.name, .path, (if .hidden then "1" else "0" end),
+              # "*" = unrestricted; "+" followed by a comma list = only these users.
+              (if has("allowed_users") then "+" + (.allowed_users | join(",")) else "*" end)]
            | @tsv]
           | join("\n"))
     end
@@ -84,8 +96,9 @@ fi
 # break under `set -u` with "unbound variable" (case: no/all shares disabled).
 declare -A want_path=()
 declare -A want_hidden=()
+declare -A want_access=()
 canonical_paths=()
-while IFS=$'\t' read -r name path hidden; do
+while IFS=$'\t' read -r name path hidden access; do
     [ -z "${name:-}" ] && continue
     canonical_path="$(readlink -m -- "$path")"
     if [ "$canonical_path" = "$STORAGE_ROOT" ] ||
@@ -104,6 +117,7 @@ while IFS=$'\t' read -r name path hidden; do
     fi
     want_path["$name"]="$path"
     want_hidden["$name"]="${hidden:-0}"
+    want_access["$name"]="${access:-*}"
     canonical_paths+=("$canonical_path")
 done <<< "$SHARE_RECORDS"
 if (( ${#canonical_paths[@]} > 0 )); then
@@ -115,6 +129,51 @@ if (( ${#canonical_paths[@]} > 0 )); then
         exit 1
     fi
 fi
+
+# --- Per-user share visibility (security descriptor) ---
+# Samba username -> SID, loaded once per run and only when a restricted share exists.
+declare -A user_sid=()
+user_sids_loaded=0
+load_user_sids() {
+    [ "$user_sids_loaded" = "1" ] && return 0
+    local pdb_output user sid
+    pdb_output="$(pdbedit -d0 -L -v 2>/dev/null)" || return 1
+    while IFS=$'\t' read -r user sid; do
+        [ -n "${user:-}" ] && [ -n "${sid:-}" ] && user_sid["${user,,}"]="$sid"
+    done < <(printf '%s\n' "$pdb_output" | awk -F ': *' '
+        /^Unix username:/ { user = $2 }
+        /^User SID:/      { if (user != "") print user "\t" $2; user = "" }')
+    user_sids_loaded=1
+}
+
+# Grants exactly the listed users (comma-separated, may be empty = nobody) read and
+# write on the share. `access based share enum` hides the share from everyone else
+# and smbd refuses their tree-connect. Writes only when the descriptor differs.
+apply_share_acl() {
+    local name="$1" list="$2" sddl="D:" user sid
+    local -a users=()
+    load_user_sids || {
+        echo "[sync-shares] FAILED to read Samba user SIDs for '$name'." >&2
+        return 1
+    }
+    [ -n "$list" ] && IFS=',' read -r -a users <<< "$list"
+    for user in "${users[@]}"; do
+        sid="${user_sid[${user,,}]:-}"
+        # A user without a Samba account yet cannot connect anyway; sync-users.sh
+        # creates it and the next cycle adds the entry.
+        [ -n "$sid" ] && sddl+="(A;;FA;;;$sid)"
+    done
+    [ "$(sharesec -d0 "$name" --viewsddl 2>/dev/null)" = "$sddl" ] && return 0
+    sharesec -d0 "$name" -S "$sddl" >/dev/null 2>&1 || {
+        echo "[sync-shares] FAILED to set share permissions on '$name'." >&2
+        return 1
+    }
+    [ "$(sharesec -d0 "$name" --viewsddl 2>/dev/null)" = "$sddl" ] || {
+        echo "[sync-shares] FAILED verification of share permissions on '$name'." >&2
+        return 1
+    }
+    echo "[sync-shares] share permissions updated: $name (${#users[@]} allowed user(s))"
+}
 
 # --- Current state: shares currently in registry (one per line) ---
 if ! current_output="$(net conf listshares 2>/dev/null)"; then
@@ -260,6 +319,11 @@ if (( ${#want_path[@]} > 0 )); then
                 exit 1
             fi
         done
+
+        access="${want_access[$name]}"
+        if [ "$access" != "*" ]; then
+            apply_share_acl "$name" "${access#+}" || exit 1
+        fi
 
         if [ "$path_changed" = "1" ]; then
             close_share_sessions "$name" || exit 1

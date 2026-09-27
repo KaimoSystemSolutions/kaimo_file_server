@@ -66,6 +66,14 @@ namespace Kaimo_File_Server.Core.Domain
         /// </summary>
         public bool IsRecycleEnabled { get; set; }
 
+        /// <summary>
+        /// Marks the single system share that holds the per-user home folders
+        /// (<c>users/&lt;userId&gt;</c>). It is managed exclusively by the home-folder
+        /// service: department defaults never apply to it and it is excluded from
+        /// share management and the ACL editor.
+        /// </summary>
+        public bool IsUserHomes { get; set; }
+
         public CloudSettings CloudSettings { get; set; } = new CloudSettings(new Dictionary<string, SyncedFolder>());
 
         public ICloudConnection? CloudConnection { get; set; }

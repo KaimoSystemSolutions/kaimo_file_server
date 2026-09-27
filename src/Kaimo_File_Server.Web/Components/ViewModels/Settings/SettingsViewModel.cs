@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Logging;
 using Kaimo_File_Server.Core.Repositories;
@@ -32,6 +33,7 @@ public partial class SettingsViewModel
     private readonly IManagementAuthService _mgmtAuth;
     private readonly IUserContextFactory _userContextFactory;
     private readonly AuthenticationStateProvider _authState;
+    private readonly HomeDirectoryService? _homes;
     private readonly ISystemInfoService _sysInfo;
     private readonly ISearchAdminService _searchAdmin;
     private readonly IShareRepository _shareRepo;
@@ -59,7 +61,8 @@ public partial class SettingsViewModel
         IBackupSettingsStore backupSettingsStore,
         IDatabaseBackupService backupService,
         BackupDownloadTokenService backupDownloadTokens,
-        ILogger<SettingsViewModel> logger)
+        ILogger<SettingsViewModel> logger,
+        HomeDirectoryService? homes = null)
     {
         _config = config;
         _mgmtAuth = mgmtAuth;
@@ -76,6 +79,7 @@ public partial class SettingsViewModel
         _backupService = backupService;
         _backupDownloadTokens = backupDownloadTokens;
         _logger = logger;
+        _homes = homes;
     }
 
     // ── State ──
@@ -156,6 +160,7 @@ public partial class SettingsViewModel
                 CloudAccessSettings = await cloudAccessSettingsTask;
                 RefreshSystemInfo();
                 await LoadPoolNamesAsync();
+                await LoadHomesAsync();
             }
 
             if (CanManageBackups)

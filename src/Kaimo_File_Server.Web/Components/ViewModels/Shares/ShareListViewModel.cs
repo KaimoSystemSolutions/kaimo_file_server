@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
@@ -255,6 +256,11 @@ public partial class ShareListViewModel
 
             foreach (var share in allShares)
             {
+                // The home-folder share is system-managed (settings + /files/users) and is
+                // never renamed, moved, disabled or re-permissioned from share management.
+                if (share.IsUserHomes)
+                    continue;
+
                 // (A) Management view: in scope → always visible (incl. hidden/disabled).
                 if (_manageAllShares || _manageableShareIds.Contains(share.Id))
                 {
@@ -304,7 +310,10 @@ public partial class ShareListViewModel
         if (name.StartsWith('.') || name.EndsWith('.'))
         { error = Resources.Web_ShareName_NoLeadingTrailingDot; return false; }
 
-        if (!SambaName.IsValidShareName(name))
+        // "users" is the home-folder share and "user" the web route of a user's own home.
+        if (!SambaName.IsValidShareName(name)
+            || name.Equals(HomeDirectoryService.ShareName, StringComparison.OrdinalIgnoreCase)
+            || name.Equals("user", StringComparison.OrdinalIgnoreCase))
         {
             error = string.Format(Resources.Web_Validation_ReservedName, name);
             return false;

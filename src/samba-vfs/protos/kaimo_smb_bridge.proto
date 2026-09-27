@@ -180,7 +180,14 @@ message ListSharesRequest {}
 message ShareEntry {
   string name      = 1; // Share name (= registry section, = directory name)
   string path      = 2; // absolute path in container storage
-  bool   is_hidden = 3; // IsShareHidden -> browseable = no (ABE: hidden flag only)
+  bool   is_hidden = 3; // IsShareHidden -> browseable = no
+  // Per-user visibility (ABE). When restricted, only allowed_users may list and
+  // open the share: sync-shares.sh stores them as the share security descriptor
+  // (sharesec), which `access based share enum` evaluates. Unrestricted shares
+  // keep Samba's default descriptor. Used for the home-folder share "users"
+  // (users with an enabled home); hard access still goes through the connect hook.
+  bool   restricted = 4;
+  repeated string allowed_users = 5; // Samba usernames; empty + restricted = nobody
 }
 
 message ListSharesReply {

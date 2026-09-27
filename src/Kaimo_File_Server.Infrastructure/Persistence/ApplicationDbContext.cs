@@ -83,6 +83,7 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.PhotoContentType).HasMaxLength(100);
                 entity.Property(e => e.IsEnabled).IsRequired().HasDefaultValue(true);
                 entity.Property(e => e.CanChangePassword).IsRequired().HasDefaultValue(true);
+                entity.Property(e => e.HomeDirectoryEnabled).IsRequired().HasDefaultValue(true);
                 entity.Property(e => e.SecurityStamp).IsRequired().HasMaxLength(64);
                 entity.Property(e => e.MustChangePassword).IsRequired();
             });
@@ -191,7 +192,10 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.IsEnabled).IsRequired();
                 entity.Property(e => e.IsShareHidden).IsRequired();
                 entity.Property(e => e.IsRecycleEnabled).IsRequired();
-                
+                entity.Property(e => e.IsUserHomes).IsRequired().HasDefaultValue(false);
+                // At most one home-folder share may exist.
+                entity.HasIndex(e => e.IsUserHomes).IsUnique().HasFilter("\"IsUserHomes\"");
+
                 entity.Property(e => e.CloudSettings)
                     .HasConversion(
                         v => v.Serialize(),

@@ -352,6 +352,9 @@ module matches the source.
   is honored; inaccessible shares are still *listed* (access denied on connect).
   **Status: DEFERRED by design** (Risk 2, decision (b)). Full ABE (option c) remains a
   later option if hiding inaccessible shares in enumeration becomes a requirement.
+  **Exception (2026-09-27):** the home-folder share `users` already uses option (c):
+  `ListShares` sends an allow list, `sync-shares.sh` stores it via `sharesec`
+  (see `docu/user-home-folders.md`). The same mechanism can be extended to all shares.
 
 ### P3 — Cosmetic / by-design
 

@@ -185,6 +185,16 @@
                                         <span class="toggle-slider"></span>
                                     </label>
                                 </div>
+                                @if (VM.CanManageHomes)
+                                {
+                                    <div class="toggle-row">
+                                        <span class="toggle-label-text">@(Resources.ResourceManager.GetString("Web_Homes_Toggle_Enabled") ?? "Home folder enabled")</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" @bind="VM.EditUserHomeDirectoryEnabled" />
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                }
                             </div>
                         }
                     </div>

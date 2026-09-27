@@ -286,6 +286,8 @@ builder.Services.AddScoped<LoginViewModel>();
 builder.Services.AddScoped<ShareBrowserViewModel>();
 builder.Services.AddScoped<FileBrowserViewModel>();
 builder.Services.AddScoped<PublicShareFileBrowserViewModel>();
+builder.Services.AddScoped<HomeFileBrowserViewModel>();
+builder.Services.AddScoped<HomesAdminViewModel>();
 builder.Services.AddScoped<Kaimo_File_Server.Web.Services.ShareLinkService>();
 builder.Services.AddScoped<Kaimo_File_Server.Web.Services.PublicUploadService>();
 builder.Services.AddSingleton<ShareLinkTokenProtector>();

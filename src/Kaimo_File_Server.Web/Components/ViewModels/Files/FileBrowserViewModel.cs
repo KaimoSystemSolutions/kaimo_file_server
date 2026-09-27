@@ -117,6 +117,12 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
     /// </summary>
     protected virtual string RootPath => "";
 
+    /// <summary>
+    /// Only the dedicated home browser may open the home-folder share; everywhere else it is
+    /// treated as unknown, so the web UI never exposes <c>users/&lt;id&gt;</c>.
+    /// </summary>
+    protected virtual bool IsHomeBrowser => false;
+
     public virtual BrowserShareInfo? CurrentBrowserShare => CurrentShare is null
         ? null
         : new BrowserShareInfo(CurrentShare.Id, CurrentShare.Name, BrowserShareKind.Local);
@@ -177,16 +183,28 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         => Items.Where(f => !f.IsDirectory).OrderBy(f => f.Name);
 
     /// <summary>
-    /// Maps a URL sub-path to a share-relative path. Identity for the default browser; the
-    /// public share VM overrides it to treat URL sub-paths as relative to the confined root.
+    /// Maps a URL sub-path to a share-relative path. URL sub-paths are relative to the
+    /// confined <see cref="RootPath"/>, so the real root folder is never part of the address.
+    /// Identity when the browser is not confined.
     /// </summary>
-    protected virtual string ResolveSubPath(string subPath) => subPath;
+    protected virtual string ResolveSubPath(string subPath)
+        => RootPath.Length == 0 ? subPath
+           : string.IsNullOrEmpty(subPath) ? RootPath
+           : $"{RootPath}/{subPath}";
 
     /// <summary>
-    /// Maps a share-relative path to the sub-path shown in the URL. Identity for the default
-    /// browser; the public share VM strips the confined-root prefix so it never leaks.
+    /// Maps a share-relative path to the sub-path shown in the URL by stripping the confined
+    /// root prefix. Identity when the browser is not confined.
     /// </summary>
-    public virtual string RouteSubPathOf(string shareRelativePath) => shareRelativePath;
+    public virtual string RouteSubPathOf(string shareRelativePath)
+    {
+        if (RootPath.Length == 0) return shareRelativePath;
+        if (string.Equals(shareRelativePath, RootPath, StringComparison.OrdinalIgnoreCase))
+            return "";
+        return shareRelativePath.StartsWith(RootPath + "/", StringComparison.OrdinalIgnoreCase)
+            ? shareRelativePath[(RootPath.Length + 1)..]
+            : shareRelativePath;
+    }
 
     // True when the given share-relative path is the confined root or lives beneath it.
     private bool IsWithinRoot(string path)
@@ -268,6 +286,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
             CurrentPath = "";
 
             CurrentShare = await _shareRepo.GetByNameAsync(shareName);
+            if (CurrentShare is not null && CurrentShare.IsUserHomes && !IsHomeBrowser)
+                CurrentShare = null;
             if (CurrentShare is null)
             {
                 ErrorMessage = Resources.Web_Error_ShareNotFound;
@@ -319,7 +339,8 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
 
             // Scoped ACL-management right for THIS share, resolved once per load and
             // reused by the view. Same authority source the ACL editor enforces on write.
-            CanManageAcls = await _mgmtAuth.CanManageShareAsync(
+            // Home-folder ACLs are owned by the home-folder service (the ACL editor refuses them too).
+            CanManageAcls = !CurrentShare.IsUserHomes && await _mgmtAuth.CanManageShareAsync(
                 userContext, CurrentShare.Id, ManagementPermission.ManageShareAcls);
 
             CanManageShareLinks = AllowShareLinkManagement

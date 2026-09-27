@@ -1,6 +1,7 @@
 using Kaimo_File_Server.Core.Language;
 using Kaimo_File_Server.Core.Services;
 using Kaimo_File_Server.Core.Storage;
+using Kaimo_File_Server.Infrastructure.Services;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -124,6 +125,122 @@ public partial class SettingsViewModel
         {
             _logger.LogError(ex, "Failed to save storage pool names");
             ErrorMessage = Resources.Web_Settings_Storage_PoolNamesSaveFailed;
+            return false;
+        }
+    }
+
+    // ── User home folders ──
+
+    /// <summary>Pool that holds the home-folder share, or <c>null</c> while home folders are not set up.</summary>
+    public string? HomesPoolPath { get; private set; }
+
+    /// <summary>Pool chosen in the setup form (only used while <see cref="HomesPoolPath"/> is null).</summary>
+    public string HomesSelectedPool { get; set; } = "";
+
+    /// <summary>Global switch: when off, no user has a home folder (per-user settings are kept).</summary>
+    public bool HomesEnabled { get; private set; }
+
+    private async Task LoadHomesAsync()
+    {
+        var share = _homes is null ? null : await _homes.GetHomesShareAsync();
+        HomesPoolPath = share is null ? null : Path.GetDirectoryName(share.Path);
+        HomesEnabled = share?.IsEnabled == true;
+        HomesSelectedPool = StorageUsages.FirstOrDefault()?.StoragePath ?? "";
+    }
+
+    /// <summary>Enables or disables home folders for every user at once.</summary>
+    public async Task<bool> SetHomesEnabledAsync(bool enabled)
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!CanManageSettings || _homes is null)
+        {
+            ErrorMessage = Resources.Web_Settings_NoPermissionChange;
+            return false;
+        }
+
+        try
+        {
+            await _homes.SetGloballyEnabledAsync(enabled);
+            SuccessMessage = enabled
+                ? Resources.ResourceManager.GetString("Web_Settings_Homes_EnabledSaved") ?? "Home folders are enabled for all users."
+                : Resources.ResourceManager.GetString("Web_Settings_Homes_DisabledSaved") ?? "Home folders are disabled for all users.";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Switching home folders failed");
+            ErrorMessage = Resources.ResourceManager.GetString("Web_Settings_Homes_ConfigureFailed")
+                ?? "Home folders could not be set up.";
+            return false;
+        }
+        finally
+        {
+            await LoadHomesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Creates the home-folder share on the selected pool. The pool is fixed afterwards;
+    /// existing homes are never moved.
+    /// </summary>
+    public async Task<bool> ConfigureHomesAsync()
+    {
+        ErrorMessage = null;
+        SuccessMessage = null;
+
+        if (!CanManageSettings || _homes is null)
+        {
+            ErrorMessage = Resources.Web_Settings_NoPermissionChange;
+            return false;
+        }
+
+        // Only a pool the server actually discovered may be chosen.
+        var pool = StorageUsages.FirstOrDefault(u =>
+            string.Equals(u.StoragePath, HomesSelectedPool, StringComparison.Ordinal))?.StoragePath;
+        if (pool is null)
+        {
+            ErrorMessage = Resources.Web_Error_StoragePoolRequired;
+            return false;
+        }
+
+        try
+        {
+            var username = (await _authState.GetAuthenticationStateAsync()).User.Identity?.Name;
+            var actor = string.IsNullOrEmpty(username) ? null : await _userContextFactory.CreateByUsernameAsync(username);
+            if (actor is null)
+            {
+                ErrorMessage = Resources.Web_Settings_NoPermissionChange;
+                return false;
+            }
+
+            var result = await _homes.ConfigureAsync(pool, actor.User.Id);
+            if (result != HomeConfigureResult.Ok)
+            {
+                ErrorMessage = result switch
+                {
+                    HomeConfigureResult.NameTaken => Resources.ResourceManager.GetString("Web_Settings_Homes_NameTaken")
+                        ?? "A share named \"users\" already exists. Rename it first.",
+                    HomeConfigureResult.DestinationIsFile => Resources.Web_Error_StoragePoolDestinationExists,
+                    _ => Resources.ResourceManager.GetString("Web_Settings_Homes_AlreadyConfigured")
+                        ?? "Home folders are already set up.",
+                };
+                await LoadHomesAsync();
+                return false;
+            }
+
+            _logger.LogInformation("Home folders set up on pool '{Pool}'", pool);
+            SuccessMessage = Resources.ResourceManager.GetString("Web_Settings_Homes_Configured")
+                ?? "Home folders are set up.";
+            await LoadHomesAsync();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Setting up home folders failed");
+            ErrorMessage = Resources.ResourceManager.GetString("Web_Settings_Homes_ConfigureFailed")
+                ?? "Home folders could not be set up.";
             return false;
         }
     }

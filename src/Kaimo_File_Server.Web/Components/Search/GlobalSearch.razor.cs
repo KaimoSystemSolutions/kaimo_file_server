@@ -192,6 +192,9 @@ public partial class GlobalSearch : IDisposable
         var found = new List<(Guid Id, string Name)>();
         foreach (var share in await ShareRepo.GetAllAsync())
         {
+            // Homes are reached through "user" in the web UI, never as the "users" share.
+            if (share.IsUserHomes)
+                continue;
             if (mgmtScope.IsUnrestricted || managedIds!.Contains(share.Id))
             {
                 found.Add((share.Id, share.Name));

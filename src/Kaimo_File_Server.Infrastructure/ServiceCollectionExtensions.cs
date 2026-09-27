@@ -101,6 +101,7 @@ namespace Kaimo_File_Server.Infrastructure
             }
             services.AddScoped<IAuthenticationLookup, AuthenticationLookup>();
             services.AddScoped<IManagementAuthService, ManagementAuthService>();
+            services.AddScoped<HomeDirectoryService>();
             services.AddSingleton<ICloudSyncPathUpdater, CloudSyncPathUpdater>();
             services.AddSingleton<ICloudSyncOperationCoordinator, DatabaseCloudSyncOperationCoordinator>();
             services.AddSingleton<IStorageConnectionCredentialLeaseManager, DatabaseStorageConnectionCredentialLeaseManager>();
@@ -283,6 +284,17 @@ namespace Kaimo_File_Server.Infrastructure
 
                         var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
                         await seeder.SeedAsync();
+
+                        // After seeding, so users created on this start get their home too.
+                        // Never fatal: a missing pool mount must not keep the app from starting.
+                        try
+                        {
+                            await scope.ServiceProvider.GetRequiredService<HomeDirectoryService>().BackfillAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogWarning(ex, "Home-folder backfill failed");
+                        }
                     }
                     finally
                     {

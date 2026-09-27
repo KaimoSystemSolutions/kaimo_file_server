@@ -71,10 +71,93 @@
     </div>
 </div>
 
+@* User home folders: one-time choice of the pool that holds the "users" share. *@
+<div class="detail-section">
+    <span class="detail-label">@T("Web_Settings_Homes_Label", "User home folders")</span>
+    <p class="settings-description">@T("Web_Settings_Homes_Description", "Every user gets a private folder users/<user id> that only they can access. Users see it as \"user\" in the web UI and app; administrators only see its size, status and links.")</p>
+    @* Inline feedback: this child re-renders on its own, the page-level banners would stay stale. *@
+    @if (_homesError is not null) { <div class="error-banner">@_homesError</div> }
+    @if (_homesSuccess is not null) { <div class="success-banner">@_homesSuccess</div> }
+    @if (VM.HomesPoolPath is { } homesPool)
+    {
+        <div class="detail-field-grid">
+            <div class="detail-field">
+                <span class="detail-field-label">@Resources.Web_ShareList_Label_StoragePool</span>
+                <span class="detail-field-value">@VM.ResolvePoolName(homesPool)</span>
+            </div>
+            <div class="detail-field">
+                <span class="detail-field-label">@T("Web_Settings_Homes_Share", "Share")</span>
+                <span class="detail-field-value detail-value--mono">users</span>
+            </div>
+        </div>
+        <div class="toggle-row homes-global-toggle">
+            <span class="toggle-label-text">@T("Web_Settings_Homes_Enabled", "Home folders enabled")</span>
+            <label class="toggle-switch">
+                <input type="checkbox" checked="@VM.HomesEnabled" disabled="@_settingUpHomes"
+                       @onchange="e => SetHomesEnabled(e.Value is true)" />
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <span class="form-hint">@T("Web_Settings_Homes_EnabledHint", "When off, no user has a home folder on any access path and the per-user switch is hidden. Files and per-user settings are kept.")</span>
+    }
+    else if (VM.StorageUsages.Count > 0)
+    {
+        <div class="form-group">
+            <label for="homes-pool">@Resources.Web_ShareList_Label_StoragePool</label>
+            <select id="homes-pool" class="edit-input" @bind="VM.HomesSelectedPool">
+                @foreach (var pool in VM.StorageUsages)
+                {
+                    <option value="@pool.StoragePath">@VM.ResolvePoolName(pool.StoragePath)</option>
+                }
+            </select>
+            <span class="form-hint">@T("Web_Settings_Homes_PoolHint", "The pool cannot be changed once home folders are set up.")</span>
+        </div>
+        <div class="settings-actions">
+            <button class="btn-primary" type="button" disabled="@_settingUpHomes" @onclick="SetUpHomes">
+                @T("Web_Settings_Homes_SetUp", "Set up home folders")
+            </button>
+        </div>
+    }
+    else
+    {
+        <p class="settings-empty">@Resources.Web_Settings_Storage_NoStoragePoolsFound</p>
+    }
+</div>
+
 @code {
     [Parameter, EditorRequired] public SettingsViewModel VM { get; set; } = default!;
     private static string Pct(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
     private void Refresh() { VM.RefreshStorageInfo(); StateHasChanged(); }
+
+    private static string T(string key, string fallback) => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    private bool _settingUpHomes;
+    private string? _homesError;
+    private string? _homesSuccess;
+
+    private async Task SetHomesEnabled(bool enabled)
+    {
+        _settingUpHomes = true;
+        try
+        {
+            var ok = await VM.SetHomesEnabledAsync(enabled);
+            _homesError = ok ? null : VM.ErrorMessage;
+            _homesSuccess = ok ? VM.SuccessMessage : null;
+        }
+        finally { _settingUpHomes = false; }
+    }
+
+    private async Task SetUpHomes()
+    {
+        _settingUpHomes = true;
+        try
+        {
+            var ok = await VM.ConfigureHomesAsync();
+            _homesError = ok ? null : VM.ErrorMessage;
+            _homesSuccess = ok ? VM.SuccessMessage : null;
+        }
+        finally { _settingUpHomes = false; }
+    }
 
     // Per-pool inline rename: only one pool edits at a time.
     private string? _editingKey;

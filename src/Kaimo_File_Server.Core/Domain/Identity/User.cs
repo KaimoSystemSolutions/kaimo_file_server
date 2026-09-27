@@ -84,6 +84,12 @@ namespace Kaimo_File_Server.Core.Domain.Identity
         /// </summary>
         public bool MustChangePassword { get; set; }
 
+        /// <summary>
+        /// Whether the user's personal home folder (<c>users/&lt;id&gt;</c>) is available.
+        /// Disabling revokes access but never deletes the folder's content.
+        /// </summary>
+        public bool HomeDirectoryEnabled { get; set; } = true;
+
         /// <summary>Creates a fresh, unpredictable <see cref="SecurityStamp"/> value.</summary>
         public static string NewSecurityStamp() => Guid.NewGuid().ToString("N");
 

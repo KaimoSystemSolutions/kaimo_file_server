@@ -6,6 +6,8 @@ using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Services.File;
+using Kaimo_File_Server.Infrastructure.Services;
+using Kaimo_File_Server.Web.Components.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
@@ -25,15 +27,21 @@ public sealed class BrowseApiController : ApiControllerBase
     private readonly IUserContextFactory _userContextFactory;
     private readonly IShareRepository _shares;
     private readonly IFileServiceFactory _fileServiceFactory;
+    private readonly HomeDirectoryService _homes;
+    private readonly ILogger<BrowseApiController> _logger;
 
     public BrowseApiController(
         IUserContextFactory userContextFactory,
         IShareRepository shares,
-        IFileServiceFactory fileServiceFactory)
+        IFileServiceFactory fileServiceFactory,
+        HomeDirectoryService homes,
+        ILogger<BrowseApiController> logger)
     {
         _userContextFactory = userContextFactory;
         _shares = shares;
         _fileServiceFactory = fileServiceFactory;
+        _homes = homes;
+        _logger = logger;
     }
 
     /// <summary>Lists the shares the caller may browse.</summary>
@@ -44,9 +52,22 @@ public sealed class BrowseApiController : ApiControllerBase
         if (user is null) return ApiUnauthorized();
 
         var visible = new List<ShareDto>();
+
+        // The caller's own home comes first as "user"; the client addresses it through RootPath.
+        try
+        {
+            if (await _homes.EnsureHomeAsync(user.User) is { } home)
+                visible.Add(new ShareDto(home.Share.Id, HomeFileBrowserViewModel.DisplayName, false, home.Path));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Home folder of {UserId} is unavailable", user.User.Id);
+        }
+
         foreach (var share in await _shares.GetAllEnabledAsync())
         {
-            if (share.IsShareHidden) continue;
+            // The home-folder share is only offered as the caller's own "user" entry above.
+            if (share.IsShareHidden || share.IsUserHomes) continue;
             var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
             if (await fs.CanListAsync(string.Empty, user))
                 visible.Add(new ShareDto(share.Id, share.Name, share.IsRecycleEnabled));

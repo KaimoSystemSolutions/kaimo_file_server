@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Helpers;
@@ -113,6 +114,7 @@ public sealed class SyncApiController : ApiControllerBase
 
         // The user must be able to list the chosen subtree to sync it.
         var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        if (IsHomesRoot(share, path)) return ApiForbidden();
         if (!await fs.CanListAsync(path, user)) return ApiForbidden();
 
         var now = DateTime.UtcNow;
@@ -151,6 +153,7 @@ public sealed class SyncApiController : ApiControllerBase
         if (share is null || !share.IsEnabled) return ApiNotFound("Share not found.");
 
         var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        if (IsHomesRoot(share, path)) return ApiForbidden();
         if (!await fs.CanListAsync(path, user)) return ApiForbidden();
 
         profile.RelativePath = path;
@@ -193,6 +196,7 @@ public sealed class SyncApiController : ApiControllerBase
             return ApiBadRequest("invalid_path", "The path is not a valid share-relative path.");
 
         var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        if (IsHomesRoot(share, root)) return ApiForbidden();
         if (!await fs.CanListAsync(root, user)) return ApiForbidden();
 
         var delta = await _syncQuery.EnumerateAsync(shareId, root, user, HttpContext.RequestAborted);
@@ -223,6 +227,7 @@ public sealed class SyncApiController : ApiControllerBase
         // Same gate as delta/wait: list access on the watched subtree, so the feed cannot be used to
         // probe for hidden content.
         var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        if (IsHomesRoot(share, root)) return ApiForbidden();
         if (!await fs.CanListAsync(root, user)) return ApiForbidden();
 
         var ct = HttpContext.RequestAborted;
@@ -254,6 +259,15 @@ public sealed class SyncApiController : ApiControllerBase
             visible.Select(FileChangeDto.From).ToList(), nextSeq, truncated, reset);
         return Ok(dto);
     }
+
+    /// <summary>
+    /// The root of the home-folder share holds every user's home. Each user may list it (SMB
+    /// tree-connect needs that, and listings are ACL-filtered), but syncing it would stream the
+    /// change log of all homes, including deleted names from other users' folders. A client
+    /// syncs its own home at <c>&lt;userId&gt;</c> instead.
+    /// </summary>
+    private static bool IsHomesRoot(ShareDefinition share, string path)
+        => share.IsUserHomes && path.Length == 0;
 
     /// <summary>
     /// Whether an incremental cursor has a retention gap: the client last saw <paramref name="since"/>
@@ -322,6 +336,7 @@ public sealed class SyncApiController : ApiControllerBase
         // Only let a caller wait on a subtree they may list, so this cannot be
         // used to probe for the existence of hidden content.
         var fs = _fileServiceFactory.CreateForShare(share.Id, share.Path);
+        if (IsHomesRoot(share, root)) return ApiForbidden();
         if (!await fs.CanListAsync(root, user)) return ApiForbidden();
 
         Response.Headers[HeaderNames.CacheControl] = "no-store";

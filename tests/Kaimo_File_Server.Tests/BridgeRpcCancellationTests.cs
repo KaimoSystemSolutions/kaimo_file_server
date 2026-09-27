@@ -42,7 +42,7 @@ public sealed class BridgeRpcCancellationTests
             .Returns(new TaskCompletionSource<List<Core.Domain.ShareDefinition>>(
                 TaskCreationOptions.RunContinuationsAsynchronously).Task);
         var sut = new ShareGrpcService(
-            shares.Object, NullLogger<ShareGrpcService>.Instance);
+            shares.Object, Mock.Of<IUserRepository>(), NullLogger<ShareGrpcService>.Instance);
 
         await AssertRpcCancellationAsync(context => sut.ListShares(
             new ListSharesRequest(), context));

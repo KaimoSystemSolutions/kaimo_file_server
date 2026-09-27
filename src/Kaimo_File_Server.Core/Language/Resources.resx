@@ -4827,4 +4827,124 @@
   <data name="Web_ShareLink_UploadDisabled" xml:space="preserve">
     <value>Upload links are disabled. An administrator can enable them under Settings → Share Links.</value>
   </data>
+  <data name="Web_Perm_ManageHomes" xml:space="preserve">
+    <value>Manage home folders</value>
+  </data>
+  <data name="Web_Home_DisplayName" xml:space="preserve">
+    <value>user</value>
+  </data>
+  <data name="Web_Home_Unavailable" xml:space="preserve">
+    <value>Your home folder is not available. It may be disabled for your account or not set up yet.</value>
+  </data>
+  <data name="Web_Homes_DisplayName" xml:space="preserve">
+    <value>users</value>
+  </data>
+  <data name="Web_Homes_Title" xml:space="preserve">
+    <value>User home folders</value>
+  </data>
+  <data name="Web_Homes_Subtitle" xml:space="preserve">
+    <value>Size, status and public links of every home folder. Contents stay private.</value>
+  </data>
+  <data name="Web_Homes_NotConfigured" xml:space="preserve">
+    <value>Home folders are not set up yet. Choose a storage pool under Settings → Storage.</value>
+  </data>
+  <data name="Web_Homes_Empty" xml:space="preserve">
+    <value>No home folders exist yet.</value>
+  </data>
+  <data name="Web_Homes_Col_Links" xml:space="preserve">
+    <value>Links</value>
+  </data>
+  <data name="Web_Homes_DeletedUser" xml:space="preserve">
+    <value>Deleted user</value>
+  </data>
+  <data name="Web_Homes_Label_Folder" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="Web_Homes_Toggle_Enabled" xml:space="preserve">
+    <value>Home folder enabled</value>
+  </data>
+  <data name="Web_Homes_Toggle_Hint" xml:space="preserve">
+    <value>Disabling hides the folder on every access path (web, app, WebDAV, SMB). Its files are kept.</value>
+  </data>
+  <data name="Web_Homes_NoLinks" xml:space="preserve">
+    <value>This home folder has no public links.</value>
+  </data>
+  <data name="Web_Homes_NoExpiry" xml:space="preserve">
+    <value>No expiry</value>
+  </data>
+  <data name="Web_Homes_SelectHint" xml:space="preserve">
+    <value>Select a home folder to see its details.</value>
+  </data>
+  <data name="Web_Homes_Status_Orphaned" xml:space="preserve">
+    <value>Orphaned</value>
+  </data>
+  <data name="Web_Homes_LoadFailed" xml:space="preserve">
+    <value>Home folders could not be loaded.</value>
+  </data>
+  <data name="Web_Homes_SaveFailed" xml:space="preserve">
+    <value>The home folder could not be changed.</value>
+  </data>
+  <data name="Web_Settings_Homes_Label" xml:space="preserve">
+    <value>User home folders</value>
+  </data>
+  <data name="Web_Settings_Homes_Description" xml:space="preserve">
+    <value>Every user gets a private folder users/&lt;user id&gt; that only they can access. Users see it as "user" in the web UI and app; administrators only see its size, status and links.</value>
+  </data>
+  <data name="Web_Settings_Homes_Share" xml:space="preserve">
+    <value>Share</value>
+  </data>
+  <data name="Web_Settings_Homes_PoolHint" xml:space="preserve">
+    <value>The pool cannot be changed once home folders are set up.</value>
+  </data>
+  <data name="Web_Settings_Homes_SetUp" xml:space="preserve">
+    <value>Set up home folders</value>
+  </data>
+  <data name="Web_Settings_Homes_Configured" xml:space="preserve">
+    <value>Home folders are set up.</value>
+  </data>
+  <data name="Web_Settings_Homes_AlreadyConfigured" xml:space="preserve">
+    <value>Home folders are already set up.</value>
+  </data>
+  <data name="Web_Settings_Homes_NameTaken" xml:space="preserve">
+    <value>A share named "users" already exists. Rename it before setting up home folders.</value>
+  </data>
+  <data name="Web_Settings_Homes_ConfigureFailed" xml:space="preserve">
+    <value>Home folders could not be set up.</value>
+  </data>
+  <data name="Web_Settings_Homes_Enabled" xml:space="preserve">
+    <value>Home folders enabled</value>
+  </data>
+  <data name="Web_Settings_Homes_EnabledHint" xml:space="preserve">
+    <value>When off, no user has a home folder on any access path and the per-user switch is hidden. Files and per-user settings are kept.</value>
+  </data>
+  <data name="Web_Settings_Homes_EnabledSaved" xml:space="preserve">
+    <value>Home folders are enabled for all users.</value>
+  </data>
+  <data name="Web_Settings_Homes_DisabledSaved" xml:space="preserve">
+    <value>Home folders are disabled for all users.</value>
+  </data>
+  <data name="Web_Homes_GloballyDisabled" xml:space="preserve">
+    <value>Home folders are disabled for all users (Settings → Storage). Files are kept.</value>
+  </data>
+  <data name="Web_Homes_Delete" xml:space="preserve">
+    <value>Delete home folder</value>
+  </data>
+  <data name="Web_Homes_DeleteConfirmTitle" xml:space="preserve">
+    <value>Delete home folder?</value>
+  </data>
+  <data name="Web_Homes_DeleteConfirmText" xml:space="preserve">
+    <value>All files in the home folder of {0} ({1}) are permanently deleted, together with its {2} public link(s) and file versions.</value>
+  </data>
+  <data name="Web_Homes_DeleteRecreateHint" xml:space="preserve">
+    <value>The user keeps an enabled home and immediately gets a new, empty one.</value>
+  </data>
+  <data name="Web_Homes_DeleteIrreversible" xml:space="preserve">
+    <value>This cannot be undone.</value>
+  </data>
+  <data name="Web_Homes_DeleteFailed" xml:space="preserve">
+    <value>The home folder could not be deleted.</value>
+  </data>
+  <data name="Web_Homes_Deleted" xml:space="preserve">
+    <value>Home folder deleted.</value>
+  </data>
 </root>

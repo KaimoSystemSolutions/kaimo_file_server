@@ -4761,4 +4761,124 @@
   <data name="Web_ShareLink_UploadDisabled" xml:space="preserve">
     <value>Upload-Links sind deaktiviert. Ein Administrator kann sie unter Einstellungen → Freigabelinks aktivieren.</value>
   </data>
+  <data name="Web_Perm_ManageHomes" xml:space="preserve">
+    <value>Home-Ordner verwalten</value>
+  </data>
+  <data name="Web_Home_DisplayName" xml:space="preserve">
+    <value>user</value>
+  </data>
+  <data name="Web_Home_Unavailable" xml:space="preserve">
+    <value>Dein Home-Ordner ist nicht verfügbar. Er ist für dein Konto deaktiviert oder noch nicht eingerichtet.</value>
+  </data>
+  <data name="Web_Homes_DisplayName" xml:space="preserve">
+    <value>users</value>
+  </data>
+  <data name="Web_Homes_Title" xml:space="preserve">
+    <value>Home-Ordner der Benutzer</value>
+  </data>
+  <data name="Web_Homes_Subtitle" xml:space="preserve">
+    <value>Größe, Status und öffentliche Links jedes Home-Ordners. Die Inhalte bleiben privat.</value>
+  </data>
+  <data name="Web_Homes_NotConfigured" xml:space="preserve">
+    <value>Home-Ordner sind noch nicht eingerichtet. Wähle unter Einstellungen → Speicher einen Storage-Pool.</value>
+  </data>
+  <data name="Web_Homes_Empty" xml:space="preserve">
+    <value>Es gibt noch keine Home-Ordner.</value>
+  </data>
+  <data name="Web_Homes_Col_Links" xml:space="preserve">
+    <value>Links</value>
+  </data>
+  <data name="Web_Homes_DeletedUser" xml:space="preserve">
+    <value>Gelöschter Benutzer</value>
+  </data>
+  <data name="Web_Homes_Label_Folder" xml:space="preserve">
+    <value>Ordner</value>
+  </data>
+  <data name="Web_Homes_Toggle_Enabled" xml:space="preserve">
+    <value>Home-Ordner aktiviert</value>
+  </data>
+  <data name="Web_Homes_Toggle_Hint" xml:space="preserve">
+    <value>Deaktivieren blendet den Ordner auf allen Zugängen aus (Web, App, WebDAV, SMB). Die Dateien bleiben erhalten.</value>
+  </data>
+  <data name="Web_Homes_NoLinks" xml:space="preserve">
+    <value>Dieser Home-Ordner hat keine öffentlichen Links.</value>
+  </data>
+  <data name="Web_Homes_NoExpiry" xml:space="preserve">
+    <value>Kein Ablauf</value>
+  </data>
+  <data name="Web_Homes_SelectHint" xml:space="preserve">
+    <value>Wähle einen Home-Ordner aus, um Details zu sehen.</value>
+  </data>
+  <data name="Web_Homes_Status_Orphaned" xml:space="preserve">
+    <value>Verwaist</value>
+  </data>
+  <data name="Web_Homes_LoadFailed" xml:space="preserve">
+    <value>Die Home-Ordner konnten nicht geladen werden.</value>
+  </data>
+  <data name="Web_Homes_SaveFailed" xml:space="preserve">
+    <value>Der Home-Ordner konnte nicht geändert werden.</value>
+  </data>
+  <data name="Web_Settings_Homes_Label" xml:space="preserve">
+    <value>Home-Ordner der Benutzer</value>
+  </data>
+  <data name="Web_Settings_Homes_Description" xml:space="preserve">
+    <value>Jeder Benutzer erhält einen privaten Ordner users/&lt;Benutzer-ID&gt;, auf den nur er zugreifen kann. Benutzer sehen ihn in Web-UI und App als "user"; Administratoren sehen nur Größe, Status und Links.</value>
+  </data>
+  <data name="Web_Settings_Homes_Share" xml:space="preserve">
+    <value>Freigabe</value>
+  </data>
+  <data name="Web_Settings_Homes_PoolHint" xml:space="preserve">
+    <value>Der Pool kann nach dem Einrichten nicht mehr geändert werden.</value>
+  </data>
+  <data name="Web_Settings_Homes_SetUp" xml:space="preserve">
+    <value>Home-Ordner einrichten</value>
+  </data>
+  <data name="Web_Settings_Homes_Configured" xml:space="preserve">
+    <value>Die Home-Ordner sind eingerichtet.</value>
+  </data>
+  <data name="Web_Settings_Homes_AlreadyConfigured" xml:space="preserve">
+    <value>Die Home-Ordner sind bereits eingerichtet.</value>
+  </data>
+  <data name="Web_Settings_Homes_NameTaken" xml:space="preserve">
+    <value>Es gibt bereits eine Freigabe namens "users". Benenne sie um, bevor du die Home-Ordner einrichtest.</value>
+  </data>
+  <data name="Web_Settings_Homes_ConfigureFailed" xml:space="preserve">
+    <value>Die Home-Ordner konnten nicht eingerichtet werden.</value>
+  </data>
+  <data name="Web_Settings_Homes_Enabled" xml:space="preserve">
+    <value>Home-Ordner aktiviert</value>
+  </data>
+  <data name="Web_Settings_Homes_EnabledHint" xml:space="preserve">
+    <value>Wenn aus, hat kein Benutzer auf irgendeinem Zugang einen Home-Ordner, und der Schalter pro Benutzer wird ausgeblendet. Dateien und Einstellungen pro Benutzer bleiben erhalten.</value>
+  </data>
+  <data name="Web_Settings_Homes_EnabledSaved" xml:space="preserve">
+    <value>Die Home-Ordner sind für alle Benutzer aktiviert.</value>
+  </data>
+  <data name="Web_Settings_Homes_DisabledSaved" xml:space="preserve">
+    <value>Die Home-Ordner sind für alle Benutzer deaktiviert.</value>
+  </data>
+  <data name="Web_Homes_GloballyDisabled" xml:space="preserve">
+    <value>Die Home-Ordner sind für alle Benutzer deaktiviert (Einstellungen → Speicher). Die Dateien bleiben erhalten.</value>
+  </data>
+  <data name="Web_Homes_Delete" xml:space="preserve">
+    <value>Home-Ordner löschen</value>
+  </data>
+  <data name="Web_Homes_DeleteConfirmTitle" xml:space="preserve">
+    <value>Home-Ordner löschen?</value>
+  </data>
+  <data name="Web_Homes_DeleteConfirmText" xml:space="preserve">
+    <value>Alle Dateien im Home-Ordner von {0} ({1}) werden endgültig gelöscht, zusammen mit {2} öffentlichen Link(s) und den Dateiversionen.</value>
+  </data>
+  <data name="Web_Homes_DeleteRecreateHint" xml:space="preserve">
+    <value>Der Benutzer behält ein aktiviertes Home und erhält sofort einen neuen, leeren Home-Ordner.</value>
+  </data>
+  <data name="Web_Homes_DeleteIrreversible" xml:space="preserve">
+    <value>Das kann nicht rückgängig gemacht werden.</value>
+  </data>
+  <data name="Web_Homes_DeleteFailed" xml:space="preserve">
+    <value>Der Home-Ordner konnte nicht gelöscht werden.</value>
+  </data>
+  <data name="Web_Homes_Deleted" xml:space="preserve">
+    <value>Home-Ordner gelöscht.</value>
+  </data>
 </root>

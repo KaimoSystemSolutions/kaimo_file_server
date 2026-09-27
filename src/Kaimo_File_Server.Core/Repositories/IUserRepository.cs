@@ -120,6 +120,9 @@ namespace Kaimo_File_Server.Core.Repositories
         /// profile picture and its MIME type.
         /// </summary>
         Task UpdatePhotoAsync(Guid userId, byte[]? photo, string? contentType);
+
+        /// <summary>Sets whether the user's personal home folder is available.</summary>
+        Task UpdateHomeDirectoryEnabledAsync(Guid userId, bool enabled);
     }
 
     /// <summary>Minimal database projection used by Samba credential export.</summary>

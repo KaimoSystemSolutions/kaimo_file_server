@@ -62,6 +62,17 @@ int main() {
             std::cerr << "kaimo_sharesync: invalid share record rejected." << std::endl;
             return 1;
         }
+        if (s.allowed_users_size() > 100000) {
+            std::cerr << "kaimo_sharesync: allow list exceeds user limit." << std::endl;
+            return 1;
+        }
+        for (const auto& user : s.allowed_users()) {
+            if (!kaimo::sync_json::valid_username(user)) {
+                std::cerr << "kaimo_sharesync: invalid allowed user rejected." << std::endl;
+                return 1;
+            }
+            estimated_json_bytes += user.size() + 3;
+        }
         estimated_json_bytes += s.name().size() + s.path().size() + 64;
         if (estimated_json_bytes > 16 * 1024 * 1024) {
             std::cerr << "kaimo_sharesync: JSON response exceeds size limit." << std::endl;
@@ -76,8 +87,18 @@ int main() {
         first = false;
         std::cout << "{\"name\":" << kaimo::sync_json::quote(s.name())
                   << ",\"path\":" << kaimo::sync_json::quote(s.path())
-                  << ",\"hidden\":" << kaimo::sync_json::boolean(s.is_hidden())
-                  << '}';
+                  << ",\"hidden\":" << kaimo::sync_json::boolean(s.is_hidden());
+        // Only restricted shares carry an allow list; its absence keeps Samba's
+        // default share security descriptor.
+        if (s.restricted()) {
+            std::cout << ",\"allowed_users\":[";
+            for (int i = 0; i < s.allowed_users_size(); ++i) {
+                if (i > 0) std::cout << ',';
+                std::cout << kaimo::sync_json::quote(s.allowed_users(i));
+            }
+            std::cout << ']';
+        }
+        std::cout << '}';
     }
     std::cout << "]}\n";
     std::cerr << "kaimo_sharesync: " << reply.shares_size()

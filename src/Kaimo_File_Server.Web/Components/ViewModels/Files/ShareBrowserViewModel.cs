@@ -11,6 +11,7 @@ using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Kaimo_File_Server.Core.Language;
+using Kaimo_File_Server.Infrastructure.Services;
 
 namespace Kaimo_File_Server.Web.Components.ViewModels;
 
@@ -27,6 +28,7 @@ public partial class ShareBrowserViewModel
     private readonly ILogger<ShareBrowserViewModel> _logger;
     private readonly IFileServiceFactory _fileServiceFactory;
     private readonly IDepartmentRepository? _departmentRepo;
+    private readonly HomeDirectoryService? _homes;
 
     public ShareBrowserViewModel(
         IShareRepository shareRepo,
@@ -36,7 +38,8 @@ public partial class ShareBrowserViewModel
         AuthenticationStateProvider authState,
         ILogger<ShareBrowserViewModel> logger,
         IFileServiceFactory fileServiceFactory,
-        IDepartmentRepository? departmentRepo = null)
+        IDepartmentRepository? departmentRepo = null,
+        HomeDirectoryService? homes = null)
     {
         _shareRepo = shareRepo;
         _aclService = aclService;
@@ -46,6 +49,7 @@ public partial class ShareBrowserViewModel
         _logger = logger;
         _fileServiceFactory = fileServiceFactory;
         _departmentRepo = departmentRepo;
+        _homes = homes;
     }
 
     // DepartmentId → department, populated in LoadAsync only when the actor may see
@@ -91,6 +95,12 @@ public partial class ShareBrowserViewModel
     public bool CanManageShares { get; private set; }
     public bool IsAdmin { get; private set; }
 
+    /// <summary>Whether the pinned "user" entry (the actor's own home folder) is shown.</summary>
+    public bool HasHome { get; private set; }
+
+    /// <summary>Whether the pinned "users" entry (home-folder metadata overview) is shown.</summary>
+    public bool CanManageHomes { get; private set; }
+
     // -- Computed --
     public string CurrentUserName { get; private set; } = "";
 
@@ -120,6 +130,9 @@ public partial class ShareBrowserViewModel
             var actor = string.IsNullOrEmpty(username)
                 ? null
                 : await _userContextFactory.CreateByUsernameAsync(username);
+
+            HasHome = false;
+            CanManageHomes = false;
 
             if (actor is null)
             {
@@ -156,12 +169,21 @@ public partial class ShareBrowserViewModel
             CanManageShares = await _mgmtAuth.HasAnyPermissionAsync(
                 actor, ManagementPermission.CreateShares);
 
+            var homesShare = _homes is null ? null : await _homes.GetHomesShareAsync();
+            HasHome = homesShare is { IsEnabled: true } && actor.User.HomeDirectoryEnabled;
+            CanManageHomes = homesShare is not null
+                && await _mgmtAuth.HasGlobalPermissionAsync(actor, ManagementPermission.ManageHomes);
+
             var allShares = await _shareRepo.GetAllEnabledAsync();
             //var allShares = await _shareRepo.GetAllAsync();
             var visible = new List<ShareDefinition>(allShares.Count);
 
             foreach (var share in allShares)
             {
+                // The home-folder share is only reachable through the pinned entries.
+                if (share.IsUserHomes)
+                    continue;
+
                 // (A) Management view: in scope → always visible (incl. hidden/disabled).
                 if (manageAll || manageableShareIds.Contains(share.Id))
                 {

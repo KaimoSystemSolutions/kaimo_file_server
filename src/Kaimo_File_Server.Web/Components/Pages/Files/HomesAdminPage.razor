@@ -1,0 +1,242 @@
+@page "/files/users"
+@using Kaimo_File_Server.Core.Domain
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@using Kaimo_File_Server.Web.Helpers
+@using Kaimo_File_Server.Web.Services
+@inherits AppComponentBase
+@inject HomesAdminViewModel VM
+@inject NavigationManager Nav
+@inject DateFormatService DateFmt
+
+@*
+    Metadata-only overview of all user home folders (users/<userId>). Folder content is never
+    listed here: an administrator sees who owns a home, its size, its status and its public
+    links, and can enable or disable it. Users without ManageHomes are sent to their own home.
+*@
+
+<PageTitle>Kaimo File Server – @T("Web_Homes_Title", "User home folders")</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>@T("Web_Homes_Title", "User home folders")</h1>
+        <p class="subtitle">@T("Web_Homes_Subtitle", "Size, status and public links of every home folder. Contents stay private.")</p>
+    </div>
+</div>
+
+@if (VM.IsLoading)
+{
+    <div class="loading-state"><div class="spinner"></div><p>@Resources.Web_Common_Loading</p></div>
+}
+else if (VM.ErrorMessage is not null)
+{
+    <div class="error-banner">@VM.ErrorMessage</div>
+}
+else if (!VM.IsConfigured)
+{
+    <div class="empty-state">
+        @Assets.SVG("users.svg", new SvgOptions(Width: 64, Height: 64, Color: "var(--text-tertiary)"))
+        <p>@T("Web_Homes_NotConfigured", "Home folders are not set up yet. Choose a storage pool under Settings → Storage.")</p>
+    </div>
+}
+else if (!VM.Rows.Any())
+{
+    <div class="empty-state">
+        @Assets.SVG("users.svg", new SvgOptions(Width: 64, Height: 64, Color: "var(--text-tertiary)"))
+        <p>@T("Web_Homes_Empty", "No home folders exist yet.")</p>
+    </div>
+}
+else
+{
+    @if (VM.SuccessMessage is not null)
+    {
+        <div class="success-banner">@VM.SuccessMessage</div>
+    }
+    @if (!VM.IsGloballyEnabled)
+    {
+        <div class="warning-banner">@T("Web_Homes_GloballyDisabled", "Home folders are disabled for all users (Settings → Storage). Files are kept.")</div>
+    }
+    <div class="admin-content homes-workspace admin-compact">
+        <section class="homes-list" aria-label="@T("Web_Homes_Title", "User home folders")">
+            <div class="homes-row homes-header" aria-hidden="true">
+                <span>@Resources.Web_Common_Name</span>
+                <span class="homes-cell-size">@Resources.Web_Folder_Size</span>
+                <span>@T("Web_Homes_Col_Links", "Links")</span>
+                <span>@Resources.Web_Admin_Label_Status</span>
+            </div>
+            @foreach (var row in VM.Rows)
+            {
+                var selected = row.UserId == VM.SelectedUserId;
+                <button type="button" class="homes-row homes-selectable @(selected ? "homes-selected" : "")"
+                        aria-pressed="@selected" @onclick="() => VM.SelectedUserId = row.UserId">
+                    <span class="homes-cell-name">
+                        <span class="homes-avatar" aria-hidden="true">
+                            @if (UserAvatar.DataUri(row.User) is { } uri)
+                            {
+                                <img src="@uri" alt="" />
+                            }
+                            else if (row.User is not null)
+                            {
+                                @UserAvatar.Initials(row.User)
+                            }
+                            else
+                            {
+                                <text>?</text>
+                            }
+                        </span>
+                        <span class="homes-name-text">
+                            <strong>@(row.User?.Name ?? T("Web_Homes_DeletedUser", "Deleted user"))</strong>
+                            <small>@(row.User is { } u ? "@" + u.Username : row.UserId.ToString())</small>
+                        </span>
+                    </span>
+                    <span class="homes-cell-size">@FormatHelper.FormatFileSize(row.SizeBytes)</span>
+                    <span>@row.Links.Count</span>
+                    <StatusBadge Tone="ToneOf(row)" Label="@StatusOf(row)" />
+                </button>
+            }
+        </section>
+
+        <aside class="admin-detail homes-detail">
+            @if (VM.Selected is { } sel)
+            {
+                <div class="detail-panel-header">
+                    <div class="detail-panel-name">@(sel.User?.Name ?? T("Web_Homes_DeletedUser", "Deleted user"))</div>
+                    <div class="detail-panel-subtitle">@(sel.User is { } su ? "@" + su.Username : "")</div>
+                </div>
+
+                <div class="detail-field-grid">
+                    <div class="detail-field">
+                        <span class="detail-field-label">@T("Web_Homes_Label_Folder", "Folder")</span>
+                        <span class="detail-field-value detail-value--mono">users/@sel.UserId</span>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-field-label">@Resources.Web_Folder_Size</span>
+                        <span class="detail-field-value">@FormatHelper.FormatFileSize(sel.SizeBytes)</span>
+                    </div>
+                </div>
+
+                @if (sel.User is not null && VM.IsGloballyEnabled)
+                {
+                    <div class="toggle-row homes-toggle">
+                        <span class="toggle-label-text">@T("Web_Homes_Toggle_Enabled", "Home folder enabled")</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" checked="@sel.IsEnabled"
+                                   @onchange="e => VM.SetEnabledAsync(sel.UserId, e.Value is true)" />
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <p class="form-hint">@T("Web_Homes_Toggle_Hint", "Disabling hides the folder on every access path. Its files are kept.")</p>
+                }
+
+                <div class="detail-section">
+                    <div class="detail-label">@T("Web_Homes_Col_Links", "Links") (@sel.Links.Count)</div>
+                    @if (sel.Links.Count == 0)
+                    {
+                        <p class="empty-hint">@T("Web_Homes_NoLinks", "This home folder has no public links.")</p>
+                    }
+                    else
+                    {
+                        <ul class="homes-links">
+                            @foreach (var link in sel.Links)
+                            {
+                                <li>
+                                    @Assets.SVG(link.Kind == ShareLinkKind.Upload ? "upload.svg" : "download.svg",
+                                        new SvgOptions(Width: 16, Height: 16, Color: "var(--text-secondary)"))
+                                    <span class="homes-link-name">@link.DisplayName</span>
+                                    <small>@DateFmt.FormatDate(link.ExpiresAtUtc, T("Web_Homes_NoExpiry", "No expiry"))</small>
+                                    <StatusBadge ShowDot="false"
+                                                 Tone="@(link.IsEnabled ? StatusTone.Positive : StatusTone.Neutral)"
+                                                 Label="@(link.IsEnabled ? Resources.Web_Common_Active : Resources.Web_Common_Disabled)" />
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+
+                <div class="detail-actions">
+                    <button class="btn-danger-outline" type="button" @onclick="() => _confirmDeleteId = sel.UserId">
+                        @Assets.SVG("trash.svg", new SvgOptions(Width: 15, Height: 15, StrokeWidth: 2))
+                        <span>@T("Web_Homes_Delete", "Delete home folder")</span>
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="detail-empty">
+                    @Assets.SVG("users.svg", new SvgOptions(Width: 48, Height: 48, Color: "var(--text-tertiary)"))
+                    <p>@T("Web_Homes_SelectHint", "Select a home folder to see its details.")</p>
+                </div>
+            }
+        </aside>
+    </div>
+
+    @if (_confirmDeleteId is { } deleteId && VM.Rows.FirstOrDefault(r => r.UserId == deleteId) is { } target)
+    {
+        <div class="modal-backdrop" @onclick="CancelDelete">
+            <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="homes-delete-title"
+                 @onclick:stopPropagation="true">
+                <h3 class="modal-title" id="homes-delete-title">@T("Web_Homes_DeleteConfirmTitle", "Delete home folder?")</h3>
+                <p class="modal-text">
+                    @string.Format(T("Web_Homes_DeleteConfirmText", "All files in the home folder of {0} ({1}) are permanently deleted, together with its {2} public link(s) and file versions."),
+                        target.User?.Name ?? target.UserId.ToString(), FormatHelper.FormatFileSize(target.SizeBytes), target.Links.Count)
+                </p>
+                @if (target.IsEnabled && VM.IsGloballyEnabled)
+                {
+                    <p class="modal-text">@T("Web_Homes_DeleteRecreateHint", "The user keeps an enabled home and immediately gets a new, empty one.")</p>
+                }
+                <p class="modal-warning">@T("Web_Homes_DeleteIrreversible", "This cannot be undone.")</p>
+                <div class="modal-actions">
+                    <button class="btn-secondary" type="button" disabled="@_deleting" @onclick="CancelDelete">@Resources.Web_Common_Cancel</button>
+                    <button class="btn-danger" type="button" disabled="@_deleting" @onclick="() => ConfirmDelete(target.UserId)">
+                        @T("Web_Homes_Delete", "Delete home folder")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await VM.LoadAsync();
+        // Without ManageHomes this overview does not exist for the user; their home is /files/user.
+        if (!VM.CanAccessPage)
+            Nav.NavigateTo("/files/user", replace: true);
+    }
+
+    private Guid? _confirmDeleteId;
+    private bool _deleting;
+
+    private void CancelDelete()
+    {
+        if (!_deleting)
+            _confirmDeleteId = null;
+    }
+
+    private async Task ConfirmDelete(Guid userId)
+    {
+        _deleting = true;
+        try { await VM.DeleteHomeAsync(userId); }
+        finally
+        {
+            _deleting = false;
+            _confirmDeleteId = null;
+        }
+    }
+
+    private static string T(string key, string fallback) => Resources.ResourceManager.GetString(key) ?? fallback;
+
+    // While home folders are off globally no home is usable, whatever its own setting.
+    private bool IsActive(HomeFolderRow row) => row.IsEnabled && VM.IsGloballyEnabled;
+
+    private StatusTone ToneOf(HomeFolderRow row)
+        => row.User is null ? StatusTone.Warning : IsActive(row) ? StatusTone.Positive : StatusTone.Neutral;
+
+    private string StatusOf(HomeFolderRow row)
+        => row.User is null ? T("Web_Homes_Status_Orphaned", "Orphaned")
+           : IsActive(row) ? Resources.Web_Common_Active
+           : Resources.Web_Common_Disabled;
+}

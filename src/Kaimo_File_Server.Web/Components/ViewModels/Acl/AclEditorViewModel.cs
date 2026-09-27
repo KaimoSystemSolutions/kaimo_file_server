@@ -69,6 +69,10 @@ public class AclEditorViewModel
         var actor = await _userContextFactory.CreateByUsernameAsync(username);
         if (actor is null) return false;
 
+        // Home-folder ACLs are owned by the home-folder service; editing them here would let an
+        // administrator grant themselves access to other users' homes.
+        if ((await _shareRepo.GetByIdAsync(ShareId))?.IsUserHomes == true) return false;
+
         return await _mgmtAuth.CanManageShareAsync(
             actor, ShareId, ManagementPermission.ManageShareAcls);
     }

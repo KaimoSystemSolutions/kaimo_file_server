@@ -1,3 +1,4 @@
+using Kaimo_File_Server.Infrastructure.Services;
 ﻿using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
@@ -32,6 +33,7 @@ public class UserListViewModel
     private readonly ILogger<UserListViewModel> _logger;
     private readonly IShareRepository _shareRepo;
     private readonly IConfigRepository _config;
+    private readonly HomeDirectoryService? _homes;
     private readonly ILoginService? _loginService;
     private readonly ClientConnectionInfo? _client;
     private readonly JwtTokenService? _jwt;
@@ -54,8 +56,10 @@ public class UserListViewModel
         ILoginService? loginService = null,
         ClientConnectionInfo? client = null,
         JwtTokenService? jwt = null,
-        IMemoryCache? cache = null)
+        IMemoryCache? cache = null,
+        HomeDirectoryService? homes = null)
     {
+        _homes = homes;
         _loginService = loginService;
         _client = client;
         _jwt = jwt;
@@ -235,6 +239,13 @@ public class UserListViewModel
     public string EditUserLastName { get; set; } = "";
     public bool EditUserIsEnabled { get; set; } = true;
     public bool EditUserCanChangePassword { get; set; } = true;
+    public bool EditUserHomeDirectoryEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Whether the per-user home toggle is offered: the actor holds global
+    /// <see cref="ManagementPermission.ManageHomes"/> and home folders are enabled globally.
+    /// </summary>
+    public bool CanManageHomes { get; private set; }
     public List<CheckboxItem<Group>> EditUserGroups { get; private set; } = [];
     public List<CheckboxItem<Role>> EditUserRoles { get; private set; } = [];
     public List<CheckboxItem<Department>> EditUserDepartments { get; private set; } = [];
@@ -373,6 +384,8 @@ public class UserListViewModel
             new(ManagementPermission.DeleteUsers, Resources.Web_Perm_DeleteUsers),
             new(ManagementPermission.EditUserProfiles, Resources.Web_Perm_EditProfiles),
             new(ManagementPermission.ResetPasswords, Resources.Web_Perm_ResetPasswords),
+            new(ManagementPermission.ManageHomes,
+                Resources.ResourceManager.GetString("Web_Perm_ManageHomes") ?? "Manage home folders"),
             // EnableDisableUsers is intentionally NOT offered here: the IsEnabled
             // toggle lives in the profile-edit form and is enforced via
             // EditUserProfiles. A standalone bit would be dead (never checked).
@@ -518,6 +531,9 @@ public class UserListViewModel
         IsGlobalAdmin = await _mgmtAuth.HasGlobalPermissionAsync(
             _actorContext, ManagementPermission.FullAdmin);
 
+        CanManageHomes = _homes is not null
+            && await _homes.GetHomesShareAsync() is { IsEnabled: true }
+            && await _mgmtAuth.HasGlobalPermissionAsync(_actorContext, ManagementPermission.ManageHomes);
         CanCreateUsers = await _mgmtAuth.HasAnyPermissionAsync(
             _actorContext, ManagementPermission.CreateUsers);
 
@@ -727,6 +743,7 @@ public class UserListViewModel
         EditUserEmail = SelectedUser.Email ?? "";
         EditUserIsEnabled = SelectedUser.IsEnabled;
         EditUserCanChangePassword = SelectedUser.CanChangePassword;
+        EditUserHomeDirectoryEnabled = SelectedUser.HomeDirectoryEnabled;
 
         var departmentIds = UserDepartments.Select(department => department.Id).ToHashSet();
         var allGroups = (await _groupRepo.GetAllAsync())
@@ -789,6 +806,8 @@ public class UserListViewModel
 
             await _userRepo.UpdatePersonalNamesAsync(
                 SelectedUser.Id, NullIfBlank(EditUserFirstName), NullIfBlank(EditUserLastName));
+            if (CanManageHomes && EditUserHomeDirectoryEnabled != SelectedUser.HomeDirectoryEnabled)
+                await _homes!.SetEnabledAsync(SelectedUser.Id, EditUserHomeDirectoryEnabled);
             if (_photoChanged)
                 await _userRepo.UpdatePhotoAsync(SelectedUser.Id, EditUserPhoto, EditUserPhotoContentType);
 
@@ -1361,6 +1380,7 @@ public class UserListViewModel
             await _departmentRepo.AddUserAsync(CreateUserDepartmentId.Value, user.Id);
             // Every user is a member of the global Everyone group.
             await _groupRepo.AddMemberAsync(WellKnownGUIDs.GROUP_EVERYONE, user.Id);
+            await EnsureHomeQuietlyAsync(user);
 
             IsCreatingUser = false;
             await LoadTabDataAsync();
@@ -1372,6 +1392,15 @@ public class UserListViewModel
             ErrorMessage = Resources.Web_Error_CreateFailed;
         }
         finally { IsSaving = false; }
+    }
+
+    // A missing home is recreated by the startup backfill or on first use, so a failure here
+    // (e.g. pool not mounted) must not fail the user creation itself.
+    private async Task EnsureHomeQuietlyAsync(User user)
+    {
+        if (_homes is null) return;
+        try { await _homes.EnsureHomeAsync(user); }
+        catch (Exception ex) { _logger.LogWarning(ex, "Could not provision the home folder of {UserId}", user.Id); }
     }
 
     // ══════════════════════════════════════════

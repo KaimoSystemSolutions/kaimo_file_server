@@ -35,7 +35,7 @@ else if (VM.ErrorMessage is not null)
 {
     <div class="error-banner">@VM.ErrorMessage</div>
 }
-else if (!VM.Shares.Any() && !RemoteVM.Shares.Any())
+else if (!VM.Shares.Any() && !RemoteVM.Shares.Any() && !VM.HasHome && !VM.CanManageHomes)
 {
     <div class="empty-state">
         @Assets.SVG("folder.svg", new SvgOptions(Width: 64, Height: 64, Color: "var(--text-tertiary)"))
@@ -66,6 +66,15 @@ else
                 @SortArrow("size")
             </div>
         </div>
+        @* Home entries are pinned above both share groups, so they stay on top in every sort order. *@
+        @if (VM.HasHome)
+        {
+            @PinnedRow(HomeFileBrowserViewModel.DisplayName, "user.svg", "/files/user")
+        }
+        @if (VM.CanManageHomes)
+        {
+            @PinnedRow(HomesAdminViewModel.DisplayName, "users.svg", "/files/users")
+        }
         @foreach (var share in SortedLocalShares())
         {
             <button class="file-grid-row file-row-dir share-overview-row" type="button" @onclick="() => OpenShare(share.Name)">
@@ -120,6 +129,21 @@ else
                 <span class="dept-muted">—</span>
             }
         </div>;
+
+    // A pinned entry: no physical path, department or size is shown for home folders.
+    private RenderFragment PinnedRow(string name, string icon, string href) =>
+        @<button class="file-grid-row file-row-dir share-overview-row" type="button" @onclick="() => Nav.NavigateTo(href)">
+            <div class="col-name">
+                @Assets.SVG(icon, new SvgOptions(Width: 20, Height: 20, Color: "var(--folder-stroke)", CssClass: "file-icon"))
+                <span>@name</span>
+            </div>
+            <div class="col-share-path"></div>
+            @if (ShowDepartmentColumn)
+            {
+                <div class="col-department"><span class="dept-muted">—</span></div>
+            }
+            <div class="col-size"></div>
+        </button>;
 
     // Column sorting mirrors the file browser: click cycles descending → ascending
     // → default (unsorted), and only one column is active at a time.

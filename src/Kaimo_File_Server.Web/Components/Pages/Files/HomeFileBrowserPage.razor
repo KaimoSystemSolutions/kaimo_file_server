@@ -1,0 +1,38 @@
+@page "/files/user"
+@page "/files/user/{*SubPath}"
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Web.Components.Pages.Files.FileBrowser
+@inject HomeFileBrowserViewModel HomeViewModel
+
+@if (_available is null)
+{
+    <div class="loading-state">
+        <div class="spinner"></div>
+    </div>
+}
+else if (_available == true)
+{
+    <FileBrowser VM="HomeViewModel"
+                 ShareName="@HomeViewModel.HomeShareName"
+                 ShareDisplayName="@HomeFileBrowserViewModel.DisplayName"
+                 SubPath="@SubPath"
+                 OverviewRoute="/files"
+                 ShareRoute="/files/user" />
+}
+else
+{
+    <div class="empty-state">
+        <p>@(Resources.ResourceManager.GetString("Web_Home_Unavailable") ?? "Your home folder is not available.")</p>
+        <a class="btn btn-secondary" href="/files">@Resources.Web_Breadcrumb_Shares</a>
+    </div>
+}
+
+@code {
+    [Parameter] public string? SubPath { get; set; }
+
+    // null = still resolving; false = no usable home (not configured, disabled, demo).
+    private bool? _available;
+
+    protected override async Task OnInitializedAsync()
+        => _available = await HomeViewModel.InitializeAsync();
+}

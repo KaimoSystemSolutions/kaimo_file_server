@@ -208,6 +208,8 @@ for invalid_case in \
     '{"version":1,"shares":[{"name":"valid","path":"/tmp/bad\npath","hidden":false}]}' \
     '{"version":1,"shares":[{"name":"Dupe","path":"/tmp/a","hidden":false},{"name":"dupe","path":"/tmp/b","hidden":false}]}' \
     '{"version":2,"shares":[]}' \
+    '{"version":1,"shares":[{"name":"users","path":"/tmp/u","hidden":false,"allowed_users":["-bad"]}]}' \
+    '{"version":1,"shares":[{"name":"users","path":"/tmp/u","hidden":false,"allowed_users":"alice"}]}' \
     '{"version":1,"shares":[]} {"version":1,"shares":[]}'; do
     printf '%s\n' "$invalid_case" >"$DESIRED_SHARES"
     if bash "$SUT" >/dev/null 2>&1 \
@@ -230,6 +232,59 @@ jq -n --arg path "/outside/storage/share" \
 if bash "$SUT" >/dev/null 2>&1 \
     || ! cmp -s "$WORK/share-state-before-invalid" "$SHARE_STATE"; then
     echo "FAIL: storage-root escape mutated registry state."
+    fail=1
+fi
+
+# Per-user visibility: a share with allowed_users gets a security descriptor that
+# grants exactly those users (by SID); shares without the list are never touched.
+export NET_FAIL_COMMAND="" NET_FAIL_PARAMETER=""   # the stub reads them under set -u
+export SHARESEC_DIR="$WORK/sharesec"
+export SHARESEC_LOG="$WORK/sharesec.log"
+mkdir -p "$SHARESEC_DIR" "$WORK/pool01/users"
+: > "$SHARESEC_LOG"
+cat > "$WORK/bin/pdbedit" <<'EOF'
+#!/bin/bash
+printf 'Unix username:        Alice\nUser SID:             S-1-5-21-1-1000\n'
+printf 'Unix username:        bob\nUser SID:             S-1-5-21-1-1001\n'
+EOF
+cat > "$WORK/bin/sharesec" <<'EOF'
+#!/bin/bash
+set -u
+name="$2"
+case "$3" in
+    --viewsddl) cat "$SHARESEC_DIR/$name" 2>/dev/null || echo 'D:(A;;FA;;;WD)' ;;
+    -S) printf '%s\n' "$4" > "$SHARESEC_DIR/$name"; echo "set $name $4" >> "$SHARESEC_LOG" ;;
+    *) exit 2 ;;
+esac
+EOF
+chmod +x "$WORK/bin/pdbedit" "$WORK/bin/sharesec"
+
+jq -n --arg users "$WORK/pool01/users" --arg plain "$WORK/pool01/stable" \
+    '{version:1,shares:[
+      {name:"users",path:$users,hidden:false,allowed_users:["alice","not-synced-yet"]},
+      {name:"plain",path:$plain,hidden:false}
+    ]}' >"$DESIRED_SHARES"
+if ! acl_output="$(bash "$SUT" 2>&1)"; then
+    printf '%s\n' "$acl_output"
+    echo "FAIL: restricted share was rejected."
+    fail=1
+elif [ "$(cat "$SHARESEC_DIR/users" 2>/dev/null)" != 'D:(A;;FA;;;S-1-5-21-1-1000)' ]; then
+    echo "FAIL: restricted share did not get exactly the allowed users (case-insensitive SID lookup)."
+    fail=1
+elif [ -e "$SHARESEC_DIR/plain" ]; then
+    echo "FAIL: unrestricted share got a security descriptor."
+    fail=1
+fi
+# An unchanged descriptor is not rewritten.
+if ! bash "$SUT" >/dev/null 2>&1 || [ "$(wc -l < "$SHARESEC_LOG")" != "1" ]; then
+    echo "FAIL: unchanged share permissions were rewritten."
+    fail=1
+fi
+# An empty allow list hides the share from everyone.
+jq -n --arg users "$WORK/pool01/users" \
+    '{version:1,shares:[{name:"users",path:$users,hidden:false,allowed_users:[]}]}' >"$DESIRED_SHARES"
+if ! bash "$SUT" >/dev/null 2>&1 || [ "$(cat "$SHARESEC_DIR/users")" != 'D:' ]; then
+    echo "FAIL: empty allow list did not deny everyone."
     fail=1
 fi
 
