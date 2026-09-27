@@ -361,12 +361,17 @@ else
                 StartCreate(connectionId);
             StateHasChanged();
         }
-        if (_scheduleGrid.Context is not null)
+        // Initialize once per rendered grid element (the grid is recreated when the
+        // tab or edit form reopens); the JS side is idempotent, but a round trip on
+        // every render floods the circuit.
+        if (_scheduleGrid.Context is not null && _scheduleGrid.Id != _initializedScheduleGridId)
         {
+            _initializedScheduleGridId = _scheduleGrid.Id;
             _schedulePaintReference ??= DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("schedulePaint.initialize", _scheduleGrid, _schedulePaintReference);
         }
     }
+    private string? _initializedScheduleGridId;
 
     private void StartCreate() => StartCreate(InitialConnectionId);
     private void StartCreate(Guid? connectionId)
@@ -614,6 +619,10 @@ else
     private void HandleSyncJobsChanged()
     {
         int count = SyncJobRunner.Jobs.Count;
+        // This page shows no live progress, so progress ticks must not re-render it
+        // (while editing, every render would also re-run the schedule-grid interop).
+        if (count == _lastSyncJobCount)
+            return;
         bool finished = count < _lastSyncJobCount;
         _lastSyncJobCount = count;
         _ = InvokeAsync(async () =>

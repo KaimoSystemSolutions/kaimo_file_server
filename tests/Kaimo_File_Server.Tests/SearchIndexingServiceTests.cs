@@ -57,6 +57,25 @@ public sealed class SearchIndexingServiceTests
     }
 
     [Fact]
+    public async Task File_CreatedWhileLockedByWriter_IndexesNameOnly_ModifiedStillThrows()
+    {
+        var (search, admin, shares) = Setup();
+        var storage = Mock.Get(shares[ShareId].Storage);
+        storage.Setup(s => s.ReadAsync(It.IsAny<string>()))
+            .Throws(new IOException("The process cannot access the file because it is being used by another process."));
+
+        await SearchIndexingService.IndexEntryAsync(
+            Entry(FileChangeType.Created, "docs/a.txt"), search.Object, admin.Object, shares);
+
+        search.Verify(s => s.onFileCreated(
+            "/abs/docs/a.txt",
+            It.Is<Task<Stream>>(t => t.Result == Stream.Null),
+            It.IsAny<CancellationToken>()), Times.Once);
+        await Assert.ThrowsAsync<IOException>(() => SearchIndexingService.IndexEntryAsync(
+            Entry(FileChangeType.Modified, "docs/a.txt"), search.Object, admin.Object, shares));
+    }
+
+    [Fact]
     public async Task Directory_Created_IndexesDirectory()
     {
         var (search, admin, shares) = Setup();

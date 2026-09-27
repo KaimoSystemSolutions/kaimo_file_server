@@ -173,11 +173,18 @@ public sealed class ExternalStorageSyncViewModel(
         }
 
         string newLocalPath = ShareRelativePath.Normalize(model.LocalPath);
-        var mutationLease = await syncOperations.TryBeginPathMutationAsync(
-            definition.LocalShareId, definition.LocalPath, newLocalPath);
-        if (mutationLease is null)
-            throw new InvalidOperationException(Text(
-                "Web_CloudSync_Error_Busy", "This folder is already being synchronized or modified."));
+        // A running sync works on the definition it loaded at start and only writes
+        // the separate runtime row, so settings edits are safe mid-run and apply to
+        // the next run. Only moving the sync to another local folder needs the lease.
+        ICloudSyncOperationLease? mutationLease = null;
+        if (!string.Equals(definition.LocalPath, newLocalPath, StringComparison.Ordinal))
+        {
+            mutationLease = await syncOperations.TryBeginPathMutationAsync(
+                definition.LocalShareId, definition.LocalPath, newLocalPath);
+            if (mutationLease is null)
+                throw new InvalidOperationException(Text(
+                    "Web_CloudSync_Error_Busy", "This folder is already being synchronized or modified."));
+        }
         await using var mutation = mutationLease;
 
         definition.ConnectionId = connection.Id;

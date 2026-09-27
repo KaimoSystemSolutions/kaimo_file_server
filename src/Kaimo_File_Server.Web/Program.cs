@@ -31,6 +31,12 @@ var builder = WebApplication.CreateBuilder(args);
 //  so certificate renewal / replacement takes effect without a restart.
 // ══════════════════════════════════════════
 
+// The aspnet base image sets ASPNETCORE_HTTP_PORTS=8080. The explicit endpoints below
+// already own the ports, so clear the implicit URL sources instead of letting Kestrel
+// log "Overriding address(es)" on every start.
+builder.WebHost.UseSetting(WebHostDefaults.ServerUrlsKey, string.Empty);
+builder.WebHost.UseSetting(WebHostDefaults.HttpPortsKey, string.Empty);
+builder.WebHost.UseSetting(WebHostDefaults.HttpsPortsKey, string.Empty);
 
 builder.WebHost.ConfigureKestrel(options =>
 {

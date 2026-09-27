@@ -54,6 +54,7 @@ public sealed class CloudSyncJobRunner(
     // Cancels every in-flight/queued job at host shutdown. Per-job tokens are
     // linked to this so no sync outlives the process.
     private readonly CancellationTokenSource _shutdown = new();
+    private const long ProgressNotifyIntervalMs = 500;
 
     public event Action? OnChanged;
 
@@ -143,6 +144,10 @@ public sealed class CloudSyncJobRunner(
                 return;
             }
 
+            // Providers report per file/chunk. Every notification re-renders each
+            // subscribed Blazor circuit, so an unthrottled large sync floods the
+            // SignalR connection until JS interop times out and the circuit dies.
+            long lastNotifyTicks = 0;
             void Report(string? message, int progress)
             {
                 lock (_gate)
@@ -151,6 +156,10 @@ public sealed class CloudSyncJobRunner(
                         job.Detail = message;
                     job.Progress = Math.Clamp(progress, 0, 100);
                 }
+                long now = Environment.TickCount64;
+                if (now - lastNotifyTicks < ProgressNotifyIntervalMs && progress is > 0 and < 100)
+                    return;
+                lastNotifyTicks = now;
                 NotifyChanged();
             }
 

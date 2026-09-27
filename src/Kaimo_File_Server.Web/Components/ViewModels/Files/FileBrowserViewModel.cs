@@ -1399,7 +1399,12 @@ public class FileBrowserViewModel : IFileBrowserViewModel, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Upload failed for '{Path}'", targetPath);
+            // A cancelled upload (user abort or browser disconnect) is expected; the storage
+            // layer already discarded the partial temp file.
+            if (ex is OperationCanceledException)
+                _logger.LogInformation("Upload cancelled for '{Path}'", targetPath);
+            else
+                _logger.LogError(ex, "Upload failed for '{Path}'", targetPath);
 
             return ex switch
             {

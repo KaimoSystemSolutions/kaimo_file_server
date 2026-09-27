@@ -185,7 +185,7 @@ public sealed class SearchIndexingService(
                     await search.onDirectoryCreated(storage.ToAbsolutePath(entry.Path));
                 else
                     await search.onFileCreated(
-                        storage.ToAbsolutePath(entry.Path), storage.ReadAsync(entry.Path));
+                        storage.ToAbsolutePath(entry.Path), OpenForIndexing(storage, entry));
                 break;
 
             case FileChangeType.Deleted:
@@ -210,6 +210,26 @@ public sealed class SearchIndexingService(
                 // path-derived doc ids). ponytail: coarse; a scoped subtree walk can replace this.
                 await searchAdmin.TryStartReindexAsync(target.ShareName);
                 break;
+        }
+    }
+
+    /// <summary>
+    /// SMB creates files via open: <c>Created</c> is logged while the writer still holds the
+    /// file exclusively, and its content is logged as <c>Modified</c> when the handle closes.
+    /// A locked <c>Created</c> file is therefore indexed by name only (empty content); the
+    /// later <c>Modified</c> entry upserts the same document with the real content.
+    /// </summary>
+    private static Task<Stream> OpenForIndexing(IStorageEngine storage, FileChangeLogEntry entry)
+    {
+        try
+        {
+            return storage.ReadAsync(entry.Path);
+        }
+        catch (IOException ex) when (entry.ChangeType == FileChangeType.Created
+                                     && ex is not FileNotFoundException
+                                     && ex is not DirectoryNotFoundException)
+        {
+            return Task.FromResult(Stream.Null);
         }
     }
 

@@ -111,6 +111,14 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider, IDisp
             // JS interop not available (should not happen with prerender: false)
             return _anonymous;
         }
+        catch (Exception ex) when (ex is TaskCanceledException or JSDisconnectedException)
+        {
+            // The browser did not answer (interop timeout or disconnect). Not cached, so the
+            // next call retries once the client is responsive again.
+            _logger.LogWarning("Browser did not respond while loading the auth state ({Reason})",
+                ex.GetType().Name);
+            return _anonymous;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error while loading the auth state");
