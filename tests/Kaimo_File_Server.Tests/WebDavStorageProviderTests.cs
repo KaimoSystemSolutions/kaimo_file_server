@@ -552,11 +552,12 @@ public sealed class WebDavStorageProviderTests
     [Fact]
     public async Task Upload_LongerThanIdleTimeout_SucceedsWhileDataKeepsFlowing()
     {
-        var store = TimedStore(new DrainingHandler(), TimeSpan.FromMilliseconds(500));
+        var store = TimedStore(new DrainingHandler(), TimeSpan.FromSeconds(2));
 
-        // 20 chunks x 50 ms = 1 s total, well beyond the 500 ms idle timeout. The 10x gap
-        // between chunk delay and timeout absorbs scheduler stalls on busy CI runners.
-        await store.WriteAsync("/big.bin", new SlowStream(chunks: 20, delay: TimeSpan.FromMilliseconds(50)), overwrite: true);
+        // 50 chunks x 50 ms = 2.5 s total, beyond the 2 s idle timeout. What matters for
+        // flakiness is the gap between one read and the next vs. the timeout: ~1.95 s of
+        // slack absorbs thread-pool starvation on busy CI runners (500 ms was not enough).
+        await store.WriteAsync("/big.bin", new SlowStream(chunks: 50, delay: TimeSpan.FromMilliseconds(50)), overwrite: true);
     }
 
     [Fact]
