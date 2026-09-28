@@ -21,6 +21,7 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
     private readonly TimeProvider _time;
     private readonly ILogger<DatabaseBackupService> _logger;
     private readonly DemoModeOptions? _demo;
+    private readonly Core.Services.Notifications.INotificationPublisher? _notifications;
 
     public string BackupRootPath { get; }
 
@@ -29,9 +30,11 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
         IProcessRunner runner,
         TimeProvider time,
         ILogger<DatabaseBackupService> logger,
-        DemoModeOptions? demo = null)
+        DemoModeOptions? demo = null,
+        Core.Services.Notifications.INotificationPublisher? notifications = null)
     {
         _demo = demo;
+        _notifications = notifications;
         var connectionString = configuration.GetConnectionString("Default")
             ?? "Host=kaimo_file_server_db;Database=kaimo_file_server;Username=kaimo_test_user;Password=change_me";
         _connection = new NpgsqlConnectionStringBuilder(connectionString);
@@ -49,6 +52,27 @@ public sealed class DatabaseBackupService : IDatabaseBackupService
         if (_demo?.ReadOnly == true && trigger == BackupTrigger.Manual)
             throw new ReadOnlyDemoException();
 
+        try
+        {
+            var backup = await CreateBackupCoreAsync(trigger, cancellationToken);
+            await PublishAsync(Core.Services.Notifications.NotificationEvents.BackupSucceeded(
+                trigger.ToString(), backup.FileName, backup.SizeBytes));
+            return backup;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            await PublishAsync(Core.Services.Notifications.NotificationEvents.BackupFailed(trigger.ToString(), ex.Message));
+            throw;
+        }
+    }
+
+    // Best-effort by contract: the publisher never throws.
+    private Task PublishAsync(Core.Domain.Notifications.NotificationEvent notification)
+        => _notifications?.PublishAsync(notification) ?? Task.CompletedTask;
+
+    private async Task<BackupFileInfo> CreateBackupCoreAsync(
+        BackupTrigger trigger, CancellationToken cancellationToken)
+    {
         EnsureBackupDirectoryWritable();
 
         var createdAt = _time.GetLocalNow();

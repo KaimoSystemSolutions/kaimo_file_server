@@ -32,6 +32,12 @@ external storage integration, synchronization and custom storage management.
 ### 🔍 Search
 - Elasticsearch-powered file search
 
+### ✉️ Notifications
+- SMTP gateway with test mail
+- Mail notifications for user, security, share-link, sync, backup and certificate events
+- Rules per event (users, groups, permission holders, external addresses) with throttling
+- Editable mail templates per language and a shared mail layout with live preview
+
 ### 🔄 Coming: Syncing to your local device via
 - Windows
 - Linux

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Kaimo_File_Server.Core.Domain.Identity;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
+using Kaimo_File_Server.Core.Services.Notifications;
 using Kaimo_File_Server.Web.Controllers.WebDav;
 
 namespace Kaimo_File_Server.Web.Services;
@@ -229,17 +230,44 @@ public sealed class SecurityMonitorFlushService(
 /// login service, so the web login, the REST API, WebDAV and the own-password check are all
 /// covered without touching their call sites. The transport is read from the current
 /// request path; Blazor circuits have no API/WebDAV path and count as web.
+/// A lockout also raises the <c>security.account_locked</c> notification, once per lock.
 /// </summary>
 public sealed class MonitoredLoginService(
     ILoginService inner,
     SecurityMonitor monitor,
-    IHttpContextAccessor http) : ILoginService
+    IHttpContextAccessor http,
+    INotificationPublisher? notifications = null,
+    IUserRepository? users = null) : ILoginService
 {
+    // Every attempt during a lock returns LockedOut again; publish only the first one per lock.
+    // ponytail: in-memory per process and cleared wholesale at the cap; the dispatcher's
+    // throttle is the real flood guard for the mails themselves.
+    private static readonly ConcurrentDictionary<string, DateTime> LockNotifiedUntil = new(StringComparer.OrdinalIgnoreCase);
+
     public async Task<LoginResult> AuthenticateAsync(string username, string password, string? remoteAddress = null)
     {
         var result = await inner.AuthenticateAsync(username, password, remoteAddress);
         monitor.RecordLogin(SecurityMonitorMiddleware.ChannelOf(http.HttpContext?.Request.Path), username, remoteAddress, result);
+        if (result.Outcome == LoginOutcome.LockedOut && notifications is not null)
+        {
+            // A notification must never affect the login result (the publisher itself never throws).
+            try { await NotifyLockedAsync(username, remoteAddress, result.RetryAfter); }
+            catch (Exception) { /* user lookup failed; the lock itself is already in effect */ }
+        }
         return result;
+    }
+
+    private async Task NotifyLockedAsync(string username, string? remoteAddress, TimeSpan retryAfter)
+    {
+        var key = username.Trim();
+        var now = DateTime.UtcNow;
+        if (LockNotifiedUntil.TryGetValue(key, out var until) && until > now) return;
+        if (LockNotifiedUntil.Count > 10_000) LockNotifiedUntil.Clear();
+        LockNotifiedUntil[key] = now + retryAfter;
+
+        // Unknown user names still notify the security administrators, just without an affected user.
+        var user = users is null ? null : await users.GetByUsernameAsync(key);
+        await notifications!.PublishAsync(NotificationEvents.AccountLocked(user?.Id, key, remoteAddress, retryAfter));
     }
 }
 

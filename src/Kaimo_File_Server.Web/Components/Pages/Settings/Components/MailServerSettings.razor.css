@@ -1,0 +1,31 @@
+.mail-server__wide {
+    flex: 1;
+    min-width: 0;
+    max-width: 420px;
+}
+
+.mail-server__select {
+    max-width: 220px;
+}
+
+.mail-server__status {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+}
+
+.mail-server__status-text {
+    color: var(--text-secondary);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 620px) {
+    .mail-server__wide,
+    .mail-server__select {
+        max-width: none;
+        width: 100%;
+    }
+}

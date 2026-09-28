@@ -51,6 +51,8 @@
         ViewSystemLogs = 1L << 43,  // view and download retained service logs
         ManageBackups = 1L << 44,  // configure/create/download database backups
         ViewSecurityMonitor = 1L << 45,  // view login attempts and API/WebDAV request activity per client
+        ManageMailServer = 1L << 46,  // configure the SMTP gateway, send test mails
+        ManageNotifications = 1L << 47,  // edit notification rules, mail templates/layout, view delivery log
 
         // -- Sync --
         CreateSyncs = 1L << 48, // sync a folder with an external cloud

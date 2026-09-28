@@ -34,3 +34,11 @@ services:
     volumes:
       - ${APPDATA:-./tests/data/user-secrets}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
       - ${APPDATA:-./tests/data/user-secrets}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+
+
+  # Local SMTP catcher for mail notifications. In Settings -> Mail server use host "mailpit",
+  # port 1025, encryption "None" and no authentication; read the mails at http://127.0.0.1:8025.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "127.0.0.1:8025:8025"

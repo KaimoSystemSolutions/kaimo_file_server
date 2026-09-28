@@ -172,7 +172,9 @@ builder.Services.AddScoped<CredentialLoginService>();
 builder.Services.AddScoped<ILoginService>(sp => new MonitoredLoginService(
     sp.GetRequiredService<CredentialLoginService>(),
     sp.GetRequiredService<SecurityMonitor>(),
-    sp.GetRequiredService<IHttpContextAccessor>()));
+    sp.GetRequiredService<IHttpContextAccessor>(),
+    sp.GetRequiredService<Kaimo_File_Server.Core.Services.Notifications.INotificationPublisher>(),
+    sp.GetRequiredService<IUserRepository>()));
 
 // Issues/rotates client-API access + refresh tokens.
 builder.Services.AddScoped<ApiTokenService>();
@@ -263,6 +265,12 @@ builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.Clie
 // Owns all Elasticsearch index writes by tailing the change log, so file operations never block on
 // ES. Single-owner: registered only here (the web host), never in the SMB/host processes.
 builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.SearchIndexingService>();
+// Turns outbox notification events into mails and sends them. Single-owner like the indexer:
+// every process publishes, only the web host (which can decrypt the SMTP password) dispatches.
+builder.Services.AddSingleton<Kaimo_File_Server.Infrastructure.Notifications.ISmtpMailSender,
+    Kaimo_File_Server.Web.Services.Notifications.MailKitSmtpMailSender>();
+builder.Services.AddSingleton<Kaimo_File_Server.Web.Services.Notifications.NotificationMailComposer>();
+builder.Services.AddHostedService<Kaimo_File_Server.Web.Services.Notifications.NotificationDispatcherService>();
 builder.Services.AddScoped<OneDriveStorageConnectionFactory>();
 builder.Services.AddScoped<CredentialRewrapService>();
 builder.Services.AddSingleton<CloudAccessDownloadTicketStore>();
@@ -306,6 +314,8 @@ builder.Services.AddScoped<AclEditorViewModel>();
 builder.Services.AddScoped<DepartmentViewModel>();
 builder.Services.AddScoped<ExternalStorageSyncViewModel>();
 builder.Services.AddScoped<ClientDeviceAdminViewModel>();
+builder.Services.AddScoped<MailServerSettingsViewModel>();
+builder.Services.AddScoped<NotificationsViewModel>();
 builder.Services.AddScoped<CloudAccessViewModel>();
 builder.Services.AddScoped<CloudAccessShareBrowserViewModel>();
 builder.Services.AddScoped<RemoteCloudAccessFileBrowserViewModel>();

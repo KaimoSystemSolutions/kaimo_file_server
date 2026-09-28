@@ -145,6 +145,12 @@ public static class SearchDestinations
         new("Web_Nav_Security",
             ["security", "sicherheit", "login attempts", "anmeldeversuche", "lockout", "sperre", "api requests"],
             "/security", "shield.svg", ManagementPermission.ViewSecurityMonitor),
+        new("Web_Nav_Notifications",
+            ["notifications", "benachrichtigungen", "mail", "e-mail", "email templates", "mailvorlagen", "rules", "regeln"],
+            "/notifications", "mail.svg", ManagementPermission.ManageNotifications),
+        new("Web_Settings_Tab_MailServer",
+            ["mail server", "mailserver", "smtp", "e-mail", "email", "test mail", "testmail"],
+            "/settings?tab=mailserver", "mail.svg", ManagementPermission.ManageMailServer),
     };
 
     /// <summary>

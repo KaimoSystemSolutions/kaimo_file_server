@@ -44,7 +44,8 @@ public sealed class CloudSyncExecutionService(
     IFileServiceFactory fileServices,
     ICloudSyncOperationCoordinator operations,
     IStorageConnectionProviderCatalog? storageProviderCatalog = null,
-    ISearchService? searchService = null) : ICloudSyncExecutionService
+    ISearchService? searchService = null,
+    Core.Services.Notifications.INotificationPublisher? notifications = null) : ICloudSyncExecutionService
 {
     public async Task<CloudSyncExecutionResult> RunAsync(
         Guid shareId,
@@ -169,7 +170,15 @@ public sealed class CloudSyncExecutionService(
                     ClassifyError(exception),
                     cancellationToken);
                 if (exception is ProviderRequestException { Category: ProviderErrorCategory.Authentication } authError)
+                {
                     await MarkNeedsReauthorizationAsync(storageConnection.Id, authError.ErrorCode, cancellationToken);
+                    await PublishAsync(Core.Services.Notifications.NotificationEvents.SyncNeedsReauthorization(
+                        storageConnection.Id, SyncName(definition), definition.CreatedByUserId, authError.ErrorCode));
+                }
+                else
+                {
+                    await PublishFailedAsync(definition, exception);
+                }
                 throw;
             }
             finally
@@ -231,6 +240,17 @@ public sealed class CloudSyncExecutionService(
                 : CloudSyncExecutionResult.Completed;
         }
     }
+
+    private Task PublishFailedAsync(SyncDefinition definition, Exception exception)
+        => PublishAsync(Core.Services.Notifications.NotificationEvents.SyncFailed(
+            definition.Id, SyncName(definition), definition.CreatedByUserId, ClassifyError(exception)));
+
+    // Best-effort and never cancelled: the run already failed, the notice should still go out.
+    private Task PublishAsync(Core.Domain.Notifications.NotificationEvent notification)
+        => notifications?.PublishAsync(notification, CancellationToken.None) ?? Task.CompletedTask;
+
+    private static string SyncName(SyncDefinition definition)
+        => string.IsNullOrWhiteSpace(definition.DisplayName) ? definition.LocalPath : definition.DisplayName;
 
     /// <summary>
     /// A revoked or expired grant cannot heal by retrying. Parking the connection
@@ -305,6 +325,7 @@ public sealed class CloudSyncExecutionService(
         {
             await syncDefinitions.MarkFailedAsync(
                 definition.Id, DateTime.UtcNow, ClassifyError(exception), cancellationToken);
+            await PublishFailedAsync(definition, exception);
             throw;
         }
         finally

@@ -35,7 +35,8 @@ public sealed class PublicUploadService(
     IFileServiceFactory fileServices,
     ShareLinkService shareLinks,
     ILogger<PublicUploadService> logger,
-    Core.Security.DemoModeOptions? demo = null)
+    Core.Security.DemoModeOptions? demo = null,
+    Core.Services.Notifications.INotificationPublisher? notifications = null)
 {
     // Target paths currently being written by any visitor, so two parallel uploads of the same
     // name never pick the same free name. Keyed by share id + share-relative path.
@@ -103,6 +104,9 @@ public sealed class PublicUploadService(
             logger.LogInformation(
                 "Public upload via link {LinkId}: '{Path}' ({Size} bytes) on share {ShareId} as {User}",
                 link.Id, target, size, share.Id, creator.User.Username);
+            if (notifications is not null)
+                await notifications.PublishAsync(Core.Services.Notifications.NotificationEvents.UploadReceived(
+                    link.Id, link.DisplayName, link.CreatedByUserId, stored, size), CancellationToken.None);
             return new(PublicUploadStatus.Uploaded, stored);
         }
         catch (Exception ex)

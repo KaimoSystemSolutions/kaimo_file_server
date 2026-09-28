@@ -1,0 +1,397 @@
+/* The frame of every tab is the shared .workspace pattern from app.css; this file only
+   holds what is specific to the notifications page. */
+
+/* ── Shared ─────────────────────────────────────────── */
+
+.notif-tabs {
+    margin-bottom: var(--space-4);
+}
+
+.notif-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+}
+
+.notif-banner a {
+    color: inherit;
+    font-weight: 600;
+}
+
+.notif-inline-error {
+    margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+}
+
+.notif-error-text {
+    color: var(--danger);
+}
+
+.notif-warning-text {
+    color: var(--warning);
+}
+
+.notif-number {
+    max-width: 120px;
+}
+
+.notif-code {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    resize: vertical;
+    tab-size: 2;
+}
+
+.notif-textarea-small {
+    resize: vertical;
+}
+
+/* ── Rules: tree (category → event → rules) ─────────── */
+
+.notif-tree-toolbar__summary {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.notif-cat__head[aria-expanded="true"] {
+    background: var(--bg-tertiary);
+}
+
+.notif-cat__head[aria-expanded="true"]:hover {
+    background: var(--bg-hover);
+}
+
+.notif-cat__chevron {
+    display: inline-flex;
+    color: var(--text-secondary);
+    transition: transform 0.08s linear;
+}
+
+.notif-cat__chevron--open {
+    transform: rotate(90deg);
+}
+
+.notif-cat__body {
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border-light);
+}
+
+/* Event: indented under the category's icon column. */
+.notif-event {
+    padding: var(--space-3) var(--space-3) 0 calc(var(--space-6) + var(--space-5));
+}
+
+.notif-event__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+}
+
+.notif-event__text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.notif-event__text strong {
+    font-size: 13px;
+    font-weight: 650;
+}
+
+.notif-event__text small {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.notif-event__add {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-1);
+    white-space: nowrap;
+}
+
+/* Rules hang off a guide line below their event. */
+.notif-rules {
+    display: flex;
+    flex-direction: column;
+    margin: var(--space-2) 0 0 var(--space-2);
+    padding-left: var(--space-3);
+    border-left: 2px solid var(--border-strong);
+}
+
+.notif-rule {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-control);
+    cursor: pointer;
+}
+
+.notif-rule:hover {
+    background: var(--bg-hover);
+}
+
+.notif-rule:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+.notif-rule--selected {
+    background: var(--accent-subtle);
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.notif-rule--selected:hover {
+    background: var(--accent-selected);
+}
+
+.notif-rule--selected .workspace-row-text strong {
+    color: var(--accent-strong);
+}
+
+.notif-rule--off .workspace-row-text strong {
+    color: var(--text-secondary);
+}
+
+.notif-rule__meta {
+    color: var(--text-tertiary);
+    font-size: 11.5px;
+    white-space: nowrap;
+}
+
+.notif-rule--empty {
+    display: block;
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-style: italic;
+    cursor: default;
+}
+
+.notif-rule--empty:hover {
+    background: none;
+}
+
+/* ── Rules: editor ──────────────────────────────────── */
+
+.notif-rule-summary {
+    margin-bottom: var(--space-4);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-secondary);
+}
+
+.notif-rule-name {
+    margin-bottom: var(--space-4);
+}
+
+.notif-roles {
+    display: grid;
+    gap: var(--space-2);
+}
+
+/* One selectable row per involved person; outside .form-group so the global
+   input sizing does not apply to the checkbox. */
+.notif-role {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.notif-role:hover {
+    background: var(--bg-hover);
+}
+
+.notif-role input {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
+.notif-role:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ── Templates ──────────────────────────────────────── */
+
+.notif-template-row {
+    min-height: 44px;
+}
+
+.notif-editor ::deep .detail-tabs {
+    margin: 0 calc(-1 * var(--space-4));
+    padding: 0 var(--space-2);
+}
+
+.notif-editor__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-4);
+    padding-top: var(--space-4);
+}
+
+.notif-placeholders {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+
+.notif-chip {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 11.5px;
+}
+
+.notif-preview {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.notif-preview__subject {
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+/* The mail itself is a light document regardless of the app theme, like in a mail client. */
+.notif-preview__frame {
+    width: 100%;
+    min-height: 520px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-surface);
+    background: var(--bg-sunken);
+}
+
+/* ── Layout ─────────────────────────────────────────── */
+
+.notif-layout__fields {
+    padding: var(--space-4) var(--space-3) var(--space-5);
+}
+
+.notif-layout__actions {
+    margin-top: 0;
+}
+
+.notif-logo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.notif-logo__img {
+    max-width: 160px;
+    max-height: 48px;
+    padding: var(--space-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--bg-tertiary);
+}
+
+.notif-logo__upload {
+    position: relative;
+    cursor: pointer;
+}
+
+.notif-logo__upload ::deep .notif-logo__input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.notif-logo__upload:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.notif-color {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.notif-color__picker {
+    width: 40px;
+    height: 36px;
+    padding: 2px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-control);
+    background: var(--bg-secondary);
+    cursor: pointer;
+}
+
+/* ── Delivery log ───────────────────────────────────── */
+
+.notif-log-row {
+    min-height: 52px;
+}
+
+.notif-log-detail .detail-actions {
+    margin-top: var(--space-3);
+}
+
+.notif-log-detail .workspace-section {
+    margin-top: var(--space-4);
+}
+
+/* ── Responsive ─────────────────────────────────────── */
+
+/* Layout tab: narrow form, wide preview (only while the panes sit side by side). */
+@media (min-width: 1181px) {
+    .notif-layout {
+        grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 1500px) {
+    .notif-editor__grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .notif-event {
+        padding-left: var(--space-3);
+    }
+
+    .notif-event__head {
+        flex-direction: column;
+    }
+
+    .notif-rule {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .notif-rule__meta {
+        display: none;
+    }
+}

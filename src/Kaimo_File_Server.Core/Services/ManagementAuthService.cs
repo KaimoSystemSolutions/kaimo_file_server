@@ -383,4 +383,43 @@ public class ManagementAuthService : IManagementAuthService
 
         return result;
     }
+
+    /// <summary>
+    /// The ENABLED users who hold a global role matching <paramref name="roleMatches"/>,
+    /// either directly or inherited through group membership. Shared by the last-admin
+    /// guards (<c>UserListViewModel</c>) and the mail-notification recipient resolver.
+    /// Static on purpose: callers that receive a mocked <see cref="IManagementAuthService"/>
+    /// (tests) still get the real lookup against their repositories.
+    /// </summary>
+    public static async Task<HashSet<Guid>> GetGlobalPermissionHolderUserIdsAsync(
+        IScopedRoleAssignmentRepository assignmentRepo,
+        IRoleRepository roleRepo,
+        IUserRepository userRepo,
+        IGroupRepository groupRepo,
+        Func<Role, bool> roleMatches,
+        Guid? excludeAssignmentId = null)
+    {
+        var globalAssignments = await assignmentRepo.GetByScopeAsync(ScopeType.Global, Guid.Empty);
+        var roles = (await roleRepo.GetAllAsync()).ToDictionary(r => r.Id);
+        var users = (await userRepo.GetAllAsync()).ToDictionary(u => u.Id);
+        var groupIds = (await groupRepo.GetAllAsync()).Select(g => g.Id).ToHashSet();
+
+        var holders = new HashSet<Guid>();
+        foreach (var a in globalAssignments)
+        {
+            if (a.Id == excludeAssignmentId) continue;
+            if (!roles.TryGetValue(a.RoleId, out var role) || !roleMatches(role)) continue;
+
+            if (users.TryGetValue(a.PrincipalId, out var user))
+            {
+                if (user.IsEnabled) holders.Add(user.Id);
+            }
+            else if (groupIds.Contains(a.PrincipalId))
+            {
+                foreach (var member in await groupRepo.GetMembersAsync(a.PrincipalId))
+                    if (member.IsEnabled) holders.Add(member.Id);
+            }
+        }
+        return holders;
+    }
 }

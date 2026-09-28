@@ -4914,4 +4914,595 @@
   <data name="Web_Unreferenced_PurgeConfirmText" xml:space="preserve">
     <value>Der Ordner „{0}" im Speicherpool {1} wird mit seinem gesamten Inhalt ({2}) von der Festplatte gelöscht.</value>
   </data>
+  <data name="Web_Nav_Notifications" xml:space="preserve">
+    <value>Benachrichtigungen</value>
+  </data>
+  <data name="Web_Perm_ManageMailServer" xml:space="preserve">
+    <value>Mailserver konfigurieren</value>
+  </data>
+  <data name="Web_Perm_ManageNotifications" xml:space="preserve">
+    <value>E-Mail-Benachrichtigungen verwalten</value>
+  </data>
+  <data name="Web_Settings_Tab_MailServer" xml:space="preserve">
+    <value>Mailserver</value>
+  </data>
+  <data name="Notification_Category_users" xml:space="preserve">
+    <value>Benutzer</value>
+  </data>
+  <data name="Notification_Category_security" xml:space="preserve">
+    <value>Sicherheit</value>
+  </data>
+  <data name="Notification_Category_sharelinks" xml:space="preserve">
+    <value>Freigabe-Links</value>
+  </data>
+  <data name="Notification_Category_sync" xml:space="preserve">
+    <value>Synchronisation</value>
+  </data>
+  <data name="Notification_Category_backup" xml:space="preserve">
+    <value>Backup</value>
+  </data>
+  <data name="Notification_Category_devices" xml:space="preserve">
+    <value>Client-Geräte</value>
+  </data>
+  <data name="Notification_Category_certificates" xml:space="preserve">
+    <value>Zertifikate</value>
+  </data>
+  <data name="Notification_Event_user_created" xml:space="preserve">
+    <value>Benutzer angelegt</value>
+  </data>
+  <data name="Notification_Event_user_created_Desc" xml:space="preserve">
+    <value>Willkommensmail mit Benutzername und Anmeldeadresse (nie mit Passwort).</value>
+  </data>
+  <data name="Notification_Event_user_password_reset" xml:space="preserve">
+    <value>Passwort durch Administrator zurückgesetzt</value>
+  </data>
+  <data name="Notification_Event_user_password_reset_Desc" xml:space="preserve">
+    <value>Ein Administrator hat einem Benutzer ein neues Passwort gesetzt.</value>
+  </data>
+  <data name="Notification_Event_user_password_changed" xml:space="preserve">
+    <value>Passwort geändert</value>
+  </data>
+  <data name="Notification_Event_user_password_changed_Desc" xml:space="preserve">
+    <value>Sicherheitshinweis, wenn Benutzer ihr eigenes Passwort ändern.</value>
+  </data>
+  <data name="Notification_Event_security_account_locked" xml:space="preserve">
+    <value>Konto gesperrt</value>
+  </data>
+  <data name="Notification_Event_security_account_locked_Desc" xml:space="preserve">
+    <value>Ein Konto wurde nach zu vielen fehlgeschlagenen Anmeldeversuchen gesperrt.</value>
+  </data>
+  <data name="Notification_Event_sharelink_upload_received" xml:space="preserve">
+    <value>Datei über Upload-Link empfangen</value>
+  </data>
+  <data name="Notification_Event_sharelink_upload_received_Desc" xml:space="preserve">
+    <value>Ein Besucher hat eine Datei über einen öffentlichen Upload-Link hochgeladen.</value>
+  </data>
+  <data name="Notification_Event_sharelink_accessed" xml:space="preserve">
+    <value>Freigabe-Link heruntergeladen</value>
+  </data>
+  <data name="Notification_Event_sharelink_accessed_Desc" xml:space="preserve">
+    <value>Ein Besucher hat Inhalte über einen öffentlichen Freigabe-Link heruntergeladen.</value>
+  </data>
+  <data name="Notification_Event_sync_failed" xml:space="preserve">
+    <value>Synchronisation fehlgeschlagen</value>
+  </data>
+  <data name="Notification_Event_sync_failed_Desc" xml:space="preserve">
+    <value>Ein Synchronisationslauf mit Cloud oder externem Speicher ist fehlgeschlagen.</value>
+  </data>
+  <data name="Notification_Event_sync_needs_reauthorization" xml:space="preserve">
+    <value>Synchronisation muss neu autorisiert werden</value>
+  </data>
+  <data name="Notification_Event_sync_needs_reauthorization_Desc" xml:space="preserve">
+    <value>Der externe Speicher hat den gespeicherten Zugriff abgelehnt; die Synchronisation ruht.</value>
+  </data>
+  <data name="Notification_Event_backup_failed" xml:space="preserve">
+    <value>Backup fehlgeschlagen</value>
+  </data>
+  <data name="Notification_Event_backup_failed_Desc" xml:space="preserve">
+    <value>Ein Datenbank-Backup konnte nicht erstellt werden.</value>
+  </data>
+  <data name="Notification_Event_backup_succeeded" xml:space="preserve">
+    <value>Backup erstellt</value>
+  </data>
+  <data name="Notification_Event_backup_succeeded_Desc" xml:space="preserve">
+    <value>Ein Datenbank-Backup wurde erfolgreich erstellt.</value>
+  </data>
+  <data name="Notification_Event_device_registered" xml:space="preserve">
+    <value>Neues Gerät angemeldet</value>
+  </data>
+  <data name="Notification_Event_device_registered_Desc" xml:space="preserve">
+    <value>Eine Client-App hat sich auf einem neuen Gerät angemeldet.</value>
+  </data>
+  <data name="Notification_Event_certificate_renewed" xml:space="preserve">
+    <value>HTTPS-Zertifikat erneuert</value>
+  </data>
+  <data name="Notification_Event_certificate_renewed_Desc" xml:space="preserve">
+    <value>Das selbstsignierte HTTPS-Zertifikat wurde automatisch erneuert.</value>
+  </data>
+  <data name="Notification_Event_certificate_renewal_failed" xml:space="preserve">
+    <value>Zertifikatserneuerung fehlgeschlagen</value>
+  </data>
+  <data name="Notification_Event_certificate_renewal_failed_Desc" xml:space="preserve">
+    <value>Die automatische Erneuerung des HTTPS-Zertifikats ist fehlgeschlagen.</value>
+  </data>
+  <data name="Web_MailServer_Description" xml:space="preserve">
+    <value>Der SMTP-Server, über den Benachrichtigungen versendet werden. Das Passwort wird verschlüsselt gespeichert und nie wieder angezeigt.</value>
+  </data>
+  <data name="Web_MailServer_ConnectionStatus" xml:space="preserve">
+    <value>Verbindungsstatus</value>
+  </data>
+  <data name="Web_MailServer_Status_Ok" xml:space="preserve">
+    <value>Funktioniert</value>
+  </data>
+  <data name="Web_MailServer_Status_Error" xml:space="preserve">
+    <value>Fehler</value>
+  </data>
+  <data name="Web_MailServer_Status_Unknown" xml:space="preserve">
+    <value>Noch nicht getestet</value>
+  </data>
+  <data name="Web_MailServer_Enabled" xml:space="preserve">
+    <value>E-Mails versenden</value>
+  </data>
+  <data name="Web_MailServer_Host" xml:space="preserve">
+    <value>SMTP-Server</value>
+  </data>
+  <data name="Web_MailServer_Port" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="Web_MailServer_Security" xml:space="preserve">
+    <value>Verschlüsselung</value>
+  </data>
+  <data name="Web_MailServer_Security_Help" xml:space="preserve">
+    <value>Automatisch nutzt SSL/TLS auf Port 465 und sonst STARTTLS, wenn der Server es anbietet. Serverzertifikate werden immer geprüft.</value>
+  </data>
+  <data name="Web_MailServer_Security_Auto" xml:space="preserve">
+    <value>Automatisch</value>
+  </data>
+  <data name="Web_MailServer_Security_None" xml:space="preserve">
+    <value>Keine (nur vertrauenswürdiges lokales Relay)</value>
+  </data>
+  <data name="Web_MailServer_AuthMode" xml:space="preserve">
+    <value>Authentifizierung</value>
+  </data>
+  <data name="Web_MailServer_Auth_Password" xml:space="preserve">
+    <value>Benutzername und Passwort</value>
+  </data>
+  <data name="Web_MailServer_Auth_None" xml:space="preserve">
+    <value>Keine</value>
+  </data>
+  <data name="Web_MailServer_Username" xml:space="preserve">
+    <value>Benutzername</value>
+  </data>
+  <data name="Web_MailServer_Password" xml:space="preserve">
+    <value>Passwort</value>
+  </data>
+  <data name="Web_MailServer_Password_Help" xml:space="preserve">
+    <value>Nur schreibbar: Feld leer lassen, um das gespeicherte Passwort zu behalten.</value>
+  </data>
+  <data name="Web_MailServer_PasswordKeep" xml:space="preserve">
+    <value>Gespeichert – leer lassen zum Beibehalten</value>
+  </data>
+  <data name="Web_MailServer_FromAddress" xml:space="preserve">
+    <value>Absenderadresse</value>
+  </data>
+  <data name="Web_MailServer_FromName" xml:space="preserve">
+    <value>Absendername</value>
+  </data>
+  <data name="Web_MailServer_FromName_Help" xml:space="preserve">
+    <value>Wird als Absender angezeigt und in den Vorlagen als {{ server.name }} verwendet.</value>
+  </data>
+  <data name="Web_MailServer_ReplyTo" xml:space="preserve">
+    <value>Antwortadresse (optional)</value>
+  </data>
+  <data name="Web_MailServer_Timeout" xml:space="preserve">
+    <value>Zeitlimit (Sekunden)</value>
+  </data>
+  <data name="Web_MailServer_MaxPerMinute" xml:space="preserve">
+    <value>Max. E-Mails pro Minute</value>
+  </data>
+  <data name="Web_MailServer_MaxPerMinute_Help" xml:space="preserve">
+    <value>Schutz vor Mailfluten: weitere E-Mails warten auf die nächste Minute.</value>
+  </data>
+  <data name="Web_MailServer_HostRequired" xml:space="preserve">
+    <value>Bitte den SMTP-Server angeben.</value>
+  </data>
+  <data name="Web_MailServer_FromInvalid" xml:space="preserve">
+    <value>Bitte eine gültige Absenderadresse angeben.</value>
+  </data>
+  <data name="Web_MailServer_ReplyToInvalid" xml:space="preserve">
+    <value>Die Antwortadresse ist ungültig.</value>
+  </data>
+  <data name="Web_MailServer_TestTitle" xml:space="preserve">
+    <value>Testmail</value>
+  </data>
+  <data name="Web_MailServer_TestDescription" xml:space="preserve">
+    <value>Sendet eine Testmail mit den oben eingegebenen Einstellungen, auch bevor sie gespeichert sind.</value>
+  </data>
+  <data name="Web_MailServer_TestAddress" xml:space="preserve">
+    <value>Empfänger</value>
+  </data>
+  <data name="Web_MailServer_TestAddressInvalid" xml:space="preserve">
+    <value>Bitte eine gültige Empfängeradresse angeben.</value>
+  </data>
+  <data name="Web_MailServer_SendTest" xml:space="preserve">
+    <value>Testmail senden</value>
+  </data>
+  <data name="Web_MailServer_Testing" xml:space="preserve">
+    <value>Wird gesendet…</value>
+  </data>
+  <data name="Web_MailServer_TestSent" xml:space="preserve">
+    <value>Testmail gesendet</value>
+  </data>
+  <data name="Web_MailServer_TestFailed" xml:space="preserve">
+    <value>Senden fehlgeschlagen</value>
+  </data>
+  <data name="Web_MailServer_Error_NotConfigured" xml:space="preserve">
+    <value>Der Mailserver ist nicht konfiguriert oder deaktiviert.</value>
+  </data>
+  <data name="Web_MailServer_Error_PasswordUnreadable" xml:space="preserve">
+    <value>Das gespeicherte Passwort kann nicht mehr entschlüsselt werden. Bitte erneut eingeben.</value>
+  </data>
+  <data name="Web_MailServer_Error_PasswordRequired" xml:space="preserve">
+    <value>Server, Port, Verschlüsselung oder Benutzername wurden geändert. Bitte das Passwort erneut eingeben.</value>
+  </data>
+  <data name="Web_MailServer_Error_Auth" xml:space="preserve">
+    <value>Der Mailserver hat Benutzername oder Passwort abgelehnt.</value>
+  </data>
+  <data name="Web_MailServer_Error_Tls" xml:space="preserve">
+    <value>Die sichere Verbindung ist fehlgeschlagen (TLS-Handshake oder nicht vertrauenswürdiges Zertifikat).</value>
+  </data>
+  <data name="Web_MailServer_Error_Connect" xml:space="preserve">
+    <value>Keine Verbindung zu {0}:{1}. Bitte Host, Port und Firewall prüfen.</value>
+  </data>
+  <data name="Web_MailServer_Error_Recipient" xml:space="preserve">
+    <value>Der Empfänger {0} wurde abgelehnt.</value>
+  </data>
+  <data name="Web_MailServer_Error_Sender" xml:space="preserve">
+    <value>Die Absenderadresse wurde vom Mailserver abgelehnt.</value>
+  </data>
+  <data name="Web_MailServer_Error_Server" xml:space="preserve">
+    <value>Mailserver-Fehler {0}: {1}</value>
+  </data>
+  <data name="Web_MailServer_Error_Timeout" xml:space="preserve">
+    <value>Der Mailserver hat nicht rechtzeitig geantwortet.</value>
+  </data>
+  <data name="Web_Notifications_Subtitle" xml:space="preserve">
+    <value>Welche Aktion welche E-Mail an wen sendet – und wie sie aussieht.</value>
+  </data>
+  <data name="Web_Notifications_SmtpMissing" xml:space="preserve">
+    <value>Der Mailserver ist nicht konfiguriert oder deaktiviert. {0} E-Mail(s) warten.</value>
+  </data>
+  <data name="Web_Notifications_Tab_Rules" xml:space="preserve">
+    <value>Regeln</value>
+  </data>
+  <data name="Web_Notifications_Tab_Templates" xml:space="preserve">
+    <value>Vorlagen</value>
+  </data>
+  <data name="Web_Notifications_Tab_Layout" xml:space="preserve">
+    <value>Layout</value>
+  </data>
+  <data name="Web_Notifications_Tab_Log" xml:space="preserve">
+    <value>Versandprotokoll</value>
+  </data>
+  <data name="Web_Notifications_AddRule" xml:space="preserve">
+    <value>Regel hinzufügen</value>
+  </data>
+  <data name="Web_Notifications_ActiveSummary" xml:space="preserve">
+    <value>{0} von {1} Regeln aktiv</value>
+  </data>
+  <data name="Web_Notifications_ActiveCount" xml:space="preserve">
+    <value>{0} aktiv</value>
+  </data>
+  <data name="Web_Notifications_NoneActive" xml:space="preserve">
+    <value>Keine aktiv</value>
+  </data>
+  <data name="Web_Notifications_EventCount" xml:space="preserve">
+    <value>{0} Ereignisse</value>
+  </data>
+  <data name="Web_Notifications_EventCount_One" xml:space="preserve">
+    <value>1 Ereignis</value>
+  </data>
+  <data name="Web_Notifications_ExpandAll" xml:space="preserve">
+    <value>Alle aufklappen</value>
+  </data>
+  <data name="Web_Notifications_CollapseAll" xml:space="preserve">
+    <value>Alle zuklappen</value>
+  </data>
+  <data name="Web_Notifications_NoRules" xml:space="preserve">
+    <value>Keine Regel – dieses Ereignis sendet keine Mail.</value>
+  </data>
+  <data name="Web_Notifications_NewRule" xml:space="preserve">
+    <value>Neue Regel</value>
+  </data>
+  <data name="Web_Notifications_NewRuleName" xml:space="preserve">
+    <value>Neue Regel</value>
+  </data>
+  <data name="Web_Notifications_RuleName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Web_Notifications_Enabled" xml:space="preserve">
+    <value>Aktiv</value>
+  </data>
+  <data name="Web_Notifications_Disabled" xml:space="preserve">
+    <value>Inaktiv</value>
+  </data>
+  <data name="Web_Notifications_LastSent" xml:space="preserve">
+    <value>Zuletzt gesendet {0}</value>
+  </data>
+  <data name="Web_Notifications_NeverSent" xml:space="preserve">
+    <value>Noch nie gesendet</value>
+  </data>
+  <data name="Web_Notifications_SelectRule" xml:space="preserve">
+    <value>Regel auswählen oder zu einem Ereignis hinzufügen.</value>
+  </data>
+  <data name="Web_Notifications_HowItWorks" xml:space="preserve">
+    <value>Jedes Ereignis – etwa eine hochgeladene Datei oder ein gesperrtes Konto – kann E-Mails auslösen. Eine Regel legt fest, wer sie bekommt: die Personen, die am Ereignis beteiligt sind (z. B. wer den Link erstellt hat), und/oder feste Empfänger wie ein Admin-Team. Pro Ereignis sind mehrere Regeln möglich, z. B. eine für den Link-Ersteller und eine gedrosselte für die Administratoren. Ohne aktive Regel wird keine E-Mail verschickt.</value>
+  </data>
+  <data name="Web_Notifications_MailTo" xml:space="preserve">
+    <value>E-Mail an: {0}</value>
+  </data>
+  <data name="Web_Notifications_HoldersOf" xml:space="preserve">
+    <value>Alle mit „{0}“</value>
+  </data>
+  <data name="Web_Notifications_When" xml:space="preserve">
+    <value>Auslöser</value>
+  </data>
+  <data name="Web_Notifications_To" xml:space="preserve">
+    <value>E-Mail an</value>
+  </data>
+  <data name="Web_Notifications_SummaryNone" xml:space="preserve">
+    <value>Noch niemand – diese Regel verschickt keine E-Mail.</value>
+  </data>
+  <data name="Web_Notifications_Section_Involved" xml:space="preserve">
+    <value>Am Ereignis beteiligt</value>
+  </data>
+  <data name="Web_Notifications_Section_Involved_Help" xml:space="preserve">
+    <value>Wer das ist, ergibt sich bei jedem Ereignis neu.</value>
+  </data>
+  <data name="Web_Notifications_Section_Involved_None" xml:space="preserve">
+    <value>An diesem Ereignis ist keine bestimmte Person beteiligt. Lege unten fest, wer informiert wird.</value>
+  </data>
+  <data name="Web_Notifications_Section_Fixed" xml:space="preserve">
+    <value>Zusätzlich immer benachrichtigen</value>
+  </data>
+  <data name="Web_Notifications_Section_Fixed_Help" xml:space="preserve">
+    <value>Diese Empfänger bekommen die E-Mail bei jedem Ereignis dieses Typs – unabhängig davon, wer beteiligt ist.</value>
+  </data>
+  <data name="Web_Notifications_Section_Frequency" xml:space="preserve">
+    <value>Häufigkeit</value>
+  </data>
+  <data name="Web_Notifications_SentAt" xml:space="preserve">
+    <value>Gesendet</value>
+  </data>
+  <data name="Web_Notifications_Col_Attempts" xml:space="preserve">
+    <value>Versuche</value>
+  </data>
+  <data name="Web_Notifications_Col_Error" xml:space="preserve">
+    <value>Letzter Fehler</value>
+  </data>
+  <data name="Web_Notifications_SelectDelivery" xml:space="preserve">
+    <value>E-Mail auswählen, um Details und Inhalt zu sehen.</value>
+  </data>
+  <data name="Notification_Role_user_created_affected" xml:space="preserve">
+    <value>Der neu angelegte Benutzer</value>
+  </data>
+  <data name="Notification_Role_user_created_actor" xml:space="preserve">
+    <value>Wer das Konto angelegt hat</value>
+  </data>
+  <data name="Notification_Role_user_password_reset_affected" xml:space="preserve">
+    <value>Der Benutzer, dessen Passwort zurückgesetzt wurde</value>
+  </data>
+  <data name="Notification_Role_user_password_reset_actor" xml:space="preserve">
+    <value>Wer das Passwort zurückgesetzt hat</value>
+  </data>
+  <data name="Notification_Role_user_password_changed_affected" xml:space="preserve">
+    <value>Der Benutzer selbst</value>
+  </data>
+  <data name="Notification_Role_security_account_locked_affected" xml:space="preserve">
+    <value>Inhaber des gesperrten Kontos (nur bei existierenden Konten)</value>
+  </data>
+  <data name="Notification_Role_sharelink_upload_received_linkCreator" xml:space="preserve">
+    <value>Wer den Upload-Link erstellt hat</value>
+  </data>
+  <data name="Notification_Role_sharelink_accessed_linkCreator" xml:space="preserve">
+    <value>Wer den Freigabe-Link erstellt hat</value>
+  </data>
+  <data name="Notification_Role_sync_failed_syncCreator" xml:space="preserve">
+    <value>Wer die Synchronisation eingerichtet hat</value>
+  </data>
+  <data name="Notification_Role_sync_needs_reauthorization_syncCreator" xml:space="preserve">
+    <value>Wer die Synchronisation eingerichtet hat</value>
+  </data>
+  <data name="Notification_Role_device_registered_affected" xml:space="preserve">
+    <value>Der Benutzer, mit dessen Konto sich das Gerät angemeldet hat</value>
+  </data>
+  <data name="Web_Notifications_Recipients" xml:space="preserve">
+    <value>Empfänger</value>
+  </data>
+  <data name="Web_Notifications_ContextRoles" xml:space="preserve">
+    <value>Beteiligte Personen</value>
+  </data>
+  <data name="Web_Notifications_ContextRoles_Help" xml:space="preserve">
+    <value>Werden je Ereignis ermittelt, z. B. der angelegte Benutzer oder der Ersteller des Links.</value>
+  </data>
+  <data name="Web_Notifications_Role_affected" xml:space="preserve">
+    <value>Betroffener Benutzer</value>
+  </data>
+  <data name="Web_Notifications_Role_actor" xml:space="preserve">
+    <value>Auslösender Benutzer</value>
+  </data>
+  <data name="Web_Notifications_Role_linkCreator" xml:space="preserve">
+    <value>Ersteller des Links</value>
+  </data>
+  <data name="Web_Notifications_Role_syncCreator" xml:space="preserve">
+    <value>Ersteller der Synchronisation</value>
+  </data>
+  <data name="Web_Notifications_Users" xml:space="preserve">
+    <value>Benutzer</value>
+  </data>
+  <data name="Web_Notifications_Groups" xml:space="preserve">
+    <value>Gruppen</value>
+  </data>
+  <data name="Web_Notifications_PermissionHolders" xml:space="preserve">
+    <value>Inhaber einer Berechtigung</value>
+  </data>
+  <data name="Web_Notifications_PermissionHolders_Help" xml:space="preserve">
+    <value>Alle aktiven Benutzer, die die Berechtigung global besitzen – direkt oder über eine Gruppe.</value>
+  </data>
+  <data name="Web_Notifications_Perm_SyncAdmin" xml:space="preserve">
+    <value>Synchronisationen verwalten</value>
+  </data>
+  <data name="Web_Notifications_External" xml:space="preserve">
+    <value>Externe Adressen</value>
+  </data>
+  <data name="Web_Notifications_External_Help" xml:space="preserve">
+    <value>Eine Adresse pro Zeile. Sie erhalten die E-Mail in der Standardsprache.</value>
+  </data>
+  <data name="Web_Notifications_Throttle" xml:space="preserve">
+    <value>Drosselung (Minuten)</value>
+  </data>
+  <data name="Web_Notifications_Throttle_Help" xml:space="preserve">
+    <value>Sendet höchstens eine E-Mail je Empfänger und Anlass (z. B. dasselbe gesperrte Konto) in diesem Zeitraum. 0 = keine Begrenzung.</value>
+  </data>
+  <data name="Web_Notifications_None" xml:space="preserve">
+    <value>Keine</value>
+  </data>
+  <data name="Web_Notifications_NoRecipients" xml:space="preserve">
+    <value>Keine Empfänger</value>
+  </data>
+  <data name="Web_Notifications_InvalidAddress" xml:space="preserve">
+    <value>„{0}“ ist keine gültige E-Mail-Adresse.</value>
+  </data>
+  <data name="Web_Notifications_ConfirmDelete" xml:space="preserve">
+    <value>Wirklich löschen</value>
+  </data>
+  <data name="Web_Notifications_RuleDeleted" xml:space="preserve">
+    <value>Regel gelöscht.</value>
+  </data>
+  <data name="Web_Notifications_Language" xml:space="preserve">
+    <value>Sprache</value>
+  </data>
+  <data name="Web_Notifications_Customized" xml:space="preserve">
+    <value>Angepasst</value>
+  </data>
+  <data name="Web_Notifications_BuiltIn" xml:space="preserve">
+    <value>Standardvorlage</value>
+  </data>
+  <data name="Web_Notifications_Subject" xml:space="preserve">
+    <value>Betreff</value>
+  </data>
+  <data name="Web_Notifications_Body" xml:space="preserve">
+    <value>Inhalt (HTML)</value>
+  </data>
+  <data name="Web_Notifications_Body_Help" xml:space="preserve">
+    <value>HTML mit Liquid-Platzhaltern wie {{ user.displayName }}. Werte werden automatisch HTML-kodiert; der Inhalt wird in das gemeinsame Layout eingesetzt.</value>
+  </data>
+  <data name="Web_Notifications_Placeholders" xml:space="preserve">
+    <value>Platzhalter (zum Einfügen klicken)</value>
+  </data>
+  <data name="Web_Notifications_Preview" xml:space="preserve">
+    <value>Vorschau mit Beispielwerten</value>
+  </data>
+  <data name="Web_Notifications_SendTestToMe" xml:space="preserve">
+    <value>Test an mich senden</value>
+  </data>
+  <data name="Web_Notifications_ResetDefault" xml:space="preserve">
+    <value>Auf Standard zurücksetzen</value>
+  </data>
+  <data name="Web_Notifications_TemplateInvalid" xml:space="preserve">
+    <value>Die Vorlage enthält Fehler.</value>
+  </data>
+  <data name="Web_Notifications_TemplateReset" xml:space="preserve">
+    <value>Die Standardvorlage gilt wieder.</value>
+  </data>
+  <data name="Web_Notifications_NoOwnEmail" xml:space="preserve">
+    <value>Dein Konto hat keine E-Mail-Adresse.</value>
+  </data>
+  <data name="Web_Notifications_TestSent" xml:space="preserve">
+    <value>Testmail an {0} gesendet.</value>
+  </data>
+  <data name="Web_Notifications_Logo" xml:space="preserve">
+    <value>Logo</value>
+  </data>
+  <data name="Web_Notifications_Logo_Help" xml:space="preserve">
+    <value>PNG, JPEG oder GIF bis {0} KB. Es wird in die E-Mail eingebettet, nicht vom Server geladen.</value>
+  </data>
+  <data name="Web_Notifications_NoLogo" xml:space="preserve">
+    <value>Kein Logo</value>
+  </data>
+  <data name="Web_Notifications_UploadLogo" xml:space="preserve">
+    <value>Logo hochladen</value>
+  </data>
+  <data name="Web_Notifications_RemoveLogo" xml:space="preserve">
+    <value>Entfernen</value>
+  </data>
+  <data name="Web_Notifications_LogoType" xml:space="preserve">
+    <value>Nur PNG-, JPEG- oder GIF-Bilder sind erlaubt.</value>
+  </data>
+  <data name="Web_Notifications_LogoTooLarge" xml:space="preserve">
+    <value>Das Logo darf höchstens {0} KB groß sein.</value>
+  </data>
+  <data name="Web_Notifications_AccentColor" xml:space="preserve">
+    <value>Akzentfarbe</value>
+  </data>
+  <data name="Web_Notifications_PublicUrl" xml:space="preserve">
+    <value>Öffentliche Adresse</value>
+  </data>
+  <data name="Web_Notifications_PublicUrl_Help" xml:space="preserve">
+    <value>Wird für Links in E-Mails verwendet ({{ server.url }}). Leer übernimmt die Standardadresse der Freigabe-Links.</value>
+  </data>
+  <data name="Web_Notifications_HeaderHtml" xml:space="preserve">
+    <value>Kopfbereich (HTML)</value>
+  </data>
+  <data name="Web_Notifications_FooterHtml" xml:space="preserve">
+    <value>Fußbereich (HTML)</value>
+  </data>
+  <data name="Web_Notifications_LogHint" xml:space="preserve">
+    <value>Die letzten {0} E-Mails. {1} warten oder werden erneut versucht. Gesendete E-Mails werden 30 Tage aufbewahrt.</value>
+  </data>
+  <data name="Web_Notifications_Refresh" xml:space="preserve">
+    <value>Aktualisieren</value>
+  </data>
+  <data name="Web_Notifications_LogEmpty" xml:space="preserve">
+    <value>Es wurden noch keine E-Mails versendet.</value>
+  </data>
+  <data name="Web_Notifications_Col_Time" xml:space="preserve">
+    <value>Erstellt</value>
+  </data>
+  <data name="Web_Notifications_Col_Event" xml:space="preserve">
+    <value>Ereignis</value>
+  </data>
+  <data name="Web_Notifications_Col_Recipient" xml:space="preserve">
+    <value>Empfänger</value>
+  </data>
+  <data name="Web_Notifications_Col_Status" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="Web_Notifications_Status_Pending" xml:space="preserve">
+    <value>Wartet</value>
+  </data>
+  <data name="Web_Notifications_Status_Sending" xml:space="preserve">
+    <value>Wird gesendet</value>
+  </data>
+  <data name="Web_Notifications_Status_Sent" xml:space="preserve">
+    <value>Gesendet</value>
+  </data>
+  <data name="Web_Notifications_Status_Failed" xml:space="preserve">
+    <value>Wird wiederholt</value>
+  </data>
+  <data name="Web_Notifications_Status_Dead" xml:space="preserve">
+    <value>Fehlgeschlagen</value>
+  </data>
+  <data name="Web_Notifications_Attempts" xml:space="preserve">
+    <value>{0} Versuch(e)</value>
+  </data>
+  <data name="Web_Notifications_View" xml:space="preserve">
+    <value>Ansehen</value>
+  </data>
+  <data name="Web_Notifications_Retry" xml:space="preserve">
+    <value>Erneut senden</value>
+  </data>
+  <data name="Web_Notifications_RetryQueued" xml:space="preserve">
+    <value>Die E-Mail wird in Kürze erneut gesendet.</value>
+  </data>
 </root>

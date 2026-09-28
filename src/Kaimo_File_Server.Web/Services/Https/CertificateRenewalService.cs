@@ -13,12 +13,15 @@ public sealed class CertificateRenewalService : BackgroundService
     private readonly IHttpsCertificateProvider _provider;
     private readonly TimeProvider _time;
     private readonly ILogger<CertificateRenewalService> _logger;
+    private readonly Core.Services.Notifications.INotificationPublisher? _notifications;
 
     public CertificateRenewalService(
         IHttpsCertificateProvider provider,
         TimeProvider time,
-        ILogger<CertificateRenewalService> logger)
+        ILogger<CertificateRenewalService> logger,
+        Core.Services.Notifications.INotificationPublisher? notifications = null)
     {
+        _notifications = notifications;
         _provider = provider;
         _time = time;
         _logger = logger;
@@ -31,7 +34,9 @@ public sealed class CertificateRenewalService : BackgroundService
         {
             try
             {
-                await _provider.EnsureValidAsync(stoppingToken);
+                if (await _provider.EnsureValidAsync(stoppingToken) && _provider.Current is { } renewed)
+                    await PublishAsync(Core.Services.Notifications.NotificationEvents.CertificateRenewed(
+                        renewed.NotAfter.ToUniversalTime()));
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -40,10 +45,14 @@ public sealed class CertificateRenewalService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "HTTPS certificate renewal check failed.");
+                await PublishAsync(Core.Services.Notifications.NotificationEvents.CertificateRenewalFailed(ex.Message));
             }
         }
         while (await SafeWaitAsync(timer, stoppingToken));
     }
+
+    private Task PublishAsync(Core.Domain.Notifications.NotificationEvent notification)
+        => _notifications?.PublishAsync(notification) ?? Task.CompletedTask;
 
     private static async Task<bool> SafeWaitAsync(PeriodicTimer timer, CancellationToken ct)
     {

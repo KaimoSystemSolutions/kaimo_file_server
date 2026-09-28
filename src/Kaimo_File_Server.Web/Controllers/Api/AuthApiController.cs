@@ -51,6 +51,7 @@ public sealed class AuthApiController : ApiControllerBase
     private readonly ApiTokenService _tokens;
     private readonly TimeProvider _clock;
     private readonly ILogger<AuthApiController> _logger;
+    private readonly Core.Services.Notifications.INotificationPublisher? _notifications;
 
     public AuthApiController(
         ILoginService loginService,
@@ -58,8 +59,10 @@ public sealed class AuthApiController : ApiControllerBase
         ISyncDeviceRepository devices,
         ApiTokenService tokens,
         TimeProvider clock,
-        ILogger<AuthApiController> logger)
+        ILogger<AuthApiController> logger,
+        Core.Services.Notifications.INotificationPublisher? notifications = null)
     {
+        _notifications = notifications;
         _loginService = loginService;
         _userContextFactory = userContextFactory;
         _devices = devices;
@@ -157,7 +160,7 @@ public sealed class AuthApiController : ApiControllerBase
             }
         }
 
-        return await _devices.CreateAsync(new SyncDevice
+        var created = await _devices.CreateAsync(new SyncDevice
         {
             UserId = userId,
             DisplayName = string.IsNullOrWhiteSpace(request.DeviceName)
@@ -167,6 +170,10 @@ public sealed class AuthApiController : ApiControllerBase
             CreatedAtUtc = now,
             LastSeenUtc = now,
         });
+        if (_notifications is not null)
+            await _notifications.PublishAsync(Core.Services.Notifications.NotificationEvents.DeviceRegistered(
+                userId, request.Username, created.DisplayName, created.Platform));
+        return created;
     }
 
     private static TokenResponse ToResponse(IssuedTokens issued, Guid deviceId)

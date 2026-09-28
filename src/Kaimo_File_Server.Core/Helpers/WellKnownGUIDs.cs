@@ -16,6 +16,10 @@ namespace Kaimo_File_Server.Core.Helpers
         public static readonly Guid ROLE_SYNC_MANAGER =         Guid.Parse("00000000-0000-0000-0000-100000000006");
         public static readonly Guid ROLE_BACKUP_MANAGER =       Guid.Parse("00000000-0000-0000-0000-100000000007");
         public static readonly Guid ROLE_CLIENT_DEVICE_MANAGER = Guid.Parse("00000000-0000-0000-0000-100000000008");
+        public static readonly Guid ROLE_NOTIFICATION_MANAGER = Guid.Parse("00000000-0000-0000-0000-100000000009");
+
+        // Credential-vault context id for the SMTP gateway password. Distinct prefix (3...).
+        public static readonly Guid SMTP_CREDENTIAL =           Guid.Parse("00000000-0000-0000-0000-300000000001");
 
         // System groups. Distinct high-nibble prefix (2...) so they never collide
         // with role (1...) or department (0...) well-known IDs.

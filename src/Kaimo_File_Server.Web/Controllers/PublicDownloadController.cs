@@ -24,7 +24,8 @@ public sealed class PublicDownloadController(
     IShareLinkRepository shareLinks,
     IShareRepository shares,
     IFileServiceFactory fileServiceFactory,
-    IUserContextFactory userContextFactory) : ControllerBase
+    IUserContextFactory userContextFactory,
+    Core.Services.Notifications.INotificationPublisher? notifications = null) : ControllerBase
 {
     [HttpGet("download")]
     public async Task<IActionResult> Download(string ticket, CancellationToken ct)
@@ -57,6 +58,10 @@ public sealed class PublicDownloadController(
         }
         if (requested.Count == 0)
             return BadRequest("Nothing to download.");
+
+        if (notifications is not null)
+            await notifications.PublishAsync(Core.Services.Notifications.NotificationEvents.LinkAccessed(
+                link.Id, link.DisplayName, link.CreatedByUserId, download.DownloadName), CancellationToken.None);
 
         var fs = fileServiceFactory.CreateForShare(share.Id, share.Path);
 

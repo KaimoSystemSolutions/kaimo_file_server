@@ -256,4 +256,23 @@ public class DatabaseSeederTests : IDisposable
         Assert.False(await db.Roles.AnyAsync(r => r.Id == userRoleId));                          // system role gone
         Assert.False(await db.ScopedRoleAssignments.AnyAsync(a => a.RoleId == userRoleId));      // its assignment gone
     }
+
+    // ─────────────── Mail notification permissions ───────────────
+
+    [Fact]
+    public async Task SeedAsync_AdministratorHoldsMailBits_WhichStayOutsideFullAdmin()
+    {
+        await SeedAsync(("Seed:DemoData", "false"));
+
+        var admin = await _db.Roles.AsNoTracking().SingleAsync(r => r.Id == WellKnownGUIDs.ROLE_ADMIN);
+        Assert.True(admin.ManagementPermissions.HasFlag(ManagementPermission.ManageMailServer));
+        Assert.True(admin.ManagementPermissions.HasFlag(ManagementPermission.ManageNotifications));
+        // FullAdmin doubles as the "is global admin" test; new bits must not widen it.
+        Assert.False(ManagementPermission.FullAdmin.HasFlag(ManagementPermission.ManageMailServer));
+        Assert.False(ManagementPermission.FullAdmin.HasFlag(ManagementPermission.ManageNotifications));
+
+        var manager = await _db.Roles.AsNoTracking().SingleAsync(r => r.Id == WellKnownGUIDs.ROLE_NOTIFICATION_MANAGER);
+        Assert.True(manager.IsSystemRole);
+        Assert.Equal(ManagementPermission.ManageNotifications, manager.ManagementPermissions);
+    }
 }

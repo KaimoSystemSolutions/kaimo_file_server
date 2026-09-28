@@ -84,6 +84,14 @@
                 </NavLink>
             }
 
+            @if (_canManageNotifications)
+            {
+                <NavLink class="nav-item" href="/notifications" Match="NavLinkMatch.Prefix">
+                    @Assets.SVG("mail.svg", new SvgOptions())
+                    <span class="nav-label">@Text("Web_Nav_Notifications", "Notifications")</span>
+                </NavLink>
+            }
+
         </div>
 
 
@@ -215,6 +223,7 @@
     private bool _canViewDepartments;
     private bool _canManageShareLinks;
     private bool _canViewSecurity;
+    private bool _canManageNotifications;
     private UserContext? _currentUser;
     
     [Inject] private IJSRuntime JS { get; set; } = default!;
@@ -389,6 +398,9 @@
             _canViewSecurity = _currentUser != null
                                && await ManagementAuthService.HasAnyPermissionAsync(
                                       _currentUser, ManagementPermission.ViewSecurityMonitor);
+            _canManageNotifications = _currentUser != null
+                                      && await ManagementAuthService.HasAnyPermissionAsync(
+                                             _currentUser, ManagementPermission.ManageNotifications);
         }
 
         if (_currentUser?.User.MustChangePassword == true)

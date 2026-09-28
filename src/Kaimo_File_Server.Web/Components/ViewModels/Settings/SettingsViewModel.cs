@@ -108,8 +108,11 @@ public partial class SettingsViewModel
     /// <summary>May review and revoke users' registered client devices.</summary>
     public bool CanManageClientDevices { get; private set; }
 
+    /// <summary>May configure the SMTP gateway for notification mails.</summary>
+    public bool CanManageMailServer { get; private set; }
+
     /// <summary>True if the user may access the settings page at all.</summary>
-    public bool CanAccessPage => CanManageSettings || CanManageDataServices || CanManageCertificates || CanViewLogs || CanManageBackups || CanManageClientDevices;
+    public bool CanAccessPage => CanManageSettings || CanManageDataServices || CanManageCertificates || CanViewLogs || CanManageBackups || CanManageClientDevices || CanManageMailServer;
 
     // ── Load ──
 
@@ -210,6 +213,7 @@ public partial class SettingsViewModel
             CanViewLogs = false;
             CanManageBackups = false;
             CanManageClientDevices = false;
+            CanManageMailServer = false;
             return;
         }
 
@@ -223,6 +227,7 @@ public partial class SettingsViewModel
         CanViewLogs = permissions.HasFlag(ManagementPermission.ViewSystemLogs);
         CanManageBackups = permissions.HasFlag(ManagementPermission.ManageBackups);
         CanManageClientDevices = permissions.HasFlag(ManagementPermission.ManageClientDevices);
+        CanManageMailServer = permissions.HasFlag(ManagementPermission.ManageMailServer);
     }
 
     private async Task<UserContext?> BuildActorContextAsync()

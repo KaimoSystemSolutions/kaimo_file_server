@@ -38,6 +38,8 @@ public partial class Settings
                 _activeTab = SettingsTab.Backup;
             else if (VM.CanManageClientDevices)
                 _activeTab = SettingsTab.ClientDevices;
+            else if (VM.CanManageMailServer)
+                _activeTab = SettingsTab.MailServer;
         }
 
         _initialLoadComplete = true;
@@ -76,6 +78,7 @@ public partial class Settings
         SettingsTab.Certificate => VM.CanManageCertificates,
         SettingsTab.Backup => VM.CanManageBackups,
         SettingsTab.ClientDevices => VM.CanManageClientDevices,
+        SettingsTab.MailServer => VM.CanManageMailServer,
         _ => VM.CanManageSettings,
     };
 
@@ -114,5 +117,6 @@ internal enum SettingsTab
     Logging,
     Certificate,
     Backup,
-    ClientDevices
+    ClientDevices,
+    MailServer
 }

@@ -1,0 +1,626 @@
+@page "/notifications"
+@using Kaimo_File_Server.Core.Domain.Notifications
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Core.Security
+@using Kaimo_File_Server.Core.Services.Notifications
+@using Kaimo_File_Server.Infrastructure.Notifications
+@using Kaimo_File_Server.Web.Components.Shared
+@using Kaimo_File_Server.Web.Components.ViewModels
+@using Kaimo_File_Server.Web.DynamicHelpers
+@inject NotificationsViewModel VM
+@inject AssetProvider Icons
+@inject DateFormatService DateFmt
+@inject IJSRuntime JS
+
+@*
+    Mail notifications: which event sends which mail to whom (rules), what the mails say
+    (templates per event and language, with a sandboxed live preview), how they look (shared
+    layout) and what was sent (delivery log). Gated by ManagementPermission.ManageNotifications.
+    Every tab uses the shared workspace frame (list left, detail right) of the sync
+    administration and the share links page.
+*@
+
+<PageTitle>@R("Web_Nav_Notifications") - Kaimo Files</PageTitle>
+
+<div class="page-header">
+    <div>
+        <h1>@R("Web_Nav_Notifications")</h1>
+        <p class="subtitle">@R("Web_Notifications_Subtitle")</p>
+    </div>
+</div>
+
+@if (VM.IsLoading)
+{
+    <div class="loading-state"><div class="spinner"></div><p>@R("Web_Common_Loading")</p></div>
+}
+else if (!VM.CanAccessPage)
+{
+    <div class="error-banner">@R("Web_Error_NoPermission")</div>
+}
+else
+{
+    @if (!VM.SmtpUsable)
+    {
+        <div class="warning-banner notif-banner">
+            <span>@string.Format(R("Web_Notifications_SmtpMissing"), VM.PendingCount)</span>
+            <a href="/settings?tab=mailserver">@R("Web_Settings_Tab_MailServer")</a>
+        </div>
+    }
+    @if (VM.SuccessMessage is not null) { <div class="success-banner notif-banner">@VM.SuccessMessage</div> }
+    @if (VM.ErrorMessage is not null) { <div class="error-banner notif-banner">@VM.ErrorMessage</div> }
+
+    <div class="notif-tabs">
+        <Tabs aria-label="@R("Web_Nav_Notifications")">
+            <Tab Active="@(_tab == NotifTab.Rules)" Icon="menu.svg" Label="@R("Web_Notifications_Tab_Rules")" OnClick="() => SwitchTab(NotifTab.Rules)" />
+            <Tab Active="@(_tab == NotifTab.Templates)" Icon="edit.svg" Label="@R("Web_Notifications_Tab_Templates")" OnClick="() => SwitchTab(NotifTab.Templates)" />
+            <Tab Active="@(_tab == NotifTab.Layout)" Icon="palette.svg" Label="@R("Web_Notifications_Tab_Layout")" OnClick="() => SwitchTab(NotifTab.Layout)" />
+            <Tab Active="@(_tab == NotifTab.Log)" Icon="history.svg" Label="@R("Web_Notifications_Tab_Log")" OnClick="() => SwitchTab(NotifTab.Log)" />
+        </Tabs>
+    </div>
+
+    @switch (_tab)
+    {
+        case NotifTab.Rules:
+            <div class="workspace">
+                @* Tree: category → event → rules. Categories start collapsed; the header shows
+                   how many rules are active, so the state is visible without expanding. *@
+                <section class="workspace-list" aria-label="@R("Web_Notifications_Tab_Rules")">
+                    <div class="workspace-list-header notif-tree-toolbar">
+                        <span class="notif-tree-toolbar__summary">
+                            <span class="form-hint">@string.Format(R("Web_Notifications_ActiveSummary"), VM.Rules.Count(r => r.Enabled), VM.Rules.Count)</span>
+                            <InfoButton Text="@R("Web_Notifications_HowItWorks")" />
+                        </span>
+                        <button type="button" class="btn-secondary btn-secondary--sm" @onclick="ToggleAllCategories">
+                            @(AllCategoriesOpen ? R("Web_Notifications_CollapseAll") : R("Web_Notifications_ExpandAll"))
+                        </button>
+                    </div>
+                    @foreach (var category in VM.CatalogByCategory)
+                    {
+                        var open = _openCategories.Contains(category.Key);
+                        var eventCount = category.Count();
+                        var activeCount = category.SelectMany(d => VM.RulesFor(d.Type)).Count(r => r.Enabled);
+                        <button type="button" class="workspace-row notif-cat__head" aria-expanded="@(open ? "true" : "false")"
+                                @onclick="() => ToggleCategory(category.Key)">
+                            <span class="notif-cat__chevron @(open ? "notif-cat__chevron--open" : "")">
+                                @Icons.SVG("chevron_right.svg", new SvgOptions(Width: 14, Height: 14))
+                            </span>
+                            <span class="workspace-row-icon">@Icons.SVG(CategoryIcon(category.Key), new SvgOptions(Width: 18, Height: 18))</span>
+                            <span class="workspace-row-text">
+                                <strong>@R("Notification_Category_" + category.Key)</strong>
+                                <small>@(eventCount == 1 ? R("Web_Notifications_EventCount_One") : string.Format(R("Web_Notifications_EventCount"), eventCount))</small>
+                            </span>
+                            <StatusBadge Tone="@(activeCount > 0 ? StatusTone.Positive : StatusTone.Neutral)"
+                                         Label="@(activeCount > 0 ? string.Format(R("Web_Notifications_ActiveCount"), activeCount) : R("Web_Notifications_NoneActive"))" />
+                        </button>
+
+                        @if (open)
+                        {
+                            <div class="notif-cat__body">
+                                @foreach (var definition in category)
+                                {
+                                    var eventRules = VM.RulesFor(definition.Type).ToList();
+                                    <div class="notif-event">
+                                        <div class="notif-event__head">
+                                            <div class="notif-event__text">
+                                                <strong>@R(definition.NameKey)</strong>
+                                                <small>@R(definition.DescriptionKey)</small>
+                                            </div>
+                                            <button type="button" class="btn-secondary btn-secondary--sm notif-event__add" @onclick="() => VM.NewRule(definition.Type)">
+                                                @Icons.SVG("plus.svg", new SvgOptions(Width: 12, Height: 12))
+                                                <span>@R("Web_Notifications_AddRule")</span>
+                                            </button>
+                                        </div>
+                                        <div class="notif-rules">
+                                            @if (eventRules.Count == 0)
+                                            {
+                                                <div class="notif-rule notif-rule--empty">@R("Web_Notifications_NoRules")</div>
+                                            }
+                                            @foreach (var rule in eventRules)
+                                            {
+                                                var selected = VM.SelectedRule?.Id == rule.Id;
+                                                <div class="notif-rule @(selected ? "notif-rule--selected" : "") @(rule.Enabled ? "" : "notif-rule--off")"
+                                                     role="button" tabindex="0" aria-pressed="@(selected ? "true" : "false")"
+                                                     @onclick="() => VM.SelectRule(rule.Id)"
+                                                     @onkeydown="e => OnRuleKey(e, rule.Id)">
+                                                    <span class="workspace-row-text">
+                                                        <strong>@rule.Name</strong>
+                                                        <small>@string.Format(R("Web_Notifications_MailTo"), VM.RecipientSummary(rule))</small>
+                                                    </span>
+                                                    <span class="notif-rule__meta">
+                                                        @(VM.LastSentByRule.TryGetValue(rule.Id, out var last)
+                                                            ? string.Format(R("Web_Notifications_LastSent"), DateFmt.FormatDateTimeLocal(last.ToLocalTime()))
+                                                            : R("Web_Notifications_NeverSent"))
+                                                    </span>
+                                                    <label class="toggle-switch" title="@(rule.Enabled ? R("Web_Notifications_Enabled") : R("Web_Notifications_Disabled"))"
+                                                           @onclick:stopPropagation="true" @onkeydown:stopPropagation="true">
+                                                        <input type="checkbox" checked="@rule.Enabled" aria-label="@R("Web_Notifications_Enabled")"
+                                                               @onchange="e => VM.SetRuleEnabledAsync(rule.Id, e.Value is true)" />
+                                                        <span class="toggle-slider"></span>
+                                                    </label>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </section>
+
+                <aside class="workspace-detail notif-rule-editor" aria-label="@R("Web_Notifications_Tab_Rules")">
+                    @if (VM.SelectedRule is { } editRule && NotificationEventCatalog.Find(editRule.EventType) is { } editDef)
+                    {
+                        var recipients = VM.EditRecipientLabels();
+                        <div class="workspace-heading">
+                            <div>
+                                <h3>@R(editDef.NameKey)</h3>
+                                <span class="workspace-heading-sub">@(VM.SelectedRuleIsNew ? R("Web_Notifications_NewRule") : editRule.Name)</span>
+                            </div>
+                            <div class="workspace-enabled">
+                                <label class="toggle-switch" title="@R("Web_Notifications_Enabled")">
+                                    <input type="checkbox" @bind="VM.EditEnabled" aria-label="@R("Web_Notifications_Enabled")" /><span class="toggle-slider"></span>
+                                </label>
+                                <span>@R("Web_Notifications_Enabled")</span>
+                            </div>
+                        </div>
+
+                        @* In plain words: what triggers the mail and who gets it (updates while editing). *@
+                        <dl class="workspace-dl notif-rule-summary">
+                            <dt>@R("Web_Notifications_When")</dt>
+                            <dd>@R(editDef.DescriptionKey)</dd>
+                            <dt>@R("Web_Notifications_To")</dt>
+                            <dd>
+                                @if (recipients.Count == 0)
+                                {
+                                    <span class="notif-warning-text">@R("Web_Notifications_SummaryNone")</span>
+                                }
+                                else
+                                {
+                                    @string.Join(", ", recipients)
+                                }
+                            </dd>
+                        </dl>
+
+                        <div class="workspace-form notif-rule-name">
+                            <label><span>@R("Web_Notifications_RuleName")</span><input class="edit-input" @bind="VM.EditName" /></label>
+                        </div>
+
+                        <section class="workspace-section">
+                            <h4>@R("Web_Notifications_Section_Involved")</h4>
+                            @if (editDef.ContextRoles.Count > 0)
+                            {
+                                <p>@R("Web_Notifications_Section_Involved_Help")</p>
+                                <div class="notif-roles">
+                                    @foreach (var role in editDef.ContextRoles)
+                                    {
+                                        <label class="notif-role">
+                                            <input type="checkbox" checked="@VM.EditContextRoles.Contains(role)"
+                                                   @onchange="e => VM.ToggleContextRole(role, e.Value is true)" />
+                                            <span>@NotificationsViewModel.RoleLabel(editDef.Type, role)</span>
+                                        </label>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <p>@R("Web_Notifications_Section_Involved_None")</p>
+                            }
+                        </section>
+
+                        <section class="workspace-section">
+                            <h4>@R("Web_Notifications_Section_Fixed")</h4>
+                            <p>@R("Web_Notifications_Section_Fixed_Help")</p>
+                            <div class="workspace-form">
+                                <div class="workspace-field">
+                                    <span>@R("Web_Notifications_Users")</span>
+                                    <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.UserItems" SelectedIds="VM.EditUserIds"
+                                                          SelectedIdsChanged="ids => VM.EditUserIds = ids"
+                                                          Title="@R("Web_Notifications_Users")" Placeholder="@R("Web_Notifications_None")" />
+                                </div>
+                                <div class="workspace-field">
+                                    <span>@R("Web_Notifications_Groups")</span>
+                                    <PrincipalPickerField Mode="SelectionMode.Multiple" Items="VM.GroupItems" SelectedIds="VM.EditGroupIds"
+                                                          SelectedIdsChanged="ids => VM.EditGroupIds = ids"
+                                                          Title="@R("Web_Notifications_Groups")" Placeholder="@R("Web_Notifications_None")" />
+                                </div>
+                                <div class="workspace-field">
+                                    <span>@R("Web_Notifications_PermissionHolders") <InfoButton Text="@R("Web_Notifications_PermissionHolders_Help")" /></span>
+                                    <MultiSelect T="ManagementPermission" Items="VM.EditPermissions" Label="PermissionLabel"
+                                                 PlaceholderText="@R("Web_Notifications_None")" />
+                                </div>
+                                <label>
+                                    <span>@R("Web_Notifications_External")</span>
+                                    <textarea class="edit-input notif-textarea-small" rows="3" placeholder="team@example.com"
+                                              @bind="VM.EditExternalAddresses" @bind:event="oninput"></textarea>
+                                    <small>@R("Web_Notifications_External_Help")</small>
+                                </label>
+                            </div>
+                        </section>
+
+                        <section class="workspace-section">
+                            <h4>@R("Web_Notifications_Section_Frequency")</h4>
+                            <div class="workspace-form">
+                                <label>
+                                    <span>@R("Web_Notifications_Throttle")</span>
+                                    <input type="number" min="0" max="10080" class="edit-input notif-number" @bind="VM.EditThrottleMinutes" />
+                                    <small>@R("Web_Notifications_Throttle_Help")</small>
+                                </label>
+                            </div>
+                        </section>
+
+                        <div class="detail-actions">
+                            <button type="button" class="btn-primary" @onclick="VM.SaveRuleAsync">@R("Web_Button_Save")</button>
+                            <button type="button" class="btn-secondary" @onclick="VM.CloseRule">@R("Web_Button_Cancel")</button>
+                            @if (!VM.SelectedRuleIsNew)
+                            {
+                                @if (_confirmDelete)
+                                {
+                                    <button type="button" class="btn-danger" @onclick="DeleteRuleAsync">@R("Web_Notifications_ConfirmDelete")</button>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn-danger-outline" @onclick="() => _confirmDelete = true">@R("Web_Button_Delete")</button>
+                                }
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="detail-empty"><p>@R("Web_Notifications_SelectRule")</p></div>
+                    }
+                </aside>
+            </div>
+            break;
+
+        case NotifTab.Templates:
+            <div class="workspace workspace--wide-detail">
+                <section class="workspace-list" aria-label="@R("Web_Notifications_Tab_Templates")">
+                    <div class="workspace-list-header"><span>@R("Web_Notifications_Col_Event")</span></div>
+                    @foreach (var category in VM.CatalogByCategory)
+                    {
+                        <div class="workspace-group-label">@R("Notification_Category_" + category.Key)</div>
+                        @foreach (var definition in category)
+                        {
+                            var active = definition.Type == VM.TemplateEventType;
+                            <button type="button" class="workspace-row notif-template-row @(active ? "workspace-row--selected" : "")"
+                                    @onclick="() => VM.SelectTemplateAsync(definition.Type, VM.TemplateLanguage)">
+                                <span class="workspace-row-text"><strong>@R(definition.NameKey)</strong></span>
+                                @foreach (var language in DefaultMailTemplates.Languages)
+                                {
+                                    if (VM.IsCustomized(definition.Type, language))
+                                    {
+                                        <StatusBadge Tone="StatusTone.Neutral" ShowDot="false" Label="@language.ToUpperInvariant()"
+                                                     title="@R("Web_Notifications_Customized")" />
+                                    }
+                                }
+                            </button>
+                        }
+                    }
+                </section>
+
+                <aside class="workspace-detail notif-editor">
+                    <div class="workspace-heading">
+                        <div>
+                            <h3>@(VM.CurrentDefinition is { } cd ? R(cd.NameKey) : VM.TemplateEventType)</h3>
+                            <span class="workspace-heading-sub">
+                                @(VM.CurrentTemplateIsCustomized ? R("Web_Notifications_Customized") : R("Web_Notifications_BuiltIn"))
+                            </span>
+                        </div>
+                    </div>
+                    <Tabs Class="detail-tabs--panel" aria-label="@R("Web_Notifications_Language")">
+                        @foreach (var language in DefaultMailTemplates.Languages)
+                        {
+                            <Tab Active="@(VM.TemplateLanguage == language)" Label="@language.ToUpperInvariant()"
+                                 OnClick="() => VM.SelectTemplateAsync(VM.TemplateEventType, language)" />
+                        }
+                    </Tabs>
+
+                    <div class="notif-editor__grid">
+                        <div class="workspace-form notif-editor__source">
+                            <label>
+                                <span>@R("Web_Notifications_Subject")</span>
+                                <input class="edit-input" @bind="VM.EditSubject" @bind:event="oninput" @bind:after="VM.RefreshPreviewAsync" />
+                            </label>
+                            <div class="workspace-field">
+                                <span>@R("Web_Notifications_Body") <InfoButton Text="@R("Web_Notifications_Body_Help")" /></span>
+                                <textarea @ref="_htmlEditor" class="edit-input notif-code" rows="16" spellcheck="false"
+                                          aria-label="@R("Web_Notifications_Body")"
+                                          @bind="VM.EditHtml" @bind:event="oninput" @bind:after="VM.RefreshPreviewAsync"></textarea>
+                            </div>
+                            @if (VM.TemplateError is not null)
+                            {
+                                <div class="error-banner notif-inline-error" role="alert">@VM.TemplateError</div>
+                            }
+                            <div class="workspace-field">
+                                <span>@R("Web_Notifications_Placeholders")</span>
+                                <div class="notif-placeholders">
+                                    @if (VM.CurrentDefinition is { } pd)
+                                    {
+                                        @foreach (var placeholder in pd.Placeholders.Concat(NotificationEventCatalog.CommonPlaceholders))
+                                        {
+                                            <button type="button" class="btn-secondary btn-secondary--sm notif-chip"
+                                                    title="@placeholder.SampleValue" @onclick="() => InsertPlaceholderAsync(placeholder.Name)">
+                                                @placeholder.Name
+                                            </button>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="notif-preview">
+                            <span class="detail-label">@R("Web_Notifications_Preview")</span>
+                            <div class="notif-preview__subject">@VM.PreviewSubject</div>
+                            <iframe class="notif-preview__frame" sandbox="" title="@R("Web_Notifications_Preview")" srcdoc="@VM.PreviewHtml"></iframe>
+                        </div>
+                    </div>
+
+                    <div class="detail-actions">
+                        <button type="button" class="btn-primary" disabled="@(VM.TemplateError is not null)" @onclick="VM.SaveTemplateAsync">@R("Web_Button_Save")</button>
+                        <button type="button" class="btn-secondary" disabled="@(VM.TemplateError is not null)" @onclick="VM.SendTemplateTestAsync">@R("Web_Notifications_SendTestToMe")</button>
+                        <button type="button" class="btn-secondary" disabled="@(!VM.CurrentTemplateIsCustomized)" @onclick="VM.ResetTemplateAsync">@R("Web_Notifications_ResetDefault")</button>
+                    </div>
+                </aside>
+            </div>
+            break;
+
+        case NotifTab.Layout:
+            <div class="workspace notif-layout">
+                <section class="workspace-list notif-layout__form" aria-label="@R("Web_Notifications_Tab_Layout")">
+                    <div class="workspace-list-header"><span>@R("Web_Notifications_Tab_Layout")</span></div>
+                    <div class="workspace-form notif-layout__fields">
+                        <div class="workspace-field">
+                            <span>@R("Web_Notifications_Logo") <InfoButton Text="@string.Format(R("Web_Notifications_Logo_Help"), MailLayoutSettings.MaxLogoBytes / 1024)" /></span>
+                            <div class="notif-logo">
+                                @if (!string.IsNullOrEmpty(VM.Layout.LogoDataUri))
+                                {
+                                    <img class="notif-logo__img" src="@VM.Layout.LogoDataUri" alt="@R("Web_Notifications_Logo")" />
+                                }
+                                else
+                                {
+                                    <span class="form-hint">@R("Web_Notifications_NoLogo")</span>
+                                }
+                                <label class="btn-secondary notif-logo__upload">
+                                    @R("Web_Notifications_UploadLogo")
+                                    <InputFile OnChange="OnLogoSelected" accept="image/png,image/jpeg,image/gif" class="notif-logo__input" />
+                                </label>
+                                @if (!string.IsNullOrEmpty(VM.Layout.LogoDataUri))
+                                {
+                                    <button type="button" class="btn-secondary" @onclick="RemoveLogoAsync">@R("Web_Notifications_RemoveLogo")</button>
+                                }
+                            </div>
+                            @if (_logoError is not null) { <small class="notif-error-text">@_logoError</small> }
+                        </div>
+                        <div class="workspace-field">
+                            <span>@R("Web_Notifications_AccentColor")</span>
+                            <div class="notif-color">
+                                <input type="color" class="notif-color__picker" aria-label="@R("Web_Notifications_AccentColor")"
+                                       @bind="VM.Layout.AccentColor" @bind:after="VM.RefreshLayoutPreviewAsync" />
+                                <input class="edit-input notif-number" aria-label="@R("Web_Notifications_AccentColor")" placeholder="#3F9E00"
+                                       @bind="VM.Layout.AccentColor" @bind:after="VM.RefreshLayoutPreviewAsync" />
+                            </div>
+                        </div>
+                        <label>
+                            <span>@R("Web_Notifications_PublicUrl")</span>
+                            <input type="url" class="edit-input" placeholder="https://files.example.com" @bind="VM.Layout.PublicBaseUrl" />
+                            <small>@R("Web_Notifications_PublicUrl_Help")</small>
+                        </label>
+                        <label>
+                            <span>@R("Web_Notifications_HeaderHtml")</span>
+                            <textarea class="edit-input notif-code" rows="4" spellcheck="false"
+                                      @bind="VM.Layout.HeaderHtml" @bind:event="oninput" @bind:after="VM.RefreshLayoutPreviewAsync"></textarea>
+                        </label>
+                        <label>
+                            <span>@R("Web_Notifications_FooterHtml")</span>
+                            <textarea class="edit-input notif-code" rows="4" spellcheck="false"
+                                      @bind="VM.Layout.FooterHtml" @bind:event="oninput" @bind:after="VM.RefreshLayoutPreviewAsync"></textarea>
+                        </label>
+                        @if (VM.LayoutError is not null)
+                        {
+                            <div class="error-banner notif-inline-error" role="alert">@VM.LayoutError</div>
+                        }
+                        <div class="detail-actions notif-layout__actions">
+                            <button type="button" class="btn-primary" disabled="@(VM.LayoutError is not null)" @onclick="VM.SaveLayoutAsync">@R("Web_Button_Save")</button>
+                        </div>
+                    </div>
+                </section>
+                <aside class="workspace-detail notif-preview">
+                    <span class="detail-label">@R("Web_Notifications_Preview")</span>
+                    <iframe class="notif-preview__frame" sandbox="" title="@R("Web_Notifications_Preview")" srcdoc="@VM.LayoutPreviewHtml"></iframe>
+                </aside>
+            </div>
+            break;
+
+        case NotifTab.Log:
+            <div class="workspace">
+                <section class="workspace-list" aria-label="@R("Web_Notifications_Tab_Log")">
+                    <div class="workspace-list-header">
+                        <span class="form-hint">@string.Format(R("Web_Notifications_LogHint"), NotificationsViewModel.LogSize, VM.PendingCount)</span>
+                        <button type="button" class="btn-secondary btn-secondary--sm" @onclick="RefreshLogAsync">@R("Web_Notifications_Refresh")</button>
+                    </div>
+                    @if (VM.Deliveries.Count == 0)
+                    {
+                        <div class="empty-state"><p>@R("Web_Notifications_LogEmpty")</p></div>
+                    }
+                    else
+                    {
+                        @foreach (var delivery in VM.Deliveries)
+                        {
+                            var selected = VM.ViewedDelivery?.Id == delivery.Id;
+                            <button type="button" class="workspace-row notif-log-row @(selected ? "workspace-row--selected" : "")"
+                                    @onclick="() => VM.ViewDeliveryAsync(delivery.Id)">
+                                <span class="workspace-row-icon">@Icons.SVG("mail.svg", new SvgOptions(Width: 16, Height: 16))</span>
+                                <span class="workspace-row-text">
+                                    <strong>@EventName(delivery.EventType)</strong>
+                                    <small>@delivery.ToAddress · @DateFmt.FormatDateTimeLocal(delivery.CreatedAtUtc.ToLocalTime())</small>
+                                </span>
+                                <StatusBadge Tone="@ToneOf(delivery.Status)" Label="@R("Web_Notifications_Status_" + delivery.Status)" />
+                            </button>
+                        }
+                    }
+                </section>
+
+                <aside class="workspace-detail notif-log-detail" aria-label="@R("Web_Notifications_Tab_Log")">
+                    @if (VM.ViewedDelivery is { } viewed)
+                    {
+                        <div class="workspace-heading">
+                            <div>
+                                <h3>@EventName(viewed.EventType)</h3>
+                                <span class="workspace-heading-sub">@viewed.Subject</span>
+                            </div>
+                            <StatusBadge Tone="@ToneOf(viewed.Status)" Label="@R("Web_Notifications_Status_" + viewed.Status)" />
+                        </div>
+                        <dl class="workspace-dl">
+                            <dt>@R("Web_Notifications_Col_Recipient")</dt>
+                            <dd>@viewed.ToAddress</dd>
+                            <dt>@R("Web_Notifications_Col_Time")</dt>
+                            <dd>@DateFmt.FormatDateTimeLocal(viewed.CreatedAtUtc.ToLocalTime())</dd>
+                            @if (viewed.SentAtUtc is { } sentAt)
+                            {
+                                <dt>@R("Web_Notifications_SentAt")</dt>
+                                <dd>@DateFmt.FormatDateTimeLocal(sentAt.ToLocalTime())</dd>
+                            }
+                            @if (viewed.AttemptCount > 0)
+                            {
+                                <dt>@R("Web_Notifications_Col_Attempts")</dt>
+                                <dd>@viewed.AttemptCount</dd>
+                            }
+                            @if (!string.IsNullOrEmpty(viewed.LastError))
+                            {
+                                <dt>@R("Web_Notifications_Col_Error")</dt>
+                                <dd class="notif-error-text">@viewed.LastError</dd>
+                            }
+                        </dl>
+                        @if (viewed.Status is MailDeliveryStatus.Dead or MailDeliveryStatus.Failed)
+                        {
+                            <div class="detail-actions">
+                                <button type="button" class="btn-secondary" @onclick="() => VM.RetryDeliveryAsync(viewed.Id)">@R("Web_Notifications_Retry")</button>
+                            </div>
+                        }
+                        <section class="workspace-section notif-preview">
+                            <h4>@R("Web_Notifications_Preview")</h4>
+                            <iframe class="notif-preview__frame" sandbox="" title="@viewed.Subject" srcdoc="@ViewHtml(viewed)"></iframe>
+                        </section>
+                    }
+                    else
+                    {
+                        <div class="detail-empty"><p>@R("Web_Notifications_SelectDelivery")</p></div>
+                    }
+                </aside>
+            </div>
+            break;
+    }
+}
+
+@code {
+    private enum NotifTab { Rules, Templates, Layout, Log }
+
+    private NotifTab _tab = NotifTab.Rules;
+    private bool _confirmDelete;
+    private string? _logoError;
+    private ElementReference _htmlEditor;
+
+    // Rule tree: categories start collapsed so the tab opens as a short overview.
+    private readonly HashSet<string> _openCategories = [];
+
+    private bool AllCategoriesOpen => VM.CatalogByCategory.All(c => _openCategories.Contains(c.Key));
+
+    private void ToggleCategory(string category)
+    {
+        if (!_openCategories.Remove(category)) _openCategories.Add(category);
+    }
+
+    private void ToggleAllCategories()
+    {
+        if (AllCategoriesOpen) _openCategories.Clear();
+        else _openCategories.UnionWith(VM.CatalogByCategory.Select(c => c.Key));
+    }
+
+    private void OnRuleKey(KeyboardEventArgs e, Guid ruleId)
+    {
+        if (e.Key is "Enter" or " ") VM.SelectRule(ruleId);
+    }
+
+    private static string CategoryIcon(string category) => category switch
+    {
+        "users" => "users.svg",
+        "security" => "shield.svg",
+        "sharelinks" => "share.svg",
+        "sync" => "sync-twoway.svg",
+        "backup" => "archive.svg",
+        "devices" => "refresh.svg",
+        "certificates" => "globe.svg",
+        _ => "mail.svg",
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await VM.LoadAsync();
+        await VM.RefreshLayoutPreviewAsync();
+    }
+
+    private void SwitchTab(NotifTab tab)
+    {
+        _tab = tab;
+        _confirmDelete = false;
+        VM.ClearMessages();
+    }
+
+    private async Task DeleteRuleAsync()
+    {
+        _confirmDelete = false;
+        await VM.DeleteRuleAsync();
+    }
+
+    private async Task InsertPlaceholderAsync(string name)
+        => await JS.InvokeVoidAsync("mailTemplateEditor.insertAtCursor", _htmlEditor, VM.PlaceholderToken(name));
+
+    private async Task OnLogoSelected(InputFileChangeEventArgs e)
+    {
+        _logoError = null;
+        var file = e.File;
+        if (file.Size > MailLayoutSettings.MaxLogoBytes)
+        {
+            _logoError = string.Format(R("Web_Notifications_LogoTooLarge"), MailLayoutSettings.MaxLogoBytes / 1024);
+            return;
+        }
+        using var ms = new MemoryStream();
+        await file.OpenReadStream(MailLayoutSettings.MaxLogoBytes).CopyToAsync(ms);
+        _logoError = VM.SetLogo(ms.ToArray(), file.ContentType);
+        await VM.RefreshLayoutPreviewAsync();
+    }
+
+    private async Task RemoveLogoAsync()
+    {
+        VM.ClearLogo();
+        await VM.RefreshLayoutPreviewAsync();
+    }
+
+    private async Task RefreshLogAsync()
+    {
+        VM.ClearMessages();
+        await VM.RefreshLogAsync();
+    }
+
+    // The stored body references the logo as an inline attachment; show the current logo instead.
+    private string ViewHtml(MailDelivery delivery)
+        => string.IsNullOrEmpty(VM.Layout.LogoDataUri)
+            ? delivery.HtmlBody
+            : delivery.HtmlBody.Replace("cid:" + MailTemplateRenderer.LogoContentId, VM.Layout.LogoDataUri);
+
+    private static string EventName(string type)
+        => NotificationEventCatalog.Find(type) is { } definition ? R(definition.NameKey) : type;
+
+    private static StatusTone ToneOf(MailDeliveryStatus status) => status switch
+    {
+        MailDeliveryStatus.Sent => StatusTone.Positive,
+        MailDeliveryStatus.Failed => StatusTone.Warning,
+        MailDeliveryStatus.Dead => StatusTone.Negative,
+        _ => StatusTone.Neutral,
+    };
+
+    private static string PermissionLabel(ManagementPermission permission)
+        => NotificationsViewModel.SelectablePermissions.FirstOrDefault(p => p.Permission == permission).Label ?? permission.ToString();
+
+    private static string R(string key) => NotificationsViewModel.R(key);
+}

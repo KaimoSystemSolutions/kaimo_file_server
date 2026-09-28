@@ -128,6 +128,16 @@ namespace Kaimo_File_Server.Infrastructure
             services.AddSingleton<Backup.IBackupSettingsStore, Backup.BackupSettingsStore>();
             services.AddSingleton<Backup.BackupSchedulerSignal>();
 
+            // -- Mail notifications: every process publishes events into the outbox table;
+            //    only the Web process dispatches them (it alone can decrypt the SMTP password).
+            //    The repository is stateless over the context factory, so singleton is safe. --
+            services.AddSingleton<INotificationRepository, NotificationRepository>();
+            services.AddSingleton<Notifications.NotificationDispatchSignal>();
+            services.AddSingleton<Core.Services.Notifications.INotificationPublisher, Notifications.DbNotificationPublisher>();
+            services.AddSingleton<Notifications.ISmtpConfigStore, Notifications.SmtpConfigStore>();
+            services.AddSingleton<Notifications.MailTemplateRenderer>();
+            services.AddScoped<Notifications.NotificationRecipientResolver>();
+
             // -- Seeder --
             services.AddScoped<DatabaseSeeder>();
             

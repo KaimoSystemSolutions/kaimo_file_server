@@ -6,6 +6,7 @@ using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
+using Kaimo_File_Server.Core.Services.Notifications;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
 using Kaimo_File_Server.Core.Language;
@@ -38,6 +39,7 @@ public class UserListViewModel
     private readonly ClientConnectionInfo? _client;
     private readonly JwtTokenService? _jwt;
     private readonly IMemoryCache? _cache;
+    private readonly INotificationPublisher? _notifications;
 
     public UserListViewModel(
         IUserRepository userRepo,
@@ -57,9 +59,11 @@ public class UserListViewModel
         ClientConnectionInfo? client = null,
         JwtTokenService? jwt = null,
         IMemoryCache? cache = null,
-        HomeDirectoryService? homes = null)
+        HomeDirectoryService? homes = null,
+        INotificationPublisher? notifications = null)
     {
         _homes = homes;
+        _notifications = notifications;
         _loginService = loginService;
         _client = client;
         _jwt = jwt;
@@ -430,6 +434,10 @@ public class UserListViewModel
             new(ManagementPermission.ManageBackups, Resources.Web_Perm_ManageBackups),
             new(ManagementPermission.ViewSecurityMonitor,
                 Resources.ResourceManager.GetString("Web_Perm_ViewSecurityMonitor") ?? "View security overview"),
+            new(ManagementPermission.ManageMailServer,
+                Resources.ResourceManager.GetString("Web_Perm_ManageMailServer") ?? "Configure mail server"),
+            new(ManagementPermission.ManageNotifications,
+                Resources.ResourceManager.GetString("Web_Perm_ManageNotifications") ?? "Manage mail notifications"),
         ]),
         new(Resources.Web_PermGroup_ExternalStorage,
         [
@@ -822,6 +830,8 @@ public class UserListViewModel
                 await _userRepo.UpdatePasswordAsync(SelectedUser.Id,
                     _passwordService.HashPassword(NewPassword),
                     _ntHashProtector.Protect(_passwordService.ComputeNtHash(NewPassword)));
+                await PublishAsync(NotificationEvents.PasswordReset(
+                    SelectedUser.Id, SelectedUser.Name, SelectedUser.Username, _actorContext?.User.Id));
                 // An admin resetting their own password keeps this session (others end).
                 if (SelectedUser.Id == _actorContext?.User.Id)
                     await RenewOwnSessionAsync(SelectedUser.Id);
@@ -930,6 +940,8 @@ public class UserListViewModel
                     _passwordService.HashPassword(NewPassword),
                     _ntHashProtector.Protect(_passwordService.ComputeNtHash(NewPassword)),
                     changedByUser: true);
+                await PublishAsync(NotificationEvents.PasswordChanged(
+                    SelectedUser.Id, SelectedUser.Name, SelectedUser.Username));
                 InvalidateCachedWebDavLogins(SelectedUser.Id);
                 // The new security stamp ended every other session; keep this one.
                 await RenewOwnSessionAsync(SelectedUser.Id);
@@ -1381,6 +1393,8 @@ public class UserListViewModel
             // Every user is a member of the global Everyone group.
             await _groupRepo.AddMemberAsync(WellKnownGUIDs.GROUP_EVERYONE, user.Id);
             await EnsureHomeQuietlyAsync(user);
+            await PublishAsync(NotificationEvents.UserCreated(
+                user.Id, user.Name, user.Username, _actorContext.User.Id));
 
             IsCreatingUser = false;
             await LoadTabDataAsync();
@@ -1393,6 +1407,10 @@ public class UserListViewModel
         }
         finally { IsSaving = false; }
     }
+
+    // Best-effort by contract: the publisher never throws.
+    private Task PublishAsync(Kaimo_File_Server.Core.Domain.Notifications.NotificationEvent notification)
+        => _notifications?.PublishAsync(notification) ?? Task.CompletedTask;
 
     // A missing home is recreated by the startup backfill or on first use, so a failure here
     // (e.g. pool not mounted) must not fail the user creation itself.
@@ -1739,35 +1757,12 @@ public class UserListViewModel
     /// no operation may reduce it to empty, or the whole management UI becomes
     /// permanently unreachable.
     /// </summary>
-    // ponytail: the guards live in this ViewModel because all write paths that can
-    // strip global admin (role uncheck, assignment delete, user delete, user disable)
-    // are here. If a second write path appears (planned client-sync REST API), move
-    // this helper into ManagementAuthService.
-    private async Task<HashSet<Guid>> GetEnabledGlobalAdminUserIdsAsync(Guid? excludeAssignmentId = null)
-    {
-        var globalAssignments = await _assignmentRepo.GetByScopeAsync(ScopeType.Global, Guid.Empty);
-        var roles = (await _roleRepo.GetAllAsync()).ToDictionary(r => r.Id);
-        var users = (await _userRepo.GetAllAsync()).ToDictionary(u => u.Id);
-        var groupIds = (await _groupRepo.GetAllAsync()).Select(g => g.Id).ToHashSet();
-
-        var admins = new HashSet<Guid>();
-        foreach (var a in globalAssignments)
-        {
-            if (a.Id == excludeAssignmentId) continue;
-            if (!roles.TryGetValue(a.RoleId, out var role) || !IsAdminRole(role)) continue;
-
-            if (users.TryGetValue(a.PrincipalId, out var user))
-            {
-                if (user.IsEnabled) admins.Add(user.Id);
-            }
-            else if (groupIds.Contains(a.PrincipalId))
-            {
-                foreach (var member in await _groupRepo.GetMembersAsync(a.PrincipalId))
-                    if (member.IsEnabled) admins.Add(member.Id);
-            }
-        }
-        return admins;
-    }
+    // The guards live in this ViewModel because all write paths that can strip global
+    // admin (role uncheck, assignment delete, user delete, user disable) are here; the
+    // lookup itself is shared with the mail-notification recipient resolver.
+    private Task<HashSet<Guid>> GetEnabledGlobalAdminUserIdsAsync(Guid? excludeAssignmentId = null)
+        => ManagementAuthService.GetGlobalPermissionHolderUserIdsAsync(
+            _assignmentRepo, _roleRepo, _userRepo, _groupRepo, IsAdminRole, excludeAssignmentId);
 
     /// <summary>
     /// Keeps the two admin representations of a user in lockstep (full mirror): a direct

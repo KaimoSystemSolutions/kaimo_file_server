@@ -2,6 +2,7 @@ using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Domain.Department;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Domain.Notifications;
 using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Infrastructure.Configuration;
@@ -53,6 +54,12 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
 
         // -- Configuration --
         public DbSet<ConfigSetting> ConfigSettings { get; set; }
+
+        // -- Mail notifications --
+        public DbSet<NotificationEvent> NotificationEvents { get; set; }
+        public DbSet<MailDelivery> MailDeliveries { get; set; }
+        public DbSet<MailRule> MailRules { get; set; }
+        public DbSet<MailTemplate> MailTemplates { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -482,6 +489,63 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.HasIndex(e => e.CreatedAtUtc);
                 entity.HasOne<SyncDevice>().WithMany().HasForeignKey(e => e.DeviceId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // -- Mail notifications --
+
+            modelBuilder.Entity<NotificationEvent>(entity =>
+            {
+                entity.ToTable("notification_events");
+                entity.HasKey(e => e.Seq);
+                // Database-assigned monotonic identity (Npgsql IDENTITY; SQLite AUTOINCREMENT).
+                entity.Property(e => e.Seq).ValueGeneratedOnAdd();
+                entity.Property(e => e.Type).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.SubjectUserIdsJson).IsRequired().HasColumnType("text");
+                entity.Property(e => e.PayloadJson).IsRequired().HasColumnType("text");
+                entity.Property(e => e.DedupKey).HasMaxLength(300);
+                entity.Property(e => e.Status).HasConversion<int>();
+                entity.Property(e => e.LastError).HasMaxLength(1000);
+                entity.HasIndex(e => new { e.Status, e.Seq });
+            });
+
+            modelBuilder.Entity<MailDelivery>(entity =>
+            {
+                entity.ToTable("mail_deliveries");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.EventType).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.DedupKey).HasMaxLength(300);
+                entity.Property(e => e.ToAddress).IsRequired().HasMaxLength(320);
+                entity.Property(e => e.Language).IsRequired().HasMaxLength(10);
+                entity.Property(e => e.Subject).IsRequired().HasMaxLength(1000);
+                entity.Property(e => e.HtmlBody).IsRequired().HasColumnType("text");
+                entity.Property(e => e.TextBody).IsRequired().HasColumnType("text");
+                entity.Property(e => e.Status).HasConversion<int>();
+                entity.Property(e => e.LastError).HasMaxLength(1000);
+                entity.HasIndex(e => new { e.Status, e.NextAttemptUtc });
+                entity.HasIndex(e => new { e.RuleId, e.DedupKey, e.ToAddress, e.CreatedAtUtc });
+                entity.HasIndex(e => e.CreatedAtUtc);
+            });
+
+            modelBuilder.Entity<MailRule>(entity =>
+            {
+                entity.ToTable("mail_rules");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.EventType).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.RecipientsJson).IsRequired().HasColumnType("text");
+                entity.HasIndex(e => e.EventType);
+            });
+
+            modelBuilder.Entity<MailTemplate>(entity =>
+            {
+                entity.ToTable("mail_templates");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.EventType).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.Language).IsRequired().HasMaxLength(10);
+                entity.Property(e => e.SubjectTemplate).IsRequired().HasMaxLength(1000);
+                entity.Property(e => e.HtmlTemplate).IsRequired().HasColumnType("text");
+                entity.Property(e => e.TextTemplate).HasColumnType("text");
+                entity.HasIndex(e => new { e.EventType, e.Language }).IsUnique();
             });
 
             modelBuilder.Entity<FileChangeLogEntry>(entity =>

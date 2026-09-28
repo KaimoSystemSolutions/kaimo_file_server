@@ -141,6 +141,14 @@ echo "vm.max_map_count=262144" | sudo tee /etc/sysctl.d/99-kaimo.conf
 Heap size is capped at 512 MB via `ELASTIC_JAVA_OPTS`; raise it in `.env` for
 larger deployments.
 
+## ✉️ Mail notifications
+
+The `web` container sends notification mails through an SMTP server of your
+choice (**Settings → Mail server**). It needs outbound access to that server,
+usually on port `587` (STARTTLS) or `465` (SSL/TLS). Which events send which
+mails to whom is configured under **Notifications**; nothing is sent until a
+rule is enabled there. Details: [`docu/mail-notifications.md`](../docu/mail-notifications.md).
+
 ## ⚙️ Configuration
 
 Values shared by multiple services (database settings, time zone, image tag,

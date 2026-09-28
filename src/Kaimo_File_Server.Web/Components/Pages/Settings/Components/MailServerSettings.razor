@@ -1,0 +1,170 @@
+@using Kaimo_File_Server.Core.Language
+@using Kaimo_File_Server.Infrastructure.Notifications
+@using Kaimo_File_Server.Web.Components.ViewModels
+@inject MailServerSettingsViewModel VM
+@inject DateFormatService DateFmt
+
+@*
+    Settings tab for the SMTP gateway that sends notification mails. Self-contained like
+    ClientDeviceSettings: it owns its view model instead of growing SettingsViewModel.
+*@
+
+@if (VM.IsLoading)
+{
+    <p class="settings-description">@R("Web_Common_Loading")</p>
+}
+else if (!VM.CanManage)
+{
+    <div class="error-banner">@R("Web_Error_NoPermission")</div>
+}
+else
+{
+    @if (VM.SuccessMessage is not null) { <div class="success-banner">@VM.SuccessMessage</div> }
+    @if (VM.ErrorMessage is not null) { <div class="error-banner">@VM.ErrorMessage</div> }
+
+    <div class="detail-section mail-server">
+        <span class="detail-label">@R("Web_Settings_Tab_MailServer")</span>
+        <p class="settings-description">@R("Web_MailServer_Description")</p>
+
+        <div class="mail-server__status">
+            <span class="settings-field-label">@R("Web_MailServer_ConnectionStatus")</span>
+            @if (VM.Status.LastErrorUtc is { } errorAt && (VM.Status.LastSuccessUtc is null || errorAt > VM.Status.LastSuccessUtc))
+            {
+                <StatusBadge Tone="StatusTone.Negative" Label="@R("Web_MailServer_Status_Error")" />
+                <span class="mail-server__status-text">@DateFmt.FormatDateTimeLocal(errorAt.ToLocalTime()) · @VM.Status.LastError</span>
+            }
+            else if (VM.Status.LastSuccessUtc is { } okAt)
+            {
+                <StatusBadge Tone="StatusTone.Positive" Label="@R("Web_MailServer_Status_Ok")" />
+                <span class="mail-server__status-text">@DateFmt.FormatDateTimeLocal(okAt.ToLocalTime())</span>
+            }
+            else
+            {
+                <StatusBadge Tone="StatusTone.Neutral" Label="@R("Web_MailServer_Status_Unknown")" />
+            }
+        </div>
+
+        <div class="service-row">
+            <div class="service-info"><span class="service-name">@R("Web_MailServer_Enabled")</span></div>
+            <label class="toggle-switch" title="@R("Web_MailServer_Enabled")"><input type="checkbox" @bind="VM.Settings.Enabled" /><span class="toggle-slider"></span></label>
+        </div>
+
+        <div class="settings-row settings-row-spaced">
+            <label class="settings-field-label" for="smtp-host">@R("Web_MailServer_Host")</label>
+            <input id="smtp-host" class="edit-input mail-server__wide" placeholder="smtp.example.com" @bind="VM.Settings.Host" />
+        </div>
+        <div class="settings-row settings-row-spaced">
+            <label class="settings-field-label" for="smtp-port">@R("Web_MailServer_Port")</label>
+            <input id="smtp-port" type="number" min="1" max="65535" class="edit-input settings-number" @bind="VM.Settings.Port" />
+        </div>
+        <div class="settings-row settings-row-spaced">
+            <label class="settings-field-label" for="smtp-security">
+                @R("Web_MailServer_Security")
+                <InfoButton Text="@R("Web_MailServer_Security_Help")" />
+            </label>
+            <select id="smtp-security" class="edit-input mail-server__select" @bind="VM.Settings.Security">
+                <option value="@SmtpSecurity.Auto">@R("Web_MailServer_Security_Auto")</option>
+                <option value="@SmtpSecurity.StartTls">STARTTLS</option>
+                <option value="@SmtpSecurity.SslOnConnect">SSL/TLS</option>
+                <option value="@SmtpSecurity.None">@R("Web_MailServer_Security_None")</option>
+            </select>
+        </div>
+        <div class="settings-row settings-row-spaced">
+            <label class="settings-field-label" for="smtp-auth">@R("Web_MailServer_AuthMode")</label>
+            <select id="smtp-auth" class="edit-input mail-server__select" @bind="VM.Settings.AuthMode">
+                <option value="@SmtpAuthMode.Password">@R("Web_MailServer_Auth_Password")</option>
+                <option value="@SmtpAuthMode.None">@R("Web_MailServer_Auth_None")</option>
+            </select>
+        </div>
+        @if (VM.Settings.AuthMode == SmtpAuthMode.Password)
+        {
+            <div class="settings-row settings-row-spaced">
+                <label class="settings-field-label" for="smtp-user">@R("Web_MailServer_Username")</label>
+                <input id="smtp-user" class="edit-input mail-server__wide" autocomplete="off" @bind="VM.Settings.Username" />
+            </div>
+            <div class="settings-row settings-row-spaced">
+                <label class="settings-field-label" for="smtp-password">
+                    @R("Web_MailServer_Password")
+                    <InfoButton Text="@R("Web_MailServer_Password_Help")" />
+                </label>
+                <input id="smtp-password" type="password" class="edit-input mail-server__wide" autocomplete="new-password"
+                       placeholder="@(VM.HasStoredPassword ? R("Web_MailServer_PasswordKeep") : string.Empty)"
+                       @bind="VM.NewPassword" />
+            </div>
+        }
+        <div class="settings-row settings-row-spaced">
+            <label class="settings-field-label" for="smtp-from">@R("Web_MailServer_FromAddress")</label>
+            <input id="smtp-from" type="email" class="edit-input mail-server__wide" placeholder="files@example.com" @bind="VM.Settings.FromAddress" />
+        </div>
+        <div class="settings-row settings-row-spaced">
+            <label class="settings-field-label" for="smtp-from-name">
+                @R("Web_MailServer_FromName")
+                <InfoButton Text="@R("Web_MailServer_FromName_Help")" />
+            </label>
+            <input id="smtp-from-name" class="edit-input mail-server__wide" @bind="VM.Settings.FromName" />
+        </div>
+        <div class="settings-row settings-row-spaced">
+            <label class="settings-field-label" for="smtp-reply">@R("Web_MailServer_ReplyTo")</label>
+            <input id="smtp-reply" type="email" class="edit-input mail-server__wide" @bind="VM.Settings.ReplyTo" />
+        </div>
+        <div class="settings-row settings-row-spaced">
+            <label class="settings-field-label" for="smtp-timeout">@R("Web_MailServer_Timeout")</label>
+            <input id="smtp-timeout" type="number" min="5" max="300" class="edit-input settings-number" @bind="VM.Settings.TimeoutSeconds" />
+        </div>
+        <div class="settings-row settings-row-spaced">
+            <label class="settings-field-label" for="smtp-rate">
+                @R("Web_MailServer_MaxPerMinute")
+                <InfoButton Text="@R("Web_MailServer_MaxPerMinute_Help")" />
+            </label>
+            <input id="smtp-rate" type="number" min="1" max="1000" class="edit-input settings-number" @bind="VM.Settings.MaxMailsPerMinute" />
+        </div>
+
+        <div class="settings-actions">
+            <button type="button" class="btn-primary" disabled="@VM.IsSaving" @onclick="SaveAsync">@Resources.Web_Settings_Button_Save</button>
+        </div>
+    </div>
+
+    <div class="detail-section mail-server">
+        <span class="detail-label">@R("Web_MailServer_TestTitle")</span>
+        <p class="settings-description">@R("Web_MailServer_TestDescription")</p>
+        <div class="settings-row settings-row-spaced">
+            <label class="settings-field-label" for="smtp-test-to">@R("Web_MailServer_TestAddress")</label>
+            <input id="smtp-test-to" type="email" class="edit-input mail-server__wide" @bind="VM.TestAddress" />
+            <button type="button" class="btn-secondary" disabled="@VM.IsTesting" @onclick="TestAsync">
+                @(VM.IsTesting ? R("Web_MailServer_Testing") : R("Web_MailServer_SendTest"))
+            </button>
+        </div>
+        @if (VM.TestResult is { } result)
+        {
+            <div class="mail-server__status" role="status">
+                @if (result.Success)
+                {
+                    <StatusBadge Tone="StatusTone.Positive" Label="@R("Web_MailServer_TestSent")" />
+                }
+                else
+                {
+                    <StatusBadge Tone="StatusTone.Negative" Label="@R("Web_MailServer_TestFailed")" />
+                    <span class="mail-server__status-text">@result.Error</span>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    protected override Task OnInitializedAsync() => VM.LoadAsync();
+
+    private async Task SaveAsync()
+    {
+        StateHasChanged();
+        await VM.SaveAsync();
+    }
+
+    private async Task TestAsync()
+    {
+        StateHasChanged();
+        await VM.SendTestAsync();
+    }
+
+    private static string R(string key) => Resources.ResourceManager.GetString(key) ?? key;
+}
