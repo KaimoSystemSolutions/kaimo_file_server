@@ -1,19 +1,20 @@
 # 🐢 Kaimo File Server
 
-The Kaimo File Server is a selfhosted, feature-rich fileserver designed for granular access control, 
-external storage integration, synchronization and custom storage management.
+The Kaimo File Server is a selfhosted fileserver, which allows you to use the fileserver how you like it.
+It is a docker compose solutions, which is meant to be running on a VM / LXC of a hypervisor like Proxmox for example.
 
-🚧 Kaimo File Server is still under developement.
+🚧 Kaimo File Server is still under developement, make backups if you use it with sensible data. 
+Please feel free to test the active beta and let me know your feedback on it.
 
 ## ✨ Features
 
 ### 📁 Storage
-- Custom storage pools (for example for fast and slow storage)
-- Multiple storage pools for different shares
-- Virtual shares to access external storage
+- Multiple custom storage pools, with differnt mountpoints
+- Shares are based on one of these storage pools
+- Virtual shares to access external storage from the built-in filebrowser
 
 ### 🔄 Synchronization
-- Sync files between local and external storage
+- You can sync files between local shares and an external storage connection
 
 ### ☁︎ External storage
 - SMB
@@ -24,21 +25,20 @@ external storage integration, synchronization and custom storage management.
 - Dropbox
 
 ### 👥 Access Control
-- Per-share and per-folder ACLs
-- User and group permissions
+- Per-share and per-folder ACLs (ACLs are NTFS like)
+- User, group and department permissions
 - Custom roles
-- Departments and scoped access
+- Departments which can handle scoped access to resources
 
 ### 🔍 Search
-- Elasticsearch-powered file search
+- In-text file search powered by Elasticsearch (if ram is short, just use the regular filename search)
 
 ### ✉️ Notifications
-- SMTP gateway with test mail
-- Mail notifications for user, security, share-link, sync, backup and certificate events
-- Rules per event (users, groups, permission holders, external addresses) with throttling
-- Editable mail templates per language and a shared mail layout with live preview
-
-### 🔄 Coming: Syncing to your local device via
+- Can be sent over E-Mail
+- Live design preview of the message 
+- Editable mail templates per language
+  
+### 🔄 Coming soon: Syncing to your local devices on
 - Windows
 - Linux
 - MacOS
@@ -62,7 +62,7 @@ Exceptions and details are in [`NOTICE`](NOTICE):
   see [`src/samba-vfs/LICENSE`](src/samba-vfs/LICENSE).
 - Bundled NuGet dependencies are permissive (MIT / Apache-2.0 / BSD / PostgreSQL).
 
-**Commercial use:** a separate commercial license is available from the copyright
+> **Commercial use:** a separate commercial license is available from the copyright
 holder for those who cannot meet the AGPL obligations or want to build
 proprietary modules. Contributions are accepted under a Contributor License
 Agreement so the project can continue to be offered under both licenses.
@@ -70,5 +70,7 @@ Agreement so the project can continue to be offered under both licenses.
 
 ## Why I built this
 
-I have been running a synology for a long time, tried to switch to TrueNas but I didn't got what I expected. So I thought I just could it by myself, but better than all of the other solutions. 
-First of all I wanted to have a complete virtual environment, so absolute suitable for a docker deployment on for for example proxmox.
+I have been running a synology for a long time, tried to switch to TrueNas but I didn't got what I expected. 
+The best case for TrueNAS is to directly attach your drives to the VM, which doesn't made sense for me, because I wanted to use a hypervisor for all of my stuff and not only some parts of it. 
+I've searched a long time but I didn't found something I wanted to work with and to trust my whole sensitive files on.
+So I thought I just could do it by myself, just a fileserver which fits my needs the most. 
