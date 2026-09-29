@@ -42,7 +42,7 @@ Kaimo stores one logical file across several independently durable systems:
 |---|---|
 | Filesystem | Live files, directories, recycle-bin entries |
 | PostgreSQL | Ownership, ACL metadata, file version rows, shares |
-| Version storage | Content-addressed compressed version blobs under `.versions` |
+| Version storage | Content-addressed compressed version blobs under `<pool>/.kaimo-versions` (the pool of the share; the former app-data `.versions` store is drained by `VersionStorageReconcilerService`) |
 | Elasticsearch | Searchable file and directory projection |
 | Snapshot cache | Rebuildable materialized `@GMT` content |
 

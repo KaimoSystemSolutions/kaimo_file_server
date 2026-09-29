@@ -49,6 +49,9 @@ builder.Services.AddHostedService<Kaimo_File_Server.Host.DataServiceReconciler>(
 // -- Scheduled database backups (Host is the sole DB owner) --
 builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Backup.DatabaseBackupSchedulerService>();
 
+// -- Version blobs: drain the former app-data store into the pools, follow moved shares --
+builder.Services.AddHostedService<Kaimo_File_Server.Infrastructure.Services.VersionStorageReconcilerService>();
+
 
 
 var host = builder.Build();

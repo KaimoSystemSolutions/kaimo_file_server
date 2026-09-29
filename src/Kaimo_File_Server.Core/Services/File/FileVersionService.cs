@@ -29,10 +29,35 @@ namespace Kaimo_File_Server.Core.Services.File;
 ///   The ShareId is NOT part of the path — it is carried alongside every call and
 ///   stored on each version so histories stay isolated between shares that happen
 ///   to contain a file at the same relative path.
+///
+/// Storage location:
+///   With an <see cref="IVersionStorageLocator"/>, blobs live in the storage pool of
+///   their share (outside every share folder). The fixed root passed to the
+///   constructor is then only the legacy location: it is read as a fallback and
+///   drained by <see cref="ReconcileStorageAsync"/>, but never written to.
+///   A version is skipped (never the file operation) when its pool is low on space.
 /// </summary>
 public class FileVersionService : IFileVersionService
 {
     private const long InMemoryReadLimitBytes = 8L * 1024 * 1024;
+
+    // Versions are a convenience copy and must never fill the disk they share with
+    // user data: keep at least this much free after writing a blob.
+    private const long MinFreeBytes = 2L * 1024 * 1024 * 1024;
+    private const double MinFreeRatio = 0.05;
+
+    // Reconciliation never touches blobs this young (a concurrent writer in another
+    // process may be between writing the blob and inserting its row) and removes
+    // crash-left temp files older than a day.
+    private static readonly TimeSpan ReconcileMinBlobAge = TimeSpan.FromHours(1);
+    private static readonly TimeSpan StaleTempAge = TimeSpan.FromDays(1);
+    private const long WarningIntervalMs = 5 * 60 * 1000;
+    private static long _lastLowSpaceWarning = long.MinValue / 2;
+    private static long _lastNoPoolWarning = long.MinValue / 2;
+
+    private static readonly StringComparison PathComparison =
+        OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
     private static readonly SemaphoreSlim[] BlobLocks = Enumerable.Range(0, 64)
         .Select(_ => new SemaphoreSlim(1, 1))
         .ToArray();
@@ -42,14 +67,23 @@ public class FileVersionService : IFileVersionService
     private readonly TimeSpan? _defaultMaxAge;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<FileVersionService> _logger;
+    private readonly IVersionStorageLocator? _locator;
+    private readonly Func<string, (long Free, long Total)> _diskSpace;
 
+    /// <param name="versionStorageRoot">
+    /// The blob store without a <paramref name="storageLocator"/>; with one, the legacy
+    /// location that is only read from and drained.
+    /// </param>
+    /// <param name="diskSpaceProbe">Free/total bytes of the volume holding a path (tests).</param>
     public FileVersionService(
         IFileVersionRepository versionRepo,
         string versionStorageRoot,
         int defaultMaxVersions = 64,
         TimeSpan? defaultMaxAge = null,
         TimeProvider? timeProvider = null,
-        ILogger<FileVersionService>? logger = null)
+        ILogger<FileVersionService>? logger = null,
+        IVersionStorageLocator? storageLocator = null,
+        Func<string, (long Free, long Total)>? diskSpaceProbe = null)
     {
         _versionRepo = versionRepo;
         _versionStorageRoot = versionStorageRoot;
@@ -57,14 +91,29 @@ public class FileVersionService : IFileVersionService
         _defaultMaxAge = defaultMaxAge;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _logger = logger ?? NullLogger<FileVersionService>.Instance;
+        _locator = storageLocator;
+        _diskSpace = diskSpaceProbe ?? ProbeDiskSpace;
 
-        Directory.CreateDirectory(_versionStorageRoot);
+        // The legacy location is never recreated once it has been drained.
+        if (_locator is null)
+            Directory.CreateDirectory(_versionStorageRoot);
     }
 
     public async Task<FileVersion?> CreateVersionAsync(
         Guid shareId, string filePath, Stream content, string? userId = null)
     {
         var normalizedPath = ShareRelativePath.Normalize(filePath);
+
+        var root = await ResolveRootAsync(shareId);
+        if (root is null)
+        {
+            if (ShouldWarn(ref _lastNoPoolWarning))
+                _logger.LogWarning(
+                    "Share {ShareId} is not located in a storage pool; file versions are not stored for it.",
+                    shareId);
+            return null;
+        }
+        Directory.CreateDirectory(root);
 
         // 1. Hash the content
         content.Position = 0;
@@ -79,7 +128,7 @@ public class FileVersionService : IFileVersionService
         // version record already exists, validate/repair its physical blob before
         // returning so a crash-left partial file cannot become permanent.
         var blobRelativePath = HashToPath(hash);
-        var blobFullPath = Path.Combine(_versionStorageRoot, blobRelativePath);
+        var blobFullPath = Path.Combine(root, blobRelativePath);
         long compressedSize;
         var createdBlob = false;
         FileVersion? version = null;
@@ -95,6 +144,17 @@ public class FileVersionService : IFileVersionService
 
             if (!blobIsValid)
             {
+                // gzip never makes a blob much larger than its content, so the content
+                // size is a safe upper bound for the space this write needs.
+                if (!HasRoomFor(root, contentSize))
+                {
+                    if (ShouldWarn(ref _lastLowSpaceWarning))
+                        _logger.LogWarning(
+                            "Version storage {Root} is low on free space; new file versions are skipped until space is freed.",
+                            root);
+                    return null;
+                }
+
                 if (blobExisted)
                     _logger.LogWarning(
                         "Replacing corrupt version blob {StoragePath}", blobRelativePath);
@@ -139,7 +199,7 @@ public class FileVersionService : IFileVersionService
         {
             // The filesystem write precedes the DB insert. If the insert fails,
             // reclaim the blob unless another version already references it.
-            if (createdBlob && !await _versionRepo.IsStoragePathReferencedAsync(blobRelativePath))
+            if (createdBlob && !await IsBlobNeededInRootAsync(root, blobRelativePath))
                 System.IO.File.Delete(blobFullPath);
             throw;
         }
@@ -175,10 +235,13 @@ public class FileVersionService : IFileVersionService
             throw new FileNotFoundException(
                 $"No version found for '{normalizedPath}' at {snapshotTimestampUtc:O}");
 
-        var blobFullPath = Path.Combine(_versionStorageRoot, version.StoragePath);
-        if (!System.IO.File.Exists(blobFullPath))
-            throw new FileNotFoundException(
+        // The share's pool first; the legacy store and other pools cover blobs that
+        // reconciliation has not moved yet (pre-upgrade data, shares moved between pools).
+        var preferredRoot = await ResolveRootAsync(shareId);
+        var blob = FindBlob(preferredRoot, version.StoragePath)
+            ?? throw new FileNotFoundException(
                 $"Version blob missing: {version.StoragePath}");
+        var blobFullPath = blob.FullPath;
 
         // Keep small snapshots fast in memory, but spill large snapshots to a
         // delete-on-close seekable file so concurrent downloads cannot exhaust RAM.
@@ -189,7 +252,7 @@ public class FileVersionService : IFileVersionService
         }
         else
         {
-            var readCache = Path.Combine(_versionStorageRoot, ".read-cache");
+            var readCache = Path.Combine(preferredRoot ?? blob.Root, ".read-cache");
             Directory.CreateDirectory(readCache);
             output = new FileStream(
                 Path.Combine(readCache, Guid.NewGuid().ToString("N") + ".tmp"),
@@ -412,36 +475,279 @@ public class FileVersionService : IFileVersionService
 
     private async Task DeleteUnreferencedBlobsAsync(IEnumerable<FileVersion> removed)
     {
+        // The removed rows' share may already be gone, so every known root is checked.
         foreach (var storagePath in removed.Select(v => v.StoragePath).Distinct(StringComparer.Ordinal))
-            await DeleteBlobIfUnreferencedAsync(storagePath);
+            foreach (var root in KnownRoots)
+                await DeleteBlobIfUnneededAsync(root, storagePath);
     }
 
-    private async Task DeleteBlobIfUnreferencedAsync(string storagePath)
+    /// <summary>Deletes one blob copy when no version still needs it in that root.</summary>
+    private async Task<bool> DeleteBlobIfUnneededAsync(string storageRoot, string storagePath)
     {
-        var fullPath = Path.GetFullPath(Path.Combine(_versionStorageRoot, storagePath));
-        var root = Path.GetFullPath(_versionStorageRoot)
+        var fullPath = Path.GetFullPath(Path.Combine(storageRoot, storagePath));
+        var root = Path.GetFullPath(storageRoot)
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
             + Path.DirectorySeparatorChar;
         if (!fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Version blob path escaped the storage root.");
+        if (!System.IO.File.Exists(fullPath))
+            return false;
 
         var blobLock = GetBlobLock(fullPath);
         await blobLock.WaitAsync();
         try
         {
-            if (await _versionRepo.IsStoragePathReferencedAsync(storagePath)) return;
+            if (await IsBlobNeededInRootAsync(storageRoot, storagePath)) return false;
             System.IO.File.Delete(fullPath);
             RemoveEmptyParentDirectories(Path.GetDirectoryName(fullPath), root);
+            return true;
         }
         catch (Exception ex)
         {
             // The DB is authoritative. Do not turn an already completed user-file
             // operation into a failure when an external process temporarily locks a blob.
             _logger.LogWarning(ex, "Failed to delete unreferenced version blob {StoragePath}", storagePath);
+            return false;
         }
         finally
         {
             blobLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Whether the copy of a blob in <paramref name="storageRoot"/> is still needed: a
+    /// share of that pool references it, a referencing share cannot be resolved (kept
+    /// conservatively), or — for the legacy store — a referencing share's pool does not
+    /// have its own copy yet.
+    /// </summary>
+    private async Task<bool> IsBlobNeededInRootAsync(string storageRoot, string storagePath)
+    {
+        if (_locator is null)
+            return await _versionRepo.IsStoragePathReferencedAsync(storagePath);
+
+        bool isLegacy = SamePath(storageRoot, _versionStorageRoot);
+        foreach (var shareId in await _versionRepo.GetShareIdsReferencingStoragePathAsync(storagePath))
+        {
+            var shareRoot = await _locator.GetRootAsync(shareId);
+            if (shareRoot is null || SamePath(shareRoot, storageRoot))
+                return true;
+            if (isLegacy && !System.IO.File.Exists(Path.Combine(shareRoot, storagePath)))
+                return true;
+        }
+        return false;
+    }
+
+    // ------------------ Storage location ------------------
+
+    private async Task<string?> ResolveRootAsync(Guid shareId)
+        => _locator is null ? _versionStorageRoot : await _locator.GetRootAsync(shareId);
+
+    /// <summary>Every root that may hold blobs: the pools first, then the legacy store.</summary>
+    private IEnumerable<string> KnownRoots => _locator is null
+        ? [_versionStorageRoot]
+        : _locator.AllRoots.Append(_versionStorageRoot);
+
+    private (string Root, string FullPath)? FindBlob(string? preferredRoot, string storagePath)
+    {
+        var roots = preferredRoot is null ? KnownRoots : KnownRoots.Prepend(preferredRoot);
+        foreach (var root in roots)
+        {
+            var fullPath = Path.Combine(root, storagePath);
+            if (System.IO.File.Exists(fullPath))
+                return (root, fullPath);
+        }
+        return null;
+    }
+
+    private bool HasRoomFor(string root, long bytes)
+    {
+        try
+        {
+            var (free, total) = _diskSpace(root);
+            var reserve = Math.Max(MinFreeBytes, (long)(total * MinFreeRatio));
+            return free - bytes >= reserve;
+        }
+        catch (Exception ex)
+        {
+            // Fail closed: an unknown fill level must not risk filling the volume.
+            _logger.LogWarning(ex, "Could not determine the free space of version storage {Root}", root);
+            return false;
+        }
+    }
+
+    private static (long Free, long Total) ProbeDiskSpace(string path)
+    {
+        var drive = new DriveInfo(path);
+        return (drive.AvailableFreeSpace, drive.TotalSize);
+    }
+
+    /// <summary>Rate limit for warnings that would otherwise fire once per written file.</summary>
+    private static bool ShouldWarn(ref long lastWarningTicks)
+    {
+        var now = Environment.TickCount64;
+        var last = Interlocked.Read(ref lastWarningTicks);
+        return now - last >= WarningIntervalMs
+               && Interlocked.CompareExchange(ref lastWarningTicks, now, last) == last;
+    }
+
+    private static bool SamePath(string a, string b)
+        => string.Equals(
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(a)),
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(b)),
+            PathComparison);
+
+    // ------------------ Reconciliation ------------------
+
+    /// <summary>
+    /// Brings the blob files in line with the database: copies every referenced blob
+    /// into the pool of its share (draining the legacy application-data store and
+    /// following shares that moved to another pool) and deletes copies no share of
+    /// that pool needs. Safe to run repeatedly; a no-op without a locator.
+    /// </summary>
+    public async Task ReconcileStorageAsync(CancellationToken cancellationToken = default)
+    {
+        if (_locator is null) return;
+
+        var references = await _versionRepo.GetAllBlobReferencesAsync(cancellationToken);
+        var rootByShare = new Dictionary<Guid, string?>();
+        foreach (var shareId in references.Select(r => r.ShareId).Distinct())
+            rootByShare[shareId] = await _locator.GetRootAsync(shareId);
+
+        // Every (pool root, blob) pair that must exist on disk.
+        var wanted = references
+            .Where(r => rootByShare[r.ShareId] is not null)
+            .Select(r => (Root: rootByShare[r.ShareId]!, r.StoragePath))
+            .ToHashSet();
+
+        int copied = 0, missing = 0, deleted = 0;
+        var fullRoots = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (root, storagePath) in wanted)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (fullRoots.Contains(root) || System.IO.File.Exists(Path.Combine(root, storagePath)))
+                continue;
+
+            var source = FindBlob(null, storagePath);
+            if (source is null)
+            {
+                missing++;
+                continue;
+            }
+
+            Directory.CreateDirectory(root);
+            if (!HasRoomFor(root, new FileInfo(source.Value.FullPath).Length))
+            {
+                // The source copy stays where it is and is retried on the next run.
+                _logger.LogWarning(
+                    "Version storage {Root} is low on free space; moving versions into it is postponed.", root);
+                fullRoots.Add(root);
+                continue;
+            }
+
+            if (await CopyBlobAsync(source.Value.FullPath, Path.Combine(root, storagePath), cancellationToken))
+                copied++;
+        }
+
+        var now = DateTime.UtcNow;
+        foreach (var root in KnownRoots.Where(Directory.Exists).ToList())
+        {
+            bool isLegacy = SamePath(root, _versionStorageRoot);
+            foreach (var file in Directory.EnumerateFiles(root, "*.bin.gz", SearchOption.AllDirectories).ToList())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var storagePath = Path.GetRelativePath(root, file);
+                // The legacy store receives no new blobs, so it needs no age guard.
+                if (!isLegacy && (wanted.Contains((root, storagePath))
+                                  || System.IO.File.GetLastWriteTimeUtc(file) > now - ReconcileMinBlobAge))
+                    continue;
+                if (await DeleteBlobIfUnneededAsync(root, storagePath))
+                    deleted++;
+            }
+
+            DeleteStaleTempFiles(root, now - StaleTempAge);
+            RemoveEmptyDirectories(root, includeRoot: isLegacy);
+        }
+
+        if (copied > 0 || deleted > 0 || missing > 0)
+            _logger.LogInformation(
+                "Version storage reconciled: {Copied} blobs moved into their pool, {Deleted} unneeded copies removed, {Missing} referenced blobs missing.",
+                copied, deleted, missing);
+    }
+
+    private async Task<bool> CopyBlobAsync(string source, string target, CancellationToken cancellationToken)
+    {
+        var blobLock = GetBlobLock(Path.GetFullPath(target));
+        await blobLock.WaitAsync(cancellationToken);
+        var directory = Path.GetDirectoryName(target)!;
+        var tempPath = Path.Combine(directory, $".{Path.GetFileName(target)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            if (System.IO.File.Exists(target))
+                return false;
+
+            Directory.CreateDirectory(directory);
+            await using (var input = new FileStream(
+                source, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete,
+                81920, FileOptions.Asynchronous | FileOptions.SequentialScan))
+            await using (var output = new FileStream(
+                tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                81920, FileOptions.Asynchronous | FileOptions.SequentialScan))
+            {
+                await input.CopyToAsync(output, cancellationToken);
+                output.Flush(flushToDisk: true);
+            }
+
+            System.IO.File.Move(tempPath, target, overwrite: false);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Failed to move version blob {Source} to {Target}", source, target);
+            return false;
+        }
+        finally
+        {
+            try { System.IO.File.Delete(tempPath); }
+            catch { /* best effort */ }
+            blobLock.Release();
+        }
+    }
+
+    /// <summary>Removes write/read temp files a crashed process left behind.</summary>
+    private void DeleteStaleTempFiles(string root, DateTime olderThanUtc)
+    {
+        foreach (var file in Directory.EnumerateFiles(root, "*.tmp", SearchOption.AllDirectories).ToList())
+        {
+            try
+            {
+                if (System.IO.File.GetLastWriteTimeUtc(file) < olderThanUtc)
+                    System.IO.File.Delete(file);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogDebug(ex, "Could not delete stale version temp file {File}", file);
+            }
+        }
+    }
+
+    private static void RemoveEmptyDirectories(string root, bool includeRoot)
+    {
+        try
+        {
+            foreach (var directory in Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories)
+                         .OrderByDescending(d => d.Length).ToList())
+            {
+                if (!Directory.EnumerateFileSystemEntries(directory).Any())
+                    Directory.Delete(directory);
+            }
+
+            if (includeRoot && !Directory.EnumerateFileSystemEntries(root).Any())
+                Directory.Delete(root);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Cosmetic cleanup only; retried on the next run.
         }
     }
 

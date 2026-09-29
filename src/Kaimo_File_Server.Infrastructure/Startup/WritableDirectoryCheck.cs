@@ -16,9 +16,10 @@ public static class WritableDirectoryCheck
     /// The standard set of writable data directories, derived from the same
     /// configuration keys every entry point already reads. Kept in one place so
     /// Host, Web and the SMB bridge check the identical paths and cannot drift.
-    /// Application-data subfolders (<c>.dp-keys</c>, <c>.versions</c>, certificates,
-    /// the snapshot cache) live under <c>Storage:ApplicationDataPath</c> and are
-    /// covered by probing that root.
+    /// Application-data subfolders (<c>.dp-keys</c>, certificates, the snapshot cache)
+    /// live under <c>Storage:ApplicationDataPath</c> and are covered by probing that
+    /// root; version blobs live in each pool's <c>.kaimo-versions</c> folder and are
+    /// covered by the per-pool probes.
     /// </summary>
     /// <param name="includeBackups">
     /// True for services that mount the backup volume (Host, Web); false for the

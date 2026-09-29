@@ -124,6 +124,13 @@ namespace Kaimo_File_Server.Core.Repositories
         /// <summary>Whether any remaining version row references a physical blob.</summary>
         Task<bool> IsStoragePathReferencedAsync(string storagePath);
 
+        /// <summary>The distinct shares whose version rows reference a physical blob.</summary>
+        Task<List<Guid>> GetShareIdsReferencingStoragePathAsync(string storagePath);
+
+        /// <summary>Every distinct (share, blob) pair, for storage reconciliation.</summary>
+        Task<List<(Guid ShareId, string StoragePath)>> GetAllBlobReferencesAsync(
+            CancellationToken cancellationToken = default);
+
         /// <summary>
         /// Checks whether a version with the given content hash already exists.
         /// Enables skipping version creation when the file content has not changed.

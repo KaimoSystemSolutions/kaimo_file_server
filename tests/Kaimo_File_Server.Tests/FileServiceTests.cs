@@ -667,6 +667,40 @@ public class FileServiceTests
         versions.Verify(v => v.DeletePathAsync(_shareId, "doc.txt"), Times.Once);
     }
 
+    [Theory]
+    [InlineData(false, 1)]
+    [InlineData(true, 0)]
+    public async Task DirtyClose_SnapshotsVersionUnlessSkipped(bool skipVersioning, int expectedVersions)
+    {
+        // Cloud-sync pulls skip the snapshot so pulled data is not stored twice.
+        var versions = new Mock<IFileVersionService>();
+        var handle = new Mock<IStorageHandle>();
+        handle.SetupGet(h => h.IsDirectory).Returns(false);
+        handle.SetupGet(h => h.IsDirty).Returns(true);
+        handle.SetupGet(h => h.AbsolutePath).Returns("C:/share/doc.txt");
+        handle.Setup(h => h.GetReadableSnapshot()).Returns(() => new MemoryStream([1, 2, 3]));
+        handle.Setup(h => h.DisposeAsync()).Returns(ValueTask.CompletedTask);
+        _storageMock.Setup(s => s.ExistsAsync("doc.txt")).ReturnsAsync(true);
+        _storageMock.Setup(s => s.IsDirectoryAsync("doc.txt")).ReturnsAsync(false);
+        _storageMock.Setup(s => s.OpenAsync(
+                "doc.txt", OpenMode.CreateOrTruncate, AccessIntent.Write, ShareIntent.None,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(handle.Object);
+        AllowAccess(FilePermission.CreateWriteData);
+        var sut = new FileService(
+            _storageMock.Object, _aclMock.Object, null, _shareId, versions.Object);
+
+        var opened = await sut.OpenAsync(
+            "doc.txt", OpenMode.CreateOrTruncate, AccessIntent.Write, ShareIntent.None, CreateContext());
+        if (skipVersioning)
+            opened.Session.SkipVersioning();
+        await opened.Session.DisposeAsync();
+
+        versions.Verify(v => v.CreateVersionAsync(
+                _shareId, "doc.txt", It.IsAny<Stream>(), It.IsAny<string>()),
+            Times.Exactly(expectedVersions));
+    }
+
     [Fact]
     public async Task RenameAsync_RenamesMetadataAndCompleteVersionHistory()
     {

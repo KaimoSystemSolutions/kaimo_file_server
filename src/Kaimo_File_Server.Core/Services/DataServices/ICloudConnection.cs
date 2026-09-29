@@ -576,12 +576,14 @@ public interface ICloudConnection
         bool ok = await TryTransferAsync(failures, localChild, SyncFailureOperation.Download, async () =>
         {
             // Open a write handle and stream the download directly into it. The
-            // session's dispose runs the same versioning/ownership/change-log and
-            // search-index hooks as WriteFileAsync, so behavior is preserved.
+            // session's dispose runs the same ownership/change-log and search-index
+            // hooks as WriteFileAsync. Versioning is skipped: the remote copy is the
+            // history, and a snapshot would store every pulled byte a second time.
             var open = await fileService.OpenAsync(
                 localChild, OpenMode.CreateOrTruncate, AccessIntent.Write, ShareIntent.None,
                 user, cancellationToken);
             await using var session = open.Session;
+            session.SkipVersioning();
             await using (var sink = options.LimitDownload(new FileSessionWriteStream(session)))
             {
                 await DownloadAsync(remoteChild, sink, cancellationToken);

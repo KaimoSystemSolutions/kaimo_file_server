@@ -208,16 +208,25 @@ namespace Kaimo_File_Server.Infrastructure
             VolumeMountManager.TrySetVolumeMounts(GetActiveStorageMounts());
 
             // -- Versioning (internal data, intentionally outside all shares) --
-            var versionStoragePath = Path.Combine(
+            // Blobs live in the pool of their share, never on the application-data
+            // volume. The former app-data location is only read and drained
+            // (VersionStorageReconcilerService in the Host).
+            var legacyVersionStoragePath = Path.Combine(
                 applicationDataPath, ".versions");
 
-            services.AddScoped<IFileVersionService>(sp =>
+            services.AddScoped<IVersionStorageLocator>(sp =>
+                new PoolVersionStorageLocator(
+                    sp.GetRequiredService<IShareRepository>(), poolStoragePaths));
+
+            services.AddScoped(sp =>
                 new FileVersionService(
                     sp.GetRequiredService<IFileVersionRepository>(),
-                    versionStoragePath,
+                    legacyVersionStoragePath,
                     defaultMaxVersions: 64,
                     defaultMaxAge: TimeSpan.FromDays(90),
-                    logger: sp.GetRequiredService<ILogger<FileVersionService>>()));
+                    logger: sp.GetRequiredService<ILogger<FileVersionService>>(),
+                    storageLocator: sp.GetRequiredService<IVersionStorageLocator>()));
+            services.AddScoped<IFileVersionService>(sp => sp.GetRequiredService<FileVersionService>());
 
             // -- Share Lock Manager (in-memory, single instance) --
             services.AddSingleton<ShareLockManager>();

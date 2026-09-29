@@ -255,6 +255,27 @@ namespace Kaimo_File_Server.Infrastructure.Repositories
             return await db.Set<FileVersion>().AnyAsync(v => v.StoragePath == storagePath);
         }
 
+        public async Task<List<Guid>> GetShareIdsReferencingStoragePathAsync(string storagePath)
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync();
+            return await db.Set<FileVersion>()
+                .Where(v => v.StoragePath == storagePath)
+                .Select(v => v.ShareId)
+                .Distinct()
+                .ToListAsync();
+        }
+
+        public async Task<List<(Guid ShareId, string StoragePath)>> GetAllBlobReferencesAsync(
+            CancellationToken cancellationToken = default)
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+            var rows = await db.Set<FileVersion>()
+                .Select(v => new { v.ShareId, v.StoragePath })
+                .Distinct()
+                .ToListAsync(cancellationToken);
+            return rows.Select(r => (r.ShareId, r.StoragePath)).ToList();
+        }
+
         public async Task<bool> ExistsWithHashAsync(Guid shareId, string filePath, string contentHash)
         {
             await using var db = await _dbFactory.CreateDbContextAsync();

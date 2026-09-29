@@ -33,6 +33,13 @@ namespace Kaimo_File_Server.Core.Services.File
         ValueTask RenameAsync(string newRelativePath, bool replaceExisting, CancellationToken ct = default);
 
         void MarkDeleteOnClose();
+
+        /// <summary>
+        /// Skips the version snapshot this session would take on close. For writers whose
+        /// source of truth lives elsewhere (cloud-sync pulls), where a local version would
+        /// only duplicate the remote copy on disk.
+        /// </summary>
+        void SkipVersioning() { }
     }
 
     public sealed record FileOpenResult(IFileSession Session, FileOpenStatus Status);
