@@ -43,6 +43,9 @@ on the internal Compose network.
    ```bash
    docker compose up -d
    ```
+   If `elasticsearch` keeps restarting (`docker compose ps`), raise
+   `vm.max_map_count` on the host; see
+   [Search (Elasticsearch)](DETAILS.md#-search-elasticsearch).
 
 Open `https://localhost:8443` and sign in as `admin` with your
 `SEED_ADMIN_PASSWORD`; you are then asked to choose a new password. SMB listens
