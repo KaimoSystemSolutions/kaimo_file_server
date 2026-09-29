@@ -1,8 +1,6 @@
 # 🐢 Kaimo File Server — Deployment
 
-Run a complete Kaimo File Server stack from the published container images. This
-Compose file pulls the released images from the registry, so it needs **neither
-the source repository nor a local image build**.
+This is a quick start guide, to explain how to run the whole docker compose stack of the Kaimo File Server.
 
 ## 📦 What you get
 
@@ -16,8 +14,8 @@ the source repository nor a local image build**.
 | `elasticsearch` | Full-text file search | internal only |
 | `pki-init` | One-shot generator for the internal mTLS control-plane PKI | — |
 
-Only `web` and `samba` are reachable from the host. The database and
-Elasticsearch stay on the internal Compose network.
+Only `web` and `samba` are reachable from the host. Every other service stays 
+on the internal Compose network.
 
 ## 🚀 Quick start
 
@@ -90,17 +88,30 @@ is missing.
 All persistent state lives under `./data` by default and survives
 `docker compose down`:
 
-| Path | Contents |
-| --- | --- |
-| `./data/postgres` | PostgreSQL database |
-| `./data/elasticsearch` | Search index |
-| `./data/storage/pool01` | File storage pool |
-| `./data/kaimo-system` | Application data and snapshot cache |
-| `./data/logs` | Archived service logs |
-| `./data/backups` | Database backups |
-| `./data/smb-control-plane` | Generated mTLS control-plane certificates |
+| Path | Contents | Redirect via `.env` |
+| --- | --- | --- |
+| `./data/postgres` | PostgreSQL database | `LOCATION_DB` |
+| `./data/elasticsearch` | Search index | `LOCATION_ES` |
+| `./data/storage/pool01` | File storage pool | — |
+| `./data/kaimo-system` | Application data and snapshot cache | — |
+| `./data/logs` | Archived service logs | — |
+| `./data/backups` | Database backups | `LOCATION_BACKUP` |
+| `./data/smb-control-plane` | Generated mTLS control-plane certificates | `KAIMO_SMB_CONTROL_PKI` |
 
-Each location can be redirected with a `LOCATION_*` variable in `.env`.
+Paths without a variable are set in the `x-*` anchors at the top of
+`docker-compose.yml`; change them there.
+
+### Storage pools
+
+Every bind mount below `/data/storage/` is detected as a storage pool. To add a
+second pool, add another anchor (e.g. `./data/storage/pool02:/data/storage/pool02`)
+and mount it into `host`, `smb-bridge`, `samba` and `web`, then run
+`docker compose up -d`. Apply the same ownership as for `pool01`.
+
+After the first login, **Settings → Storage → User home folders** creates a
+private home folder for every user on a pool of your choice (SMB share `users`,
+shown as "user" in the web UI). Details:
+[`docu/user-home-folders.md`](../docu/user-home-folders.md).
 
 ### 🔑 Data directory permissions
 
@@ -123,6 +134,26 @@ adjusts its own data directory on startup, and `pki-init` runs as `root`.
 If you redirect a location with a `LOCATION_*` variable, apply the matching
 ownership to that path instead. On Windows/WSL bind mounts (drvfs/9p) POSIX
 ownership is not enforced — the `chown` is a no-op there and can be skipped.
+
+## 🗄️ Database backup & restore
+
+`host` backs up the database daily (and before every schema migration) into
+`./data/backups`. Schedule and retention are set under **Settings → Backup**,
+where you can also create and download a manual backup.
+
+To restore, put the backup file into the backup folder, set its file name in
+`.env` and restart the stack:
+
+```bash
+# .env
+KAIMO_DB_RESTORE_FROM=kaimo_20260820-030000_manual.dump
+```
+
+On the next start `host` **overwrites** the current database with the backup,
+applies newer migrations and writes a `<file>.done` marker so the restore runs
+only once. Clear the variable again afterwards. Back up `NT_HASH_ENCRYPTION_KEY`
+with the backups — see [Secrets](#-secrets). Details:
+[`docu/database-backup/README.md`](../docu/database-backup/README.md).
 
 ## 🔍 Search (Elasticsearch)
 
