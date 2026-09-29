@@ -27,8 +27,13 @@ cat >"$WORK/bin/net" <<'EOF'
 [ "${1:-}" = "conf" ] || exit 2
 command="${2:-}"
 [ "$command" != "listshares" ] || exit 0
-[ "$command" = "getparm" ] || [ "$command" = "setparm" ] || exit 2
 [ "${3:-}" = "global" ] || exit 2
+if [ "$command" = "showshare" ]; then
+    # Same layout as Samba: section header, then tab-indented "key = value".
+    awk -F '\t' 'BEGIN { print "[global]" } { print "\t" $1 " = " $2 }' "$CONFIG_STATE"
+    exit
+fi
+[ "$command" = "getparm" ] || [ "$command" = "setparm" ] || exit 2
 parameter="${4:-}"
 if [ "$command" = "getparm" ]; then
     awk -F '\t' -v parameter="$parameter" \

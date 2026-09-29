@@ -51,7 +51,18 @@ case "$command" in
         cut -f1 "$SHARE_STATE"
         ;;
     showshare)
-        grep -q "^${name}"$'\t' "$SHARE_STATE"
+        # Same layout as Samba: section header, then tab-indented "key = value"
+        # for every parameter that is set.
+        awk -F '\t' -v wanted="$name" '
+            $1 == wanted {
+                print "[" $1 "]"
+                if ($2 != "") print "\tpath = " $2
+                if ($3 != "") print "\tread only = " $3
+                if ($4 != "") print "\tbrowseable = " $4
+                if ($5 != "") print "\tguest ok = " $5
+                found=1
+            }
+            END { exit !found }' "$SHARE_STATE"
         ;;
     getparm)
         parameter="${4:-}"

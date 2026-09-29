@@ -156,22 +156,36 @@ chmod 0644 "$console_level_tmp"
 mv -f -- "$console_level_tmp" "$console_level_file"
 
 changed=0
+# Snapshot all global registry parameters with ONE `net` call. Every `net`
+# invocation loads the full Samba configuration (~50 ms), and this script runs
+# every few seconds, so per-parameter getparm calls dominated container CPU.
+# A missing [global] section (fresh registry) yields an empty snapshot; an unset
+# parameter reads as empty, exactly as `net conf getparm` failing did before.
+declare -A global_params=()
+if global_output="$(net conf showshare global 2>/dev/null)"; then
+    while IFS= read -r line; do
+        [[ "$line" == $'\t'*' = '* ]] || continue
+        line="${line#$'\t'}"
+        global_params["${line%% = *}"]="${line#* = }"
+    done <<< "$global_output"
+fi
+
 # apply <set-param> <value> [read-param]: sets a global registry parameter only
 # if it differs from the canonical registry value. Most parameters use the same
 # name for set/get. Samba 4.19 accepts "smb encrypt" on setparm but persists it
 # as "server smb encrypt", so callers can provide that canonical read-back name.
-# net conf getparm gives an error on unset -> curr empty.
+# An unchanged value is already verified by the registry snapshot; a written
+# value is read back individually.
 apply() {
     local param="$1" value="$2" read_param="${3:-$1}" curr actual
-    curr="$(net conf getparm global "$read_param" 2>/dev/null)"
-    if [ "${curr:-}" != "$value" ]; then
-        net conf setparm global "$param" "$value" >/dev/null 2>&1 || {
-            echo "[sync-config] FAILED to set '$param'." >&2
-            return 1
-        }
-        echo "[sync-config] $param: '${curr:-<unset>}' -> '$value'"
-        changed=1
-    fi
+    curr="${global_params[$read_param]-}"
+    [ "$curr" = "$value" ] && return 0
+    net conf setparm global "$param" "$value" >/dev/null 2>&1 || {
+        echo "[sync-config] FAILED to set '$param'." >&2
+        return 1
+    }
+    echo "[sync-config] $param: '${curr:-<unset>}' -> '$value'"
+    changed=1
     actual="$(net conf getparm global "$read_param" 2>/dev/null)" || {
         echo "[sync-config] FAILED to read back '$param' as registry parameter '$read_param'." >&2
         return 1

@@ -71,7 +71,12 @@ public sealed class SearchIndexingService(
 
                 var batch = await log.GetChangesSinceGlobalAsync(cursor, BatchSize, stoppingToken);
                 if (batch.Count == 0)
-                    continue; // nothing new — fall through to the poll delay
+                {
+                    // Nothing new. `continue` would skip the poll delay at the loop end and
+                    // spin against the database, so wait here explicitly.
+                    await Sleep(PollInterval, stoppingToken);
+                    continue;
+                }
 
                 var shares = await BuildShareMapAsync(sp, stoppingToken);
                 foreach (var entry in batch)

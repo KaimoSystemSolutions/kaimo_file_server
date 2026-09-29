@@ -270,9 +270,18 @@ if (( ${#want_path[@]} > 0 )); then
             exit 1
         fi
 
-        # Create, if not already present ...
-        if net conf showshare "$name" >/dev/null 2>&1; then
-            current_path="$(net conf getparm "$name" path 2>/dev/null || true)"
+        # Create, if not already present ... The existing share's parameters are
+        # snapshotted with this ONE `net` call: every `net` invocation loads the
+        # full Samba configuration (~50 ms) and this runs every few seconds, so
+        # per-parameter set/get calls dominated container CPU.
+        declare -A share_params=()
+        if share_output="$(net conf showshare "$name" 2>/dev/null)"; then
+            while IFS= read -r share_line; do
+                [[ "$share_line" == $'\t'*' = '* ]] || continue
+                share_line="${share_line#$'\t'}"
+                share_params["${share_line%% = *}"]="${share_line#* = }"
+            done <<< "$share_output"
+            current_path="${share_params[path]-}"
             current_canonical="$(readlink -m "$current_path")"
             desired_canonical="$(readlink -m "$path")"
             if [ "$current_canonical" != "$desired_canonical" ]; then
@@ -301,6 +310,14 @@ if (( ${#want_path[@]} > 0 )); then
             "guest ok"$'\t'"no"; do
             param="${setting%%$'\t'*}"
             value="${setting#*$'\t'}"
+            # Already in the desired state per the snapshot -> no write needed.
+            if [ -n "${share_params[$param]+x}" ]; then
+                if [ "$param" = "path" ]; then
+                    [ "$(readlink -m "${share_params[$param]}")" = "$(readlink -m "$value")" ] && continue
+                elif [ "${share_params[$param]}" = "$value" ]; then
+                    continue
+                fi
+            fi
             net conf setparm "$name" "$param" "$value" >/dev/null 2>&1 || {
                 echo "[sync-shares] FAILED to set '$param' on '$name'." >&2
                 exit 1
