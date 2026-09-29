@@ -35,6 +35,7 @@
     </div>
     <Routes @rendermode="new InteractiveServerRenderMode(prerender: false)"
             ClientAddress="@HttpContext?.Connection.RemoteIpAddress?.ToString()" />
+    <script src="js/noAutofill.js"></script>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="js/columnResize.js"></script>
     <script src="js/contextMenu.js"></script>

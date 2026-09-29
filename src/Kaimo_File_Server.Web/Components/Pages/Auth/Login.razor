@@ -24,6 +24,8 @@
             <div class="form-group">
                 <label>Benutzername</label>
                 <input type="text"
+                       name="username"
+                       autocomplete="username"
                        placeholder="Benutzername eingeben"
                        @bind="VM.Username"
                        @bind:event="oninput"
@@ -34,6 +36,8 @@
             <div class="form-group">
                 <label>Passwort</label>
                 <input type="password"
+                       name="password"
+                       autocomplete="current-password"
                        placeholder="Passwort eingeben"
                        @bind="VM.Password"
                        @bind:event="oninput"
