@@ -40,6 +40,16 @@ namespace Kaimo_File_Server.Core.Domain.ClientSync
         public string Platform { get; set; } = string.Empty;
 
         /// <summary>
+        /// SHA-256 (hex) of the hardware identifier the client reported at sign-in
+        /// (Android ID, Windows MachineGuid, …); the raw value is never stored.
+        /// Together with <see cref="UserId"/> it lets a sign-in reattach to this
+        /// registration after the client lost its stored device id, and stops a
+        /// device id copied to other hardware from being reused. Null for clients
+        /// that do not report one.
+        /// </summary>
+        public string? HardwareIdHash { get; set; }
+
+        /// <summary>
         /// Optional push-notification token (FCM/APNs) used to wake the device on
         /// change. Null until the client registers one. See the notification design.
         /// </summary>

@@ -270,4 +270,32 @@ public sealed class ClientSyncApiTests
         Assert.Equal(IdempotencyOutcome.Replay, IdempotencyDecision.Decide(hash, hash));
         Assert.Equal(IdempotencyOutcome.Conflict, IdempotencyDecision.Decide("other", hash));
     }
+
+    // ─────────────────── Device recognition at login ───────────────────
+
+    [Fact]
+    public void Login_device_match_uses_device_id_and_hardware_hash()
+    {
+        var pc = AuthApiController.HashHardwareId("windows:pc-guid");
+        var phone = AuthApiController.HashHardwareId("android:phone-id");
+        var winDevice = new SyncDevice { HardwareIdHash = pc };
+        var legacy = new SyncDevice(); // registered before hardware ids existed
+        var revoked = new SyncDevice { HardwareIdHash = phone, RevokedAtUtc = DateTime.UtcNow };
+        SyncDevice[] devices = [winDevice, legacy, revoked];
+
+        // Same machine: by id, or by hardware alone after the id was lost.
+        Assert.Same(winDevice, AuthApiController.MatchDevice(devices, winDevice.Id, pc));
+        Assert.Same(winDevice, AuthApiController.MatchDevice(devices, null, pc));
+        // Device id presented from other hardware → never reused, new device.
+        Assert.Null(AuthApiController.MatchDevice(devices, winDevice.Id, phone));
+        // Revoked registrations and unknown ids are never reused.
+        Assert.Null(AuthApiController.MatchDevice(devices, null, phone));
+        Assert.Null(AuthApiController.MatchDevice(devices, Guid.NewGuid(), null));
+        // Legacy device / legacy client: device id alone still works.
+        Assert.Same(legacy, AuthApiController.MatchDevice(devices, legacy.Id, phone));
+        Assert.Same(winDevice, AuthApiController.MatchDevice(devices, winDevice.Id, null));
+        // Hashing is deterministic and ignores blanks.
+        Assert.Equal(pc, AuthApiController.HashHardwareId("windows:pc-guid"));
+        Assert.Null(AuthApiController.HashHardwareId("  "));
+    }
 }

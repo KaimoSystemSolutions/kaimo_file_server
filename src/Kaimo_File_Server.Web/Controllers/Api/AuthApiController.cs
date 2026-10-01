@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Kaimo_File_Server.Core.Domain.ClientSync;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
@@ -19,12 +21,18 @@ namespace Kaimo_File_Server.Web.Controllers.Api;
 /// </param>
 /// <param name="DeviceName">Display name for a newly created device.</param>
 /// <param name="Platform">Advisory platform hint (e.g. "android", "windows").</param>
+/// <param name="HardwareId">
+/// Optional stable hardware identifier of the client machine. Only its hash is
+/// stored; it lets the server recognize the device again (user + hardware) when
+/// the client no longer knows its device id.
+/// </param>
 public sealed record LoginRequest(
     string Username,
     string Password,
     Guid? DeviceId = null,
     string? DeviceName = null,
-    string? Platform = null);
+    string? Platform = null,
+    string? HardwareId = null);
 
 /// <summary>Tokens plus the device id the caller should persist and reuse.</summary>
 public sealed record TokenResponse(
@@ -142,22 +150,22 @@ public sealed class AuthApiController : ApiControllerBase
     private async Task<SyncDevice> ResolveOrCreateDeviceAsync(Guid userId, LoginRequest request)
     {
         var now = _clock.GetUtcNow().UtcDateTime;
+        var hardwareIdHash = HashHardwareId(request.HardwareId);
 
-        if (request.DeviceId is { } id)
+        // Only devices this user owns are candidates (see MatchDevice).
+        var existing = MatchDevice(await _devices.GetByUserAsync(userId), request.DeviceId, hardwareIdHash);
+        if (existing is not null)
         {
-            var existing = await _devices.GetByIdAsync(id);
-            // Only reuse a device the same user owns and that is still active.
-            if (existing is { IsActive: true } && existing.UserId == userId)
-            {
-                existing.LastSeenUtc = now;
-                // An admin-assigned name wins over the name the client reports.
-                if (!existing.DisplayNameSetByAdmin && !string.IsNullOrWhiteSpace(request.DeviceName))
-                    existing.DisplayName = request.DeviceName!;
-                if (!string.IsNullOrWhiteSpace(request.Platform))
-                    existing.Platform = request.Platform!;
-                await _devices.UpdateAsync(existing);
-                return existing;
-            }
+            existing.LastSeenUtc = now;
+            // Registrations from before hardware ids adopt the first one reported.
+            existing.HardwareIdHash ??= hardwareIdHash;
+            // An admin-assigned name wins over the name the client reports.
+            if (!existing.DisplayNameSetByAdmin && !string.IsNullOrWhiteSpace(request.DeviceName))
+                existing.DisplayName = request.DeviceName!;
+            if (!string.IsNullOrWhiteSpace(request.Platform))
+                existing.Platform = request.Platform!;
+            await _devices.UpdateAsync(existing);
+            return existing;
         }
 
         var created = await _devices.CreateAsync(new SyncDevice
@@ -167,6 +175,7 @@ public sealed class AuthApiController : ApiControllerBase
                 ? "New device"
                 : request.DeviceName!,
             Platform = request.Platform ?? string.Empty,
+            HardwareIdHash = hardwareIdHash,
             CreatedAtUtc = now,
             LastSeenUtc = now,
         });
@@ -175,6 +184,35 @@ public sealed class AuthApiController : ApiControllerBase
                 userId, request.Username, created.DisplayName, created.Platform));
         return created;
     }
+
+    /// <summary>
+    /// Picks the registration a sign-in should reuse from the user's own devices:
+    /// the presented device id if it is active and its hardware hash does not
+    /// contradict the reported one (either side unknown counts as compatible),
+    /// otherwise the active device with the same hardware hash. Null means "create
+    /// a new device" — so a device id copied to other hardware is never reused, and
+    /// different machines of the same user always stay separate devices.
+    /// </summary>
+    internal static SyncDevice? MatchDevice(
+        IEnumerable<SyncDevice> userDevices, Guid? requestedId, string? hardwareIdHash)
+    {
+        var active = userDevices.Where(d => d.IsActive).ToList();
+
+        if (requestedId is { } id &&
+            active.FirstOrDefault(d => d.Id == id) is { } byId &&
+            (byId.HardwareIdHash is null || hardwareIdHash is null || byId.HardwareIdHash == hardwareIdHash))
+            return byId;
+
+        return hardwareIdHash is null
+            ? null
+            : active.FirstOrDefault(d => d.HardwareIdHash == hardwareIdHash);
+    }
+
+    /// <summary>SHA-256 hex of a reported hardware id; null when absent or implausibly long.</summary>
+    internal static string? HashHardwareId(string? hardwareId)
+        => string.IsNullOrWhiteSpace(hardwareId) || hardwareId.Length > 256
+            ? null
+            : Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(hardwareId.Trim())));
 
     private static TokenResponse ToResponse(IssuedTokens issued, Guid deviceId)
         => new(issued.AccessToken, issued.RefreshToken, issued.ExpiresInSeconds, deviceId);

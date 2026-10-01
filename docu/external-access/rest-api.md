@@ -58,7 +58,8 @@ username-enumeration resistance are identical.
   "password": "…",
   "deviceId": null,              // send your stored device id on later logins; null on first
   "deviceName": "Alice's Pixel", // used when a new device is created
-  "platform": "android"
+  "platform": "android",
+  "hardwareId": "android:9774d56d682e549c" // optional, stable per machine; only its hash is stored
 }
 // 200 response
 {
@@ -68,6 +69,10 @@ username-enumeration resistance are identical.
   "deviceId": "6f9…"            // persist this and send it on subsequent logins/refreshes
 }
 ```
+- Device resolution (only among the user's own active devices): the sent `deviceId`
+  is reused unless its stored hardware hash contradicts `hardwareId`; otherwise a
+  device with the same `hardwareId` is reused (e.g. after the client lost its stored
+  id); otherwise a new device is created. Different machines are never merged.
 - `401 unauthorized` — invalid credentials.
 - `403 forbidden` — account disabled.
 - `429 locked_out` — too many attempts; honor the `Retry-After` header.

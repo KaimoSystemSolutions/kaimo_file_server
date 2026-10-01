@@ -431,7 +431,9 @@ namespace Kaimo_File_Server.Infrastructure.Persistence
                 entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(200);
                 entity.Property(e => e.Platform).HasMaxLength(50);
                 entity.Property(e => e.PushToken).HasMaxLength(500);
+                entity.Property(e => e.HardwareIdHash).HasMaxLength(64);
                 entity.HasIndex(e => e.UserId);
+                entity.HasIndex(e => new { e.UserId, e.HardwareIdHash });
                 entity.HasOne<User>().WithMany().HasForeignKey(e => e.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
