@@ -3,6 +3,7 @@
 @using Kaimo_File_Server.Core.Services.DataServices
 @using Kaimo_File_Server.Web.Components.ViewModels
 @inject ClientDeviceAdminViewModel VM
+@inject DateFormatService DateFmt
 
 <div class="detail-section client-devices">
     <span class="detail-label">@R("Web_Nav_DeviceAdmin")</span>
@@ -52,7 +53,7 @@
                             <small>@VM.OwnerName(device.UserId)</small>
                         </span>
                         <span class="device-row__cell">@(string.IsNullOrWhiteSpace(device.Platform) ? "—" : device.Platform)</span>
-                        <span class="device-row__cell">@FormatUtc(device.LastSeenUtc)</span>
+                        <span class="device-row__cell">@DateFmt.FormatDateTime(device.LastSeenUtc)</span>
                         @if (device.IsActive)
                         {
                             <StatusBadge Tone="StatusTone.Positive" Label="@R("Web_Devices_Active")" />
@@ -100,17 +101,17 @@
                         </div>
                         <div class="device-meta__item">
                             <dt>@R("Web_Devices_LastSeen")</dt>
-                            <dd>@FormatUtc(device.LastSeenUtc)</dd>
+                            <dd>@DateFmt.FormatDateTime(device.LastSeenUtc)</dd>
                         </div>
                         <div class="device-meta__item">
                             <dt>@R("Web_DeviceAdmin_Registered")</dt>
-                            <dd>@FormatUtc(device.CreatedAtUtc)</dd>
+                            <dd>@DateFmt.FormatDateTime(device.CreatedAtUtc)</dd>
                         </div>
                         @if (!device.IsActive && device.RevokedAtUtc is { } revoked)
                         {
                             <div class="device-meta__item">
                                 <dt>@R("Web_DeviceAdmin_RevokedOn")</dt>
-                                <dd>@FormatUtc(revoked)</dd>
+                                <dd>@DateFmt.FormatDateTime(revoked)</dd>
                             </div>
                         }
                     </dl>
@@ -274,9 +275,6 @@
         else
             _error = R("Web_DeviceAdmin_DeleteFailed");
     }
-
-    private static string FormatUtc(DateTime utc)
-        => utc.ToString("yyyy-MM-dd HH:mm") + " UTC";
 
     private static string ModeLabel(SyncMode mode) => mode switch
     {

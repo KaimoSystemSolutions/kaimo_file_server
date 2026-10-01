@@ -1488,6 +1488,9 @@
   <data name="Web_Settings_Backup_WindowEnd" xml:space="preserve">
     <value>Window end</value>
   </data>
+  <data name="Web_Settings_Backup_TimeZoneHint" xml:space="preserve">
+    <value>Times are in server time ({0}).</value>
+  </data>
   <data name="Web_Settings_Backup_RetentionCount" xml:space="preserve">
     <value>Keep last (backups)</value>
   </data>

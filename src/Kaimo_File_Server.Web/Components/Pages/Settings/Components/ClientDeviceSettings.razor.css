@@ -26,7 +26,7 @@
 
 .device-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(340px, 440px);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     margin-top: 16px;
     overflow: hidden;
     border: 1px solid var(--border);
@@ -44,7 +44,7 @@
 .device-list-header,
 .device-row {
     display: grid;
-    grid-template-columns: minmax(160px, 2fr) minmax(80px, 1fr) minmax(130px, 1.2fr) minmax(90px, 1fr);
+    grid-template-columns: minmax(120px, 2fr) minmax(60px, 1fr) minmax(110px, 1.2fr) minmax(80px, 1fr);
     align-items: center;
     gap: 14px;
 }

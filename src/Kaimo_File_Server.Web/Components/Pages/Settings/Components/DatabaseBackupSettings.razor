@@ -14,12 +14,14 @@
 
     <div class="settings-row settings-row-spaced">
         <label class="settings-field-label" for="backup-window-start">@R("Web_Settings_Backup_WindowStart")</label>
-        <input id="backup-window-start" type="time" class="edit-input settings-number" @bind="VM.BackupSettings.WindowStart" @bind:format="HH:mm" />
+        <input id="backup-window-start" type="text" class="edit-input settings-number" @bind="VM.BackupSettings.WindowStart" @bind:format="@DateFmt.TimePattern" @bind:culture="System.Globalization.CultureInfo.InvariantCulture" />
     </div>
     <div class="settings-row settings-row-spaced">
         <label class="settings-field-label" for="backup-window-end">@R("Web_Settings_Backup_WindowEnd")</label>
-        <input id="backup-window-end" type="time" class="edit-input settings-number" @bind="VM.BackupSettings.WindowEnd" @bind:format="HH:mm" />
+        <input id="backup-window-end" type="text" class="edit-input settings-number" @bind="VM.BackupSettings.WindowEnd" @bind:format="@DateFmt.TimePattern" @bind:culture="System.Globalization.CultureInfo.InvariantCulture" />
     </div>
+    @* The Host scheduler and this Web container share the same TZ (docker-compose), so the local zone here is the scheduler's zone. *@
+    <p class="form-hint">@string.Format(R("Web_Settings_Backup_TimeZoneHint"), TimeZoneInfo.Local.Id)</p>
 
     <div class="settings-row settings-row-spaced">
         <label class="settings-field-label" for="backup-retention-count">@R("Web_Settings_Backup_RetentionCount")</label>
