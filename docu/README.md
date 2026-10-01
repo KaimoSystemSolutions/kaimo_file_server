@@ -1,0 +1,76 @@
+# Kaimo File Server — Technical Documentation
+
+This folder documents how Kaimo File Server works at the technical level: the processes and
+containers, how they communicate, where state lives, how access is enforced, and which external
+interfaces exist. It describes the implemented system only.
+
+## The stack in one paragraph
+
+Kaimo File Server is a Docker Compose stack around one PostgreSQL database. A .NET **Host** worker
+owns the schema, backups and reconcilers. The .NET **Web** host serves the Blazor UI, the REST API,
+WebDAV, downloads and share links, and runs the single-owner workers for search indexing, mail
+dispatch and external-storage syncs. **SMB** is served by a self-built Samba whose custom VFS module
+asks a .NET **SmbBridge** over mutually authenticated gRPC for every authorization decision and
+reports every change. All transports converge on the same Core `IFileService`, so ACLs, recycle bin,
+versioning and the change log behave identically everywhere. Elasticsearch is a derived index fed
+asynchronously from the change log.
+
+## Reading order
+
+### Architecture
+
+| Document | Content |
+|---|---|
+| [System overview](architecture/system-overview.md) | Containers, networks, volumes, startup order, code layering |
+| [Storage and persistence](architecture/storage-and-persistence.md) | PostgreSQL, storage pools, versions, recycle bin, snapshot cache, change log |
+| [Domain model](architecture/domain-model.md) | Entities and relationships |
+| [Security model](architecture/security-model.md) | Authentication, ACL evaluation, management permissions, secrets, transport security |
+| [Background services](architecture/background-services.md) | Hosted services per process and coordination patterns |
+
+### SMB
+
+| Document | Content |
+|---|---|
+| [Samba VFS integration](smb/samba-vfs-integration.md) | Samba build, VFS hooks, `kaimo_authd` sidecar, local protocol, POSIX identity model |
+| [Control plane (gRPC)](smb/control-plane-grpc.md) | mTLS PKI, RPC contract and allow-list, user/share/config provisioning |
+| [Lifecycle events and snapshots](smb/lifecycle-events-and-snapshots.md) | Durable event spool, idempotency, close capture, @GMT Previous Versions |
+
+### Interfaces
+
+| Document | Content |
+|---|---|
+| [REST API v1](interfaces/rest-api-v1.md) | `/api/v1` authentication, browse, search, device sync |
+| [WebDAV server](interfaces/webdav.md) | `/dav` architecture, authentication, methods, locking |
+| [Downloads and share links](interfaces/downloads-and-share-links.md) | Ticket-based downloads, public download and upload links |
+
+### External storage
+
+| Document | Content |
+|---|---|
+| [Connections and credentials](external-storage/connections-and-credentials.md) | Connection model, provider contracts, credential vault, authorization runtime |
+| [Providers](external-storage/providers.md) | OneDrive, Dropbox, Google Drive, SMB, SFTP, rsync over SSH, WebDAV |
+| [Sync engine](external-storage/sync-engine.md) | Sync definitions, scheduling, execution, delete propagation, legacy import |
+| [Virtual shares](external-storage/virtual-shares.md) | Cloud Access virtual shares, grants, metadata cache, cross-share transfers |
+
+### Subsystems
+
+| Document | Content |
+|---|---|
+| [Search and indexing](subsystems/search-indexing.md) | Elasticsearch, change-log indexer, filename fallback, ACL filter |
+| [Mail notifications](subsystems/mail-notifications.md) | Outbox, dispatcher, rules, templates |
+| [User home folders](subsystems/user-home-folders.md) | The `users` system share and its ACL layout |
+
+### Operations
+
+| Document | Content |
+|---|---|
+| [Database backup and restore](operations/database-backup-and-restore.md) | Scheduled and manual backups, restore, what else to back up |
+| [WebDAV client setup](operations/webdav-client-setup.md) | Connecting Windows, macOS, Linux and other clients |
+| [Microsoft OneDrive setup](operations/microsoft-onedrive-setup.md) | Entra application, overrides, runtime requirements |
+| [Dropbox setup](operations/dropbox-setup.md) | Dropbox app registration and app key |
+
+## Related documentation outside this folder
+
+- `src/samba-vfs/README.md` — build, test and run notes for the Samba container.
+- `src/Kaimo_File_Server.Web/DESIGN_SPEC.md` — binding design specification for the web UI.
+- `example/` — example deployment configuration.

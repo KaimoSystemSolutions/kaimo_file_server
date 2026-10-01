@@ -265,7 +265,7 @@ and mount it into <code>host</code>, <code>smb-bridge</code>, <code>samba</code>
 <p>After the first login, <strong>Settings → Storage → User home folders</strong> creates a<br>
 private home folder for every user on a pool of your choice (SMB share <code>users</code>,<br>
 shown as "user" in the web UI). Details:<br>
-<a href="../docu/user-home-folders.md" title="../docu/user-home-folders.md"><code>docu/user-home-folders.md</code></a>.</p>
+<a href="../docu/subsystems/user-home-folders.md" title="../docu/subsystems/user-home-folders.md"><code>docu/subsystems/user-home-folders.md</code></a>.</p>
 <h3 id="-data-directory-permissions">🔑 Data directory permissions</h3>
 <p>Docker creates missing bind-mount directories as <code>root:root</code>, but the services<br>
 run as <strong>non-root</strong> users and cannot write to root-owned directories. Create and<br>
@@ -293,7 +293,7 @@ KAIMO_DB_RESTORE_FROM=kaimo_20260820-030000_manual.dump</code></pre>
 applies newer migrations and writes a <code>&lt;file&gt;.done</code> marker so the restore runs<br>
 only once. Clear the variable again afterwards. Back up <code>NT_HASH_ENCRYPTION_KEY</code><br>
 with the backups — see <a href="#-secrets" title="#-secrets">Secrets</a>. Details:<br>
-<a href="../docu/database-backup/README.md" title="../docu/database-backup/README.md"><code>docu/database-backup/README.md</code></a>.</p>
+<a href="../docu/operations/database-backup-and-restore.md" title="../docu/operations/database-backup-and-restore.md"><code>docu/operations/database-backup-and-restore.md</code></a>.</p>
 <h2 id="-search-elasticsearch">🔍 Search (Elasticsearch)</h2>
 <p>File search is served by Elasticsearch. The stack starts without it —<br>
 if Elasticsearch is unavailable the server automatically falls back to<br>
@@ -309,7 +309,7 @@ larger deployments.</p>
 choice (<strong>Settings → Mail server</strong>). It needs outbound access to that server,<br>
 usually on port <code>587</code> (STARTTLS) or <code>465</code> (SSL/TLS). Which events send which<br>
 mails to whom is configured under <strong>Notifications</strong>; nothing is sent until a<br>
-rule is enabled there. Details: <a href="../docu/mail-notifications.md" title="../docu/mail-notifications.md"><code>docu/mail-notifications.md</code></a>.</p>
+rule is enabled there. Details: <a href="../docu/subsystems/mail-notifications.md" title="../docu/subsystems/mail-notifications.md"><code>docu/subsystems/mail-notifications.md</code></a>.</p>
 <h2 id="️-configuration">⚙️ Configuration</h2>
 <p>Values shared by multiple services (database settings, time zone, image tag,<br>
 data locations) are set in <code>.env</code>. One-off settings such as published ports are<br>

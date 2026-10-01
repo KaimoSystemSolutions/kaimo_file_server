@@ -81,7 +81,7 @@ and mount it into `host`, `smb-bridge`, `samba` and `web`, then run
 After the first login, **Settings → Storage → User home folders** creates a
 private home folder for every user on a pool of your choice (SMB share `users`,
 shown as "user" in the web UI). Details:
-[`docu/user-home-folders.md`](../docu/user-home-folders.md).
+[`docu/subsystems/user-home-folders.md`](../docu/subsystems/user-home-folders.md).
 
 ### 🔑 Data directory permissions
 
@@ -123,7 +123,7 @@ On the next start `host` **overwrites** the current database with the backup,
 applies newer migrations and writes a `<file>.done` marker so the restore runs
 only once. Clear the variable again afterwards. Back up `NT_HASH_ENCRYPTION_KEY`
 with the backups — see [Secrets](#-secrets). Details:
-[`docu/database-backup/README.md`](../docu/database-backup/README.md).
+[`docu/operations/database-backup-and-restore.md`](../docu/operations/database-backup-and-restore.md).
 
 ## 🔍 Search (Elasticsearch)
 
@@ -148,7 +148,7 @@ The `web` container sends notification mails through an SMTP server of your
 choice (**Settings → Mail server**). It needs outbound access to that server,
 usually on port `587` (STARTTLS) or `465` (SSL/TLS). Which events send which
 mails to whom is configured under **Notifications**; nothing is sent until a
-rule is enabled there. Details: [`docu/mail-notifications.md`](../docu/mail-notifications.md).
+rule is enabled there. Details: [`docu/subsystems/mail-notifications.md`](../docu/subsystems/mail-notifications.md).
 
 ## ⚙️ Configuration
 

@@ -1,0 +1,90 @@
+# Sync Engine
+
+Server-side syncs mirror a folder of a local share with a folder behind a storage connection. They
+run unattended in the Web process under the identity of a configured user, so every local write is
+ACL-checked and recorded like any other file operation. Device ↔ server sync of the client apps is a
+separate mechanism (see [REST API v1](../interfaces/rest-api-v1.md)).
+
+Related: [Connections and credentials](connections-and-credentials.md) · [Providers](providers.md) ·
+[Background services](../architecture/background-services.md)
+
+## Model
+
+| Entity | Table | Content |
+|---|---|---|
+| `SyncDefinition` | `sync_definitions` | `ConnectionId`, `LocalShareId` + `LocalPath`, `RemotePath` (+ optional `RemoteProviderItemId`), `Mode`, `Schedule`, `AdvancedSettings`, `Enabled`, `RunAsUserId`, `MigrationSource` / `MigrationSourceChecksum` |
+| `SyncDefinitionRuntime` | `sync_definition_runtimes` | Mutable run state: last run and last success, `CurrentJobId`, `LeaseOwner`, progress, sanitized `LastErrorCode`, per-item failures, `LastSyncManifest` |
+
+Configuration and run state are separate so a running job never rewrites the configuration
+aggregate. `(LocalShareId, LocalPath)` is unique. Both entities live in
+`src/Kaimo_File_Server.Core/Domain/SyncDefinition.cs`.
+
+**Modes** (`SyncMode`): `Pull` (remote → local), `Push` (local → remote), `TwoWay`.
+
+**Advanced settings** (`CloudSyncAdvancedSettings`): maximum file size, excluded extensions,
+upload and download bandwidth limits, and `SyncDeletions` (two-way only).
+
+## Execution
+
+```mermaid
+flowchart LR
+    sched[CloudSyncSchedulerService] -- due definitions --> runner[CloudSyncJobRunner]
+    manual[Manual run] --> runner
+    runner --> exec[CloudSyncExecutionService]
+    exec -- decrypt grant, open session --> prov[Provider]
+    exec -- RunAsUserId context --> fs[IFileService]
+    exec -- runtime, manifest --> db[(sync_definition_runtimes)]
+```
+
+1. **Scheduling.** `CloudSyncSchedulerService` evaluates enabled definitions. A schedule selects hours
+   of the day (`ActiveSlots`, local server time) and an evaluation interval (1 s – 24 h, default 60 s).
+   A successful run becomes eligible again after its interval has elapsed. Saving a definition wakes
+   the scheduler immediately.
+2. **Queueing.** Scheduled and manual runs go through the same `CloudSyncJobRunner`, which executes
+   them off the request thread and reports progress.
+3. **Coordination.** `DatabaseCloudSyncOperationCoordinator` keeps a per-share operation lease in
+   `config_settings`, visible to Web and SmbBridge alike, so path edits, deletes and concurrent runs
+   on the same share exclude each other.
+4. **Execution.** `CloudSyncExecutionService` (`src/Kaimo_File_Server.Infrastructure/Clouds/`) loads
+   the definition, decrypts the connection grant, opens a provider session and runs the transfer as
+   `RunAsUserId`. Browse-capable providers go through the generic engine
+   (`ICloudConnection.SyncAsync`, with `RemoteFileStoreSyncAdapter` for protocol providers); rsync
+   uses `IOptimizedStorageSync`.
+5. **Completion.** Success updates only the runtime row. A run that finished but skipped individual
+   items is recorded as completed with the item failures listed. Failures store an allow-listed
+   provider code or the generic `sync_failed`; exception text is never persisted. Rotated provider
+   grants are written to the connection before they are acknowledged.
+
+Files written locally by a sync do not create file versions.
+
+## Two-way reconciliation and deletions
+
+Two-way sync compares both sides. An item present on only one side is ambiguous: newly created
+there, or deleted on the other side. The engine resolves this with a **manifest** of share-relative
+paths that existed after the last converged run (`SyncDefinitionRuntime.LastSyncManifest`).
+
+- A manifest is built after every successful **TwoWay** and **Pull** run (pull uses it to tell
+  remote-backed items from local-only ones).
+- When `SyncDeletions` is enabled on a two-way sync, the previous manifest is consulted:
+
+  | One-sided item in previous manifest? | Interpretation | Action |
+  |---|---|---|
+  | Yes | Deleted on the other side | Delete on this side too |
+  | No | Newly created | Copy across |
+
+- Without a stored manifest every one-sided item counts as new, so a first run can only copy, never
+  mass-delete.
+- A local deletion applied by the sync honors the share's recycle bin
+  (`ShareDefinition.IsRecycleEnabled`). Remote deletions use the provider's delete; a provider that
+  cannot delete fails the run instead of resurrecting the item.
+- `.RECYCLE_BIN` and `.kaimo-*` entries are excluded from reconciliation (`ShareEntryPolicy`).
+
+## Legacy import
+
+Older installations stored sync mappings and provider grants as JSON inside
+`ShareDefinition.CloudSettings`. `LegacyCloudSyncMigrationHostedService` runs once at Web startup,
+before scheduled work, and for each legacy mapping atomically creates a `StorageConnection` with an
+encrypted grant, a `SyncDefinition` and its runtime. The unique `(LocalShareId, LocalPath)` index and
+the source checksum make the import restart-safe and convergent. Editing an imported definition
+clears its `MigrationSource`; deleting one leaves a disabled tombstone so it is not re-imported.
+Successful runs of imported definitions also update the legacy timestamp and grant for compatibility.

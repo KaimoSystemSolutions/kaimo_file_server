@@ -11,10 +11,11 @@ Serves SMB directly from Samba while Kaimo stays the source of truth for users,
 shares, ACLs, versions and search. A custom VFS module hooks the points where
 Kaimo must decide or be notified; everything else stays native Samba I/O.
 
-The phase-by-phase history and rationale live in the
-[overall plan](../../docu/smb-samba-vfs-migration.md) and the
-[hardening roadmap](../../docu/samba-vfs-hardening-roadmap/README.md). This file
-describes only how the result is put together.
+The architecture is documented in
+[Samba VFS integration](../../docu/smb/samba-vfs-integration.md),
+[SMB control plane](../../docu/smb/control-plane-grpc.md) and
+[lifecycle events and snapshots](../../docu/smb/lifecycle-events-and-snapshots.md).
+This file covers how the container is built, tested and run.
 
 ## Architecture
 
@@ -106,8 +107,8 @@ Hooks and what they call:
 Pinned build: self-built upstream **Samba 4.19.5**, `SMB_VFS_INTERFACE_VERSION = 49`.
 A Samba upgrade means bumping [`samba-build.env`](samba-build.env) (version +
 archive digest + ABI), rebasing [`patches/`](patches), and re-reviewing every
-callback signature and access-mask constant — see the CI workflow and the
-hardening roadmap for the full checklist.
+callback signature and access-mask constant; the CI workflow verifies the
+pinned version and ABI.
 
 ## Build & run
 
