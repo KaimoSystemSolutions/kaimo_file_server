@@ -4,7 +4,7 @@ This document describes how Kaimo File Server authenticates callers, authorizes 
 administrative operations, and protects secrets at rest and in transit.
 
 Related: [System overview](system-overview.md) · [Domain model](domain-model.md) ·
-[SMB control plane](../smb/control-plane-grpc.md) · [REST API v1](../interfaces/rest-api-v1.md)
+[SMB control plane](../external-access/smb/control-plane-grpc.md) · [REST API v1](../external-access/rest-api.md)
 
 ## Trust boundaries
 
@@ -40,8 +40,8 @@ flowchart LR
 | Web UI (Blazor Server) | Username/password → JWT held in browser `localStorage`; logout revokes the token ID (`jti`) in `revoked_web_tokens` | `src/Kaimo_File_Server.Web/Services/JwtTokenService.cs`, `JwtAuthenticationStateProvider.cs` |
 | REST API `/api/v1` | Device-scoped JWT bearer + rotating refresh tokens | `src/Kaimo_File_Server.Web/Controllers/Api/AuthApiController.cs`, `Services/Api/ApiTokenService.cs` |
 | WebDAV `/dav` | HTTP Basic (verified against the user store) or the device-scoped JWT bearer | `src/Kaimo_File_Server.Web/Controllers/WebDav/WebDavBasicAuthenticationHandler.cs` |
-| SMB | NTLMv2 by Samba against NT hashes provisioned from the database | [SMB control plane](../smb/control-plane-grpc.md) |
-| Public share links | Unguessable token in the URL, no account | [Downloads and share links](../interfaces/downloads-and-share-links.md) |
+| SMB | NTLMv2 by Samba against NT hashes provisioned from the database | [SMB control plane](../external-access/smb/control-plane-grpc.md) |
+| Public share links | Unguessable token in the URL, no account | [Downloads and share links](../external-access/downloads-and-share-links.md) |
 
 Common rules:
 

@@ -12,9 +12,9 @@ shares, ACLs, versions and search. A custom VFS module hooks the points where
 Kaimo must decide or be notified; everything else stays native Samba I/O.
 
 The architecture is documented in
-[Samba VFS integration](../../docu/smb/samba-vfs-integration.md),
-[SMB control plane](../../docu/smb/control-plane-grpc.md) and
-[lifecycle events and snapshots](../../docu/smb/lifecycle-events-and-snapshots.md).
+[Samba VFS integration](../../docu/external-access/smb/samba-vfs-integration.md),
+[SMB control plane](../../docu/external-access/smb/control-plane-grpc.md) and
+[lifecycle events and snapshots](../../docu/external-access/smb/lifecycle-events-and-snapshots.md).
 This file covers how the container is built, tested and run.
 
 ## Architecture

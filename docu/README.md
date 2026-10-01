@@ -27,21 +27,21 @@ asynchronously from the change log.
 | [Security model](architecture/security-model.md) | Authentication, ACL evaluation, management permissions, secrets, transport security |
 | [Background services](architecture/background-services.md) | Hosted services per process and coordination patterns |
 
-### SMB
+### External access
+
+Every way a client reaches the server from outside. All of them converge on the same ACL-checked
+`IFileService`.
 
 | Document | Content |
 |---|---|
-| [Samba VFS integration](smb/samba-vfs-integration.md) | Samba build, VFS hooks, `kaimo_authd` sidecar, local protocol, POSIX identity model |
-| [Control plane (gRPC)](smb/control-plane-grpc.md) | mTLS PKI, RPC contract and allow-list, user/share/config provisioning |
-| [Lifecycle events and snapshots](smb/lifecycle-events-and-snapshots.md) | Durable event spool, idempotency, close capture, @GMT Previous Versions |
-
-### Interfaces
-
-| Document | Content |
-|---|---|
-| [REST API v1](interfaces/rest-api-v1.md) | `/api/v1` authentication, browse, search, device sync |
-| [WebDAV server](interfaces/webdav.md) | `/dav` architecture, authentication, methods, locking |
-| [Downloads and share links](interfaces/downloads-and-share-links.md) | Ticket-based downloads, public download and upload links |
+| [REST API v1](external-access/rest-api.md) | `/api/v1` authentication and devices, browsing, safe mutations, error format |
+| [Client Sync API](external-access/sync-api.md) | `/api/v1/sync` device sync connections, delta, change feed, long-poll |
+| [Search API](external-access/search-api.md) | `POST /api/v1/search` request, response, limits |
+| [WebDAV server](external-access/webdav.md) | `/dav` architecture, authentication, methods, locking |
+| [Downloads and share links](external-access/downloads-and-share-links.md) | Ticket-based downloads, public download and upload links |
+| [SMB: Samba VFS integration](external-access/smb/samba-vfs-integration.md) | Samba build, VFS hooks, `kaimo_authd` sidecar, local protocol, POSIX identity model |
+| [SMB: Control plane (gRPC)](external-access/smb/control-plane-grpc.md) | mTLS PKI, RPC contract and allow-list, user/share/config provisioning |
+| [SMB: Lifecycle events and snapshots](external-access/smb/lifecycle-events-and-snapshots.md) | Durable event spool, idempotency, close capture, @GMT Previous Versions |
 
 ### External storage
 

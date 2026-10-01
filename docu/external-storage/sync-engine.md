@@ -3,7 +3,7 @@
 Server-side syncs mirror a folder of a local share with a folder behind a storage connection. They
 run unattended in the Web process under the identity of a configured user, so every local write is
 ACL-checked and recorded like any other file operation. Device ↔ server sync of the client apps is a
-separate mechanism (see [REST API v1](../interfaces/rest-api-v1.md)).
+separate mechanism (see [Client Sync API](../external-access/sync-api.md)).
 
 Related: [Connections and credentials](connections-and-credentials.md) · [Providers](providers.md) ·
 [Background services](../architecture/background-services.md)

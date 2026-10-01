@@ -7,7 +7,7 @@ the provisioning flow.
 
 Related: [Samba VFS integration](samba-vfs-integration.md) ·
 [Lifecycle events and snapshots](lifecycle-events-and-snapshots.md) ·
-[Security model](../architecture/security-model.md)
+[Security model](../../architecture/security-model.md)
 
 ## Transport
 

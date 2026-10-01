@@ -6,7 +6,7 @@ lazily on demand; nothing is copied to local storage. Virtual shares are a separ
 local shares and are available in the Web host only.
 
 Related: [Connections and credentials](connections-and-credentials.md) · [Providers](providers.md) ·
-[Downloads and share links](../interfaces/downloads-and-share-links.md)
+[Downloads and share links](../external-access/downloads-and-share-links.md)
 
 ## Model
 

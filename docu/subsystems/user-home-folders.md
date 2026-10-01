@@ -5,7 +5,7 @@ each home is the folder `users/<userId>`. Privacy is expressed entirely through 
 so every transport (web, REST, WebDAV, SMB) enforces it without special code paths.
 
 Related: [Security model](../architecture/security-model.md) ·
-[Samba VFS integration](../smb/samba-vfs-integration.md) · [REST API v1](../interfaces/rest-api-v1.md)
+[Samba VFS integration](../external-access/smb/samba-vfs-integration.md) · [REST API v1](../external-access/rest-api.md)
 
 ## Share
 

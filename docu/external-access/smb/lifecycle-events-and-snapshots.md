@@ -7,7 +7,7 @@ This document describes both flows.
 
 Related: [Samba VFS integration](samba-vfs-integration.md) ·
 [Control plane (gRPC)](control-plane-grpc.md) ·
-[Storage and persistence](../architecture/storage-and-persistence.md)
+[Storage and persistence](../../architecture/storage-and-persistence.md)
 
 ## Lifecycle events
 

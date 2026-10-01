@@ -6,7 +6,7 @@ Code paths are relative to the repository root (`Kaimo_File_Server/`).
 
 Related: [Storage and persistence](storage-and-persistence.md) ·
 [Security model](security-model.md) · [Background services](background-services.md) ·
-[Samba VFS integration](../smb/samba-vfs-integration.md)
+[Samba VFS integration](../external-access/smb/samba-vfs-integration.md)
 
 ## Runtime topology
 

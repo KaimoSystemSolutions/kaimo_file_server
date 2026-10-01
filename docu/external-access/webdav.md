@@ -5,7 +5,7 @@ Kaimo File Server exposes every enabled local share over WebDAV (RFC 4918, class
 versioning, ownership, the change log and read-only demo mode apply exactly as for the web UI, the
 REST API and SMB.
 
-Related: [REST API v1](rest-api-v1.md) · [Security model](../architecture/security-model.md) ·
+Related: [REST API v1](rest-api.md) · [Security model](../architecture/security-model.md) ·
 [WebDAV client setup](../operations/webdav-client-setup.md)
 
 ## Placement

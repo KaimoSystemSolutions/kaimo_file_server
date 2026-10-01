@@ -4,7 +4,7 @@ A small, dependency-free **tkinter** prototype for exercising the client
 API (`/api/v1`) by hand while developing the server. It is a developer tool, not
 an automated test — use it to poke the running server and watch what happens.
 
-See the API reference in [`docu/interfaces/rest-api-v1.md`](../../docu/interfaces/rest-api-v1.md).
+See the API reference in [`docu/external-access/rest-api.md`](../../docu/external-access/rest-api.md).
 
 ## Prerequisites
 

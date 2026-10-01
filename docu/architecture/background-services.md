@@ -52,7 +52,7 @@ mapping.
 
 Not .NET services, but long-running loops supervised by `src/samba-vfs/supervise-samba.sh`:
 `kaimo_authd` and the periodic user, share and configuration sync jobs. See
-[Samba VFS integration](../smb/samba-vfs-integration.md).
+[Samba VFS integration](../external-access/smb/samba-vfs-integration.md).
 
 ## Coordination patterns
 
@@ -93,4 +93,4 @@ the runtime to it and publish status back. No process calls another to switch a 
 
 SMB lifecycle events are spooled to disk inside the Samba container, delivered to the bridge with
 retries and deduplicated by event ID through `samba_lifecycle_event_receipts`. See
-[SMB lifecycle events and snapshots](../smb/lifecycle-events-and-snapshots.md).
+[SMB lifecycle events and snapshots](../external-access/smb/lifecycle-events-and-snapshots.md).

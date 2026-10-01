@@ -7,7 +7,7 @@ notified. This document covers the Samba side and the local decision path.
 
 Related: [Control plane (gRPC)](control-plane-grpc.md) ·
 [Lifecycle events and snapshots](lifecycle-events-and-snapshots.md) ·
-[Security model](../architecture/security-model.md)
+[Security model](../../architecture/security-model.md)
 
 Source: `src/samba-vfs/` (GPL-3.0-or-later; the rest of the repository is AGPL-3.0-or-later. The
 two license domains meet only at the socket/gRPC boundary.)

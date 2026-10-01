@@ -1,7 +1,7 @@
 # WebDAV Client Setup
 
 How to connect WebDAV clients to Kaimo File Server. The server side is described in
-[WebDAV server](../interfaces/webdav.md). The service is disabled by default and is switched on with
+[WebDAV server](../external-access/webdav.md). The service is disabled by default and is switched on with
 the data-service setting `services.webdav.enabled`.
 
 ## Address form

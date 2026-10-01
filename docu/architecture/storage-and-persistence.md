@@ -6,7 +6,7 @@ these stores relate to each other.
 
 Related: [System overview](system-overview.md) · [Domain model](domain-model.md) ·
 [Background services](background-services.md) ·
-[SMB lifecycle events and snapshots](../smb/lifecycle-events-and-snapshots.md)
+[SMB lifecycle events and snapshots](../external-access/smb/lifecycle-events-and-snapshots.md)
 
 ## State at a glance
 
@@ -114,7 +114,7 @@ Implemented by `FileVersionService` (`src/Kaimo_File_Server.Core/Services/File/F
 The SMB bridge materializes "Previous Versions" (@GMT tokens) into
 `/data/kaimo-system/.kaimo-snapshots/<share>/`, outside every share. The cache is rebuildable, bounded
 per share and evicted by TTL (`Snapshots__Cache__*` settings). Details:
-[SMB lifecycle events and snapshots](../smb/lifecycle-events-and-snapshots.md).
+[SMB lifecycle events and snapshots](../external-access/smb/lifecycle-events-and-snapshots.md).
 
 ## Change log
 

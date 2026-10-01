@@ -90,7 +90,7 @@ erDiagram
 | `ClientRequestReceipt` | `client_request_receipts` | Stored responses for `Idempotency-Key` replays |
 | `FileChangeLogEntry` | `file_change_log` | Append-only per-share change feed |
 
-See [REST API v1](../interfaces/rest-api-v1.md).
+See [REST API v1](../external-access/rest-api.md).
 
 ## Notifications
 

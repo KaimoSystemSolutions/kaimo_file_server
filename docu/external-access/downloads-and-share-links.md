@@ -4,7 +4,7 @@ The Web host serves file bytes to browsers through plain HTTP endpoints rather t
 Blazor Server circuit, and exposes public download and upload links for anonymous visitors. This
 document describes the ticket mechanism behind both and the share-link model.
 
-Related: [REST API v1](rest-api-v1.md) · [Security model](../architecture/security-model.md) ·
+Related: [REST API v1](rest-api.md) · [Security model](../architecture/security-model.md) ·
 [Mail notifications](../subsystems/mail-notifications.md)
 
 ## Ticket-based downloads

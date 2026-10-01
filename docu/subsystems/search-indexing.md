@@ -7,7 +7,7 @@ ever waits on Elasticsearch. Every result passes the same ACL filter.
 
 Related: [Background services](../architecture/background-services.md) ·
 [Storage and persistence](../architecture/storage-and-persistence.md) ·
-[REST API v1](../interfaces/rest-api-v1.md#32-search)
+[Search API](../external-access/search-api.md)
 
 Source: `src/Kaimo_File_Server.Search/`, `src/Kaimo_File_Server.Infrastructure/Services/SearchIndexingService.cs`
 
