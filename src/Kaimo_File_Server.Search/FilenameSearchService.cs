@@ -1,5 +1,6 @@
 using Kaimo_File_Server.Core.Domain;
 using Kaimo_File_Server.Core.Domain.Identity;
+using Kaimo_File_Server.Core.Helpers;
 using Kaimo_File_Server.Core.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,12 @@ public sealed class FilenameSearchService
     // Over-fetch before ACL filtering so dropping unauthorized hits still leaves
     // enough to display; also bounds the filesystem walk on huge trees.
     private const int RawFetchSize = 200;
+
+    // Each search walks whole directory trees, so concurrent walks are capped
+    // process-wide; further searches wait (bounded by the caller's token) instead
+    // of letting a burst of requests saturate the disks.
+    // ponytail: fixed cap of 2 walks; make configurable if large installs need more
+    private static readonly SemaphoreSlim WalkSlots = new(2, 2);
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly SearchAclFilter _aclFilter;
@@ -41,7 +48,17 @@ public sealed class FilenameSearchService
         if (user is null || string.IsNullOrWhiteSpace(searchText))
             return new List<FileDocument>();
 
-        var raw = await CollectRawMatchesAsync(searchText, shareName, pathPrefix, ct);
+        List<FileDocument> raw;
+        await WalkSlots.WaitAsync(ct);
+        try
+        {
+            raw = await CollectRawMatchesAsync(searchText, shareName, pathPrefix, ct);
+        }
+        finally
+        {
+            WalkSlots.Release();
+        }
+
         if (raw.Count == 0)
             return raw;
 
@@ -73,22 +90,26 @@ public sealed class FilenameSearchService
                 .Where(s => string.Equals(s.Name, shareName, StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
+        // SECURITY: the prefix is untrusted (it reaches the client API). A traversal or
+        // otherwise invalid prefix yields no results instead of walking outside a share.
         var relativePrefix = (pathPrefix ?? string.Empty).Replace('\\', '/').Trim('/');
+        if (!ShareRelativePath.TryNormalizeStrict(relativePrefix, out relativePrefix))
+            return results;
 
         foreach (var share in shares)
         {
             ct.ThrowIfCancellationRequested();
 
-            // Start the walk at the scoped subfolder when one is given, so "this
-            // folder and below" is honored; otherwise at the share root.
-            var walkRoot = relativePrefix.Length == 0
-                ? share.Path
-                : Path.Combine(share.Path, relativePrefix.Replace('/', Path.DirectorySeparatorChar));
-            if (!Directory.Exists(walkRoot))
-                continue;
-
             try
             {
+                // Start the walk at the scoped subfolder when one is given, so "this
+                // folder and below" is honored; otherwise at the share root. Resolved
+                // with a containment check as a second line of defense.
+                var walkRoot = ShareRelativePath.ToContainedAbsolutePath(
+                    share.Path, relativePrefix, allowInternalNamespace: false);
+                if (!Directory.Exists(walkRoot))
+                    continue;
+
                 var options = new EnumerationOptions
                 {
                     RecurseSubdirectories = true,

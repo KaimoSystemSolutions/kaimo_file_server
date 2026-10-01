@@ -63,6 +63,10 @@ public partial class GlobalSearch : IDisposable
     private bool _isSearching;
     private CancellationTokenSource? _searchCts;
 
+    // Same cap as the client API: in filename-fallback mode a search holds one of the
+    // process-wide walk slots, so an unbounded UI search would starve all others.
+    private static readonly TimeSpan SearchTimeout = TimeSpan.FromSeconds(10);
+
     private UserContext? _user;
 
     // Context, refreshed on every navigation.
@@ -246,6 +250,7 @@ public partial class GlobalSearch : IDisposable
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
+            EndTimedOutSearch(token);
         }
     }
 
@@ -313,14 +318,25 @@ public partial class GlobalSearch : IDisposable
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
+            EndTimedOutSearch(token);
         }
     }
 
     private CancellationToken NewSearchToken()
     {
         _searchCts?.Cancel();
-        _searchCts = new CancellationTokenSource();
+        _searchCts = new CancellationTokenSource(SearchTimeout);
         return _searchCts.Token;
+    }
+
+    /// <summary>
+    /// A cancelled search that is still the current one hit <see cref="SearchTimeout"/>
+    /// (a superseded one was replaced by a newer search): stop the spinner.
+    /// </summary>
+    private void EndTimedOutSearch(CancellationToken token)
+    {
+        if (_searchCts?.Token == token)
+            ResetResults();
     }
 
     private async Task ExecuteSearchAsync(CancellationToken token)
@@ -346,7 +362,10 @@ public partial class GlobalSearch : IDisposable
             : new List<SearchDestination>();
 
         if (token.IsCancellationRequested)
+        {
+            EndTimedOutSearch(token);
             return;
+        }
 
         _fileResults = files
             .GroupBy(f => f.Id)

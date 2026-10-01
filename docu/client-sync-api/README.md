@@ -65,7 +65,7 @@ These rules are fixed and must be preserved by all clients and by the server:
 ## Contents
 1. [Concepts](#1-concepts)
 2. [Authentication & devices](#2-authentication--devices)
-3. [Browsing](#3-browsing) · [3.1 Safe mutations: conditional requests & idempotency keys](#31-safe-mutations-conditional-requests--idempotency-keys)
+3. [Browsing](#3-browsing) · [3.1 Safe mutations: conditional requests & idempotency keys](#31-safe-mutations-conditional-requests--idempotency-keys) · [3.2 Search](#32-search)
 4. [Sync](#4-sync)
 5. [Change notification & battery model](#5-change-notification--battery-model)
 6. [Error format](#6-error-format)
@@ -217,6 +217,44 @@ and the item tag you last saw; on (re)connect, replay each op with
 `Idempotency-Key: <opId>` and `If-Match: <tag>`. A `2xx` (or a replayed one) → done; a
 `412` → a genuine conflict to resolve (e.g. keep-both); a network error → keep the op and
 retry later.
+
+### 3.2 Search
+
+`POST /api/v1/search` searches file names and content (Elasticsearch, falling back to
+a file-name-only search when the index is disabled or unreachable). Every hit has
+passed the same ACL filter as the web UI (`ListReadData`, fail-closed), so a caller
+only ever sees items they may read.
+
+The request is a JSON body rather than a query string, so search terms never land in
+URL or reverse-proxy access logs:
+```jsonc
+{ "q": "invoice 2026",   // required, 2–100 chars, no control characters
+  "shareId": "…",        // optional: restrict to one share
+  "path": "projects/a",  // optional, requires shareId: that folder and below
+  "limit": 25 }          // optional, 1–50 (default 25)
+```
+Response (`Cache-Control: no-store`):
+```jsonc
+[ { "shareId": "…", "shareName": "docs", "path": "projects/a/invoice.pdf",
+    "name": "invoice.pdf", "isDirectory": false, "fileType": "pdf",
+    "size": 48213,
+    "snippet": [ { "text": "… the ", "highlighted": false },
+                 { "text": "invoice", "highlighted": true },
+                 { "text": " for …", "highlighted": false } ] } ]
+```
+- Open a hit through the browse endpoints with `shareId` + `path`. Hits in the
+  caller's home folder carry the home share's id and the display name `user`; their
+  `path` includes the `RootPath` from `browse/shares`.
+- Hits carry no modification time (the index only knows when an item was indexed);
+  read timestamps from the browse endpoints.
+- `snippet` is pre-split into plain-text segments. Render them as text (e.g. styled
+  `TextSpan`s); the API never returns markup.
+- Errors: `invalid_query` / `invalid_path` (400), `not_found` (404, unknown or disabled
+  share), `rate_limited` (429, honor `Retry-After`), `search_timeout` (503, a search is
+  capped at 10 s).
+- Rate limit: per user, a burst of 10 requests, then one every 2 s. Clients should
+  debounce input (≥ 250 ms), require at least 2 characters, and cancel the previous
+  request when the query changes.
 
 ---
 
@@ -380,9 +418,9 @@ Every error uses a uniform envelope with a **stable, non-localized machine code*
 { "code": "forbidden", "message": "Access denied." }
 ```
 Common codes: `unauthorized` (401), `forbidden` (403), `not_found` (404),
-`invalid_path` / `invalid_request` / `invalid_timestamp` / `invalid_idempotency_key` (400),
-`precondition_failed` (412), `idempotency_key_conflict` (422), `conflict` (409),
-`locked_out` (429). Clients should branch on `code`, not on `message` (the message
+`invalid_path` / `invalid_request` / `invalid_timestamp` / `invalid_idempotency_key` /
+`invalid_query` (400), `precondition_failed` (412), `idempotency_key_conflict` (422),
+`conflict` (409), `locked_out` / `rate_limited` (429), `search_timeout` (503). Clients should branch on `code`, not on `message` (the message
 is an English developer hint; user-facing text is localized in the app).
 
 > **OpenAPI note.** The generated `/openapi/v1.json` describes the routes, bodies, and
@@ -407,6 +445,11 @@ is an English developer hint; user-facing text is localized in the app).
   file access.
 - `changes/wait` requires list access on the watched subtree, so it cannot be used
   to probe for hidden content.
+- Search results are ACL-filtered before they leave the search service and never
+  include server paths, internal ids or indexed full text. Search text is only ever
+  used in `match` queries (no Elasticsearch query-DSL injection) and is not logged.
+  Requests are rate-limited per user and time-boxed, and concurrent file-name walks
+  (fallback mode) are capped process-wide.
 
 ---
 
@@ -421,6 +464,8 @@ is an English developer hint; user-facing text is localized in the app).
   appended on every mutation through every transport, exposed as
   `GET /sync/{shareId}/changes?since=N` and as the token behind the seq-based `changes/wait`
   (see [§4](#4-sync)). Detects renames and net-zero changes, closing the coarse-token gap.
+- **Search endpoint** — `POST /api/v1/search` over the ACL-checked `ISearchService`,
+  rate-limited and time-boxed (see [§3.2](#32-search)).
 
 **Next**
 - **Change-log retention** — a background job pruning old `file_change_log` entries
@@ -429,8 +474,6 @@ is an English developer hint; user-facing text is localized in the app).
 - **Client baseline + operation outbox** — a persisted last-synced snapshot and a durable
   device-side journal that replays queued renames/deletes on reconnect using the mechanisms in
   §3.1; enables true two-way delete/rename propagation and conflict handling.
-- **Search endpoint** — a thin `GET /api/v1/search` over the ACL-checked `ISearchService`
-  (Elasticsearch with filename fallback), server-side rate-limited; clients debounce input.
 - **Idempotency receipt pruning** — a background job calling
   `IClientRequestReceiptRepository.PruneOlderThanAsync` (not yet wired).
 - **Native push** (FCM/APNs) for battery-optimal mobile wake-ups.

@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using System.Threading.RateLimiting;
 using Kaimo_File_Server.Core.Repositories;
 using Kaimo_File_Server.Core.Security;
 using Kaimo_File_Server.Core.Services;
@@ -14,6 +16,7 @@ using Kaimo_File_Server.Infrastructure.Services;
 using Kaimo_File_Server.Search;
 using Kaimo_File_Server.Web.Components;
 using Kaimo_File_Server.Web.Components.ViewModels;
+using Kaimo_File_Server.Web.Controllers.Api;
 using Kaimo_File_Server.Web.Controllers.WebDav;
 using Kaimo_File_Server.Web.Middleware;
 using Kaimo_File_Server.Web.Services;
@@ -22,6 +25,7 @@ using Kaimo_File_Server.Web.Services.Https;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -178,6 +182,35 @@ builder.Services.AddScoped<ILoginService>(sp => new MonitoredLoginService(
 
 // Issues/rotates client-API access + refresh tokens.
 builder.Services.AddScoped<ApiTokenService>();
+
+// Per-user throttling for expensive client-API endpoints (currently search, which may
+// walk whole directory trees when Elasticsearch is down). Partitioned by the JWT subject,
+// falling back to the client address (already resolved through trusted proxies only).
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy(SearchApiController.RateLimitPolicy, context =>
+        RateLimitPartition.GetTokenBucketLimiter(
+            context.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? context.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown",
+            _ => new TokenBucketRateLimiterOptions
+            {
+                TokenLimit = 10,                              // burst
+                TokensPerPeriod = 1,
+                ReplenishmentPeriod = TimeSpan.FromSeconds(2), // sustained: 30/min
+                QueueLimit = 0
+            }));
+
+    options.OnRejected = async (context, ct) =>
+    {
+        var response = context.HttpContext.Response;
+        response.StatusCode = StatusCodes.Status429TooManyRequests;
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+            response.Headers.RetryAfter = ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+        await response.WriteAsJsonAsync(
+            new ApiError("rate_limited", "Too many requests. Retry later."), ct);
+    };
+});
 
 // OpenAPI document for per-platform client code generation (served at /openapi/v1.json).
 builder.Services.AddOpenApi("v1");
@@ -501,6 +534,9 @@ app.UseMiddleware<SecurityMonitorMiddleware>();
 // controllers see the JWT-derived principal. Blazor keeps its own cascading auth.
 app.UseAuthentication();
 app.UseAuthorization();
+
+// After authentication, so rate-limit partitions see the JWT subject.
+app.UseRateLimiter();
 
 // While the WebDAV service is switched off, short-circuit /dav with 503 before the
 // endpoint runs. In-process, so no reconciler — the flag is read with a 5s cache.
