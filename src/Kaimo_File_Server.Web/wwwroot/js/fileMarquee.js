@@ -253,6 +253,16 @@ window.fileMarquee = (() => {
             void dotNetRef.invokeMethodAsync('ClearSelectionOnEscape');
         }, options);
 
+        // Ctrl+A selects all files instead of the page text, page-level like
+        // Escape so it works wherever focus is. Text fields keep native behavior.
+        document.addEventListener('keydown', event => {
+            if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'a') return;
+            if (event.target.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+            event.preventDefault();
+            if (event.repeat || event.target.closest?.('.modal-backdrop')) return;
+            void dotNetRef.invokeMethodAsync('SelectAllFiles');
+        }, options);
+
         host.addEventListener('click', event => {
             if (!suppressClick) return;
             suppressClick = false;

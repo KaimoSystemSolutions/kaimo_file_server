@@ -175,20 +175,32 @@ public partial class FileBrowser
     [JSInvokable]
     public Task ClearSelectionOnEscape()
     {
-        if (_showCreateFolder || _showDeleteConfirm || _showRenameDialog || _showCloudToLocal ||
-            _filePreviewComponent?.IsOpen == true || _versionDialogComponent?.IsOpen == true ||
-            _propertiesDialogComponent?.IsOpen == true || _hashDialogComponent?.IsOpen == true ||
-            _contextMenuComponent?.IsOpen == true)
-        {
-            return Task.CompletedTask;
-        }
-
-        if (_selectedItems.Count == 0)
+        if (IsOverlayOpen || _selectedItems.Count == 0)
             return Task.CompletedTask;
 
         _selectedItems.Clear();
         return InvokeAsync(StateHasChanged);
     }
+
+    /// <summary>
+    /// Selects every entry of the current directory for a page-level Ctrl+A,
+    /// provided no dialog or context menu currently owns the keyboard.
+    /// </summary>
+    [JSInvokable]
+    public Task SelectAllFiles()
+    {
+        if (IsOverlayOpen)
+            return Task.CompletedTask;
+
+        _selectedItems.UnionWith(VM.Directories.Cast<FileMetadata>().Concat(VM.Files));
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private bool IsOverlayOpen =>
+        _showCreateFolder || _showDeleteConfirm || _showRenameDialog || _showCloudToLocal ||
+        _filePreviewComponent?.IsOpen == true || _versionDialogComponent?.IsOpen == true ||
+        _propertiesDialogComponent?.IsOpen == true || _hashDialogComponent?.IsOpen == true ||
+        _contextMenuComponent?.IsOpen == true;
 
     // ========== Toolbar Actions ==========
 
